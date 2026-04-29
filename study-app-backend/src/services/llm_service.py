@@ -1,0 +1,462 @@
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass
+
+import httpx
+
+from src.config import settings
+from src.schemas.attempt_schema import FRQGrade
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+@dataclass(frozen=True)
+class GeneratedMCQ:
+    question_text: str
+    options: list[str]
+    correct_index: int
+
+
+@dataclass(frozen=True)
+class GeneratedFRQ:
+    question_text: str
+    expected_answer: str
+
+
+@dataclass(frozen=True)
+class GeneratedFlashcard:
+    front: str
+    back: str
+
+
+@dataclass(frozen=True)
+class _ExtractedTerm:
+    term: str
+    definition: str
+
+
+@dataclass(frozen=True)
+class _StudyContent:
+    title: str
+    terms: list[_ExtractedTerm]
+    concepts: list[str]
+
+
+_EXTRACT_CHAR_LIMIT = 10_000
+_GENERATE_CHAR_LIMIT = 8_000
+
+
+class LLMService:
+    async def generate_test_questions(
+        self,
+        notes: str,
+        test_type: str,
+        count_mcq: int = 10,
+        count_frq: int = 5,
+    ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
+        if test_type == "MCQ_only":
+            count_frq = 0
+        elif test_type == "FRQ_only":
+            count_mcq = 0
+
+        # Strip file metadata (YAML frontmatter, doc markers) before any LLM pass.
+        cleaned = self._strip_metadata(notes)
+
+        # Pass 1: extract structured study content from the cleaned notes.
+        study = await self._extract_study_content(cleaned)
+
+        # Pass 2: generate questions from the clean structured content.
+        prompt = self._build_generation_prompt(study, count_mcq, count_frq)
+        try:
+            data = await self._complete_json(prompt)
+            return self._parse_generated_test(data, count_mcq, count_frq, cleaned)
+        except Exception as exc:
+            logger.warning("LLM test generation failed; using deterministic fallback: %s", exc)
+            return self._fallback_questions(cleaned, count_mcq, count_frq)
+
+    async def _extract_study_content(self, notes: str) -> _StudyContent:
+        prompt = (
+            "Analyze the study notes below and return JSON with exactly these keys:\n"
+            "- title: the subject or chapter title (string, empty string if none found)\n"
+            "- terms: array of objects with 'term' (string) and 'definition' (string) "
+            "for every vocabulary term, key concept, or defined idea in the notes\n"
+            "- concepts: array of strings, each a core fact, rule, or idea worth testing "
+            "(not the same as terms — these are statements, not definitions)\n\n"
+            "RULES:\n"
+            "- DO NOT include authors, publication dates, page numbers, URLs, or citation info\n"
+            "- DO NOT include the title itself as a term or concept\n"
+            "- Extract as many terms and concepts as exist in the notes — be thorough\n"
+            "- Keep each definition and concept concise but complete\n\n"
+            "Return JSON only. Example format:\n"
+            '{"title":"Cell Biology","terms":[{"term":"Mitosis",'
+            '"definition":"Process of cell division producing two genetically identical cells"}],'
+            '"concepts":["The cell cycle has four phases: G1, S, G2, and M"]}\n\n'
+            f"NOTES:\n{notes[:_EXTRACT_CHAR_LIMIT]}"
+        )
+        try:
+            data = await self._complete_json(prompt)
+            title = str(data.get("title", "")).strip()
+            raw_terms = data.get("terms", [])
+            raw_concepts = data.get("concepts", [])
+            terms = [
+                _ExtractedTerm(term=str(t.get("term", "")).strip(), definition=str(t.get("definition", "")).strip())
+                for t in (raw_terms if isinstance(raw_terms, list) else [])
+                if isinstance(t, dict) and t.get("term") and t.get("definition")
+            ]
+            concepts = [
+                str(c).strip()
+                for c in (raw_concepts if isinstance(raw_concepts, list) else [])
+                if isinstance(c, str) and c.strip()
+            ]
+            if terms or concepts:
+                logger.info("Extracted %d terms and %d concepts from notes", len(terms), len(concepts))
+                return _StudyContent(title=title, terms=terms, concepts=concepts)
+        except Exception as exc:
+            logger.warning("Study content extraction failed; falling back to raw notes: %s", exc)
+
+        # Extraction failed — treat raw sentences as concepts so generation still works.
+        return _StudyContent(title="", terms=[], concepts=self._sentences(notes)[:40])
+
+    def _build_generation_prompt(
+        self, study: _StudyContent, count_mcq: int, count_frq: int
+    ) -> str:
+        context_header = f'SUBJECT: "{study.title}"\n\n' if study.title else ""
+
+        terms_block = ""
+        if study.terms:
+            lines = "\n".join(
+                f"  - {t.term}: {t.definition}" for t in study.terms[:60]
+            )
+            terms_block = f"TERMS AND DEFINITIONS:\n{lines}\n\n"
+
+        concepts_block = ""
+        if study.concepts:
+            lines = "\n".join(f"  - {c}" for c in study.concepts[:40])
+            concepts_block = f"KEY CONCEPTS AND FACTS:\n{lines}\n\n"
+
+        mcq_instructions = ""
+        if count_mcq > 0:
+            mcq_instructions = (
+                f"Generate exactly {count_mcq} MCQ questions.\n"
+                "MCQ rules:\n"
+                "  - Each question must test understanding of a SPECIFIC term, definition, or concept above\n"
+                "  - Wrong answer options must be plausible but clearly incorrect\n"
+                "  - Do NOT ask 'what is the title of...' or reference authors/sources\n"
+                "  - Vary question style: some ask for the definition, some apply the concept\n"
+            )
+
+        frq_instructions = ""
+        if count_frq > 0:
+            frq_instructions = (
+                f"Generate exactly {count_frq} FRQ questions.\n"
+                "FRQ rules:\n"
+                "  - Ask the student to explain, compare, or apply a concept from the list above\n"
+                "  - Each expected_answer must be a complete, accurate explanation (2–4 sentences)\n"
+                "  - Do NOT ask students to list titles, authors, or sources\n"
+            )
+
+        return (
+            "You are building a study test. Use ONLY the terms, definitions, and concepts "
+            "below as source material — do not invent facts.\n\n"
+            f"{context_header}"
+            f"{terms_block}"
+            f"{concepts_block}"
+            f"{mcq_instructions}\n"
+            f"{frq_instructions}\n"
+            "Return JSON only with keys mcq and frq.\n"
+            "mcq items: {question_text, options: [4 strings], correct_index: 0-3}\n"
+            "frq items: {question_text, expected_answer}\n"
+        )
+
+    async def grade_frq_answer(
+        self,
+        notes: str,
+        question: str,
+        expected_answer: str,
+        user_answer: str,
+    ) -> FRQGrade:
+        prompt = f"""
+You are a grading assistant. Grade ONLY from the provided notes.
+
+NOTES:
+{notes[:12000]}
+
+QUESTION:
+{question}
+
+EXPECTED ANSWER:
+{expected_answer}
+
+USER ANSWER:
+{user_answer}
+
+Return JSON only:
+{{"is_correct": true/false, "feedback": "brief explanation", "flagged_uncertain": true/false, "confidence": 0.0-1.0}}
+If the notes do not support grading, set flagged_uncertain true and confidence 0.0.
+"""
+        try:
+            data = await self._complete_json(prompt)
+            return FRQGrade(
+                is_correct=bool(data.get("is_correct", False)),
+                feedback=str(data.get("feedback", ""))[:2000],
+                flagged_uncertain=bool(data.get("flagged_uncertain", False)),
+                confidence=max(0.0, min(1.0, float(data.get("confidence", 0.0)))),
+            )
+        except Exception as exc:
+            logger.warning("LLM FRQ grading failed; using simple fallback: %s", exc)
+            return self._fallback_grade(expected_answer, user_answer)
+
+    async def generate_flashcards(
+        self, content: str, count: int, prompt: str | None = None
+    ) -> list[GeneratedFlashcard]:
+        llm_prompt = (
+            f"Generate {count} flashcards. Return JSON only with key flashcards, "
+            "an array of objects with front and back.\n"
+            f"TOPIC: {prompt or 'Use the provided study content'}\nCONTENT:\n{content[:12000]}"
+        )
+        try:
+            data = await self._complete_json(llm_prompt)
+            cards = data.get("flashcards", [])
+            if not isinstance(cards, list):
+                raise ValueError("flashcards was not a list")
+            parsed = [
+                GeneratedFlashcard(front=str(card.get("front", "")), back=str(card.get("back", "")))
+                for card in cards
+                if isinstance(card, dict) and card.get("front") and card.get("back")
+            ]
+            return parsed[:count] or self._fallback_flashcards(content, count, prompt)
+        except Exception as exc:
+            logger.warning("LLM flashcard generation failed; using fallback: %s", exc)
+            return self._fallback_flashcards(content, count, prompt)
+
+    async def call_kojo(self, prompt: str) -> str:
+        try:
+            if settings.groq_api_key:
+                return await self._complete_text_groq(prompt)
+            return await self._complete_text_ollama(prompt)
+        except Exception as exc:
+            from src.utils.exceptions import LLMException
+            raise LLMException(f"Kojo error: {exc}") from exc
+
+    async def _complete_text_ollama(self, prompt: str) -> str:
+        async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
+            response = await client.post(
+                f"{settings.ollama_base_url.rstrip('/')}/api/generate",
+                json={
+                    "model": settings.ollama_model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {"num_predict": settings.llm_max_tokens},
+                },
+            )
+            response.raise_for_status()
+        return str(response.json().get("response", "")).strip()
+
+    async def _complete_text_groq(self, prompt: str) -> str:
+        async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
+            response = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {settings.groq_api_key}"},
+                json={
+                    "model": "llama-3.1-8b-instant",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.7,
+                    "max_tokens": settings.llm_max_tokens,
+                },
+            )
+            response.raise_for_status()
+        return str(response.json()["choices"][0]["message"]["content"]).strip()
+
+    async def _complete_json(self, prompt: str) -> dict[str, object]:
+        if settings.groq_api_key:
+            return await self._complete_groq(prompt)
+        return await self._complete_ollama(prompt)
+
+    async def _complete_ollama(self, prompt: str) -> dict[str, object]:
+        async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
+            response = await client.post(
+                f"{settings.ollama_base_url.rstrip('/')}/api/generate",
+                json={
+                    "model": settings.ollama_model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "format": "json",
+                    "options": {"num_predict": settings.llm_max_tokens},
+                },
+            )
+            response.raise_for_status()
+            payload = response.json()
+        return self._loads_json(str(payload.get("response", "{}")))
+
+    async def _complete_groq(self, prompt: str) -> dict[str, object]:
+        async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
+            response = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {settings.groq_api_key}"},
+                json={
+                    "model": "llama-3.1-8b-instant",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.2,
+                    "max_tokens": settings.llm_max_tokens,
+                    "response_format": {"type": "json_object"},
+                },
+            )
+            response.raise_for_status()
+            payload = response.json()
+        content = payload["choices"][0]["message"]["content"]
+        return self._loads_json(str(content))
+
+    def _loads_json(self, raw: str) -> dict[str, object]:
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            match = re.search(r"\{.*\}", raw, flags=re.DOTALL)
+            if match is None:
+                raise
+            parsed = json.loads(match.group(0))
+        if not isinstance(parsed, dict):
+            raise ValueError("LLM response was not a JSON object")
+        return parsed
+
+    def _is_valid_mcq(self, item: object) -> bool:
+        if not isinstance(item, dict):
+            return False
+        options = item.get("options")
+        if not isinstance(options, list) or len(options) < 4:
+            return False
+        question = str(item.get("question_text", ""))
+        if re.search(r"which statement is supported", question, re.IGNORECASE):
+            return False
+        for text in [question] + [str(o) for o in options]:
+            if "---" in text or text.strip().startswith("#") or len(text) > 400:
+                return False
+            if re.match(r"^[a-z][a-z_]+:\s", text.strip()):
+                return False
+        return bool(question.strip())
+
+    def _is_valid_frq(self, item: object) -> bool:
+        if not isinstance(item, dict):
+            return False
+        question = str(item.get("question_text", "")).strip()
+        answer = str(item.get("expected_answer", "")).strip()
+        if not question or not answer:
+            return False
+        if re.match(r"explain this idea from the notes:", question, re.IGNORECASE):
+            return False
+        if "---" in question[:100] or question.startswith("#"):
+            return False
+        return True
+
+    def _parse_generated_test(
+        self, data: dict[str, object], count_mcq: int, count_frq: int, notes: str
+    ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
+        mcq_raw = data.get("mcq", [])
+        frq_raw = data.get("frq", [])
+        mcq: list[GeneratedMCQ] = []
+        frq: list[GeneratedFRQ] = []
+        if isinstance(mcq_raw, list):
+            for item in mcq_raw:
+                if self._is_valid_mcq(item):
+                    options = [str(o) for o in item["options"]][:4]  # type: ignore[index]
+                    mcq.append(
+                        GeneratedMCQ(
+                            question_text=str(item.get("question_text", "Study question")),  # type: ignore[union-attr]
+                            options=options,
+                            correct_index=max(0, min(3, int(item.get("correct_index", 0)))),  # type: ignore[union-attr]
+                        )
+                    )
+        if isinstance(frq_raw, list):
+            for item in frq_raw:
+                if self._is_valid_frq(item):
+                    frq.append(
+                        GeneratedFRQ(
+                            question_text=str(item.get("question_text", "")).strip(),  # type: ignore[union-attr]
+                            expected_answer=str(item.get("expected_answer", "")).strip(),  # type: ignore[union-attr]
+                        )
+                    )
+        if len(mcq) < count_mcq or len(frq) < count_frq:
+            fallback_mcq, fallback_frq = self._fallback_questions(notes, count_mcq, count_frq)
+            mcq = (mcq + fallback_mcq)[:count_mcq]
+            frq = (frq + fallback_frq)[:count_frq]
+        return mcq[:count_mcq], frq[:count_frq]
+
+    def _fallback_questions(
+        self, notes: str, count_mcq: int, count_frq: int
+    ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
+        snippets = self._sentences(notes)
+        if not snippets:
+            snippets = ["Review the uploaded notes and identify the most important idea."]
+        mcq = [
+            GeneratedMCQ(
+                question_text=f"Which statement is supported by the notes? ({index + 1})",
+                options=[
+                    snippets[index % len(snippets)],
+                    "A detail that is not established in the uploaded notes.",
+                    "A conclusion unrelated to the provided material.",
+                    "An unsupported definition not found in the notes.",
+                ],
+                correct_index=0,
+            )
+            for index in range(count_mcq)
+        ]
+        frq = [
+            GeneratedFRQ(
+                question_text=f"Explain this idea from the notes: {snippets[index % len(snippets)][:120]}",
+                expected_answer=snippets[index % len(snippets)],
+            )
+            for index in range(count_frq)
+        ]
+        return mcq, frq
+
+    def _fallback_grade(self, expected_answer: str, user_answer: str) -> FRQGrade:
+        expected_terms = {word.lower() for word in re.findall(r"[A-Za-z]{4,}", expected_answer)}
+        user_terms = {word.lower() for word in re.findall(r"[A-Za-z]{4,}", user_answer)}
+        overlap = len(expected_terms & user_terms)
+        confidence = overlap / max(1, min(len(expected_terms), 8))
+        is_correct = confidence >= settings.llm_uncertainty_threshold
+        return FRQGrade(
+            is_correct=is_correct,
+            feedback="Graded with keyword overlap because the LLM was unavailable.",
+            flagged_uncertain=True,
+            confidence=max(0.0, min(1.0, confidence)),
+        )
+
+    def _fallback_flashcards(
+        self, content: str, count: int, prompt: str | None = None
+    ) -> list[GeneratedFlashcard]:
+        snippets = self._sentences(content or prompt or "Study this topic")
+        return [
+            GeneratedFlashcard(
+                front=f"What should you remember about item {index + 1}?",
+                back=snippets[index % len(snippets)],
+            )
+            for index in range(count)
+        ]
+
+    def _strip_metadata(self, notes: str) -> str:
+        # Remove [filename] document markers added by the repository
+        cleaned = re.sub(r"^\[.+\]\s*$", "", notes, flags=re.MULTILINE)
+        # Remove single-line --- label --- markers (e.g. --- Document 1: file.md ---)
+        cleaned = re.sub(r"^---[^-\n].+---\s*$", "", cleaned, flags=re.MULTILINE)
+        # Remove YAML frontmatter blocks (--- ... ---), possibly multiple in one string
+        cleaned = re.sub(r"(?sm)^---\s*\n.*?\n---\s*$", "", cleaned)
+        # Remove any remaining standalone horizontal rule lines
+        cleaned = re.sub(r"^[-*=]{3,}\s*$", "", cleaned, flags=re.MULTILINE)
+        # Collapse excess blank lines
+        cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+        return cleaned.strip()
+
+    def _sentences(self, content: str) -> list[str]:
+        content = self._strip_metadata(content)
+        raw = [s.strip() for s in re.split(r"(?<=[.!?])\s+", content) if s.strip()]
+        return [
+            s[:500]
+            for s in raw
+            if len(s) > 20
+            and not s.startswith("#")
+            and "---" not in s
+            and not re.match(r"^[a-z][a-z_]+:\s", s)
+        ][:50]
