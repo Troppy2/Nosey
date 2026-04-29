@@ -242,9 +242,9 @@ export async function fetchFlashcards(folderId?: number): Promise<Flashcard[]> {
   }
 }
 
-export async function recordFlashcardAttempt(cardId: number, correct: boolean, timeMs: number) {
+export async function recordFlashcardAttempt(folderId: number, cardId: number, correct: boolean, timeMs: number) {
   try {
-    await request(`/flashcards/${cardId}/attempts`, {
+    await request(`/folders/${folderId}/flashcards/${cardId}/attempt`, {
       method: "POST",
       body: JSON.stringify({ correct, time_ms: timeMs }),
     });
