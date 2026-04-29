@@ -1,0 +1,67 @@
+import json
+from pathlib import Path
+from typing import Any, Optional
+
+from dotenv import load_dotenv
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=True)
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(extra="ignore")
+
+    database_url: str = Field(
+        default="postgresql+psycopg://user:password@localhost:5432/study_app",
+        alias="DATABASE_URL",
+    )
+    google_client_id: str = Field(default="replace-me", alias="GOOGLE_CLIENT_ID")
+    google_client_secret: str = Field(default="replace-me", alias="GOOGLE_CLIENT_SECRET")
+    jwt_secret: str = Field(default="replace-me", alias="JWT_SECRET")
+    jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
+    jwt_expiration_hours: int = Field(default=24, alias="JWT_EXPIRATION_HOURS")
+    ollama_base_url: str = Field(default="http://localhost:11434", alias="OLLAMA_BASE_URL")
+    ollama_model: str = Field(default="mistral", alias="OLLAMA_MODEL")
+    groq_api_key: Optional[str] = Field(default=None, alias="GROQ_API_KEY")
+    environment: str = Field(default="development", alias="ENVIRONMENT")
+    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+    cors_origins: list[str] = Field(
+        default_factory=lambda: ["http://localhost:3000", "http://localhost:5173"],
+        alias="CORS_ORIGINS",
+    )
+    max_file_size_bytes: int = Field(default=52_428_800, alias="MAX_FILE_SIZE_BYTES")
+    allowed_file_types: list[str] = Field(default_factory=lambda: ["pdf", "txt", "md"], alias="ALLOWED_FILE_TYPES")
+    llm_max_tokens: int = Field(default=1000, alias="LLM_MAX_TOKENS")
+    llm_timeout_seconds: int = Field(default=30, alias="LLM_TIMEOUT_SECONDS")
+    llm_uncertainty_threshold: float = Field(default=0.6, alias="LLM_UNCERTAINTY_THRESHOLD")
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value: Any) -> list[str]:
+        if isinstance(value, str):
+            stripped = value.strip()
+            if stripped.startswith("["):
+                try:
+                    return json.loads(stripped)
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            return [origin.strip() for origin in stripped.split(",") if origin.strip()]
+        return value
+
+    @field_validator("allowed_file_types", mode="before")
+    @classmethod
+    def parse_allowed_file_types(cls, value: Any) -> list[str]:
+        if isinstance(value, str):
+            stripped = value.strip()
+            if stripped.startswith("["):
+                try:
+                    return [item.lower() for item in json.loads(stripped)]
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            return [item.strip().lower() for item in stripped.split(",") if item.strip()]
+        return value
+
+
+settings = Settings()
