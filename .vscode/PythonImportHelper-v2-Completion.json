@@ -1640,6 +1640,14 @@
         "documentation": {}
     },
     {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
         "label": "asyncio",
         "kind": 6,
         "isExtraImport": true,
@@ -3457,6 +3465,14 @@
         "documentation": {}
     },
     {
+        "label": "LLMException",
+        "importPath": "src.utils.exceptions",
+        "description": "src.utils.exceptions",
+        "isExtraImport": true,
+        "detail": "src.utils.exceptions",
+        "documentation": {}
+    },
+    {
         "label": "httpx",
         "kind": 6,
         "isExtraImport": true,
@@ -4164,6 +4180,38 @@
         "documentation": {}
     },
     {
+        "label": "GeneratedFRQ",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "GeneratedFlashcard",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "GeneratedMCQ",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "LLMService",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
         "label": "AttemptRepository",
         "importPath": "src.repositories.attempt_repository",
         "description": "src.repositories.attempt_repository",
@@ -4338,6 +4386,47 @@
         "description": "src.main",
         "isExtraImport": true,
         "detail": "src.main",
+        "documentation": {}
+    },
+    {
+        "label": "contextmanager",
+        "importPath": "contextlib",
+        "description": "contextlib",
+        "isExtraImport": true,
+        "detail": "contextlib",
+        "documentation": {}
+    },
+    {
+        "label": "AsyncMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "MagicMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "patch",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "pytest",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "pytest",
+        "description": "pytest",
+        "detail": "pytest",
         "documentation": {}
     },
     {
@@ -5679,6 +5768,213 @@
         "description": "study-app-backend.src.main",
         "peekOfCode": "app = FastAPI(title=\"Study App\", version=\"0.1.0\")\napp.add_middleware(\n    CORSMiddleware,\n    allow_origins=settings.cors_origins,\n    allow_credentials=True,\n    allow_methods=[\"*\"],\n    allow_headers=[\"*\"],\n)\napp.include_router(health.router)\napp.include_router(auth.router)",
         "detail": "study-app-backend.src.main",
+        "documentation": {}
+    },
+    {
+        "label": "TestStripMetadata",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "class TestStripMetadata:\n    svc = LLMService()\n    def test_removes_yaml_frontmatter_block(self):\n        notes = \"---\\ntitle: DB Notes\\ntags: [csci, db]\\ncreated: 2026-04-26\\n---\\nReal content here.\"\n        result = self.svc._strip_metadata(notes)\n        assert \"title:\" not in result\n        assert \"tags:\" not in result\n        assert \"Real content here.\" in result\n    def test_removes_document_bracket_markers(self):\n        notes = \"[CSCI2050_Notes.md]\\nActual study content follows.\"",
+        "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "TestSentences",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "class TestSentences:\n    svc = LLMService()\n    def test_strips_metadata_before_splitting(self):\n        notes = \"---\\ntitle: Notes\\n---\\n# Chapter 1\\n\" + SAMPLE_NOTES\n        sentences = self.svc._sentences(notes)\n        assert all(\"---\" not in s for s in sentences)\n        assert all(not s.startswith(\"#\") for s in sentences)\n    def test_excludes_sentences_under_20_chars(self):\n        notes = \"OK. \" + SAMPLE_NOTES\n        sentences = self.svc._sentences(notes)",
+        "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "TestIsValidMCQ",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "class TestIsValidMCQ:\n    svc = LLMService()\n    good_opts = [\"Atomicity\", \"Consistency\", \"Isolation\", \"Durability\"]\n    def test_accepts_well_formed_question(self):\n        item = {\"question_text\": \"What does ACID stand for?\", \"options\": self.good_opts, \"correct_index\": 0}\n        assert self.svc._is_valid_mcq(item) is True\n    def test_rejects_fallback_template_pattern(self):\n        item = {\"question_text\": \"Which statement is supported by the notes? (1)\", \"options\": self.good_opts, \"correct_index\": 0}\n        assert self.svc._is_valid_mcq(item) is False\n    def test_rejects_raw_markdown_in_options(self):",
+        "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "TestIsValidFRQ",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "class TestIsValidFRQ:\n    svc = LLMService()\n    def test_accepts_well_formed_question(self):\n        item = {\"question_text\": \"Explain ACID properties.\", \"expected_answer\": \"ACID ensures data integrity.\"}\n        assert self.svc._is_valid_frq(item) is True\n    def test_rejects_fallback_template(self):\n        item = {\"question_text\": \"Explain this idea from the notes: some raw text\", \"expected_answer\": \"answer\"}\n        assert self.svc._is_valid_frq(item) is False\n    def test_rejects_dash_marker_in_question(self):\n        item = {\"question_text\": \"--- Document 1 --- What is isolation?\", \"expected_answer\": \"answer\"}",
+        "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "TestLoadsJson",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "class TestLoadsJson:\n    svc = LLMService()\n    def test_parses_clean_json(self):\n        assert self.svc._loads_json('{\"mcq\": [], \"frq\": []}') == {\"mcq\": [], \"frq\": []}\n    def test_extracts_json_from_surrounding_prose(self):\n        raw = 'Sure, here you go:\\n{\"key\": \"value\"}\\nLet me know if that helps.'\n        assert self.svc._loads_json(raw) == {\"key\": \"value\"}\n    def test_raises_on_completely_invalid_input(self):\n        with pytest.raises(Exception):\n            self.svc._loads_json(\"This is just plain text with no JSON at all.\")",
+        "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "TestFallbackGrade",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "class TestFallbackGrade:\n    svc = LLMService()\n    def test_high_keyword_overlap_is_correct(self):\n        expected = \"Atomicity ensures all database operations complete or none execute during transaction.\"\n        user = \"Atomicity means all database operations complete or none execute in transaction.\"\n        grade = self.svc._fallback_grade(expected, user)\n        assert grade.is_correct is True\n        assert grade.flagged_uncertain is True\n    def test_low_keyword_overlap_is_incorrect(self):\n        expected = \"Atomicity ensures all operations complete or none do.\"",
+        "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "TestFallbackQuestions",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "class TestFallbackQuestions:\n    svc = LLMService()\n    def test_returns_requested_counts(self):\n        mcq, frq = self.svc._fallback_questions(SAMPLE_NOTES, count_mcq=4, count_frq=2)\n        assert len(mcq) == 4\n        assert len(frq) == 2\n    def test_mcq_options_contain_no_raw_markdown(self):\n        mcq, _ = self.svc._fallback_questions(SAMPLE_NOTES, count_mcq=3, count_frq=0)\n        for q in mcq:\n            for opt in q.options:",
+        "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "TestCompleteGroq",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "class TestCompleteGroq:\n    svc = LLMService()\n    async def test_calls_correct_url_and_auth_header(self):\n        payload = {\"mcq\": [], \"frq\": []}\n        with mock_httpx_post(groq_json_body(payload)) as mock_client:\n            with patch(\"src.services.llm_service.settings\", fake_settings()):\n                result = await self.svc._complete_groq(\"test prompt\")\n        call = mock_client.post.call_args\n        assert call.args[0] == \"https://api.groq.com/openai/v1/chat/completions\"\n        assert call.kwargs[\"headers\"][\"Authorization\"] == f\"Bearer {FAKE_KEY}\"",
+        "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "TestCompleteTextGroq",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "class TestCompleteTextGroq:\n    svc = LLMService()\n    async def test_returns_plain_text_response(self):\n        response_text = \"Atomicity means all-or-nothing execution of a transaction.\"\n        with mock_httpx_post(groq_text_body(response_text)) as _:\n            with patch(\"src.services.llm_service.settings\", fake_settings()):\n                result = await self.svc._complete_text_groq(\"Explain atomicity\")\n        assert result == response_text\n    async def test_uses_temperature_07_and_no_json_format(self):\n        with mock_httpx_post(groq_text_body(\"response\")) as mock_client:",
+        "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "TestCompleteJsonDispatch",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "class TestCompleteJsonDispatch:\n    async def test_prefers_groq_when_key_is_set(self):\n        svc = LLMService()\n        svc._complete_groq = AsyncMock(return_value={\"result\": \"groq\"})\n        svc._complete_ollama = AsyncMock(return_value={\"result\": \"ollama\"})\n        with patch(\"src.services.llm_service.settings\", fake_settings(groq_key=FAKE_KEY)):\n            result = await svc._complete_json(\"prompt\")\n        svc._complete_groq.assert_awaited_once()\n        svc._complete_ollama.assert_not_awaited()\n        assert result == {\"result\": \"groq\"}",
+        "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "TestCallKojo",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "class TestCallKojo:\n    async def test_uses_groq_text_when_key_set(self):\n        svc = LLMService()\n        svc._complete_text_groq = AsyncMock(return_value=\"Groq answer\")\n        svc._complete_text_ollama = AsyncMock(return_value=\"Ollama answer\")\n        with patch(\"src.services.llm_service.settings\", fake_settings(groq_key=FAKE_KEY)):\n            result = await svc.call_kojo(\"Explain transactions\")\n        assert result == \"Groq answer\"\n        svc._complete_text_groq.assert_awaited_once()\n        svc._complete_text_ollama.assert_not_awaited()",
+        "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "TestGenerateTestQuestions",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "class TestGenerateTestQuestions:\n    async def test_mcq_only_mode_sets_frq_count_to_zero(self):\n        svc = LLMService()\n        svc._complete_json = AsyncMock(side_effect=[\n            EXTRACTION_RESP,\n            {\"mcq\": [VALID_MCQ] * 3, \"frq\": []},\n        ])\n        mcq, frq = await svc.generate_test_questions(SAMPLE_NOTES, \"MCQ_only\", count_mcq=3)\n        assert len(mcq) == 3\n        assert len(frq) == 0",
+        "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "TestGradeFRQAnswer",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "class TestGradeFRQAnswer:\n    async def test_returns_correct_grade_from_llm(self):\n        svc = LLMService()\n        svc._complete_json = AsyncMock(return_value={\n            \"is_correct\": True,\n            \"feedback\": \"Well explained.\",\n            \"flagged_uncertain\": False,\n            \"confidence\": 0.92,\n        })\n        grade = await svc.grade_frq_answer(SAMPLE_NOTES, \"What is atomicity?\", \"expected\", \"user answer\")",
+        "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "TestGenerateFlashcards",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "class TestGenerateFlashcards:\n    async def test_returns_correct_cards_from_llm(self):\n        svc = LLMService()\n        svc._complete_json = AsyncMock(return_value={\n            \"flashcards\": [\n                {\"front\": \"What is Atomicity?\", \"back\": \"All-or-nothing execution.\"},\n                {\"front\": \"What is Durability?\", \"back\": \"Committed data persists.\"},\n            ]\n        })\n        cards = await svc.generate_flashcards(SAMPLE_NOTES, count=2)",
+        "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "mock_httpx_post",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "def mock_httpx_post(json_body: dict):\n    \"\"\"Patch httpx.AsyncClient so every .post() returns a response with json_body.\"\"\"\n    mock_resp = MagicMock()\n    mock_resp.raise_for_status = MagicMock()\n    mock_resp.json.return_value = json_body\n    mock_client = AsyncMock()\n    mock_client.post = AsyncMock(return_value=mock_resp)\n    mock_cm = MagicMock()\n    mock_cm.__aenter__ = AsyncMock(return_value=mock_client)\n    mock_cm.__aexit__ = AsyncMock(return_value=False)",
+        "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "groq_json_body",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "def groq_json_body(payload: dict) -> dict:\n    \"\"\"Wrap payload in the Groq chat completions JSON shape.\"\"\"\n    return {\"choices\": [{\"message\": {\"content\": json.dumps(payload)}}]}\ndef groq_text_body(text: str) -> dict:\n    \"\"\"Wrap plain text in the Groq chat completions JSON shape.\"\"\"\n    return {\"choices\": [{\"message\": {\"content\": text}}]}\ndef fake_settings(groq_key: str | None = FAKE_KEY, timeout: int = 30, max_tokens: int = 200):\n    \"\"\"Return a mock settings object with common LLM fields.\"\"\"\n    s = MagicMock()\n    s.groq_api_key = groq_key",
+        "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "groq_text_body",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "def groq_text_body(text: str) -> dict:\n    \"\"\"Wrap plain text in the Groq chat completions JSON shape.\"\"\"\n    return {\"choices\": [{\"message\": {\"content\": text}}]}\ndef fake_settings(groq_key: str | None = FAKE_KEY, timeout: int = 30, max_tokens: int = 200):\n    \"\"\"Return a mock settings object with common LLM fields.\"\"\"\n    s = MagicMock()\n    s.groq_api_key = groq_key\n    s.llm_timeout_seconds = timeout\n    s.llm_max_tokens = max_tokens\n    s.ollama_base_url = \"http://localhost:11434\"",
+        "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "fake_settings",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "def fake_settings(groq_key: str | None = FAKE_KEY, timeout: int = 30, max_tokens: int = 200):\n    \"\"\"Return a mock settings object with common LLM fields.\"\"\"\n    s = MagicMock()\n    s.groq_api_key = groq_key\n    s.llm_timeout_seconds = timeout\n    s.llm_max_tokens = max_tokens\n    s.ollama_base_url = \"http://localhost:11434\"\n    s.ollama_model = \"llama3.1:8b\"\n    return s\n# ── _strip_metadata ────────────────────────────────────────────────────────────",
+        "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "FAKE_KEY",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "FAKE_KEY = \"gsk_test_fake_key_for_unit_tests\"\n# Realistic notes used across multiple tests\nSAMPLE_NOTES = (\n    \"A transaction is a logical unit of database processing. \"\n    \"Transactions must satisfy four ACID properties: Atomicity, Consistency, \"\n    \"Isolation, and Durability. Atomicity ensures all operations complete or \"\n    \"none do. Durability means committed data persists even after a crash.\"\n)\n# Representative MCQ/FRQ items that pass all validators\nVALID_MCQ = {",
+        "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "SAMPLE_NOTES",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "SAMPLE_NOTES = (\n    \"A transaction is a logical unit of database processing. \"\n    \"Transactions must satisfy four ACID properties: Atomicity, Consistency, \"\n    \"Isolation, and Durability. Atomicity ensures all operations complete or \"\n    \"none do. Durability means committed data persists even after a crash.\"\n)\n# Representative MCQ/FRQ items that pass all validators\nVALID_MCQ = {\n    \"question_text\": \"What does Atomicity guarantee in a database transaction?\",\n    \"options\": [",
+        "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "VALID_MCQ",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "VALID_MCQ = {\n    \"question_text\": \"What does Atomicity guarantee in a database transaction?\",\n    \"options\": [\n        \"All operations complete or none do\",\n        \"Transactions execute in sequence\",\n        \"Data is replicated to multiple nodes\",\n        \"Queries run faster with indexes\",\n    ],\n    \"correct_index\": 0,\n}",
+        "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "VALID_FRQ",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "VALID_FRQ = {\n    \"question_text\": \"Explain what Durability means in the context of ACID properties.\",\n    \"expected_answer\": (\n        \"Durability guarantees that once a transaction is committed, its changes \"\n        \"persist permanently even if the system crashes immediately afterward.\"\n    ),\n}\n# ── httpx mock helper ──────────────────────────────────────────────────────────\n@contextmanager\ndef mock_httpx_post(json_body: dict):",
+        "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "EXTRACTION_RESP",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_llm_service",
+        "description": "study-app-backend.tests.test_llm_service",
+        "peekOfCode": "EXTRACTION_RESP = {\n    \"title\": \"Database Transactions\",\n    \"terms\": [{\"term\": \"Atomicity\", \"definition\": \"All-or-nothing execution\"}],\n    \"concepts\": [\"ACID properties ensure transaction correctness\"],\n}\nclass TestGenerateTestQuestions:\n    async def test_mcq_only_mode_sets_frq_count_to_zero(self):\n        svc = LLMService()\n        svc._complete_json = AsyncMock(side_effect=[\n            EXTRACTION_RESP,",
+        "detail": "study-app-backend.tests.test_llm_service",
         "documentation": {}
     }
 ]
