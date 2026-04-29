@@ -13,6 +13,7 @@ import type {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 const TOKEN_KEY = "nosey_access_token";
 const USER_KEY = "nosey_user";
+const GUEST_TOKEN = "nosey_guest_token";
 
 type RequestOptions = RequestInit & {
   allowMock?: boolean;
@@ -58,17 +59,18 @@ export function getStoredUser(): AuthUser | null {
 }
 
 export function isGuestSession() {
-  return getStoredUser()?.email === "guest@nosey.local";
+  return localStorage.getItem(TOKEN_KEY) === GUEST_TOKEN;
 }
 
-export async function setGuestSession(): Promise<AuthUser> {
-  const data = await request<{ access_token: string; user_id: number; email: string; user: AuthUser }>(
-    "/auth/guest",
-    { method: "POST" },
-  );
-  localStorage.setItem(TOKEN_KEY, data.access_token);
-  localStorage.setItem(USER_KEY, JSON.stringify(data.user));
-  return data.user;
+export function setGuestSession(): AuthUser {
+  const user: AuthUser = {
+    id: 1,
+    email: "guest@nosey.local",
+    full_name: "Guest User",
+  };
+  localStorage.setItem(TOKEN_KEY, GUEST_TOKEN);
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  return user;
 }
 
 export function setGoogleSession() {
