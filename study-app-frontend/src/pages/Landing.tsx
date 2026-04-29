@@ -106,12 +106,19 @@ export default function Landing() {
               fullWidth
               icon={<ArrowRight size={19} />}
               variant="secondary"
-              onClick={() => {
-                setGuestSession();
-                navigate("/dashboard");
+              onClick={async () => {
+                setLoading(true);
+                try {
+                  await setGuestSession();
+                  navigate("/dashboard");
+                } catch {
+                  // guest auth failed — backend may be unreachable
+                } finally {
+                  setLoading(false);
+                }
               }}
             >
-              Continue as guest
+              {loading ? "Signing in..." : "Continue as guest"}
             </Button>
           </div>
           <div className="trust-note">
