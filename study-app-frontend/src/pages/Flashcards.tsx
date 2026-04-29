@@ -33,7 +33,7 @@ export default function Flashcards() {
 
   async function mark(correct: boolean) {
     if (!current) return;
-    await recordFlashcardAttempt(current.id, correct, Date.now() - startedAt);
+    await recordFlashcardAttempt(current.folder_id, current.id, correct, Date.now() - startedAt);
     const nextStudied = new Set(studied).add(current.id);
     setStudied(nextStudied);
     setStartedAt(Date.now());
