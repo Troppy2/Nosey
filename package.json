@@ -1,0 +1,10 @@
+{
+  "name": "nosey-study-tool",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "npm --prefix study-app-frontend run dev",
+    "build": "npm --prefix study-app-frontend run build",
+    "preview": "npm --prefix study-app-frontend run preview"
+  }
+}
