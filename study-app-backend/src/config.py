@@ -27,12 +27,12 @@ class Settings(BaseSettings):
     groq_api_key: Optional[str] = Field(default=None, alias="GROQ_API_KEY")
     environment: str = Field(default="development", alias="ENVIRONMENT")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
-    cors_origins: list[str] = Field(
+    cors_origins: Any = Field(
         default_factory=lambda: ["http://localhost:3000", "http://localhost:5173"],
         alias="CORS_ORIGINS",
     )
     max_file_size_bytes: int = Field(default=52_428_800, alias="MAX_FILE_SIZE_BYTES")
-    allowed_file_types: list[str] = Field(default_factory=lambda: ["pdf", "txt", "md"], alias="ALLOWED_FILE_TYPES")
+    allowed_file_types: Any = Field(default_factory=lambda: ["pdf", "txt", "md"], alias="ALLOWED_FILE_TYPES")
     llm_max_tokens: int = Field(default=1000, alias="LLM_MAX_TOKENS")
     llm_timeout_seconds: int = Field(default=30, alias="LLM_TIMEOUT_SECONDS")
     llm_uncertainty_threshold: float = Field(default=0.6, alias="LLM_UNCERTAINTY_THRESHOLD")
