@@ -26,8 +26,6 @@ const features = [
 export default function Landing() {
   const navigate = useNavigate();
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [guestLoading, setGuestLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const initialized = useRef(false);
 
@@ -44,13 +42,11 @@ export default function Landing() {
           callback: async (resp: any) => {
             if (!resp?.credential) return;
             setGoogleLoading(true);
-            setError(null);
             try {
               await googleSignIn(resp.credential);
               navigate("/dashboard");
             } catch (err) {
               console.error(err);
-              setError("Google sign-in failed. Please try again.");
             } finally {
               setGoogleLoading(false);
             }
@@ -107,22 +103,13 @@ export default function Landing() {
               fullWidth
               icon={<ArrowRight size={19} />}
               variant="secondary"
-              onClick={async () => {
-                setGuestLoading(true);
-                setError(null);
-                try {
-                  await setGuestSession();
-                  navigate("/dashboard");
-                } catch {
-                  setError("Unable to connect to the server. Please try again.");
-                } finally {
-                  setGuestLoading(false);
-                }
+              onClick={() => {
+                setGuestSession();
+                navigate("/dashboard");
               }}
             >
-              {guestLoading ? "Signing in..." : "Continue as guest"}
+              Continue as guest
             </Button>
-            {error && <p className="muted small" style={{ color: "var(--color-error, #e53e3e)" }}>{error}</p>}
           </div>
           <div className="trust-note">
             <ShieldCheck size={17} />

@@ -10,13 +10,6 @@ from src.utils.exceptions import StudyAppException
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/guest", response_model=AuthResponse)
-async def guest_auth(
-    session: AsyncSession = Depends(get_session),
-) -> AuthResponse:
-    return await AuthService().authenticate_guest(session)
-
-
 @router.post("/google", response_model=AuthResponse)
 async def google_auth(
     request: GoogleAuthRequest,
