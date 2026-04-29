@@ -1,3 +1,6 @@
+import json
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -5,11 +8,26 @@ from src.config import settings
 from src.routes import attempts, auth, flashcards, folders, health, kojo, tests
 
 
+def _resolve_cors_origins() -> list[str]:
+    raw = os.environ.get("CORS_ORIGINS", "").strip()
+    if raw:
+        if raw.startswith("["):
+            try:
+                return json.loads(raw)
+            except (json.JSONDecodeError, ValueError):
+                pass
+        return [o.strip() for o in raw.split(",") if o.strip()]
+    parsed = settings.cors_origins
+    if isinstance(parsed, list):
+        return parsed
+    return ["http://localhost:3000", "http://localhost:5173"]
+
+
 app = FastAPI(title="Study App", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=_resolve_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
