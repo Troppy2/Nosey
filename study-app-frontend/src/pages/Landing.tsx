@@ -25,7 +25,9 @@ const features = [
 
 export default function Landing() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const initialized = useRef(false);
 
@@ -41,15 +43,16 @@ export default function Landing() {
           client_id: clientId,
           callback: async (resp: any) => {
             if (!resp?.credential) return;
-            setLoading(true);
+            setGoogleLoading(true);
+            setError(null);
             try {
               await googleSignIn(resp.credential);
               navigate("/dashboard");
             } catch (err) {
-              // fallback to guest session on error
               console.error(err);
+              setError("Google sign-in failed. Please try again.");
             } finally {
-              setLoading(false);
+              setGoogleLoading(false);
             }
           },
         });
@@ -91,35 +94,35 @@ export default function Landing() {
               icon={<LogIn size={18} />}
               onClick={async () => {
                 if (clientId && (window as any).google?.accounts?.id) {
-                  // trigger the Google One Tap / prompt flow
                   (window as any).google.accounts.id.prompt();
                   return;
                 }
-                // fallback to local session when client id missing
                 setGoogleSession();
                 navigate("/dashboard");
               }}
             >
-              {loading ? "Signing in..." : "Google sign in"}
+              {googleLoading ? "Signing in..." : "Google sign in"}
             </Button>
             <Button
               fullWidth
               icon={<ArrowRight size={19} />}
               variant="secondary"
               onClick={async () => {
-                setLoading(true);
+                setGuestLoading(true);
+                setError(null);
                 try {
                   await setGuestSession();
                   navigate("/dashboard");
                 } catch {
-                  // guest auth failed — backend may be unreachable
+                  setError("Unable to connect to the server. Please try again.");
                 } finally {
-                  setLoading(false);
+                  setGuestLoading(false);
                 }
               }}
             >
-              {loading ? "Signing in..." : "Continue as guest"}
+              {guestLoading ? "Signing in..." : "Continue as guest"}
             </Button>
+            {error && <p className="muted small" style={{ color: "var(--color-error, #e53e3e)" }}>{error}</p>}
           </div>
           <div className="trust-note">
             <ShieldCheck size={17} />
