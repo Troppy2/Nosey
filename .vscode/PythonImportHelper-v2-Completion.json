@@ -1873,6 +1873,14 @@
         "documentation": {}
     },
     {
+        "label": "settings",
+        "importPath": "src.config",
+        "description": "src.config",
+        "isExtraImport": true,
+        "detail": "src.config",
+        "documentation": {}
+    },
+    {
         "label": "Base",
         "importPath": "src.models",
         "description": "src.models",
@@ -4317,6 +4325,15 @@
         "documentation": {}
     },
     {
+        "label": "os",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "os",
+        "description": "os",
+        "detail": "os",
+        "documentation": {}
+    },
+    {
         "label": "CORSMiddleware",
         "importPath": "fastapi.middleware.cors",
         "description": "fastapi.middleware.cors",
@@ -5172,7 +5189,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.routes.health",
         "description": "study-app-backend.src.routes.health",
-        "peekOfCode": "router = APIRouter(tags=[\"health\"])\n@router.get(\"/health\")\nasync def health_check() -> dict[str, str]:\n    return {\"status\": \"healthy\"}",
+        "peekOfCode": "router = APIRouter(tags=[\"health\"])\n@router.get(\"/health\")\nasync def health_check() -> dict:\n    return {\n        \"status\": \"healthy\",\n        \"cors_origins\": settings.cors_origins,\n        \"environment\": settings.environment,\n    }",
         "detail": "study-app-backend.src.routes.health",
         "documentation": {}
     },
@@ -5766,7 +5783,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.main",
         "description": "study-app-backend.src.main",
-        "peekOfCode": "app = FastAPI(title=\"Study App\", version=\"0.1.0\")\napp.add_middleware(\n    CORSMiddleware,\n    allow_origins=settings.cors_origins,\n    allow_credentials=True,\n    allow_methods=[\"*\"],\n    allow_headers=[\"*\"],\n)\napp.include_router(health.router)\napp.include_router(auth.router)",
+        "peekOfCode": "app = FastAPI(title=\"Study App\", version=\"0.1.0\")\napp.add_middleware(\n    CORSMiddleware,\n    allow_origins=_resolve_cors_origins(),\n    allow_credentials=True,\n    allow_methods=[\"*\"],\n    allow_headers=[\"*\"],\n)\napp.include_router(health.router)\napp.include_router(auth.router)",
         "detail": "study-app-backend.src.main",
         "documentation": {}
     },
