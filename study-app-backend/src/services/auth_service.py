@@ -31,6 +31,16 @@ class AuthService:
             "profile_picture_url": payload.get("picture"),
         }
 
+    async def authenticate_guest(self, session: AsyncSession) -> AuthResponse:
+        user = await UserRepository(session).create_or_update(
+            google_id="guest",
+            email="guest@nosey.local",
+            full_name="Guest User",
+            profile_picture_url=None,
+        )
+        await session.commit()
+        return self._token_response(user)
+
     async def authenticate_google_token(self, token: str, session: AsyncSession) -> AuthResponse:
         google_user = await self.verify_google_token(token)
         user = await UserRepository(session).create_or_update(

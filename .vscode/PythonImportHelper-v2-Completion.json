@@ -5162,7 +5162,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.routes.auth",
         "description": "study-app-backend.src.routes.auth",
-        "peekOfCode": "router = APIRouter(prefix=\"/auth\", tags=[\"auth\"])\n@router.post(\"/google\", response_model=AuthResponse)\nasync def google_auth(\n    request: GoogleAuthRequest,\n    session: AsyncSession = Depends(get_session),\n) -> AuthResponse:\n    try:\n        return await AuthService().authenticate_google_token(request.token, session)\n    except httpx.HTTPStatusError as exc:\n        raise HTTPException(status_code=401, detail=\"Invalid Google token\") from exc",
+        "peekOfCode": "router = APIRouter(prefix=\"/auth\", tags=[\"auth\"])\n@router.post(\"/guest\", response_model=AuthResponse)\nasync def guest_auth(\n    session: AsyncSession = Depends(get_session),\n) -> AuthResponse:\n    return await AuthService().authenticate_guest(session)\n@router.post(\"/google\", response_model=AuthResponse)\nasync def google_auth(\n    request: GoogleAuthRequest,\n    session: AsyncSession = Depends(get_session),",
         "detail": "study-app-backend.src.routes.auth",
         "documentation": {}
     },
