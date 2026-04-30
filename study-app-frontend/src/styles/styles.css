@@ -802,6 +802,29 @@ h3 {
   gap: 6px;
 }
 
+.row-actions button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  color: var(--green-dark);
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+
+.row-actions button:hover {
+  color: var(--ink);
+  background: rgba(113, 131, 85, 0.12);
+  transform: scale(1.08);
+}
+
+.row-actions button:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
 .floating-action {
   position: fixed;
   right: 28px;
@@ -1991,4 +2014,312 @@ h3 {
   font-size: 0.72rem;
   color: var(--green-mid);
   text-align: center;
+}
+
+/* ─── Math Mode ────────────────────────────────────────────── */
+
+.math-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 2px 8px;
+  background: var(--green-light);
+  color: var(--green-dark);
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.math-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--white);
+  border: 1.5px solid var(--green-light);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+.math-mode-toggle:hover { border-color: var(--green-dark); }
+.math-mode-toggle.active {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+}
+.math-mode-toggle > span:nth-child(2) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.math-mode-toggle strong { font-size: 0.9rem; color: var(--ink); }
+.math-mode-toggle-sub {
+  font-size: 0.78rem;
+  color: var(--green-dark-mid);
+}
+.math-mode-pill {
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.math-mode-pill.on { background: var(--green-dark); color: var(--white); }
+.math-mode-pill.off { background: var(--green-light); color: var(--green-dark); }
+
+/* Math input wrapper */
+.math-input-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.math-answer-textarea {
+  resize: vertical;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  min-height: 80px;
+}
+
+/* Symbol keyboard */
+.math-keyboard {
+  background: var(--green-lightest);
+  border: 1.5px solid var(--green-light);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.math-keyboard-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--green-light);
+  background: var(--white);
+}
+
+.math-tab {
+  flex: 1;
+  padding: 6px 4px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--green-dark-mid);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+.math-tab:hover { color: var(--green-dark); }
+.math-tab.active {
+  color: var(--green-dark);
+  border-bottom-color: var(--green-dark);
+  font-weight: 600;
+}
+
+.math-keyboard-symbols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 12px;
+}
+
+.math-sym-btn {
+  min-width: 38px;
+  padding: 6px 10px;
+  background: var(--white);
+  border: 1.5px solid var(--green-light);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-family: var(--font-sans);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+  line-height: 1.2;
+}
+.math-sym-btn:hover {
+  background: var(--green-light);
+  border-color: var(--green-dark-mid);
+}
+.math-sym-btn:active { transform: scale(0.92); }
+
+/* Scratchpad */
+.math-scratchpad { display: flex; flex-direction: column; gap: 8px; }
+
+.math-scratchpad-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 4px 10px 4px 8px;
+  background: transparent;
+  border: 1.5px solid var(--green-light);
+  border-radius: 20px;
+  font-size: 0.82rem;
+  color: var(--green-dark-mid);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+.math-scratchpad-toggle:hover { color: var(--green-dark); border-color: var(--green-dark); }
+.math-scratchpad-toggle .rotated { transform: rotate(180deg); }
+
+.math-scratchpad-area {
+  font-size: 0.88rem;
+  background: #fffde7;
+  border-color: #e8d87c;
+  resize: vertical;
+}
+
+/* Results — math explanation */
+.math-mode-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light);
+  font-size: 0.875rem;
+  color: var(--green-dark);
+}
+
+.math-explanation {
+  border-top: 1px solid var(--green-light);
+  padding-top: 14px;
+  margin-top: 4px;
+}
+.math-explanation .kojo-markdown { font-size: 0.9rem; }
+.math-explanation code {
+  font-family: "SFMono-Regular", Consolas, monospace;
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.9em;
+}
+.math-explanation .kojo-md-heading {
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin: 10px 0 4px;
+  color: var(--green-dark);
+}
+
+.math-answer-text {
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.9rem;
+  background: var(--green-lightest);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+/* ─── Attempt history (inside TestRow) ───────────────────────────────── */
+
+.attempt-history {
+  width: 100%;
+  border-top: 1px solid var(--green-light-mid);
+  padding: 8px 20px 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.attempt-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  color: #596949;
+  font-size: 0.875rem;
+  border-radius: 6px;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.attempt-row:hover {
+  background: rgba(113, 131, 85, 0.09);
+  color: var(--ink);
+}
+
+/* ─── Flashcard preview in folder detail ────────────────────────────── */
+
+.flashcard-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.flashcard-preview-card {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal), border-color var(--transition-normal);
+}
+
+.flashcard-preview-card:hover {
+  border-color: var(--green-mid);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.flashcard-preview-card p {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ─── Flashcard manage page ──────────────────────────────────────────── */
+
+.add-card-form {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  margin-bottom: 4px;
+}
+
+.flashcard-manage-list {
+  display: grid;
+  gap: 12px;
+}
+
+.flashcard-manage-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+}
+
+.flashcard-manage-item.editing {
+  display: grid;
+  gap: 14px;
+  padding: 18px 20px;
+}
+
+.flashcard-manage-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
+}
+
+.flashcard-manage-content p {
+  margin-top: 4px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+@media (max-width: 760px) {
+  .flashcard-preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .flashcard-manage-content {
+    grid-template-columns: 1fr;
+  }
 }

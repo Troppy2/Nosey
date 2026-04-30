@@ -271,6 +271,122 @@ If the notes do not support grading, set flagged_uncertain true and confidence 0
             logger.warning("LLM FRQ grading failed; using simple fallback: %s", exc)
             return self._fallback_grade(expected_answer, user_answer)
 
+    def _build_math_generation_prompt(
+        self, notes: str, count_mcq: int, count_frq: int, test_type: str
+    ) -> str:
+        mcq_block = ""
+        if count_mcq > 0 and test_type != "FRQ_only":
+            mcq_block = (
+                f"Generate exactly {count_mcq} MCQ math problems.\n"
+                "MCQ rules:\n"
+                "  - Each question must be a concrete calculation or problem-solving question\n"
+                "  - All 4 answer options must be plausible numeric or algebraic expressions\n"
+                "  - Only one option is correct\n"
+                "  - Vary difficulty: some straightforward, some multi-step\n"
+            )
+        frq_block = ""
+        if count_frq > 0 and test_type != "MCQ_only":
+            frq_block = (
+                f"Generate exactly {count_frq} FRQ math problems.\n"
+                "FRQ rules:\n"
+                "  - Ask the student to solve a problem and show their work\n"
+                "  - expected_answer must include the complete worked solution with numbered steps\n"
+                "  - Use phrases like 'Solve for x:', 'Simplify:', 'Find the value of:'\n"
+                "  - Vary question types: equations, simplification, word problems\n"
+            )
+        return (
+            "You are generating math practice problems based on the following study notes.\n"
+            "Create problems that test mathematical understanding and calculation skills.\n\n"
+            f"{mcq_block}\n"
+            f"{frq_block}\n"
+            "Return JSON only with keys mcq and frq.\n"
+            "mcq items: {question_text, options: [4 strings], correct_index: 0-3}\n"
+            "frq items: {question_text, expected_answer}\n\n"
+            f"MATH NOTES:\n{notes[:_GENERATE_CHAR_LIMIT]}"
+        )
+
+    async def grade_math_answer(
+        self,
+        question: str,
+        expected_answer: str,
+        user_answer: str,
+    ) -> FRQGrade:
+        prompt = f"""You are grading a math problem. Evaluate the student's answer carefully.
+
+QUESTION:
+{question}
+
+CORRECT SOLUTION:
+{expected_answer}
+
+STUDENT'S ANSWER:
+{user_answer}
+
+Determine if the student's final answer is mathematically correct (even if written differently).
+Then return JSON only with these exact keys:
+{{
+  "is_correct": true or false,
+  "what_went_right": "brief description of what the student did correctly (empty string if nothing)",
+  "what_went_wrong": "brief description of the error (empty string if correct)",
+  "steps": [
+    {{"step": 1, "description": "step description", "expression": "math expression or equation for this step"}},
+    {{"step": 2, ...}}
+  ],
+  "final_answer": "the correct final answer",
+  "confidence": 0.0 to 1.0,
+  "flagged_uncertain": true or false
+}}
+
+Rules:
+- Accept equivalent forms (e.g. x=4 and 4 are equivalent for "solve for x: ... = 4")
+- steps must walk through the complete solution from start to finish
+- Be specific in what_went_right and what_went_wrong
+"""
+        try:
+            data = await self._complete_json(prompt)
+            is_correct = bool(data.get("is_correct", False))
+            what_right = str(data.get("what_went_right", "")).strip()
+            what_wrong = str(data.get("what_went_wrong", "")).strip()
+            steps_raw = data.get("steps", [])
+            final_answer = str(data.get("final_answer", "")).strip()
+            confidence = max(0.0, min(1.0, float(data.get("confidence", 0.5))))
+            flagged = bool(data.get("flagged_uncertain", False))
+
+            # Build structured markdown feedback
+            sections: list[str] = []
+            if what_right:
+                sections.append(f"**What you got right:** {what_right}")
+            if what_wrong:
+                sections.append(f"**What to fix:** {what_wrong}")
+
+            if isinstance(steps_raw, list) and steps_raw:
+                sections.append("\n**Step-by-step solution:**")
+                for item in steps_raw:
+                    if not isinstance(item, dict):
+                        continue
+                    num = item.get("step", "")
+                    desc = str(item.get("description", "")).strip()
+                    expr = str(item.get("expression", "")).strip()
+                    if desc:
+                        line = f"**Step {num}:** {desc}"
+                        if expr:
+                            line += f"\n`{expr}`"
+                        sections.append(line)
+
+            if final_answer:
+                sections.append(f"\n**Final answer:** `{final_answer}`")
+
+            feedback = "\n\n".join(sections)
+            return FRQGrade(
+                is_correct=is_correct,
+                feedback=feedback[:4000],
+                flagged_uncertain=flagged,
+                confidence=confidence,
+            )
+        except Exception as exc:
+            logger.warning("LLM math grading failed; using fallback: %s", exc)
+            return self._fallback_grade(expected_answer, user_answer)
+
     async def generate_flashcards(
         self, content: str, count: int, prompt: str | None = None
     ) -> list[GeneratedFlashcard]:
