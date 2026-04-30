@@ -831,6 +831,14 @@
         "documentation": {}
     },
     {
+        "label": "op",
+        "importPath": "alembic",
+        "description": "alembic",
+        "isExtraImport": true,
+        "detail": "alembic",
+        "documentation": {}
+    },
+    {
         "label": "context",
         "importPath": "alembic",
         "description": "alembic",
@@ -1113,6 +1121,14 @@
     },
     {
         "label": "Text",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "Boolean",
         "importPath": "sqlalchemy",
         "description": "sqlalchemy",
         "isExtraImport": true,
@@ -2913,6 +2929,14 @@
         "documentation": {}
     },
     {
+        "label": "File",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
         "label": "HTTPException",
         "importPath": "fastapi",
         "description": "fastapi",
@@ -2922,6 +2946,14 @@
     },
     {
         "label": "Query",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "UploadFile",
         "importPath": "fastapi",
         "description": "fastapi",
         "isExtraImport": true,
@@ -3034,6 +3066,14 @@
     },
     {
         "label": "status",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "UploadFile",
         "importPath": "fastapi",
         "description": "fastapi",
         "isExtraImport": true,
@@ -3578,6 +3618,14 @@
         "documentation": {}
     },
     {
+        "label": "FlashcardUpdate",
+        "importPath": "src.schemas.flashcard_schema",
+        "description": "src.schemas.flashcard_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.flashcard_schema",
+        "documentation": {}
+    },
+    {
         "label": "FlashcardCreate",
         "importPath": "src.schemas.flashcard_schema",
         "description": "src.schemas.flashcard_schema",
@@ -3587,6 +3635,14 @@
     },
     {
         "label": "FlashcardResponse",
+        "importPath": "src.schemas.flashcard_schema",
+        "description": "src.schemas.flashcard_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.flashcard_schema",
+        "documentation": {}
+    },
+    {
+        "label": "FlashcardUpdate",
         "importPath": "src.schemas.flashcard_schema",
         "description": "src.schemas.flashcard_schema",
         "isExtraImport": true,
@@ -3730,6 +3786,30 @@
         "documentation": {}
     },
     {
+        "label": "QuestionCreate",
+        "importPath": "src.schemas.test_schema",
+        "description": "src.schemas.test_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.test_schema",
+        "documentation": {}
+    },
+    {
+        "label": "QuestionEditable",
+        "importPath": "src.schemas.test_schema",
+        "description": "src.schemas.test_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.test_schema",
+        "documentation": {}
+    },
+    {
+        "label": "QuestionUpdate",
+        "importPath": "src.schemas.test_schema",
+        "description": "src.schemas.test_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.test_schema",
+        "documentation": {}
+    },
+    {
         "label": "TestResponse",
         "importPath": "src.schemas.test_schema",
         "description": "src.schemas.test_schema",
@@ -3786,6 +3866,14 @@
         "documentation": {}
     },
     {
+        "label": "MCQOptionEditable",
+        "importPath": "src.schemas.test_schema",
+        "description": "src.schemas.test_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.test_schema",
+        "documentation": {}
+    },
+    {
         "label": "MCQOptionPublic",
         "importPath": "src.schemas.test_schema",
         "description": "src.schemas.test_schema",
@@ -3794,7 +3882,31 @@
         "documentation": {}
     },
     {
+        "label": "QuestionCreate",
+        "importPath": "src.schemas.test_schema",
+        "description": "src.schemas.test_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.test_schema",
+        "documentation": {}
+    },
+    {
+        "label": "QuestionEditable",
+        "importPath": "src.schemas.test_schema",
+        "description": "src.schemas.test_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.test_schema",
+        "documentation": {}
+    },
+    {
         "label": "QuestionPublic",
+        "importPath": "src.schemas.test_schema",
+        "description": "src.schemas.test_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.test_schema",
+        "documentation": {}
+    },
+    {
+        "label": "QuestionUpdate",
         "importPath": "src.schemas.test_schema",
         "description": "src.schemas.test_schema",
         "isExtraImport": true,
@@ -4156,6 +4268,22 @@
         "documentation": {}
     },
     {
+        "label": "FileService",
+        "importPath": "src.services.file_service",
+        "description": "src.services.file_service",
+        "isExtraImport": true,
+        "detail": "src.services.file_service",
+        "documentation": {}
+    },
+    {
+        "label": "FileService",
+        "importPath": "src.services.file_service",
+        "description": "src.services.file_service",
+        "isExtraImport": true,
+        "detail": "src.services.file_service",
+        "documentation": {}
+    },
+    {
         "label": "LLMService",
         "importPath": "src.services.llm_service",
         "description": "src.services.llm_service",
@@ -4266,14 +4394,6 @@
         "description": "dataclasses",
         "isExtraImport": true,
         "detail": "dataclasses",
-        "documentation": {}
-    },
-    {
-        "label": "FileService",
-        "importPath": "src.services.file_service",
-        "description": "src.services.file_service",
-        "isExtraImport": true,
-        "detail": "src.services.file_service",
         "documentation": {}
     },
     {
@@ -4897,6 +5017,60 @@
         "documentation": {}
     },
     {
+        "label": "upgrade",
+        "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.003_add_math_mode",
+        "description": "study-app-backend.src.migrations.versions.003_add_math_mode",
+        "peekOfCode": "def upgrade() -> None:\n    op.add_column(\n        \"tests\",\n        sa.Column(\"is_math_mode\", sa.Boolean(), nullable=False, server_default=\"false\"),\n    )\ndef downgrade() -> None:\n    op.drop_column(\"tests\", \"is_math_mode\")",
+        "detail": "study-app-backend.src.migrations.versions.003_add_math_mode",
+        "documentation": {}
+    },
+    {
+        "label": "downgrade",
+        "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.003_add_math_mode",
+        "description": "study-app-backend.src.migrations.versions.003_add_math_mode",
+        "peekOfCode": "def downgrade() -> None:\n    op.drop_column(\"tests\", \"is_math_mode\")",
+        "detail": "study-app-backend.src.migrations.versions.003_add_math_mode",
+        "documentation": {}
+    },
+    {
+        "label": "revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.003_add_math_mode",
+        "description": "study-app-backend.src.migrations.versions.003_add_math_mode",
+        "peekOfCode": "revision = \"003_add_math_mode\"\ndown_revision = \"002_add_kojo_tables\"\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.add_column(\n        \"tests\",\n        sa.Column(\"is_math_mode\", sa.Boolean(), nullable=False, server_default=\"false\"),\n    )\ndef downgrade() -> None:",
+        "detail": "study-app-backend.src.migrations.versions.003_add_math_mode",
+        "documentation": {}
+    },
+    {
+        "label": "down_revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.003_add_math_mode",
+        "description": "study-app-backend.src.migrations.versions.003_add_math_mode",
+        "peekOfCode": "down_revision = \"002_add_kojo_tables\"\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.add_column(\n        \"tests\",\n        sa.Column(\"is_math_mode\", sa.Boolean(), nullable=False, server_default=\"false\"),\n    )\ndef downgrade() -> None:\n    op.drop_column(\"tests\", \"is_math_mode\")",
+        "detail": "study-app-backend.src.migrations.versions.003_add_math_mode",
+        "documentation": {}
+    },
+    {
+        "label": "branch_labels",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.003_add_math_mode",
+        "description": "study-app-backend.src.migrations.versions.003_add_math_mode",
+        "peekOfCode": "branch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.add_column(\n        \"tests\",\n        sa.Column(\"is_math_mode\", sa.Boolean(), nullable=False, server_default=\"false\"),\n    )\ndef downgrade() -> None:\n    op.drop_column(\"tests\", \"is_math_mode\")",
+        "detail": "study-app-backend.src.migrations.versions.003_add_math_mode",
+        "documentation": {}
+    },
+    {
+        "label": "depends_on",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.003_add_math_mode",
+        "description": "study-app-backend.src.migrations.versions.003_add_math_mode",
+        "peekOfCode": "depends_on = None\ndef upgrade() -> None:\n    op.add_column(\n        \"tests\",\n        sa.Column(\"is_math_mode\", sa.Boolean(), nullable=False, server_default=\"false\"),\n    )\ndef downgrade() -> None:\n    op.drop_column(\"tests\", \"is_math_mode\")",
+        "detail": "study-app-backend.src.migrations.versions.003_add_math_mode",
+        "documentation": {}
+    },
+    {
         "label": "run_migrations_offline",
         "kind": 2,
         "importPath": "study-app-backend.src.migrations.env",
@@ -5045,7 +5219,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.models.test",
         "description": "study-app-backend.src.models.test",
-        "peekOfCode": "class Test(Base, TimestampMixin):\n    __tablename__ = \"tests\"\n    id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)\n    folder_id: Mapped[int] = mapped_column(\n        BIGINT_ID, ForeignKey(\"folders.id\", ondelete=\"CASCADE\"), nullable=False, index=True\n    )\n    title: Mapped[str] = mapped_column(String(255), nullable=False)\n    description: Mapped[Optional[str]] = mapped_column(Text)\n    test_type: Mapped[str] = mapped_column(String(50), nullable=False)\n    folder: Mapped[Folder] = relationship(\"Folder\", back_populates=\"tests\")",
+        "peekOfCode": "class Test(Base, TimestampMixin):\n    __tablename__ = \"tests\"\n    id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)\n    folder_id: Mapped[int] = mapped_column(\n        BIGINT_ID, ForeignKey(\"folders.id\", ondelete=\"CASCADE\"), nullable=False, index=True\n    )\n    title: Mapped[str] = mapped_column(String(255), nullable=False)\n    description: Mapped[Optional[str]] = mapped_column(Text)\n    test_type: Mapped[str] = mapped_column(String(50), nullable=False)\n    is_math_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=\"false\")",
         "detail": "study-app-backend.src.models.test",
         "documentation": {}
     },
@@ -5108,7 +5282,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.repositories.flashcard_repository",
         "description": "study-app-backend.src.repositories.flashcard_repository",
-        "peekOfCode": "class FlashcardRepository(BaseRepository[Flashcard]):\n    async def create(self, folder_id: int, front: str, back: str, source: str | None) -> Flashcard:\n        flashcard = Flashcard(folder_id=folder_id, front=front, back=back, source=source)\n        self.session.add(flashcard)\n        await self.session.flush()\n        return flashcard\n    async def get(self, flashcard_id: int) -> Flashcard | None:\n        return await self.session.scalar(select(Flashcard).where(Flashcard.id == flashcard_id))\n    async def list_with_stats(self, folder_id: int, user_id: int) -> list[tuple[Flashcard, int, int, float | None, object]]:\n        correct_count = func.sum(case((FlashcardAttempt.correct.is_(True), 1), else_=0))",
+        "peekOfCode": "class FlashcardRepository(BaseRepository[Flashcard]):\n    async def create(self, folder_id: int, front: str, back: str, source: str | None) -> Flashcard:\n        flashcard = Flashcard(folder_id=folder_id, front=front, back=back, source=source)\n        self.session.add(flashcard)\n        await self.session.flush()\n        return flashcard\n    async def get(self, flashcard_id: int) -> Flashcard | None:\n        return await self.session.scalar(select(Flashcard).where(Flashcard.id == flashcard_id))\n    async def update(self, card: Flashcard, front: str, back: str) -> Flashcard:\n        card.front = front",
         "detail": "study-app-backend.src.repositories.flashcard_repository",
         "documentation": {}
     },
@@ -5135,7 +5309,16 @@
         "kind": 6,
         "importPath": "study-app-backend.src.repositories.test_repository",
         "description": "study-app-backend.src.repositories.test_repository",
-        "peekOfCode": "class TestRepository(BaseRepository[Test]):\n    async def create(self, folder_id: int, title: str, test_type: str, description: str | None) -> Test:\n        test = Test(folder_id=folder_id, title=title, test_type=test_type, description=description)\n        self.session.add(test)\n        await self.session.flush()\n        return test\n    async def get_owned(self, test_id: int, user_id: int) -> Test | None:\n        stmt = select(Test).join(Folder, Folder.id == Test.folder_id).where(\n            Test.id == test_id,\n            Folder.user_id == user_id,",
+        "peekOfCode": "class TestRepository(BaseRepository[Test]):\n    async def create(\n        self, folder_id: int, title: str, test_type: str, description: str | None, is_math_mode: bool = False\n    ) -> Test:\n        test = Test(\n            folder_id=folder_id,\n            title=title,\n            test_type=test_type,\n            description=description,\n            is_math_mode=is_math_mode,",
+        "detail": "study-app-backend.src.repositories.test_repository",
+        "documentation": {}
+    },
+    {
+        "label": "_QUESTION_WITH_ANSWERS",
+        "kind": 5,
+        "importPath": "study-app-backend.src.repositories.test_repository",
+        "description": "study-app-backend.src.repositories.test_repository",
+        "peekOfCode": "_QUESTION_WITH_ANSWERS = (\n    selectinload(Question.mcq_options),\n    selectinload(Question.frq_answer),\n)\nclass TestRepository(BaseRepository[Test]):\n    async def create(\n        self, folder_id: int, title: str, test_type: str, description: str | None, is_math_mode: bool = False\n    ) -> Test:\n        test = Test(\n            folder_id=folder_id,",
         "detail": "study-app-backend.src.repositories.test_repository",
         "documentation": {}
     },
@@ -5162,7 +5345,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.routes.auth",
         "description": "study-app-backend.src.routes.auth",
-        "peekOfCode": "router = APIRouter(prefix=\"/auth\", tags=[\"auth\"])\n@router.post(\"/guest\", response_model=AuthResponse)\nasync def guest_auth(\n    session: AsyncSession = Depends(get_session),\n) -> AuthResponse:\n    return await AuthService().authenticate_guest(session)\n@router.post(\"/google\", response_model=AuthResponse)\nasync def google_auth(\n    request: GoogleAuthRequest,\n    session: AsyncSession = Depends(get_session),",
+        "peekOfCode": "router = APIRouter(prefix=\"/auth\", tags=[\"auth\"])\n@router.post(\"/google\", response_model=AuthResponse)\nasync def google_auth(\n    request: GoogleAuthRequest,\n    session: AsyncSession = Depends(get_session),\n) -> AuthResponse:\n    try:\n        return await AuthService().authenticate_google_token(request.token, session)\n    except httpx.HTTPStatusError as exc:\n        raise HTTPException(status_code=401, detail=\"Invalid Google token\") from exc",
         "detail": "study-app-backend.src.routes.auth",
         "documentation": {}
     },
@@ -5225,7 +5408,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.attempt_schema",
         "description": "study-app-backend.src.schemas.attempt_schema",
-        "peekOfCode": "class SubmitAttemptRequest(BaseModel):\n    answers: list[SubmittedAnswer] = Field(..., min_length=1)\nclass AnswerResult(BaseModel):\n    question_id: int\n    user_answer: str\n    is_correct: bool\n    feedback: Optional[str] = None\n    confidence: Optional[float] = None\n    flagged_uncertain: bool = False\nclass AttemptResult(BaseModel):",
+        "peekOfCode": "class SubmitAttemptRequest(BaseModel):\n    answers: list[SubmittedAnswer] = Field(..., min_length=1)\nclass AnswerResult(BaseModel):\n    question_id: int\n    question_text: Optional[str] = None\n    user_answer: str\n    correct_answer: Optional[str] = None\n    is_correct: bool\n    feedback: Optional[str] = None\n    confidence: Optional[float] = None",
         "detail": "study-app-backend.src.schemas.attempt_schema",
         "documentation": {}
     },
@@ -5234,7 +5417,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.attempt_schema",
         "description": "study-app-backend.src.schemas.attempt_schema",
-        "peekOfCode": "class AnswerResult(BaseModel):\n    question_id: int\n    user_answer: str\n    is_correct: bool\n    feedback: Optional[str] = None\n    confidence: Optional[float] = None\n    flagged_uncertain: bool = False\nclass AttemptResult(BaseModel):\n    attempt_id: int\n    attempt_number: int",
+        "peekOfCode": "class AnswerResult(BaseModel):\n    question_id: int\n    question_text: Optional[str] = None\n    user_answer: str\n    correct_answer: Optional[str] = None\n    is_correct: bool\n    feedback: Optional[str] = None\n    confidence: Optional[float] = None\n    flagged_uncertain: bool = False\nclass AttemptResult(BaseModel):",
         "detail": "study-app-backend.src.schemas.attempt_schema",
         "documentation": {}
     },
@@ -5252,7 +5435,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.attempt_schema",
         "description": "study-app-backend.src.schemas.attempt_schema",
-        "peekOfCode": "class AttemptSummary(BaseModel):\n    id: int\n    attempt_number: int\n    score: float\n    correct_count: int\n    total: int\n    created_at: datetime\nclass AttemptDetail(AttemptSummary):\n    answers: list[AnswerResult]\nclass FRQGrade(BaseModel):",
+        "peekOfCode": "class AttemptSummary(BaseModel):\n    id: int\n    attempt_number: int\n    score: float\n    correct_count: int\n    total: int\n    created_at: datetime\nclass AttemptDetail(AttemptSummary):\n    test_title: str = \"\"\n    answers: list[AnswerResult]",
         "detail": "study-app-backend.src.schemas.attempt_schema",
         "documentation": {}
     },
@@ -5261,7 +5444,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.attempt_schema",
         "description": "study-app-backend.src.schemas.attempt_schema",
-        "peekOfCode": "class AttemptDetail(AttemptSummary):\n    answers: list[AnswerResult]\nclass FRQGrade(BaseModel):\n    is_correct: bool\n    feedback: str\n    flagged_uncertain: bool = False\n    confidence: float = 0.0",
+        "peekOfCode": "class AttemptDetail(AttemptSummary):\n    test_title: str = \"\"\n    answers: list[AnswerResult]\nclass FRQGrade(BaseModel):\n    is_correct: bool\n    feedback: Optional[str] = None\n    flagged_uncertain: bool = False\n    confidence: float = 0.0",
         "detail": "study-app-backend.src.schemas.attempt_schema",
         "documentation": {}
     },
@@ -5270,7 +5453,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.attempt_schema",
         "description": "study-app-backend.src.schemas.attempt_schema",
-        "peekOfCode": "class FRQGrade(BaseModel):\n    is_correct: bool\n    feedback: str\n    flagged_uncertain: bool = False\n    confidence: float = 0.0",
+        "peekOfCode": "class FRQGrade(BaseModel):\n    is_correct: bool\n    feedback: Optional[str] = None\n    flagged_uncertain: bool = False\n    confidence: float = 0.0",
         "detail": "study-app-backend.src.schemas.attempt_schema",
         "documentation": {}
     },
@@ -5316,6 +5499,15 @@
         "importPath": "study-app-backend.src.schemas.flashcard_schema",
         "description": "study-app-backend.src.schemas.flashcard_schema",
         "peekOfCode": "class FlashcardGenerateRequest(BaseModel):\n    source_type: str = Field(..., pattern=\"^(test|prompt)$\")\n    test_id: Optional[int] = None\n    prompt: Optional[str] = None\n    count: int = Field(default=10, ge=1, le=50)\n    @model_validator(mode=\"after\")\n    def validate_source(self) -> \"FlashcardGenerateRequest\":\n        if self.source_type == \"test\" and self.test_id is None:\n            raise ValueError(\"test_id is required when source_type is test\")\n        if self.source_type == \"prompt\" and not self.prompt:",
+        "detail": "study-app-backend.src.schemas.flashcard_schema",
+        "documentation": {}
+    },
+    {
+        "label": "FlashcardUpdate",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.flashcard_schema",
+        "description": "study-app-backend.src.schemas.flashcard_schema",
+        "peekOfCode": "class FlashcardUpdate(BaseModel):\n    front: str = Field(..., min_length=1)\n    back: str = Field(..., min_length=1)\nclass FlashcardAttemptCreate(BaseModel):\n    correct: bool\n    time_ms: Optional[int] = Field(default=None, ge=0)\nclass FlashcardResponse(BaseModel):\n    model_config = ConfigDict(from_attributes=True)\n    id: int\n    folder_id: int",
         "detail": "study-app-backend.src.schemas.flashcard_schema",
         "documentation": {}
     },
@@ -5405,7 +5597,25 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class MCQOptionPublic(BaseModel):\n    id: int\n    text: str\n    is_correct: None = None\nclass QuestionPublic(BaseModel):\n    id: int\n    type: str\n    question_text: str\n    options: list[MCQOptionPublic] = Field(default_factory=list)\nclass TestResponse(BaseModel):",
+        "peekOfCode": "class MCQOptionPublic(BaseModel):\n    id: int\n    text: str\n    is_correct: None = None\nclass MCQOptionEditable(BaseModel):\n    id: int\n    text: str\n    is_correct: bool\nclass MCQOptionInput(BaseModel):\n    text: str",
+        "detail": "study-app-backend.src.schemas.test_schema",
+        "documentation": {}
+    },
+    {
+        "label": "MCQOptionEditable",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.test_schema",
+        "description": "study-app-backend.src.schemas.test_schema",
+        "peekOfCode": "class MCQOptionEditable(BaseModel):\n    id: int\n    text: str\n    is_correct: bool\nclass MCQOptionInput(BaseModel):\n    text: str\n    is_correct: bool\nclass QuestionPublic(BaseModel):\n    id: int\n    type: str",
+        "detail": "study-app-backend.src.schemas.test_schema",
+        "documentation": {}
+    },
+    {
+        "label": "MCQOptionInput",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.test_schema",
+        "description": "study-app-backend.src.schemas.test_schema",
+        "peekOfCode": "class MCQOptionInput(BaseModel):\n    text: str\n    is_correct: bool\nclass QuestionPublic(BaseModel):\n    id: int\n    type: str\n    question_text: str\n    options: list[MCQOptionPublic] = Field(default_factory=list)\nclass QuestionEditable(BaseModel):\n    id: int",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -5414,7 +5624,34 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class QuestionPublic(BaseModel):\n    id: int\n    type: str\n    question_text: str\n    options: list[MCQOptionPublic] = Field(default_factory=list)\nclass TestResponse(BaseModel):\n    model_config = ConfigDict(from_attributes=True)\n    id: int\n    folder_id: int\n    title: str",
+        "peekOfCode": "class QuestionPublic(BaseModel):\n    id: int\n    type: str\n    question_text: str\n    options: list[MCQOptionPublic] = Field(default_factory=list)\nclass QuestionEditable(BaseModel):\n    id: int\n    type: str\n    question_text: str\n    options: list[MCQOptionEditable] = Field(default_factory=list)",
+        "detail": "study-app-backend.src.schemas.test_schema",
+        "documentation": {}
+    },
+    {
+        "label": "QuestionEditable",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.test_schema",
+        "description": "study-app-backend.src.schemas.test_schema",
+        "peekOfCode": "class QuestionEditable(BaseModel):\n    id: int\n    type: str\n    question_text: str\n    options: list[MCQOptionEditable] = Field(default_factory=list)\n    expected_answer: Optional[str] = None\nclass QuestionCreate(BaseModel):\n    type: str\n    question_text: str = Field(min_length=1)\n    options: list[MCQOptionInput] = Field(default_factory=list)",
+        "detail": "study-app-backend.src.schemas.test_schema",
+        "documentation": {}
+    },
+    {
+        "label": "QuestionCreate",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.test_schema",
+        "description": "study-app-backend.src.schemas.test_schema",
+        "peekOfCode": "class QuestionCreate(BaseModel):\n    type: str\n    question_text: str = Field(min_length=1)\n    options: list[MCQOptionInput] = Field(default_factory=list)\n    expected_answer: Optional[str] = None\nclass QuestionUpdate(BaseModel):\n    question_text: Optional[str] = Field(default=None, min_length=1)\n    options: Optional[list[MCQOptionInput]] = None\n    expected_answer: Optional[str] = None\nclass TestResponse(BaseModel):",
+        "detail": "study-app-backend.src.schemas.test_schema",
+        "documentation": {}
+    },
+    {
+        "label": "QuestionUpdate",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.test_schema",
+        "description": "study-app-backend.src.schemas.test_schema",
+        "peekOfCode": "class QuestionUpdate(BaseModel):\n    question_text: Optional[str] = Field(default=None, min_length=1)\n    options: Optional[list[MCQOptionInput]] = None\n    expected_answer: Optional[str] = None\nclass TestResponse(BaseModel):\n    model_config = ConfigDict(from_attributes=True)\n    id: int\n    folder_id: int\n    title: str\n    description: Optional[str] = None",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -5423,7 +5660,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class TestResponse(BaseModel):\n    model_config = ConfigDict(from_attributes=True)\n    id: int\n    folder_id: int\n    title: str\n    description: Optional[str] = None\n    test_type: str\n    created_at: datetime\n    updated_at: datetime\nclass TestSummary(BaseModel):",
+        "peekOfCode": "class TestResponse(BaseModel):\n    model_config = ConfigDict(from_attributes=True)\n    id: int\n    folder_id: int\n    title: str\n    description: Optional[str] = None\n    test_type: str\n    is_math_mode: bool = False\n    created_at: datetime\n    updated_at: datetime",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -5441,7 +5678,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class TestUpdate(BaseModel):\n    title: Optional[str] = Field(default=None, min_length=1, max_length=255)\n    description: Optional[str] = None\nclass TestTakeResponse(BaseModel):\n    id: int\n    title: str\n    description: Optional[str] = None\n    test_type: str\n    questions: list[QuestionPublic]\nclass CreateTestResponse(BaseModel):",
+        "peekOfCode": "class TestUpdate(BaseModel):\n    title: Optional[str] = Field(default=None, min_length=1, max_length=255)\n    description: Optional[str] = None\nclass TestTakeResponse(BaseModel):\n    id: int\n    title: str\n    description: Optional[str] = None\n    test_type: str\n    is_math_mode: bool = False\n    questions: list[QuestionPublic]",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -5450,7 +5687,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class TestTakeResponse(BaseModel):\n    id: int\n    title: str\n    description: Optional[str] = None\n    test_type: str\n    questions: list[QuestionPublic]\nclass CreateTestResponse(BaseModel):\n    test_id: int\n    title: str\n    questions_generated: int",
+        "peekOfCode": "class TestTakeResponse(BaseModel):\n    id: int\n    title: str\n    description: Optional[str] = None\n    test_type: str\n    is_math_mode: bool = False\n    questions: list[QuestionPublic]\nclass CreateTestResponse(BaseModel):\n    test_id: int\n    title: str",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -5594,7 +5831,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "class LLMService:\n    async def generate_test_questions(\n        self,\n        notes: str,\n        test_type: str,\n        count_mcq: int = 10,\n        count_frq: int = 5,\n    ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:\n        if test_type == \"MCQ_only\":\n            count_frq = 0",
+        "peekOfCode": "class LLMService:\n    async def generate_test_questions(\n        self,\n        notes: str,\n        test_type: str,\n        count_mcq: int = 10,\n        count_frq: int = 5,\n        is_math_mode: bool = False,\n    ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:\n        if test_type == \"MCQ_only\":",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -5612,7 +5849,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "_EXTRACT_CHAR_LIMIT = 10_000\n_GENERATE_CHAR_LIMIT = 8_000\nclass LLMService:\n    async def generate_test_questions(\n        self,\n        notes: str,\n        test_type: str,\n        count_mcq: int = 10,\n        count_frq: int = 5,\n    ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:",
+        "peekOfCode": "_EXTRACT_CHAR_LIMIT = 10_000\n_GENERATE_CHAR_LIMIT = 8_000\nclass LLMService:\n    async def generate_test_questions(\n        self,\n        notes: str,\n        test_type: str,\n        count_mcq: int = 10,\n        count_frq: int = 5,\n        is_math_mode: bool = False,",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -5621,7 +5858,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "_GENERATE_CHAR_LIMIT = 8_000\nclass LLMService:\n    async def generate_test_questions(\n        self,\n        notes: str,\n        test_type: str,\n        count_mcq: int = 10,\n        count_frq: int = 5,\n    ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:\n        if test_type == \"MCQ_only\":",
+        "peekOfCode": "_GENERATE_CHAR_LIMIT = 8_000\nclass LLMService:\n    async def generate_test_questions(\n        self,\n        notes: str,\n        test_type: str,\n        count_mcq: int = 10,\n        count_frq: int = 5,\n        is_math_mode: bool = False,\n    ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },

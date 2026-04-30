@@ -25,7 +25,9 @@ class SubmitAttemptRequest(BaseModel):
 
 class AnswerResult(BaseModel):
     question_id: int
+    question_text: Optional[str] = None
     user_answer: str
+    correct_answer: Optional[str] = None
     is_correct: bool
     feedback: Optional[str] = None
     confidence: Optional[float] = None
@@ -51,6 +53,7 @@ class AttemptSummary(BaseModel):
 
 
 class AttemptDetail(AttemptSummary):
+    test_title: str = ""
     answers: list[AnswerResult]
 
 

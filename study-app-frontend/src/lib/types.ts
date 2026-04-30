@@ -42,6 +42,38 @@ export type Question = {
   options: MCQOption[];
 };
 
+export type MCQOptionEditable = {
+  id: ID;
+  text: string;
+  is_correct: boolean;
+};
+
+export type MCQOptionInput = {
+  text: string;
+  is_correct: boolean;
+};
+
+export type QuestionEditable = {
+  id: ID;
+  type: "MCQ" | "FRQ" | string;
+  question_text: string;
+  options: MCQOptionEditable[];
+  expected_answer?: string | null;
+};
+
+export type QuestionCreate = {
+  type: "MCQ" | "FRQ";
+  question_text: string;
+  options: MCQOptionInput[];
+  expected_answer?: string | null;
+};
+
+export type QuestionUpdate = {
+  question_text?: string;
+  options?: MCQOptionInput[];
+  expected_answer?: string;
+};
+
 export type TestTake = {
   id: ID;
   title: string;
@@ -57,12 +89,13 @@ export type SubmittedAnswer = {
 
 export type AnswerResult = {
   question_id: ID;
+  question_text?: string | null;
   user_answer: string;
+  correct_answer?: string | null;
   is_correct: boolean;
   feedback?: string | null;
   confidence?: number | null;
   flagged_uncertain: boolean;
-  question_text?: string;
 };
 
 export type AttemptResult = {
@@ -72,6 +105,25 @@ export type AttemptResult = {
   correct_count: number;
   total: number;
   answers: AnswerResult[];
+};
+
+export type AttemptSummary = {
+  id: ID;
+  attempt_number: number;
+  score: number;
+  correct_count: number;
+  total: number;
+  created_at: string;
+};
+
+export type AttemptDetail = AttemptSummary & {
+  test_title: string;
+  answers: AnswerResult[];
+};
+
+export type FlashcardUpdate = {
+  front: string;
+  back: string;
 };
 
 export type Flashcard = {

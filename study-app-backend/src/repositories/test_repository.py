@@ -12,10 +12,23 @@ from src.models.test import Test
 from src.models.user_attempt import UserAttempt
 from src.repositories.base_repository import BaseRepository
 
+_QUESTION_WITH_ANSWERS = (
+    selectinload(Question.mcq_options),
+    selectinload(Question.frq_answer),
+)
+
 
 class TestRepository(BaseRepository[Test]):
-    async def create(self, folder_id: int, title: str, test_type: str, description: str | None) -> Test:
-        test = Test(folder_id=folder_id, title=title, test_type=test_type, description=description)
+    async def create(
+        self, folder_id: int, title: str, test_type: str, description: str | None, is_math_mode: bool = False
+    ) -> Test:
+        test = Test(
+            folder_id=folder_id,
+            title=title,
+            test_type=test_type,
+            description=description,
+            is_math_mode=is_math_mode,
+        )
         self.session.add(test)
         await self.session.flush()
         return test
@@ -138,4 +151,47 @@ class TestRepository(BaseRepository[Test]):
 
     async def delete(self, test: Test) -> None:
         await self.session.delete(test)
+
+    async def get_questions_for_editing(self, test_id: int, user_id: int) -> list[Question]:
+        stmt = (
+            select(Question)
+            .join(Test, Test.id == Question.test_id)
+            .join(Folder, Folder.id == Test.folder_id)
+            .where(Test.id == test_id, Folder.user_id == user_id)
+            .options(*_QUESTION_WITH_ANSWERS)
+            .order_by(Question.display_order)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_question_owned(self, question_id: int, user_id: int) -> Question | None:
+        stmt = (
+            select(Question)
+            .join(Test, Test.id == Question.test_id)
+            .join(Folder, Folder.id == Test.folder_id)
+            .where(Question.id == question_id, Folder.user_id == user_id)
+            .options(*_QUESTION_WITH_ANSWERS)
+        )
+        return await self.session.scalar(stmt)
+
+    async def get_max_display_order(self, test_id: int) -> int:
+        result = await self.session.scalar(
+            select(func.max(Question.display_order)).where(Question.test_id == test_id)
+        )
+        return int(result) if result is not None else 0
+
+    async def update_mcq_options(self, question: Question, options: list[tuple[str, bool]]) -> None:
+        for opt in list(question.mcq_options):
+            await self.session.delete(opt)
+        await self.session.flush()
+        for index, (option_text, is_correct) in enumerate(options, start=1):
+            self.session.add(MCQOption(
+                question_id=question.id,
+                option_text=option_text,
+                is_correct=is_correct,
+                display_order=index,
+            ))
+
+    async def delete_question(self, question: Question) -> None:
+        await self.session.delete(question)
 
