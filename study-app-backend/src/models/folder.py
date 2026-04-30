@@ -9,6 +9,7 @@ from src.models.base import BIGINT_ID, Base, TimestampMixin
 
 if TYPE_CHECKING:
     from src.models.flashcard import Flashcard
+    from src.models.folder_file import FolderFile
     from src.models.kojo_conversation import KojoConversation
     from src.models.test import Test
     from src.models.user import User
@@ -35,6 +36,9 @@ class Folder(Base, TimestampMixin):
     )
     kojo_conversations: Mapped[list[KojoConversation]] = relationship(
         "KojoConversation", back_populates="folder", cascade="all, delete-orphan"
+    )
+    files: Mapped[list[FolderFile]] = relationship(
+        "FolderFile", back_populates="folder", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:

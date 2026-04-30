@@ -2409,3 +2409,149 @@ h3 {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Math rendering (KaTeX) ── */
+.math-inline { display: inline; vertical-align: middle; }
+.math-block {
+  display: block;
+  overflow-x: auto;
+  margin: 12px 0;
+  padding: 10px 16px;
+  background: var(--green-lightest);
+  border-left: 3px solid var(--green-dark);
+  border-radius: 0 6px 6px 0;
+  text-align: center;
+}
+
+/* ── MathInput preview ── */
+.math-input-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.math-preview-toggle {
+  font-size: 0.78rem;
+  color: var(--green-dark);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+.math-preview {
+  background: var(--white);
+  border: 1.5px solid var(--green-light);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  overflow-x: auto;
+}
+.math-preview-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--green-dark-mid);
+  margin-bottom: 6px;
+}
+.math-preview-rendered { font-size: 1.1rem; }
+
+/* ── Math keyboard revamp ── */
+.math-keyboard { background: var(--green-lightest); border: 1.5px solid var(--green-light); border-radius: 10px; overflow: hidden; margin-top: 8px; }
+.math-keyboard-tabs { display: flex; overflow-x: auto; border-bottom: 1.5px solid var(--green-light); background: var(--white); scrollbar-width: none; }
+.math-keyboard-tabs::-webkit-scrollbar { display: none; }
+.math-tab { flex-shrink: 0; padding: 8px 14px; font-size: 0.78rem; font-weight: 600; background: none; border: none; cursor: pointer; color: var(--green-dark-mid); transition: background var(--transition-fast); white-space: nowrap; }
+.math-tab.active { background: var(--green-lightest); color: var(--green-dark); border-bottom: 2px solid var(--green-dark); }
+.math-keyboard-symbols { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; }
+.math-sym-btn {
+  min-width: 44px; min-height: 38px;
+  padding: 4px 10px;
+  background: var(--white);
+  border: 1.5px solid var(--green-light);
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+  font-size: 0.9rem;
+}
+.math-sym-btn:hover { background: var(--green-lightest); border-color: var(--green-dark); }
+.math-sym-btn .katex { font-size: 0.95rem; }
+
+/* ── File manager ── */
+.file-manager-list { display: flex; flex-direction: column; gap: 4px; }
+.file-manager-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  background: var(--white);
+  border: 1.5px solid var(--green-light);
+  border-radius: 8px;
+  transition: border-color var(--transition-fast);
+}
+.file-manager-row:hover { border-color: var(--green-dark-mid); }
+.row-action-btn { background: none; border: none; cursor: pointer; padding: 4px; border-radius: 4px; display: flex; align-items: center; }
+.row-action-btn:hover { background: var(--green-lightest); }
+
+/* ── Coding mode ── */
+.code-editor-wrap { margin-top: 8px; }
+.code-editor-frame {
+  border: 1.5px solid var(--green-light);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+/* ── Kojo UI revamp ── */
+.kojo-header-center { display: flex; align-items: center; gap: 6px; }
+.kojo-provider-label { font-size: 0.75rem; color: rgba(255,255,255,0.7); font-weight: 500; }
+.kojo-provider-select {
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: var(--white);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.kojo-provider-select option { background: var(--green-dark); color: var(--white); }
+
+.kojo-avatar {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.kojo-header-online {
+  display: inline-block;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #4ade80;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+
+.kojo-message-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.kojo-message-time { font-size: 0.72rem; color: var(--green-dark-mid); opacity: 0.75; }
+.kojo-message-time--user { display: block; font-size: 0.7rem; opacity: 0.6; margin-top: 4px; text-align: right; }
+.kojo-thinking-label { font-style: italic; }
+
+.kojo-msg-avatar {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--green-lightest);
+  border: 1.5px solid var(--green-light);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.kojo-empty-icon {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: var(--green-lightest);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 12px;
+  color: var(--green-dark);
+}
