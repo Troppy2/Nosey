@@ -308,10 +308,12 @@ export async function recordFlashcardAttempt(folderId: number, cardId: number, c
   }
 }
 
-export async function kojoChat(folderId: number, message: string): Promise<KojoChatResponse> {
+export async function kojoChat(folderId: number, message: string, provider?: string): Promise<KojoChatResponse> {
+  const body: any = { message };
+  if (provider) body.provider = provider;
   return request<KojoChatResponse>(`/kojo/folders/${folderId}/chat`, {
     method: "POST",
-    body: JSON.stringify({ message }),
+    body: JSON.stringify(body),
   });
 }
 
