@@ -1,4 +1,4 @@
-import { ArrowLeft, FileText, Settings2, Upload } from "lucide-react";
+import { ArrowLeft, Calculator, FileText, Settings2, Upload } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -29,6 +29,7 @@ export default function CreateTest() {
   const [reviewBeforeTaking, setReviewBeforeTaking] = useState(false);
   const [practiceTestFile, setPracticeTestFile] = useState<File | null>(null);
   const practiceTestInputRef = useRef<HTMLInputElement>(null);
+  const [isMathMode, setIsMathMode] = useState(false);
 
   useEffect(() => {
     fetchFolders().then((data) => {
@@ -51,6 +52,7 @@ export default function CreateTest() {
         countMcq: advancedMode ? countMcq : undefined,
         countFrq: advancedMode ? countFrq : undefined,
         practiceTestFile: advancedMode ? practiceTestFile : null,
+        isMathMode,
       });
       if (advancedMode && reviewBeforeTaking) {
         navigate(`/test/${result.test_id}/edit`);
@@ -181,6 +183,26 @@ export default function CreateTest() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="field">
+              <span className="field-label">Mode</span>
+              <button
+                type="button"
+                className={`math-mode-toggle ${isMathMode ? "active" : ""}`}
+                onClick={() => setIsMathMode((v) => !v)}
+              >
+                <Calculator size={16} />
+                <span>
+                  <strong>Math mode</strong>
+                  <span className="math-mode-toggle-sub">
+                    Generates calculation problems · symbol keyboard · step-by-step explanations
+                  </span>
+                </span>
+                <span className={`math-mode-pill ${isMathMode ? "on" : "off"}`}>
+                  {isMathMode ? "On" : "Off"}
+                </span>
+              </button>
             </div>
           </Card>
 

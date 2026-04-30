@@ -72,6 +72,7 @@ class GradingService:
                     feedback=grade.feedback,
                     confidence=grade.confidence,
                     flagged_uncertain=grade.flagged_uncertain,
+                    is_math=is_math_mode and question.question_type == "FRQ",
                 )
             )
 

@@ -79,6 +79,7 @@ export type TestTake = {
   title: string;
   description?: string | null;
   test_type: string;
+  is_math_mode?: boolean;
   questions: Question[];
 };
 
@@ -96,6 +97,7 @@ export type AnswerResult = {
   feedback?: string | null;
   confidence?: number | null;
   flagged_uncertain: boolean;
+  is_math?: boolean;
 };
 
 export type AttemptResult = {

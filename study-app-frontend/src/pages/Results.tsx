@@ -1,43 +1,17 @@
-import { AlertTriangle, Brain, CheckCircle2, ChevronDown, RotateCcw, XCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Brain, Calculator, CheckCircle2, ChevronDown, RotateCcw, XCircle } from "lucide-react";
+import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
-import { fetchAttemptDetail } from "../lib/api";
+import { MarkdownContent } from "../components/MarkdownContent";
 import { scoreTone } from "../lib/format";
-import type { AnswerResult, AttemptDetail, AttemptResult } from "../lib/types";
-
-type DisplayAttempt = AttemptResult | AttemptDetail;
+import type { AnswerResult, AttemptResult } from "../lib/types";
 
 export default function Results() {
   const { attemptId } = useParams();
-  const [attempt, setAttempt] = useState<DisplayAttempt | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!attemptId) { setLoading(false); return; }
-    const stored = sessionStorage.getItem(`nosey_attempt_${attemptId}`);
-    if (stored) {
-      setAttempt(JSON.parse(stored) as AttemptResult);
-      setLoading(false);
-      return;
-    }
-    fetchAttemptDetail(Number(attemptId))
-      .then(setAttempt)
-      .catch(() => setAttempt(null))
-      .finally(() => setLoading(false));
-  }, [attemptId]);
-
-  if (loading) {
-    return (
-      <div className="page centered-block">
-        <span className="loader" />
-      </div>
-    );
-  }
-
-  if (!attempt) {
+  const stored = attemptId ? sessionStorage.getItem(`nosey_attempt_${attemptId}`) : null;
+  if (!stored) {
     return (
       <div className="page page-narrow">
         <EmptyState
@@ -53,17 +27,15 @@ export default function Results() {
       </div>
     );
   }
-
-  const attemptNumber = "attempt_number" in attempt ? attempt.attempt_number : (attempt as AttemptDetail).attempt_number;
-  const testTitle = "test_title" in attempt ? (attempt as AttemptDetail).test_title : null;
+  const attempt: AttemptResult = JSON.parse(stored) as AttemptResult;
   const tone = scoreTone(attempt.score);
-  const missed = useMemo(() => attempt.answers.filter((a) => !a.is_correct), [attempt.answers]);
+  const missed = useMemo(() => attempt.answers.filter((answer) => !answer.is_correct), [attempt.answers]);
+  const hasMath = attempt.answers.some((a) => a.is_math);
 
   return (
     <div className="page page-narrow">
       <Card className={`score-hero score-${tone}`}>
-        {testTitle ? <span className="eyebrow">{testTitle}</span> : null}
-        <span className="eyebrow">Attempt {attemptNumber}</span>
+        <span className="eyebrow">Attempt {attempt.attempt_number}</span>
         <strong>{Math.round(attempt.score)}%</strong>
         <p>
           {attempt.correct_count} of {attempt.total} correct
@@ -81,9 +53,16 @@ export default function Results() {
         </Card>
         <Card>
           <span>Flagged</span>
-          <strong>{attempt.answers.filter((a) => a.flagged_uncertain).length}</strong>
+          <strong>{attempt.answers.filter((answer) => answer.flagged_uncertain).length}</strong>
         </Card>
       </div>
+
+      {hasMath && (
+        <Card className="math-mode-notice">
+          <Calculator size={18} />
+          <span>Math mode — tap any question to see the full worked solution and step-by-step breakdown.</span>
+        </Card>
+      )}
 
       {missed.length > 0 ? (
         <Card tone="soft" className="focus-card">
@@ -111,8 +90,8 @@ export default function Results() {
           <h2>Answer Review</h2>
         </div>
         <div className="review-list">
-          {attempt.answers.map((answer, index) => (
-            <ReviewItem answer={answer} key={answer.question_id} number={index + 1} />
+          {attempt.answers.map((answer, i) => (
+            <ReviewItem answer={answer} key={answer.question_id} number={i + 1} />
           ))}
         </div>
       </section>
@@ -138,20 +117,18 @@ function ReviewItem({ answer, number }: { answer: AnswerResult; number: number }
         <div className="review-detail">
           <div>
             <span>Your answer</span>
-            <p>{answer.user_answer}</p>
+            <p className="math-answer-text">{answer.user_answer}</p>
           </div>
-          {!answer.is_correct && answer.correct_answer ? (
-            <div>
-              <span>Correct answer</span>
-              <p>{answer.correct_answer}</p>
+          {answer.is_math && answer.feedback ? (
+            <div className="math-explanation">
+              <MarkdownContent content={answer.feedback} />
             </div>
-          ) : null}
-          {answer.feedback ? (
+          ) : (
             <div>
               <span>Feedback</span>
-              <p>{answer.feedback}</p>
+              <p>{answer.feedback ?? "No feedback returned for this answer."}</p>
             </div>
-          ) : null}
+          )}
           {answer.confidence !== null && answer.confidence !== undefined ? (
             <span className="pill">{Math.round(answer.confidence * 100)}% confidence</span>
           ) : null}
