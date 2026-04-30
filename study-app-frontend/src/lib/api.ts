@@ -3,11 +3,14 @@ import type {
   AttemptResult,
   AttemptSummary,
   AuthUser,
+  KojoClearResponse,
+  KojoClearedConversation,
   Flashcard,
   FlashcardUpdate,
   Folder,
   KojoChatResponse,
   KojoConversation,
+  KojoRestoreResponse,
   QuestionCreate,
   QuestionEditable,
   QuestionUpdate,
@@ -317,6 +320,26 @@ export async function fetchKojoConversation(folderId: number): Promise<KojoConve
     return await request<KojoConversation>(`/kojo/folders/${folderId}/conversation`);
   } catch {
     return null;
+  }
+}
+
+export async function clearKojoConversation(folderId: number): Promise<KojoClearResponse> {
+  return request<KojoClearResponse>(`/kojo/folders/${folderId}/clear`, {
+    method: "POST",
+  });
+}
+
+export async function restoreKojoConversation(folderId: number): Promise<KojoRestoreResponse> {
+  return request<KojoRestoreResponse>(`/kojo/folders/${folderId}/restore`, {
+    method: "POST",
+  });
+}
+
+export async function fetchClearedKojoConversations(): Promise<KojoClearedConversation[]> {
+  try {
+    return await request<KojoClearedConversation[]>("/kojo/conversations/cleared");
+  } catch {
+    return [];
   }
 }
 
