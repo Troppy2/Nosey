@@ -38,6 +38,18 @@ async def list_attempts(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@router.get("/attempts/{attempt_id}", response_model=AttemptDetail)
+async def get_attempt(
+    attempt_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> AttemptDetail:
+    try:
+        return await GradingService().get_attempt_detail(attempt_id, user.id, session)
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.get("/tests/{test_id}/attempts/{attempt_id}", response_model=AttemptDetail)
 async def get_attempt_detail(
     test_id: int,

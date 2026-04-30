@@ -1,16 +1,43 @@
 import { AlertTriangle, Brain, CheckCircle2, ChevronDown, RotateCcw, XCircle } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
+import { fetchAttemptDetail } from "../lib/api";
 import { scoreTone } from "../lib/format";
-import type { AnswerResult, AttemptResult } from "../lib/types";
+import type { AnswerResult, AttemptDetail, AttemptResult } from "../lib/types";
+
+type DisplayAttempt = AttemptResult | AttemptDetail;
 
 export default function Results() {
   const { attemptId } = useParams();
-  const stored = attemptId ? sessionStorage.getItem(`nosey_attempt_${attemptId}`) : null;
-  if (!stored) {
+  const [attempt, setAttempt] = useState<DisplayAttempt | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!attemptId) { setLoading(false); return; }
+    const stored = sessionStorage.getItem(`nosey_attempt_${attemptId}`);
+    if (stored) {
+      setAttempt(JSON.parse(stored) as AttemptResult);
+      setLoading(false);
+      return;
+    }
+    fetchAttemptDetail(Number(attemptId))
+      .then(setAttempt)
+      .catch(() => setAttempt(null))
+      .finally(() => setLoading(false));
+  }, [attemptId]);
+
+  if (loading) {
+    return (
+      <div className="page centered-block">
+        <span className="loader" />
+      </div>
+    );
+  }
+
+  if (!attempt) {
     return (
       <div className="page page-narrow">
         <EmptyState
@@ -26,14 +53,17 @@ export default function Results() {
       </div>
     );
   }
-  const attempt: AttemptResult = JSON.parse(stored) as AttemptResult;
+
+  const attemptNumber = "attempt_number" in attempt ? attempt.attempt_number : (attempt as AttemptDetail).attempt_number;
+  const testTitle = "test_title" in attempt ? (attempt as AttemptDetail).test_title : null;
   const tone = scoreTone(attempt.score);
-  const missed = useMemo(() => attempt.answers.filter((answer) => !answer.is_correct), [attempt.answers]);
+  const missed = useMemo(() => attempt.answers.filter((a) => !a.is_correct), [attempt.answers]);
 
   return (
     <div className="page page-narrow">
       <Card className={`score-hero score-${tone}`}>
-        <span className="eyebrow">Attempt {attempt.attempt_number}</span>
+        {testTitle ? <span className="eyebrow">{testTitle}</span> : null}
+        <span className="eyebrow">Attempt {attemptNumber}</span>
         <strong>{Math.round(attempt.score)}%</strong>
         <p>
           {attempt.correct_count} of {attempt.total} correct
@@ -51,7 +81,7 @@ export default function Results() {
         </Card>
         <Card>
           <span>Flagged</span>
-          <strong>{attempt.answers.filter((answer) => answer.flagged_uncertain).length}</strong>
+          <strong>{attempt.answers.filter((a) => a.flagged_uncertain).length}</strong>
         </Card>
       </div>
 
@@ -110,11 +140,21 @@ function ReviewItem({ answer, number }: { answer: AnswerResult; number: number }
             <span>Your answer</span>
             <p>{answer.user_answer}</p>
           </div>
-          <div>
-            <span>Feedback</span>
-            <p>{answer.feedback ?? "No feedback returned for this answer."}</p>
-          </div>
-          {answer.confidence !== null && answer.confidence !== undefined ? <span className="pill">{Math.round(answer.confidence * 100)}% confidence</span> : null}
+          {!answer.is_correct && answer.correct_answer ? (
+            <div>
+              <span>Correct answer</span>
+              <p>{answer.correct_answer}</p>
+            </div>
+          ) : null}
+          {answer.feedback ? (
+            <div>
+              <span>Feedback</span>
+              <p>{answer.feedback}</p>
+            </div>
+          ) : null}
+          {answer.confidence !== null && answer.confidence !== undefined ? (
+            <span className="pill">{Math.round(answer.confidence * 100)}% confidence</span>
+          ) : null}
         </div>
       ) : null}
     </Card>

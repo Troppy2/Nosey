@@ -16,6 +16,15 @@ class FlashcardRepository(BaseRepository[Flashcard]):
     async def get(self, flashcard_id: int) -> Flashcard | None:
         return await self.session.scalar(select(Flashcard).where(Flashcard.id == flashcard_id))
 
+    async def update(self, card: Flashcard, front: str, back: str) -> Flashcard:
+        card.front = front
+        card.back = back
+        await self.session.flush()
+        return card
+
+    async def delete(self, card: Flashcard) -> None:
+        await self.session.delete(card)
+
     async def list_with_stats(self, folder_id: int, user_id: int) -> list[tuple[Flashcard, int, int, float | None, object]]:
         correct_count = func.sum(case((FlashcardAttempt.correct.is_(True), 1), else_=0))
         total_count = func.count(FlashcardAttempt.id)

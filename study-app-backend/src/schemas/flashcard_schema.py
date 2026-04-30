@@ -27,6 +27,11 @@ class FlashcardGenerateRequest(BaseModel):
         return self
 
 
+class FlashcardUpdate(BaseModel):
+    front: str = Field(..., min_length=1)
+    back: str = Field(..., min_length=1)
+
+
 class FlashcardAttemptCreate(BaseModel):
     correct: bool
     time_ms: Optional[int] = Field(default=None, ge=0)

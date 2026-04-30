@@ -56,6 +56,7 @@ class LLMService:
         test_type: str,
         count_mcq: int = 10,
         count_frq: int = 5,
+        is_math_mode: bool = False,
     ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
         if test_type == "MCQ_only":
             count_frq = 0
@@ -64,6 +65,15 @@ class LLMService:
 
         # Strip file metadata (YAML frontmatter, doc markers) before any LLM pass.
         cleaned = self._strip_metadata(notes)
+
+        if is_math_mode:
+            try:
+                prompt = self._build_math_generation_prompt(cleaned, count_mcq, count_frq, test_type)
+                data = await self._complete_json(prompt)
+                return self._parse_generated_test(data, count_mcq, count_frq, cleaned)
+            except Exception as exc:
+                logger.warning("Math question generation failed; using fallback: %s", exc)
+                return self._fallback_questions(cleaned, count_mcq, count_frq)
 
         # Pass 1: extract structured study content from the cleaned notes.
         study = await self._extract_study_content(cleaned)
@@ -170,6 +180,58 @@ class LLMService:
             "mcq items: {question_text, options: [4 strings], correct_index: 0-3}\n"
             "frq items: {question_text, expected_answer}\n"
         )
+
+    async def parse_practice_test(
+        self,
+        content: str,
+        count_mcq: int = 0,
+        count_frq: int = 0,
+    ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
+        """Extract questions from an uploaded practice test document."""
+        cleaned = self._strip_metadata(content)
+        prompt = (
+            "Read the following practice test document and extract every question you find.\n"
+            "For multiple-choice questions: extract the question text, all answer options (exactly 4), "
+            "and which option is correct (0-indexed as correct_index).\n"
+            "For free-response/short-answer questions: extract the question text and any provided "
+            "sample answer or answer key (as expected_answer). If no sample answer is given, "
+            "write a concise expected answer based on the question context.\n\n"
+            "Return JSON only with keys mcq and frq.\n"
+            "mcq items: {question_text, options: [4 strings], correct_index: 0-3}\n"
+            "frq items: {question_text, expected_answer}\n\n"
+            f"PRACTICE TEST:\n{cleaned[:_EXTRACT_CHAR_LIMIT]}"
+        )
+        try:
+            data = await self._complete_json(prompt)
+            mcq_raw = data.get("mcq", [])
+            frq_raw = data.get("frq", [])
+            mcq: list[GeneratedMCQ] = []
+            frq: list[GeneratedFRQ] = []
+            if isinstance(mcq_raw, list):
+                for item in mcq_raw:
+                    if self._is_valid_mcq(item):
+                        options = [str(o) for o in item["options"]][:4]  # type: ignore[index]
+                        mcq.append(GeneratedMCQ(
+                            question_text=str(item.get("question_text", "")),  # type: ignore[union-attr]
+                            options=options,
+                            correct_index=max(0, min(3, int(item.get("correct_index", 0)))),  # type: ignore[union-attr]
+                        ))
+            if isinstance(frq_raw, list):
+                for item in frq_raw:
+                    if self._is_valid_frq(item):
+                        frq.append(GeneratedFRQ(
+                            question_text=str(item.get("question_text", "")),  # type: ignore[union-attr]
+                            expected_answer=str(item.get("expected_answer", "")),  # type: ignore[union-attr]
+                        ))
+            if count_mcq > 0:
+                mcq = mcq[:count_mcq]
+            if count_frq > 0:
+                frq = frq[:count_frq]
+            logger.info("Parsed practice test: %d MCQ, %d FRQ", len(mcq), len(frq))
+            return mcq, frq
+        except Exception as exc:
+            logger.warning("Practice test parsing failed: %s", exc)
+            return [], []
 
     async def grade_frq_answer(
         self,
