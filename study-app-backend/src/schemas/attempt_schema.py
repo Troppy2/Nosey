@@ -56,6 +56,6 @@ class AttemptDetail(AttemptSummary):
 
 class FRQGrade(BaseModel):
     is_correct: bool
-    feedback: str
+    feedback: Optional[str] = None
     flagged_uncertain: bool = False
     confidence: float = 0.0
