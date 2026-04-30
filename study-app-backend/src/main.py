@@ -25,9 +25,12 @@ def _resolve_cors_origins() -> list[str]:
 
 app = FastAPI(title="Study App", version="0.1.0")
 
+# For local development it's sometimes helpful to allow all origins to avoid
+# intermittent CORS issues while debugging frontend/backend connectivity.
+# This is intentionally permissive and should NOT be used in production.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_resolve_cors_origins(),
+    allow_origins=["*"],  # dev-only: allow any origin
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
