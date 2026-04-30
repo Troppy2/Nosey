@@ -413,8 +413,18 @@ Rules:
             logger.warning("LLM flashcard generation failed; using fallback: %s", exc)
             return self._fallback_flashcards(content, count, prompt)
 
-    async def call_kojo(self, prompt: str) -> str:
+    async def call_kojo(self, prompt: str, provider: str | None = None) -> str:
         try:
+            provider = (provider or getattr(settings, "llm_provider", "auto") or "auto").lower()
+            if provider == "auto":
+                if settings.groq_api_key:
+                    return await self._complete_text_groq(prompt)
+                return await self._complete_text_ollama(prompt)
+            if provider == "groq":
+                return await self._complete_text_groq(prompt)
+            if provider == "ollama":
+                return await self._complete_text_ollama(prompt)
+            # fallback to previous behavior
             if settings.groq_api_key:
                 return await self._complete_text_groq(prompt)
             return await self._complete_text_ollama(prompt)
@@ -452,6 +462,16 @@ Rules:
         return str(response.json()["choices"][0]["message"]["content"]).strip()
 
     async def _complete_json(self, prompt: str) -> dict[str, object]:
+        provider = (getattr(settings, "llm_provider", "auto") or "auto").lower()
+        if provider == "auto":
+            if settings.groq_api_key:
+                return await self._complete_groq(prompt)
+            return await self._complete_ollama(prompt)
+        if provider == "groq":
+            return await self._complete_groq(prompt)
+        if provider == "ollama":
+            return await self._complete_ollama(prompt)
+        # fallback
         if settings.groq_api_key:
             return await self._complete_groq(prompt)
         return await self._complete_ollama(prompt)

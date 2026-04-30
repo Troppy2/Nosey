@@ -25,6 +25,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearNotice, setClearNotice] = useState<string | null>(null);
+  const [provider, setProvider] = useState<string>(() => localStorage.getItem("kojo_llm_provider") || "auto");
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -64,7 +65,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
     setError(null);
 
     try {
-      const result = await kojoChat(folderId, messageText);
+      const result = await kojoChat(folderId, messageText, provider);
       const assistantMsg: KojoMessage = {
         id: result.message_id,
         role: "assistant",
@@ -131,6 +132,19 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
               <span className="kojo-header-name">Kojo</span>
               <span className="kojo-header-sub">{folderName}</span>
             </div>
+          </div>
+          <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+            <label style={{fontSize:12, opacity:0.8, marginRight:4}}>Model</label>
+            <select
+              value={provider}
+              onChange={(e) => { setProvider(e.target.value); localStorage.setItem("kojo_llm_provider", e.target.value); }}
+              disabled={isLoading}
+              aria-label="LLM provider"
+            >
+              <option value="auto">Auto</option>
+              <option value="ollama">Ollama</option>
+              <option value="groq">Groq</option>
+            </select>
           </div>
           <div className="kojo-header-actions">
             <button

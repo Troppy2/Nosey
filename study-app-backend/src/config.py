@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     llm_max_tokens: int = Field(default=1000, alias="LLM_MAX_TOKENS")
     llm_timeout_seconds: int = Field(default=30, alias="LLM_TIMEOUT_SECONDS")
     llm_uncertainty_threshold: float = Field(default=0.6, alias="LLM_UNCERTAINTY_THRESHOLD")
+    llm_provider: str = Field(default="auto", alias="LLM_PROVIDER")
 
     @field_validator("cors_origins", mode="before")
     @classmethod
