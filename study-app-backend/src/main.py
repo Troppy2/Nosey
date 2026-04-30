@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.config import settings
-from src.routes import attempts, auth, flashcards, folders, health, kojo, tests
+from src.routes import attempts, auth, flashcards, folder_files, folders, health, kojo, tests
 
 
 def _resolve_cors_origins() -> list[str]:
@@ -39,6 +39,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(folders.router)
+app.include_router(folder_files.router)
 app.include_router(tests.router)
 app.include_router(attempts.router)
 app.include_router(flashcards.router)

@@ -25,6 +25,8 @@ class Test(Base, TimestampMixin):
     description: Mapped[Optional[str]] = mapped_column(Text)
     test_type: Mapped[str] = mapped_column(String(50), nullable=False)
     is_math_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    is_coding_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    coding_language: Mapped[Optional[str]] = mapped_column(String(50))
 
     folder: Mapped[Folder] = relationship("Folder", back_populates="tests")
     questions: Mapped[list[Question]] = relationship(

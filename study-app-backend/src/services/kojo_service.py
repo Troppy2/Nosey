@@ -14,6 +14,7 @@ from src.schemas.kojo_schema import (
     KojoMessageDTO,
     KojoRestoreResponse,
 )
+from src.services.file_service import FileService
 from src.services.llm_service import LLMService
 from src.utils.exceptions import LLMException, ResourceNotFoundException
 from src.utils.logger import get_logger
@@ -42,7 +43,9 @@ class KojoService:
         conversation = await repo.get_or_create_conversation(user_id, folder_id)
 
         notes = await repo.get_folder_notes_content(folder_id)
-        notes_context = notes or _NO_NOTES
+        folder_files = await FileService().get_folder_files_content(folder_id, session)
+        context_parts = [part for part in (notes, folder_files) if part]
+        notes_context = "\n\n---\n\n".join(context_parts) if context_parts else _NO_NOTES
 
         await repo.add_message(conversation.id, "user", user_message)
 
@@ -183,24 +186,36 @@ class KojoService:
 
 
 def _build_prompt(notes: str, user_message: str, history: list) -> str:
-    history_text = ""
-    if len(history) > 1:
-        history_text = "\n\nPREVIOUS CONVERSATION:\n"
-        for msg in history[:-1]:
-            history_text += f"{msg.role.upper()}: {msg.content}\n"
+    # Build conversation history (all messages except the last, which is the current question)
+    history_lines: list[str] = []
+    for msg in history[:-1]:
+        role_label = "Student" if msg.role == "user" else "Kojo"
+        history_lines.append(f"{role_label}: {msg.content}")
+    history_block = "\n\nCONVERSATION SO FAR:\n" + "\n".join(history_lines) if history_lines else ""
 
-    return f"""You are Kojo, a study companion. Help students understand material from their notes.
+    has_notes = notes != _NO_NOTES
+    notes_block = f"STUDENT'S STUDY NOTES AND FOLDER FILES:\n{notes[:12000]}" if has_notes else (
+        "NOTE: The student has not uploaded any study materials yet. "
+        "You can still answer general questions, but encourage them to upload notes for personalized help."
+    )
 
-STUDENT'S NOTES:
-{notes[:10000]}
-{history_text}
-CURRENT QUESTION: {user_message}
+    return f"""You are Kojo, an intelligent and supportive AI study companion built into Nosey, a study tool.
+Your role is to help students genuinely understand their course material — not to give them answers to memorize.
 
-RULES:
-1. Explain concepts using the notes. Give examples. Encourage thinking.
-2. REFUSE direct test answers, grading, or solving problems for the student.
-3. If you can't help directly, say: "I can't help with that directly. But I can help you understand [concept]. What part is confusing?"
-4. If the topic isn't in the notes, say: "That topic isn't in your uploaded notes. I'd suggest asking your instructor."
-5. Be encouraging and concise.
+{notes_block}
+{history_block}
 
-Respond to the student's question now:"""
+STUDENT'S MESSAGE: {user_message}
+
+RESPONSE GUIDELINES:
+- Draw from the student's notes and uploaded folder files whenever possible. Quote or reference specific sections to anchor your explanations.
+- Use concrete examples, analogies, and step-by-step breakdowns to explain difficult concepts.
+- Ask a follow-up question if the student seems confused or hasn't given you enough context.
+- If the student asks you to "just give the answer" to a test question, gently redirect: explain the underlying concept instead.
+- If the topic is not in the notes and is highly specific, say so clearly and suggest they check with their instructor or textbook.
+- For math topics: write expressions clearly using LaTeX notation like \\frac{{dy}}{{dx}} = 3t^{{2}} + 1.
+- For coding topics: provide short code snippets in fenced code blocks with the language tag.
+- Keep responses focused and well-structured. Use bullet points or numbered steps when listing multiple ideas.
+- Be warm, encouraging, and treat the student as capable — never condescending.
+
+Respond now:"""

@@ -1,4 +1,4 @@
-import { AlertCircle, Maximize2, Minimize2, Send, Trash2, X } from "lucide-react";
+import { AlertCircle, Bot, Maximize2, Minimize2, Send, Sparkles, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { clearKojoConversation, fetchKojoConversation, kojoChat } from "../lib/api";
 import type { KojoMessage } from "../lib/types";
@@ -12,10 +12,20 @@ interface KojoChatProps {
 
 const SUGGESTIONS = [
   "Explain the main concepts in these notes",
-  "What should I focus on when studying this?",
-  "Give me an example to help understand a key idea",
-  "What are the most important terms to know?",
+  "What should I focus on when studying?",
+  "Give me an example to understand a key idea",
+  "Quiz me on the most important terms",
 ];
+
+const PROVIDER_LABELS: Record<string, string> = {
+  auto: "Auto",
+  ollama: "Ollama (local)",
+  groq: "Groq (cloud)",
+};
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
 
 export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
   const [messages, setMessages] = useState<KojoMessage[]>([]);
@@ -97,7 +107,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
     setInput(e.target.value);
     const el = e.target;
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
   }
 
   async function handleClearConversation() {
@@ -107,7 +117,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
       await clearKojoConversation(folderId);
       setMessages([]);
       setConfirmClear(false);
-      setClearNotice("Chat history cleared. You can restore it from Settings for 5 hours.");
+      setClearNotice("Chat cleared. You can restore it from Settings within 5 hours.");
       inputRef.current?.focus();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to clear chat history.");
@@ -127,35 +137,43 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
         {/* ── Header ── */}
         <div className="kojo-header">
           <div className="kojo-header-left">
-            <div className="kojo-avatar">K</div>
+            <div className="kojo-avatar">
+              <Bot size={16} />
+            </div>
             <div className="kojo-header-info">
-              <span className="kojo-header-name">Kojo</span>
+              <span className="kojo-header-name">
+                Kojo
+                <span className="kojo-header-online" aria-label="online" />
+              </span>
               <span className="kojo-header-sub">{folderName}</span>
             </div>
           </div>
-          <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
-            <label style={{fontSize:12, opacity:0.8, marginRight:4}}>Model</label>
+
+          <div className="kojo-header-center">
+            <label className="kojo-provider-label">Model</label>
             <select
+              className="kojo-provider-select"
               value={provider}
               onChange={(e) => { setProvider(e.target.value); localStorage.setItem("kojo_llm_provider", e.target.value); }}
               disabled={isLoading}
               aria-label="LLM provider"
             >
-              <option value="auto">Auto</option>
-              <option value="ollama">Ollama</option>
-              <option value="groq">Groq</option>
+              {Object.entries(PROVIDER_LABELS).map(([v, l]) => (
+                <option key={v} value={v}>{l}</option>
+              ))}
             </select>
           </div>
+
           <div className="kojo-header-actions">
             <button
               className="kojo-header-btn"
-              onClick={() => setConfirmClear((current) => !current)}
+              onClick={() => setConfirmClear((c) => !c)}
               type="button"
               aria-label="Clear chat history"
-              title="Clear chat history"
+              title="Clear chat"
               disabled={isLoading}
             >
-              <Trash2 size={16} />
+              <Trash2 size={15} />
             </button>
             <button
               className="kojo-header-btn"
@@ -164,7 +182,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
               aria-label={isFullscreen ? "Exit full screen" : "Full screen"}
               title={isFullscreen ? "Exit full screen" : "Full screen"}
             >
-              {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
             </button>
             <button
               className="kojo-header-btn"
@@ -172,14 +190,15 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
               type="button"
               aria-label="Close Kojo"
             >
-              <X size={18} />
+              <X size={17} />
             </button>
           </div>
         </div>
 
+        {/* ── Clear confirmation bar ── */}
         {confirmClear && (
           <div className="kojo-clear-inline" role="alert">
-            <span>Clear this chat? You can restore it from Settings within 5 hours.</span>
+            <span>Clear this chat? Restorable from Settings for 5 hours.</span>
             <div className="kojo-clear-inline-actions">
               <button
                 className="kojo-clear-inline-btn kojo-clear-inline-btn--confirm"
@@ -187,13 +206,12 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
                 onClick={handleClearConversation}
                 disabled={isLoading}
               >
-                Clear chat
+                Clear
               </button>
               <button
                 className="kojo-clear-inline-btn"
                 type="button"
                 onClick={() => setConfirmClear(false)}
-                disabled={isLoading}
               >
                 Cancel
               </button>
@@ -206,11 +224,14 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
           <div className="kojo-messages-inner">
             {messages.length === 0 && !isLoading ? (
               <div className="kojo-empty">
-                <div className="kojo-empty-icon">K</div>
+                <div className="kojo-empty-icon">
+                  <Sparkles size={28} />
+                </div>
                 <p className="kojo-empty-title">Hi, I'm Kojo</p>
                 <p className="kojo-empty-sub">
-                  Your study companion for <strong>{folderName}</strong>. I can explain concepts,
-                  give examples, and help you think through ideas — but I won't hand you test answers.
+                  Your AI study companion for <strong>{folderName}</strong>.
+                  I can explain concepts, give examples, and help you work through ideas
+                  using your uploaded notes.
                 </p>
                 <div className="kojo-suggestions">
                   {SUGGESTIONS.map((s) => (
@@ -229,15 +250,23 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
               messages.map((msg) =>
                 msg.role === "assistant" ? (
                   <div key={msg.id} className="kojo-message kojo-message--assistant">
-                    <div className="kojo-msg-avatar">K</div>
+                    <div className="kojo-msg-avatar">
+                      <Bot size={14} />
+                    </div>
                     <div className="kojo-message-body">
-                      <span className="kojo-message-label">Kojo</span>
+                      <div className="kojo-message-meta">
+                        <span className="kojo-message-label">Kojo</span>
+                        <span className="kojo-message-time">{formatTime(msg.created_at)}</span>
+                      </div>
                       <MarkdownContent content={msg.content} />
                     </div>
                   </div>
                 ) : (
                   <div key={msg.id} className="kojo-message kojo-message--user">
-                    <div className="kojo-user-bubble">{msg.content}</div>
+                    <div className="kojo-user-bubble">
+                      <p>{msg.content}</p>
+                      <span className="kojo-message-time kojo-message-time--user">{formatTime(msg.created_at)}</span>
+                    </div>
                   </div>
                 ),
               )
@@ -245,9 +274,12 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
 
             {isLoading && (
               <div className="kojo-message kojo-message--assistant">
-                <div className="kojo-msg-avatar">K</div>
+                <div className="kojo-msg-avatar"><Bot size={14} /></div>
                 <div className="kojo-message-body">
-                  <span className="kojo-message-label">Kojo</span>
+                  <div className="kojo-message-meta">
+                    <span className="kojo-message-label">Kojo</span>
+                    <span className="kojo-message-time kojo-thinking-label">thinking…</span>
+                  </div>
                   <div className="kojo-thinking">
                     <span /><span /><span />
                   </div>
@@ -288,7 +320,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
               type="button"
               aria-label="Send"
             >
-              <Send size={16} />
+              <Send size={15} />
             </button>
           </div>
           <p className="kojo-input-hint">Enter to send · Shift+Enter for new line</p>

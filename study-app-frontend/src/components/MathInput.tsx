@@ -1,3 +1,5 @@
+import katex from "katex";
+import "katex/dist/katex.min.css";
 import { ChevronDown, PenLine } from "lucide-react";
 import { useRef, useState } from "react";
 import { MathKeyboard } from "./MathKeyboard";
@@ -8,10 +10,26 @@ type MathInputProps = {
   placeholder?: string;
 };
 
+function renderLatexPreview(src: string): string {
+  if (!src.trim()) return "";
+  // Wrap in $...$ for inline rendering if not already wrapped
+  const toRender = src.includes("\\") ? src : src;
+  try {
+    return katex.renderToString(toRender, {
+      throwOnError: false,
+      output: "html",
+      displayMode: false,
+    });
+  } catch {
+    return "";
+  }
+}
+
 export function MathInput({ value, onChange, placeholder }: MathInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [scratchpad, setScratchpad] = useState("");
   const [scratchOpen, setScratchOpen] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
 
   function insertSymbol(symbol: string) {
     const el = textareaRef.current;
@@ -23,7 +41,6 @@ export function MathInput({ value, onChange, placeholder }: MathInputProps) {
     const end = el.selectionEnd ?? value.length;
     const next = value.slice(0, start) + symbol + value.slice(end);
     onChange(next);
-    // restore cursor after React re-render
     requestAnimationFrame(() => {
       el.focus();
       const cursor = start + symbol.length;
@@ -31,17 +48,39 @@ export function MathInput({ value, onChange, placeholder }: MathInputProps) {
     });
   }
 
+  const previewHtml = renderLatexPreview(value);
+
   return (
     <div className="math-input-wrap">
-      <label className="field-label">Your answer</label>
+      <div className="math-input-header">
+        <label className="field-label">Your answer</label>
+        <button
+          type="button"
+          className="math-preview-toggle"
+          onClick={() => setShowPreview((v) => !v)}
+        >
+          {showPreview ? "Hide preview" : "Show preview"}
+        </button>
+      </div>
+
       <textarea
         ref={textareaRef}
         className="field-input math-answer-textarea"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder ?? "Type your answer using the keyboard below or write normally…"}
+        placeholder={placeholder ?? "Type LaTeX (e.g. \\frac{dx}{dt} = 3t^2 + 1) or use the keyboard below…"}
         rows={3}
       />
+
+      {showPreview && value.trim() && (
+        <div className="math-preview">
+          <span className="math-preview-label">Preview</span>
+          <div
+            className="math-preview-rendered"
+            dangerouslySetInnerHTML={{ __html: previewHtml || value }}
+          />
+        </div>
+      )}
 
       <MathKeyboard onInsert={insertSymbol} />
 
