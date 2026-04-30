@@ -1,10 +1,19 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.repositories.folder_repository import FolderRepository
 from src.repositories.kojo_repository import KojoRepository
-from src.schemas.kojo_schema import KojoChatResponse, KojoConversationDTO, KojoMessageDTO
+from src.schemas.kojo_schema import (
+    KojoChatResponse,
+    KojoClearResponse,
+    KojoClearedConversationDTO,
+    KojoConversationDTO,
+    KojoMessageDTO,
+    KojoRestoreResponse,
+)
 from src.services.llm_service import LLMService
 from src.utils.exceptions import LLMException, ResourceNotFoundException
 from src.utils.logger import get_logger
@@ -12,6 +21,7 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 _NO_NOTES = "[No study materials uploaded yet. Ask the student to upload notes first.]"
+_CLEAR_WINDOW_HOURS = 5
 
 
 class KojoService:
@@ -35,7 +45,11 @@ class KojoService:
 
         await repo.add_message(conversation.id, "user", user_message)
 
-        history = await repo.get_history(conversation.id, limit=10)
+        history = await repo.get_history(
+            conversation.id,
+            limit=10,
+            after=conversation.cleared_at,
+        )
 
         prompt = _build_prompt(notes_context, user_message, history)
 
@@ -78,6 +92,11 @@ class KojoService:
         conversation = await repo.get_by_folder(user_id, folder_id)
         if conversation is None:
             raise ResourceNotFoundException("Conversation")
+        visible_messages = conversation.messages
+        if conversation.cleared_at is not None:
+            visible_messages = [
+                msg for msg in conversation.messages if msg.created_at > conversation.cleared_at
+            ]
         return KojoConversationDTO(
             id=conversation.id,
             folder_id=conversation.folder_id,
@@ -88,10 +107,75 @@ class KojoService:
                     content=msg.content,
                     created_at=msg.created_at,
                 )
-                for msg in conversation.messages
+                for msg in visible_messages
             ],
             created_at=conversation.created_at,
+            cleared_at=conversation.cleared_at,
         )
+
+    async def clear_conversation(
+        self,
+        user_id: int,
+        folder_id: int,
+        session: AsyncSession,
+    ) -> KojoClearResponse:
+        folder = await FolderRepository(session).get_owned(folder_id, user_id)
+        if folder is None:
+            raise ResourceNotFoundException("Folder")
+
+        repo = KojoRepository(session)
+        conversation = await repo.clear_conversation(user_id, folder_id)
+        if conversation is None:
+            conversation = await repo.get_or_create_conversation(user_id, folder_id)
+            conversation.cleared_at = datetime.utcnow()
+            await session.flush()
+
+        await session.commit()
+
+        cleared_at = conversation.cleared_at or datetime.utcnow()
+        return KojoClearResponse(
+            conversation_id=conversation.id,
+            folder_id=folder_id,
+            cleared_at=cleared_at,
+            restore_expires_at=cleared_at + timedelta(hours=_CLEAR_WINDOW_HOURS),
+        )
+
+    async def restore_conversation(
+        self,
+        user_id: int,
+        folder_id: int,
+        session: AsyncSession,
+    ) -> KojoRestoreResponse:
+        folder = await FolderRepository(session).get_owned(folder_id, user_id)
+        if folder is None:
+            raise ResourceNotFoundException("Folder")
+
+        restored = await KojoRepository(session).restore_conversation(user_id, folder_id)
+        if restored:
+            await session.commit()
+
+        return KojoRestoreResponse(folder_id=folder_id, restored=restored)
+
+    async def get_cleared_conversations(
+        self,
+        user_id: int,
+        session: AsyncSession,
+    ) -> list[KojoClearedConversationDTO]:
+        conversations = await KojoRepository(session).get_cleared_conversations(user_id)
+        result: list[KojoClearedConversationDTO] = []
+        for conv in conversations:
+            if conv.cleared_at is None:
+                continue
+            result.append(
+                KojoClearedConversationDTO(
+                    conversation_id=conv.id,
+                    folder_id=conv.folder_id,
+                    folder_name=conv.folder.name if conv.folder is not None else f"Folder {conv.folder_id}",
+                    cleared_at=conv.cleared_at,
+                    restore_expires_at=conv.cleared_at + timedelta(hours=_CLEAR_WINDOW_HOURS),
+                )
+            )
+        return result
 
 
 def _build_prompt(notes: str, user_message: str, history: list) -> str:
