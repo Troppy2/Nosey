@@ -162,6 +162,7 @@ export type KojoConversation = {
   folder_id: ID;
   messages: KojoMessage[];
   created_at: string;
+  cleared_at?: string | null;
 };
 
 export type KojoChatResponse = {
@@ -169,4 +170,24 @@ export type KojoChatResponse = {
   conversation_id: ID;
   message_id: ID;
   flagged_uncertain: boolean;
+};
+
+export type KojoClearResponse = {
+  conversation_id: ID;
+  folder_id: ID;
+  cleared_at: string;
+  restore_expires_at: string;
+};
+
+export type KojoRestoreResponse = {
+  folder_id: ID;
+  restored: boolean;
+};
+
+export type KojoClearedConversation = {
+  conversation_id: ID;
+  folder_id: ID;
+  folder_name: string;
+  cleared_at: string;
+  restore_expires_at: string;
 };

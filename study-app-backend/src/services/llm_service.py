@@ -223,10 +223,13 @@ class LLMService:
                             question_text=str(item.get("question_text", "")),  # type: ignore[union-attr]
                             expected_answer=str(item.get("expected_answer", "")),  # type: ignore[union-attr]
                         ))
-            if count_mcq > 0:
-                mcq = mcq[:count_mcq]
-            if count_frq > 0:
-                frq = frq[:count_frq]
+            # If both counts are left at their defaults (0, 0) treat that as
+            # "no limit" and return everything found. If either count is
+            # specified (including an explicit 0) apply slicing so callers can
+            # request zero questions of a type (used by MCQ_only/FRQ_only).
+            if not (count_mcq == 0 and count_frq == 0):
+                mcq = mcq[: max(0, int(count_mcq))]
+                frq = frq[: max(0, int(count_frq))]
             logger.info("Parsed practice test: %d MCQ, %d FRQ", len(mcq), len(frq))
             return mcq, frq
         except Exception as exc:

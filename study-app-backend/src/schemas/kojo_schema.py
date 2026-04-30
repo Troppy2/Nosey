@@ -22,6 +22,7 @@ class KojoConversationDTO(BaseModel):
     folder_id: int
     messages: list[KojoMessageDTO]
     created_at: datetime
+    cleared_at: Optional[datetime] = None
 
 
 class KojoChatRequest(BaseModel):
@@ -33,3 +34,23 @@ class KojoChatResponse(BaseModel):
     conversation_id: int
     message_id: int
     flagged_uncertain: bool = False
+
+
+class KojoClearResponse(BaseModel):
+    conversation_id: int
+    folder_id: int
+    cleared_at: datetime
+    restore_expires_at: datetime
+
+
+class KojoRestoreResponse(BaseModel):
+    folder_id: int
+    restored: bool
+
+
+class KojoClearedConversationDTO(BaseModel):
+    conversation_id: int
+    folder_id: int
+    folder_name: str
+    cleared_at: datetime
+    restore_expires_at: datetime

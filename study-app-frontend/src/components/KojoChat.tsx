@@ -1,6 +1,6 @@
-import { AlertCircle, Maximize2, Minimize2, Send, X } from "lucide-react";
+import { AlertCircle, Maximize2, Minimize2, Send, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { fetchKojoConversation, kojoChat } from "../lib/api";
+import { clearKojoConversation, fetchKojoConversation, kojoChat } from "../lib/api";
 import type { KojoMessage } from "../lib/types";
 import { MarkdownContent } from "./MarkdownContent";
 
@@ -23,6 +23,8 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearNotice, setClearNotice] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -30,6 +32,8 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
     fetchKojoConversation(folderId).then((conv) => {
       if (conv) setMessages(conv.messages);
     });
+    setConfirmClear(false);
+    setClearNotice(null);
     inputRef.current?.focus();
   }, [folderId]);
 
@@ -54,6 +58,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
     };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
+    setClearNotice(null);
     if (inputRef.current) inputRef.current.style.height = "auto";
     setIsLoading(true);
     setError(null);
@@ -94,6 +99,20 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   }
 
+  async function handleClearConversation() {
+    if (isLoading) return;
+    try {
+      setError(null);
+      await clearKojoConversation(folderId);
+      setMessages([]);
+      setConfirmClear(false);
+      setClearNotice("Chat history cleared. You can restore it from Settings for 5 hours.");
+      inputRef.current?.focus();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to clear chat history.");
+    }
+  }
+
   return (
     <>
       {!isFullscreen && (
@@ -116,6 +135,16 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
           <div className="kojo-header-actions">
             <button
               className="kojo-header-btn"
+              onClick={() => setConfirmClear((current) => !current)}
+              type="button"
+              aria-label="Clear chat history"
+              title="Clear chat history"
+              disabled={isLoading}
+            >
+              <Trash2 size={16} />
+            </button>
+            <button
+              className="kojo-header-btn"
               onClick={() => setIsFullscreen((f) => !f)}
               type="button"
               aria-label={isFullscreen ? "Exit full screen" : "Full screen"}
@@ -133,6 +162,30 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
             </button>
           </div>
         </div>
+
+        {confirmClear && (
+          <div className="kojo-clear-inline" role="alert">
+            <span>Clear this chat? You can restore it from Settings within 5 hours.</span>
+            <div className="kojo-clear-inline-actions">
+              <button
+                className="kojo-clear-inline-btn kojo-clear-inline-btn--confirm"
+                type="button"
+                onClick={handleClearConversation}
+                disabled={isLoading}
+              >
+                Clear chat
+              </button>
+              <button
+                className="kojo-clear-inline-btn"
+                type="button"
+                onClick={() => setConfirmClear(false)}
+                disabled={isLoading}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ── Messages ── */}
         <div className="kojo-messages">
@@ -194,6 +247,8 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
                 <span>{error}</span>
               </div>
             )}
+
+            {clearNotice && <p className="kojo-notice">{clearNotice}</p>}
 
             <div ref={bottomRef} />
           </div>

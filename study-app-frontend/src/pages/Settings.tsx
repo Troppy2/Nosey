@@ -2,8 +2,17 @@ import { CheckCircle, LogIn, LogOut, Sparkles, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
-import { getStoredUser, googleSignIn, isGuestSession, setGoogleSession, signOut } from "../lib/api";
+import {
+  fetchClearedKojoConversations,
+  getStoredUser,
+  googleSignIn,
+  isGuestSession,
+  restoreKojoConversation,
+  setGoogleSession,
+  signOut,
+} from "../lib/api";
 import { useEffect, useRef, useState } from "react";
+import type { KojoClearedConversation } from "../lib/types";
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -12,8 +21,19 @@ export default function Settings() {
   const [loading, setLoading] = useState(false);
   const [signInError, setSignInError] = useState<string | null>(null);
   const [signInSuccess, setSignInSuccess] = useState(false);
+  const [clearedConversations, setClearedConversations] = useState<KojoClearedConversation[]>([]);
+  const [loadingCleared, setLoadingCleared] = useState(true);
+  const [restoreFolderId, setRestoreFolderId] = useState<number | null>(null);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const initialized = useRef(false);
+
+  async function loadClearedConversations() {
+    setLoadingCleared(true);
+    const conversations = await fetchClearedKojoConversations();
+    setClearedConversations(conversations);
+    setLoadingCleared(false);
+  }
 
   useEffect(() => {
     if (!clientId || initialized.current) return;
@@ -53,6 +73,10 @@ export default function Settings() {
     };
   }, [clientId, navigate]);
 
+  useEffect(() => {
+    void loadClearedConversations();
+  }, [user?.id]);
+
   function handleSignIn() {
     setSignInError(null);
     setSignInSuccess(false);
@@ -69,6 +93,32 @@ export default function Settings() {
     signOut();
     setUser(null);
     navigate("/");
+  }
+
+  async function handleRestore(folderId: number) {
+    setRestoreError(null);
+    setRestoreFolderId(folderId);
+    try {
+      const result = await restoreKojoConversation(folderId);
+      if (!result.restored) {
+        setRestoreError("This chat can no longer be restored. The 5-hour window may have expired.");
+      }
+      await loadClearedConversations();
+    } catch (err) {
+      setRestoreError(err instanceof Error ? err.message : "Unable to restore chat history.");
+    } finally {
+      setRestoreFolderId(null);
+    }
+  }
+
+  function getRestoreTimeLabel(isoTime: string) {
+    const diffMs = new Date(isoTime).getTime() - Date.now();
+    if (diffMs <= 0) return "Expired";
+    const totalMinutes = Math.ceil(diffMs / 60000);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (hours <= 0) return `${minutes}m left`;
+    return `${hours}h ${minutes}m left`;
   }
 
   return (
@@ -116,6 +166,44 @@ export default function Settings() {
           <Sparkles size={18} />
           <span>Use the guest session to try the full flow before connecting a real account.</span>
         </div>
+
+        <section className="settings-restore">
+          <h3>Kojo chat history restore</h3>
+          <p className="muted small">
+            Cleared Kojo chats are available here for up to 5 hours.
+          </p>
+
+          {restoreError ? (
+            <div className="settings-feedback settings-feedback--error">
+              <XCircle size={16} />
+              <span>{restoreError}</span>
+            </div>
+          ) : null}
+
+          {loadingCleared ? (
+            <p className="muted small">Loading cleared chats…</p>
+          ) : clearedConversations.length === 0 ? (
+            <p className="muted small">No recently cleared Kojo chats.</p>
+          ) : (
+            <div className="settings-restore-list">
+              {clearedConversations.map((conv) => (
+                <div className="settings-restore-item" key={conv.conversation_id}>
+                  <div>
+                    <p className="settings-restore-folder">{conv.folder_name}</p>
+                    <p className="muted small">{getRestoreTimeLabel(conv.restore_expires_at)}</p>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    onClick={() => handleRestore(conv.folder_id)}
+                    disabled={restoreFolderId === conv.folder_id}
+                  >
+                    {restoreFolderId === conv.folder_id ? "Restoring…" : "Restore"}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </Card>
     </div>
   );

@@ -4,7 +4,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database import get_session
 from src.dependencies import get_current_user
 from src.models.user import User
-from src.schemas.kojo_schema import KojoChatRequest, KojoChatResponse, KojoConversationDTO
+from src.schemas.kojo_schema import (
+    KojoChatRequest,
+    KojoChatResponse,
+    KojoClearResponse,
+    KojoClearedConversationDTO,
+    KojoConversationDTO,
+    KojoRestoreResponse,
+)
 from src.services.kojo_service import KojoService
 from src.utils.exceptions import LLMException, ResourceNotFoundException
 
@@ -45,3 +52,43 @@ async def get_conversation(
         )
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/folders/{folder_id}/clear", response_model=KojoClearResponse)
+async def clear_conversation(
+    folder_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> KojoClearResponse:
+    try:
+        return await KojoService().clear_conversation(
+            user_id=user.id,
+            folder_id=folder_id,
+            session=session,
+        )
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/folders/{folder_id}/restore", response_model=KojoRestoreResponse)
+async def restore_conversation(
+    folder_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> KojoRestoreResponse:
+    try:
+        return await KojoService().restore_conversation(
+            user_id=user.id,
+            folder_id=folder_id,
+            session=session,
+        )
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/conversations/cleared", response_model=list[KojoClearedConversationDTO])
+async def get_cleared_conversations(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[KojoClearedConversationDTO]:
+    return await KojoService().get_cleared_conversations(user_id=user.id, session=session)
