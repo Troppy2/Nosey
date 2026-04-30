@@ -5,14 +5,15 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { KojoChat } from "../components/KojoChat";
-import { deleteTest, fetchAttempts, fetchFolder, fetchTests, updateTest } from "../lib/api";
+import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
-import type { AttemptSummary, Folder, TestSummary } from "../lib/types";
+import type { AttemptSummary, Flashcard, Folder, TestSummary } from "../lib/types";
 
 export default function FolderDetail() {
   const { folderId } = useParams();
   const [folder, setFolder] = useState<Folder | null>(null);
   const [tests, setTests] = useState<TestSummary[]>([]);
+  const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [kojoOpen, setKojoOpen] = useState(false);
@@ -21,10 +22,11 @@ export default function FolderDetail() {
 
   useEffect(() => {
     if (!id) return;
-    Promise.all([fetchFolder(id), fetchTests(id)])
-      .then(([folderData, testData]) => {
+    Promise.all([fetchFolder(id), fetchTests(id), fetchFlashcards(id)])
+      .then(([folderData, testData, cardData]) => {
         setFolder(folderData);
         setTests(testData);
+        setFlashcards(cardData);
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : "Unable to load folder.");
@@ -106,6 +108,53 @@ export default function FolderDetail() {
       ) : null}
 
       {error ? <div className="form-error">{error}</div> : null}
+
+      <section>
+        <div className="section-title">
+          <h2>Flashcards</h2>
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <span className="muted small">
+              {flashcards.length} card{flashcards.length === 1 ? "" : "s"}
+            </span>
+            <Link to={`/folders/${id}/flashcards/manage`}>
+              <Button variant="ghost" icon={<Settings size={15} />} style={{ minHeight: 36, padding: "6px 12px", fontSize: "0.85rem" }}>
+                Manage
+              </Button>
+            </Link>
+          </div>
+        </div>
+        {flashcards.length === 0 ? (
+          <EmptyState
+            icon={<Brain />}
+            title="No flashcards yet"
+            body="Generate flashcards from your notes or add them manually."
+            action={
+              <Link to={`/folders/${id}/flashcards/manage`}>
+                <Button variant="secondary" icon={<Plus size={16} />}>Add Flashcards</Button>
+              </Link>
+            }
+          />
+        ) : (
+          <>
+            <div className="flashcard-preview-grid">
+              {flashcards.slice(0, 6).map((card) => (
+                <div key={card.id} className="flashcard-preview-card card">
+                  <span className="eyebrow">Front</span>
+                  <p>{card.front}</p>
+                </div>
+              ))}
+            </div>
+            {flashcards.length > 6 && (
+              <p className="muted small" style={{ marginTop: 10 }}>
+                +{flashcards.length - 6} more cards ·{" "}
+                <Link to={`/folders/${id}/flashcards/manage`} style={{ color: "var(--green-dark)", fontWeight: 700 }}>
+                  View all
+                </Link>
+              </p>
+            )}
+          </>
+        )}
+      </section>
 
       {tests.length === 0 ? (
         <EmptyState

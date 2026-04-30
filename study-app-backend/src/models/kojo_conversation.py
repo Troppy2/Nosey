@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from datetime import datetime
+from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import ForeignKey, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import BIGINT_ID, Base, TimestampMixin
@@ -24,6 +25,8 @@ class KojoConversation(Base, TimestampMixin):
     folder_id: Mapped[int] = mapped_column(
         BIGINT_ID, ForeignKey("folders.id", ondelete="CASCADE"), nullable=False, index=True
     )
+
+    cleared_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, default=None)
 
     user: Mapped[User] = relationship("User", back_populates="kojo_conversations")
     folder: Mapped[Folder] = relationship("Folder", back_populates="kojo_conversations")

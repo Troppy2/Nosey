@@ -1,10 +1,11 @@
-import { ArrowLeft, ArrowRight, Check, Send } from "lucide-react";
+import { ArrowLeft, ArrowRight, Calculator, Check, Send } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { TextArea } from "../components/Field";
+import { MathInput } from "../components/MathInput";
 import { fetchTest, submitAttempt } from "../lib/api";
 import type { Question, SubmittedAnswer, TestTake } from "../lib/types";
 
@@ -28,6 +29,7 @@ export default function TakeTest() {
   const answeredCount = Object.values(answers).filter(Boolean).length;
   const progress = test ? ((index + 1) / test.questions.length) * 100 : 0;
   const canSubmit = test ? answeredCount === test.questions.length : false;
+  const isMathMode = Boolean(test?.is_math_mode);
 
   const submittedAnswers = useMemo<SubmittedAnswer[]>(
     () =>
@@ -88,7 +90,15 @@ export default function TakeTest() {
             Dashboard
           </Link>
           <div>
-            <strong>{test.title}</strong>
+            <strong>
+              {test.title}
+              {isMathMode && (
+                <span className="math-mode-badge">
+                  <Calculator size={12} />
+                  Math
+                </span>
+              )}
+            </strong>
             <span>
               Question {index + 1} of {test.questions.length} · {answeredCount} answered
             </span>
@@ -102,6 +112,11 @@ export default function TakeTest() {
           <h1>{question.question_text}</h1>
           {question.type === "MCQ" ? (
             <MCQQuestion question={question} answer={answers[question.id]} onAnswer={(answer) => setAnswers({ ...answers, [question.id]: answer })} />
+          ) : isMathMode ? (
+            <MathInput
+              value={answers[question.id] ?? ""}
+              onChange={(val) => setAnswers({ ...answers, [question.id]: val })}
+            />
           ) : (
             <TextArea
               label="Your answer"

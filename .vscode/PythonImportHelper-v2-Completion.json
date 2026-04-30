@@ -308,6 +308,14 @@
         "documentation": {}
     },
     {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
         "label": "TYPE_CHECKING",
         "importPath": "typing",
         "description": "typing",
@@ -421,6 +429,14 @@
     },
     {
         "label": "TypeVar",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
         "importPath": "typing",
         "description": "typing",
         "isExtraImport": true,
@@ -839,6 +855,14 @@
         "documentation": {}
     },
     {
+        "label": "op",
+        "importPath": "alembic",
+        "description": "alembic",
+        "isExtraImport": true,
+        "detail": "alembic",
+        "documentation": {}
+    },
+    {
         "label": "context",
         "importPath": "alembic",
         "description": "alembic",
@@ -977,6 +1001,14 @@
     },
     {
         "label": "Text",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "DateTime",
         "importPath": "sqlalchemy",
         "description": "sqlalchemy",
         "isExtraImport": true,
@@ -1664,6 +1696,14 @@
         "documentation": {}
     },
     {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
         "label": "asyncio",
         "kind": 6,
         "isExtraImport": true,
@@ -1914,6 +1954,38 @@
     },
     {
         "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "timedelta",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
         "importPath": "datetime",
         "description": "datetime",
         "isExtraImport": true,
@@ -2710,6 +2782,14 @@
         "description": "src.models.flashcard",
         "isExtraImport": true,
         "detail": "src.models.flashcard",
+        "documentation": {}
+    },
+    {
+        "label": "Folder",
+        "importPath": "src.models.folder",
+        "description": "src.models.folder",
+        "isExtraImport": true,
+        "detail": "src.models.folder",
         "documentation": {}
     },
     {
@@ -4324,6 +4404,30 @@
         "documentation": {}
     },
     {
+        "label": "GeneratedMCQ",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "LLMService",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "GeneratedFRQ",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
         "label": "GeneratedFlashcard",
         "importPath": "src.services.llm_service",
         "description": "src.services.llm_service",
@@ -4518,19 +4622,27 @@
         "documentation": {}
     },
     {
-        "label": "app",
-        "importPath": "src.main",
-        "description": "src.main",
+        "label": "AsyncMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
         "isExtraImport": true,
-        "detail": "src.main",
+        "detail": "unittest.mock",
         "documentation": {}
     },
     {
-        "label": "contextmanager",
-        "importPath": "contextlib",
-        "description": "contextlib",
+        "label": "MagicMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
         "isExtraImport": true,
-        "detail": "contextlib",
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "patch",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
         "documentation": {}
     },
     {
@@ -4564,6 +4676,22 @@
         "importPath": "pytest",
         "description": "pytest",
         "detail": "pytest",
+        "documentation": {}
+    },
+    {
+        "label": "app",
+        "importPath": "src.main",
+        "description": "src.main",
+        "isExtraImport": true,
+        "detail": "src.main",
+        "documentation": {}
+    },
+    {
+        "label": "contextmanager",
+        "importPath": "contextlib",
+        "description": "contextlib",
+        "isExtraImport": true,
+        "detail": "contextlib",
         "documentation": {}
     },
     {
@@ -5071,6 +5199,60 @@
         "documentation": {}
     },
     {
+        "label": "upgrade",
+        "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.004_add_kojo_cleared_at",
+        "description": "study-app-backend.src.migrations.versions.004_add_kojo_cleared_at",
+        "peekOfCode": "def upgrade() -> None:\n    op.add_column(\n        \"kojo_conversations\",\n        sa.Column(\"cleared_at\", sa.DateTime(), nullable=True),\n    )\ndef downgrade() -> None:\n    op.drop_column(\"kojo_conversations\", \"cleared_at\")",
+        "detail": "study-app-backend.src.migrations.versions.004_add_kojo_cleared_at",
+        "documentation": {}
+    },
+    {
+        "label": "downgrade",
+        "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.004_add_kojo_cleared_at",
+        "description": "study-app-backend.src.migrations.versions.004_add_kojo_cleared_at",
+        "peekOfCode": "def downgrade() -> None:\n    op.drop_column(\"kojo_conversations\", \"cleared_at\")",
+        "detail": "study-app-backend.src.migrations.versions.004_add_kojo_cleared_at",
+        "documentation": {}
+    },
+    {
+        "label": "revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.004_add_kojo_cleared_at",
+        "description": "study-app-backend.src.migrations.versions.004_add_kojo_cleared_at",
+        "peekOfCode": "revision = \"004_add_kojo_cleared_at\"\ndown_revision = \"003_add_math_mode\"\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.add_column(\n        \"kojo_conversations\",\n        sa.Column(\"cleared_at\", sa.DateTime(), nullable=True),\n    )\ndef downgrade() -> None:",
+        "detail": "study-app-backend.src.migrations.versions.004_add_kojo_cleared_at",
+        "documentation": {}
+    },
+    {
+        "label": "down_revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.004_add_kojo_cleared_at",
+        "description": "study-app-backend.src.migrations.versions.004_add_kojo_cleared_at",
+        "peekOfCode": "down_revision = \"003_add_math_mode\"\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.add_column(\n        \"kojo_conversations\",\n        sa.Column(\"cleared_at\", sa.DateTime(), nullable=True),\n    )\ndef downgrade() -> None:\n    op.drop_column(\"kojo_conversations\", \"cleared_at\")",
+        "detail": "study-app-backend.src.migrations.versions.004_add_kojo_cleared_at",
+        "documentation": {}
+    },
+    {
+        "label": "branch_labels",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.004_add_kojo_cleared_at",
+        "description": "study-app-backend.src.migrations.versions.004_add_kojo_cleared_at",
+        "peekOfCode": "branch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.add_column(\n        \"kojo_conversations\",\n        sa.Column(\"cleared_at\", sa.DateTime(), nullable=True),\n    )\ndef downgrade() -> None:\n    op.drop_column(\"kojo_conversations\", \"cleared_at\")",
+        "detail": "study-app-backend.src.migrations.versions.004_add_kojo_cleared_at",
+        "documentation": {}
+    },
+    {
+        "label": "depends_on",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.004_add_kojo_cleared_at",
+        "description": "study-app-backend.src.migrations.versions.004_add_kojo_cleared_at",
+        "peekOfCode": "depends_on = None\ndef upgrade() -> None:\n    op.add_column(\n        \"kojo_conversations\",\n        sa.Column(\"cleared_at\", sa.DateTime(), nullable=True),\n    )\ndef downgrade() -> None:\n    op.drop_column(\"kojo_conversations\", \"cleared_at\")",
+        "detail": "study-app-backend.src.migrations.versions.004_add_kojo_cleared_at",
+        "documentation": {}
+    },
+    {
         "label": "run_migrations_offline",
         "kind": 2,
         "importPath": "study-app-backend.src.migrations.env",
@@ -5305,6 +5487,15 @@
         "documentation": {}
     },
     {
+        "label": "_CLEAR_WINDOW_HOURS",
+        "kind": 5,
+        "importPath": "study-app-backend.src.repositories.kojo_repository",
+        "description": "study-app-backend.src.repositories.kojo_repository",
+        "peekOfCode": "_CLEAR_WINDOW_HOURS = 5\nclass KojoRepository(BaseRepository[KojoConversation]):\n    async def get_or_create_conversation(\n        self, user_id: int, folder_id: int\n    ) -> KojoConversation:\n        stmt = select(KojoConversation).where(\n            and_(KojoConversation.user_id == user_id, KojoConversation.folder_id == folder_id)\n        )\n        conversation = await self.session.scalar(stmt)\n        if not conversation:",
+        "detail": "study-app-backend.src.repositories.kojo_repository",
+        "documentation": {}
+    },
+    {
         "label": "TestRepository",
         "kind": 6,
         "importPath": "study-app-backend.src.repositories.test_repository",
@@ -5417,7 +5608,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.attempt_schema",
         "description": "study-app-backend.src.schemas.attempt_schema",
-        "peekOfCode": "class AnswerResult(BaseModel):\n    question_id: int\n    question_text: Optional[str] = None\n    user_answer: str\n    correct_answer: Optional[str] = None\n    is_correct: bool\n    feedback: Optional[str] = None\n    confidence: Optional[float] = None\n    flagged_uncertain: bool = False\nclass AttemptResult(BaseModel):",
+        "peekOfCode": "class AnswerResult(BaseModel):\n    question_id: int\n    question_text: Optional[str] = None\n    user_answer: str\n    correct_answer: Optional[str] = None\n    is_correct: bool\n    feedback: Optional[str] = None\n    confidence: Optional[float] = None\n    flagged_uncertain: bool = False\n    is_math: bool = False",
         "detail": "study-app-backend.src.schemas.attempt_schema",
         "documentation": {}
     },
@@ -6022,6 +6213,51 @@
         "description": "study-app-backend.src.main",
         "peekOfCode": "app = FastAPI(title=\"Study App\", version=\"0.1.0\")\napp.add_middleware(\n    CORSMiddleware,\n    allow_origins=_resolve_cors_origins(),\n    allow_credentials=True,\n    allow_methods=[\"*\"],\n    allow_headers=[\"*\"],\n)\napp.include_router(health.router)\napp.include_router(auth.router)",
         "detail": "study-app-backend.src.main",
+        "documentation": {}
+    },
+    {
+        "label": "TestParsePracticeTest",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_create_test",
+        "description": "study-app-backend.tests.test_create_test",
+        "peekOfCode": "class TestParsePracticeTest:\n    async def test_returns_mcq_and_frq_from_llm(self):\n        svc = LLMService()\n        svc._complete_json = AsyncMock(return_value={\"mcq\": [VALID_MCQ], \"frq\": [VALID_FRQ]})\n        mcq, frq = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST)\n        assert len(mcq) == 1\n        assert len(frq) == 1\n        assert isinstance(mcq[0], GeneratedMCQ)\n        assert isinstance(frq[0], GeneratedFRQ)\n    async def test_limits_mcq_when_count_mcq_specified(self):",
+        "detail": "study-app-backend.tests.test_create_test",
+        "documentation": {}
+    },
+    {
+        "label": "TestCreateTestService",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_create_test",
+        "description": "study-app-backend.tests.test_create_test",
+        "peekOfCode": "class TestCreateTestService:\n    \"\"\"\n    Tests for TestService.create_test() with all external dependencies mocked.\n    Verifies routing logic (notes vs practice-test path), question storage,\n    and validation error handling.\n    \"\"\"\n    def _make_upload_file(self, name: str = \"notes.txt\", content: bytes = b\"Study content.\") -> MagicMock:\n        f = MagicMock()\n        f.filename = name\n        f.read = AsyncMock(return_value=content)",
+        "detail": "study-app-backend.tests.test_create_test",
+        "documentation": {}
+    },
+    {
+        "label": "VALID_MCQ",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_create_test",
+        "description": "study-app-backend.tests.test_create_test",
+        "peekOfCode": "VALID_MCQ = {\n    \"question_text\": \"What does Atomicity guarantee in a database transaction?\",\n    \"options\": [\n        \"All operations complete or none do\",\n        \"Transactions execute in sequence\",\n        \"Data is replicated to multiple nodes\",\n        \"Queries run faster with indexes\",\n    ],\n    \"correct_index\": 0,\n}",
+        "detail": "study-app-backend.tests.test_create_test",
+        "documentation": {}
+    },
+    {
+        "label": "VALID_FRQ",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_create_test",
+        "description": "study-app-backend.tests.test_create_test",
+        "peekOfCode": "VALID_FRQ = {\n    \"question_text\": \"Explain what Durability means in the context of ACID properties.\",\n    \"expected_answer\": (\n        \"Durability guarantees that once a transaction is committed, its changes \"\n        \"persist permanently even if the system crashes immediately afterward.\"\n    ),\n}\nSAMPLE_PRACTICE_TEST = (\n    \"Practice Test — Database Systems\\n\\n\"\n    \"1. What does Atomicity guarantee?\\n\"",
+        "detail": "study-app-backend.tests.test_create_test",
+        "documentation": {}
+    },
+    {
+        "label": "SAMPLE_PRACTICE_TEST",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_create_test",
+        "description": "study-app-backend.tests.test_create_test",
+        "peekOfCode": "SAMPLE_PRACTICE_TEST = (\n    \"Practice Test — Database Systems\\n\\n\"\n    \"1. What does Atomicity guarantee?\\n\"\n    \"   A) All operations complete or none do\\n\"\n    \"   B) Transactions execute in sequence\\n\"\n    \"   C) Data is replicated to multiple nodes\\n\"\n    \"   D) Queries run faster with indexes\\n\"\n    \"   Answer: A\\n\\n\"\n    \"2. Explain Durability in the context of ACID.\\n\"\n    \"   Model Answer: Committed data persists even after a system crash.\\n\"",
+        "detail": "study-app-backend.tests.test_create_test",
         "documentation": {}
     },
     {
