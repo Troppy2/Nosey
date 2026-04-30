@@ -1,13 +1,13 @@
-import { BookOpen, Bot, Brain, Edit3, FolderOpen, Plus, Trash2 } from "lucide-react";
+import { BookOpen, Bot, Brain, Edit3, FolderOpen, History, Plus, Settings, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { KojoChat } from "../components/KojoChat";
-import { deleteTest, fetchFolder, fetchTests, updateTest } from "../lib/api";
+import { deleteTest, fetchAttempts, fetchFolder, fetchTests, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
-import type { Folder, TestSummary } from "../lib/types";
+import type { AttemptSummary, Folder, TestSummary } from "../lib/types";
 
 export default function FolderDetail() {
   const { folderId } = useParams();
@@ -90,6 +90,11 @@ export default function FolderDetail() {
               Study Flashcards
             </Button>
           </Link>
+          <Link to={`/folders/${id}/flashcards/manage`}>
+            <Button variant="secondary" icon={<Settings size={18} />}>
+              Manage Flashcards
+            </Button>
+          </Link>
           <Link to="/create-test">
             <Button icon={<Plus size={18} />}>New Test</Button>
           </Link>
@@ -123,25 +128,7 @@ export default function FolderDetail() {
           </div>
           <div className="test-list">
             {tests.map((test) => (
-              <Card key={test.id} interactive className="test-row">
-                <Link className="test-row-main" to={`/test/${test.id}`}>
-                  <div>
-                    <h3>{test.title}</h3>
-                    <p className="muted small">
-                      {test.question_count} questions · {formatDate(test.created_at)}
-                    </p>
-                  </div>
-                  <div className="score-badge">{formatPercent(test.best_score)}</div>
-                </Link>
-                <div className="row-actions">
-                  <button aria-label={`Rename ${test.title}`} onClick={() => handleRenameTest(test)} type="button">
-                    <Edit3 size={17} />
-                  </button>
-                  <button aria-label={`Delete ${test.title}`} onClick={() => handleDeleteTest(test)} type="button">
-                    <Trash2 size={17} />
-                  </button>
-                </div>
-              </Card>
+              <TestRow key={test.id} test={test} onRename={handleRenameTest} onDelete={handleDeleteTest} />
             ))}
           </div>
         </section>
@@ -154,5 +141,62 @@ export default function FolderDetail() {
         </span>
       </div>
     </div>
+  );
+}
+
+function TestRow({
+  test,
+  onRename,
+  onDelete,
+}: {
+  test: TestSummary;
+  onRename: (test: TestSummary) => void;
+  onDelete: (test: TestSummary) => void;
+}) {
+  const [showAttempts, setShowAttempts] = useState(false);
+  const [attempts, setAttempts] = useState<AttemptSummary[]>([]);
+
+  async function loadAttempts() {
+    if (showAttempts) { setShowAttempts(false); return; }
+    const data = await fetchAttempts(test.id);
+    setAttempts(data);
+    setShowAttempts(true);
+  }
+
+  return (
+    <Card className="test-row">
+      <Link className="test-row-main" to={`/test/${test.id}`}>
+        <div>
+          <h3>{test.title}</h3>
+          <p className="muted small">
+            {test.question_count} questions · {formatDate(test.created_at)}
+          </p>
+        </div>
+        <div className="score-badge">{formatPercent(test.best_score)}</div>
+      </Link>
+      <div className="row-actions">
+        {test.attempt_count > 0 ? (
+          <button aria-label="View attempt history" onClick={loadAttempts} type="button">
+            <History size={17} />
+          </button>
+        ) : null}
+        <button aria-label={`Rename ${test.title}`} onClick={() => onRename(test)} type="button">
+          <Edit3 size={17} />
+        </button>
+        <button aria-label={`Delete ${test.title}`} onClick={() => onDelete(test)} type="button">
+          <Trash2 size={17} />
+        </button>
+      </div>
+      {showAttempts && attempts.length > 0 ? (
+        <div className="attempt-history">
+          {attempts.map((a) => (
+            <Link className="attempt-row" key={a.id} to={`/results/${a.id}`}>
+              <span>Attempt {a.attempt_number}</span>
+              <span>{formatPercent(a.score)} · {formatDate(a.created_at)}</span>
+            </Link>
+          ))}
+        </div>
+      ) : null}
+    </Card>
   );
 }

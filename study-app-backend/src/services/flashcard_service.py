@@ -4,10 +4,13 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fastapi import UploadFile
+
 from src.repositories.flashcard_repository import FlashcardRepository
 from src.repositories.folder_repository import FolderRepository
 from src.repositories.test_repository import TestRepository
-from src.schemas.flashcard_schema import FlashcardCreate, FlashcardResponse
+from src.schemas.flashcard_schema import FlashcardCreate, FlashcardResponse, FlashcardUpdate
+from src.services.file_service import FileService
 from src.services.llm_service import LLMService
 from src.utils.exceptions import ResourceNotFoundException, ValidationException
 
@@ -112,6 +115,50 @@ class FlashcardService:
                 "success_rate": round(success_rate, 2),
             }
         )
+
+    async def update_flashcard(
+        self, folder_id: int, flashcard_id: int, user_id: int, data: FlashcardUpdate, session: AsyncSession
+    ) -> FlashcardResponse:
+        folder = await FolderRepository(session).get_owned(folder_id, user_id)
+        if folder is None:
+            raise ResourceNotFoundException("Folder")
+        repo = FlashcardRepository(session)
+        card = await repo.get(flashcard_id)
+        if card is None or card.folder_id != folder_id:
+            raise ResourceNotFoundException("Flashcard")
+        card = await repo.update(card, data.front, data.back)
+        await session.commit()
+        await session.refresh(card)
+        return FlashcardResponse.model_validate(card)
+
+    async def delete_flashcard(
+        self, folder_id: int, flashcard_id: int, user_id: int, session: AsyncSession
+    ) -> None:
+        folder = await FolderRepository(session).get_owned(folder_id, user_id)
+        if folder is None:
+            raise ResourceNotFoundException("Folder")
+        repo = FlashcardRepository(session)
+        card = await repo.get(flashcard_id)
+        if card is None or card.folder_id != folder_id:
+            raise ResourceNotFoundException("Flashcard")
+        await repo.delete(card)
+        await session.commit()
+
+    async def generate_from_file(
+        self, folder_id: int, user_id: int, files: list[UploadFile], count: int, session: AsyncSession
+    ) -> list[FlashcardResponse]:
+        folder = await FolderRepository(session).get_owned(folder_id, user_id)
+        if folder is None:
+            raise ResourceNotFoundException("Folder")
+        content, _ = await FileService().extract_from_files(files)
+        generated = await self.llm_service.generate_flashcards(content=content, count=count)
+        repo = FlashcardRepository(session)
+        cards = [
+            await repo.create(folder_id, item.front, item.back, "generated_from_file")
+            for item in generated
+        ]
+        await session.commit()
+        return [FlashcardResponse.model_validate(card) for card in cards]
 
     async def get_weak_flashcards(
         self, folder_id: int, user_id: int, threshold: float, session: AsyncSession

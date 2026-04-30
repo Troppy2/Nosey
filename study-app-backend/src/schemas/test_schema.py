@@ -12,11 +12,43 @@ class MCQOptionPublic(BaseModel):
     is_correct: None = None
 
 
+class MCQOptionEditable(BaseModel):
+    id: int
+    text: str
+    is_correct: bool
+
+
+class MCQOptionInput(BaseModel):
+    text: str
+    is_correct: bool
+
+
 class QuestionPublic(BaseModel):
     id: int
     type: str
     question_text: str
     options: list[MCQOptionPublic] = Field(default_factory=list)
+
+
+class QuestionEditable(BaseModel):
+    id: int
+    type: str
+    question_text: str
+    options: list[MCQOptionEditable] = Field(default_factory=list)
+    expected_answer: Optional[str] = None
+
+
+class QuestionCreate(BaseModel):
+    type: str
+    question_text: str = Field(min_length=1)
+    options: list[MCQOptionInput] = Field(default_factory=list)
+    expected_answer: Optional[str] = None
+
+
+class QuestionUpdate(BaseModel):
+    question_text: Optional[str] = Field(default=None, min_length=1)
+    options: Optional[list[MCQOptionInput]] = None
+    expected_answer: Optional[str] = None
 
 
 class TestResponse(BaseModel):
@@ -27,6 +59,7 @@ class TestResponse(BaseModel):
     title: str
     description: Optional[str] = None
     test_type: str
+    is_math_mode: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -52,6 +85,7 @@ class TestTakeResponse(BaseModel):
     title: str
     description: Optional[str] = None
     test_type: str
+    is_math_mode: bool = False
     questions: list[QuestionPublic]
 
 

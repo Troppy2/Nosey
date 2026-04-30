@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy import Boolean, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import BIGINT_ID, Base, TimestampMixin
@@ -24,6 +24,7 @@ class Test(Base, TimestampMixin):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text)
     test_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    is_math_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 
     folder: Mapped[Folder] = relationship("Folder", back_populates="tests")
     questions: Mapped[list[Question]] = relationship(

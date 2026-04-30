@@ -44,11 +44,12 @@ class GradingService:
         results: list[AnswerResult] = []
         correct_count = 0
 
+        is_math_mode = getattr(test, "is_math_mode", False)
         for question_id, user_answer in submitted_by_id.items():
             question = question_by_id.get(question_id)
             if question is None:
                 raise ValidationException(f"Question {question_id} does not belong to this test")
-            grade = await self._grade_question(question, user_answer, notes)
+            grade = await self._grade_question(question, user_answer, notes, is_math_mode=is_math_mode)
             if grade.is_correct:
                 correct_count += 1
             await repo.add_answer(
@@ -60,10 +61,13 @@ class GradingService:
                 grade.confidence,
                 grade.flagged_uncertain,
             )
+            correct_answer = self._correct_answer_text(question)
             results.append(
                 AnswerResult(
                     question_id=question.id,
+                    question_text=question.question_text,
                     user_answer=user_answer,
+                    correct_answer=correct_answer,
                     is_correct=grade.is_correct,
                     feedback=grade.feedback,
                     confidence=grade.confidence,
@@ -87,7 +91,9 @@ class GradingService:
             answers=results,
         )
 
-    async def _grade_question(self, question: Question, user_answer: str, notes: str) -> FRQGrade:
+    async def _grade_question(
+        self, question: Question, user_answer: str, notes: str, is_math_mode: bool = False
+    ) -> FRQGrade:
         if question.question_type == "MCQ":
             return self._grade_mcq(question, user_answer)
         if question.frq_answer is None:
@@ -96,6 +102,12 @@ class GradingService:
                 feedback="This FRQ has no expected answer configured.",
                 flagged_uncertain=True,
                 confidence=0.0,
+            )
+        if is_math_mode:
+            return await self.llm_service.grade_math_answer(
+                question=question.question_text,
+                expected_answer=question.frq_answer.expected_answer,
+                user_answer=user_answer,
             )
         return await self.llm_service.grade_frq_answer(
             notes=notes,
@@ -120,12 +132,21 @@ class GradingService:
             question.mcq_options[letter_index] if 0 <= letter_index < len(question.mcq_options) else None
         )
         is_correct = normalized == correct.option_text.strip().lower() or chosen_by_letter == correct
+        feedback = None if is_correct else f"The correct answer was: {correct.option_text}"
         return FRQGrade(
             is_correct=is_correct,
-            feedback=None if is_correct else "Incorrect MCQ answer.",
+            feedback=feedback,
             flagged_uncertain=False,
             confidence=1.0,
         )
+
+    def _correct_answer_text(self, question: Question) -> str | None:
+        if question.question_type == "MCQ":
+            correct = next((o for o in question.mcq_options if o.is_correct), None)
+            return correct.option_text if correct else None
+        if question.frq_answer is not None:
+            return question.frq_answer.expected_answer
+        return None
 
     async def list_attempts(
         self, test_id: int, user_id: int, session: AsyncSession
@@ -159,10 +180,13 @@ class GradingService:
             correct_count=attempt.correct_count or 0,
             total=attempt.total_questions or 0,
             created_at=attempt.created_at,
+            test_title=attempt.test.title if attempt.test else "",
             answers=[
                 AnswerResult(
                     question_id=answer.question_id,
+                    question_text=answer.question.question_text if answer.question else None,
                     user_answer=answer.user_answer,
+                    correct_answer=self._correct_answer_text(answer.question) if answer.question else None,
                     is_correct=bool(answer.is_correct),
                     feedback=answer.ai_feedback,
                     confidence=float(answer.confidence_score)

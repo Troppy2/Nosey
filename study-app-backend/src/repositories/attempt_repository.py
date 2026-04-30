@@ -57,10 +57,18 @@ class AttemptRepository(BaseRepository[UserAttempt]):
         return list(rows.all())
 
     async def get_detail(self, attempt_id: int, user_id: int) -> UserAttempt | None:
+        from src.models.question import Question
+        from src.models.mcq_option import MCQOption
+        from src.models.frq_answer import FRQAnswer
+        from src.models.test import Test
         return await self.session.scalar(
             select(UserAttempt)
             .where(UserAttempt.id == attempt_id, UserAttempt.user_id == user_id)
-            .options(selectinload(UserAttempt.answers))
+            .options(
+                selectinload(UserAttempt.test),
+                selectinload(UserAttempt.answers).selectinload(UserAnswer.question).selectinload(Question.mcq_options),
+                selectinload(UserAttempt.answers).selectinload(UserAnswer.question).selectinload(Question.frq_answer),
+            )
         )
 
     async def weakness(self, user_id: int, test_id: int) -> list[tuple[int, str, int, int, float]]:

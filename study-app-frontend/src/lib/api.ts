@@ -1,10 +1,16 @@
 import type {
+  AttemptDetail,
   AttemptResult,
+  AttemptSummary,
   AuthUser,
   Flashcard,
+  FlashcardUpdate,
   Folder,
   KojoChatResponse,
   KojoConversation,
+  QuestionCreate,
+  QuestionEditable,
+  QuestionUpdate,
   SubmittedAnswer,
   TestSummary,
   TestTake,
@@ -175,6 +181,9 @@ export async function createTest(input: {
   title: string;
   testType: string;
   files: File[];
+  countMcq?: number;
+  countFrq?: number;
+  practiceTestFile?: File | null;
 }): Promise<{ test_id: number; title: string; questions_generated: number; message: string }> {
   if (isGuestSession()) {
     const tests = await fetchTests();
@@ -182,8 +191,8 @@ export async function createTest(input: {
       throw new Error("Guest accounts can only create one practice test. Sign in to make more.");
     }
   }
-  if (input.files.length === 0) {
-    throw new Error("Add at least one document to generate a test.");
+  if (input.files.length === 0 && !input.practiceTestFile) {
+    throw new Error("Add at least one document or a practice test file.");
   }
   if (input.files.length > 5) {
     throw new Error("You can upload at most 5 documents.");
@@ -191,7 +200,10 @@ export async function createTest(input: {
   const formData = new FormData();
   formData.append("title", input.title);
   formData.append("test_type", input.testType);
+  if (input.countMcq !== undefined) formData.append("count_mcq", String(input.countMcq));
+  if (input.countFrq !== undefined) formData.append("count_frq", String(input.countFrq));
   input.files.forEach((file) => formData.append("notes_files", file));
+  if (input.practiceTestFile) formData.append("practice_test_file", input.practiceTestFile);
 
   try {
     return await request(`/folders/${input.folderId}/tests`, {
@@ -201,6 +213,32 @@ export async function createTest(input: {
   } catch (error) {
     throw error;
   }
+}
+
+export async function fetchQuestionsForEditing(testId: number): Promise<QuestionEditable[]> {
+  return request<QuestionEditable[]>(`/tests/${testId}/edit`);
+}
+
+export async function addQuestion(testId: number, data: QuestionCreate): Promise<QuestionEditable> {
+  return request<QuestionEditable>(`/tests/${testId}/questions`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateQuestion(
+  testId: number,
+  questionId: number,
+  data: QuestionUpdate,
+): Promise<QuestionEditable> {
+  return request<QuestionEditable>(`/tests/${testId}/questions/${questionId}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteQuestion(testId: number, questionId: number): Promise<void> {
+  await request(`/tests/${testId}/questions/${questionId}`, { method: "DELETE" });
 }
 
 export async function updateTest(
@@ -238,6 +276,13 @@ export async function submitAttempt(testId: number, answers: SubmittedAnswer[]):
   }
 }
 
+export async function createFlashcard(folderId: number, data: { front: string; back: string }): Promise<Flashcard> {
+  return request<Flashcard>(`/folders/${folderId}/flashcards`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 export async function fetchFlashcards(folderId?: number): Promise<Flashcard[]> {
   try {
     const path = folderId ? `/folders/${folderId}/flashcards` : "/flashcards";
@@ -271,4 +316,36 @@ export async function fetchKojoConversation(folderId: number): Promise<KojoConve
   } catch {
     return null;
   }
+}
+
+export async function fetchAttemptDetail(attemptId: number): Promise<AttemptDetail> {
+  return request<AttemptDetail>(`/attempts/${attemptId}`);
+}
+
+export async function fetchAttempts(testId: number): Promise<AttemptSummary[]> {
+  try {
+    return await request<AttemptSummary[]>(`/tests/${testId}/attempts`);
+  } catch {
+    return [];
+  }
+}
+
+export async function updateFlashcard(folderId: number, cardId: number, data: FlashcardUpdate): Promise<Flashcard> {
+  return request<Flashcard>(`/folders/${folderId}/flashcards/${cardId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteFlashcard(folderId: number, cardId: number): Promise<void> {
+  await request(`/folders/${folderId}/flashcards/${cardId}`, { method: "DELETE" });
+}
+
+export async function generateFlashcardsFromFile(folderId: number, files: File[], count = 10): Promise<Flashcard[]> {
+  const formData = new FormData();
+  files.forEach((f) => formData.append("notes_files", f));
+  return request<Flashcard[]>(`/folders/${folderId}/flashcards/generate-from-file?count=${count}`, {
+    method: "POST",
+    body: formData,
+  });
 }
