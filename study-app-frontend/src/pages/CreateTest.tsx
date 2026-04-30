@@ -1,5 +1,5 @@
-import { ArrowLeft, FileText, Upload } from "lucide-react";
-import { FormEvent, useEffect, useState } from "react";
+import { ArrowLeft, FileText, Settings2, Upload } from "lucide-react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -22,6 +22,14 @@ export default function CreateTest() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Advanced mode state
+  const [advancedMode, setAdvancedMode] = useState(false);
+  const [countMcq, setCountMcq] = useState(10);
+  const [countFrq, setCountFrq] = useState(5);
+  const [reviewBeforeTaking, setReviewBeforeTaking] = useState(false);
+  const [practiceTestFile, setPracticeTestFile] = useState<File | null>(null);
+  const practiceTestInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     fetchFolders().then((data) => {
       setFolders(data);
@@ -31,11 +39,24 @@ export default function CreateTest() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!title.trim() || files.length === 0) return;
+    if (!title.trim()) return;
+    if (files.length === 0 && !practiceTestFile) return;
     setIsSubmitting(true);
     try {
-      const result = await createTest({ folderId, title: title.trim(), testType, files });
-      navigate(`/test/${result.test_id}`);
+      const result = await createTest({
+        folderId,
+        title: title.trim(),
+        testType,
+        files,
+        countMcq: advancedMode ? countMcq : undefined,
+        countFrq: advancedMode ? countFrq : undefined,
+        practiceTestFile: advancedMode ? practiceTestFile : null,
+      });
+      if (advancedMode && reviewBeforeTaking) {
+        navigate(`/test/${result.test_id}/edit`);
+      } else {
+        navigate(`/test/${result.test_id}`);
+      }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to create that practice test.");
     } finally {
@@ -46,7 +67,9 @@ export default function CreateTest() {
   function acceptFiles(nextFiles?: FileList | File[]) {
     if (!nextFiles || nextFiles.length === 0) return;
     const selected = Array.from(nextFiles).filter((file) => {
-      const allowedType = ["application/pdf", "text/plain", "text/markdown", "text/x-markdown"].includes(file.type) || /\.(pdf|txt|md)$/i.test(file.name);
+      const allowedType =
+        ["application/pdf", "text/plain", "text/markdown", "text/x-markdown"].includes(file.type) ||
+        /\.(pdf|txt|md)$/i.test(file.name);
       return allowedType && file.size <= MAX_UPLOAD_FILE_SIZE_MB * 1024 * 1024;
     });
     if (selected.length === 0) {
@@ -62,8 +85,24 @@ export default function CreateTest() {
   }
 
   function removeFile(index: number) {
-    setFiles((current) => current.filter((_, currentIndex) => currentIndex !== index));
+    setFiles((current) => current.filter((_, i) => i !== index));
   }
+
+  function acceptPracticeTestFile(file?: File) {
+    if (!file) return;
+    const allowed =
+      ["application/pdf", "text/plain", "text/markdown", "text/x-markdown"].includes(file.type) ||
+      /\.(pdf|txt|md)$/i.test(file.name);
+    if (!allowed || file.size > MAX_UPLOAD_FILE_SIZE_MB * 1024 * 1024) {
+      setError("Practice test must be a PDF, TXT, or Markdown file under 5 MB.");
+      return;
+    }
+    setError(null);
+    setPracticeTestFile(file);
+    if (!title) setTitle(file.name.replace(/\.[^/.]+$/, ""));
+  }
+
+  const canSubmit = title.trim() && (files.length > 0 || (advancedMode && practiceTestFile !== null)) && !isSubmitting;
 
   return (
     <div className="page page-narrow">
@@ -75,8 +114,19 @@ export default function CreateTest() {
         <div>
           <span className="eyebrow">Generate</span>
           <h1>Create a practice test</h1>
-              <p className="muted">Upload up to 5 PDF, TXT, or Markdown documents and choose the question style Nosey should generate.</p>
+          <p className="muted">
+            Upload up to 5 PDF, TXT, or Markdown documents and choose the question style Nosey should generate.
+          </p>
         </div>
+        <button
+          type="button"
+          className={`choice ${advancedMode ? "active" : ""}`}
+          style={{ display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}
+          onClick={() => setAdvancedMode((v) => !v)}
+        >
+          <Settings2 size={15} />
+          Advanced mode
+        </button>
       </header>
 
       {error ? <div className="form-error">{error}</div> : null}
@@ -95,8 +145,17 @@ export default function CreateTest() {
       ) : (
         <form className="create-form" onSubmit={handleSubmit}>
           <Card className="form-panel">
-            <TextInput label="Test title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Midterm Practice" />
-            <SelectInput label="Folder" value={folderId} onChange={(event) => setFolderId(Number(event.target.value))}>
+            <TextInput
+              label="Test title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Midterm Practice"
+            />
+            <SelectInput
+              label="Folder"
+              value={folderId}
+              onChange={(e) => setFolderId(Number(e.target.value))}
+            >
               {folders.map((folder) => (
                 <option key={folder.id} value={folder.id}>
                   {folder.name}
@@ -125,6 +184,112 @@ export default function CreateTest() {
             </div>
           </Card>
 
+          {/* Advanced Mode panel */}
+          {advancedMode && (
+            <Card className="form-panel">
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                <div>
+                  <span className="eyebrow" style={{ display: "block", marginBottom: 12 }}>
+                    Upload practice test
+                  </span>
+                  <p className="muted" style={{ marginTop: 0, marginBottom: 12, fontSize: "0.875rem" }}>
+                    Upload an existing practice test — Nosey will read the questions and recreate them as an MCQ+FRQ set.
+                  </p>
+                  {practiceTestFile ? (
+                    <div className="selected-file" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span>
+                        <FileText size={14} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
+                        {practiceTestFile.name} · {(practiceTestFile.size / (1024 * 1024)).toFixed(1)} MB
+                      </span>
+                      <button type="button" onClick={() => { setPracticeTestFile(null); if (practiceTestInputRef.current) practiceTestInputRef.current.value = ""; }}>
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <label
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        cursor: "pointer",
+                        padding: "8px 14px",
+                        border: "1.5px dashed var(--green-light-mid)",
+                        borderRadius: 8,
+                        fontSize: "0.875rem",
+                        color: "var(--green-dark)",
+                        background: "var(--green-lightest)",
+                      }}
+                    >
+                      <Upload size={14} />
+                      Choose practice test file
+                      <input
+                        ref={practiceTestInputRef}
+                        type="file"
+                        accept=".pdf,.txt,.md"
+                        style={{ display: "none" }}
+                        onChange={(e) => acceptPracticeTestFile(e.target.files?.[0])}
+                      />
+                    </label>
+                  )}
+                </div>
+
+                <div>
+                  <span className="eyebrow" style={{ display: "block", marginBottom: 12 }}>
+                    Question count
+                  </span>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                    <div className="field">
+                      <label className="field-label" htmlFor="count-mcq">
+                        MCQ questions
+                      </label>
+                      <input
+                        id="count-mcq"
+                        type="number"
+                        min={0}
+                        max={50}
+                        value={countMcq}
+                        onChange={(e) => setCountMcq(Math.max(0, Math.min(50, Number(e.target.value))))}
+                        className="input"
+                        disabled={testType === "FRQ_only"}
+                        style={{ opacity: testType === "FRQ_only" ? 0.4 : 1 }}
+                      />
+                    </div>
+                    <div className="field">
+                      <label className="field-label" htmlFor="count-frq">
+                        FRQ questions
+                      </label>
+                      <input
+                        id="count-frq"
+                        type="number"
+                        min={0}
+                        max={50}
+                        value={countFrq}
+                        onChange={(e) => setCountFrq(Math.max(0, Math.min(50, Number(e.target.value))))}
+                        className="input"
+                        disabled={testType === "MCQ_only"}
+                        style={{ opacity: testType === "MCQ_only" ? 0.4 : 1 }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <label
+                  style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none" }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={reviewBeforeTaking}
+                    onChange={(e) => setReviewBeforeTaking(e.target.checked)}
+                    style={{ width: 16, height: 16, accentColor: "var(--green-dark)", cursor: "pointer" }}
+                  />
+                  <span style={{ fontSize: "0.9rem" }}>
+                    <strong>Question editor mode</strong> — review and edit questions before taking the test
+                  </span>
+                </label>
+              </div>
+            </Card>
+          )}
+
           <Card
             className={`upload-zone ${isDragging ? "dragging" : ""}`}
             onDragLeave={() => setIsDragging(false)}
@@ -148,7 +313,9 @@ export default function CreateTest() {
             {files.length > 0 ? (
               <>
                 <FileText size={44} />
-                <h2>{files.length} document{files.length === 1 ? "" : "s"} selected</h2>
+                <h2>
+                  {files.length} document{files.length === 1 ? "" : "s"} selected
+                </h2>
                 <p>Each document must be 5 MB or smaller. You can upload up to {MAX_UPLOAD_DOCUMENTS} documents.</p>
                 <div className="selected-files">
                   {files.map((file, index) => (
@@ -176,7 +343,7 @@ export default function CreateTest() {
             <Link to="/dashboard">
               <Button variant="secondary">Cancel</Button>
             </Link>
-            <Button disabled={!title.trim() || files.length === 0 || isSubmitting} type="submit">
+            <Button disabled={!canSubmit} type="submit">
               {isSubmitting ? "Generating..." : "Generate Test"}
             </Button>
           </div>

@@ -7,8 +7,12 @@ from src.repositories.folder_repository import FolderRepository
 from src.repositories.test_repository import TestRepository
 from src.schemas.test_schema import (
     CreateTestResponse,
+    MCQOptionEditable,
     MCQOptionPublic,
+    QuestionCreate,
+    QuestionEditable,
     QuestionPublic,
+    QuestionUpdate,
     TestResponse,
     TestSummary,
     TestTakeResponse,
@@ -38,31 +42,61 @@ class TestService:
         notes_files: list[UploadFile],
         session: AsyncSession,
         description: str | None = None,
+        count_mcq: int = 10,
+        count_frq: int = 5,
+        practice_test_file: UploadFile | None = None,
+        is_math_mode: bool = False,
     ) -> CreateTestResponse:
         if test_type not in VALID_TEST_TYPES:
             raise ValidationException("test_type must be MCQ_only, FRQ_only, or mixed")
-        if not notes_files:
-            raise ValidationException("At least one notes document is required")
+        if not notes_files and practice_test_file is None:
+            raise ValidationException("At least one notes document or a practice test file is required")
         folder = await FolderRepository(session).get_owned(folder_id, user_id)
         if folder is None:
             raise ResourceNotFoundException("Folder")
 
-        notes_content, file_types = await self.file_service.extract_from_files(notes_files)
         repo = TestRepository(session)
-        test = await repo.create(folder_id, title, test_type, description)
-        await repo.add_note(
-            test.id,
-            ", ".join(notes_file.filename or "notes" for notes_file in notes_files),
-            ",".join(file_types),
-            notes_content,
-        )
+        test = await repo.create(folder_id, title, test_type, description, is_math_mode=is_math_mode)
 
-        mcq_questions, frq_questions = await self.llm_service.generate_test_questions(
-            notes=notes_content,
-            test_type=test_type,
-            count_mcq=10,
-            count_frq=5,
-        )
+        if practice_test_file is not None:
+            # Practice test mode: extract questions directly from the uploaded test doc
+            pt_content, pt_file_types = await self.file_service.extract_from_files([practice_test_file])
+            await repo.add_note(
+                test.id,
+                practice_test_file.filename or "practice_test",
+                ",".join(pt_file_types),
+                pt_content,
+            )
+            # Also store any accompanying notes files for grading context
+            if notes_files:
+                notes_content, notes_file_types = await self.file_service.extract_from_files(notes_files)
+                await repo.add_note(
+                    test.id,
+                    ", ".join(f.filename or "notes" for f in notes_files),
+                    ",".join(notes_file_types),
+                    notes_content,
+                )
+            mcq_questions, frq_questions = await self.llm_service.parse_practice_test(
+                content=pt_content,
+                count_mcq=count_mcq if test_type != "FRQ_only" else 0,
+                count_frq=count_frq if test_type != "MCQ_only" else 0,
+            )
+        else:
+            notes_content, file_types = await self.file_service.extract_from_files(notes_files)
+            await repo.add_note(
+                test.id,
+                ", ".join(notes_file.filename or "notes" for notes_file in notes_files),
+                ",".join(file_types),
+                notes_content,
+            )
+            mcq_questions, frq_questions = await self.llm_service.generate_test_questions(
+                notes=notes_content,
+                test_type=test_type,
+                count_mcq=count_mcq,
+                count_frq=count_frq,
+                is_math_mode=is_math_mode,
+            )
+
         display_order = 1
         for item in mcq_questions:
             options = [
@@ -81,6 +115,141 @@ class TestService:
             title=test.title,
             questions_generated=len(mcq_questions) + len(frq_questions),
         )
+
+    async def get_questions_for_editing(
+        self, test_id: int, user_id: int, session: AsyncSession
+    ) -> list[QuestionEditable]:
+        questions = await TestRepository(session).get_questions_for_editing(test_id, user_id)
+        result = []
+        for q in questions:
+            if q.question_type == "MCQ":
+                result.append(QuestionEditable(
+                    id=q.id,
+                    type="MCQ",
+                    question_text=q.question_text,
+                    options=[
+                        MCQOptionEditable(id=opt.id, text=opt.option_text, is_correct=opt.is_correct)
+                        for opt in q.mcq_options
+                    ],
+                ))
+            else:
+                result.append(QuestionEditable(
+                    id=q.id,
+                    type="FRQ",
+                    question_text=q.question_text,
+                    options=[],
+                    expected_answer=q.frq_answer.expected_answer if q.frq_answer else None,
+                ))
+        return result
+
+    async def update_question(
+        self, question_id: int, user_id: int, data: QuestionUpdate, session: AsyncSession
+    ) -> QuestionEditable:
+        repo = TestRepository(session)
+        question = await repo.get_question_owned(question_id, user_id)
+        if question is None:
+            raise ResourceNotFoundException("Question")
+        if data.question_text is not None:
+            question.question_text = data.question_text
+        if question.question_type == "MCQ" and data.options is not None:
+            if len(data.options) != 4:
+                raise ValidationException("MCQ questions must have exactly 4 options")
+            correct_count = sum(1 for o in data.options if o.is_correct)
+            if correct_count != 1:
+                raise ValidationException("Exactly one option must be marked correct")
+            await repo.update_mcq_options(question, [(o.text, o.is_correct) for o in data.options])
+        if question.question_type == "FRQ" and data.expected_answer is not None:
+            if question.frq_answer is not None:
+                question.frq_answer.expected_answer = data.expected_answer
+        await session.commit()
+        await session.refresh(question)
+        # Reload with options after commit
+        refreshed = await repo.get_question_owned(question.id, user_id)
+        assert refreshed is not None
+        if refreshed.question_type == "MCQ":
+            return QuestionEditable(
+                id=refreshed.id,
+                type="MCQ",
+                question_text=refreshed.question_text,
+                options=[
+                    MCQOptionEditable(id=opt.id, text=opt.option_text, is_correct=opt.is_correct)
+                    for opt in refreshed.mcq_options
+                ],
+            )
+        return QuestionEditable(
+            id=refreshed.id,
+            type="FRQ",
+            question_text=refreshed.question_text,
+            options=[],
+            expected_answer=refreshed.frq_answer.expected_answer if refreshed.frq_answer else None,
+        )
+
+    async def add_question(
+        self, test_id: int, user_id: int, data: QuestionCreate, session: AsyncSession
+    ) -> QuestionEditable:
+        from src.models.question import Question as QuestionModel
+        repo = TestRepository(session)
+        # Verify the test belongs to the user
+        from sqlalchemy import select
+        from src.models.test import Test
+        from src.models.folder import Folder
+        stmt = (
+            select(Test)
+            .join(Folder, Folder.id == Test.folder_id)
+            .where(Test.id == test_id, Folder.user_id == user_id)
+        )
+        test = await session.scalar(stmt)
+        if test is None:
+            raise ResourceNotFoundException("Test")
+        display_order = await repo.get_max_display_order(test_id) + 1
+        if data.type == "MCQ":
+            if len(data.options) != 4:
+                raise ValidationException("MCQ questions must have exactly 4 options")
+            correct_count = sum(1 for o in data.options if o.is_correct)
+            if correct_count != 1:
+                raise ValidationException("Exactly one option must be marked correct")
+            question = await repo.add_mcq_question(
+                test_id, data.question_text, display_order,
+                [(o.text, o.is_correct) for o in data.options]
+            )
+            await session.commit()
+            refreshed = await repo.get_question_owned(question.id, user_id)
+            assert refreshed is not None
+            return QuestionEditable(
+                id=refreshed.id,
+                type="MCQ",
+                question_text=refreshed.question_text,
+                options=[
+                    MCQOptionEditable(id=opt.id, text=opt.option_text, is_correct=opt.is_correct)
+                    for opt in refreshed.mcq_options
+                ],
+            )
+        elif data.type == "FRQ":
+            if not data.expected_answer:
+                raise ValidationException("FRQ questions require an expected_answer")
+            question = await repo.add_frq_question(
+                test_id, data.question_text, display_order, data.expected_answer
+            )
+            await session.commit()
+            refreshed = await repo.get_question_owned(question.id, user_id)
+            assert refreshed is not None
+            return QuestionEditable(
+                id=refreshed.id,
+                type="FRQ",
+                question_text=refreshed.question_text,
+                options=[],
+                expected_answer=refreshed.frq_answer.expected_answer if refreshed.frq_answer else None,
+            )
+        else:
+            raise ValidationException("type must be MCQ or FRQ")
+
+    async def delete_question(self, question_id: int, user_id: int, session: AsyncSession) -> None:
+        repo = TestRepository(session)
+        question = await repo.get_question_owned(question_id, user_id)
+        if question is None:
+            raise ResourceNotFoundException("Question")
+        await repo.delete_question(question)
+        await session.commit()
 
     async def list_tests(
         self, folder_id: int, user_id: int, session: AsyncSession
@@ -142,6 +311,7 @@ class TestService:
             title=test.title,
             description=test.description,
             test_type=test.test_type,
+            is_math_mode=test.is_math_mode,
             questions=questions,
         )
 
