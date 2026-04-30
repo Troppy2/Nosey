@@ -20,7 +20,14 @@ _QUESTION_WITH_ANSWERS = (
 
 class TestRepository(BaseRepository[Test]):
     async def create(
-        self, folder_id: int, title: str, test_type: str, description: str | None, is_math_mode: bool = False
+        self,
+        folder_id: int,
+        title: str,
+        test_type: str,
+        description: str | None,
+        is_math_mode: bool = False,
+        is_coding_mode: bool = False,
+        coding_language: str | None = None,
     ) -> Test:
         test = Test(
             folder_id=folder_id,
@@ -28,6 +35,8 @@ class TestRepository(BaseRepository[Test]):
             test_type=test_type,
             description=description,
             is_math_mode=is_math_mode,
+            is_coding_mode=is_coding_mode,
+            coding_language=coding_language,
         )
         self.session.add(test)
         await self.session.flush()

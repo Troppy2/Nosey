@@ -1,9 +1,10 @@
-import { BookOpen, Bot, Brain, Edit3, FolderOpen, History, Plus, Settings, Trash2 } from "lucide-react";
+import { BookOpen, Bot, Brain, Edit3, Files, FolderOpen, History, Plus, Settings, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
+import { FileManager } from "../components/FileManager";
 import { KojoChat } from "../components/KojoChat";
 import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
@@ -17,6 +18,7 @@ export default function FolderDetail() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [kojoOpen, setKojoOpen] = useState(false);
+  const [filesOpen, setFilesOpen] = useState(false);
 
   const id = Number(folderId);
 
@@ -82,6 +84,13 @@ export default function FolderDetail() {
         <div className="toolbar">
           <Button
             variant="secondary"
+            icon={<Files size={18} />}
+            onClick={() => setFilesOpen(true)}
+          >
+            Manage Files
+          </Button>
+          <Button
+            variant="secondary"
             icon={<Bot size={18} />}
             onClick={() => setKojoOpen((o) => !o)}
           >
@@ -97,7 +106,7 @@ export default function FolderDetail() {
               Manage Flashcards
             </Button>
           </Link>
-          <Link to="/create-test">
+          <Link to={`/create-test?folderId=${id}`}>
             <Button icon={<Plus size={18} />}>New Test</Button>
           </Link>
         </div>
@@ -105,6 +114,10 @@ export default function FolderDetail() {
 
       {kojoOpen && folder ? (
         <KojoChat folderId={id} folderName={folder.name} onClose={() => setKojoOpen(false)} />
+      ) : null}
+
+      {filesOpen ? (
+        <FileManager folderId={id} onClose={() => setFilesOpen(false)} />
       ) : null}
 
       {error ? <div className="form-error">{error}</div> : null}
@@ -162,7 +175,7 @@ export default function FolderDetail() {
           title="No tests yet"
           body="Upload notes to generate a practice test for this folder."
           action={
-            <Link to="/create-test">
+            <Link to={`/create-test?folderId=${id}`}>
               <Button>Create Test</Button>
             </Link>
           }

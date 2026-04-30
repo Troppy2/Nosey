@@ -80,6 +80,8 @@ export type TestTake = {
   description?: string | null;
   test_type: string;
   is_math_mode?: boolean;
+  is_coding_mode?: boolean;
+  coding_language?: string | null;
   questions: Question[];
 };
 

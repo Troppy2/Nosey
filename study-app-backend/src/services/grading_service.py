@@ -45,11 +45,18 @@ class GradingService:
         correct_count = 0
 
         is_math_mode = getattr(test, "is_math_mode", False)
+        is_coding_mode = getattr(test, "is_coding_mode", False)
+        coding_language = getattr(test, "coding_language", None) or "Python"
         for question_id, user_answer in submitted_by_id.items():
             question = question_by_id.get(question_id)
             if question is None:
                 raise ValidationException(f"Question {question_id} does not belong to this test")
-            grade = await self._grade_question(question, user_answer, notes, is_math_mode=is_math_mode)
+            grade = await self._grade_question(
+                question, user_answer, notes,
+                is_math_mode=is_math_mode,
+                is_coding_mode=is_coding_mode,
+                coding_language=coding_language,
+            )
             if grade.is_correct:
                 correct_count += 1
             await repo.add_answer(
@@ -93,7 +100,13 @@ class GradingService:
         )
 
     async def _grade_question(
-        self, question: Question, user_answer: str, notes: str, is_math_mode: bool = False
+        self,
+        question: Question,
+        user_answer: str,
+        notes: str,
+        is_math_mode: bool = False,
+        is_coding_mode: bool = False,
+        coding_language: str = "Python",
     ) -> FRQGrade:
         if question.question_type == "MCQ":
             return self._grade_mcq(question, user_answer)
@@ -103,6 +116,13 @@ class GradingService:
                 feedback="This FRQ has no expected answer configured.",
                 flagged_uncertain=True,
                 confidence=0.0,
+            )
+        if is_coding_mode:
+            return await self.llm_service.grade_code_answer(
+                question=question.question_text,
+                expected_answer=question.frq_answer.expected_answer,
+                user_code=user_answer,
+                language=coding_language,
             )
         if is_math_mode:
             return await self.llm_service.grade_math_answer(

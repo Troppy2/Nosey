@@ -188,6 +188,10 @@ export async function createTest(input: {
   countFrq?: number;
   practiceTestFile?: File | null;
   isMathMode?: boolean;
+  difficulty?: string;
+  topicFocus?: string;
+  isCodingMode?: boolean;
+  codingLanguage?: string;
 }): Promise<{ test_id: number; title: string; questions_generated: number; message: string }> {
   if (isGuestSession()) {
     const tests = await fetchTests();
@@ -195,11 +199,8 @@ export async function createTest(input: {
       throw new Error("Guest accounts can only create one practice test. Sign in to make more.");
     }
   }
-  if (input.files.length === 0 && !input.practiceTestFile) {
-    throw new Error("Add at least one document or a practice test file.");
-  }
-  if (input.files.length > 5) {
-    throw new Error("You can upload at most 5 documents.");
+  if (input.files.length > 30) {
+    throw new Error("You can upload at most 30 documents.");
   }
   const formData = new FormData();
   formData.append("title", input.title);
@@ -207,6 +208,10 @@ export async function createTest(input: {
   if (input.countMcq !== undefined) formData.append("count_mcq", String(input.countMcq));
   if (input.countFrq !== undefined) formData.append("count_frq", String(input.countFrq));
   if (input.isMathMode) formData.append("is_math_mode", "true");
+  if (input.difficulty) formData.append("difficulty", input.difficulty);
+  if (input.topicFocus) formData.append("topic_focus", input.topicFocus);
+  if (input.isCodingMode) formData.append("is_coding_mode", "true");
+  if (input.codingLanguage) formData.append("coding_language", input.codingLanguage);
   input.files.forEach((file) => formData.append("notes_files", file));
   if (input.practiceTestFile) formData.append("practice_test_file", input.practiceTestFile);
 
@@ -285,6 +290,22 @@ export async function createFlashcard(folderId: number, data: { front: string; b
   return request<Flashcard>(`/folders/${folderId}/flashcards`, {
     method: "POST",
     body: JSON.stringify(data),
+  });
+}
+
+export async function generateFlashcards(
+  folderId: number,
+  input: { count?: number; prompt: string; sourceType?: "prompt" | "test"; testId?: number },
+): Promise<Flashcard[]> {
+  const body: Record<string, unknown> = {
+    source_type: input.sourceType ?? "prompt",
+    count: input.count ?? 10,
+    prompt: input.prompt,
+  };
+  if (input.testId !== undefined) body.test_id = input.testId;
+  return request<Flashcard[]>(`/folders/${folderId}/flashcards/generate`, {
+    method: "POST",
+    body: JSON.stringify(body),
   });
 }
 
@@ -375,4 +396,35 @@ export async function generateFlashcardsFromFile(folderId: number, files: File[]
     method: "POST",
     body: formData,
   });
+}
+
+// Folder file management
+export interface FolderFile {
+  id: number;
+  folder_id: number;
+  file_name: string;
+  file_type: string;
+  size_bytes: number;
+  uploaded_at: string;
+}
+
+export async function fetchFolderFiles(folderId: number): Promise<FolderFile[]> {
+  try {
+    return await request<FolderFile[]>(`/folders/${folderId}/files`);
+  } catch {
+    return [];
+  }
+}
+
+export async function uploadFolderFiles(folderId: number, files: File[]): Promise<FolderFile[]> {
+  const formData = new FormData();
+  files.forEach((f) => formData.append("files", f));
+  return request<FolderFile[]>(`/folders/${folderId}/files`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export async function deleteFolderFile(folderId: number, fileId: number): Promise<void> {
+  await request(`/folders/${folderId}/files/${fileId}`, { method: "DELETE" });
 }

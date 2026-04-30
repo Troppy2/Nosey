@@ -1,9 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.datastructures import UploadFile
 
 from src.database import get_session
 from src.dependencies import get_current_user
+from src.models.folder import Folder
+from src.models.folder_file import FolderFile
 from src.models.user import User
 from src.schemas.test_schema import (
     CreateTestResponse,
@@ -55,11 +58,28 @@ async def create_test(
         except (ValueError, TypeError):
             count_frq = 5
         is_math_mode = str(form.get("is_math_mode", "false")).lower() in ("true", "1", "yes")
+        difficulty_raw = str(form.get("difficulty", "mixed")).strip().lower()
+        difficulty = difficulty_raw if difficulty_raw in ("easy", "medium", "hard", "mixed") else "mixed"
+        topic_focus_raw = form.get("topic_focus")
+        topic_focus = str(topic_focus_raw).strip()[:200] if topic_focus_raw else None
+        is_coding_mode = str(form.get("is_coding_mode", "false")).lower() in ("true", "1", "yes")
+        coding_language_raw = form.get("coding_language")
+        coding_language = str(coding_language_raw).strip()[:50] if coding_language_raw else "Python"
 
         if not title or not test_type:
             raise StudyAppException("title and test_type are required")
-        if not notes_files and practice_test_file is None:
-            raise StudyAppException("Provide at least one notes document or a practice test file")
+        folder = await session.scalar(
+            select(Folder).where(Folder.id == folder_id, Folder.user_id == user.id)
+        )
+        if folder is None:
+            raise ResourceNotFoundException("Folder")
+        folder_file_count = await session.scalar(
+            select(func.count()).select_from(FolderFile).where(FolderFile.folder_id == folder_id)
+        )
+        if not notes_files and practice_test_file is None and int(folder_file_count or 0) == 0:
+            raise StudyAppException(
+                "Provide at least one notes document, a saved folder file, or a practice test file"
+            )
         if len(notes_files) > MAX_UPLOAD_DOCUMENTS:
             raise StudyAppException(f"You can upload at most {MAX_UPLOAD_DOCUMENTS} documents")
         valid_files = [f for f in notes_files if isinstance(f, UploadFile)]
@@ -77,6 +97,10 @@ async def create_test(
             count_frq=count_frq,
             practice_test_file=practice_test_file,
             is_math_mode=is_math_mode,
+            difficulty=difficulty,
+            topic_focus=topic_focus,
+            is_coding_mode=is_coding_mode,
+            coding_language=coding_language,
         )
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

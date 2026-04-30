@@ -1,5 +1,5 @@
 import { BookOpen, Brain, Edit3, FolderOpen, Plus, Trash2, TrendingUp } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -8,12 +8,44 @@ import { deleteTest, fetchFlashcards, fetchFolders, fetchTests, updateTest } fro
 import { formatDate, formatPercent } from "../lib/format";
 import type { Flashcard, Folder, TestSummary } from "../lib/types";
 
+const TYPE_START_DELAY_MS = 3000;
+const TYPE_ROTATE_INTERVAL_MS = 5 * 60 * 1000;
+const TYPE_STEP_MS = 28;
+
+const OTHER_MESSAGES = [
+  "Stop doom scrolling and get to studying bud",
+  "Studying first doom scrolling later!",
+  "Did you drink water yet?",
+  "Time to lock in man",
+  "Look who it is",
+  "Put ur phone away and start practicing",
+  "Time to study perchance",
+  "Put your phone on DND and get to work!",
+];
+
+function getTimeOfDayMessage(now = new Date()) {
+  const hour = now.getHours();
+  if (hour < 12) return "Good morning, my goat, time to study!";
+  if (hour < 18) return "Good afternoon my goat study time!";
+  return "Good evening my goat study time!";
+}
+
+function getMessageQueue() {
+  return [getTimeOfDayMessage(), ...OTHER_MESSAGES];
+}
+
 export default function Dashboard() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [tests, setTests] = useState<TestSummary[]>([]);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [displayTitle, setDisplayTitle] = useState("Your study cockpit");
+  const displayTitleRef = useRef(displayTitle);
+
+  useEffect(() => {
+    displayTitleRef.current = displayTitle;
+  }, [displayTitle]);
 
   useEffect(() => {
     Promise.all([fetchFolders(), fetchTests(), fetchFlashcards()])
@@ -26,6 +58,78 @@ export default function Dashboard() {
         setError(loadError instanceof Error ? loadError.message : "Unable to load your study data.");
       })
       .finally(() => setIsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+    const timers = new Set<number>();
+
+    function clearTimers() {
+      timers.forEach((timerId) => window.clearTimeout(timerId));
+      timers.clear();
+    }
+
+    function typeText(targetText: string, onComplete?: () => void) {
+      let index = 0;
+
+      function step() {
+        if (!isActive) return;
+        setDisplayTitle(targetText.slice(0, index));
+        if (index <= targetText.length) {
+          const timerId = window.setTimeout(() => {
+            index += 1;
+            step();
+          }, TYPE_STEP_MS);
+          timers.add(timerId);
+        } else if (onComplete) {
+          onComplete();
+        }
+      }
+
+      step();
+    }
+
+    function eraseAndType(nextText: string) {
+      const currentText = displayTitleRef.current;
+
+      function erase(index: number) {
+        if (!isActive) return;
+        setDisplayTitle(currentText.slice(0, index));
+        if (index > 0) {
+          const timerId = window.setTimeout(() => erase(index - 1), TYPE_STEP_MS);
+          timers.add(timerId);
+        } else {
+          typeText(nextText);
+        }
+      }
+
+      erase(currentText.length);
+    }
+
+    const startTimer = window.setTimeout(() => {
+      if (!isActive) return;
+      eraseAndType(getMessageQueue()[0]);
+
+      let messageIndex = 1;
+      const rotate = () => {
+        if (!isActive) return;
+        const queue = getMessageQueue();
+        eraseAndType(queue[messageIndex % queue.length]);
+        messageIndex += 1;
+        const rotateTimer = window.setTimeout(rotate, TYPE_ROTATE_INTERVAL_MS);
+        timers.add(rotateTimer);
+      };
+
+      const rotateTimer = window.setTimeout(rotate, TYPE_ROTATE_INTERVAL_MS);
+      timers.add(rotateTimer);
+    }, TYPE_START_DELAY_MS);
+
+    timers.add(startTimer);
+
+    return () => {
+      isActive = false;
+      clearTimers();
+    };
   }, []);
 
   const stats = useMemo(() => {
@@ -78,7 +182,7 @@ export default function Dashboard() {
       <header className="page-header">
         <div>
           <span className="eyebrow">Dashboard</span>
-          <h1>Your study cockpit</h1>
+          <h1 aria-live="polite">{displayTitle || " "}</h1>
           <p className="muted">Recent tests, active folders, and weak concepts in one place.</p>
         </div>
         <Link to="/create-test">

@@ -46,17 +46,30 @@ class TestService:
         count_frq: int = 5,
         practice_test_file: UploadFile | None = None,
         is_math_mode: bool = False,
+        difficulty: str = "mixed",
+        topic_focus: str | None = None,
+        is_coding_mode: bool = False,
+        coding_language: str | None = None,
     ) -> CreateTestResponse:
         if test_type not in VALID_TEST_TYPES:
             raise ValidationException("test_type must be MCQ_only, FRQ_only, or mixed")
-        if not notes_files and practice_test_file is None:
-            raise ValidationException("At least one notes document or a practice test file is required")
         folder = await FolderRepository(session).get_owned(folder_id, user_id)
         if folder is None:
             raise ResourceNotFoundException("Folder")
 
+        folder_files_content = await self.file_service.get_folder_files_content(folder_id, session)
+        if not notes_files and practice_test_file is None and not folder_files_content:
+            raise ValidationException(
+                "At least one notes document, folder file, or a practice test file is required"
+            )
+
         repo = TestRepository(session)
-        test = await repo.create(folder_id, title, test_type, description, is_math_mode=is_math_mode)
+        test = await repo.create(
+            folder_id, title, test_type, description,
+            is_math_mode=is_math_mode,
+            is_coding_mode=is_coding_mode,
+            coding_language=coding_language,
+        )
 
         if practice_test_file is not None:
             # Practice test mode: extract questions directly from the uploaded test doc
@@ -67,14 +80,28 @@ class TestService:
                 ",".join(pt_file_types),
                 pt_content,
             )
-            # Also store any accompanying notes files for grading context
+            # Also store any accompanying notes files or folder files for grading context
+            context_parts: list[str] = []
+            context_labels: list[str] = []
             if notes_files:
                 notes_content, notes_file_types = await self.file_service.extract_from_files(notes_files)
+                context_parts.append(notes_content)
+                context_labels.append(", ".join(f.filename or "notes" for f in notes_files))
                 await repo.add_note(
                     test.id,
                     ", ".join(f.filename or "notes" for f in notes_files),
                     ",".join(notes_file_types),
                     notes_content,
+                )
+            if folder_files_content:
+                context_parts.append(folder_files_content)
+                context_labels.append("stored folder files")
+            if context_parts:
+                await repo.add_note(
+                    test.id,
+                    ", ".join(context_labels) if context_labels else "study context",
+                    "combined",
+                    "\n\n---\n\n".join(context_parts),
                 )
             mcq_questions, frq_questions = await self.llm_service.parse_practice_test(
                 content=pt_content,
@@ -82,11 +109,24 @@ class TestService:
                 count_frq=count_frq if test_type != "MCQ_only" else 0,
             )
         else:
-            notes_content, file_types = await self.file_service.extract_from_files(notes_files)
+            context_parts: list[str] = []
+            context_labels: list[str] = []
+            file_types: list[str] = []
+            if notes_files:
+                notes_content, file_types = await self.file_service.extract_from_files(notes_files)
+                context_parts.append(notes_content)
+                context_labels.append(", ".join(f.filename or "notes" for f in notes_files))
+            else:
+                notes_content = ""
+            if folder_files_content:
+                context_parts.append(folder_files_content)
+                context_labels.append("stored folder files")
+                file_types.append("combined")
+            notes_content = "\n\n---\n\n".join(context_parts).strip()
             await repo.add_note(
                 test.id,
-                ", ".join(notes_file.filename or "notes" for notes_file in notes_files),
-                ",".join(file_types),
+                ", ".join(context_labels) if context_labels else "study context",
+                ",".join(file_types) if file_types else "combined",
                 notes_content,
             )
             mcq_questions, frq_questions = await self.llm_service.generate_test_questions(
@@ -95,6 +135,10 @@ class TestService:
                 count_mcq=count_mcq,
                 count_frq=count_frq,
                 is_math_mode=is_math_mode,
+                difficulty=difficulty,
+                topic_focus=topic_focus,
+                is_coding_mode=is_coding_mode,
+                coding_language=coding_language,
             )
 
         display_order = 1
@@ -312,6 +356,8 @@ class TestService:
             description=test.description,
             test_type=test.test_type,
             is_math_mode=test.is_math_mode,
+            is_coding_mode=test.is_coding_mode,
+            coding_language=test.coding_language,
             questions=questions,
         )
 
