@@ -57,6 +57,10 @@ class LLMService:
         count_mcq: int = 10,
         count_frq: int = 5,
         is_math_mode: bool = False,
+        difficulty: str = "mixed",
+        topic_focus: str | None = None,
+        is_coding_mode: bool = False,
+        coding_language: str | None = None,
     ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
         if test_type == "MCQ_only":
             count_frq = 0
@@ -66,9 +70,25 @@ class LLMService:
         # Strip file metadata (YAML frontmatter, doc markers) before any LLM pass.
         cleaned = self._strip_metadata(notes)
 
+        if is_coding_mode:
+            lang = coding_language or "Python"
+            try:
+                prompt = self._build_coding_generation_prompt(
+                    cleaned, count_mcq, count_frq, test_type, lang,
+                    difficulty=difficulty, topic_focus=topic_focus,
+                )
+                data = await self._complete_json(prompt)
+                return self._parse_generated_test(data, count_mcq, count_frq, cleaned)
+            except Exception as exc:
+                logger.warning("Coding question generation failed; using fallback: %s", exc)
+                return self._fallback_questions(cleaned, count_mcq, count_frq)
+
         if is_math_mode:
             try:
-                prompt = self._build_math_generation_prompt(cleaned, count_mcq, count_frq, test_type)
+                prompt = self._build_math_generation_prompt(
+                    cleaned, count_mcq, count_frq, test_type,
+                    difficulty=difficulty, topic_focus=topic_focus,
+                )
                 data = await self._complete_json(prompt)
                 return self._parse_generated_test(data, count_mcq, count_frq, cleaned)
             except Exception as exc:
@@ -79,7 +99,10 @@ class LLMService:
         study = await self._extract_study_content(cleaned)
 
         # Pass 2: generate questions from the clean structured content.
-        prompt = self._build_generation_prompt(study, count_mcq, count_frq)
+        prompt = self._build_generation_prompt(
+            study, count_mcq, count_frq,
+            difficulty=difficulty, topic_focus=topic_focus,
+        )
         try:
             data = await self._complete_json(prompt)
             return self._parse_generated_test(data, count_mcq, count_frq, cleaned)
@@ -131,9 +154,24 @@ class LLMService:
         return _StudyContent(title="", terms=[], concepts=self._sentences(notes)[:40])
 
     def _build_generation_prompt(
-        self, study: _StudyContent, count_mcq: int, count_frq: int
+        self,
+        study: _StudyContent,
+        count_mcq: int,
+        count_frq: int,
+        difficulty: str = "mixed",
+        topic_focus: str | None = None,
     ) -> str:
         context_header = f'SUBJECT: "{study.title}"\n\n' if study.title else ""
+
+        difficulty_map = {
+            "easy": "straightforward recall questions — definitions, simple identification",
+            "medium": "application questions — use the concept, connect ideas",
+            "hard": "analysis and synthesis — compare, evaluate, multi-step reasoning",
+            "mixed": "a mix of easy recall, medium application, and hard analysis questions",
+        }
+        difficulty_line = f"DIFFICULTY: {difficulty_map.get(difficulty, difficulty_map['mixed'])}\n\n"
+
+        topic_line = f'TOPIC FOCUS: Only generate questions about "{topic_focus}".\n\n' if topic_focus else ""
 
         terms_block = ""
         if study.terms:
@@ -155,7 +193,7 @@ class LLMService:
                 "  - Each question must test understanding of a SPECIFIC term, definition, or concept above\n"
                 "  - Wrong answer options must be plausible but clearly incorrect\n"
                 "  - Do NOT ask 'what is the title of...' or reference authors/sources\n"
-                "  - Vary question style: some ask for the definition, some apply the concept\n"
+                "  - Vary question style according to the difficulty level above\n"
             )
 
         frq_instructions = ""
@@ -166,12 +204,15 @@ class LLMService:
                 "  - Ask the student to explain, compare, or apply a concept from the list above\n"
                 "  - Each expected_answer must be a complete, accurate explanation (2–4 sentences)\n"
                 "  - Do NOT ask students to list titles, authors, or sources\n"
+                "  - Match difficulty level above\n"
             )
 
         return (
             "You are building a study test. Use ONLY the terms, definitions, and concepts "
             "below as source material — do not invent facts.\n\n"
             f"{context_header}"
+            f"{difficulty_line}"
+            f"{topic_line}"
             f"{terms_block}"
             f"{concepts_block}"
             f"{mcq_instructions}\n"
@@ -274,16 +315,154 @@ If the notes do not support grading, set flagged_uncertain true and confidence 0
             logger.warning("LLM FRQ grading failed; using simple fallback: %s", exc)
             return self._fallback_grade(expected_answer, user_answer)
 
-    def _build_math_generation_prompt(
-        self, notes: str, count_mcq: int, count_frq: int, test_type: str
+    def _build_coding_generation_prompt(
+        self,
+        notes: str,
+        count_mcq: int,
+        count_frq: int,
+        test_type: str,
+        language: str,
+        difficulty: str = "mixed",
+        topic_focus: str | None = None,
     ) -> str:
+        difficulty_map = {
+            "easy": "basic syntax and single-function problems",
+            "medium": "multi-step algorithms and data structure usage",
+            "hard": "complex algorithms, optimization, and system design",
+            "mixed": "a range from basic to advanced",
+        }
+        difficulty_line = f"DIFFICULTY: {difficulty_map.get(difficulty, difficulty_map['mixed'])}\n"
+        topic_line = f'TOPIC FOCUS: Only generate problems about "{topic_focus}".\n' if topic_focus else ""
+
+        mcq_block = ""
+        if count_mcq > 0 and test_type != "FRQ_only":
+            mcq_block = (
+                f"Generate exactly {count_mcq} MCQ coding questions.\n"
+                "MCQ rules:\n"
+                f"  - Questions about {language} syntax, built-in functions, time/space complexity, or CS concepts\n"
+                "  - 4 answer options, only one is correct\n"
+                "  - Vary from conceptual to tricky code-reading questions\n"
+            )
+        frq_block = ""
+        if count_frq > 0 and test_type != "MCQ_only":
+            frq_block = (
+                f"Generate exactly {count_frq} coding challenge questions.\n"
+                "Coding challenge rules:\n"
+                f"  - Each question must be a programming task solvable in {language}\n"
+                "  - question_text must include: problem description, input format, output format, and 1-2 examples\n"
+                f"  - expected_answer must include: complete working {language} solution with brief comments\n"
+                "  - Vary: functions, loops, data structures, algorithms\n"
+            )
+        return (
+            f"You are generating {language} programming practice questions based on the following CS notes.\n\n"
+            f"{difficulty_line}"
+            f"{topic_line}\n"
+            f"{mcq_block}\n"
+            f"{frq_block}\n"
+            "Return JSON only with keys mcq and frq.\n"
+            "mcq items: {question_text, options: [4 strings], correct_index: 0-3}\n"
+            "frq items: {question_text, expected_answer}\n\n"
+            f"CS NOTES:\n{notes[:_GENERATE_CHAR_LIMIT]}"
+        )
+
+    async def grade_code_answer(
+        self,
+        question: str,
+        expected_answer: str,
+        user_code: str,
+        language: str = "Python",
+    ) -> FRQGrade:
+        prompt = f"""You are a CS instructor grading a coding assignment.
+
+LANGUAGE: {language}
+
+PROBLEM:
+{question}
+
+REFERENCE SOLUTION:
+{expected_answer}
+
+STUDENT'S CODE:
+{user_code}
+
+Evaluate the student's code for:
+1. Correctness — does it solve the problem as described?
+2. Logic — is the approach sound even if syntax is slightly off?
+3. Edge cases — does it handle the given examples?
+
+Return JSON only with these exact keys:
+{{
+  "is_correct": true or false,
+  "what_went_right": "what the student did well (empty string if nothing)",
+  "what_went_wrong": "specific bugs or issues (empty string if correct)",
+  "improvements": ["suggestion 1", "suggestion 2"],
+  "corrected_snippet": "short corrected version or key fix (empty string if fully correct)",
+  "time_complexity": "O(?) with brief explanation",
+  "confidence": 0.0 to 1.0,
+  "flagged_uncertain": true or false
+}}
+
+Be lenient on minor syntax errors if the logic is correct. Accept equivalent solutions.
+"""
+        try:
+            data = await self._complete_json(prompt)
+            is_correct = bool(data.get("is_correct", False))
+            what_right = str(data.get("what_went_right", "")).strip()
+            what_wrong = str(data.get("what_went_wrong", "")).strip()
+            improvements = data.get("improvements", [])
+            corrected = str(data.get("corrected_snippet", "")).strip()
+            complexity = str(data.get("time_complexity", "")).strip()
+            confidence = max(0.0, min(1.0, float(data.get("confidence", 0.5))))
+            flagged = bool(data.get("flagged_uncertain", False))
+
+            sections: list[str] = []
+            if what_right:
+                sections.append(f"**What you did well:** {what_right}")
+            if what_wrong:
+                sections.append(f"**Issues found:** {what_wrong}")
+            if isinstance(improvements, list) and improvements:
+                items = "\n".join(f"- {s}" for s in improvements if isinstance(s, str))
+                sections.append(f"**Suggestions:**\n{items}")
+            if corrected:
+                sections.append(f"**Key fix:**\n```{language.lower()}\n{corrected}\n```")
+            if complexity:
+                sections.append(f"**Time complexity:** {complexity}")
+
+            feedback = "\n\n".join(sections)
+            return FRQGrade(
+                is_correct=is_correct,
+                feedback=feedback[:4000],
+                flagged_uncertain=flagged,
+                confidence=confidence,
+            )
+        except Exception as exc:
+            logger.warning("LLM code grading failed; using fallback: %s", exc)
+            return self._fallback_grade(expected_answer, user_code)
+
+    def _build_math_generation_prompt(
+        self,
+        notes: str,
+        count_mcq: int,
+        count_frq: int,
+        test_type: str,
+        difficulty: str = "mixed",
+        topic_focus: str | None = None,
+    ) -> str:
+        latex_rule = (
+            "IMPORTANT — LaTeX formatting rules:\n"
+            "  - Write ALL math expressions using LaTeX notation\n"
+            "  - Inline expressions: use \\frac{a}{b}, x^{2}, \\sqrt{x}, \\int, etc.\n"
+            "  - Example question: 'Find \\frac{dx}{dt} when x = t^{3} + t at t = 2'\n"
+            "  - Example answer option: '3t^{2} + 1' or '\\frac{1}{2}'\n"
+            "  - Do NOT use unicode superscripts like x² — always use x^{2}\n"
+        )
         mcq_block = ""
         if count_mcq > 0 and test_type != "FRQ_only":
             mcq_block = (
                 f"Generate exactly {count_mcq} MCQ math problems.\n"
                 "MCQ rules:\n"
                 "  - Each question must be a concrete calculation or problem-solving question\n"
-                "  - All 4 answer options must be plausible numeric or algebraic expressions\n"
+                "  - All 4 answer options must be plausible numeric or algebraic LaTeX expressions\n"
                 "  - Only one option is correct\n"
                 "  - Vary difficulty: some straightforward, some multi-step\n"
             )
@@ -294,12 +473,25 @@ If the notes do not support grading, set flagged_uncertain true and confidence 0
                 "FRQ rules:\n"
                 "  - Ask the student to solve a problem and show their work\n"
                 "  - expected_answer must include the complete worked solution with numbered steps\n"
+                "  - Write all math in LaTeX: '\\frac{dy}{dt} = 3t^{2} + 1'\n"
                 "  - Use phrases like 'Solve for x:', 'Simplify:', 'Find the value of:'\n"
                 "  - Vary question types: equations, simplification, word problems\n"
             )
+        difficulty_map = {
+            "easy": "basic calculations and single-step problems",
+            "medium": "multi-step problems requiring intermediate algebraic or calculus skills",
+            "hard": "challenging problems requiring deep reasoning, proof, or advanced techniques",
+            "mixed": "a variety from basic to challenging",
+        }
+        difficulty_line = f"DIFFICULTY: {difficulty_map.get(difficulty, difficulty_map['mixed'])}\n"
+        topic_line = f'TOPIC FOCUS: Only generate problems about "{topic_focus}".\n' if topic_focus else ""
+
         return (
             "You are generating math practice problems based on the following study notes.\n"
             "Create problems that test mathematical understanding and calculation skills.\n\n"
+            f"{difficulty_line}"
+            f"{topic_line}"
+            f"{latex_rule}\n"
             f"{mcq_block}\n"
             f"{frq_block}\n"
             "Return JSON only with keys mcq and frq.\n"
@@ -332,10 +524,10 @@ Then return JSON only with these exact keys:
   "what_went_right": "brief description of what the student did correctly (empty string if nothing)",
   "what_went_wrong": "brief description of the error (empty string if correct)",
   "steps": [
-    {{"step": 1, "description": "step description", "expression": "math expression or equation for this step"}},
+    {{"step": 1, "description": "step description", "expression": "LaTeX math expression for this step"}},
     {{"step": 2, ...}}
   ],
-  "final_answer": "the correct final answer",
+  "final_answer": "the correct final answer in LaTeX",
   "confidence": 0.0 to 1.0,
   "flagged_uncertain": true or false
 }}
@@ -343,6 +535,7 @@ Then return JSON only with these exact keys:
 Rules:
 - Accept equivalent forms (e.g. x=4 and 4 are equivalent for "solve for x: ... = 4")
 - steps must walk through the complete solution from start to finish
+- Write ALL math expressions in LaTeX notation: \\frac{{dy}}{{dx}} = 3t^{{2}} + 1
 - Be specific in what_went_right and what_went_wrong
 """
         try:
@@ -355,7 +548,7 @@ Rules:
             confidence = max(0.0, min(1.0, float(data.get("confidence", 0.5))))
             flagged = bool(data.get("flagged_uncertain", False))
 
-            # Build structured markdown feedback
+            # Build structured markdown+LaTeX feedback (rendered by MarkdownContent)
             sections: list[str] = []
             if what_right:
                 sections.append(f"**What you got right:** {what_right}")
@@ -373,11 +566,11 @@ Rules:
                     if desc:
                         line = f"**Step {num}:** {desc}"
                         if expr:
-                            line += f"\n`{expr}`"
+                            line += f"  $${expr}$$"
                         sections.append(line)
 
             if final_answer:
-                sections.append(f"\n**Final answer:** `{final_answer}`")
+                sections.append(f"\n**Final answer:** $${final_answer}$$")
 
             feedback = "\n\n".join(sections)
             return FRQGrade(
@@ -391,24 +584,38 @@ Rules:
             return self._fallback_grade(expected_answer, user_answer)
 
     async def generate_flashcards(
-        self, content: str, count: int, prompt: str | None = None
+        self,
+        content: str,
+        count: int,
+        prompt: str | None = None,
+        existing_flashcards: list[str] | None = None,
     ) -> list[GeneratedFlashcard]:
+        existing_flashcards = [item.strip() for item in (existing_flashcards or []) if item and item.strip()]
+        existing_block = ""
+        if existing_flashcards:
+            existing_lines = "\n".join(f"- {item}" for item in existing_flashcards[:80])
+            existing_block = (
+                "EXISTING FLASHCARDS TO AVOID DUPLICATING OR REPHRASING:\n"
+                f"{existing_lines}\n\n"
+            )
         llm_prompt = (
-            f"Generate {count} flashcards. Return JSON only with key flashcards, "
+            f"Generate {count} flashcards that are new, specific, and clearly different from any existing cards. Return JSON only with key flashcards, "
             "an array of objects with front and back.\n"
+            f"{existing_block}"
             f"TOPIC: {prompt or 'Use the provided study content'}\nCONTENT:\n{content[:12000]}"
         )
         try:
             data = await self._complete_json(llm_prompt)
-            cards = data.get("flashcards", [])
-            if not isinstance(cards, list):
-                raise ValueError("flashcards was not a list")
-            parsed = [
-                GeneratedFlashcard(front=str(card.get("front", "")), back=str(card.get("back", "")))
-                for card in cards
-                if isinstance(card, dict) and card.get("front") and card.get("back")
-            ]
-            return parsed[:count] or self._fallback_flashcards(content, count, prompt)
+            parsed = self._parse_generated_flashcards(data)
+            unique = self._dedupe_flashcards(parsed, existing_flashcards)
+            if len(unique) < count:
+                retry_prompt = llm_prompt + "\nGenerate only cards that are entirely new compared with the existing list above."
+                retry_data = await self._complete_json(retry_prompt)
+                unique = self._dedupe_flashcards(
+                    unique + self._parse_generated_flashcards(retry_data),
+                    existing_flashcards,
+                )
+            return unique[:count] or self._fallback_flashcards(content, count, prompt)
         except Exception as exc:
             logger.warning("LLM flashcard generation failed; using fallback: %s", exc)
             return self._fallback_flashcards(content, count, prompt)
@@ -636,6 +843,32 @@ Rules:
             )
             for index in range(count)
         ]
+
+    def _parse_generated_flashcards(self, data: dict[str, object]) -> list[GeneratedFlashcard]:
+        cards = data.get("flashcards", [])
+        if not isinstance(cards, list):
+            raise ValueError("flashcards was not a list")
+        return [
+            GeneratedFlashcard(front=str(card.get("front", "")).strip(), back=str(card.get("back", "")).strip())
+            for card in cards
+            if isinstance(card, dict) and card.get("front") and card.get("back")
+        ]
+
+    def _dedupe_flashcards(
+        self, cards: list[GeneratedFlashcard], existing_flashcards: list[str]
+    ) -> list[GeneratedFlashcard]:
+        seen = {self._flashcard_key(item) for item in existing_flashcards}
+        unique: list[GeneratedFlashcard] = []
+        for card in cards:
+            key = self._flashcard_key(f"{card.front}\n{card.back}")
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            unique.append(card)
+        return unique
+
+    def _flashcard_key(self, text: str) -> str:
+        return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]+", " ", text.lower())).strip()
 
     def _strip_metadata(self, notes: str) -> str:
         # Remove [filename] document markers added by the repository

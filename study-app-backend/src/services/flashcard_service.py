@@ -16,8 +16,9 @@ from src.utils.exceptions import ResourceNotFoundException, ValidationException
 
 
 class FlashcardService:
-    def __init__(self, llm_service: LLMService | None = None) -> None:
+    def __init__(self, llm_service: LLMService | None = None, file_service: FileService | None = None) -> None:
         self.llm_service = llm_service or LLMService()
+        self.file_service = file_service or FileService()
 
     async def create_flashcard(
         self, folder_id: int, user_id: int, data: FlashcardCreate, session: AsyncSession
@@ -44,8 +45,17 @@ class FlashcardService:
         test = await TestRepository(session).get_owned_with_questions(test_id, user_id)
         if test is None or test.folder_id != folder_id:
             raise ResourceNotFoundException("Test")
-        content = "\n\n".join(note.content for note in test.notes)
-        generated = await self.llm_service.generate_flashcards(content=content, count=count)
+        folder_files_content = await self.file_service.get_folder_files_content(folder_id, session)
+        content = self._join_contexts(
+            "\n\n".join(note.content for note in test.notes),
+            folder_files_content,
+        )
+        existing_flashcards = await self._existing_flashcard_context(folder_id, user_id, session)
+        generated = await self.llm_service.generate_flashcards(
+            content=content,
+            count=count,
+            existing_flashcards=existing_flashcards,
+        )
         repo = FlashcardRepository(session)
         cards = [
             await repo.create(folder_id, item.front, item.back, "generated_from_test")
@@ -60,7 +70,14 @@ class FlashcardService:
         folder = await FolderRepository(session).get_owned(folder_id, user_id)
         if folder is None:
             raise ResourceNotFoundException("Folder")
-        generated = await self.llm_service.generate_flashcards(content="", count=count, prompt=prompt)
+        folder_files_content = await self.file_service.get_folder_files_content(folder_id, session)
+        existing_flashcards = await self._existing_flashcard_context(folder_id, user_id, session)
+        generated = await self.llm_service.generate_flashcards(
+            content=folder_files_content,
+            count=count,
+            prompt=prompt,
+            existing_flashcards=existing_flashcards,
+        )
         repo = FlashcardRepository(session)
         cards = [
             await repo.create(folder_id, item.front, item.back, "generated_from_prompt")
@@ -150,8 +167,14 @@ class FlashcardService:
         folder = await FolderRepository(session).get_owned(folder_id, user_id)
         if folder is None:
             raise ResourceNotFoundException("Folder")
-        content, _ = await FileService().extract_from_files(files)
-        generated = await self.llm_service.generate_flashcards(content=content, count=count)
+        content, _ = await self.file_service.extract_from_files(files)
+        folder_files_content = await self.file_service.get_folder_files_content(folder_id, session)
+        existing_flashcards = await self._existing_flashcard_context(folder_id, user_id, session)
+        generated = await self.llm_service.generate_flashcards(
+            content=self._join_contexts(content, folder_files_content),
+            count=count,
+            existing_flashcards=existing_flashcards,
+        )
         repo = FlashcardRepository(session)
         cards = [
             await repo.create(folder_id, item.front, item.back, "generated_from_file")
@@ -171,6 +194,18 @@ class FlashcardService:
             for card in sorted(cards, key=lambda item: item.difficulty, reverse=True)
             if card.success_rate is not None and card.success_rate < threshold
         ]
+
+    async def _existing_flashcard_context(
+        self, folder_id: int, user_id: int, session: AsyncSession
+    ) -> list[str]:
+        rows = await FlashcardRepository(session).list_with_stats(folder_id, user_id)
+        return [
+            f"Front: {card.front}\nBack: {card.back}"
+            for card, _, _, _, _ in rows[:60]
+        ]
+
+    def _join_contexts(self, *parts: str) -> str:
+        return "\n\n---\n\n".join(part.strip() for part in parts if part and part.strip())
 
     def _response_from_stats(
         self,

@@ -5,6 +5,10 @@ from io import BytesIO
 
 import pdfplumber
 from fastapi import UploadFile
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.models.folder_file import FolderFile
 
 from src.utils.exceptions import ValidationException
 from src.utils.validators import (
@@ -43,6 +47,22 @@ class FileService:
             sections.append(f"--- Document {index}: {notes_file.filename or 'notes'} ---\n{content}")
 
         return "\n\n".join(sections), file_types
+
+    async def get_folder_files_content(self, folder_id: int, session: AsyncSession) -> str:
+        rows = await session.scalars(
+            select(FolderFile)
+            .where(FolderFile.folder_id == folder_id)
+            .order_by(FolderFile.uploaded_at.desc())
+        )
+        files = list(rows.all())
+        if not files:
+            return ""
+
+        sections: list[str] = []
+        for folder_file in files:
+            sections.append(f"[{folder_file.file_name}]\n{folder_file.content}")
+
+        return "\n\n---\n\n".join(sections).strip()
 
     def _extract_pdf(self, data: bytes) -> str:
         with pdfplumber.open(BytesIO(data)) as pdf:

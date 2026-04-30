@@ -8,6 +8,8 @@ import {
   createFlashcard,
   deleteFlashcard,
   fetchFlashcards,
+  fetchFolderFiles,
+  generateFlashcards,
   generateFlashcardsFromFile,
   updateFlashcard,
 } from "../lib/api";
@@ -24,10 +26,24 @@ export default function FlashcardsManage() {
   const [newFront, setNewFront] = useState("");
   const [newBack, setNewBack] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [generatingMore, setGeneratingMore] = useState(false);
+  const [generateCount, setGenerateCount] = useState(10);
+  const [folderFileCount, setFolderFileCount] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchFlashcards(id).then(setCards);
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    let active = true;
+    fetchFolderFiles(id).then((files) => {
+      if (active) setFolderFileCount(files.length);
+    });
+    return () => {
+      active = false;
+    };
   }, [id]);
 
   function startEdit(card: Flashcard) {
@@ -85,6 +101,32 @@ export default function FlashcardsManage() {
     }
   }
 
+  async function handleGenerateMore() {
+    setGeneratingMore(true);
+    setError(null);
+    try {
+      const generated = await generateFlashcards(id, {
+        count: generateCount,
+        prompt:
+          "Create fresh flashcards using the folder's saved files and the current flashcards as context. Do not repeat existing cards, and focus on new concepts, definitions, examples, or comparisons that are not already covered.",
+      });
+      setCards((prev) => {
+        const seen = new Set(prev.map((card) => `${card.front.trim().toLowerCase()}::${card.back.trim().toLowerCase()}`));
+        const fresh = generated.filter((card) => {
+          const key = `${card.front.trim().toLowerCase()}::${card.back.trim().toLowerCase()}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        return [...fresh, ...prev];
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate more flashcards.");
+    } finally {
+      setGeneratingMore(false);
+    }
+  }
+
   return (
     <div className="page page-narrow">
       <header className="page-header">
@@ -112,8 +154,36 @@ export default function FlashcardsManage() {
           >
             {generating ? "Generating..." : "Generate from file"}
           </Button>
+          <Button
+            icon={<Plus size={18} />}
+            onClick={handleGenerateMore}
+            variant="secondary"
+            disabled={generatingMore}
+          >
+            {generatingMore ? "Generating..." : "Generate more"}
+          </Button>
         </div>
       </header>
+
+      <div className="toolbar" style={{ justifyContent: "flex-end", marginTop: -8, marginBottom: 12 }}>
+        <label className="muted small" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          Cards to add
+          <input
+            type="number"
+            min={1}
+            max={50}
+            value={generateCount}
+            onChange={(e) => setGenerateCount(Math.max(1, Math.min(50, Number(e.target.value))))}
+            className="input"
+            style={{ width: 92, padding: "8px 10px" }}
+          />
+        </label>
+        <span className="muted small" style={{ alignSelf: "center" }}>
+          {folderFileCount > 0
+            ? `${folderFileCount} saved file${folderFileCount === 1 ? "" : "s"} will be used as source context.`
+            : "No saved files in this folder yet. Nosey will generate from the existing flashcards and any uploaded file you choose."}
+        </span>
+      </div>
 
       {error ? <div className="form-error">{error}</div> : null}
 

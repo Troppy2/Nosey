@@ -2,6 +2,7 @@
 from src.models.base import Base
 from src.models.flashcard import Flashcard, FlashcardAttempt
 from src.models.folder import Folder
+from src.models.folder_file import FolderFile
 from src.models.frq_answer import FRQAnswer
 from src.models.kojo_conversation import KojoConversation
 from src.models.kojo_message import KojoMessage
@@ -18,6 +19,7 @@ __all__ = [
     "Flashcard",
     "FlashcardAttempt",
     "Folder",
+    "FolderFile",
     "FRQAnswer",
     "KojoConversation",
     "KojoMessage",

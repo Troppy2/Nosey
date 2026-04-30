@@ -1,4 +1,5 @@
-import { ArrowLeft, ArrowRight, Calculator, Check, Send } from "lucide-react";
+import Editor from "@monaco-editor/react";
+import { ArrowLeft, ArrowRight, Calculator, Check, Code2, Send } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -30,6 +31,8 @@ export default function TakeTest() {
   const progress = test ? ((index + 1) / test.questions.length) * 100 : 0;
   const canSubmit = test ? answeredCount === test.questions.length : false;
   const isMathMode = Boolean(test?.is_math_mode);
+  const isCodingMode = Boolean(test?.is_coding_mode);
+  const codingLanguage = test?.coding_language ?? "python";
 
   const submittedAnswers = useMemo<SubmittedAnswer[]>(
     () =>
@@ -98,6 +101,12 @@ export default function TakeTest() {
                   Math
                 </span>
               )}
+              {isCodingMode && (
+                <span className="math-mode-badge" style={{ background: "var(--blue-light, #ebf8ff)", color: "var(--blue-dark, #2b6cb0)" }}>
+                  <Code2 size={12} />
+                  {codingLanguage}
+                </span>
+              )}
             </strong>
             <span>
               Question {index + 1} of {test.questions.length} · {answeredCount} answered
@@ -112,6 +121,30 @@ export default function TakeTest() {
           <h1>{question.question_text}</h1>
           {question.type === "MCQ" ? (
             <MCQQuestion question={question} answer={answers[question.id]} onAnswer={(answer) => setAnswers({ ...answers, [question.id]: answer })} />
+          ) : isCodingMode ? (
+            <div className="code-editor-wrap">
+              <label className="field-label">Your code</label>
+              <div className="code-editor-frame">
+                <Editor
+                  height="320px"
+                  language={codingLanguage.toLowerCase()}
+                  value={answers[question.id] ?? ""}
+                  onChange={(val) => setAnswers({ ...answers, [question.id]: val ?? "" })}
+                  theme="vs-dark"
+                  options={{
+                    fontSize: 14,
+                    minimap: { enabled: false },
+                    scrollBeyondLastLine: false,
+                    lineNumbers: "on",
+                    wordWrap: "on",
+                    automaticLayout: true,
+                  }}
+                />
+              </div>
+              <p className="muted" style={{ fontSize: "0.8rem", marginTop: 6 }}>
+                Write your solution in {codingLanguage}. Your code will be reviewed by AI.
+              </p>
+            </div>
           ) : isMathMode ? (
             <MathInput
               value={answers[question.id] ?? ""}

@@ -60,6 +60,8 @@ class TestResponse(BaseModel):
     description: Optional[str] = None
     test_type: str
     is_math_mode: bool = False
+    is_coding_mode: bool = False
+    coding_language: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -86,6 +88,8 @@ class TestTakeResponse(BaseModel):
     description: Optional[str] = None
     test_type: str
     is_math_mode: bool = False
+    is_coding_mode: bool = False
+    coding_language: Optional[str] = None
     questions: list[QuestionPublic]
 
 
