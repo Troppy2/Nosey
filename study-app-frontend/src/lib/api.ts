@@ -184,6 +184,7 @@ export async function createTest(input: {
   countMcq?: number;
   countFrq?: number;
   practiceTestFile?: File | null;
+  isMathMode?: boolean;
 }): Promise<{ test_id: number; title: string; questions_generated: number; message: string }> {
   if (isGuestSession()) {
     const tests = await fetchTests();
@@ -202,6 +203,7 @@ export async function createTest(input: {
   formData.append("test_type", input.testType);
   if (input.countMcq !== undefined) formData.append("count_mcq", String(input.countMcq));
   if (input.countFrq !== undefined) formData.append("count_frq", String(input.countFrq));
+  if (input.isMathMode) formData.append("is_math_mode", "true");
   input.files.forEach((file) => formData.append("notes_files", file));
   if (input.practiceTestFile) formData.append("practice_test_file", input.practiceTestFile);
 

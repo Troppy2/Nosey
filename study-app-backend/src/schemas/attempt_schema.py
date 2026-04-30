@@ -32,6 +32,7 @@ class AnswerResult(BaseModel):
     feedback: Optional[str] = None
     confidence: Optional[float] = None
     flagged_uncertain: bool = False
+    is_math: bool = False
 
 
 class AttemptResult(BaseModel):
