@@ -31,6 +31,7 @@ class KojoService:
         folder_id: int,
         user_message: str,
         session: AsyncSession,
+        provider: str | None = None,
     ) -> KojoChatResponse:
         repo = KojoRepository(session)
 
@@ -54,7 +55,10 @@ class KojoService:
         prompt = _build_prompt(notes_context, user_message, history)
 
         try:
-            kojo_response = await LLMService().call_kojo(prompt)
+            if provider:
+                kojo_response = await LLMService().call_kojo(prompt if isinstance(prompt, str) else str(prompt), provider=provider)
+            else:
+                kojo_response = await LLMService().call_kojo(prompt if isinstance(prompt, str) else str(prompt))
         except LLMException:
             raise
         except Exception as exc:
