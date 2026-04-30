@@ -5945,7 +5945,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.kojo_schema",
         "description": "study-app-backend.src.schemas.kojo_schema",
-        "peekOfCode": "class KojoConversationDTO(BaseModel):\n    model_config = ConfigDict(from_attributes=True)\n    id: int\n    folder_id: int\n    messages: list[KojoMessageDTO]\n    created_at: datetime\n    cleared_at: Optional[datetime] = None\nclass KojoChatRequest(BaseModel):\n    message: str = Field(..., min_length=1, max_length=2000)\nclass KojoChatResponse(BaseModel):",
+        "peekOfCode": "class KojoConversationDTO(BaseModel):\n    model_config = ConfigDict(from_attributes=True)\n    id: int\n    folder_id: int\n    messages: list[KojoMessageDTO]\n    created_at: datetime\n    cleared_at: Optional[datetime] = None\nclass KojoChatRequest(BaseModel):\n    message: str = Field(..., min_length=1, max_length=2000)\n    provider: str | None = Field(default=None, description=\"Optional LLM provider override: 'auto', 'groq', or 'ollama'\")",
         "detail": "study-app-backend.src.schemas.kojo_schema",
         "documentation": {}
     },
@@ -5954,7 +5954,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.kojo_schema",
         "description": "study-app-backend.src.schemas.kojo_schema",
-        "peekOfCode": "class KojoChatRequest(BaseModel):\n    message: str = Field(..., min_length=1, max_length=2000)\nclass KojoChatResponse(BaseModel):\n    response: str\n    conversation_id: int\n    message_id: int\n    flagged_uncertain: bool = False\nclass KojoClearResponse(BaseModel):\n    conversation_id: int\n    folder_id: int",
+        "peekOfCode": "class KojoChatRequest(BaseModel):\n    message: str = Field(..., min_length=1, max_length=2000)\n    provider: str | None = Field(default=None, description=\"Optional LLM provider override: 'auto', 'groq', or 'ollama'\")\nclass KojoChatResponse(BaseModel):\n    response: str\n    conversation_id: int\n    message_id: int\n    flagged_uncertain: bool = False\nclass KojoClearResponse(BaseModel):\n    conversation_id: int",
         "detail": "study-app-backend.src.schemas.kojo_schema",
         "documentation": {}
     },
@@ -6161,7 +6161,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.services.kojo_service",
         "description": "study-app-backend.src.services.kojo_service",
-        "peekOfCode": "class KojoService:\n    async def chat(\n        self,\n        user_id: int,\n        folder_id: int,\n        user_message: str,\n        session: AsyncSession,\n    ) -> KojoChatResponse:\n        repo = KojoRepository(session)\n        folder = await FolderRepository(session).get_owned(folder_id, user_id)",
+        "peekOfCode": "class KojoService:\n    async def chat(\n        self,\n        user_id: int,\n        folder_id: int,\n        user_message: str,\n        session: AsyncSession,\n        provider: str | None = None,\n    ) -> KojoChatResponse:\n        repo = KojoRepository(session)",
         "detail": "study-app-backend.src.services.kojo_service",
         "documentation": {}
     },
@@ -6179,7 +6179,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.kojo_service",
         "description": "study-app-backend.src.services.kojo_service",
-        "peekOfCode": "_NO_NOTES = \"[No study materials uploaded yet. Ask the student to upload notes first.]\"\n_CLEAR_WINDOW_HOURS = 5\nclass KojoService:\n    async def chat(\n        self,\n        user_id: int,\n        folder_id: int,\n        user_message: str,\n        session: AsyncSession,\n    ) -> KojoChatResponse:",
+        "peekOfCode": "_NO_NOTES = \"[No study materials uploaded yet. Ask the student to upload notes first.]\"\n_CLEAR_WINDOW_HOURS = 5\nclass KojoService:\n    async def chat(\n        self,\n        user_id: int,\n        folder_id: int,\n        user_message: str,\n        session: AsyncSession,\n        provider: str | None = None,",
         "detail": "study-app-backend.src.services.kojo_service",
         "documentation": {}
     },
@@ -6188,7 +6188,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.kojo_service",
         "description": "study-app-backend.src.services.kojo_service",
-        "peekOfCode": "_CLEAR_WINDOW_HOURS = 5\nclass KojoService:\n    async def chat(\n        self,\n        user_id: int,\n        folder_id: int,\n        user_message: str,\n        session: AsyncSession,\n    ) -> KojoChatResponse:\n        repo = KojoRepository(session)",
+        "peekOfCode": "_CLEAR_WINDOW_HOURS = 5\nclass KojoService:\n    async def chat(\n        self,\n        user_id: int,\n        folder_id: int,\n        user_message: str,\n        session: AsyncSession,\n        provider: str | None = None,\n    ) -> KojoChatResponse:",
         "detail": "study-app-backend.src.services.kojo_service",
         "documentation": {}
     },
