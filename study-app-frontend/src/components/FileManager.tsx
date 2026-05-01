@@ -4,7 +4,13 @@ import { type FolderFile, deleteFolderFile, fetchFolderFiles, uploadFolderFiles 
 
 const MAX_FILES = 30;
 const MAX_FILE_SIZE_MB = 10;
-const ALLOWED_TYPES = ["application/pdf", "text/plain", "text/markdown", "text/x-markdown"];
+const ALLOWED_TYPES = [
+  "application/pdf",
+  "text/plain",
+  "text/markdown",
+  "text/x-markdown",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -44,7 +50,7 @@ export function FileManager({ folderId, onClose }: Props) {
 
     Array.from(selected).forEach((f) => {
       const allowed =
-        ALLOWED_TYPES.includes(f.type) || /\.(pdf|txt|md)$/i.test(f.name);
+        ALLOWED_TYPES.includes(f.type) || /\.(pdf|txt|md|docx)$/i.test(f.name);
       if (!allowed) { errs.push(`${f.name}: unsupported type`); return; }
       if (f.size > MAX_FILE_SIZE_MB * 1024 * 1024) { errs.push(`${f.name}: exceeds ${MAX_FILE_SIZE_MB} MB`); return; }
       valid.push(f);
@@ -103,7 +109,7 @@ export function FileManager({ folderId, onClose }: Props) {
         </div>
 
         <p className="muted" style={{ marginTop: 0, marginBottom: 16, fontSize: "0.875rem" }}>
-          Upload notes files (PDF, TXT, Markdown) to this folder — up to {MAX_FILES} files, {MAX_FILE_SIZE_MB} MB each.
+          Upload notes files (PDF, DOCX, TXT, Markdown) to this folder — up to {MAX_FILES} files, {MAX_FILE_SIZE_MB} MB each.
           These files are available when generating tests.
         </p>
 
@@ -133,7 +139,7 @@ export function FileManager({ folderId, onClose }: Props) {
           <input
             ref={inputRef}
             type="file"
-            accept=".pdf,.txt,.md"
+            accept=".pdf,.docx,.txt,.md"
             multiple
             disabled={isUploading}
             style={{ display: "none" }}

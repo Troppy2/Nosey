@@ -91,6 +91,7 @@ def fake_settings(groq_key: str | None = FAKE_KEY, timeout: int = 30, max_tokens
     s.llm_max_tokens = max_tokens
     s.ollama_base_url = "http://localhost:11434"
     s.ollama_model = "llama3.1:8b"
+    s.llm_provider = "auto"
     return s
 
 
@@ -307,6 +308,19 @@ class TestFallbackQuestions:
         assert len(mcq) == 2
         assert len(frq) == 1
 
+    def test_math_fallback_returns_requested_counts(self):
+        mcq, frq = self.svc._fallback_math_questions(SAMPLE_NOTES, count_mcq=3, count_frq=2)
+        assert len(mcq) == 3
+        assert len(frq) == 2
+
+    def test_math_fallback_outputs_math_only_content(self):
+        mcq, frq = self.svc._fallback_math_questions("", count_mcq=2, count_frq=1)
+        for q in mcq:
+            assert q.question_text.startswith("Solve for $x$")
+            assert len(q.options) == 4
+            assert all(option.startswith("$x = ") for option in q.options)
+        assert frq[0].question_text.startswith("Solve for $x$")
+
 
 # ── _complete_groq ─────────────────────────────────────────────────────────────
 
@@ -440,6 +454,7 @@ class TestCallKojo:
         svc = LLMService()
         svc._complete_text_groq = AsyncMock(return_value="Groq answer")
         svc._complete_text_ollama = AsyncMock(return_value="Ollama answer")
+        svc._candidate_providers = AsyncMock(return_value=["ollama"])
 
         with patch("src.services.llm_service.settings", fake_settings(groq_key=None)):
             result = await svc.call_kojo("Explain transactions")
@@ -453,7 +468,7 @@ class TestCallKojo:
 
         with patch("src.services.llm_service.settings", fake_settings(groq_key=FAKE_KEY)):
             with pytest.raises(LLMException, match="Kojo error"):
-                await svc.call_kojo("question")
+                await svc.call_kojo("question", provider="groq")
 
     async def test_llm_exception_passes_through_unwrapped(self):
         svc = LLMService()
@@ -510,6 +525,7 @@ class TestGenerateTestQuestions:
 
     async def test_falls_back_when_generation_fails(self):
         svc = LLMService()
+        svc._candidate_providers = AsyncMock(return_value=["groq"])
         svc._complete_json = AsyncMock(side_effect=[
             EXTRACTION_RESP,
             Exception("Groq timeout"),
@@ -527,6 +543,7 @@ class TestGenerateTestQuestions:
             "correct_index": 0,
         }
         svc = LLMService()
+        svc._candidate_providers = AsyncMock(return_value=["groq"])
         svc._complete_json = AsyncMock(side_effect=[
             EXTRACTION_RESP,
             {"mcq": [VALID_MCQ, invalid_mcq], "frq": [VALID_FRQ]},
@@ -544,9 +561,10 @@ class TestGenerateTestQuestions:
             "---\ntitle: CSCI DB\n---\n" + SAMPLE_NOTES
         )
         svc = LLMService()
+        svc._candidate_providers = AsyncMock(return_value=["groq"])
         captured_prompts: list[str] = []
 
-        async def capture_complete_json(prompt: str) -> dict:
+        async def capture_complete_json(prompt: str, provider=None) -> dict:
             captured_prompts.append(prompt)
             if len(captured_prompts) == 1:
                 return EXTRACTION_RESP
@@ -558,6 +576,67 @@ class TestGenerateTestQuestions:
         for prompt in captured_prompts:
             assert "Document 1:" not in prompt
             assert "title: CSCI" not in prompt
+
+    async def test_math_mode_rejects_non_math_llm_and_uses_math_fallback(self):
+        svc = LLMService()
+        svc._candidate_providers = AsyncMock(return_value=["groq"])
+        svc._complete_json = AsyncMock(return_value={"mcq": [VALID_MCQ], "frq": [VALID_FRQ]})
+        mcq, frq = await svc.generate_test_questions(
+            SAMPLE_NOTES,
+            "mixed",
+            count_mcq=1,
+            count_frq=1,
+            is_math_mode=True,
+        )
+        assert len(mcq) == 1
+        assert len(frq) == 1
+        assert mcq[0].question_text.startswith("Solve for $x$")
+        assert all(option.startswith("$x = ") for option in mcq[0].options)
+        assert frq[0].question_text.startswith("Solve for $x$")
+
+    async def test_math_mode_exception_path_uses_math_fallback(self):
+        svc = LLMService()
+        svc._candidate_providers = AsyncMock(return_value=["groq"])
+        svc._complete_json = AsyncMock(side_effect=Exception("LLM unavailable"))
+        mcq, frq = await svc.generate_test_questions(
+            SAMPLE_NOTES,
+            "mixed",
+            count_mcq=2,
+            count_frq=1,
+            is_math_mode=True,
+        )
+        assert len(mcq) == 2
+        assert len(frq) == 1
+        assert all(q.question_text.startswith("Solve for $x$") for q in mcq)
+
+    async def test_generation_meta_marks_fallback_for_math_exception(self):
+        svc = LLMService()
+        svc._candidate_providers = AsyncMock(return_value=["groq"])
+        svc._complete_json = AsyncMock(side_effect=Exception("rate limited"))
+        await svc.generate_test_questions(
+            SAMPLE_NOTES,
+            "mixed",
+            count_mcq=1,
+            count_frq=1,
+            is_math_mode=True,
+        )
+        meta = svc.get_last_generation_meta()
+        assert meta["fallback_used"] is True
+        assert meta["fallback_reason"] == "llm_exception_math"
+        assert meta["note_grounded"] is False
+
+    async def test_generation_meta_includes_retrieval_stats(self):
+        svc = LLMService()
+        svc._complete_json = AsyncMock(side_effect=[
+            EXTRACTION_RESP,
+            {"mcq": [VALID_MCQ], "frq": [VALID_FRQ]},
+        ])
+        await svc.generate_test_questions(SAMPLE_NOTES, "mixed", count_mcq=1, count_frq=1)
+        meta = svc.get_last_generation_meta()
+        assert meta["retrieval_enabled"] is True
+        assert int(meta["retrieval_total_chunks"]) >= 1
+        assert int(meta["retrieval_selected_chunks"]) >= 1
+        assert int(meta["retrieval_top_k"]) >= 1
 
 
 # ── grade_frq_answer ───────────────────────────────────────────────────────────

@@ -166,6 +166,53 @@ export function MarkdownContent({ content }: { content: string }) {
       continue;
     }
 
+    // Table: lines starting with |
+    if (line.startsWith("|")) {
+      const tableLines: string[] = [];
+      while (i < lines.length && lines[i].startsWith("|")) {
+        tableLines.push(lines[i]);
+        i++;
+      }
+      const parseRow = (row: string) =>
+        row.split("|").slice(1, -1).map((cell) => cell.trim());
+      const isSeparator = (row: string) => /^\|[-:\s|]+\|$/.test(row);
+
+      let headerCells: string[] = [];
+      let bodyRows: string[][] = [];
+      if (tableLines.length >= 2 && isSeparator(tableLines[1])) {
+        headerCells = parseRow(tableLines[0]);
+        bodyRows = tableLines.slice(2).map(parseRow);
+      } else {
+        bodyRows = tableLines.map(parseRow);
+      }
+      const tk = k++;
+      nodes.push(
+        <div key={tk} className="kojo-md-table-wrapper">
+          <table className="kojo-md-table">
+            {headerCells.length > 0 && (
+              <thead>
+                <tr>
+                  {headerCells.map((cell, ci) => (
+                    <th key={ci}><Inline text={cell} pk={`th${tk}-${ci}`} /></th>
+                  ))}
+                </tr>
+              </thead>
+            )}
+            <tbody>
+              {bodyRows.map((row, ri) => (
+                <tr key={ri}>
+                  {row.map((cell, ci) => (
+                    <td key={ci}><Inline text={cell} pk={`td${tk}-${ri}-${ci}`} /></td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>,
+      );
+      continue;
+    }
+
     // Blank line
     if (line.trim() === "") {
       i++;
@@ -177,6 +224,7 @@ export function MarkdownContent({ content }: { content: string }) {
     while (
       i < lines.length &&
       lines[i].trim() !== "" &&
+      !lines[i].startsWith("|") &&
       !lines[i].startsWith("```") &&
       !lines[i].trimStart().startsWith("$$") &&
       !/^#{1,4} /.test(lines[i]) &&

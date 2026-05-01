@@ -22,13 +22,14 @@ from src.services.file_service import FileService
 from src.services.llm_service import LLMService
 from src.utils.exceptions import ResourceNotFoundException, ValidationException
 from src.utils.validators import VALID_TEST_TYPES
+from typing import Optional
 
 
 class TestService:
     def __init__(
         self,
-        llm_service: LLMService | None = None,
-        file_service: FileService | None = None,
+        llm_service: Optional[LLMService] = None,
+        file_service: Optional[FileService] = None,
     ) -> None:
         self.llm_service = llm_service or LLMService()
         self.file_service = file_service or FileService()
@@ -41,15 +42,17 @@ class TestService:
         test_type: str,
         notes_files: list[UploadFile],
         session: AsyncSession,
-        description: str | None = None,
+        description: Optional[str] = None,
         count_mcq: int = 10,
         count_frq: int = 5,
-        practice_test_file: UploadFile | None = None,
+        practice_test_file: Optional[UploadFile] = None,
         is_math_mode: bool = False,
         difficulty: str = "mixed",
-        topic_focus: str | None = None,
+        topic_focus: Optional[str] = None,
         is_coding_mode: bool = False,
-        coding_language: str | None = None,
+        coding_language: Optional[str] = None,
+        custom_instructions: Optional[str] = None,
+        provider: Optional[str] = None,
     ) -> CreateTestResponse:
         if test_type not in VALID_TEST_TYPES:
             raise ValidationException("test_type must be MCQ_only, FRQ_only, or mixed")
@@ -87,12 +90,6 @@ class TestService:
                 notes_content, notes_file_types = await self.file_service.extract_from_files(notes_files)
                 context_parts.append(notes_content)
                 context_labels.append(", ".join(f.filename or "notes" for f in notes_files))
-                await repo.add_note(
-                    test.id,
-                    ", ".join(f.filename or "notes" for f in notes_files),
-                    ",".join(notes_file_types),
-                    notes_content,
-                )
             if folder_files_content:
                 context_parts.append(folder_files_content)
                 context_labels.append("stored folder files")
@@ -107,7 +104,17 @@ class TestService:
                 content=pt_content,
                 count_mcq=count_mcq if test_type != "FRQ_only" else 0,
                 count_frq=count_frq if test_type != "MCQ_only" else 0,
+                provider=provider,
             )
+            generation_meta: dict[str, object] = {
+                "fallback_used": False,
+                "fallback_reason": None,
+                "note_grounded": True,
+                "retrieval_enabled": False,
+                "retrieval_total_chunks": 0,
+                "retrieval_selected_chunks": 0,
+                "retrieval_top_k": 0,
+            }
         else:
             context_parts: list[str] = []
             context_labels: list[str] = []
@@ -139,7 +146,16 @@ class TestService:
                 topic_focus=topic_focus,
                 is_coding_mode=is_coding_mode,
                 coding_language=coding_language,
+                custom_instructions=custom_instructions,
+                provider=provider,
             )
+            generation_meta = {}
+            try:
+                meta_candidate = self.llm_service.get_last_generation_meta()
+                if isinstance(meta_candidate, dict):
+                    generation_meta = meta_candidate
+            except Exception:
+                generation_meta = {}
 
         display_order = 1
         for item in mcq_questions:
@@ -154,10 +170,23 @@ class TestService:
             display_order += 1
 
         await session.commit()
+        fallback_used = bool(generation_meta.get("fallback_used", False))
+        fallback_reason = generation_meta.get("fallback_reason")
+        message = "Test created. Ready to take."
+        if fallback_used:
+            message = "Test created with fallback questions because the LLM output was unavailable or invalid."
         return CreateTestResponse(
             test_id=test.id,
             title=test.title,
             questions_generated=len(mcq_questions) + len(frq_questions),
+            message=message,
+            fallback_used=fallback_used,
+            fallback_reason=str(fallback_reason) if fallback_reason else None,
+            note_grounded=bool(generation_meta.get("note_grounded", not fallback_used)),
+            retrieval_enabled=bool(generation_meta.get("retrieval_enabled", False)),
+            retrieval_total_chunks=int(generation_meta.get("retrieval_total_chunks", 0) or 0),
+            retrieval_selected_chunks=int(generation_meta.get("retrieval_selected_chunks", 0) or 0),
+            retrieval_top_k=int(generation_meta.get("retrieval_top_k", 0) or 0),
         )
 
     async def get_questions_for_editing(

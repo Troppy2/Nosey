@@ -166,7 +166,7 @@ class TestParsePracticeTest:
         svc = LLMService()
         captured: list[str] = []
 
-        async def capture(prompt: str) -> dict:
+        async def capture(prompt: str, provider=None) -> dict:
             captured.append(prompt)
             return {"mcq": [VALID_MCQ], "frq": [VALID_FRQ]}
 
@@ -220,6 +220,7 @@ class TestCreateTestService:
         svc.file_service = MagicMock()
         svc.file_service.extract_from_files = AsyncMock(return_value=("Extracted content", ["txt"]))
         svc.file_service.extract_from_file = AsyncMock(return_value=("Practice test content", "txt"))
+        svc.file_service.get_folder_files_content = AsyncMock(return_value="")
 
         return svc
 
