@@ -11,6 +11,7 @@ from src.models.question import Question
 from src.models.test import Test
 from src.models.user_attempt import UserAttempt
 from src.repositories.base_repository import BaseRepository
+from typing import Optional
 
 _QUESTION_WITH_ANSWERS = (
     selectinload(Question.mcq_options),
@@ -24,10 +25,10 @@ class TestRepository(BaseRepository[Test]):
         folder_id: int,
         title: str,
         test_type: str,
-        description: str | None,
+        description: Optional[str],
         is_math_mode: bool = False,
         is_coding_mode: bool = False,
-        coding_language: str | None = None,
+        coding_language: Optional[str] = None,
     ) -> Test:
         test = Test(
             folder_id=folder_id,
@@ -42,14 +43,14 @@ class TestRepository(BaseRepository[Test]):
         await self.session.flush()
         return test
 
-    async def get_owned(self, test_id: int, user_id: int) -> Test | None:
+    async def get_owned(self, test_id: int, user_id: int) -> Optional[Test]:
         stmt = select(Test).join(Folder, Folder.id == Test.folder_id).where(
             Test.id == test_id,
             Folder.user_id == user_id,
         )
         return await self.session.scalar(stmt)
 
-    async def get_with_questions(self, test_id: int) -> Test | None:
+    async def get_with_questions(self, test_id: int) -> Optional[Test]:
         stmt = (
             select(Test)
             .where(Test.id == test_id)
@@ -61,7 +62,7 @@ class TestRepository(BaseRepository[Test]):
         )
         return await self.session.scalar(stmt)
 
-    async def get_owned_with_questions(self, test_id: int, user_id: int) -> Test | None:
+    async def get_owned_with_questions(self, test_id: int, user_id: int) -> Optional[Test]:
         stmt = (
             select(Test)
             .join(Folder, Folder.id == Test.folder_id)
@@ -74,8 +75,8 @@ class TestRepository(BaseRepository[Test]):
         )
         return await self.session.scalar(stmt)
 
-    async def list_by_folder(self, folder_id: int, user_id: int) -> list[tuple[Test, int, float | None, int]]:
-        stmt: Select[tuple[Test, int, float | None, int]] = (
+    async def list_by_folder(self, folder_id: int, user_id: int) -> list[tuple[Test, int, Optional[float], int]]:
+        stmt: Select[tuple[Test, int, Optional[float], int]] = (
             select(
                 Test,
                 func.count(func.distinct(Question.id)).label("question_count"),
@@ -95,8 +96,8 @@ class TestRepository(BaseRepository[Test]):
         rows = await self.session.execute(stmt)
         return list(rows.all())
 
-    async def list_by_user(self, user_id: int) -> list[tuple[Test, int, float | None, int]]:
-        stmt: Select[tuple[Test, int, float | None, int]] = (
+    async def list_by_user(self, user_id: int) -> list[tuple[Test, int, Optional[float], int]]:
+        stmt: Select[tuple[Test, int, Optional[float], int]] = (
             select(
                 Test,
                 func.count(func.distinct(Question.id)).label("question_count"),
@@ -173,7 +174,7 @@ class TestRepository(BaseRepository[Test]):
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_question_owned(self, question_id: int, user_id: int) -> Question | None:
+    async def get_question_owned(self, question_id: int, user_id: int) -> Optional[Question]:
         stmt = (
             select(Question)
             .join(Test, Test.id == Question.test_id)

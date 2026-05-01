@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +19,7 @@ from src.services.file_service import FileService
 from src.services.llm_service import LLMService
 from src.utils.exceptions import LLMException, ResourceNotFoundException
 from src.utils.logger import get_logger
+from typing import Optional
 
 logger = get_logger(__name__)
 
@@ -32,7 +34,7 @@ class KojoService:
         folder_id: int,
         user_message: str,
         session: AsyncSession,
-        provider: str | None = None,
+        provider: Optional[str] = None,
     ) -> KojoChatResponse:
         repo = KojoRepository(session)
 
@@ -185,8 +187,44 @@ class KojoService:
         return result
 
 
+_STOPWORDS = {
+    "the", "and", "for", "are", "but", "not", "you", "all", "can", "had",
+    "her", "was", "one", "our", "out", "day", "get", "has", "him", "his",
+    "how", "its", "may", "new", "now", "old", "see", "two", "way", "who",
+    "did", "each", "from", "have", "what", "this", "that", "with", "want",
+    "help", "explain", "show", "tell", "give", "does", "work", "will",
+    "would", "could", "should", "about", "into", "there", "their", "then",
+    "than", "when", "where", "which", "while", "also", "more", "like",
+    "just", "here", "even", "know", "come", "said", "make", "look", "use",
+    "some", "very", "over", "such", "been", "they", "them", "these",
+}
+
+
+def _extract_relevant_sections(notes: str, user_message: str, max_sections: int = 6) -> str:
+    """Return the paragraphs from notes that best match the user's question keywords."""
+    keywords = [
+        w for w in re.findall(r"[a-zA-Z]{3,}", user_message.lower())
+        if w not in _STOPWORDS
+    ]
+    if not keywords:
+        return ""
+
+    # Split on blank lines or section separators into meaningful chunks
+    raw_chunks = re.split(r"\n{2,}|(?:^|\n)---+(?:\n|$)", notes)
+    paragraphs = [c.strip() for c in raw_chunks if len(c.strip()) > 40]
+
+    scored: list[tuple[int, str]] = []
+    for para in paragraphs:
+        para_lower = para.lower()
+        score = sum(1 for kw in keywords if kw in para_lower)
+        if score > 0:
+            scored.append((score, para))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return "\n\n".join(para for _, para in scored[:max_sections])
+
+
 def _build_prompt(notes: str, user_message: str, history: list) -> str:
-    # Build conversation history (all messages except the last, which is the current question)
     history_lines: list[str] = []
     for msg in history[:-1]:
         role_label = "Student" if msg.role == "user" else "Kojo"
@@ -194,10 +232,25 @@ def _build_prompt(notes: str, user_message: str, history: list) -> str:
     history_block = "\n\nCONVERSATION SO FAR:\n" + "\n".join(history_lines) if history_lines else ""
 
     has_notes = notes != _NO_NOTES
-    notes_block = f"STUDENT'S STUDY NOTES AND FOLDER FILES:\n{notes[:12000]}" if has_notes else (
-        "NOTE: The student has not uploaded any study materials yet. "
-        "You can still answer general questions, but encourage them to upload notes for personalized help."
-    )
+
+    if has_notes:
+        relevant = _extract_relevant_sections(notes, user_message)
+        relevant_block = (
+            "RELEVANT SECTIONS FROM STUDENT'S NOTES (pre-matched to their question):\n"
+            f"{relevant}\n\n"
+            if relevant else
+            "RELEVANT SECTIONS: [No closely matching sections found — use the full notes below.]\n\n"
+        )
+        notes_block = (
+            f"{relevant_block}"
+            f"FULL STUDENT NOTES AND FOLDER FILES:\n{notes[:12000]}"
+        )
+    else:
+        relevant_block = ""
+        notes_block = (
+            "NOTE: The student has not uploaded any study materials yet. "
+            "You can still answer general questions, but encourage them to upload notes for personalized help."
+        )
 
     return f"""You are Kojo, an intelligent and supportive AI study companion built into Nosey, a study tool.
 Your role is to help students genuinely understand their course material — not to give them answers to memorize.
@@ -208,12 +261,14 @@ Your role is to help students genuinely understand their course material — not
 STUDENT'S MESSAGE: {user_message}
 
 RESPONSE GUIDELINES:
-- Draw from the student's notes and uploaded folder files whenever possible. Quote or reference specific sections to anchor your explanations.
+- ALWAYS check the RELEVANT SECTIONS above first before answering — they are pre-matched to the student's question from their uploaded files.
+- Ground your explanation in what the student's own notes say. Quote or reference specific sections to anchor your answer.
+- If the relevant sections contain a formula, definition, or procedure that applies to the question, use it as your primary source — do not substitute your own version.
 - Use concrete examples, analogies, and step-by-step breakdowns to explain difficult concepts.
 - Ask a follow-up question if the student seems confused or hasn't given you enough context.
 - If the student asks you to "just give the answer" to a test question, gently redirect: explain the underlying concept instead.
 - If the topic is not in the notes and is highly specific, say so clearly and suggest they check with their instructor or textbook.
-- For math topics: write expressions clearly using LaTeX notation like \\frac{{dy}}{{dx}} = 3t^{{2}} + 1.
+- For math topics: wrap ALL math expressions in KaTeX delimiters — inline math in $...$, display/block math in $$...$$. Example: "The derivative is $\\frac{{dy}}{{dx}} = 3t^{{2}} + 1$." Never write bare LaTeX without dollar signs.
 - For coding topics: provide short code snippets in fenced code blocks with the language tag.
 - Keep responses focused and well-structured. Use bullet points or numbered steps when listing multiple ideas.
 - Be warm, encouraging, and treat the student as capable — never condescending.

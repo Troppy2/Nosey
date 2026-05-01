@@ -11,10 +11,11 @@ from src.models.user import User
 from src.repositories.user_repository import UserRepository
 from src.schemas.auth_schema import AuthResponse, UserResponse
 from src.utils.exceptions import ValidationException
+from typing import Optional
 
 
 class AuthService:
-    async def verify_google_token(self, token: str) -> dict[str, str | None]:
+    async def verify_google_token(self, token: str) -> dict[str, Optional[str]]:
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.get(
                 "https://oauth2.googleapis.com/tokeninfo", params={"id_token": token}

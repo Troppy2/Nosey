@@ -1,9 +1,11 @@
-import { CheckCircle, LogIn, LogOut, Sparkles, XCircle } from "lucide-react";
+import { CheckCircle, LogIn, LogOut, RotateCcw, Sparkles, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import {
   fetchClearedKojoConversations,
+  fetchFlashcards,
+  fetchTests,
   getStoredUser,
   googleSignIn,
   isGuestSession,
@@ -13,6 +15,8 @@ import {
 } from "../lib/api";
 import { useEffect, useRef, useState } from "react";
 import type { KojoClearedConversation } from "../lib/types";
+
+const STATS_RESET_BASELINE_KEY = "nosey_stats_reset_baseline";
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -25,6 +29,8 @@ export default function Settings() {
   const [loadingCleared, setLoadingCleared] = useState(true);
   const [restoreFolderId, setRestoreFolderId] = useState<number | null>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [resettingStats, setResettingStats] = useState(false);
+  const [statsResetNotice, setStatsResetNotice] = useState<string | null>(null);
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const initialized = useRef(false);
 
@@ -93,6 +99,29 @@ export default function Settings() {
     signOut();
     setUser(null);
     navigate("/");
+  }
+
+  async function handleResetStats() {
+    setResettingStats(true);
+    setStatsResetNotice(null);
+    try {
+      const [tests, flashcards] = await Promise.all([fetchTests(), fetchFlashcards()]);
+      const scored = tests.filter((test) => typeof test.best_score === "number");
+      const baseline = {
+        attempts: tests.reduce((sum, test) => sum + test.attempt_count, 0),
+        cardsReviewed: flashcards.reduce((sum, card) => sum + card.attempt_count, 0),
+        scoreSum: scored.reduce((sum, test) => sum + (test.best_score ?? 0), 0),
+        scoreCount: scored.length,
+        resetAt: new Date().toISOString(),
+      };
+      localStorage.setItem(STATS_RESET_BASELINE_KEY, JSON.stringify(baseline));
+      window.dispatchEvent(new Event("nosey-stats-reset"));
+      setStatsResetNotice("Stats reset. Dashboard totals now start from zero.");
+    } catch (err) {
+      setStatsResetNotice(err instanceof Error ? err.message : "Unable to reset stats right now.");
+    } finally {
+      setResettingStats(false);
+    }
   }
 
   async function handleRestore(folderId: number) {
@@ -166,6 +195,25 @@ export default function Settings() {
           <Sparkles size={18} />
           <span>Use the guest session to try the full flow before connecting a real account.</span>
         </div>
+
+        <section className="settings-appearance">
+          <h3><RotateCcw size={16} /> Reset Study Stats</h3>
+          <p className="muted small">
+            Reset dashboard counters for Tests Taken, Cards Reviewed, and Average Score.
+          </p>
+          <div className="settings-reset-row">
+            <Button
+              type="button"
+              variant="secondary"
+              icon={<RotateCcw size={16} />}
+              onClick={handleResetStats}
+              disabled={resettingStats}
+            >
+              {resettingStats ? "Resetting..." : "Reset Stats"}
+            </Button>
+            {statsResetNotice ? <span className="muted small">{statsResetNotice}</span> : null}
+          </div>
+        </section>
 
         <section className="settings-restore">
           <h3>Kojo chat history restore</h3>

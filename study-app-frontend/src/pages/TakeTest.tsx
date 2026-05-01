@@ -6,9 +6,20 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { TextArea } from "../components/Field";
+import { MarkdownContent } from "../components/MarkdownContent";
 import { MathInput } from "../components/MathInput";
 import { fetchTest, submitAttempt } from "../lib/api";
 import type { Question, SubmittedAnswer, TestTake } from "../lib/types";
+
+type GenerationMeta = {
+  fallback_used: boolean;
+  fallback_reason?: string | null;
+  note_grounded: boolean;
+  retrieval_enabled: boolean;
+  retrieval_total_chunks: number;
+  retrieval_selected_chunks: number;
+  retrieval_top_k: number;
+};
 
 export default function TakeTest() {
   const { testId } = useParams();
@@ -19,11 +30,24 @@ export default function TakeTest() {
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [generationMeta, setGenerationMeta] = useState<GenerationMeta | null>(null);
 
   useEffect(() => {
     fetchTest(numericTestId)
       .then(setTest)
       .catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Unable to load this test."));
+  }, [numericTestId]);
+
+  useEffect(() => {
+    const key = `nosey_generation_meta_${numericTestId}`;
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as GenerationMeta;
+      setGenerationMeta(parsed);
+    } catch {
+      setGenerationMeta(null);
+    }
   }, [numericTestId]);
 
   const question = test?.questions[index];
@@ -116,9 +140,23 @@ export default function TakeTest() {
       </div>
 
       <main className="question-wrap">
+        {generationMeta?.fallback_used ? (
+          <div className="generation-banner generation-banner-warning">
+            Question generation used fallback content because the model response was unavailable or invalid.
+            <span>
+              Reason: {generationMeta.fallback_reason ?? "unknown"}. These questions may be less grounded in your uploaded notes.
+            </span>
+          </div>
+        ) : generationMeta?.retrieval_enabled ? (
+          <div className="generation-banner generation-banner-info">
+            Questions were retrieval-grounded using {generationMeta.retrieval_selected_chunks} of {generationMeta.retrieval_total_chunks} note chunks.
+          </div>
+        ) : null}
         <Card className="question-card">
           <span className="pill">{question.type === "MCQ" ? "Multiple choice" : "Free response"}</span>
-          <h1>{question.question_text}</h1>
+          <div className="test-question-markdown">
+            <MarkdownContent content={question.question_text} />
+          </div>
           {question.type === "MCQ" ? (
             <MCQQuestion question={question} answer={answers[question.id]} onAnswer={(answer) => setAnswers({ ...answers, [question.id]: answer })} />
           ) : isCodingMode ? (
@@ -194,8 +232,10 @@ function MCQQuestion({
         const selected = answer === option.text;
         return (
           <button className={`option-button ${selected ? "selected" : ""}`} key={option.id} onClick={() => onAnswer(option.text)} type="button">
-            <span>{String.fromCharCode(65 + optionIndex)}</span>
-            <strong>{option.text}</strong>
+            <span className="option-label">{String.fromCharCode(65 + optionIndex)}</span>
+            <div className="test-option-markdown">
+              <MarkdownContent content={option.text} />
+            </div>
             {selected ? <Check size={18} /> : null}
           </button>
         );
