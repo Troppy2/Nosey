@@ -6,18 +6,19 @@ from src.models.flashcard import Flashcard
 from src.models.folder import Folder
 from src.models.test import Test
 from src.repositories.base_repository import BaseRepository
+from typing import Optional
 
 
 class FolderRepository(BaseRepository[Folder]):
     async def create(
-        self, user_id: int, name: str, subject: str | None, description: str | None
+        self, user_id: int, name: str, subject: Optional[str], description: Optional[str]
     ) -> Folder:
         folder = Folder(user_id=user_id, name=name, subject=subject, description=description)
         self.session.add(folder)
         await self.session.flush()
         return folder
 
-    async def get_owned(self, folder_id: int, user_id: int) -> Folder | None:
+    async def get_owned(self, folder_id: int, user_id: int) -> Optional[Folder]:
         return await self.session.scalar(
             select(Folder).where(Folder.id == folder_id, Folder.user_id == user_id)
         )

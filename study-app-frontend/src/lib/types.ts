@@ -29,6 +29,23 @@ export type TestUpdate = {
   description?: string | null;
 };
 
+export type GenerationDiagnostics = {
+  fallback_used: boolean;
+  fallback_reason?: string | null;
+  note_grounded: boolean;
+  retrieval_enabled: boolean;
+  retrieval_total_chunks: number;
+  retrieval_selected_chunks: number;
+  retrieval_top_k: number;
+};
+
+export type CreateTestResult = {
+  test_id: ID;
+  title: string;
+  questions_generated: number;
+  message: string;
+} & GenerationDiagnostics;
+
 export type MCQOption = {
   id: ID;
   text: string;
@@ -192,4 +209,13 @@ export type KojoClearedConversation = {
   folder_name: string;
   cleared_at: string;
   restore_expires_at: string;
+};
+
+export type ProviderStatus = {
+  gemini: boolean;
+  groq: boolean;
+  claude: boolean;
+  ollama: boolean;
+  ollama_model: string;
+  ollama_model_available: boolean;
 };

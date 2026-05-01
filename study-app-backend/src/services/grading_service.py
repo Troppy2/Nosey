@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.question import Question
@@ -16,10 +18,11 @@ from src.schemas.attempt_schema import (
 from src.schemas.test_schema import WeaknessResponse
 from src.services.llm_service import LLMService
 from src.utils.exceptions import ResourceNotFoundException, ValidationException
+from typing import Optional
 
 
 class GradingService:
-    def __init__(self, llm_service: LLMService | None = None) -> None:
+    def __init__(self, llm_service: Optional[LLMService] = None) -> None:
         self.llm_service = llm_service or LLMService()
 
     async def submit_and_grade(
@@ -37,26 +40,34 @@ class GradingService:
         if not submitted_by_id:
             raise ValidationException("At least one answer is required")
 
+        for question_id in submitted_by_id:
+            if question_by_id.get(question_id) is None:
+                raise ValidationException(f"Question {question_id} does not belong to this test")
+
         repo = AttemptRepository(session)
         attempt_number = await repo.next_attempt_number(user_id, test_id)
         attempt = await repo.create(user_id, test_id, attempt_number)
         notes = "\n\n".join(note.content for note in test.notes)
-        results: list[AnswerResult] = []
-        correct_count = 0
 
         is_math_mode = getattr(test, "is_math_mode", False)
         is_coding_mode = getattr(test, "is_coding_mode", False)
         coding_language = getattr(test, "coding_language", None) or "Python"
-        for question_id, user_answer in submitted_by_id.items():
-            question = question_by_id.get(question_id)
-            if question is None:
-                raise ValidationException(f"Question {question_id} does not belong to this test")
-            grade = await self._grade_question(
-                question, user_answer, notes,
+
+        # Grade all questions in parallel — LLM calls for FRQ are concurrent, MCQ is instant
+        pairs = [(question_by_id[qid], ans) for qid, ans in submitted_by_id.items()]
+        grades = await asyncio.gather(*(
+            self._grade_question(
+                q, ans, notes,
                 is_math_mode=is_math_mode,
                 is_coding_mode=is_coding_mode,
                 coding_language=coding_language,
             )
+            for q, ans in pairs
+        ))
+
+        results: list[AnswerResult] = []
+        correct_count = 0
+        for (question, user_answer), grade in zip(pairs, grades):
             if grade.is_correct:
                 correct_count += 1
             await repo.add_answer(
@@ -161,7 +172,7 @@ class GradingService:
             confidence=1.0,
         )
 
-    def _correct_answer_text(self, question: Question) -> str | None:
+    def _correct_answer_text(self, question: Question) -> Optional[str]:
         if question.question_type == "MCQ":
             correct = next((o for o in question.mcq_options if o.is_correct), None)
             return correct.option_text if correct else None

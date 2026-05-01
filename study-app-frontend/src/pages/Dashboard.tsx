@@ -11,6 +11,32 @@ import type { Flashcard, Folder, TestSummary } from "../lib/types";
 const TYPE_START_DELAY_MS = 3000;
 const TYPE_ROTATE_INTERVAL_MS = 5 * 60 * 1000;
 const TYPE_STEP_MS = 28;
+const STATS_RESET_BASELINE_KEY = "nosey_stats_reset_baseline";
+
+type StatsResetBaseline = {
+  attempts: number;
+  cardsReviewed: number;
+  scoreSum: number;
+  scoreCount: number;
+};
+
+function readStatsResetBaseline(): StatsResetBaseline {
+  try {
+    const raw = localStorage.getItem(STATS_RESET_BASELINE_KEY);
+    if (!raw) {
+      return { attempts: 0, cardsReviewed: 0, scoreSum: 0, scoreCount: 0 };
+    }
+    const parsed = JSON.parse(raw) as Partial<StatsResetBaseline>;
+    return {
+      attempts: Math.max(0, Number(parsed.attempts ?? 0)),
+      cardsReviewed: Math.max(0, Number(parsed.cardsReviewed ?? 0)),
+      scoreSum: Math.max(0, Number(parsed.scoreSum ?? 0)),
+      scoreCount: Math.max(0, Number(parsed.scoreCount ?? 0)),
+    };
+  } catch {
+    return { attempts: 0, cardsReviewed: 0, scoreSum: 0, scoreCount: 0 };
+  }
+}
 
 const OTHER_MESSAGES = [
   "Stop doom scrolling and get to studying bud",
@@ -41,6 +67,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [displayTitle, setDisplayTitle] = useState("Your study cockpit");
+  const [statsResetVersion, setStatsResetVersion] = useState(0);
   const displayTitleRef = useRef(displayTitle);
 
   useEffect(() => {
@@ -58,6 +85,19 @@ export default function Dashboard() {
         setError(loadError instanceof Error ? loadError.message : "Unable to load your study data.");
       })
       .finally(() => setIsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    function refreshStats() {
+      setStatsResetVersion((version) => version + 1);
+    }
+
+    window.addEventListener("nosey-stats-reset", refreshStats);
+    window.addEventListener("storage", refreshStats);
+    return () => {
+      window.removeEventListener("nosey-stats-reset", refreshStats);
+      window.removeEventListener("storage", refreshStats);
+    };
   }, []);
 
   useEffect(() => {
@@ -133,18 +173,22 @@ export default function Dashboard() {
   }, []);
 
   const stats = useMemo(() => {
-    const attempts = tests.reduce((sum, test) => sum + test.attempt_count, 0);
+    const baseline = readStatsResetBaseline();
+    const attempts = Math.max(0, tests.reduce((sum, test) => sum + test.attempt_count, 0) - baseline.attempts);
+    const cardsReviewed = Math.max(
+      0,
+      flashcards.reduce((sum, card) => sum + card.attempt_count, 0) - baseline.cardsReviewed,
+    );
     const scored = tests.filter((test) => typeof test.best_score === "number");
-    const average =
-      scored.length > 0
-        ? Math.round(scored.reduce((sum, test) => sum + (test.best_score ?? 0), 0) / scored.length)
-        : null;
+    const scoreSum = Math.max(0, scored.reduce((sum, test) => sum + (test.best_score ?? 0), 0) - baseline.scoreSum);
+    const scoreCount = Math.max(0, scored.length - baseline.scoreCount);
+    const average = scoreCount > 0 ? Math.round(scoreSum / scoreCount) : null;
     return [
       { label: "Tests Taken", value: attempts.toString(), icon: BookOpen },
-      { label: "Cards Reviewed", value: flashcards.reduce((sum, card) => sum + card.attempt_count, 0).toString(), icon: Brain },
+      { label: "Cards Reviewed", value: cardsReviewed.toString(), icon: Brain },
       { label: "Average Score", value: average ? `${average}%` : "New", icon: TrendingUp },
     ];
-  }, [flashcards, tests]);
+  }, [flashcards, tests, statsResetVersion]);
 
   const weakCards = [...flashcards].sort((a, b) => b.difficulty - a.difficulty).slice(0, 3);
 

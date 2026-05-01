@@ -13,9 +13,17 @@ from src.schemas.kojo_schema import (
     KojoRestoreResponse,
 )
 from src.services.kojo_service import KojoService
+from src.services.llm_service import LLMService
 from src.utils.exceptions import LLMException, ResourceNotFoundException
 
 router = APIRouter(prefix="/kojo", tags=["kojo"])
+
+
+@router.get("/providers/status")
+async def providers_status(
+    user: User = Depends(get_current_user),
+) -> dict:
+    return await LLMService().check_providers_status()
 
 
 @router.post("/folders/{folder_id}/chat", response_model=KojoChatResponse)

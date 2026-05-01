@@ -308,30 +308,6 @@
         "documentation": {}
     },
     {
-        "label": "Optional",
-        "importPath": "typing",
-        "description": "typing",
-        "isExtraImport": true,
-        "detail": "typing",
-        "documentation": {}
-    },
-    {
-        "label": "TYPE_CHECKING",
-        "importPath": "typing",
-        "description": "typing",
-        "isExtraImport": true,
-        "detail": "typing",
-        "documentation": {}
-    },
-    {
-        "label": "TYPE_CHECKING",
-        "importPath": "typing",
-        "description": "typing",
-        "isExtraImport": true,
-        "detail": "typing",
-        "documentation": {}
-    },
-    {
         "label": "TYPE_CHECKING",
         "importPath": "typing",
         "description": "typing",
@@ -356,7 +332,7 @@
         "documentation": {}
     },
     {
-        "label": "Optional",
+        "label": "TYPE_CHECKING",
         "importPath": "typing",
         "description": "typing",
         "isExtraImport": true,
@@ -413,6 +389,46 @@
     },
     {
         "label": "TYPE_CHECKING",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "TYPE_CHECKING",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "TYPE_CHECKING",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
         "importPath": "typing",
         "description": "typing",
         "isExtraImport": true,
@@ -461,6 +477,126 @@
     },
     {
         "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Callable",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Any",
         "importPath": "typing",
         "description": "typing",
         "isExtraImport": true,
@@ -863,6 +999,22 @@
         "documentation": {}
     },
     {
+        "label": "op",
+        "importPath": "alembic",
+        "description": "alembic",
+        "isExtraImport": true,
+        "detail": "alembic",
+        "documentation": {}
+    },
+    {
+        "label": "op",
+        "importPath": "alembic",
+        "description": "alembic",
+        "isExtraImport": true,
+        "detail": "alembic",
+        "documentation": {}
+    },
+    {
         "label": "context",
         "importPath": "alembic",
         "description": "alembic",
@@ -985,6 +1137,54 @@
     },
     {
         "label": "UniqueConstraint",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "DateTime",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "ForeignKey",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "Integer",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "String",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "Text",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "func",
         "importPath": "sqlalchemy",
         "description": "sqlalchemy",
         "isExtraImport": true,
@@ -1413,6 +1613,86 @@
         "description": "sqlalchemy",
         "isExtraImport": true,
         "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "delete",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "select",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "func",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "select",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "select",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
         "documentation": {}
     },
     {
@@ -1857,6 +2137,22 @@
         "documentation": {}
     },
     {
+        "label": "AsyncSession",
+        "importPath": "sqlalchemy.ext.asyncio",
+        "description": "sqlalchemy.ext.asyncio",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.ext.asyncio",
+        "documentation": {}
+    },
+    {
+        "label": "AsyncSession",
+        "importPath": "sqlalchemy.ext.asyncio",
+        "description": "sqlalchemy.ext.asyncio",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.ext.asyncio",
+        "documentation": {}
+    },
+    {
         "label": "async_sessionmaker",
         "importPath": "sqlalchemy.ext.asyncio",
         "description": "sqlalchemy.ext.asyncio",
@@ -1985,6 +2281,14 @@
         "documentation": {}
     },
     {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
         "label": "timedelta",
         "importPath": "datetime",
         "description": "datetime",
@@ -1994,6 +2298,14 @@
     },
     {
         "label": "timezone",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
         "importPath": "datetime",
         "description": "datetime",
         "isExtraImport": true,
@@ -2417,6 +2729,30 @@
         "documentation": {}
     },
     {
+        "label": "Mapped",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.orm",
+        "documentation": {}
+    },
+    {
+        "label": "mapped_column",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.orm",
+        "documentation": {}
+    },
+    {
+        "label": "relationship",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.orm",
+        "documentation": {}
+    },
+    {
         "label": "selectinload",
         "importPath": "sqlalchemy.orm",
         "description": "sqlalchemy.orm",
@@ -2482,6 +2818,22 @@
     },
     {
         "label": "TimestampMixin",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "BIGINT_ID",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
         "importPath": "src.models.base",
         "description": "src.models.base",
         "isExtraImport": true,
@@ -2849,6 +3201,22 @@
         "documentation": {}
     },
     {
+        "label": "Folder",
+        "importPath": "src.models.folder",
+        "description": "src.models.folder",
+        "isExtraImport": true,
+        "detail": "src.models.folder",
+        "documentation": {}
+    },
+    {
+        "label": "Folder",
+        "importPath": "src.models.folder",
+        "description": "src.models.folder",
+        "isExtraImport": true,
+        "detail": "src.models.folder",
+        "documentation": {}
+    },
+    {
         "label": "Test",
         "importPath": "src.models.test",
         "description": "src.models.test",
@@ -2918,6 +3286,14 @@
         "description": "src.models.mcq_option",
         "isExtraImport": true,
         "detail": "src.models.mcq_option",
+        "documentation": {}
+    },
+    {
+        "label": "User",
+        "importPath": "src.models.user",
+        "description": "src.models.user",
+        "isExtraImport": true,
+        "detail": "src.models.user",
         "documentation": {}
     },
     {
@@ -3066,6 +3442,54 @@
     },
     {
         "label": "Query",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "UploadFile",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "status",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "APIRouter",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "Depends",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "File",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "HTTPException",
         "importPath": "fastapi",
         "description": "fastapi",
         "isExtraImport": true,
@@ -3313,6 +3737,22 @@
         "documentation": {}
     },
     {
+        "label": "get_session",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
+        "label": "get_current_user",
+        "importPath": "src.dependencies",
+        "description": "src.dependencies",
+        "isExtraImport": true,
+        "detail": "src.dependencies",
+        "documentation": {}
+    },
+    {
         "label": "get_current_user",
         "importPath": "src.dependencies",
         "description": "src.dependencies",
@@ -3505,6 +3945,14 @@
         "documentation": {}
     },
     {
+        "label": "ValidationException",
+        "importPath": "src.utils.exceptions",
+        "description": "src.utils.exceptions",
+        "isExtraImport": true,
+        "detail": "src.utils.exceptions",
+        "documentation": {}
+    },
+    {
         "label": "ResourceNotFoundException",
         "importPath": "src.utils.exceptions",
         "description": "src.utils.exceptions",
@@ -3530,6 +3978,14 @@
     },
     {
         "label": "ResourceNotFoundException",
+        "importPath": "src.utils.exceptions",
+        "description": "src.utils.exceptions",
+        "isExtraImport": true,
+        "detail": "src.utils.exceptions",
+        "documentation": {}
+    },
+    {
+        "label": "LLMException",
         "importPath": "src.utils.exceptions",
         "description": "src.utils.exceptions",
         "isExtraImport": true,
@@ -3810,6 +4266,302 @@
         "documentation": {}
     },
     {
+        "label": "BaseModel",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "BaseModel",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "Field",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "field_validator",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "BaseModel",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "ConfigDict",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "BaseModel",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "ConfigDict",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "Field",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "model_validator",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "BaseModel",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "ConfigDict",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "Field",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "BaseModel",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "ConfigDict",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "Field",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "BaseModel",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "ConfigDict",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "Field",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "Field",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "field_validator",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "FolderFile",
+        "importPath": "src.models.folder_file",
+        "description": "src.models.folder_file",
+        "isExtraImport": true,
+        "detail": "src.models.folder_file",
+        "documentation": {}
+    },
+    {
+        "label": "FolderFile",
+        "importPath": "src.models.folder_file",
+        "description": "src.models.folder_file",
+        "isExtraImport": true,
+        "detail": "src.models.folder_file",
+        "documentation": {}
+    },
+    {
+        "label": "FolderFile",
+        "importPath": "src.models.folder_file",
+        "description": "src.models.folder_file",
+        "isExtraImport": true,
+        "detail": "src.models.folder_file",
+        "documentation": {}
+    },
+    {
+        "label": "FileService",
+        "importPath": "src.services.file_service",
+        "description": "src.services.file_service",
+        "isExtraImport": true,
+        "detail": "src.services.file_service",
+        "documentation": {}
+    },
+    {
+        "label": "FileService",
+        "importPath": "src.services.file_service",
+        "description": "src.services.file_service",
+        "isExtraImport": true,
+        "detail": "src.services.file_service",
+        "documentation": {}
+    },
+    {
+        "label": "FileService",
+        "importPath": "src.services.file_service",
+        "description": "src.services.file_service",
+        "isExtraImport": true,
+        "detail": "src.services.file_service",
+        "documentation": {}
+    },
+    {
+        "label": "FileService",
+        "importPath": "src.services.file_service",
+        "description": "src.services.file_service",
+        "isExtraImport": true,
+        "detail": "src.services.file_service",
+        "documentation": {}
+    },
+    {
+        "label": "FileService",
+        "importPath": "src.services.file_service",
+        "description": "src.services.file_service",
+        "isExtraImport": true,
+        "detail": "src.services.file_service",
+        "documentation": {}
+    },
+    {
+        "label": "MAX_UPLOAD_DOCUMENTS",
+        "importPath": "src.utils.validators",
+        "description": "src.utils.validators",
+        "isExtraImport": true,
+        "detail": "src.utils.validators",
+        "documentation": {}
+    },
+    {
+        "label": "MAX_UPLOAD_FILE_SIZE_BYTES",
+        "importPath": "src.utils.validators",
+        "description": "src.utils.validators",
+        "isExtraImport": true,
+        "detail": "src.utils.validators",
+        "documentation": {}
+    },
+    {
+        "label": "MAX_UPLOAD_DOCUMENTS",
+        "importPath": "src.utils.validators",
+        "description": "src.utils.validators",
+        "isExtraImport": true,
+        "detail": "src.utils.validators",
+        "documentation": {}
+    },
+    {
+        "label": "ALLOWED_FILE_TYPES",
+        "importPath": "src.utils.validators",
+        "description": "src.utils.validators",
+        "isExtraImport": true,
+        "detail": "src.utils.validators",
+        "documentation": {}
+    },
+    {
+        "label": "MAX_UPLOAD_DOCUMENTS",
+        "importPath": "src.utils.validators",
+        "description": "src.utils.validators",
+        "isExtraImport": true,
+        "detail": "src.utils.validators",
+        "documentation": {}
+    },
+    {
+        "label": "MAX_UPLOAD_FILE_SIZE_BYTES",
+        "importPath": "src.utils.validators",
+        "description": "src.utils.validators",
+        "isExtraImport": true,
+        "detail": "src.utils.validators",
+        "documentation": {}
+    },
+    {
+        "label": "normalize_file_extension",
+        "importPath": "src.utils.validators",
+        "description": "src.utils.validators",
+        "isExtraImport": true,
+        "detail": "src.utils.validators",
+        "documentation": {}
+    },
+    {
+        "label": "VALID_TEST_TYPES",
+        "importPath": "src.utils.validators",
+        "description": "src.utils.validators",
+        "isExtraImport": true,
+        "detail": "src.utils.validators",
+        "documentation": {}
+    },
+    {
         "label": "FolderCreate",
         "importPath": "src.schemas.folder_schema",
         "description": "src.schemas.folder_schema",
@@ -3991,6 +4743,102 @@
         "description": "src.services.kojo_service",
         "isExtraImport": true,
         "detail": "src.services.kojo_service",
+        "documentation": {}
+    },
+    {
+        "label": "LLMService",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "LLMService",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "LLMService",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "LLMService",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "LLMService",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "GeneratedFRQ",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "GeneratedMCQ",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "LLMService",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "GeneratedFRQ",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "GeneratedFlashcard",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "GeneratedMCQ",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "LLMService",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
         "documentation": {}
     },
     {
@@ -4178,214 +5026,6 @@
         "documentation": {}
     },
     {
-        "label": "MAX_UPLOAD_DOCUMENTS",
-        "importPath": "src.utils.validators",
-        "description": "src.utils.validators",
-        "isExtraImport": true,
-        "detail": "src.utils.validators",
-        "documentation": {}
-    },
-    {
-        "label": "ALLOWED_FILE_TYPES",
-        "importPath": "src.utils.validators",
-        "description": "src.utils.validators",
-        "isExtraImport": true,
-        "detail": "src.utils.validators",
-        "documentation": {}
-    },
-    {
-        "label": "MAX_UPLOAD_DOCUMENTS",
-        "importPath": "src.utils.validators",
-        "description": "src.utils.validators",
-        "isExtraImport": true,
-        "detail": "src.utils.validators",
-        "documentation": {}
-    },
-    {
-        "label": "MAX_UPLOAD_FILE_SIZE_BYTES",
-        "importPath": "src.utils.validators",
-        "description": "src.utils.validators",
-        "isExtraImport": true,
-        "detail": "src.utils.validators",
-        "documentation": {}
-    },
-    {
-        "label": "normalize_file_extension",
-        "importPath": "src.utils.validators",
-        "description": "src.utils.validators",
-        "isExtraImport": true,
-        "detail": "src.utils.validators",
-        "documentation": {}
-    },
-    {
-        "label": "VALID_TEST_TYPES",
-        "importPath": "src.utils.validators",
-        "description": "src.utils.validators",
-        "isExtraImport": true,
-        "detail": "src.utils.validators",
-        "documentation": {}
-    },
-    {
-        "label": "BaseModel",
-        "importPath": "pydantic",
-        "description": "pydantic",
-        "isExtraImport": true,
-        "detail": "pydantic",
-        "documentation": {}
-    },
-    {
-        "label": "Field",
-        "importPath": "pydantic",
-        "description": "pydantic",
-        "isExtraImport": true,
-        "detail": "pydantic",
-        "documentation": {}
-    },
-    {
-        "label": "field_validator",
-        "importPath": "pydantic",
-        "description": "pydantic",
-        "isExtraImport": true,
-        "detail": "pydantic",
-        "documentation": {}
-    },
-    {
-        "label": "BaseModel",
-        "importPath": "pydantic",
-        "description": "pydantic",
-        "isExtraImport": true,
-        "detail": "pydantic",
-        "documentation": {}
-    },
-    {
-        "label": "ConfigDict",
-        "importPath": "pydantic",
-        "description": "pydantic",
-        "isExtraImport": true,
-        "detail": "pydantic",
-        "documentation": {}
-    },
-    {
-        "label": "BaseModel",
-        "importPath": "pydantic",
-        "description": "pydantic",
-        "isExtraImport": true,
-        "detail": "pydantic",
-        "documentation": {}
-    },
-    {
-        "label": "ConfigDict",
-        "importPath": "pydantic",
-        "description": "pydantic",
-        "isExtraImport": true,
-        "detail": "pydantic",
-        "documentation": {}
-    },
-    {
-        "label": "Field",
-        "importPath": "pydantic",
-        "description": "pydantic",
-        "isExtraImport": true,
-        "detail": "pydantic",
-        "documentation": {}
-    },
-    {
-        "label": "model_validator",
-        "importPath": "pydantic",
-        "description": "pydantic",
-        "isExtraImport": true,
-        "detail": "pydantic",
-        "documentation": {}
-    },
-    {
-        "label": "BaseModel",
-        "importPath": "pydantic",
-        "description": "pydantic",
-        "isExtraImport": true,
-        "detail": "pydantic",
-        "documentation": {}
-    },
-    {
-        "label": "ConfigDict",
-        "importPath": "pydantic",
-        "description": "pydantic",
-        "isExtraImport": true,
-        "detail": "pydantic",
-        "documentation": {}
-    },
-    {
-        "label": "Field",
-        "importPath": "pydantic",
-        "description": "pydantic",
-        "isExtraImport": true,
-        "detail": "pydantic",
-        "documentation": {}
-    },
-    {
-        "label": "BaseModel",
-        "importPath": "pydantic",
-        "description": "pydantic",
-        "isExtraImport": true,
-        "detail": "pydantic",
-        "documentation": {}
-    },
-    {
-        "label": "ConfigDict",
-        "importPath": "pydantic",
-        "description": "pydantic",
-        "isExtraImport": true,
-        "detail": "pydantic",
-        "documentation": {}
-    },
-    {
-        "label": "Field",
-        "importPath": "pydantic",
-        "description": "pydantic",
-        "isExtraImport": true,
-        "detail": "pydantic",
-        "documentation": {}
-    },
-    {
-        "label": "BaseModel",
-        "importPath": "pydantic",
-        "description": "pydantic",
-        "isExtraImport": true,
-        "detail": "pydantic",
-        "documentation": {}
-    },
-    {
-        "label": "ConfigDict",
-        "importPath": "pydantic",
-        "description": "pydantic",
-        "isExtraImport": true,
-        "detail": "pydantic",
-        "documentation": {}
-    },
-    {
-        "label": "Field",
-        "importPath": "pydantic",
-        "description": "pydantic",
-        "isExtraImport": true,
-        "detail": "pydantic",
-        "documentation": {}
-    },
-    {
-        "label": "Field",
-        "importPath": "pydantic",
-        "description": "pydantic",
-        "isExtraImport": true,
-        "detail": "pydantic",
-        "documentation": {}
-    },
-    {
-        "label": "field_validator",
-        "importPath": "pydantic",
-        "description": "pydantic",
-        "isExtraImport": true,
-        "detail": "pydantic",
-        "documentation": {}
-    },
-    {
         "label": "jwt",
         "kind": 6,
         "isExtraImport": true,
@@ -4411,11 +5051,44 @@
         "documentation": {}
     },
     {
+        "label": "os",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "os",
+        "description": "os",
+        "detail": "os",
+        "documentation": {}
+    },
+    {
+        "label": "ProcessPoolExecutor",
+        "importPath": "concurrent.futures",
+        "description": "concurrent.futures",
+        "isExtraImport": true,
+        "detail": "concurrent.futures",
+        "documentation": {}
+    },
+    {
         "label": "BytesIO",
         "importPath": "io",
         "description": "io",
         "isExtraImport": true,
         "detail": "io",
+        "documentation": {}
+    },
+    {
+        "label": "repeat",
+        "importPath": "itertools",
+        "description": "itertools",
+        "isExtraImport": true,
+        "detail": "itertools",
+        "documentation": {}
+    },
+    {
+        "label": "get_context",
+        "importPath": "multiprocessing",
+        "description": "multiprocessing",
+        "isExtraImport": true,
+        "detail": "multiprocessing",
         "documentation": {}
     },
     {
@@ -4492,110 +5165,6 @@
         "documentation": {}
     },
     {
-        "label": "FileService",
-        "importPath": "src.services.file_service",
-        "description": "src.services.file_service",
-        "isExtraImport": true,
-        "detail": "src.services.file_service",
-        "documentation": {}
-    },
-    {
-        "label": "FileService",
-        "importPath": "src.services.file_service",
-        "description": "src.services.file_service",
-        "isExtraImport": true,
-        "detail": "src.services.file_service",
-        "documentation": {}
-    },
-    {
-        "label": "LLMService",
-        "importPath": "src.services.llm_service",
-        "description": "src.services.llm_service",
-        "isExtraImport": true,
-        "detail": "src.services.llm_service",
-        "documentation": {}
-    },
-    {
-        "label": "LLMService",
-        "importPath": "src.services.llm_service",
-        "description": "src.services.llm_service",
-        "isExtraImport": true,
-        "detail": "src.services.llm_service",
-        "documentation": {}
-    },
-    {
-        "label": "LLMService",
-        "importPath": "src.services.llm_service",
-        "description": "src.services.llm_service",
-        "isExtraImport": true,
-        "detail": "src.services.llm_service",
-        "documentation": {}
-    },
-    {
-        "label": "LLMService",
-        "importPath": "src.services.llm_service",
-        "description": "src.services.llm_service",
-        "isExtraImport": true,
-        "detail": "src.services.llm_service",
-        "documentation": {}
-    },
-    {
-        "label": "GeneratedFRQ",
-        "importPath": "src.services.llm_service",
-        "description": "src.services.llm_service",
-        "isExtraImport": true,
-        "detail": "src.services.llm_service",
-        "documentation": {}
-    },
-    {
-        "label": "GeneratedMCQ",
-        "importPath": "src.services.llm_service",
-        "description": "src.services.llm_service",
-        "isExtraImport": true,
-        "detail": "src.services.llm_service",
-        "documentation": {}
-    },
-    {
-        "label": "LLMService",
-        "importPath": "src.services.llm_service",
-        "description": "src.services.llm_service",
-        "isExtraImport": true,
-        "detail": "src.services.llm_service",
-        "documentation": {}
-    },
-    {
-        "label": "GeneratedFRQ",
-        "importPath": "src.services.llm_service",
-        "description": "src.services.llm_service",
-        "isExtraImport": true,
-        "detail": "src.services.llm_service",
-        "documentation": {}
-    },
-    {
-        "label": "GeneratedFlashcard",
-        "importPath": "src.services.llm_service",
-        "description": "src.services.llm_service",
-        "isExtraImport": true,
-        "detail": "src.services.llm_service",
-        "documentation": {}
-    },
-    {
-        "label": "GeneratedMCQ",
-        "importPath": "src.services.llm_service",
-        "description": "src.services.llm_service",
-        "isExtraImport": true,
-        "detail": "src.services.llm_service",
-        "documentation": {}
-    },
-    {
-        "label": "LLMService",
-        "importPath": "src.services.llm_service",
-        "description": "src.services.llm_service",
-        "isExtraImport": true,
-        "detail": "src.services.llm_service",
-        "documentation": {}
-    },
-    {
         "label": "AttemptRepository",
         "importPath": "src.repositories.attempt_repository",
         "description": "src.repositories.attempt_repository",
@@ -4636,12 +5205,37 @@
         "documentation": {}
     },
     {
+        "label": "hashlib",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "hashlib",
+        "description": "hashlib",
+        "detail": "hashlib",
+        "documentation": {}
+    },
+    {
         "label": "json",
         "kind": 6,
         "isExtraImport": true,
         "importPath": "json",
         "description": "json",
         "detail": "json",
+        "documentation": {}
+    },
+    {
+        "label": "sqrt",
+        "importPath": "math",
+        "description": "math",
+        "isExtraImport": true,
+        "detail": "math",
+        "documentation": {}
+    },
+    {
+        "label": "Fraction",
+        "importPath": "fractions",
+        "description": "fractions",
+        "isExtraImport": true,
+        "detail": "fractions",
         "documentation": {}
     },
     {
@@ -4701,15 +5295,6 @@
         "documentation": {}
     },
     {
-        "label": "os",
-        "kind": 6,
-        "isExtraImport": true,
-        "importPath": "os",
-        "description": "os",
-        "detail": "os",
-        "documentation": {}
-    },
-    {
         "label": "CORSMiddleware",
         "importPath": "fastapi.middleware.cors",
         "description": "fastapi.middleware.cors",
@@ -4735,6 +5320,14 @@
     },
     {
         "label": "flashcards",
+        "importPath": "src.routes",
+        "description": "src.routes",
+        "isExtraImport": true,
+        "detail": "src.routes",
+        "documentation": {}
+    },
+    {
+        "label": "folder_files",
         "importPath": "src.routes",
         "description": "src.routes",
         "isExtraImport": true,
@@ -4806,6 +5399,22 @@
         "documentation": {}
     },
     {
+        "label": "MagicMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "AsyncMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
         "label": "patch",
         "importPath": "unittest.mock",
         "description": "unittest.mock",
@@ -4847,19 +5456,11 @@
         "documentation": {}
     },
     {
-        "label": "app",
-        "importPath": "src.main",
-        "description": "src.main",
+        "label": "SimpleNamespace",
+        "importPath": "types",
+        "description": "types",
         "isExtraImport": true,
-        "detail": "src.main",
-        "documentation": {}
-    },
-    {
-        "label": "app",
-        "importPath": "src.main",
-        "description": "src.main",
-        "isExtraImport": true,
-        "detail": "src.main",
+        "detail": "types",
         "documentation": {}
     },
     {
@@ -4871,11 +5472,86 @@
         "documentation": {}
     },
     {
+        "label": "app",
+        "importPath": "src.main",
+        "description": "src.main",
+        "isExtraImport": true,
+        "detail": "src.main",
+        "documentation": {}
+    },
+    {
+        "label": "app",
+        "importPath": "src.main",
+        "description": "src.main",
+        "isExtraImport": true,
+        "detail": "src.main",
+        "documentation": {}
+    },
+    {
         "label": "contextmanager",
         "importPath": "contextlib",
         "description": "contextlib",
         "isExtraImport": true,
         "detail": "contextlib",
+        "documentation": {}
+    },
+    {
+        "label": "TTFont",
+        "importPath": "fontTools.ttLib",
+        "description": "fontTools.ttLib",
+        "isExtraImport": true,
+        "detail": "fontTools.ttLib",
+        "documentation": {}
+    },
+    {
+        "label": "sfnt",
+        "importPath": "fontTools.ttLib",
+        "description": "fontTools.ttLib",
+        "isExtraImport": true,
+        "detail": "fontTools.ttLib",
+        "documentation": {}
+    },
+    {
+        "label": "TTFont",
+        "importPath": "fontTools.ttLib",
+        "description": "fontTools.ttLib",
+        "isExtraImport": true,
+        "detail": "fontTools.ttLib",
+        "documentation": {}
+    },
+    {
+        "label": "timestampNow",
+        "importPath": "fontTools.misc.timeTools",
+        "description": "fontTools.misc.timeTools",
+        "isExtraImport": true,
+        "detail": "fontTools.misc.timeTools",
+        "documentation": {}
+    },
+    {
+        "label": "collections",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "collections",
+        "description": "collections",
+        "detail": "collections",
+        "documentation": {}
+    },
+    {
+        "label": "parse_tfm",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "parse_tfm",
+        "description": "parse_tfm",
+        "detail": "parse_tfm",
+        "documentation": {}
+    },
+    {
+        "label": "subprocess",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "subprocess",
+        "description": "subprocess",
+        "detail": "subprocess",
         "documentation": {}
     },
     {
@@ -5437,6 +6113,114 @@
         "documentation": {}
     },
     {
+        "label": "upgrade",
+        "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.005_add_folder_files",
+        "description": "study-app-backend.src.migrations.versions.005_add_folder_files",
+        "peekOfCode": "def upgrade() -> None:\n    op.create_table(\n        \"folder_files\",\n        sa.Column(\"id\", sa.BigInteger(), autoincrement=True, nullable=False),\n        sa.Column(\"folder_id\", sa.BigInteger(), nullable=False),\n        sa.Column(\"file_name\", sa.String(255), nullable=False),\n        sa.Column(\"file_type\", sa.String(10), nullable=False),\n        sa.Column(\"size_bytes\", sa.Integer(), nullable=False, server_default=\"0\"),\n        sa.Column(\"content\", sa.Text(), nullable=False),\n        sa.Column(\"uploaded_at\", sa.DateTime(), server_default=sa.text(\"now()\"), nullable=False),",
+        "detail": "study-app-backend.src.migrations.versions.005_add_folder_files",
+        "documentation": {}
+    },
+    {
+        "label": "downgrade",
+        "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.005_add_folder_files",
+        "description": "study-app-backend.src.migrations.versions.005_add_folder_files",
+        "peekOfCode": "def downgrade() -> None:\n    op.drop_index(\"ix_folder_files_folder_id\", table_name=\"folder_files\")\n    op.drop_table(\"folder_files\")",
+        "detail": "study-app-backend.src.migrations.versions.005_add_folder_files",
+        "documentation": {}
+    },
+    {
+        "label": "revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.005_add_folder_files",
+        "description": "study-app-backend.src.migrations.versions.005_add_folder_files",
+        "peekOfCode": "revision = \"005_add_folder_files\"\ndown_revision = \"004_add_kojo_cleared_at\"\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.create_table(\n        \"folder_files\",\n        sa.Column(\"id\", sa.BigInteger(), autoincrement=True, nullable=False),\n        sa.Column(\"folder_id\", sa.BigInteger(), nullable=False),\n        sa.Column(\"file_name\", sa.String(255), nullable=False),",
+        "detail": "study-app-backend.src.migrations.versions.005_add_folder_files",
+        "documentation": {}
+    },
+    {
+        "label": "down_revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.005_add_folder_files",
+        "description": "study-app-backend.src.migrations.versions.005_add_folder_files",
+        "peekOfCode": "down_revision = \"004_add_kojo_cleared_at\"\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.create_table(\n        \"folder_files\",\n        sa.Column(\"id\", sa.BigInteger(), autoincrement=True, nullable=False),\n        sa.Column(\"folder_id\", sa.BigInteger(), nullable=False),\n        sa.Column(\"file_name\", sa.String(255), nullable=False),\n        sa.Column(\"file_type\", sa.String(10), nullable=False),",
+        "detail": "study-app-backend.src.migrations.versions.005_add_folder_files",
+        "documentation": {}
+    },
+    {
+        "label": "branch_labels",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.005_add_folder_files",
+        "description": "study-app-backend.src.migrations.versions.005_add_folder_files",
+        "peekOfCode": "branch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.create_table(\n        \"folder_files\",\n        sa.Column(\"id\", sa.BigInteger(), autoincrement=True, nullable=False),\n        sa.Column(\"folder_id\", sa.BigInteger(), nullable=False),\n        sa.Column(\"file_name\", sa.String(255), nullable=False),\n        sa.Column(\"file_type\", sa.String(10), nullable=False),\n        sa.Column(\"size_bytes\", sa.Integer(), nullable=False, server_default=\"0\"),",
+        "detail": "study-app-backend.src.migrations.versions.005_add_folder_files",
+        "documentation": {}
+    },
+    {
+        "label": "depends_on",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.005_add_folder_files",
+        "description": "study-app-backend.src.migrations.versions.005_add_folder_files",
+        "peekOfCode": "depends_on = None\ndef upgrade() -> None:\n    op.create_table(\n        \"folder_files\",\n        sa.Column(\"id\", sa.BigInteger(), autoincrement=True, nullable=False),\n        sa.Column(\"folder_id\", sa.BigInteger(), nullable=False),\n        sa.Column(\"file_name\", sa.String(255), nullable=False),\n        sa.Column(\"file_type\", sa.String(10), nullable=False),\n        sa.Column(\"size_bytes\", sa.Integer(), nullable=False, server_default=\"0\"),\n        sa.Column(\"content\", sa.Text(), nullable=False),",
+        "detail": "study-app-backend.src.migrations.versions.005_add_folder_files",
+        "documentation": {}
+    },
+    {
+        "label": "upgrade",
+        "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.006_add_coding_mode",
+        "description": "study-app-backend.src.migrations.versions.006_add_coding_mode",
+        "peekOfCode": "def upgrade() -> None:\n    op.add_column(\"tests\", sa.Column(\"is_coding_mode\", sa.Boolean(), nullable=False, server_default=\"false\"))\n    op.add_column(\"tests\", sa.Column(\"coding_language\", sa.String(50), nullable=True))\ndef downgrade() -> None:\n    op.drop_column(\"tests\", \"coding_language\")\n    op.drop_column(\"tests\", \"is_coding_mode\")",
+        "detail": "study-app-backend.src.migrations.versions.006_add_coding_mode",
+        "documentation": {}
+    },
+    {
+        "label": "downgrade",
+        "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.006_add_coding_mode",
+        "description": "study-app-backend.src.migrations.versions.006_add_coding_mode",
+        "peekOfCode": "def downgrade() -> None:\n    op.drop_column(\"tests\", \"coding_language\")\n    op.drop_column(\"tests\", \"is_coding_mode\")",
+        "detail": "study-app-backend.src.migrations.versions.006_add_coding_mode",
+        "documentation": {}
+    },
+    {
+        "label": "revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.006_add_coding_mode",
+        "description": "study-app-backend.src.migrations.versions.006_add_coding_mode",
+        "peekOfCode": "revision = \"006_add_coding_mode\"\ndown_revision = \"005_add_folder_files\"\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.add_column(\"tests\", sa.Column(\"is_coding_mode\", sa.Boolean(), nullable=False, server_default=\"false\"))\n    op.add_column(\"tests\", sa.Column(\"coding_language\", sa.String(50), nullable=True))\ndef downgrade() -> None:\n    op.drop_column(\"tests\", \"coding_language\")\n    op.drop_column(\"tests\", \"is_coding_mode\")",
+        "detail": "study-app-backend.src.migrations.versions.006_add_coding_mode",
+        "documentation": {}
+    },
+    {
+        "label": "down_revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.006_add_coding_mode",
+        "description": "study-app-backend.src.migrations.versions.006_add_coding_mode",
+        "peekOfCode": "down_revision = \"005_add_folder_files\"\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.add_column(\"tests\", sa.Column(\"is_coding_mode\", sa.Boolean(), nullable=False, server_default=\"false\"))\n    op.add_column(\"tests\", sa.Column(\"coding_language\", sa.String(50), nullable=True))\ndef downgrade() -> None:\n    op.drop_column(\"tests\", \"coding_language\")\n    op.drop_column(\"tests\", \"is_coding_mode\")",
+        "detail": "study-app-backend.src.migrations.versions.006_add_coding_mode",
+        "documentation": {}
+    },
+    {
+        "label": "branch_labels",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.006_add_coding_mode",
+        "description": "study-app-backend.src.migrations.versions.006_add_coding_mode",
+        "peekOfCode": "branch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.add_column(\"tests\", sa.Column(\"is_coding_mode\", sa.Boolean(), nullable=False, server_default=\"false\"))\n    op.add_column(\"tests\", sa.Column(\"coding_language\", sa.String(50), nullable=True))\ndef downgrade() -> None:\n    op.drop_column(\"tests\", \"coding_language\")\n    op.drop_column(\"tests\", \"is_coding_mode\")",
+        "detail": "study-app-backend.src.migrations.versions.006_add_coding_mode",
+        "documentation": {}
+    },
+    {
+        "label": "depends_on",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.006_add_coding_mode",
+        "description": "study-app-backend.src.migrations.versions.006_add_coding_mode",
+        "peekOfCode": "depends_on = None\ndef upgrade() -> None:\n    op.add_column(\"tests\", sa.Column(\"is_coding_mode\", sa.Boolean(), nullable=False, server_default=\"false\"))\n    op.add_column(\"tests\", sa.Column(\"coding_language\", sa.String(50), nullable=True))\ndef downgrade() -> None:\n    op.drop_column(\"tests\", \"coding_language\")\n    op.drop_column(\"tests\", \"is_coding_mode\")",
+        "detail": "study-app-backend.src.migrations.versions.006_add_coding_mode",
+        "documentation": {}
+    },
+    {
         "label": "run_migrations_offline",
         "kind": 2,
         "importPath": "study-app-backend.src.migrations.env",
@@ -5524,6 +6308,15 @@
         "description": "study-app-backend.src.models.folder",
         "peekOfCode": "class Folder(Base, TimestampMixin):\n    __tablename__ = \"folders\"\n    __table_args__ = (UniqueConstraint(\"user_id\", \"name\", name=\"uq_folders_user_name\"),)\n    id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)\n    user_id: Mapped[int] = mapped_column(\n        BIGINT_ID, ForeignKey(\"users.id\", ondelete=\"CASCADE\"), nullable=False, index=True\n    )\n    name: Mapped[str] = mapped_column(String(255), nullable=False)\n    subject: Mapped[Optional[str]] = mapped_column(String(255))\n    description: Mapped[Optional[str]] = mapped_column(Text)",
         "detail": "study-app-backend.src.models.folder",
+        "documentation": {}
+    },
+    {
+        "label": "FolderFile",
+        "kind": 6,
+        "importPath": "study-app-backend.src.models.folder_file",
+        "description": "study-app-backend.src.models.folder_file",
+        "peekOfCode": "class FolderFile(Base):\n    __tablename__ = \"folder_files\"\n    id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)\n    folder_id: Mapped[int] = mapped_column(\n        BIGINT_ID, ForeignKey(\"folders.id\", ondelete=\"CASCADE\"), nullable=False, index=True\n    )\n    file_name: Mapped[str] = mapped_column(String(255), nullable=False)\n    file_type: Mapped[str] = mapped_column(String(10), nullable=False)\n    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)\n    content: Mapped[str] = mapped_column(Text, nullable=False)",
+        "detail": "study-app-backend.src.models.folder_file",
         "documentation": {}
     },
     {
@@ -5648,7 +6441,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.repositories.flashcard_repository",
         "description": "study-app-backend.src.repositories.flashcard_repository",
-        "peekOfCode": "class FlashcardRepository(BaseRepository[Flashcard]):\n    async def create(self, folder_id: int, front: str, back: str, source: str | None) -> Flashcard:\n        flashcard = Flashcard(folder_id=folder_id, front=front, back=back, source=source)\n        self.session.add(flashcard)\n        await self.session.flush()\n        return flashcard\n    async def get(self, flashcard_id: int) -> Flashcard | None:\n        return await self.session.scalar(select(Flashcard).where(Flashcard.id == flashcard_id))\n    async def update(self, card: Flashcard, front: str, back: str) -> Flashcard:\n        card.front = front",
+        "peekOfCode": "class FlashcardRepository(BaseRepository[Flashcard]):\n    async def create(self, folder_id: int, front: str, back: str, source: Optional[str]) -> Flashcard:\n        flashcard = Flashcard(folder_id=folder_id, front=front, back=back, source=source)\n        self.session.add(flashcard)\n        await self.session.flush()\n        return flashcard\n    async def get(self, flashcard_id: int) -> Optional[Flashcard]:\n        return await self.session.scalar(select(Flashcard).where(Flashcard.id == flashcard_id))\n    async def update(self, card: Flashcard, front: str, back: str) -> Flashcard:\n        card.front = front",
         "detail": "study-app-backend.src.repositories.flashcard_repository",
         "documentation": {}
     },
@@ -5657,7 +6450,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.repositories.folder_repository",
         "description": "study-app-backend.src.repositories.folder_repository",
-        "peekOfCode": "class FolderRepository(BaseRepository[Folder]):\n    async def create(\n        self, user_id: int, name: str, subject: str | None, description: str | None\n    ) -> Folder:\n        folder = Folder(user_id=user_id, name=name, subject=subject, description=description)\n        self.session.add(folder)\n        await self.session.flush()\n        return folder\n    async def get_owned(self, folder_id: int, user_id: int) -> Folder | None:\n        return await self.session.scalar(",
+        "peekOfCode": "class FolderRepository(BaseRepository[Folder]):\n    async def create(\n        self, user_id: int, name: str, subject: Optional[str], description: Optional[str]\n    ) -> Folder:\n        folder = Folder(user_id=user_id, name=name, subject=subject, description=description)\n        self.session.add(folder)\n        await self.session.flush()\n        return folder\n    async def get_owned(self, folder_id: int, user_id: int) -> Optional[Folder]:\n        return await self.session.scalar(",
         "detail": "study-app-backend.src.repositories.folder_repository",
         "documentation": {}
     },
@@ -5684,7 +6477,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.repositories.test_repository",
         "description": "study-app-backend.src.repositories.test_repository",
-        "peekOfCode": "class TestRepository(BaseRepository[Test]):\n    async def create(\n        self, folder_id: int, title: str, test_type: str, description: str | None, is_math_mode: bool = False\n    ) -> Test:\n        test = Test(\n            folder_id=folder_id,\n            title=title,\n            test_type=test_type,\n            description=description,\n            is_math_mode=is_math_mode,",
+        "peekOfCode": "class TestRepository(BaseRepository[Test]):\n    async def create(\n        self,\n        folder_id: int,\n        title: str,\n        test_type: str,\n        description: Optional[str],\n        is_math_mode: bool = False,\n        is_coding_mode: bool = False,\n        coding_language: Optional[str] = None,",
         "detail": "study-app-backend.src.repositories.test_repository",
         "documentation": {}
     },
@@ -5693,7 +6486,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.repositories.test_repository",
         "description": "study-app-backend.src.repositories.test_repository",
-        "peekOfCode": "_QUESTION_WITH_ANSWERS = (\n    selectinload(Question.mcq_options),\n    selectinload(Question.frq_answer),\n)\nclass TestRepository(BaseRepository[Test]):\n    async def create(\n        self, folder_id: int, title: str, test_type: str, description: str | None, is_math_mode: bool = False\n    ) -> Test:\n        test = Test(\n            folder_id=folder_id,",
+        "peekOfCode": "_QUESTION_WITH_ANSWERS = (\n    selectinload(Question.mcq_options),\n    selectinload(Question.frq_answer),\n)\nclass TestRepository(BaseRepository[Test]):\n    async def create(\n        self,\n        folder_id: int,\n        title: str,\n        test_type: str,",
         "detail": "study-app-backend.src.repositories.test_repository",
         "documentation": {}
     },
@@ -5702,7 +6495,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.repositories.user_repository",
         "description": "study-app-backend.src.repositories.user_repository",
-        "peekOfCode": "class UserRepository(BaseRepository[User]):\n    async def get_by_id(self, user_id: int) -> User | None:\n        return await self.session.scalar(select(User).where(User.id == user_id))\n    async def get_by_google_id(self, google_id: str) -> User | None:\n        return await self.session.scalar(select(User).where(User.google_id == google_id))\n    async def create_or_update(\n        self,\n        google_id: str,\n        email: str,\n        full_name: str | None,",
+        "peekOfCode": "class UserRepository(BaseRepository[User]):\n    async def get_by_id(self, user_id: int) -> Optional[User]:\n        return await self.session.scalar(select(User).where(User.id == user_id))\n    async def get_by_google_id(self, google_id: str) -> Optional[User]:\n        return await self.session.scalar(select(User).where(User.google_id == google_id))\n    async def create_or_update(\n        self,\n        google_id: str,\n        email: str,\n        full_name: Optional[str],",
         "detail": "study-app-backend.src.repositories.user_repository",
         "documentation": {}
     },
@@ -5734,6 +6527,24 @@
         "documentation": {}
     },
     {
+        "label": "FolderFileResponse",
+        "kind": 6,
+        "importPath": "study-app-backend.src.routes.folder_files",
+        "description": "study-app-backend.src.routes.folder_files",
+        "peekOfCode": "class FolderFileResponse(BaseModel):\n    id: int\n    folder_id: int\n    file_name: str\n    file_type: str\n    size_bytes: int\n    uploaded_at: datetime\n    model_config = {\"from_attributes\": True}\nasync def _get_owned_folder(\n    folder_id: int,",
+        "detail": "study-app-backend.src.routes.folder_files",
+        "documentation": {}
+    },
+    {
+        "label": "router",
+        "kind": 5,
+        "importPath": "study-app-backend.src.routes.folder_files",
+        "description": "study-app-backend.src.routes.folder_files",
+        "peekOfCode": "router = APIRouter(prefix=\"/folders\", tags=[\"folder-files\"])\nclass FolderFileResponse(BaseModel):\n    id: int\n    folder_id: int\n    file_name: str\n    file_type: str\n    size_bytes: int\n    uploaded_at: datetime\n    model_config = {\"from_attributes\": True}\nasync def _get_owned_folder(",
+        "detail": "study-app-backend.src.routes.folder_files",
+        "documentation": {}
+    },
+    {
         "label": "router",
         "kind": 5,
         "importPath": "study-app-backend.src.routes.folders",
@@ -5756,7 +6567,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.routes.kojo",
         "description": "study-app-backend.src.routes.kojo",
-        "peekOfCode": "router = APIRouter(prefix=\"/kojo\", tags=[\"kojo\"])\n@router.post(\"/folders/{folder_id}/chat\", response_model=KojoChatResponse)\nasync def kojo_chat(\n    folder_id: int,\n    body: KojoChatRequest,\n    session: AsyncSession = Depends(get_session),\n    user: User = Depends(get_current_user),\n) -> KojoChatResponse:\n    try:\n        return await KojoService().chat(",
+        "peekOfCode": "router = APIRouter(prefix=\"/kojo\", tags=[\"kojo\"])\n@router.get(\"/providers/status\")\nasync def providers_status(\n    user: User = Depends(get_current_user),\n) -> dict:\n    return await LLMService().check_providers_status()\n@router.post(\"/folders/{folder_id}/chat\", response_model=KojoChatResponse)\nasync def kojo_chat(\n    folder_id: int,\n    body: KojoChatRequest,",
         "detail": "study-app-backend.src.routes.kojo",
         "documentation": {}
     },
@@ -5864,7 +6675,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.flashcard_schema",
         "description": "study-app-backend.src.schemas.flashcard_schema",
-        "peekOfCode": "class FlashcardCreate(BaseModel):\n    front: str = Field(..., min_length=1)\n    back: str = Field(..., min_length=1)\n    source: str = Field(default=\"user_created\", max_length=50)\nclass FlashcardGenerateRequest(BaseModel):\n    source_type: str = Field(..., pattern=\"^(test|prompt)$\")\n    test_id: Optional[int] = None\n    prompt: Optional[str] = None\n    count: int = Field(default=10, ge=1, le=50)\n    @model_validator(mode=\"after\")",
+        "peekOfCode": "class FlashcardCreate(BaseModel):\n    front: str = Field(..., min_length=1)\n    back: str = Field(..., min_length=1)\n    source: str = Field(default=\"user_created\", max_length=50)\nclass FlashcardGenerateRequest(BaseModel):\n    source_type: str = Field(..., pattern=\"^(test|prompt)$\")\n    test_id: Optional[int] = None\n    prompt: Optional[str] = None\n    count: int = Field(default=10, ge=1, le=50)\n    provider: Optional[str] = Field(default=None, description=\"Optional LLM provider override\")",
         "detail": "study-app-backend.src.schemas.flashcard_schema",
         "documentation": {}
     },
@@ -5873,7 +6684,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.flashcard_schema",
         "description": "study-app-backend.src.schemas.flashcard_schema",
-        "peekOfCode": "class FlashcardGenerateRequest(BaseModel):\n    source_type: str = Field(..., pattern=\"^(test|prompt)$\")\n    test_id: Optional[int] = None\n    prompt: Optional[str] = None\n    count: int = Field(default=10, ge=1, le=50)\n    @model_validator(mode=\"after\")\n    def validate_source(self) -> \"FlashcardGenerateRequest\":\n        if self.source_type == \"test\" and self.test_id is None:\n            raise ValueError(\"test_id is required when source_type is test\")\n        if self.source_type == \"prompt\" and not self.prompt:",
+        "peekOfCode": "class FlashcardGenerateRequest(BaseModel):\n    source_type: str = Field(..., pattern=\"^(test|prompt)$\")\n    test_id: Optional[int] = None\n    prompt: Optional[str] = None\n    count: int = Field(default=10, ge=1, le=50)\n    provider: Optional[str] = Field(default=None, description=\"Optional LLM provider override\")\n    @model_validator(mode=\"after\")\n    def validate_source(self) -> \"FlashcardGenerateRequest\":\n        if self.source_type == \"test\" and self.test_id is None:\n            raise ValueError(\"test_id is required when source_type is test\")",
         "detail": "study-app-backend.src.schemas.flashcard_schema",
         "documentation": {}
     },
@@ -5945,7 +6756,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.kojo_schema",
         "description": "study-app-backend.src.schemas.kojo_schema",
-        "peekOfCode": "class KojoConversationDTO(BaseModel):\n    model_config = ConfigDict(from_attributes=True)\n    id: int\n    folder_id: int\n    messages: list[KojoMessageDTO]\n    created_at: datetime\n    cleared_at: Optional[datetime] = None\nclass KojoChatRequest(BaseModel):\n    message: str = Field(..., min_length=1, max_length=2000)\n    provider: str | None = Field(default=None, description=\"Optional LLM provider override: 'auto', 'groq', or 'ollama'\")",
+        "peekOfCode": "class KojoConversationDTO(BaseModel):\n    model_config = ConfigDict(from_attributes=True)\n    id: int\n    folder_id: int\n    messages: list[KojoMessageDTO]\n    created_at: datetime\n    cleared_at: Optional[datetime] = None\nclass KojoChatRequest(BaseModel):\n    message: str = Field(..., min_length=1, max_length=2000)\n    provider: Optional[str] = Field(default=None, description=\"Optional LLM provider override: 'auto', 'groq', 'ollama', or 'gemini'\")",
         "detail": "study-app-backend.src.schemas.kojo_schema",
         "documentation": {}
     },
@@ -5954,7 +6765,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.kojo_schema",
         "description": "study-app-backend.src.schemas.kojo_schema",
-        "peekOfCode": "class KojoChatRequest(BaseModel):\n    message: str = Field(..., min_length=1, max_length=2000)\n    provider: str | None = Field(default=None, description=\"Optional LLM provider override: 'auto', 'groq', or 'ollama'\")\nclass KojoChatResponse(BaseModel):\n    response: str\n    conversation_id: int\n    message_id: int\n    flagged_uncertain: bool = False\nclass KojoClearResponse(BaseModel):\n    conversation_id: int",
+        "peekOfCode": "class KojoChatRequest(BaseModel):\n    message: str = Field(..., min_length=1, max_length=2000)\n    provider: Optional[str] = Field(default=None, description=\"Optional LLM provider override: 'auto', 'groq', 'ollama', or 'gemini'\")\nclass KojoChatResponse(BaseModel):\n    response: str\n    conversation_id: int\n    message_id: int\n    flagged_uncertain: bool = False\nclass KojoClearResponse(BaseModel):\n    conversation_id: int",
         "detail": "study-app-backend.src.schemas.kojo_schema",
         "documentation": {}
     },
@@ -6062,7 +6873,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class TestResponse(BaseModel):\n    model_config = ConfigDict(from_attributes=True)\n    id: int\n    folder_id: int\n    title: str\n    description: Optional[str] = None\n    test_type: str\n    is_math_mode: bool = False\n    created_at: datetime\n    updated_at: datetime",
+        "peekOfCode": "class TestResponse(BaseModel):\n    model_config = ConfigDict(from_attributes=True)\n    id: int\n    folder_id: int\n    title: str\n    description: Optional[str] = None\n    test_type: str\n    is_math_mode: bool = False\n    is_coding_mode: bool = False\n    coding_language: Optional[str] = None",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -6080,7 +6891,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class TestUpdate(BaseModel):\n    title: Optional[str] = Field(default=None, min_length=1, max_length=255)\n    description: Optional[str] = None\nclass TestTakeResponse(BaseModel):\n    id: int\n    title: str\n    description: Optional[str] = None\n    test_type: str\n    is_math_mode: bool = False\n    questions: list[QuestionPublic]",
+        "peekOfCode": "class TestUpdate(BaseModel):\n    title: Optional[str] = Field(default=None, min_length=1, max_length=255)\n    description: Optional[str] = None\nclass TestTakeResponse(BaseModel):\n    id: int\n    title: str\n    description: Optional[str] = None\n    test_type: str\n    is_math_mode: bool = False\n    is_coding_mode: bool = False",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -6089,7 +6900,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class TestTakeResponse(BaseModel):\n    id: int\n    title: str\n    description: Optional[str] = None\n    test_type: str\n    is_math_mode: bool = False\n    questions: list[QuestionPublic]\nclass CreateTestResponse(BaseModel):\n    test_id: int\n    title: str",
+        "peekOfCode": "class TestTakeResponse(BaseModel):\n    id: int\n    title: str\n    description: Optional[str] = None\n    test_type: str\n    is_math_mode: bool = False\n    is_coding_mode: bool = False\n    coding_language: Optional[str] = None\n    questions: list[QuestionPublic]\nclass CreateTestResponse(BaseModel):",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -6098,7 +6909,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class CreateTestResponse(BaseModel):\n    test_id: int\n    title: str\n    questions_generated: int\n    message: str = \"Test created. Ready to take.\"\nclass WeaknessResponse(BaseModel):\n    question_id: int\n    question_text: str\n    times_attempted: int\n    times_correct: int",
+        "peekOfCode": "class CreateTestResponse(BaseModel):\n    test_id: int\n    title: str\n    questions_generated: int\n    message: str = \"Test created. Ready to take.\"\n    fallback_used: bool = False\n    fallback_reason: Optional[str] = None\n    note_grounded: bool = True\n    retrieval_enabled: bool = False\n    retrieval_total_chunks: int = 0",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -6116,7 +6927,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.services.auth_service",
         "description": "study-app-backend.src.services.auth_service",
-        "peekOfCode": "class AuthService:\n    async def verify_google_token(self, token: str) -> dict[str, str | None]:\n        async with httpx.AsyncClient(timeout=10) as client:\n            response = await client.get(\n                \"https://oauth2.googleapis.com/tokeninfo\", params={\"id_token\": token}\n            )\n            response.raise_for_status()\n            payload = response.json()\n        audience = payload.get(\"aud\")\n        if settings.google_client_id != \"replace-me\" and audience != settings.google_client_id:",
+        "peekOfCode": "class AuthService:\n    async def verify_google_token(self, token: str) -> dict[str, Optional[str]]:\n        async with httpx.AsyncClient(timeout=10) as client:\n            response = await client.get(\n                \"https://oauth2.googleapis.com/tokeninfo\", params={\"id_token\": token}\n            )\n            response.raise_for_status()\n            payload = response.json()\n        audience = payload.get(\"aud\")\n        if settings.google_client_id != \"replace-me\" and audience != settings.google_client_id:",
         "detail": "study-app-backend.src.services.auth_service",
         "documentation": {}
     },
@@ -6125,7 +6936,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.services.file_service",
         "description": "study-app-backend.src.services.file_service",
-        "peekOfCode": "class FileService:\n    async def extract_from_file(self, notes_file: UploadFile) -> tuple[str, str]:\n        file_type = normalize_file_extension(notes_file.filename)\n        if file_type not in ALLOWED_FILE_TYPES:\n            raise ValidationException(\"Only PDF, TXT, and MD notes are supported\")\n        data = await notes_file.read()\n        if len(data) > MAX_UPLOAD_FILE_SIZE_BYTES:\n            raise ValidationException(\"Uploaded notes file is too large\")\n        if not data:\n            raise ValidationException(\"Uploaded notes file is empty\")",
+        "peekOfCode": "class FileService:\n    async def extract_from_file(self, notes_file: UploadFile) -> tuple[str, str]:\n        file_type = normalize_file_extension(notes_file.filename)\n        if file_type not in ALLOWED_FILE_TYPES:\n            raise ValidationException(\"Only PDF, DOCX, TXT, and MD notes are supported\")\n        data = await notes_file.read()\n        if len(data) > MAX_UPLOAD_FILE_SIZE_BYTES:\n            raise ValidationException(\"Uploaded notes file is too large\")\n        if not data:\n            raise ValidationException(\"Uploaded notes file is empty\")",
         "detail": "study-app-backend.src.services.file_service",
         "documentation": {}
     },
@@ -6134,7 +6945,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.services.flashcard_service",
         "description": "study-app-backend.src.services.flashcard_service",
-        "peekOfCode": "class FlashcardService:\n    def __init__(self, llm_service: LLMService | None = None) -> None:\n        self.llm_service = llm_service or LLMService()\n    async def create_flashcard(\n        self, folder_id: int, user_id: int, data: FlashcardCreate, session: AsyncSession\n    ) -> FlashcardResponse:\n        folder = await FolderRepository(session).get_owned(folder_id, user_id)\n        if folder is None:\n            raise ResourceNotFoundException(\"Folder\")\n        card = await FlashcardRepository(session).create(",
+        "peekOfCode": "class FlashcardService:\n    def __init__(self, llm_service: Optional[LLMService] = None, file_service: Optional[FileService] = None) -> None:\n        self.llm_service = llm_service or LLMService()\n        self.file_service = file_service or FileService()\n    async def create_flashcard(\n        self, folder_id: int, user_id: int, data: FlashcardCreate, session: AsyncSession\n    ) -> FlashcardResponse:\n        folder = await FolderRepository(session).get_owned(folder_id, user_id)\n        if folder is None:\n            raise ResourceNotFoundException(\"Folder\")",
         "detail": "study-app-backend.src.services.flashcard_service",
         "documentation": {}
     },
@@ -6152,7 +6963,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.services.grading_service",
         "description": "study-app-backend.src.services.grading_service",
-        "peekOfCode": "class GradingService:\n    def __init__(self, llm_service: LLMService | None = None) -> None:\n        self.llm_service = llm_service or LLMService()\n    async def submit_and_grade(\n        self,\n        test_id: int,\n        user_id: int,\n        answers: list[SubmittedAnswer],\n        session: AsyncSession,\n    ) -> AttemptResult:",
+        "peekOfCode": "class GradingService:\n    def __init__(self, llm_service: Optional[LLMService] = None) -> None:\n        self.llm_service = llm_service or LLMService()\n    async def submit_and_grade(\n        self,\n        test_id: int,\n        user_id: int,\n        answers: list[SubmittedAnswer],\n        session: AsyncSession,\n    ) -> AttemptResult:",
         "detail": "study-app-backend.src.services.grading_service",
         "documentation": {}
     },
@@ -6161,7 +6972,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.services.kojo_service",
         "description": "study-app-backend.src.services.kojo_service",
-        "peekOfCode": "class KojoService:\n    async def chat(\n        self,\n        user_id: int,\n        folder_id: int,\n        user_message: str,\n        session: AsyncSession,\n        provider: str | None = None,\n    ) -> KojoChatResponse:\n        repo = KojoRepository(session)",
+        "peekOfCode": "class KojoService:\n    async def chat(\n        self,\n        user_id: int,\n        folder_id: int,\n        user_message: str,\n        session: AsyncSession,\n        provider: Optional[str] = None,\n    ) -> KojoChatResponse:\n        repo = KojoRepository(session)",
         "detail": "study-app-backend.src.services.kojo_service",
         "documentation": {}
     },
@@ -6179,7 +6990,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.kojo_service",
         "description": "study-app-backend.src.services.kojo_service",
-        "peekOfCode": "_NO_NOTES = \"[No study materials uploaded yet. Ask the student to upload notes first.]\"\n_CLEAR_WINDOW_HOURS = 5\nclass KojoService:\n    async def chat(\n        self,\n        user_id: int,\n        folder_id: int,\n        user_message: str,\n        session: AsyncSession,\n        provider: str | None = None,",
+        "peekOfCode": "_NO_NOTES = \"[No study materials uploaded yet. Ask the student to upload notes first.]\"\n_CLEAR_WINDOW_HOURS = 5\nclass KojoService:\n    async def chat(\n        self,\n        user_id: int,\n        folder_id: int,\n        user_message: str,\n        session: AsyncSession,\n        provider: Optional[str] = None,",
         "detail": "study-app-backend.src.services.kojo_service",
         "documentation": {}
     },
@@ -6188,7 +6999,16 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.kojo_service",
         "description": "study-app-backend.src.services.kojo_service",
-        "peekOfCode": "_CLEAR_WINDOW_HOURS = 5\nclass KojoService:\n    async def chat(\n        self,\n        user_id: int,\n        folder_id: int,\n        user_message: str,\n        session: AsyncSession,\n        provider: str | None = None,\n    ) -> KojoChatResponse:",
+        "peekOfCode": "_CLEAR_WINDOW_HOURS = 5\nclass KojoService:\n    async def chat(\n        self,\n        user_id: int,\n        folder_id: int,\n        user_message: str,\n        session: AsyncSession,\n        provider: Optional[str] = None,\n    ) -> KojoChatResponse:",
+        "detail": "study-app-backend.src.services.kojo_service",
+        "documentation": {}
+    },
+    {
+        "label": "_STOPWORDS",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.kojo_service",
+        "description": "study-app-backend.src.services.kojo_service",
+        "peekOfCode": "_STOPWORDS = {\n    \"the\", \"and\", \"for\", \"are\", \"but\", \"not\", \"you\", \"all\", \"can\", \"had\",\n    \"her\", \"was\", \"one\", \"our\", \"out\", \"day\", \"get\", \"has\", \"him\", \"his\",\n    \"how\", \"its\", \"may\", \"new\", \"now\", \"old\", \"see\", \"two\", \"way\", \"who\",\n    \"did\", \"each\", \"from\", \"have\", \"what\", \"this\", \"that\", \"with\", \"want\",\n    \"help\", \"explain\", \"show\", \"tell\", \"give\", \"does\", \"work\", \"will\",\n    \"would\", \"could\", \"should\", \"about\", \"into\", \"there\", \"their\", \"then\",\n    \"than\", \"when\", \"where\", \"which\", \"while\", \"also\", \"more\", \"like\",\n    \"just\", \"here\", \"even\", \"know\", \"come\", \"said\", \"make\", \"look\", \"use\",\n    \"some\", \"very\", \"over\", \"such\", \"been\", \"they\", \"them\", \"these\",",
         "detail": "study-app-backend.src.services.kojo_service",
         "documentation": {}
     },
@@ -6233,7 +7053,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "class _StudyContent:\n    title: str\n    terms: list[_ExtractedTerm]\n    concepts: list[str]\n_EXTRACT_CHAR_LIMIT = 10_000\n_GENERATE_CHAR_LIMIT = 8_000\nclass LLMService:\n    async def generate_test_questions(\n        self,\n        notes: str,",
+        "peekOfCode": "class _StudyContent:\n    title: str\n    terms: list[_ExtractedTerm]\n    concepts: list[str]\n_EXTRACT_CHAR_LIMIT = 10_000\n_GENERATE_CHAR_LIMIT = 8_000\n_RETRIEVAL_EMBEDDING_DIM = 384\n_RETRIEVAL_CHUNK_WORDS = 160\n_RETRIEVAL_CHUNK_OVERLAP_WORDS = 40\n_RETRIEVAL_TOP_K = 6",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -6242,7 +7062,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "class LLMService:\n    async def generate_test_questions(\n        self,\n        notes: str,\n        test_type: str,\n        count_mcq: int = 10,\n        count_frq: int = 5,\n        is_math_mode: bool = False,\n    ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:\n        if test_type == \"MCQ_only\":",
+        "peekOfCode": "class LLMService:\n    def __init__(self) -> None:\n        self._last_generation_meta: dict[str, object] = {\n            \"fallback_used\": False,\n            \"fallback_reason\": None,\n            \"note_grounded\": True,\n            \"retrieval_enabled\": False,\n            \"retrieval_total_chunks\": 0,\n            \"retrieval_selected_chunks\": 0,\n            \"retrieval_top_k\": 0,",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -6260,7 +7080,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "_EXTRACT_CHAR_LIMIT = 10_000\n_GENERATE_CHAR_LIMIT = 8_000\nclass LLMService:\n    async def generate_test_questions(\n        self,\n        notes: str,\n        test_type: str,\n        count_mcq: int = 10,\n        count_frq: int = 5,\n        is_math_mode: bool = False,",
+        "peekOfCode": "_EXTRACT_CHAR_LIMIT = 10_000\n_GENERATE_CHAR_LIMIT = 8_000\n_RETRIEVAL_EMBEDDING_DIM = 384\n_RETRIEVAL_CHUNK_WORDS = 160\n_RETRIEVAL_CHUNK_OVERLAP_WORDS = 40\n_RETRIEVAL_TOP_K = 6\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)\n# Matches any meaningful math content: numbers, operators, LaTeX commands, KaTeX delimiters",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -6269,7 +7089,61 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "_GENERATE_CHAR_LIMIT = 8_000\nclass LLMService:\n    async def generate_test_questions(\n        self,\n        notes: str,\n        test_type: str,\n        count_mcq: int = 10,\n        count_frq: int = 5,\n        is_math_mode: bool = False,\n    ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:",
+        "peekOfCode": "_GENERATE_CHAR_LIMIT = 8_000\n_RETRIEVAL_EMBEDDING_DIM = 384\n_RETRIEVAL_CHUNK_WORDS = 160\n_RETRIEVAL_CHUNK_OVERLAP_WORDS = 40\n_RETRIEVAL_TOP_K = 6\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)\n# Matches any meaningful math content: numbers, operators, LaTeX commands, KaTeX delimiters\n_MATH_CONTENT_RE = re.compile(",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_RETRIEVAL_EMBEDDING_DIM",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "_RETRIEVAL_EMBEDDING_DIM = 384\n_RETRIEVAL_CHUNK_WORDS = 160\n_RETRIEVAL_CHUNK_OVERLAP_WORDS = 40\n_RETRIEVAL_TOP_K = 6\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)\n# Matches any meaningful math content: numbers, operators, LaTeX commands, KaTeX delimiters\n_MATH_CONTENT_RE = re.compile(\n    r\"\\$|\\d+[\\./]\\d+|[+\\-*/=^<>%]|\\\\(?:frac|sqrt|int|sum|lim|sin|cos|tan|log|ln|pi|theta|alpha|beta|infty|vec|hat)\"",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_RETRIEVAL_CHUNK_WORDS",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "_RETRIEVAL_CHUNK_WORDS = 160\n_RETRIEVAL_CHUNK_OVERLAP_WORDS = 40\n_RETRIEVAL_TOP_K = 6\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)\n# Matches any meaningful math content: numbers, operators, LaTeX commands, KaTeX delimiters\n_MATH_CONTENT_RE = re.compile(\n    r\"\\$|\\d+[\\./]\\d+|[+\\-*/=^<>%]|\\\\(?:frac|sqrt|int|sum|lim|sin|cos|tan|log|ln|pi|theta|alpha|beta|infty|vec|hat)\"\n    r\"|\\b(?:solve|simplify|evaluate|calculate|compute|differentiate|integrate|factor|expand)\\b\",",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_RETRIEVAL_CHUNK_OVERLAP_WORDS",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "_RETRIEVAL_CHUNK_OVERLAP_WORDS = 40\n_RETRIEVAL_TOP_K = 6\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)\n# Matches any meaningful math content: numbers, operators, LaTeX commands, KaTeX delimiters\n_MATH_CONTENT_RE = re.compile(\n    r\"\\$|\\d+[\\./]\\d+|[+\\-*/=^<>%]|\\\\(?:frac|sqrt|int|sum|lim|sin|cos|tan|log|ln|pi|theta|alpha|beta|infty|vec|hat)\"\n    r\"|\\b(?:solve|simplify|evaluate|calculate|compute|differentiate|integrate|factor|expand)\\b\",\n    re.IGNORECASE,",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_RETRIEVAL_TOP_K",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "_RETRIEVAL_TOP_K = 6\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)\n# Matches any meaningful math content: numbers, operators, LaTeX commands, KaTeX delimiters\n_MATH_CONTENT_RE = re.compile(\n    r\"\\$|\\d+[\\./]\\d+|[+\\-*/=^<>%]|\\\\(?:frac|sqrt|int|sum|lim|sin|cos|tan|log|ln|pi|theta|alpha|beta|infty|vec|hat)\"\n    r\"|\\b(?:solve|simplify|evaluate|calculate|compute|differentiate|integrate|factor|expand)\\b\",\n    re.IGNORECASE,\n)",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_AI_SERVICES_UNAVAILABLE_MESSAGE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)\n# Matches any meaningful math content: numbers, operators, LaTeX commands, KaTeX delimiters\n_MATH_CONTENT_RE = re.compile(\n    r\"\\$|\\d+[\\./]\\d+|[+\\-*/=^<>%]|\\\\(?:frac|sqrt|int|sum|lim|sin|cos|tan|log|ln|pi|theta|alpha|beta|infty|vec|hat)\"\n    r\"|\\b(?:solve|simplify|evaluate|calculate|compute|differentiate|integrate|factor|expand)\\b\",\n    re.IGNORECASE,\n)\nclass LLMService:",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_MATH_CONTENT_RE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "_MATH_CONTENT_RE = re.compile(\n    r\"\\$|\\d+[\\./]\\d+|[+\\-*/=^<>%]|\\\\(?:frac|sqrt|int|sum|lim|sin|cos|tan|log|ln|pi|theta|alpha|beta|infty|vec|hat)\"\n    r\"|\\b(?:solve|simplify|evaluate|calculate|compute|differentiate|integrate|factor|expand)\\b\",\n    re.IGNORECASE,\n)\nclass LLMService:\n    def __init__(self) -> None:\n        self._last_generation_meta: dict[str, object] = {\n            \"fallback_used\": False,\n            \"fallback_reason\": None,",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -6278,7 +7152,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.services.test_service",
         "description": "study-app-backend.src.services.test_service",
-        "peekOfCode": "class TestService:\n    def __init__(\n        self,\n        llm_service: LLMService | None = None,\n        file_service: FileService | None = None,\n    ) -> None:\n        self.llm_service = llm_service or LLMService()\n        self.file_service = file_service or FileService()\n    async def create_test(\n        self,",
+        "peekOfCode": "class TestService:\n    def __init__(\n        self,\n        llm_service: Optional[LLMService] = None,\n        file_service: Optional[FileService] = None,\n    ) -> None:\n        self.llm_service = llm_service or LLMService()\n        self.file_service = file_service or FileService()\n    async def create_test(\n        self,",
         "detail": "study-app-backend.src.services.test_service",
         "documentation": {}
     },
@@ -6341,7 +7215,7 @@
         "kind": 2,
         "importPath": "study-app-backend.src.utils.validators",
         "description": "study-app-backend.src.utils.validators",
-        "peekOfCode": "def normalize_file_extension(filename: str | None) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
+        "peekOfCode": "def normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
         "detail": "study-app-backend.src.utils.validators",
         "documentation": {}
     },
@@ -6350,7 +7224,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.utils.validators",
         "description": "study-app-backend.src.utils.validators",
-        "peekOfCode": "VALID_TEST_TYPES = {\"MCQ_only\", \"FRQ_only\", \"mixed\"}\nVALID_QUESTION_TYPES = {\"MCQ\", \"FRQ\"}\nALLOWED_FILE_TYPES = {\"pdf\", \"txt\", \"md\"}\nMAX_UPLOAD_DOCUMENTS = 5\nMAX_UPLOAD_FILE_SIZE_BYTES = 5 * 1024 * 1024\ndef normalize_file_extension(filename: str | None) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
+        "peekOfCode": "VALID_TEST_TYPES = {\"MCQ_only\", \"FRQ_only\", \"mixed\"}\nVALID_QUESTION_TYPES = {\"MCQ\", \"FRQ\"}\nALLOWED_FILE_TYPES = {\"pdf\", \"txt\", \"md\", \"docx\"}\nMAX_UPLOAD_DOCUMENTS = 30\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
         "detail": "study-app-backend.src.utils.validators",
         "documentation": {}
     },
@@ -6359,7 +7233,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.utils.validators",
         "description": "study-app-backend.src.utils.validators",
-        "peekOfCode": "VALID_QUESTION_TYPES = {\"MCQ\", \"FRQ\"}\nALLOWED_FILE_TYPES = {\"pdf\", \"txt\", \"md\"}\nMAX_UPLOAD_DOCUMENTS = 5\nMAX_UPLOAD_FILE_SIZE_BYTES = 5 * 1024 * 1024\ndef normalize_file_extension(filename: str | None) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
+        "peekOfCode": "VALID_QUESTION_TYPES = {\"MCQ\", \"FRQ\"}\nALLOWED_FILE_TYPES = {\"pdf\", \"txt\", \"md\", \"docx\"}\nMAX_UPLOAD_DOCUMENTS = 30\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
         "detail": "study-app-backend.src.utils.validators",
         "documentation": {}
     },
@@ -6368,7 +7242,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.utils.validators",
         "description": "study-app-backend.src.utils.validators",
-        "peekOfCode": "ALLOWED_FILE_TYPES = {\"pdf\", \"txt\", \"md\"}\nMAX_UPLOAD_DOCUMENTS = 5\nMAX_UPLOAD_FILE_SIZE_BYTES = 5 * 1024 * 1024\ndef normalize_file_extension(filename: str | None) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
+        "peekOfCode": "ALLOWED_FILE_TYPES = {\"pdf\", \"txt\", \"md\", \"docx\"}\nMAX_UPLOAD_DOCUMENTS = 30\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
         "detail": "study-app-backend.src.utils.validators",
         "documentation": {}
     },
@@ -6377,7 +7251,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.utils.validators",
         "description": "study-app-backend.src.utils.validators",
-        "peekOfCode": "MAX_UPLOAD_DOCUMENTS = 5\nMAX_UPLOAD_FILE_SIZE_BYTES = 5 * 1024 * 1024\ndef normalize_file_extension(filename: str | None) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
+        "peekOfCode": "MAX_UPLOAD_DOCUMENTS = 30\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
         "detail": "study-app-backend.src.utils.validators",
         "documentation": {}
     },
@@ -6386,7 +7260,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.utils.validators",
         "description": "study-app-backend.src.utils.validators",
-        "peekOfCode": "MAX_UPLOAD_FILE_SIZE_BYTES = 5 * 1024 * 1024\ndef normalize_file_extension(filename: str | None) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
+        "peekOfCode": "MAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
         "detail": "study-app-backend.src.utils.validators",
         "documentation": {}
     },
@@ -6478,6 +7352,42 @@
         "description": "study-app-backend.tests.test_create_test",
         "peekOfCode": "SAMPLE_PRACTICE_TEST = (\n    \"Practice Test — Database Systems\\n\\n\"\n    \"1. What does Atomicity guarantee?\\n\"\n    \"   A) All operations complete or none do\\n\"\n    \"   B) Transactions execute in sequence\\n\"\n    \"   C) Data is replicated to multiple nodes\\n\"\n    \"   D) Queries run faster with indexes\\n\"\n    \"   Answer: A\\n\\n\"\n    \"2. Explain Durability in the context of ACID.\\n\"\n    \"   Model Answer: Committed data persists even after a system crash.\\n\"",
         "detail": "study-app-backend.tests.test_create_test",
+        "documentation": {}
+    },
+    {
+        "label": "_FakePdfplumberPage",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_file_service",
+        "description": "study-app-backend.tests.test_file_service",
+        "peekOfCode": "class _FakePdfplumberPage:\n    def __init__(self, text: str) -> None:\n        self._text = text\n    def extract_text(self) -> str:\n        return self._text\nclass _FakePdfplumberDoc:\n    def __init__(self, page_texts: list[str]) -> None:\n        self.pages = [_FakePdfplumberPage(text) for text in page_texts]\n    def __enter__(self) -> _FakePdfplumberDoc:\n        return self",
+        "detail": "study-app-backend.tests.test_file_service",
+        "documentation": {}
+    },
+    {
+        "label": "_FakePdfplumberDoc",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_file_service",
+        "description": "study-app-backend.tests.test_file_service",
+        "peekOfCode": "class _FakePdfplumberDoc:\n    def __init__(self, page_texts: list[str]) -> None:\n        self.pages = [_FakePdfplumberPage(text) for text in page_texts]\n    def __enter__(self) -> _FakePdfplumberDoc:\n        return self\n    def __exit__(self, exc_type, exc, tb) -> bool:\n        return False\nclass _FakePyMuPDFPage:\n    def __init__(self, text: str) -> None:\n        self._text = text",
+        "detail": "study-app-backend.tests.test_file_service",
+        "documentation": {}
+    },
+    {
+        "label": "_FakePyMuPDFPage",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_file_service",
+        "description": "study-app-backend.tests.test_file_service",
+        "peekOfCode": "class _FakePyMuPDFPage:\n    def __init__(self, text: str) -> None:\n        self._text = text\n    def get_text(self, mode: str) -> str:\n        return self._text\nclass _FakePyMuPDFDoc:\n    def __init__(self, page_texts: list[str]) -> None:\n        self._page_texts = page_texts\n    @property\n    def page_count(self) -> int:",
+        "detail": "study-app-backend.tests.test_file_service",
+        "documentation": {}
+    },
+    {
+        "label": "_FakePyMuPDFDoc",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_file_service",
+        "description": "study-app-backend.tests.test_file_service",
+        "peekOfCode": "class _FakePyMuPDFDoc:\n    def __init__(self, page_texts: list[str]) -> None:\n        self._page_texts = page_texts\n    @property\n    def page_count(self) -> int:\n        return len(self._page_texts)\n    def load_page(self, index: int) -> _FakePyMuPDFPage:\n        return _FakePyMuPDFPage(self._page_texts[index])\n    def close(self) -> None:\n        return None",
+        "detail": "study-app-backend.tests.test_file_service",
         "documentation": {}
     },
     {
@@ -6638,7 +7548,7 @@
         "kind": 2,
         "importPath": "study-app-backend.tests.test_llm_service",
         "description": "study-app-backend.tests.test_llm_service",
-        "peekOfCode": "def fake_settings(groq_key: str | None = FAKE_KEY, timeout: int = 30, max_tokens: int = 200):\n    \"\"\"Return a mock settings object with common LLM fields.\"\"\"\n    s = MagicMock()\n    s.groq_api_key = groq_key\n    s.llm_timeout_seconds = timeout\n    s.llm_max_tokens = max_tokens\n    s.ollama_base_url = \"http://localhost:11434\"\n    s.ollama_model = \"llama3.1:8b\"\n    return s\n# ── _strip_metadata ────────────────────────────────────────────────────────────",
+        "peekOfCode": "def fake_settings(groq_key: str | None = FAKE_KEY, timeout: int = 30, max_tokens: int = 200):\n    \"\"\"Return a mock settings object with common LLM fields.\"\"\"\n    s = MagicMock()\n    s.groq_api_key = groq_key\n    s.llm_timeout_seconds = timeout\n    s.llm_max_tokens = max_tokens\n    s.ollama_base_url = \"http://localhost:11434\"\n    s.ollama_model = \"llama3.1:8b\"\n    s.llm_provider = \"auto\"\n    return s",
         "detail": "study-app-backend.tests.test_llm_service",
         "documentation": {}
     },
@@ -6685,6 +7595,276 @@
         "description": "study-app-backend.tests.test_llm_service",
         "peekOfCode": "EXTRACTION_RESP = {\n    \"title\": \"Database Transactions\",\n    \"terms\": [{\"term\": \"Atomicity\", \"definition\": \"All-or-nothing execution\"}],\n    \"concepts\": [\"ACID properties ensure transaction correctness\"],\n}\nclass TestGenerateTestQuestions:\n    async def test_mcq_only_mode_sets_frq_count_to_zero(self):\n        svc = LLMService()\n        svc._complete_json = AsyncMock(side_effect=[\n            EXTRACTION_RESP,",
         "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "sfnt.USE_ZOPFLI",
+        "kind": 5,
+        "importPath": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "description": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "peekOfCode": "sfnt.USE_ZOPFLI = True\nif len(sys.argv) < 2:\n    print(\"Usage: %s <font file>\" % sys.argv[0])\n    sys.exit(1)\nfont_file = sys.argv[1]\nfont_name = os.path.splitext(os.path.basename(font_file))[0]\nfont = TTFont(font_file, recalcBBoxes=False, recalcTimestamp=False)\n# fix timestamp to the epoch\nfont['head'].created = 0\nfont['head'].modified = 0",
+        "detail": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "documentation": {}
+    },
+    {
+        "label": "font_file",
+        "kind": 5,
+        "importPath": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "description": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "peekOfCode": "font_file = sys.argv[1]\nfont_name = os.path.splitext(os.path.basename(font_file))[0]\nfont = TTFont(font_file, recalcBBoxes=False, recalcTimestamp=False)\n# fix timestamp to the epoch\nfont['head'].created = 0\nfont['head'].modified = 0\n# remove fontforge timestamps\nif 'FFTM' in font:\n    del font['FFTM']\n# remove redundant GDEF table",
+        "detail": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "documentation": {}
+    },
+    {
+        "label": "font_name",
+        "kind": 5,
+        "importPath": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "description": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "peekOfCode": "font_name = os.path.splitext(os.path.basename(font_file))[0]\nfont = TTFont(font_file, recalcBBoxes=False, recalcTimestamp=False)\n# fix timestamp to the epoch\nfont['head'].created = 0\nfont['head'].modified = 0\n# remove fontforge timestamps\nif 'FFTM' in font:\n    del font['FFTM']\n# remove redundant GDEF table\nif 'GDEF' in font:",
+        "detail": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "documentation": {}
+    },
+    {
+        "label": "font",
+        "kind": 5,
+        "importPath": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "description": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "peekOfCode": "font = TTFont(font_file, recalcBBoxes=False, recalcTimestamp=False)\n# fix timestamp to the epoch\nfont['head'].created = 0\nfont['head'].modified = 0\n# remove fontforge timestamps\nif 'FFTM' in font:\n    del font['FFTM']\n# remove redundant GDEF table\nif 'GDEF' in font:\n    del font['GDEF']",
+        "detail": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "documentation": {}
+    },
+    {
+        "label": "font['head'].created",
+        "kind": 5,
+        "importPath": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "description": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "peekOfCode": "font['head'].created = 0\nfont['head'].modified = 0\n# remove fontforge timestamps\nif 'FFTM' in font:\n    del font['FFTM']\n# remove redundant GDEF table\nif 'GDEF' in font:\n    del font['GDEF']\n# remove Macintosh table\n# https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6cmap.html",
+        "detail": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "documentation": {}
+    },
+    {
+        "label": "font['head'].modified",
+        "kind": 5,
+        "importPath": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "description": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "peekOfCode": "font['head'].modified = 0\n# remove fontforge timestamps\nif 'FFTM' in font:\n    del font['FFTM']\n# remove redundant GDEF table\nif 'GDEF' in font:\n    del font['GDEF']\n# remove Macintosh table\n# https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6cmap.html\nfont['name'].names = [record for record in font['name'].names if record.platformID != 1]",
+        "detail": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "documentation": {}
+    },
+    {
+        "label": "font['name'].names",
+        "kind": 5,
+        "importPath": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "description": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "peekOfCode": "font['name'].names = [record for record in font['name'].names if record.platformID != 1]\nfont['cmap'].tables = [table for table in font['cmap'].tables if table.platformID != 1]\n# fix OS/2 and hhea metrics\nglyf = font['glyf']\nascent = int(max(glyf[c].yMax for c in font.getGlyphOrder() if hasattr(glyf[c], \"yMax\")))\ndescent = -int(min(glyf[c].yMin for c in font.getGlyphOrder() if hasattr(glyf[c], \"yMin\")))\nfont['OS/2'].usWinAscent = ascent\nfont['OS/2'].usWinDescent = descent\nfont['hhea'].ascent = ascent\nfont['hhea'].descent = -descent",
+        "detail": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "documentation": {}
+    },
+    {
+        "label": "font['cmap'].tables",
+        "kind": 5,
+        "importPath": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "description": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "peekOfCode": "font['cmap'].tables = [table for table in font['cmap'].tables if table.platformID != 1]\n# fix OS/2 and hhea metrics\nglyf = font['glyf']\nascent = int(max(glyf[c].yMax for c in font.getGlyphOrder() if hasattr(glyf[c], \"yMax\")))\ndescent = -int(min(glyf[c].yMin for c in font.getGlyphOrder() if hasattr(glyf[c], \"yMin\")))\nfont['OS/2'].usWinAscent = ascent\nfont['OS/2'].usWinDescent = descent\nfont['hhea'].ascent = ascent\nfont['hhea'].descent = -descent\n# save TTF",
+        "detail": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "documentation": {}
+    },
+    {
+        "label": "glyf",
+        "kind": 5,
+        "importPath": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "description": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "peekOfCode": "glyf = font['glyf']\nascent = int(max(glyf[c].yMax for c in font.getGlyphOrder() if hasattr(glyf[c], \"yMax\")))\ndescent = -int(min(glyf[c].yMin for c in font.getGlyphOrder() if hasattr(glyf[c], \"yMin\")))\nfont['OS/2'].usWinAscent = ascent\nfont['OS/2'].usWinDescent = descent\nfont['hhea'].ascent = ascent\nfont['hhea'].descent = -descent\n# save TTF\nfont.save(font_file, reorderTables=None)\n# save WOFF",
+        "detail": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "documentation": {}
+    },
+    {
+        "label": "ascent",
+        "kind": 5,
+        "importPath": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "description": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "peekOfCode": "ascent = int(max(glyf[c].yMax for c in font.getGlyphOrder() if hasattr(glyf[c], \"yMax\")))\ndescent = -int(min(glyf[c].yMin for c in font.getGlyphOrder() if hasattr(glyf[c], \"yMin\")))\nfont['OS/2'].usWinAscent = ascent\nfont['OS/2'].usWinDescent = descent\nfont['hhea'].ascent = ascent\nfont['hhea'].descent = -descent\n# save TTF\nfont.save(font_file, reorderTables=None)\n# save WOFF\nfont.flavor = 'woff'",
+        "detail": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "documentation": {}
+    },
+    {
+        "label": "descent",
+        "kind": 5,
+        "importPath": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "description": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "peekOfCode": "descent = -int(min(glyf[c].yMin for c in font.getGlyphOrder() if hasattr(glyf[c], \"yMin\")))\nfont['OS/2'].usWinAscent = ascent\nfont['OS/2'].usWinDescent = descent\nfont['hhea'].ascent = ascent\nfont['hhea'].descent = -descent\n# save TTF\nfont.save(font_file, reorderTables=None)\n# save WOFF\nfont.flavor = 'woff'\nfont.save(os.path.join('woff', font_name + '.woff'), reorderTables=None)",
+        "detail": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "documentation": {}
+    },
+    {
+        "label": "font['OS/2'].usWinAscent",
+        "kind": 5,
+        "importPath": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "description": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "peekOfCode": "font['OS/2'].usWinAscent = ascent\nfont['OS/2'].usWinDescent = descent\nfont['hhea'].ascent = ascent\nfont['hhea'].descent = -descent\n# save TTF\nfont.save(font_file, reorderTables=None)\n# save WOFF\nfont.flavor = 'woff'\nfont.save(os.path.join('woff', font_name + '.woff'), reorderTables=None)\n# save WOFF2",
+        "detail": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "documentation": {}
+    },
+    {
+        "label": "font['OS/2'].usWinDescent",
+        "kind": 5,
+        "importPath": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "description": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "peekOfCode": "font['OS/2'].usWinDescent = descent\nfont['hhea'].ascent = ascent\nfont['hhea'].descent = -descent\n# save TTF\nfont.save(font_file, reorderTables=None)\n# save WOFF\nfont.flavor = 'woff'\nfont.save(os.path.join('woff', font_name + '.woff'), reorderTables=None)\n# save WOFF2\nfont.flavor = 'woff2'",
+        "detail": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "documentation": {}
+    },
+    {
+        "label": "font['hhea'].ascent",
+        "kind": 5,
+        "importPath": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "description": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "peekOfCode": "font['hhea'].ascent = ascent\nfont['hhea'].descent = -descent\n# save TTF\nfont.save(font_file, reorderTables=None)\n# save WOFF\nfont.flavor = 'woff'\nfont.save(os.path.join('woff', font_name + '.woff'), reorderTables=None)\n# save WOFF2\nfont.flavor = 'woff2'\nfont.save(os.path.join('woff2', font_name + '.woff2'), reorderTables=None)",
+        "detail": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "documentation": {}
+    },
+    {
+        "label": "font['hhea'].descent",
+        "kind": 5,
+        "importPath": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "description": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "peekOfCode": "font['hhea'].descent = -descent\n# save TTF\nfont.save(font_file, reorderTables=None)\n# save WOFF\nfont.flavor = 'woff'\nfont.save(os.path.join('woff', font_name + '.woff'), reorderTables=None)\n# save WOFF2\nfont.flavor = 'woff2'\nfont.save(os.path.join('woff2', font_name + '.woff2'), reorderTables=None)",
+        "detail": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "documentation": {}
+    },
+    {
+        "label": "font.flavor",
+        "kind": 5,
+        "importPath": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "description": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "peekOfCode": "font.flavor = 'woff'\nfont.save(os.path.join('woff', font_name + '.woff'), reorderTables=None)\n# save WOFF2\nfont.flavor = 'woff2'\nfont.save(os.path.join('woff2', font_name + '.woff2'), reorderTables=None)",
+        "detail": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "documentation": {}
+    },
+    {
+        "label": "font.flavor",
+        "kind": 5,
+        "importPath": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "description": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "peekOfCode": "font.flavor = 'woff2'\nfont.save(os.path.join('woff2', font_name + '.woff2'), reorderTables=None)",
+        "detail": "study-app-frontend.node_modules.katex.src.fonts.generate_fonts",
+        "documentation": {}
+    },
+    {
+        "label": "find_font_path",
+        "kind": 2,
+        "importPath": "study-app-frontend.node_modules.katex.src.metrics.extract_tfms",
+        "description": "study-app-frontend.node_modules.katex.src.metrics.extract_tfms",
+        "peekOfCode": "def find_font_path(font_name):\n    try:\n        font_path = subprocess.check_output(['kpsewhich', font_name])\n    except OSError:\n        raise RuntimeError(\"Couldn't find kpsewhich program, make sure you\" +\n                           \" have TeX installed\")\n    except subprocess.CalledProcessError:\n        raise RuntimeError(\"Couldn't find font metrics: '%s'\" % font_name)\n    return font_path.strip()\ndef main():",
+        "detail": "study-app-frontend.node_modules.katex.src.metrics.extract_tfms",
+        "documentation": {}
+    },
+    {
+        "label": "main",
+        "kind": 2,
+        "importPath": "study-app-frontend.node_modules.katex.src.metrics.extract_tfms",
+        "description": "study-app-frontend.node_modules.katex.src.metrics.extract_tfms",
+        "peekOfCode": "def main():\n    mapping = json.load(sys.stdin)\n    fonts = [\n        'cmbsy10.tfm',\n        'cmbx10.tfm',\n        'cmbxti10.tfm',\n        'cmex10.tfm',\n        'cmmi10.tfm',\n        'cmmib10.tfm',\n        'cmr10.tfm',",
+        "detail": "study-app-frontend.node_modules.katex.src.metrics.extract_tfms",
+        "documentation": {}
+    },
+    {
+        "label": "main",
+        "kind": 2,
+        "importPath": "study-app-frontend.node_modules.katex.src.metrics.extract_ttfs",
+        "description": "study-app-frontend.node_modules.katex.src.metrics.extract_ttfs",
+        "peekOfCode": "def main():\n    start_json = json.load(sys.stdin)\n    for font in start_json:\n        fontInfo = TTFont(\"../../fonts/KaTeX_\" + font + \".ttf\")\n        glyf = fontInfo[\"glyf\"]\n        widths = fontInfo.getGlyphSet()\n        unitsPerEm = float(fontInfo[\"head\"].unitsPerEm)\n        # We keep ALL Unicode cmaps, not just fontInfo[\"cmap\"].getcmap(3, 1).\n        # This is playing it extra safe, since it reports inconsistencies.\n        # Platform 0 is Unicode, platform 3 is Windows. For platform 3,",
+        "detail": "study-app-frontend.node_modules.katex.src.metrics.extract_ttfs",
+        "documentation": {}
+    },
+    {
+        "label": "metrics_to_extract",
+        "kind": 5,
+        "importPath": "study-app-frontend.node_modules.katex.src.metrics.extract_ttfs",
+        "description": "study-app-frontend.node_modules.katex.src.metrics.extract_ttfs",
+        "peekOfCode": "metrics_to_extract = {\n    # Font name\n    \"AMS-Regular\": {\n        u\"\\u21e2\": None,  # \\dashrightarrow\n        u\"\\u21e0\": None,  # \\dashleftarrow\n    },\n    \"Main-Regular\": {\n        # Skew and italic metrics can't be easily parsed from the TTF. Instead,\n        # we map each character to a \"base character\", which is a character\n        # from the same font with correct italic and skew metrics. A character",
+        "detail": "study-app-frontend.node_modules.katex.src.metrics.extract_ttfs",
+        "documentation": {}
+    },
+    {
+        "label": "props",
+        "kind": 5,
+        "importPath": "study-app-frontend.node_modules.katex.src.metrics.format_json",
+        "description": "study-app-frontend.node_modules.katex.src.metrics.format_json",
+        "peekOfCode": "props = ['depth', 'height', 'italic', 'skew']\nif len(sys.argv) > 1:\n    if sys.argv[1] == '--width':\n        props.append('width')\ndata = json.load(sys.stdin)\nsys.stdout.write(\n  \"// This file is GENERATED by buildMetrics.sh. DO NOT MODIFY.\\n\")\nsep = \"export default {\\n    \"\nfor font in sorted(data):\n    sys.stdout.write(sep + json.dumps(font))",
+        "detail": "study-app-frontend.node_modules.katex.src.metrics.format_json",
+        "documentation": {}
+    },
+    {
+        "label": "data",
+        "kind": 5,
+        "importPath": "study-app-frontend.node_modules.katex.src.metrics.format_json",
+        "description": "study-app-frontend.node_modules.katex.src.metrics.format_json",
+        "peekOfCode": "data = json.load(sys.stdin)\nsys.stdout.write(\n  \"// This file is GENERATED by buildMetrics.sh. DO NOT MODIFY.\\n\")\nsep = \"export default {\\n    \"\nfor font in sorted(data):\n    sys.stdout.write(sep + json.dumps(font))\n    sep = \": {\\n        \"\n    for glyph in sorted(data[font], key=int):\n        sys.stdout.write(sep + json.dumps(glyph) + \": \")\n        values = [value if value != 0.0 else 0 for value in",
+        "detail": "study-app-frontend.node_modules.katex.src.metrics.format_json",
+        "documentation": {}
+    },
+    {
+        "label": "sep",
+        "kind": 5,
+        "importPath": "study-app-frontend.node_modules.katex.src.metrics.format_json",
+        "description": "study-app-frontend.node_modules.katex.src.metrics.format_json",
+        "peekOfCode": "sep = \"export default {\\n    \"\nfor font in sorted(data):\n    sys.stdout.write(sep + json.dumps(font))\n    sep = \": {\\n        \"\n    for glyph in sorted(data[font], key=int):\n        sys.stdout.write(sep + json.dumps(glyph) + \": \")\n        values = [value if value != 0.0 else 0 for value in\n                  [data[font][glyph][key] for key in props]]\n        sys.stdout.write(json.dumps(values))\n        sep = \",\\n        \"",
+        "detail": "study-app-frontend.node_modules.katex.src.metrics.format_json",
+        "documentation": {}
+    },
+    {
+        "label": "CharInfoWord",
+        "kind": 6,
+        "importPath": "study-app-frontend.node_modules.katex.src.metrics.parse_tfm",
+        "description": "study-app-frontend.node_modules.katex.src.metrics.parse_tfm",
+        "peekOfCode": "class CharInfoWord(object):\n    def __init__(self, word):\n        b1, b2, b3, b4 = (word >> 24,\n                          (word & 0xff0000) >> 16,\n                          (word & 0xff00) >> 8,\n                          word & 0xff)\n        self.width_index = b1\n        self.height_index = b2 >> 4\n        self.depth_index = b2 & 0x0f\n        self.italic_index = (b3 & 0b11111100) >> 2",
+        "detail": "study-app-frontend.node_modules.katex.src.metrics.parse_tfm",
+        "documentation": {}
+    },
+    {
+        "label": "LigKernProgram",
+        "kind": 6,
+        "importPath": "study-app-frontend.node_modules.katex.src.metrics.parse_tfm",
+        "description": "study-app-frontend.node_modules.katex.src.metrics.parse_tfm",
+        "peekOfCode": "class LigKernProgram(object):\n    def __init__(self, program):\n        self.program = program\n    def execute(self, start, next_char):\n        curr_instruction = start\n        while True:\n            instruction = self.program[curr_instruction]\n            (skip, inst_next_char, op, remainder) = instruction\n            if inst_next_char == next_char:\n                if op < 128:",
+        "detail": "study-app-frontend.node_modules.katex.src.metrics.parse_tfm",
+        "documentation": {}
+    },
+    {
+        "label": "TfmCharMetrics",
+        "kind": 6,
+        "importPath": "study-app-frontend.node_modules.katex.src.metrics.parse_tfm",
+        "description": "study-app-frontend.node_modules.katex.src.metrics.parse_tfm",
+        "peekOfCode": "class TfmCharMetrics(object):\n    def __init__(self, width, height, depth, italic, kern_table):\n        self.width = width\n        self.height = height\n        self.depth = depth\n        self.italic_correction = italic\n        self.kern_table = kern_table\nclass TfmFile(object):\n    def __init__(self, start_char, end_char, char_info, width_table,\n                 height_table, depth_table, italic_table, ligkern_table,",
+        "detail": "study-app-frontend.node_modules.katex.src.metrics.parse_tfm",
+        "documentation": {}
+    },
+    {
+        "label": "TfmFile",
+        "kind": 6,
+        "importPath": "study-app-frontend.node_modules.katex.src.metrics.parse_tfm",
+        "description": "study-app-frontend.node_modules.katex.src.metrics.parse_tfm",
+        "peekOfCode": "class TfmFile(object):\n    def __init__(self, start_char, end_char, char_info, width_table,\n                 height_table, depth_table, italic_table, ligkern_table,\n                 kern_table):\n        self.start_char = start_char\n        self.end_char = end_char\n        self.char_info = char_info\n        self.width_table = width_table\n        self.height_table = height_table\n        self.depth_table = depth_table",
+        "detail": "study-app-frontend.node_modules.katex.src.metrics.parse_tfm",
+        "documentation": {}
+    },
+    {
+        "label": "TfmReader",
+        "kind": 6,
+        "importPath": "study-app-frontend.node_modules.katex.src.metrics.parse_tfm",
+        "description": "study-app-frontend.node_modules.katex.src.metrics.parse_tfm",
+        "peekOfCode": "class TfmReader(object):\n    def __init__(self, f):\n        self.f = f\n    def read_byte(self):\n        return ord(self.f.read(1))\n    def read_halfword(self):\n        b1 = self.read_byte()\n        b2 = self.read_byte()\n        return (b1 << 8) | b2\n    def read_word(self):",
+        "detail": "study-app-frontend.node_modules.katex.src.metrics.parse_tfm",
+        "documentation": {}
+    },
+    {
+        "label": "read_tfm_file",
+        "kind": 2,
+        "importPath": "study-app-frontend.node_modules.katex.src.metrics.parse_tfm",
+        "description": "study-app-frontend.node_modules.katex.src.metrics.parse_tfm",
+        "peekOfCode": "def read_tfm_file(file_name):\n    with open(file_name, 'rb') as f:\n        reader = TfmReader(f)\n        # file_size\n        reader.read_halfword()\n        header_size = reader.read_halfword()\n        start_char = reader.read_halfword()\n        end_char = reader.read_halfword()\n        width_table_size = reader.read_halfword()\n        height_table_size = reader.read_halfword()",
+        "detail": "study-app-frontend.node_modules.katex.src.metrics.parse_tfm",
         "documentation": {}
     }
 ]

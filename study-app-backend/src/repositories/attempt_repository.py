@@ -7,6 +7,7 @@ from src.models.question import Question
 from src.models.user_answer import UserAnswer
 from src.models.user_attempt import UserAttempt
 from src.repositories.base_repository import BaseRepository
+from typing import Optional
 
 
 class AttemptRepository(BaseRepository[UserAttempt]):
@@ -31,8 +32,8 @@ class AttemptRepository(BaseRepository[UserAttempt]):
         question_id: int,
         user_answer: str,
         is_correct: bool,
-        feedback: str | None,
-        confidence: float | None,
+        feedback: Optional[str],
+        confidence: Optional[float],
         flagged_uncertain: bool,
     ) -> UserAnswer:
         answer = UserAnswer(
@@ -56,7 +57,7 @@ class AttemptRepository(BaseRepository[UserAttempt]):
         )
         return list(rows.all())
 
-    async def get_detail(self, attempt_id: int, user_id: int) -> UserAttempt | None:
+    async def get_detail(self, attempt_id: int, user_id: int) -> Optional[UserAttempt]:
         from src.models.question import Question
         from src.models.mcq_option import MCQOption
         from src.models.frq_answer import FRQAnswer

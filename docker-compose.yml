@@ -1,0 +1,50 @@
+services:
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: study_app
+      POSTGRES_USER: study_user
+      POSTGRES_PASSWORD: study_pass
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U study_user -d study_app"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./study-app-backend
+    restart: unless-stopped
+    # env_file loads your API keys and other secrets.
+    # Copy study-app-backend/.env.example → study-app-backend/.env and fill it in.
+    env_file: ./study-app-backend/.env
+    environment:
+      # Overrides DATABASE_URL from .env so it points at the compose db service.
+      DATABASE_URL: postgresql+psycopg://study_user:study_pass@db:5432/study_app
+      # Lock CORS down to the frontend origin in production.
+      CORS_ORIGINS: "http://localhost"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./study-app-frontend
+      args:
+        # Points the built JS bundle at the backend.
+        # Change to your public domain if deploying remotely, e.g. https://api.yourdomain.com
+        VITE_API_BASE_URL: http://localhost:8000
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  pg_data:

@@ -13,10 +13,11 @@ from src.schemas.flashcard_schema import FlashcardCreate, FlashcardResponse, Fla
 from src.services.file_service import FileService
 from src.services.llm_service import LLMService
 from src.utils.exceptions import ResourceNotFoundException, ValidationException
+from typing import Optional
 
 
 class FlashcardService:
-    def __init__(self, llm_service: LLMService | None = None, file_service: FileService | None = None) -> None:
+    def __init__(self, llm_service: Optional[LLMService] = None, file_service: Optional[FileService] = None) -> None:
         self.llm_service = llm_service or LLMService()
         self.file_service = file_service or FileService()
 
@@ -37,7 +38,13 @@ class FlashcardService:
         return FlashcardResponse.model_validate(card)
 
     async def generate_from_test(
-        self, folder_id: int, test_id: int, user_id: int, count: int, session: AsyncSession
+        self,
+        folder_id: int,
+        test_id: int,
+        user_id: int,
+        count: int,
+        session: AsyncSession,
+        provider: Optional[str] = None,
     ) -> list[FlashcardResponse]:
         folder = await FolderRepository(session).get_owned(folder_id, user_id)
         if folder is None:
@@ -55,6 +62,7 @@ class FlashcardService:
             content=content,
             count=count,
             existing_flashcards=existing_flashcards,
+            provider=provider,
         )
         repo = FlashcardRepository(session)
         cards = [
@@ -65,7 +73,13 @@ class FlashcardService:
         return [FlashcardResponse.model_validate(card) for card in cards]
 
     async def generate_from_prompt(
-        self, folder_id: int, user_id: int, prompt: str, count: int, session: AsyncSession
+        self,
+        folder_id: int,
+        user_id: int,
+        prompt: str,
+        count: int,
+        session: AsyncSession,
+        provider: Optional[str] = None,
     ) -> list[FlashcardResponse]:
         folder = await FolderRepository(session).get_owned(folder_id, user_id)
         if folder is None:
@@ -77,6 +91,7 @@ class FlashcardService:
             count=count,
             prompt=prompt,
             existing_flashcards=existing_flashcards,
+            provider=provider,
         )
         repo = FlashcardRepository(session)
         cards = [
@@ -107,7 +122,7 @@ class FlashcardService:
         flashcard_id: int,
         user_id: int,
         correct: bool,
-        time_ms: int | None,
+        time_ms: Optional[int],
         session: AsyncSession,
     ) -> FlashcardResponse:
         folder = await FolderRepository(session).get_owned(folder_id, user_id)
@@ -162,7 +177,13 @@ class FlashcardService:
         await session.commit()
 
     async def generate_from_file(
-        self, folder_id: int, user_id: int, files: list[UploadFile], count: int, session: AsyncSession
+        self,
+        folder_id: int,
+        user_id: int,
+        files: list[UploadFile],
+        count: int,
+        session: AsyncSession,
+        provider: Optional[str] = None,
     ) -> list[FlashcardResponse]:
         folder = await FolderRepository(session).get_owned(folder_id, user_id)
         if folder is None:
@@ -174,6 +195,7 @@ class FlashcardService:
             content=self._join_contexts(content, folder_files_content),
             count=count,
             existing_flashcards=existing_flashcards,
+            provider=provider,
         )
         repo = FlashcardRepository(session)
         cards = [
@@ -212,7 +234,7 @@ class FlashcardService:
         card,
         attempt_count: int,
         correct_count: int,
-        success_rate: float | None,
+        success_rate: Optional[float],
         last_attempted: object,
     ) -> FlashcardResponse:
         return FlashcardResponse.model_validate(card).model_copy(
