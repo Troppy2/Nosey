@@ -4,21 +4,22 @@ from sqlalchemy import select
 
 from src.models.user import User
 from src.repositories.base_repository import BaseRepository
+from typing import Optional
 
 
 class UserRepository(BaseRepository[User]):
-    async def get_by_id(self, user_id: int) -> User | None:
+    async def get_by_id(self, user_id: int) -> Optional[User]:
         return await self.session.scalar(select(User).where(User.id == user_id))
 
-    async def get_by_google_id(self, google_id: str) -> User | None:
+    async def get_by_google_id(self, google_id: str) -> Optional[User]:
         return await self.session.scalar(select(User).where(User.google_id == google_id))
 
     async def create_or_update(
         self,
         google_id: str,
         email: str,
-        full_name: str | None,
-        profile_picture_url: str | None,
+        full_name: Optional[str],
+        profile_picture_url: Optional[str],
     ) -> User:
         user = await self.get_by_google_id(google_id)
         if user is None:

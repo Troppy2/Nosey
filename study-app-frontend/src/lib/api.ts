@@ -2,6 +2,7 @@ import type {
   AttemptDetail,
   AttemptResult,
   AttemptSummary,
+  CreateTestResult,
   AuthUser,
   KojoClearResponse,
   KojoClearedConversation,
@@ -11,6 +12,7 @@ import type {
   KojoChatResponse,
   KojoConversation,
   KojoRestoreResponse,
+  ProviderStatus,
   QuestionCreate,
   QuestionEditable,
   QuestionUpdate,
@@ -192,7 +194,9 @@ export async function createTest(input: {
   topicFocus?: string;
   isCodingMode?: boolean;
   codingLanguage?: string;
-}): Promise<{ test_id: number; title: string; questions_generated: number; message: string }> {
+  customInstructions?: string;
+  generationProvider?: string;
+}): Promise<CreateTestResult> {
   if (isGuestSession()) {
     const tests = await fetchTests();
     if (tests.length >= 1) {
@@ -212,6 +216,8 @@ export async function createTest(input: {
   if (input.topicFocus) formData.append("topic_focus", input.topicFocus);
   if (input.isCodingMode) formData.append("is_coding_mode", "true");
   if (input.codingLanguage) formData.append("coding_language", input.codingLanguage);
+  if (input.customInstructions) formData.append("custom_instructions", input.customInstructions);
+  if (input.generationProvider) formData.append("provider", input.generationProvider)
   input.files.forEach((file) => formData.append("notes_files", file));
   if (input.practiceTestFile) formData.append("practice_test_file", input.practiceTestFile);
 
@@ -295,7 +301,7 @@ export async function createFlashcard(folderId: number, data: { front: string; b
 
 export async function generateFlashcards(
   folderId: number,
-  input: { count?: number; prompt: string; sourceType?: "prompt" | "test"; testId?: number },
+  input: { count?: number; prompt: string; sourceType?: "prompt" | "test"; testId?: number; provider?: string },
 ): Promise<Flashcard[]> {
   const body: Record<string, unknown> = {
     source_type: input.sourceType ?? "prompt",
@@ -303,6 +309,7 @@ export async function generateFlashcards(
     prompt: input.prompt,
   };
   if (input.testId !== undefined) body.test_id = input.testId;
+  if (input.provider) body.provider = input.provider;
   return request<Flashcard[]>(`/folders/${folderId}/flashcards/generate`, {
     method: "POST",
     body: JSON.stringify(body),
@@ -327,6 +334,10 @@ export async function recordFlashcardAttempt(folderId: number, cardId: number, c
   } catch {
     return;
   }
+}
+
+export async function fetchProviderStatus(): Promise<ProviderStatus> {
+  return request<ProviderStatus>("/kojo/providers/status");
 }
 
 export async function kojoChat(folderId: number, message: string, provider?: string): Promise<KojoChatResponse> {
@@ -389,10 +400,16 @@ export async function deleteFlashcard(folderId: number, cardId: number): Promise
   await request(`/folders/${folderId}/flashcards/${cardId}`, { method: "DELETE" });
 }
 
-export async function generateFlashcardsFromFile(folderId: number, files: File[], count = 10): Promise<Flashcard[]> {
+export async function generateFlashcardsFromFile(
+  folderId: number,
+  files: File[],
+  count = 10,
+  provider?: string,
+): Promise<Flashcard[]> {
   const formData = new FormData();
   files.forEach((f) => formData.append("notes_files", f));
-  return request<Flashcard[]>(`/folders/${folderId}/flashcards/generate-from-file?count=${count}`, {
+  const providerQuery = provider ? `&provider=${encodeURIComponent(provider)}` : "";
+  return request<Flashcard[]>(`/folders/${folderId}/flashcards/generate-from-file?count=${count}${providerQuery}`, {
     method: "POST",
     body: formData,
   });

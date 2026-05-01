@@ -30,7 +30,7 @@ class KojoRepository(BaseRepository[KojoConversation]):
             await self.session.flush()
         return conversation
 
-    async def get_owned(self, conversation_id: int, user_id: int) -> KojoConversation | None:
+    async def get_owned(self, conversation_id: int, user_id: int) -> Optional[KojoConversation]:
         stmt = (
             select(KojoConversation)
             .where(
@@ -40,7 +40,7 @@ class KojoRepository(BaseRepository[KojoConversation]):
         )
         return await self.session.scalar(stmt)
 
-    async def get_by_folder(self, user_id: int, folder_id: int) -> KojoConversation | None:
+    async def get_by_folder(self, user_id: int, folder_id: int) -> Optional[KojoConversation]:
         stmt = (
             select(KojoConversation)
             .where(
@@ -82,7 +82,7 @@ class KojoRepository(BaseRepository[KojoConversation]):
             f"[{note.file_name}]\n{note.content}" for note in notes
         )
 
-    async def clear_conversation(self, user_id: int, folder_id: int) -> KojoConversation | None:
+    async def clear_conversation(self, user_id: int, folder_id: int) -> Optional[KojoConversation]:
         stmt = select(KojoConversation).where(
             and_(KojoConversation.user_id == user_id, KojoConversation.folder_id == folder_id)
         )

@@ -13,6 +13,7 @@ from src.schemas.flashcard_schema import (
 )
 from src.services.flashcard_service import FlashcardService
 from src.utils.exceptions import ResourceNotFoundException, StudyAppException
+from typing import Optional
 
 router = APIRouter(tags=["flashcards"])
 
@@ -54,8 +55,22 @@ async def generate_flashcards(
     try:
         service = FlashcardService()
         if data.source_type == "test":
-            return await service.generate_from_test(folder_id, data.test_id or 0, user.id, data.count, session)
-        return await service.generate_from_prompt(folder_id, user.id, data.prompt or "", data.count, session)
+            return await service.generate_from_test(
+                folder_id,
+                data.test_id or 0,
+                user.id,
+                data.count,
+                session,
+                provider=data.provider,
+            )
+        return await service.generate_from_prompt(
+            folder_id,
+            user.id,
+            data.prompt or "",
+            data.count,
+            session,
+            provider=data.provider,
+        )
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except StudyAppException as exc:
@@ -94,11 +109,19 @@ async def generate_flashcards_from_file(
     folder_id: int,
     notes_files: list[UploadFile] = File(...),
     count: int = Query(default=10, ge=1, le=50),
+    provider: Optional[str] = Query(default=None),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> list[FlashcardResponse]:
     try:
-        return await FlashcardService().generate_from_file(folder_id, user.id, notes_files, count, session)
+        return await FlashcardService().generate_from_file(
+            folder_id,
+            user.id,
+            notes_files,
+            count,
+            session,
+            provider=provider,
+        )
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except StudyAppException as exc:

@@ -17,6 +17,7 @@ class FlashcardGenerateRequest(BaseModel):
     test_id: Optional[int] = None
     prompt: Optional[str] = None
     count: int = Field(default=10, ge=1, le=50)
+    provider: Optional[str] = Field(default=None, description="Optional LLM provider override")
 
     @model_validator(mode="after")
     def validate_source(self) -> "FlashcardGenerateRequest":
@@ -24,6 +25,16 @@ class FlashcardGenerateRequest(BaseModel):
             raise ValueError("test_id is required when source_type is test")
         if self.source_type == "prompt" and not self.prompt:
             raise ValueError("prompt is required when source_type is prompt")
+        if self.provider is not None:
+            provider = self.provider.strip().lower()
+            provider_aliases = {
+                "google": "gemini",
+                "anthropic": "claude",
+            }
+            provider = provider_aliases.get(provider, provider)
+            if provider not in ("auto", "groq", "gemini", "claude", "ollama"):
+                raise ValueError("provider must be auto, groq, google, anthropic, gemini, claude, or ollama")
+            self.provider = provider
         return self
 
 

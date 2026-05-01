@@ -21,7 +21,7 @@ from src.schemas.test_schema import (
 )
 from src.services.grading_service import GradingService
 from src.services.test_service import TestService
-from src.utils.exceptions import ResourceNotFoundException, StudyAppException
+from src.utils.exceptions import LLMException, ResourceNotFoundException, StudyAppException
 from src.utils.validators import MAX_UPLOAD_DOCUMENTS
 
 router = APIRouter(tags=["tests"])
@@ -65,6 +65,20 @@ async def create_test(
         is_coding_mode = str(form.get("is_coding_mode", "false")).lower() in ("true", "1", "yes")
         coding_language_raw = form.get("coding_language")
         coding_language = str(coding_language_raw).strip()[:50] if coding_language_raw else "Python"
+        custom_instructions_raw = form.get("custom_instructions")
+        custom_instructions = str(custom_instructions_raw).strip()[:500] if custom_instructions_raw else None
+        provider_raw = form.get("provider")
+        provider = str(provider_raw).strip().lower() if provider_raw else None
+        provider_aliases = {
+            "google": "gemini",
+            "anthropic": "claude",
+        }
+        if provider:
+            provider = provider_aliases.get(provider, provider)
+            if provider not in ("auto", "groq", "gemini", "claude", "ollama"):
+                raise StudyAppException(
+                    "provider must be auto, groq, google, anthropic, gemini, claude, or ollama"
+                )
 
         if not title or not test_type:
             raise StudyAppException("title and test_type are required")
@@ -101,9 +115,13 @@ async def create_test(
             topic_focus=topic_focus,
             is_coding_mode=is_coding_mode,
             coding_language=coding_language,
+            custom_instructions=custom_instructions,
+            provider=provider,
         )
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except LLMException as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except StudyAppException as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

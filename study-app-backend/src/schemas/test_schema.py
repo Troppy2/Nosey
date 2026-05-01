@@ -98,6 +98,13 @@ class CreateTestResponse(BaseModel):
     title: str
     questions_generated: int
     message: str = "Test created. Ready to take."
+    fallback_used: bool = False
+    fallback_reason: Optional[str] = None
+    note_grounded: bool = True
+    retrieval_enabled: bool = False
+    retrieval_total_chunks: int = 0
+    retrieval_selected_chunks: int = 0
+    retrieval_top_k: int = 0
 
 
 class WeaknessResponse(BaseModel):

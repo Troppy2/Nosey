@@ -5,11 +5,18 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { SelectInput, TextInput } from "../components/Field";
-import { createTest, fetchFolderFiles, fetchFolders } from "../lib/api";
-import type { Folder } from "../lib/types";
+import { createTest, fetchFolderFiles, fetchFolders, fetchProviderStatus } from "../lib/api";
+import type { Folder, ProviderStatus } from "../lib/types";
 
 const MAX_UPLOAD_DOCUMENTS = 30;
 const MAX_UPLOAD_FILE_SIZE_MB = 10;
+const GENERATION_PROVIDER_OPTIONS = [
+  { value: "auto", label: "Auto" },
+  { value: "groq", label: "Groq" },
+  { value: "gemini", label: "Google" },
+  { value: "claude", label: "Anthropic" },
+  { value: "ollama", label: "Ollama" },
+];
 
 export default function CreateTest() {
   const navigate = useNavigate();
@@ -35,7 +42,10 @@ export default function CreateTest() {
   const [topicFocus, setTopicFocus] = useState("");
   const [isCodingMode, setIsCodingMode] = useState(false);
   const [codingLanguage, setCodingLanguage] = useState("Python");
+  const [customInstructions, setCustomInstructions] = useState("");
   const [folderFileCount, setFolderFileCount] = useState(0);
+  const [generationProvider, setGenerationProvider] = useState(() => localStorage.getItem("nosey_generation_provider") || "auto");
+  const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
 
   useEffect(() => {
     fetchFolders().then((data) => {
@@ -58,6 +68,23 @@ export default function CreateTest() {
     };
   }, [folderId]);
 
+  useEffect(() => {
+    fetchProviderStatus().then(setProviderStatus).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!providerStatus) return;
+    const unavailable =
+      (generationProvider === "groq" && !providerStatus.groq) ||
+      (generationProvider === "gemini" && !providerStatus.gemini) ||
+      (generationProvider === "claude" && !providerStatus.claude) ||
+      (generationProvider === "ollama" && !providerStatus.ollama);
+    if (unavailable) {
+      setGenerationProvider("auto");
+      localStorage.setItem("nosey_generation_provider", "auto");
+    }
+  }, [providerStatus, generationProvider]);
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!title.trim() || !folderId) return;
@@ -76,7 +103,21 @@ export default function CreateTest() {
         codingLanguage: isCodingMode ? codingLanguage : undefined,
         difficulty: advancedMode ? difficulty : undefined,
         topicFocus: advancedMode && topicFocus.trim() ? topicFocus.trim() : undefined,
+        customInstructions: advancedMode && customInstructions.trim() ? customInstructions.trim() : undefined,
+        generationProvider: advancedMode ? generationProvider : "auto",
       });
+      sessionStorage.setItem(
+        `nosey_generation_meta_${result.test_id}`,
+        JSON.stringify({
+          fallback_used: result.fallback_used,
+          fallback_reason: result.fallback_reason,
+          note_grounded: result.note_grounded,
+          retrieval_enabled: result.retrieval_enabled,
+          retrieval_total_chunks: result.retrieval_total_chunks,
+          retrieval_selected_chunks: result.retrieval_selected_chunks,
+          retrieval_top_k: result.retrieval_top_k,
+        }),
+      );
       if (advancedMode && reviewBeforeTaking) {
         navigate(`/test/${result.test_id}/edit`);
       } else {
@@ -93,12 +134,17 @@ export default function CreateTest() {
     if (!nextFiles || nextFiles.length === 0) return;
     const selected = Array.from(nextFiles).filter((file) => {
       const allowedType =
-        ["application/pdf", "text/plain", "text/markdown", "text/x-markdown"].includes(file.type) ||
-        /\.(pdf|txt|md)$/i.test(file.name);
+        [
+          "application/pdf",
+          "text/plain",
+          "text/markdown",
+          "text/x-markdown",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ].includes(file.type) || /\.(pdf|docx|txt|md)$/i.test(file.name);
       return allowedType && file.size <= MAX_UPLOAD_FILE_SIZE_MB * 1024 * 1024;
     });
     if (selected.length === 0) {
-      setError(`Upload up to ${MAX_UPLOAD_DOCUMENTS} PDF, TXT, or Markdown documents, each under ${MAX_UPLOAD_FILE_SIZE_MB} MB.`);
+      setError(`Upload up to ${MAX_UPLOAD_DOCUMENTS} PDF, DOCX, TXT, or Markdown documents, each under ${MAX_UPLOAD_FILE_SIZE_MB} MB.`);
       return;
     }
     setError(null);
@@ -116,10 +162,15 @@ export default function CreateTest() {
   function acceptPracticeTestFile(file?: File) {
     if (!file) return;
     const allowed =
-      ["application/pdf", "text/plain", "text/markdown", "text/x-markdown"].includes(file.type) ||
-      /\.(pdf|txt|md)$/i.test(file.name);
+      [
+        "application/pdf",
+        "text/plain",
+        "text/markdown",
+        "text/x-markdown",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ].includes(file.type) || /\.(pdf|docx|txt|md)$/i.test(file.name);
     if (!allowed || file.size > MAX_UPLOAD_FILE_SIZE_MB * 1024 * 1024) {
-      setError("Practice test must be a PDF, TXT, or Markdown file under 5 MB.");
+      setError("Practice test must be a PDF, DOCX, TXT, or Markdown file under 10 MB.");
       return;
     }
     setError(null);
@@ -144,7 +195,7 @@ export default function CreateTest() {
           <span className="eyebrow">Generate</span>
           <h1>Create a practice test</h1>
           <p className="muted">
-            Upload up to 30 PDF, TXT, or Markdown documents (10 MB each), or use files already saved in the folder, and choose the question style Nosey should generate.
+            Upload up to 30 PDF, DOCX, TXT, or Markdown documents (10 MB each), or use files already saved in the folder, and choose the question style Nosey should generate.
           </p>
         </div>
         <button
@@ -272,6 +323,43 @@ export default function CreateTest() {
                 )}
               </div>
             </div>
+
+            {advancedMode && (
+              <SelectInput
+                label="AI model"
+                value={generationProvider}
+                onChange={(e) => {
+                  setGenerationProvider(e.target.value);
+                  localStorage.setItem("nosey_generation_provider", e.target.value);
+                }}
+                hint="Choose which model generates your practice test."
+              >
+                {GENERATION_PROVIDER_OPTIONS.map((option) => {
+                  let label = option.label;
+                  let disabled = false;
+                  if (providerStatus) {
+                    if (option.value === "ollama") {
+                      disabled = !providerStatus.ollama;
+                      if (disabled) label += " (offline)";
+                    } else if (option.value === "groq") {
+                      disabled = !providerStatus.groq;
+                      if (disabled) label += " (no key)";
+                    } else if (option.value === "gemini") {
+                      disabled = !providerStatus.gemini;
+                      if (disabled) label += " (no key)";
+                    } else if (option.value === "claude") {
+                      disabled = !providerStatus.claude;
+                      if (disabled) label += " (no key)";
+                    }
+                  }
+                  return (
+                    <option key={option.value} value={option.value} disabled={disabled}>
+                      {label}
+                    </option>
+                  );
+                })}
+              </SelectInput>
+            )}
           </Card>
 
           {/* Advanced Mode panel */}
@@ -313,6 +401,26 @@ export default function CreateTest() {
                   />
                   <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.8rem" }}>
                     Focus questions on a specific topic within your notes.
+                  </p>
+                </div>
+
+                {/* Custom instructions */}
+                <div className="field">
+                  <label className="field-label" htmlFor="custom-instructions">
+                    Custom instructions <span className="muted" style={{ fontWeight: 400 }}>(optional)</span>
+                  </label>
+                  <textarea
+                    id="custom-instructions"
+                    className="input"
+                    rows={3}
+                    placeholder="e.g. Generate 5 word problems involving integration by parts, make all MCQ options close in value, include at least 2 proof questions…"
+                    value={customInstructions}
+                    onChange={(e) => setCustomInstructions(e.target.value)}
+                    maxLength={500}
+                    style={{ resize: "vertical", fontFamily: "inherit" }}
+                  />
+                  <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.8rem" }}>
+                    Natural language instructions that guide how questions are generated. Overrides topic focus when both are set.
                   </p>
                 </div>
 
@@ -381,7 +489,7 @@ export default function CreateTest() {
                       <input
                         ref={practiceTestInputRef}
                         type="file"
-                        accept=".pdf,.txt,.md"
+                        accept=".pdf,.docx,.txt,.md"
                         style={{ display: "none" }}
                         onChange={(e) => acceptPracticeTestFile(e.target.files?.[0])}
                       />
@@ -420,7 +528,7 @@ export default function CreateTest() {
           >
             <input
               aria-label="Upload notes files"
-              accept=".pdf,.txt,.md"
+              accept=".pdf,.docx,.txt,.md"
               multiple
               onChange={(event) => acceptFiles(event.target.files ?? undefined)}
               type="file"
@@ -449,7 +557,7 @@ export default function CreateTest() {
               <>
                 <Upload size={44} />
                 <h2>Drop notes here</h2>
-                <p>PDF, TXT, or Markdown files work best for the current backend.</p>
+                <p>PDF, DOCX, TXT, and Markdown files are supported.</p>
               </>
             )}
           </Card>

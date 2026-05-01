@@ -226,7 +226,7 @@ function TestRow({
   }
 
   return (
-    <Card className="test-row">
+    <Card className={`test-row${showAttempts ? " test-row--attempts-open" : ""}`}>
       <Link className="test-row-main" to={`/test/${test.id}`}>
         <div>
           <h3>{test.title}</h3>
@@ -238,7 +238,13 @@ function TestRow({
       </Link>
       <div className="row-actions">
         {test.attempt_count > 0 ? (
-          <button aria-label="View attempt history" onClick={loadAttempts} type="button">
+          <button
+            aria-label="View attempt history"
+            className={`attempt-toggle-btn${showAttempts ? " attempt-toggle-btn--active" : ""}`}
+            onClick={loadAttempts}
+            title="Attempt history"
+            type="button"
+          >
             <History size={17} />
           </button>
         ) : null}

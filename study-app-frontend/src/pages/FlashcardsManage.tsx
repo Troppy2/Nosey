@@ -9,11 +9,20 @@ import {
   deleteFlashcard,
   fetchFlashcards,
   fetchFolderFiles,
+  fetchProviderStatus,
   generateFlashcards,
   generateFlashcardsFromFile,
   updateFlashcard,
 } from "../lib/api";
-import type { Flashcard } from "../lib/types";
+import type { Flashcard, ProviderStatus } from "../lib/types";
+
+const GENERATION_PROVIDER_OPTIONS = [
+  { value: "auto", label: "Auto" },
+  { value: "groq", label: "Groq" },
+  { value: "gemini", label: "Google" },
+  { value: "claude", label: "Anthropic" },
+  { value: "ollama", label: "Ollama" },
+];
 
 export default function FlashcardsManage() {
   const { folderId } = useParams();
@@ -29,6 +38,10 @@ export default function FlashcardsManage() {
   const [generatingMore, setGeneratingMore] = useState(false);
   const [generateCount, setGenerateCount] = useState(10);
   const [folderFileCount, setFolderFileCount] = useState(0);
+  const [generationProvider, setGenerationProvider] = useState(() => localStorage.getItem("nosey_generation_provider") || "auto");
+  const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -45,6 +58,23 @@ export default function FlashcardsManage() {
       active = false;
     };
   }, [id]);
+
+  useEffect(() => {
+    fetchProviderStatus().then(setProviderStatus).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!providerStatus) return;
+    const unavailable =
+      (generationProvider === "groq" && !providerStatus.groq) ||
+      (generationProvider === "gemini" && !providerStatus.gemini) ||
+      (generationProvider === "claude" && !providerStatus.claude) ||
+      (generationProvider === "ollama" && !providerStatus.ollama);
+    if (unavailable) {
+      setGenerationProvider("auto");
+      localStorage.setItem("nosey_generation_provider", "auto");
+    }
+  }, [providerStatus, generationProvider]);
 
   function startEdit(card: Flashcard) {
     setEditingId(card.id);
@@ -85,13 +115,28 @@ export default function FlashcardsManage() {
     }
   }
 
+  async function handleDeleteAllFlashcards() {
+    if (cards.length === 0 || deletingAll) return;
+    setDeletingAll(true);
+    setError(null);
+    try {
+      await Promise.all(cards.map((card) => deleteFlashcard(id, card.id)));
+      setCards([]);
+      setShowDeleteAllModal(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete all flashcards.");
+    } finally {
+      setDeletingAll(false);
+    }
+  }
+
   async function handleGenerateFromFile(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
     setGenerating(true);
     setError(null);
     try {
-      const generated = await generateFlashcardsFromFile(id, files);
+      const generated = await generateFlashcardsFromFile(id, files, 10, generationProvider);
       setCards((prev) => [...generated, ...prev]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate flashcards.");
@@ -109,6 +154,7 @@ export default function FlashcardsManage() {
         count: generateCount,
         prompt:
           "Create fresh flashcards using the folder's saved files and the current flashcards as context. Do not repeat existing cards, and focus on new concepts, definitions, examples, or comparisons that are not already covered.",
+        provider: generationProvider,
       });
       setCards((prev) => {
         const seen = new Set(prev.map((card) => `${card.front.trim().toLowerCase()}::${card.back.trim().toLowerCase()}`));
@@ -140,7 +186,7 @@ export default function FlashcardsManage() {
         </div>
         <div className="toolbar">
           <input
-            accept=".pdf,.txt,.md"
+            accept=".pdf,.docx,.txt,.md"
             multiple
             onChange={handleGenerateFromFile}
             ref={fileRef}
@@ -162,6 +208,14 @@ export default function FlashcardsManage() {
           >
             {generatingMore ? "Generating..." : "Generate more"}
           </Button>
+          <Button
+            icon={<Trash2 size={18} />}
+            onClick={() => setShowDeleteAllModal(true)}
+            variant="danger"
+            disabled={cards.length === 0 || deletingAll}
+          >
+            Delete All Flashcards
+          </Button>
         </div>
       </header>
 
@@ -177,6 +231,43 @@ export default function FlashcardsManage() {
             className="input"
             style={{ width: 92, padding: "8px 10px" }}
           />
+        </label>
+        <label className="muted small" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          AI model
+          <select
+            className="input select"
+            value={generationProvider}
+            onChange={(e) => {
+              setGenerationProvider(e.target.value);
+              localStorage.setItem("nosey_generation_provider", e.target.value);
+            }}
+            style={{ width: 160, padding: "8px 10px" }}
+          >
+            {GENERATION_PROVIDER_OPTIONS.map((option) => {
+              let label = option.label;
+              let disabled = false;
+              if (providerStatus) {
+                if (option.value === "ollama") {
+                  disabled = !providerStatus.ollama;
+                  if (disabled) label += " (offline)";
+                } else if (option.value === "groq") {
+                  disabled = !providerStatus.groq;
+                  if (disabled) label += " (no key)";
+                } else if (option.value === "gemini") {
+                  disabled = !providerStatus.gemini;
+                  if (disabled) label += " (no key)";
+                } else if (option.value === "claude") {
+                  disabled = !providerStatus.claude;
+                  if (disabled) label += " (no key)";
+                }
+              }
+              return (
+                <option key={option.value} value={option.value} disabled={disabled}>
+                  {label}
+                </option>
+              );
+            })}
+          </select>
         </label>
         <span className="muted small" style={{ alignSelf: "center" }}>
           {folderFileCount > 0
@@ -265,6 +356,35 @@ export default function FlashcardsManage() {
           </div>
         )}
       </section>
+
+      {showDeleteAllModal ? (
+        <div className="modal-backdrop" onMouseDown={() => setShowDeleteAllModal(false)}>
+          <div className="modal-card" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
+            <h2>Delete All Flashcards?</h2>
+            <p className="muted">
+              This will permanently remove all flashcards in this class folder. Are you sure?
+            </p>
+            <div className="button-row">
+              <Button
+                type="button"
+                variant="danger"
+                onClick={handleDeleteAllFlashcards}
+                disabled={deletingAll}
+              >
+                {deletingAll ? "Deleting..." : "Yes"}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setShowDeleteAllModal(false)}
+                disabled={deletingAll}
+              >
+                No
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
