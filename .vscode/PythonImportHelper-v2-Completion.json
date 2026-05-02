@@ -7314,7 +7314,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.main",
         "description": "study-app-backend.src.main",
-        "peekOfCode": "app = FastAPI(title=\"Study App\", version=\"0.1.0\")\n# For local development it's sometimes helpful to allow all origins to avoid\n# intermittent CORS issues while debugging frontend/backend connectivity.\n# This is intentionally permissive and should NOT be used in production.\napp.add_middleware(\n    CORSMiddleware,\n    allow_origins=[\"*\"],  # dev-only: allow any origin\n    allow_credentials=True,\n    allow_methods=[\"*\"],\n    allow_headers=[\"*\"],",
+        "peekOfCode": "app = FastAPI(title=\"Study App\", version=\"0.1.0\")\napp.add_middleware(\n    CORSMiddleware,\n    allow_origins=_resolve_cors_origins(),\n    allow_credentials=True,\n    allow_methods=[\"*\"],\n    allow_headers=[\"*\"],\n)\napp.include_router(health.router)\napp.include_router(auth.router)",
         "detail": "study-app-backend.src.main",
         "documentation": {}
     },
