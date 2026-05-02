@@ -22,7 +22,7 @@ def _resolve_cors_origins() -> list[str]:
     parsed = settings.cors_origins
     if isinstance(parsed, list):
         return [o.rstrip("/") for o in parsed]
-    return ["http://localhost:3000", "http://localhost:5173"]
+    return ["https://nosey-eosin.vercel.app"]
 
 
 app = FastAPI(title="Study App", version="0.1.0")
