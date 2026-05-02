@@ -7278,7 +7278,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.config",
         "description": "study-app-backend.src.config",
-        "peekOfCode": "class Settings(BaseSettings):\n    model_config = SettingsConfigDict(extra=\"ignore\")\n    database_url: str = Field(\n        default=\"postgresql+psycopg://user:password@localhost:5432/study_app\",\n        alias=\"DATABASE_URL\",\n    )\n    google_client_id: str = Field(default=\"replace-me\", alias=\"GOOGLE_CLIENT_ID\")\n    google_client_secret: str = Field(default=\"replace-me\", alias=\"GOOGLE_CLIENT_SECRET\")\n    jwt_secret: str = Field(default=\"replace-me\", alias=\"JWT_SECRET\")\n    jwt_algorithm: str = Field(default=\"HS256\", alias=\"JWT_ALGORITHM\")",
+        "peekOfCode": "class Settings(BaseSettings):\n    model_config = SettingsConfigDict(extra=\"ignore\")\n    database_url: str = Field(\n        default=\"\",\n        alias=\"DATABASE_URL\",\n    )\n    google_client_id: str = Field(default=\"replace-me\", alias=\"GOOGLE_CLIENT_ID\")\n    google_client_secret: str = Field(default=\"replace-me\", alias=\"GOOGLE_CLIENT_SECRET\")\n    jwt_secret: str = Field(default=\"replace-me\", alias=\"JWT_SECRET\")\n    jwt_algorithm: str = Field(default=\"HS256\", alias=\"JWT_ALGORITHM\")",
         "detail": "study-app-backend.src.config",
         "documentation": {}
     },
