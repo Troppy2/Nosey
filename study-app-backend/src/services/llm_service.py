@@ -17,6 +17,11 @@ from typing import Any, Optional
 
 logger = get_logger(__name__)
 
+# High token budget for JSON generation (test/flashcard creation).
+# Do NOT use for Kojo/text completion — those are fine at the lower
+# settings.llm_max_tokens value and a global increase broke Kojo chat.
+_JSON_MAX_TOKENS = 8192
+
 
 @dataclass(frozen=True)
 class GeneratedMCQ:
@@ -102,6 +107,7 @@ class LLMService:
         coding_language: Optional[str] = None,
         custom_instructions: Optional[str] = None,
         provider: Optional[str] = None,
+        enable_fallback: bool = True,
     ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
         if test_type == "MCQ_only":
             count_frq = 0
@@ -158,6 +164,7 @@ class LLMService:
                 count_mcq=count_mcq,
                 count_frq=count_frq,
                 diagnostics=diagnostics,
+                enable_fallback=enable_fallback,
             )
 
         if is_math_mode:
@@ -179,8 +186,11 @@ class LLMService:
                     count_frq=count_frq,
                     diagnostics=diagnostics,
                     math_mode=True,
+                    enable_fallback=enable_fallback,
                 )
             except Exception:
+                if not enable_fallback:
+                    raise
                 diagnostics.update({
                     "fallback_used": True,
                     "fallback_reason": "llm_exception_math",
@@ -201,11 +211,20 @@ class LLMService:
                 difficulty=difficulty,
                 topic_focus=topic_focus,
                 custom_instructions=custom_instructions,
+                enable_fallback=enable_fallback,
             )
         except Exception:
+            if not enable_fallback:
+                raise
             mcq, frq = [], []
 
         if len(mcq) < count_mcq or len(frq) < count_frq:
+            if not enable_fallback:
+                from src.utils.exceptions import LLMException
+                raise LLMException(
+                    "The AI model could not generate enough questions. "
+                    "Try again or enable question fallback in Settings."
+                )
             diagnostics.update({
                 "fallback_used": True,
                 "fallback_reason": "llm_output_invalid_or_insufficient",
@@ -734,6 +753,7 @@ Rules:
         prompt: Optional[str] = None,
         existing_flashcards: Optional[list[str]] = None,
         provider: Optional[str] = None,
+        enable_fallback: bool = True,
     ) -> list[GeneratedFlashcard]:
         existing_flashcards = [item.strip() for item in (existing_flashcards or []) if item and item.strip()]
         existing_block = ""
@@ -751,7 +771,13 @@ Rules:
         )
         provider_candidates = await self._candidate_providers(provider)
         if not provider_candidates:
+            if not enable_fallback:
+                from src.utils.exceptions import LLMException
+                raise LLMException(
+                    "No AI provider is available. Add an API key in Settings or start Ollama."
+                )
             return self._fallback_flashcards(content, count, prompt)
+        last_error: Optional[Exception] = None
         for candidate in provider_candidates:
             try:
                 data = await self._complete_json(llm_prompt, provider=candidate)
@@ -767,7 +793,13 @@ Rules:
                 if unique:
                     return unique[:count]
             except Exception as exc:
+                last_error = exc
                 logger.warning("Flashcard generation failed with %s; trying next provider: %s", candidate, exc)
+        if not enable_fallback:
+            from src.utils.exceptions import LLMException
+            raise LLMException(
+                "Flashcard generation failed — the AI service is unavailable. Try again later."
+            ) from last_error
         logger.warning("LLM flashcard generation failed; using fallback")
         return self._fallback_flashcards(content, count, prompt)
 
@@ -830,8 +862,24 @@ Rules:
         difficulty: str = "mixed",
         topic_focus: Optional[str] = None,
         custom_instructions: Optional[str] = None,
+        enable_fallback: bool = True,
     ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
         from src.utils.exceptions import LLMException
+
+        # Extract study content once before trying providers — avoids burning rate-limited
+        # API calls on extraction for each provider when only generation needs to be retried.
+        if prompt is None:
+            study = await self._extract_study_content(generation_notes or notes)
+            shared_prompt: str = self._build_generation_prompt(
+                study,
+                count_mcq,
+                count_frq,
+                difficulty=difficulty,
+                topic_focus=topic_focus,
+                custom_instructions=custom_instructions,
+            )
+        else:
+            shared_prompt = prompt
 
         last_error: Optional[Exception] = None
         best_mcq: list[GeneratedMCQ] = []
@@ -839,20 +887,7 @@ Rules:
 
         for candidate in provider_candidates:
             try:
-                if prompt is None:
-                    study = await self._extract_study_content(generation_notes or notes, provider=candidate)
-                    prompt_to_use = self._build_generation_prompt(
-                        study,
-                        count_mcq,
-                        count_frq,
-                        difficulty=difficulty,
-                        topic_focus=topic_focus,
-                        custom_instructions=custom_instructions,
-                    )
-                else:
-                    prompt_to_use = prompt
-
-                data = await self._complete_json(prompt_to_use, provider=candidate)
+                data = await self._complete_json(shared_prompt, provider=candidate)
                 mcq, frq = self._parse_generated_test(
                     data,
                     count_mcq,
@@ -871,13 +906,15 @@ Rules:
                     "Provider %s returned insufficient test output (%d MCQ, %d FRQ of %d/%d requested); trying next provider",
                     candidate, len(mcq), len(frq), count_mcq, count_frq,
                 )
-            except LLMException:
-                raise
             except Exception as exc:
                 last_error = exc
                 logger.warning("Provider %s failed test generation; trying next provider: %s", candidate, exc)
 
         if best_mcq or best_frq:
+            if not enable_fallback:
+                raise LLMException(
+                    "The AI model is unavailable right now. Try again later."
+                ) from last_error
             self._set_last_generation_meta(diagnostics)
             return best_mcq[:count_mcq], best_frq[:count_frq]
 
@@ -942,8 +979,6 @@ Rules:
                 continue
             try:
                 return await fn(prompt)
-            except LLMException:
-                raise
             except Exception as exc:
                 last_error = exc
                 logger.warning("Kojo provider %s failed; trying next: %s", candidate, exc)
@@ -1085,7 +1120,7 @@ Rules:
                     },
                     json={
                         "model": settings.anthropic_model,
-                        "max_tokens": settings.llm_max_tokens,
+                        "max_tokens": _JSON_MAX_TOKENS,
                         "messages": [{"role": "user", "content": prompt}],
                     },
                 )
@@ -1123,7 +1158,7 @@ Rules:
                     json={
                         "contents": [{"parts": [{"text": prompt}]}],
                         "generationConfig": {
-                            "maxOutputTokens": settings.llm_max_tokens,
+                            "maxOutputTokens": _JSON_MAX_TOKENS,
                             "temperature": 0.2,
                             "responseMimeType": "application/json",
                         },
@@ -1149,7 +1184,7 @@ Rules:
                         "prompt": prompt,
                         "stream": False,
                         "format": "json",
-                        "options": {"num_predict": settings.llm_max_tokens},
+                        "options": {"num_predict": _JSON_MAX_TOKENS},
                     },
                 )
                 response.raise_for_status()
@@ -1179,10 +1214,10 @@ Rules:
                     "https://api.groq.com/openai/v1/chat/completions",
                     headers={"Authorization": f"Bearer {settings.groq_api_key}"},
                     json={
-                        "model": "llama-3.1-8b-instant",
+                        "model": "llama-3.3-70b-versatile",
                         "messages": [{"role": "user", "content": prompt}],
                         "temperature": 0.2,
-                        "max_tokens": settings.llm_max_tokens,
+                        "max_tokens": _JSON_MAX_TOKENS,
                         "response_format": {"type": "json_object"},
                     },
                 )

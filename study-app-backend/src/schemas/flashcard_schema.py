@@ -18,6 +18,7 @@ class FlashcardGenerateRequest(BaseModel):
     prompt: Optional[str] = None
     count: int = Field(default=10, ge=1, le=50)
     provider: Optional[str] = Field(default=None, description="Optional LLM provider override")
+    enable_fallback: bool = Field(default=True)
 
     @model_validator(mode="after")
     def validate_source(self) -> "FlashcardGenerateRequest":
