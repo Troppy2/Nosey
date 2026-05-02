@@ -45,6 +45,7 @@ class FlashcardService:
         count: int,
         session: AsyncSession,
         provider: Optional[str] = None,
+        enable_fallback: bool = True,
     ) -> list[FlashcardResponse]:
         folder = await FolderRepository(session).get_owned(folder_id, user_id)
         if folder is None:
@@ -63,6 +64,7 @@ class FlashcardService:
             count=count,
             existing_flashcards=existing_flashcards,
             provider=provider,
+            enable_fallback=enable_fallback,
         )
         repo = FlashcardRepository(session)
         cards = [
@@ -80,6 +82,7 @@ class FlashcardService:
         count: int,
         session: AsyncSession,
         provider: Optional[str] = None,
+        enable_fallback: bool = True,
     ) -> list[FlashcardResponse]:
         folder = await FolderRepository(session).get_owned(folder_id, user_id)
         if folder is None:
@@ -92,6 +95,7 @@ class FlashcardService:
             prompt=prompt,
             existing_flashcards=existing_flashcards,
             provider=provider,
+            enable_fallback=enable_fallback,
         )
         repo = FlashcardRepository(session)
         cards = [
@@ -184,6 +188,7 @@ class FlashcardService:
         count: int,
         session: AsyncSession,
         provider: Optional[str] = None,
+        enable_fallback: bool = True,
     ) -> list[FlashcardResponse]:
         folder = await FolderRepository(session).get_owned(folder_id, user_id)
         if folder is None:
@@ -196,6 +201,7 @@ class FlashcardService:
             count=count,
             existing_flashcards=existing_flashcards,
             provider=provider,
+            enable_fallback=enable_fallback,
         )
         repo = FlashcardRepository(session)
         cards = [
