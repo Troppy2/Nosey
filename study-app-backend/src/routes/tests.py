@@ -79,6 +79,7 @@ async def create_test(
                 raise StudyAppException(
                     "provider must be auto, groq, google, anthropic, gemini, claude, or ollama"
                 )
+        enable_fallback = str(form.get("enable_fallback", "true")).lower() not in ("false", "0", "no")
 
         if not title or not test_type:
             raise StudyAppException("title and test_type are required")
@@ -117,6 +118,7 @@ async def create_test(
             coding_language=coding_language,
             custom_instructions=custom_instructions,
             provider=provider,
+            enable_fallback=enable_fallback,
         )
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
