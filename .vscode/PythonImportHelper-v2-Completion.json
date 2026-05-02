@@ -7503,7 +7503,7 @@
         "kind": 6,
         "importPath": "study-app-backend.tests.test_llm_service",
         "description": "study-app-backend.tests.test_llm_service",
-        "peekOfCode": "class TestGenerateTestQuestions:\n    async def test_mcq_only_mode_sets_frq_count_to_zero(self):\n        svc = LLMService()\n        svc._complete_json = AsyncMock(side_effect=[\n            EXTRACTION_RESP,\n            {\"mcq\": [VALID_MCQ] * 3, \"frq\": []},\n        ])\n        mcq, frq = await svc.generate_test_questions(SAMPLE_NOTES, \"MCQ_only\", count_mcq=3)\n        assert len(mcq) == 3\n        assert len(frq) == 0",
+        "peekOfCode": "class TestGenerateTestQuestions:\n    async def test_mcq_only_mode_sets_frq_count_to_zero(self):\n        svc = LLMService()\n        svc._candidate_providers = AsyncMock(return_value=[\"groq\"])\n        svc._complete_json = AsyncMock(side_effect=[\n            EXTRACTION_RESP,\n            {\"mcq\": [VALID_MCQ] * 3, \"frq\": []},\n        ])\n        mcq, frq = await svc.generate_test_questions(SAMPLE_NOTES, \"MCQ_only\", count_mcq=3)\n        assert len(mcq) == 3",
         "detail": "study-app-backend.tests.test_llm_service",
         "documentation": {}
     },
@@ -7521,7 +7521,7 @@
         "kind": 6,
         "importPath": "study-app-backend.tests.test_llm_service",
         "description": "study-app-backend.tests.test_llm_service",
-        "peekOfCode": "class TestGenerateFlashcards:\n    async def test_returns_correct_cards_from_llm(self):\n        svc = LLMService()\n        svc._complete_json = AsyncMock(return_value={\n            \"flashcards\": [\n                {\"front\": \"What is Atomicity?\", \"back\": \"All-or-nothing execution.\"},\n                {\"front\": \"What is Durability?\", \"back\": \"Committed data persists.\"},\n            ]\n        })\n        cards = await svc.generate_flashcards(SAMPLE_NOTES, count=2)",
+        "peekOfCode": "class TestGenerateFlashcards:\n    async def test_returns_correct_cards_from_llm(self):\n        svc = LLMService()\n        svc._candidate_providers = AsyncMock(return_value=[\"groq\"])\n        svc._complete_json = AsyncMock(return_value={\n            \"flashcards\": [\n                {\"front\": \"What is Atomicity?\", \"back\": \"All-or-nothing execution.\"},\n                {\"front\": \"What is Durability?\", \"back\": \"Committed data persists.\"},\n            ]\n        })",
         "detail": "study-app-backend.tests.test_llm_service",
         "documentation": {}
     },
@@ -7602,7 +7602,7 @@
         "kind": 5,
         "importPath": "study-app-backend.tests.test_llm_service",
         "description": "study-app-backend.tests.test_llm_service",
-        "peekOfCode": "EXTRACTION_RESP = {\n    \"title\": \"Database Transactions\",\n    \"terms\": [{\"term\": \"Atomicity\", \"definition\": \"All-or-nothing execution\"}],\n    \"concepts\": [\"ACID properties ensure transaction correctness\"],\n}\nclass TestGenerateTestQuestions:\n    async def test_mcq_only_mode_sets_frq_count_to_zero(self):\n        svc = LLMService()\n        svc._complete_json = AsyncMock(side_effect=[\n            EXTRACTION_RESP,",
+        "peekOfCode": "EXTRACTION_RESP = {\n    \"title\": \"Database Transactions\",\n    \"terms\": [{\"term\": \"Atomicity\", \"definition\": \"All-or-nothing execution\"}],\n    \"concepts\": [\"ACID properties ensure transaction correctness\"],\n}\nclass TestGenerateTestQuestions:\n    async def test_mcq_only_mode_sets_frq_count_to_zero(self):\n        svc = LLMService()\n        svc._candidate_providers = AsyncMock(return_value=[\"groq\"])\n        svc._complete_json = AsyncMock(side_effect=[",
         "detail": "study-app-backend.tests.test_llm_service",
         "documentation": {}
     },
