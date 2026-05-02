@@ -53,6 +53,7 @@ class TestService:
         coding_language: Optional[str] = None,
         custom_instructions: Optional[str] = None,
         provider: Optional[str] = None,
+        enable_fallback: bool = True,
     ) -> CreateTestResponse:
         if test_type not in VALID_TEST_TYPES:
             raise ValidationException("test_type must be MCQ_only, FRQ_only, or mixed")
@@ -148,6 +149,7 @@ class TestService:
                 coding_language=coding_language,
                 custom_instructions=custom_instructions,
                 provider=provider,
+                enable_fallback=enable_fallback,
             )
             generation_meta = {}
             try:

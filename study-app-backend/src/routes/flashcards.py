@@ -62,6 +62,7 @@ async def generate_flashcards(
                 data.count,
                 session,
                 provider=data.provider,
+                enable_fallback=data.enable_fallback,
             )
         return await service.generate_from_prompt(
             folder_id,
@@ -70,6 +71,7 @@ async def generate_flashcards(
             data.count,
             session,
             provider=data.provider,
+            enable_fallback=data.enable_fallback,
         )
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -110,6 +112,7 @@ async def generate_flashcards_from_file(
     notes_files: list[UploadFile] = File(...),
     count: int = Query(default=10, ge=1, le=50),
     provider: Optional[str] = Query(default=None),
+    enable_fallback: bool = Query(default=True),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> list[FlashcardResponse]:
@@ -121,6 +124,7 @@ async def generate_flashcards_from_file(
             count,
             session,
             provider=provider,
+            enable_fallback=enable_fallback,
         )
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

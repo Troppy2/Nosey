@@ -6684,7 +6684,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.flashcard_schema",
         "description": "study-app-backend.src.schemas.flashcard_schema",
-        "peekOfCode": "class FlashcardGenerateRequest(BaseModel):\n    source_type: str = Field(..., pattern=\"^(test|prompt)$\")\n    test_id: Optional[int] = None\n    prompt: Optional[str] = None\n    count: int = Field(default=10, ge=1, le=50)\n    provider: Optional[str] = Field(default=None, description=\"Optional LLM provider override\")\n    @model_validator(mode=\"after\")\n    def validate_source(self) -> \"FlashcardGenerateRequest\":\n        if self.source_type == \"test\" and self.test_id is None:\n            raise ValueError(\"test_id is required when source_type is test\")",
+        "peekOfCode": "class FlashcardGenerateRequest(BaseModel):\n    source_type: str = Field(..., pattern=\"^(test|prompt)$\")\n    test_id: Optional[int] = None\n    prompt: Optional[str] = None\n    count: int = Field(default=10, ge=1, le=50)\n    provider: Optional[str] = Field(default=None, description=\"Optional LLM provider override\")\n    enable_fallback: bool = Field(default=True)\n    @model_validator(mode=\"after\")\n    def validate_source(self) -> \"FlashcardGenerateRequest\":\n        if self.source_type == \"test\" and self.test_id is None:",
         "detail": "study-app-backend.src.schemas.flashcard_schema",
         "documentation": {}
     },
@@ -7071,7 +7071,16 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "logger = get_logger(__name__)\n@dataclass(frozen=True)\nclass GeneratedMCQ:\n    question_text: str\n    options: list[str]\n    correct_index: int\n@dataclass(frozen=True)\nclass GeneratedFRQ:\n    question_text: str\n    expected_answer: str",
+        "peekOfCode": "logger = get_logger(__name__)\n# High token budget for JSON generation (test/flashcard creation).\n# Do NOT use for Kojo/text completion — those are fine at the lower\n# settings.llm_max_tokens value and a global increase broke Kojo chat.\n_JSON_MAX_TOKENS = 8192\n@dataclass(frozen=True)\nclass GeneratedMCQ:\n    question_text: str\n    options: list[str]\n    correct_index: int",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_JSON_MAX_TOKENS",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "_JSON_MAX_TOKENS = 8192\n@dataclass(frozen=True)\nclass GeneratedMCQ:\n    question_text: str\n    options: list[str]\n    correct_index: int\n@dataclass(frozen=True)\nclass GeneratedFRQ:\n    question_text: str\n    expected_answer: str",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },

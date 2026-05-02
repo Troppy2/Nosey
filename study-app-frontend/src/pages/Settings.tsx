@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import type { KojoClearedConversation } from "../lib/types";
 
 const STATS_RESET_BASELINE_KEY = "nosey_stats_reset_baseline";
+const QUESTION_FALLBACK_KEY = "nosey_question_fallback";
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -31,6 +32,9 @@ export default function Settings() {
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [resettingStats, setResettingStats] = useState(false);
   const [statsResetNotice, setStatsResetNotice] = useState<string | null>(null);
+  const [questionFallbackEnabled, setQuestionFallbackEnabled] = useState<boolean>(
+    () => localStorage.getItem(QUESTION_FALLBACK_KEY) !== "false"
+  );
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const initialized = useRef(false);
 
@@ -124,6 +128,12 @@ export default function Settings() {
     }
   }
 
+  function handleToggleFallback() {
+    const next = !questionFallbackEnabled;
+    setQuestionFallbackEnabled(next);
+    localStorage.setItem(QUESTION_FALLBACK_KEY, String(next));
+  }
+
   async function handleRestore(folderId: number) {
     setRestoreError(null);
     setRestoreFolderId(folderId);
@@ -212,6 +222,30 @@ export default function Settings() {
               {resettingStats ? "Resetting..." : "Reset Stats"}
             </Button>
             {statsResetNotice ? <span className="muted small">{statsResetNotice}</span> : null}
+          </div>
+        </section>
+
+        <section className="settings-appearance">
+          <h3>Question Fallback</h3>
+          <p className="muted small">
+            When enabled, if the AI model fails to generate questions, placeholder questions are shown instead.
+            When disabled, you'll see an error and can try again once the AI is available.
+          </p>
+          <div className="settings-reset-row">
+            <button
+              type="button"
+              role="switch"
+              className={`settings-toggle-switch${questionFallbackEnabled ? " settings-toggle-switch--on" : ""}`}
+              onClick={handleToggleFallback}
+              aria-pressed={questionFallbackEnabled}
+            >
+              <span className="settings-toggle-track">
+                <span className="settings-toggle-thumb" />
+              </span>
+              <span className="settings-toggle-label">
+                {questionFallbackEnabled ? "Fallback on" : "Fallback off"}
+              </span>
+            </button>
           </div>
         </section>
 

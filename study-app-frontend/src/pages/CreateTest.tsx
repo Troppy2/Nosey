@@ -105,6 +105,7 @@ export default function CreateTest() {
         topicFocus: advancedMode && topicFocus.trim() ? topicFocus.trim() : undefined,
         customInstructions: advancedMode && customInstructions.trim() ? customInstructions.trim() : undefined,
         generationProvider: advancedMode ? generationProvider : "auto",
+        enableFallback: localStorage.getItem("nosey_question_fallback") !== "false",
       });
       sessionStorage.setItem(
         `nosey_generation_meta_${result.test_id}`,

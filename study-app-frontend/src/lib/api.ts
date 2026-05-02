@@ -196,6 +196,7 @@ export async function createTest(input: {
   codingLanguage?: string;
   customInstructions?: string;
   generationProvider?: string;
+  enableFallback?: boolean;
 }): Promise<CreateTestResult> {
   if (isGuestSession()) {
     const tests = await fetchTests();
@@ -217,7 +218,8 @@ export async function createTest(input: {
   if (input.isCodingMode) formData.append("is_coding_mode", "true");
   if (input.codingLanguage) formData.append("coding_language", input.codingLanguage);
   if (input.customInstructions) formData.append("custom_instructions", input.customInstructions);
-  if (input.generationProvider) formData.append("provider", input.generationProvider)
+  if (input.generationProvider) formData.append("provider", input.generationProvider);
+  formData.append("enable_fallback", input.enableFallback === false ? "false" : "true");
   input.files.forEach((file) => formData.append("notes_files", file));
   if (input.practiceTestFile) formData.append("practice_test_file", input.practiceTestFile);
 
@@ -301,12 +303,13 @@ export async function createFlashcard(folderId: number, data: { front: string; b
 
 export async function generateFlashcards(
   folderId: number,
-  input: { count?: number; prompt: string; sourceType?: "prompt" | "test"; testId?: number; provider?: string },
+  input: { count?: number; prompt: string; sourceType?: "prompt" | "test"; testId?: number; provider?: string; enableFallback?: boolean },
 ): Promise<Flashcard[]> {
   const body: Record<string, unknown> = {
     source_type: input.sourceType ?? "prompt",
     count: input.count ?? 10,
     prompt: input.prompt,
+    enable_fallback: input.enableFallback !== false,
   };
   if (input.testId !== undefined) body.test_id = input.testId;
   if (input.provider) body.provider = input.provider;
@@ -405,11 +408,13 @@ export async function generateFlashcardsFromFile(
   files: File[],
   count = 10,
   provider?: string,
+  enableFallback = true,
 ): Promise<Flashcard[]> {
   const formData = new FormData();
   files.forEach((f) => formData.append("notes_files", f));
   const providerQuery = provider ? `&provider=${encodeURIComponent(provider)}` : "";
-  return request<Flashcard[]>(`/folders/${folderId}/flashcards/generate-from-file?count=${count}${providerQuery}`, {
+  const fallbackQuery = `&enable_fallback=${enableFallback ? "true" : "false"}`;
+  return request<Flashcard[]>(`/folders/${folderId}/flashcards/generate-from-file?count=${count}${providerQuery}${fallbackQuery}`, {
     method: "POST",
     body: formData,
   });
