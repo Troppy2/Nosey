@@ -344,7 +344,7 @@ class TestCompleteGroq:
                 await self.svc._complete_groq("prompt")
 
         body = mock_client.post.call_args.kwargs["json"]
-        assert body["model"] == "llama-3.1-8b-instant"
+        assert body["model"] == "llama-3.3-70b-versatile"
         assert body["response_format"] == {"type": "json_object"}
         assert body["temperature"] == 0.2
 
@@ -473,6 +473,7 @@ class TestCallKojo:
     async def test_llm_exception_passes_through_unwrapped(self):
         svc = LLMService()
         svc._complete_text_groq = AsyncMock(side_effect=LLMException("already wrapped"))
+        svc._candidate_providers = AsyncMock(return_value=["groq"])
 
         with patch("src.services.llm_service.settings", fake_settings(groq_key=FAKE_KEY)):
             with pytest.raises(LLMException, match="already wrapped"):
@@ -493,6 +494,7 @@ class TestGenerateTestQuestions:
 
     async def test_mcq_only_mode_sets_frq_count_to_zero(self):
         svc = LLMService()
+        svc._candidate_providers = AsyncMock(return_value=["groq"])
         svc._complete_json = AsyncMock(side_effect=[
             EXTRACTION_RESP,
             {"mcq": [VALID_MCQ] * 3, "frq": []},
@@ -503,6 +505,7 @@ class TestGenerateTestQuestions:
 
     async def test_frq_only_mode_sets_mcq_count_to_zero(self):
         svc = LLMService()
+        svc._candidate_providers = AsyncMock(return_value=["groq"])
         svc._complete_json = AsyncMock(side_effect=[
             EXTRACTION_RESP,
             {"mcq": [], "frq": [VALID_FRQ] * 2},
@@ -513,6 +516,7 @@ class TestGenerateTestQuestions:
 
     async def test_mixed_mode_returns_both(self):
         svc = LLMService()
+        svc._candidate_providers = AsyncMock(return_value=["groq"])
         svc._complete_json = AsyncMock(side_effect=[
             EXTRACTION_RESP,
             {"mcq": [VALID_MCQ] * 5, "frq": [VALID_FRQ] * 3},
@@ -627,6 +631,7 @@ class TestGenerateTestQuestions:
 
     async def test_generation_meta_includes_retrieval_stats(self):
         svc = LLMService()
+        svc._candidate_providers = AsyncMock(return_value=["groq"])
         svc._complete_json = AsyncMock(side_effect=[
             EXTRACTION_RESP,
             {"mcq": [VALID_MCQ], "frq": [VALID_FRQ]},
@@ -690,6 +695,7 @@ class TestGenerateFlashcards:
 
     async def test_returns_correct_cards_from_llm(self):
         svc = LLMService()
+        svc._candidate_providers = AsyncMock(return_value=["groq"])
         svc._complete_json = AsyncMock(return_value={
             "flashcards": [
                 {"front": "What is Atomicity?", "back": "All-or-nothing execution."},

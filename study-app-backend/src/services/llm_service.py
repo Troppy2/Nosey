@@ -373,49 +373,36 @@ class LLMService:
             "frq items: {question_text, expected_answer}\n\n"
             f"PRACTICE TEST:\n{cleaned[:_EXTRACT_CHAR_LIMIT]}"
         )
-        provider_candidates = await self._candidate_providers(provider)
-        if not provider_candidates:
-            from src.utils.exceptions import LLMException
-
-            raise LLMException(_AI_SERVICES_UNAVAILABLE_MESSAGE)
-
-        last_error: Optional[Exception] = None
-        for candidate in provider_candidates:
-            try:
-                data = await self._complete_json(prompt, provider=candidate)
-                mcq_raw = data.get("mcq", [])
-                frq_raw = data.get("frq", [])
-                mcq: list[GeneratedMCQ] = []
-                frq: list[GeneratedFRQ] = []
-                if isinstance(mcq_raw, list):
-                    for item in mcq_raw:
-                        if self._is_valid_mcq(item):
-                            options = [str(o) for o in item["options"]][:4]  # type: ignore[index]
-                            mcq.append(GeneratedMCQ(
-                                question_text=str(item.get("question_text", "")),  # type: ignore[union-attr]
-                                options=options,
-                                correct_index=max(0, min(3, int(item.get("correct_index", 0)))),  # type: ignore[union-attr]
-                            ))
-                if isinstance(frq_raw, list):
-                    for item in frq_raw:
-                        if self._is_valid_frq(item):
-                            frq.append(GeneratedFRQ(
-                                question_text=str(item.get("question_text", "")),  # type: ignore[union-attr]
-                                expected_answer=str(item.get("expected_answer", "")),  # type: ignore[union-attr]
-                            ))
-                if not (count_mcq == 0 and count_frq == 0):
-                    mcq = mcq[: max(0, int(count_mcq))]
-                    frq = frq[: max(0, int(count_frq))]
-                if mcq or frq or (count_mcq == 0 and count_frq == 0):
-                    logger.info("Parsed practice test: %d MCQ, %d FRQ", len(mcq), len(frq))
-                    return mcq, frq
-                logger.warning("Provider %s returned no practice-test questions; trying next provider", candidate)
-            except Exception as exc:
-                last_error = exc
-                logger.warning("Practice test parsing failed with %s; trying next provider: %s", candidate, exc)
-
-        logger.warning("parse_practice_test: all providers failed, returning empty result")
-        return [], []
+        try:
+            data = await self._complete_json(prompt, provider=provider)
+            mcq_raw = data.get("mcq", [])
+            frq_raw = data.get("frq", [])
+            mcq: list[GeneratedMCQ] = []
+            frq: list[GeneratedFRQ] = []
+            if isinstance(mcq_raw, list):
+                for item in mcq_raw:
+                    if self._is_valid_mcq(item):
+                        options = [str(o) for o in item["options"]][:4]  # type: ignore[index]
+                        mcq.append(GeneratedMCQ(
+                            question_text=str(item.get("question_text", "")),  # type: ignore[union-attr]
+                            options=options,
+                            correct_index=max(0, min(3, int(item.get("correct_index", 0)))),  # type: ignore[union-attr]
+                        ))
+            if isinstance(frq_raw, list):
+                for item in frq_raw:
+                    if self._is_valid_frq(item):
+                        frq.append(GeneratedFRQ(
+                            question_text=str(item.get("question_text", "")),  # type: ignore[union-attr]
+                            expected_answer=str(item.get("expected_answer", "")),  # type: ignore[union-attr]
+                        ))
+            if not (count_mcq == 0 and count_frq == 0):
+                mcq = mcq[: max(0, int(count_mcq))]
+                frq = frq[: max(0, int(count_frq))]
+            logger.info("Parsed practice test: %d MCQ, %d FRQ", len(mcq), len(frq))
+            return mcq, frq
+        except Exception as exc:
+            logger.warning("parse_practice_test failed: %s", exc)
+            return [], []
 
     async def grade_frq_answer(
         self,
@@ -983,6 +970,8 @@ Rules:
                 last_error = exc
                 logger.warning("Kojo provider %s failed; trying next: %s", candidate, exc)
 
+        if isinstance(last_error, LLMException):
+            raise last_error
         raise LLMException(
             "Kojo failed to generate a response — all providers are unavailable. Try again."
         ) from last_error
