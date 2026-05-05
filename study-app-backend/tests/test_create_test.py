@@ -215,6 +215,10 @@ class TestCreateTestService:
             parse_mcq or [GeneratedMCQ("PQ1", ["A", "B", "C", "D"], 0)],
             parse_frq or [GeneratedFRQ("PFQ1", "Answer")],
         ))
+        svc.llm_service.generate_from_practice_test_template = AsyncMock(return_value=(
+            llm_mcq or [GeneratedMCQ("Q1", ["A", "B", "C", "D"], 0)],
+            llm_frq or [GeneratedFRQ("FQ1", "Answer 1")],
+        ))
 
         # File service mock
         svc.file_service = MagicMock()
