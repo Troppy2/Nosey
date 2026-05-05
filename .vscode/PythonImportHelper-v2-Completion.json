@@ -260,14 +260,6 @@
         "documentation": {}
     },
     {
-        "label": "Optional",
-        "importPath": "typing",
-        "description": "typing",
-        "isExtraImport": true,
-        "detail": "typing",
-        "documentation": {}
-    },
-    {
         "label": "TYPE_CHECKING",
         "importPath": "typing",
         "description": "typing",
@@ -277,30 +269,6 @@
     },
     {
         "label": "Optional",
-        "importPath": "typing",
-        "description": "typing",
-        "isExtraImport": true,
-        "detail": "typing",
-        "documentation": {}
-    },
-    {
-        "label": "TYPE_CHECKING",
-        "importPath": "typing",
-        "description": "typing",
-        "isExtraImport": true,
-        "detail": "typing",
-        "documentation": {}
-    },
-    {
-        "label": "TYPE_CHECKING",
-        "importPath": "typing",
-        "description": "typing",
-        "isExtraImport": true,
-        "detail": "typing",
-        "documentation": {}
-    },
-    {
-        "label": "TYPE_CHECKING",
         "importPath": "typing",
         "description": "typing",
         "isExtraImport": true,
@@ -348,7 +316,71 @@
         "documentation": {}
     },
     {
+        "label": "TYPE_CHECKING",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
         "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "TYPE_CHECKING",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "TYPE_CHECKING",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "TYPE_CHECKING",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "TYPE_CHECKING",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "TYPE_CHECKING",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "TYPE_CHECKING",
         "importPath": "typing",
         "description": "typing",
         "isExtraImport": true,
@@ -556,7 +588,23 @@
         "documentation": {}
     },
     {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
         "label": "Callable",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
         "importPath": "typing",
         "description": "typing",
         "isExtraImport": true,
@@ -613,6 +661,22 @@
     },
     {
         "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Tuple",
         "importPath": "typing",
         "description": "typing",
         "isExtraImport": true,
@@ -1015,6 +1079,22 @@
         "documentation": {}
     },
     {
+        "label": "op",
+        "importPath": "alembic",
+        "description": "alembic",
+        "isExtraImport": true,
+        "detail": "alembic",
+        "documentation": {}
+    },
+    {
+        "label": "op",
+        "importPath": "alembic",
+        "description": "alembic",
+        "isExtraImport": true,
+        "detail": "alembic",
+        "documentation": {}
+    },
+    {
         "label": "context",
         "importPath": "alembic",
         "description": "alembic",
@@ -1072,6 +1152,14 @@
         "documentation": {}
     },
     {
+        "label": "ForeignKey",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
         "label": "Boolean",
         "importPath": "sqlalchemy",
         "description": "sqlalchemy",
@@ -1256,6 +1344,14 @@
         "documentation": {}
     },
     {
+        "label": "ForeignKey",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
         "label": "Boolean",
         "importPath": "sqlalchemy",
         "description": "sqlalchemy",
@@ -1336,6 +1432,14 @@
         "documentation": {}
     },
     {
+        "label": "ForeignKey",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
         "label": "Integer",
         "importPath": "sqlalchemy",
         "description": "sqlalchemy",
@@ -1353,6 +1457,14 @@
     },
     {
         "label": "Text",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "ForeignKey",
         "importPath": "sqlalchemy",
         "description": "sqlalchemy",
         "isExtraImport": true,
@@ -1465,6 +1577,14 @@
     },
     {
         "label": "Numeric",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "String",
         "importPath": "sqlalchemy",
         "description": "sqlalchemy",
         "isExtraImport": true,
@@ -1489,6 +1609,14 @@
     },
     {
         "label": "case",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "delete",
         "importPath": "sqlalchemy",
         "description": "sqlalchemy",
         "isExtraImport": true,
@@ -1653,6 +1781,46 @@
         "description": "sqlalchemy",
         "isExtraImport": true,
         "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
         "documentation": {}
     },
     {
@@ -2289,70 +2457,6 @@
         "documentation": {}
     },
     {
-        "label": "timedelta",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "timezone",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
         "label": "datetime",
         "importPath": "datetime",
         "description": "datetime",
@@ -2370,6 +2474,86 @@
     },
     {
         "label": "timezone",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "timedelta",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
         "importPath": "datetime",
         "description": "datetime",
         "isExtraImport": true,
@@ -2753,7 +2937,95 @@
         "documentation": {}
     },
     {
-        "label": "selectinload",
+        "label": "Mapped",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.orm",
+        "documentation": {}
+    },
+    {
+        "label": "mapped_column",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.orm",
+        "documentation": {}
+    },
+    {
+        "label": "relationship",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.orm",
+        "documentation": {}
+    },
+    {
+        "label": "Mapped",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.orm",
+        "documentation": {}
+    },
+    {
+        "label": "mapped_column",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.orm",
+        "documentation": {}
+    },
+    {
+        "label": "relationship",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.orm",
+        "documentation": {}
+    },
+    {
+        "label": "Mapped",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.orm",
+        "documentation": {}
+    },
+    {
+        "label": "mapped_column",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.orm",
+        "documentation": {}
+    },
+    {
+        "label": "relationship",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.orm",
+        "documentation": {}
+    },
+    {
+        "label": "Mapped",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.orm",
+        "documentation": {}
+    },
+    {
+        "label": "mapped_column",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.orm",
+        "documentation": {}
+    },
+    {
+        "label": "relationship",
         "importPath": "sqlalchemy.orm",
         "description": "sqlalchemy.orm",
         "isExtraImport": true,
@@ -2777,75 +3049,11 @@
         "documentation": {}
     },
     {
-        "label": "BIGINT_ID",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
+        "label": "selectinload",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
         "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
-        "label": "Base",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
-        "label": "TimestampMixin",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
-        "label": "BIGINT_ID",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
-        "label": "Base",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
-        "label": "TimestampMixin",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
-        "label": "BIGINT_ID",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
-        "label": "Base",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
-        "label": "BIGINT_ID",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
+        "detail": "sqlalchemy.orm",
         "documentation": {}
     },
     {
@@ -2938,6 +3146,110 @@
     },
     {
         "label": "BIGINT_ID",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "TimestampMixin",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "BIGINT_ID",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "TimestampMixin",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "BIGINT_ID",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "BIGINT_ID",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "BIGINT_ID",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
         "importPath": "src.models.base",
         "description": "src.models.base",
         "isExtraImport": true,
@@ -3078,6 +3390,38 @@
         "description": "src.models.question",
         "isExtraImport": true,
         "detail": "src.models.question",
+        "documentation": {}
+    },
+    {
+        "label": "Test",
+        "importPath": "src.models.test",
+        "description": "src.models.test",
+        "isExtraImport": true,
+        "detail": "src.models.test",
+        "documentation": {}
+    },
+    {
+        "label": "Test",
+        "importPath": "src.models.test",
+        "description": "src.models.test",
+        "isExtraImport": true,
+        "detail": "src.models.test",
+        "documentation": {}
+    },
+    {
+        "label": "Test",
+        "importPath": "src.models.test",
+        "description": "src.models.test",
+        "isExtraImport": true,
+        "detail": "src.models.test",
+        "documentation": {}
+    },
+    {
+        "label": "Test",
+        "importPath": "src.models.test",
+        "description": "src.models.test",
+        "isExtraImport": true,
+        "detail": "src.models.test",
         "documentation": {}
     },
     {
@@ -3153,6 +3497,158 @@
         "documentation": {}
     },
     {
+        "label": "ResumableTestInfo",
+        "importPath": "src.schemas.attempt_schema",
+        "description": "src.schemas.attempt_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "AttemptDetail",
+        "importPath": "src.schemas.attempt_schema",
+        "description": "src.schemas.attempt_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "AttemptResult",
+        "importPath": "src.schemas.attempt_schema",
+        "description": "src.schemas.attempt_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "AttemptSummary",
+        "importPath": "src.schemas.attempt_schema",
+        "description": "src.schemas.attempt_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "DraftAttemptResponse",
+        "importPath": "src.schemas.attempt_schema",
+        "description": "src.schemas.attempt_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "ResumableTestInfo",
+        "importPath": "src.schemas.attempt_schema",
+        "description": "src.schemas.attempt_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SaveDraftAttemptRequest",
+        "importPath": "src.schemas.attempt_schema",
+        "description": "src.schemas.attempt_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SubmitAttemptRequest",
+        "importPath": "src.schemas.attempt_schema",
+        "description": "src.schemas.attempt_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "AnswerResult",
+        "importPath": "src.schemas.attempt_schema",
+        "description": "src.schemas.attempt_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "AttemptDetail",
+        "importPath": "src.schemas.attempt_schema",
+        "description": "src.schemas.attempt_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "AttemptResult",
+        "importPath": "src.schemas.attempt_schema",
+        "description": "src.schemas.attempt_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "AttemptSummary",
+        "importPath": "src.schemas.attempt_schema",
+        "description": "src.schemas.attempt_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "DraftAttemptAnswer",
+        "importPath": "src.schemas.attempt_schema",
+        "description": "src.schemas.attempt_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "DraftAttemptResponse",
+        "importPath": "src.schemas.attempt_schema",
+        "description": "src.schemas.attempt_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "FRQGrade",
+        "importPath": "src.schemas.attempt_schema",
+        "description": "src.schemas.attempt_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "ResumableTestInfo",
+        "importPath": "src.schemas.attempt_schema",
+        "description": "src.schemas.attempt_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SaveDraftAttemptRequest",
+        "importPath": "src.schemas.attempt_schema",
+        "description": "src.schemas.attempt_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SubmittedAnswer",
+        "importPath": "src.schemas.attempt_schema",
+        "description": "src.schemas.attempt_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "FRQGrade",
+        "importPath": "src.schemas.attempt_schema",
+        "description": "src.schemas.attempt_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
         "label": "Flashcard",
         "importPath": "src.models.flashcard",
         "description": "src.models.flashcard",
@@ -3217,30 +3713,6 @@
         "documentation": {}
     },
     {
-        "label": "Test",
-        "importPath": "src.models.test",
-        "description": "src.models.test",
-        "isExtraImport": true,
-        "detail": "src.models.test",
-        "documentation": {}
-    },
-    {
-        "label": "Test",
-        "importPath": "src.models.test",
-        "description": "src.models.test",
-        "isExtraImport": true,
-        "detail": "src.models.test",
-        "documentation": {}
-    },
-    {
-        "label": "Test",
-        "importPath": "src.models.test",
-        "description": "src.models.test",
-        "isExtraImport": true,
-        "detail": "src.models.test",
-        "documentation": {}
-    },
-    {
         "label": "KojoConversation",
         "importPath": "src.models.kojo_conversation",
         "description": "src.models.kojo_conversation",
@@ -3273,6 +3745,23 @@
         "documentation": {}
     },
     {
+        "label": "json",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "json",
+        "description": "json",
+        "detail": "json",
+        "documentation": {}
+    },
+    {
+        "label": "FillBlankAnswer",
+        "importPath": "src.models.fill_blank_answer",
+        "description": "src.models.fill_blank_answer",
+        "isExtraImport": true,
+        "detail": "src.models.fill_blank_answer",
+        "documentation": {}
+    },
+    {
         "label": "FRQAnswer",
         "importPath": "src.models.frq_answer",
         "description": "src.models.frq_answer",
@@ -3281,11 +3770,43 @@
         "documentation": {}
     },
     {
+        "label": "MatchingAnswer",
+        "importPath": "src.models.matching_answer",
+        "description": "src.models.matching_answer",
+        "isExtraImport": true,
+        "detail": "src.models.matching_answer",
+        "documentation": {}
+    },
+    {
         "label": "MCQOption",
         "importPath": "src.models.mcq_option",
         "description": "src.models.mcq_option",
         "isExtraImport": true,
         "detail": "src.models.mcq_option",
+        "documentation": {}
+    },
+    {
+        "label": "OrderingAnswer",
+        "importPath": "src.models.ordering_answer",
+        "description": "src.models.ordering_answer",
+        "isExtraImport": true,
+        "detail": "src.models.ordering_answer",
+        "documentation": {}
+    },
+    {
+        "label": "SelectAllAnswer",
+        "importPath": "src.models.select_all_answer",
+        "description": "src.models.select_all_answer",
+        "isExtraImport": true,
+        "detail": "src.models.select_all_answer",
+        "documentation": {}
+    },
+    {
+        "label": "User",
+        "importPath": "src.models.user",
+        "description": "src.models.user",
+        "isExtraImport": true,
+        "detail": "src.models.user",
         "documentation": {}
     },
     {
@@ -3601,6 +4122,30 @@
         "documentation": {}
     },
     {
+        "label": "APIRouter",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "Depends",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "HTTPException",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
         "label": "Request",
         "importPath": "fastapi",
         "description": "fastapi",
@@ -3801,91 +4346,11 @@
         "documentation": {}
     },
     {
-        "label": "AttemptDetail",
-        "importPath": "src.schemas.attempt_schema",
-        "description": "src.schemas.attempt_schema",
+        "label": "get_current_user",
+        "importPath": "src.dependencies",
+        "description": "src.dependencies",
         "isExtraImport": true,
-        "detail": "src.schemas.attempt_schema",
-        "documentation": {}
-    },
-    {
-        "label": "AttemptResult",
-        "importPath": "src.schemas.attempt_schema",
-        "description": "src.schemas.attempt_schema",
-        "isExtraImport": true,
-        "detail": "src.schemas.attempt_schema",
-        "documentation": {}
-    },
-    {
-        "label": "AttemptSummary",
-        "importPath": "src.schemas.attempt_schema",
-        "description": "src.schemas.attempt_schema",
-        "isExtraImport": true,
-        "detail": "src.schemas.attempt_schema",
-        "documentation": {}
-    },
-    {
-        "label": "SubmitAttemptRequest",
-        "importPath": "src.schemas.attempt_schema",
-        "description": "src.schemas.attempt_schema",
-        "isExtraImport": true,
-        "detail": "src.schemas.attempt_schema",
-        "documentation": {}
-    },
-    {
-        "label": "AnswerResult",
-        "importPath": "src.schemas.attempt_schema",
-        "description": "src.schemas.attempt_schema",
-        "isExtraImport": true,
-        "detail": "src.schemas.attempt_schema",
-        "documentation": {}
-    },
-    {
-        "label": "AttemptDetail",
-        "importPath": "src.schemas.attempt_schema",
-        "description": "src.schemas.attempt_schema",
-        "isExtraImport": true,
-        "detail": "src.schemas.attempt_schema",
-        "documentation": {}
-    },
-    {
-        "label": "AttemptResult",
-        "importPath": "src.schemas.attempt_schema",
-        "description": "src.schemas.attempt_schema",
-        "isExtraImport": true,
-        "detail": "src.schemas.attempt_schema",
-        "documentation": {}
-    },
-    {
-        "label": "AttemptSummary",
-        "importPath": "src.schemas.attempt_schema",
-        "description": "src.schemas.attempt_schema",
-        "isExtraImport": true,
-        "detail": "src.schemas.attempt_schema",
-        "documentation": {}
-    },
-    {
-        "label": "FRQGrade",
-        "importPath": "src.schemas.attempt_schema",
-        "description": "src.schemas.attempt_schema",
-        "isExtraImport": true,
-        "detail": "src.schemas.attempt_schema",
-        "documentation": {}
-    },
-    {
-        "label": "SubmittedAnswer",
-        "importPath": "src.schemas.attempt_schema",
-        "description": "src.schemas.attempt_schema",
-        "isExtraImport": true,
-        "detail": "src.schemas.attempt_schema",
-        "documentation": {}
-    },
-    {
-        "label": "FRQGrade",
-        "importPath": "src.schemas.attempt_schema",
-        "description": "src.schemas.attempt_schema",
-        "isExtraImport": true,
-        "detail": "src.schemas.attempt_schema",
+        "detail": "src.dependencies",
         "documentation": {}
     },
     {
@@ -4001,6 +4466,22 @@
         "documentation": {}
     },
     {
+        "label": "LLMException",
+        "importPath": "src.utils.exceptions",
+        "description": "src.utils.exceptions",
+        "isExtraImport": true,
+        "detail": "src.utils.exceptions",
+        "documentation": {}
+    },
+    {
+        "label": "ResourceNotFoundException",
+        "importPath": "src.utils.exceptions",
+        "description": "src.utils.exceptions",
+        "isExtraImport": true,
+        "detail": "src.utils.exceptions",
+        "documentation": {}
+    },
+    {
         "label": "StudyAppException",
         "importPath": "src.utils.exceptions",
         "description": "src.utils.exceptions",
@@ -4058,6 +4539,22 @@
     },
     {
         "label": "ValidationException",
+        "importPath": "src.utils.exceptions",
+        "description": "src.utils.exceptions",
+        "isExtraImport": true,
+        "detail": "src.utils.exceptions",
+        "documentation": {}
+    },
+    {
+        "label": "LLMException",
+        "importPath": "src.utils.exceptions",
+        "description": "src.utils.exceptions",
+        "isExtraImport": true,
+        "detail": "src.utils.exceptions",
+        "documentation": {}
+    },
+    {
+        "label": "ResourceNotFoundException",
         "importPath": "src.utils.exceptions",
         "description": "src.utils.exceptions",
         "isExtraImport": true,
@@ -4379,6 +4876,22 @@
     },
     {
         "label": "ConfigDict",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "Field",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "BaseModel",
         "importPath": "pydantic",
         "description": "pydantic",
         "isExtraImport": true,
@@ -4786,6 +5299,14 @@
         "documentation": {}
     },
     {
+        "label": "LLMService",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
         "label": "GeneratedFRQ",
         "importPath": "src.services.llm_service",
         "description": "src.services.llm_service",
@@ -4839,6 +5360,70 @@
         "description": "src.services.llm_service",
         "isExtraImport": true,
         "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "LeetCodeHintRequest",
+        "importPath": "src.schemas.leetcode_schema",
+        "description": "src.schemas.leetcode_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.leetcode_schema",
+        "documentation": {}
+    },
+    {
+        "label": "LeetCodeHintResponse",
+        "importPath": "src.schemas.leetcode_schema",
+        "description": "src.schemas.leetcode_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.leetcode_schema",
+        "documentation": {}
+    },
+    {
+        "label": "LeetCodeProblemResponse",
+        "importPath": "src.schemas.leetcode_schema",
+        "description": "src.schemas.leetcode_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.leetcode_schema",
+        "documentation": {}
+    },
+    {
+        "label": "LeetCodeExample",
+        "importPath": "src.schemas.leetcode_schema",
+        "description": "src.schemas.leetcode_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.leetcode_schema",
+        "documentation": {}
+    },
+    {
+        "label": "LeetCodeHintResponse",
+        "importPath": "src.schemas.leetcode_schema",
+        "description": "src.schemas.leetcode_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.leetcode_schema",
+        "documentation": {}
+    },
+    {
+        "label": "LeetCodeProblemResponse",
+        "importPath": "src.schemas.leetcode_schema",
+        "description": "src.schemas.leetcode_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.leetcode_schema",
+        "documentation": {}
+    },
+    {
+        "label": "LeetCodeTopicTag",
+        "importPath": "src.schemas.leetcode_schema",
+        "description": "src.schemas.leetcode_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.leetcode_schema",
+        "documentation": {}
+    },
+    {
+        "label": "LeetCodeService",
+        "importPath": "src.services.leetcode_service",
+        "description": "src.services.leetcode_service",
+        "isExtraImport": true,
+        "detail": "src.services.leetcode_service",
         "documentation": {}
     },
     {
@@ -4931,6 +5516,14 @@
     },
     {
         "label": "CreateTestResponse",
+        "importPath": "src.schemas.test_schema",
+        "description": "src.schemas.test_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.test_schema",
+        "documentation": {}
+    },
+    {
+        "label": "MatchingPair",
         "importPath": "src.schemas.test_schema",
         "description": "src.schemas.test_schema",
         "isExtraImport": true,
@@ -5173,6 +5766,14 @@
         "documentation": {}
     },
     {
+        "label": "AttemptRepository",
+        "importPath": "src.repositories.attempt_repository",
+        "description": "src.repositories.attempt_repository",
+        "isExtraImport": true,
+        "detail": "src.repositories.attempt_repository",
+        "documentation": {}
+    },
+    {
         "label": "KojoRepository",
         "importPath": "src.repositories.kojo_repository",
         "description": "src.repositories.kojo_repository",
@@ -5202,6 +5803,30 @@
         "description": "src.utils.logger",
         "isExtraImport": true,
         "detail": "src.utils.logger",
+        "documentation": {}
+    },
+    {
+        "label": "dataclass",
+        "importPath": "dataclasses",
+        "description": "dataclasses",
+        "isExtraImport": true,
+        "detail": "dataclasses",
+        "documentation": {}
+    },
+    {
+        "label": "dataclass",
+        "importPath": "dataclasses",
+        "description": "dataclasses",
+        "isExtraImport": true,
+        "detail": "dataclasses",
+        "documentation": {}
+    },
+    {
+        "label": "unescape",
+        "importPath": "html",
+        "description": "html",
+        "isExtraImport": true,
+        "detail": "html",
         "documentation": {}
     },
     {
@@ -5211,15 +5836,6 @@
         "importPath": "hashlib",
         "description": "hashlib",
         "detail": "hashlib",
-        "documentation": {}
-    },
-    {
-        "label": "json",
-        "kind": 6,
-        "isExtraImport": true,
-        "importPath": "json",
-        "description": "json",
-        "detail": "json",
         "documentation": {}
     },
     {
@@ -5239,11 +5855,20 @@
         "documentation": {}
     },
     {
-        "label": "dataclass",
-        "importPath": "dataclasses",
-        "description": "dataclasses",
+        "label": "normalize_latex",
+        "importPath": "src.utils.latex_utils",
+        "description": "src.utils.latex_utils",
         "isExtraImport": true,
-        "detail": "dataclasses",
+        "detail": "src.utils.latex_utils",
+        "documentation": {}
+    },
+    {
+        "label": "random",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "random",
+        "description": "random",
+        "detail": "random",
         "documentation": {}
     },
     {
@@ -5352,6 +5977,14 @@
     },
     {
         "label": "kojo",
+        "importPath": "src.routes",
+        "description": "src.routes",
+        "isExtraImport": true,
+        "detail": "src.routes",
+        "documentation": {}
+    },
+    {
+        "label": "leetcode",
         "importPath": "src.routes",
         "description": "src.routes",
         "isExtraImport": true,
@@ -6221,6 +6854,114 @@
         "documentation": {}
     },
     {
+        "label": "upgrade",
+        "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.007_add_attempt_caching",
+        "description": "study-app-backend.src.migrations.versions.007_add_attempt_caching",
+        "peekOfCode": "def upgrade() -> None:\n    op.add_column(\"user_attempts\", sa.Column(\"status\", sa.String(20), nullable=False, server_default=\"in_progress\"))\n    op.add_column(\"user_attempts\", sa.Column(\"exited_at\", sa.DateTime(), nullable=True))\ndef downgrade() -> None:\n    op.drop_column(\"user_attempts\", \"exited_at\")\n    op.drop_column(\"user_attempts\", \"status\")",
+        "detail": "study-app-backend.src.migrations.versions.007_add_attempt_caching",
+        "documentation": {}
+    },
+    {
+        "label": "downgrade",
+        "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.007_add_attempt_caching",
+        "description": "study-app-backend.src.migrations.versions.007_add_attempt_caching",
+        "peekOfCode": "def downgrade() -> None:\n    op.drop_column(\"user_attempts\", \"exited_at\")\n    op.drop_column(\"user_attempts\", \"status\")",
+        "detail": "study-app-backend.src.migrations.versions.007_add_attempt_caching",
+        "documentation": {}
+    },
+    {
+        "label": "revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.007_add_attempt_caching",
+        "description": "study-app-backend.src.migrations.versions.007_add_attempt_caching",
+        "peekOfCode": "revision = \"007_add_attempt_caching\"\ndown_revision = \"006_add_coding_mode\"\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.add_column(\"user_attempts\", sa.Column(\"status\", sa.String(20), nullable=False, server_default=\"in_progress\"))\n    op.add_column(\"user_attempts\", sa.Column(\"exited_at\", sa.DateTime(), nullable=True))\ndef downgrade() -> None:\n    op.drop_column(\"user_attempts\", \"exited_at\")\n    op.drop_column(\"user_attempts\", \"status\")",
+        "detail": "study-app-backend.src.migrations.versions.007_add_attempt_caching",
+        "documentation": {}
+    },
+    {
+        "label": "down_revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.007_add_attempt_caching",
+        "description": "study-app-backend.src.migrations.versions.007_add_attempt_caching",
+        "peekOfCode": "down_revision = \"006_add_coding_mode\"\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.add_column(\"user_attempts\", sa.Column(\"status\", sa.String(20), nullable=False, server_default=\"in_progress\"))\n    op.add_column(\"user_attempts\", sa.Column(\"exited_at\", sa.DateTime(), nullable=True))\ndef downgrade() -> None:\n    op.drop_column(\"user_attempts\", \"exited_at\")\n    op.drop_column(\"user_attempts\", \"status\")",
+        "detail": "study-app-backend.src.migrations.versions.007_add_attempt_caching",
+        "documentation": {}
+    },
+    {
+        "label": "branch_labels",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.007_add_attempt_caching",
+        "description": "study-app-backend.src.migrations.versions.007_add_attempt_caching",
+        "peekOfCode": "branch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.add_column(\"user_attempts\", sa.Column(\"status\", sa.String(20), nullable=False, server_default=\"in_progress\"))\n    op.add_column(\"user_attempts\", sa.Column(\"exited_at\", sa.DateTime(), nullable=True))\ndef downgrade() -> None:\n    op.drop_column(\"user_attempts\", \"exited_at\")\n    op.drop_column(\"user_attempts\", \"status\")",
+        "detail": "study-app-backend.src.migrations.versions.007_add_attempt_caching",
+        "documentation": {}
+    },
+    {
+        "label": "depends_on",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.007_add_attempt_caching",
+        "description": "study-app-backend.src.migrations.versions.007_add_attempt_caching",
+        "peekOfCode": "depends_on = None\ndef upgrade() -> None:\n    op.add_column(\"user_attempts\", sa.Column(\"status\", sa.String(20), nullable=False, server_default=\"in_progress\"))\n    op.add_column(\"user_attempts\", sa.Column(\"exited_at\", sa.DateTime(), nullable=True))\ndef downgrade() -> None:\n    op.drop_column(\"user_attempts\", \"exited_at\")\n    op.drop_column(\"user_attempts\", \"status\")",
+        "detail": "study-app-backend.src.migrations.versions.007_add_attempt_caching",
+        "documentation": {}
+    },
+    {
+        "label": "upgrade",
+        "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
+        "description": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
+        "peekOfCode": "def upgrade() -> None:\n    # ### commands auto generated by Alembic - please adjust! ###\n    op.create_table('fill_blank_answers',\n    sa.Column('id', sa.Integer(), nullable=False),\n    sa.Column('question_id', sa.BigInteger().with_variant(sa.Integer(), 'sqlite'), nullable=False),\n    sa.Column('acceptable_answers_json', sa.String(), nullable=False),\n    sa.ForeignKeyConstraint(['question_id'], ['questions.id'], ondelete='CASCADE'),\n    sa.PrimaryKeyConstraint('id'),\n    sa.UniqueConstraint('question_id')\n    )",
+        "detail": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
+        "documentation": {}
+    },
+    {
+        "label": "downgrade",
+        "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
+        "description": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
+        "peekOfCode": "def downgrade() -> None:\n    # ### commands auto generated by Alembic - please adjust! ###\n    op.drop_index(op.f('ix_users_google_id'), table_name='users')\n    op.create_index('ix_users_google_id', 'users', ['google_id'], unique=False)\n    op.drop_index(op.f('ix_users_email'), table_name='users')\n    op.create_index('ix_users_email', 'users', ['email'], unique=False)\n    op.create_unique_constraint('users_google_id_key', 'users', ['google_id'])\n    op.create_unique_constraint('users_email_key', 'users', ['email'])\n    op.drop_index(op.f('ix_frq_answers_question_id'), table_name='frq_answers')\n    op.create_index('ix_frq_answers_question_id', 'frq_answers', ['question_id'], unique=False)",
+        "detail": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
+        "documentation": {}
+    },
+    {
+        "label": "revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
+        "description": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
+        "peekOfCode": "revision = '9449496ba921'\ndown_revision = '007_add_attempt_caching'\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    # ### commands auto generated by Alembic - please adjust! ###\n    op.create_table('fill_blank_answers',\n    sa.Column('id', sa.Integer(), nullable=False),\n    sa.Column('question_id', sa.BigInteger().with_variant(sa.Integer(), 'sqlite'), nullable=False),\n    sa.Column('acceptable_answers_json', sa.String(), nullable=False),",
+        "detail": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
+        "documentation": {}
+    },
+    {
+        "label": "down_revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
+        "description": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
+        "peekOfCode": "down_revision = '007_add_attempt_caching'\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    # ### commands auto generated by Alembic - please adjust! ###\n    op.create_table('fill_blank_answers',\n    sa.Column('id', sa.Integer(), nullable=False),\n    sa.Column('question_id', sa.BigInteger().with_variant(sa.Integer(), 'sqlite'), nullable=False),\n    sa.Column('acceptable_answers_json', sa.String(), nullable=False),\n    sa.ForeignKeyConstraint(['question_id'], ['questions.id'], ondelete='CASCADE'),",
+        "detail": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
+        "documentation": {}
+    },
+    {
+        "label": "branch_labels",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
+        "description": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
+        "peekOfCode": "branch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    # ### commands auto generated by Alembic - please adjust! ###\n    op.create_table('fill_blank_answers',\n    sa.Column('id', sa.Integer(), nullable=False),\n    sa.Column('question_id', sa.BigInteger().with_variant(sa.Integer(), 'sqlite'), nullable=False),\n    sa.Column('acceptable_answers_json', sa.String(), nullable=False),\n    sa.ForeignKeyConstraint(['question_id'], ['questions.id'], ondelete='CASCADE'),\n    sa.PrimaryKeyConstraint('id'),",
+        "detail": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
+        "documentation": {}
+    },
+    {
+        "label": "depends_on",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
+        "description": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
+        "peekOfCode": "depends_on = None\ndef upgrade() -> None:\n    # ### commands auto generated by Alembic - please adjust! ###\n    op.create_table('fill_blank_answers',\n    sa.Column('id', sa.Integer(), nullable=False),\n    sa.Column('question_id', sa.BigInteger().with_variant(sa.Integer(), 'sqlite'), nullable=False),\n    sa.Column('acceptable_answers_json', sa.String(), nullable=False),\n    sa.ForeignKeyConstraint(['question_id'], ['questions.id'], ondelete='CASCADE'),\n    sa.PrimaryKeyConstraint('id'),\n    sa.UniqueConstraint('question_id')",
+        "detail": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
+        "documentation": {}
+    },
+    {
         "label": "run_migrations_offline",
         "kind": 2,
         "importPath": "study-app-backend.src.migrations.env",
@@ -6281,6 +7022,15 @@
         "description": "study-app-backend.src.models.base",
         "peekOfCode": "BIGINT_ID = BigInteger().with_variant(Integer, \"sqlite\")\nclass TimestampMixin:\n    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)\n    updated_at: Mapped[datetime] = mapped_column(\n        DateTime,\n        server_default=func.now(),\n        onupdate=func.now(),\n        nullable=False,\n    )",
         "detail": "study-app-backend.src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "FillBlankAnswer",
+        "kind": 6,
+        "importPath": "study-app-backend.src.models.fill_blank_answer",
+        "description": "study-app-backend.src.models.fill_blank_answer",
+        "peekOfCode": "class FillBlankAnswer(Base):\n    \"\"\"Correct answer for a fill-in-the-blank question.\n    Stores one or more acceptable answers (for case-insensitive matching or synonyms).\n    Stored as JSON array of strings.\n    \"\"\"\n    __tablename__ = \"fill_blank_answers\"\n    id: Mapped[int] = mapped_column(primary_key=True)\n    question_id: Mapped[int] = mapped_column(ForeignKey(\"questions.id\", ondelete=\"CASCADE\"), unique=True)\n    # JSON: [\"correct_answer1\", \"acceptable_synonym\", \"another_valid_answer\"]\n    # Stored as string; caller must serialize/deserialize",
+        "detail": "study-app-backend.src.models.fill_blank_answer",
         "documentation": {}
     },
     {
@@ -6347,6 +7097,15 @@
         "documentation": {}
     },
     {
+        "label": "MatchingAnswer",
+        "kind": 6,
+        "importPath": "study-app-backend.src.models.matching_answer",
+        "description": "study-app-backend.src.models.matching_answer",
+        "peekOfCode": "class MatchingAnswer(Base):\n    \"\"\"Correct answer for a matching question.\n    Stores pairs of items (left: left_item, right: right_item) that students must match.\n    Stored as JSON string to support flexible pair structures.\n    \"\"\"\n    __tablename__ = \"matching_answers\"\n    id: Mapped[int] = mapped_column(primary_key=True)\n    question_id: Mapped[int] = mapped_column(ForeignKey(\"questions.id\", ondelete=\"CASCADE\"), unique=True)\n    # JSON: [{\"left\": \"term1\", \"right\": \"def1\"}, {\"left\": \"term2\", \"right\": \"def2\"}]\n    # Stored as string; caller must serialize/deserialize",
+        "detail": "study-app-backend.src.models.matching_answer",
+        "documentation": {}
+    },
+    {
         "label": "MCQOption",
         "kind": 6,
         "importPath": "study-app-backend.src.models.mcq_option",
@@ -6365,12 +7124,30 @@
         "documentation": {}
     },
     {
+        "label": "OrderingAnswer",
+        "kind": 6,
+        "importPath": "study-app-backend.src.models.ordering_answer",
+        "description": "study-app-backend.src.models.ordering_answer",
+        "peekOfCode": "class OrderingAnswer(Base):\n    \"\"\"Correct answer for an ordering question.\n    Stores the correct sequence of items that students must arrange.\n    Stored as JSON array to maintain order.\n    \"\"\"\n    __tablename__ = \"ordering_answers\"\n    id: Mapped[int] = mapped_column(primary_key=True)\n    question_id: Mapped[int] = mapped_column(ForeignKey(\"questions.id\", ondelete=\"CASCADE\"), unique=True)\n    # JSON: [\"item1\", \"item2\", \"item3\"]\n    # Stored as string; caller must serialize/deserialize",
+        "detail": "study-app-backend.src.models.ordering_answer",
+        "documentation": {}
+    },
+    {
         "label": "Question",
         "kind": 6,
         "importPath": "study-app-backend.src.models.question",
         "description": "study-app-backend.src.models.question",
         "peekOfCode": "class Question(Base):\n    __tablename__ = \"questions\"\n    id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)\n    test_id: Mapped[int] = mapped_column(\n        BIGINT_ID, ForeignKey(\"tests.id\", ondelete=\"CASCADE\"), nullable=False, index=True\n    )\n    question_text: Mapped[str] = mapped_column(Text, nullable=False)\n    question_type: Mapped[str] = mapped_column(String(10), nullable=False)\n    display_order: Mapped[int] = mapped_column(Integer, nullable=False)\n    test: Mapped[Test] = relationship(\"Test\", back_populates=\"questions\")",
         "detail": "study-app-backend.src.models.question",
+        "documentation": {}
+    },
+    {
+        "label": "SelectAllAnswer",
+        "kind": 6,
+        "importPath": "study-app-backend.src.models.select_all_answer",
+        "description": "study-app-backend.src.models.select_all_answer",
+        "peekOfCode": "class SelectAllAnswer(Base):\n    \"\"\"Correct answer for a select-all question.\n    Stores which options are correct (the set of correct option indices or texts).\n    Uses options table but with multiple correct answers rather than exactly one.\n    Stored as JSON array of indices or texts.\n    \"\"\"\n    __tablename__ = \"select_all_answers\"\n    id: Mapped[int] = mapped_column(primary_key=True)\n    question_id: Mapped[int] = mapped_column(ForeignKey(\"questions.id\", ondelete=\"CASCADE\"), unique=True)\n    # JSON: [0, 2, 3]  — indices of correct options",
+        "detail": "study-app-backend.src.models.select_all_answer",
         "documentation": {}
     },
     {
@@ -6486,7 +7263,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.repositories.test_repository",
         "description": "study-app-backend.src.repositories.test_repository",
-        "peekOfCode": "_QUESTION_WITH_ANSWERS = (\n    selectinload(Question.mcq_options),\n    selectinload(Question.frq_answer),\n)\nclass TestRepository(BaseRepository[Test]):\n    async def create(\n        self,\n        folder_id: int,\n        title: str,\n        test_type: str,",
+        "peekOfCode": "_QUESTION_WITH_ANSWERS = (\n    selectinload(Question.mcq_options),\n    selectinload(Question.frq_answer),\n    selectinload(Question.matching_answer),\n    selectinload(Question.ordering_answer),\n    selectinload(Question.fill_blank_answer),\n    selectinload(Question.select_all_answer),\n)\nclass TestRepository(BaseRepository[Test]):\n    async def create(",
         "detail": "study-app-backend.src.repositories.test_repository",
         "documentation": {}
     },
@@ -6574,6 +7351,15 @@
     {
         "label": "router",
         "kind": 5,
+        "importPath": "study-app-backend.src.routes.leetcode",
+        "description": "study-app-backend.src.routes.leetcode",
+        "peekOfCode": "router = APIRouter(prefix=\"/leetcode\", tags=[\"leetcode\"])\n@router.get(\"/problems/{title_slug}\", response_model=LeetCodeProblemResponse)\nasync def get_problem(\n    title_slug: str,\n    user: User = Depends(get_current_user),\n) -> LeetCodeProblemResponse:\n    try:\n        return await LeetCodeService().get_problem(title_slug)\n    except ResourceNotFoundException as exc:\n        raise HTTPException(status_code=404, detail=str(exc)) from exc",
+        "detail": "study-app-backend.src.routes.leetcode",
+        "documentation": {}
+    },
+    {
+        "label": "router",
+        "kind": 5,
         "importPath": "study-app-backend.src.routes.tests",
         "description": "study-app-backend.src.routes.tests",
         "peekOfCode": "router = APIRouter(tags=[\"tests\"])\n@router.post(\n    \"/folders/{folder_id}/tests\",\n    response_model=CreateTestResponse,\n    status_code=status.HTTP_201_CREATED,\n)\nasync def create_test(\n    folder_id: int,\n    request: Request,\n    session: AsyncSession = Depends(get_session),",
@@ -6621,7 +7407,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.attempt_schema",
         "description": "study-app-backend.src.schemas.attempt_schema",
-        "peekOfCode": "class AttemptSummary(BaseModel):\n    id: int\n    attempt_number: int\n    score: float\n    correct_count: int\n    total: int\n    created_at: datetime\nclass AttemptDetail(AttemptSummary):\n    test_title: str = \"\"\n    answers: list[AnswerResult]",
+        "peekOfCode": "class AttemptSummary(BaseModel):\n    id: int\n    attempt_number: int\n    score: float\n    correct_count: int\n    total: int\n    created_at: datetime\nclass AttemptDetail(AttemptSummary):\n    test_id: int\n    folder_id: Optional[int] = None",
         "detail": "study-app-backend.src.schemas.attempt_schema",
         "documentation": {}
     },
@@ -6630,7 +7416,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.attempt_schema",
         "description": "study-app-backend.src.schemas.attempt_schema",
-        "peekOfCode": "class AttemptDetail(AttemptSummary):\n    test_title: str = \"\"\n    answers: list[AnswerResult]\nclass FRQGrade(BaseModel):\n    is_correct: bool\n    feedback: Optional[str] = None\n    flagged_uncertain: bool = False\n    confidence: float = 0.0",
+        "peekOfCode": "class AttemptDetail(AttemptSummary):\n    test_id: int\n    folder_id: Optional[int] = None\n    test_title: str = \"\"\n    answers: list[AnswerResult]\nclass FRQGrade(BaseModel):\n    is_correct: bool\n    feedback: Optional[str] = None\n    flagged_uncertain: bool = False\n    confidence: float = 0.0",
         "detail": "study-app-backend.src.schemas.attempt_schema",
         "documentation": {}
     },
@@ -6639,7 +7425,43 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.attempt_schema",
         "description": "study-app-backend.src.schemas.attempt_schema",
-        "peekOfCode": "class FRQGrade(BaseModel):\n    is_correct: bool\n    feedback: Optional[str] = None\n    flagged_uncertain: bool = False\n    confidence: float = 0.0",
+        "peekOfCode": "class FRQGrade(BaseModel):\n    is_correct: bool\n    feedback: Optional[str] = None\n    flagged_uncertain: bool = False\n    confidence: float = 0.0\nclass DraftAttemptAnswer(BaseModel):\n    \"\"\"A draft answer saved while test is in progress.\"\"\"\n    question_id: int\n    user_answer: str = Field(..., min_length=0, max_length=5000)  # Allow empty for drafts\nclass SaveDraftAttemptRequest(BaseModel):",
+        "detail": "study-app-backend.src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "DraftAttemptAnswer",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.attempt_schema",
+        "description": "study-app-backend.src.schemas.attempt_schema",
+        "peekOfCode": "class DraftAttemptAnswer(BaseModel):\n    \"\"\"A draft answer saved while test is in progress.\"\"\"\n    question_id: int\n    user_answer: str = Field(..., min_length=0, max_length=5000)  # Allow empty for drafts\nclass SaveDraftAttemptRequest(BaseModel):\n    \"\"\"Save current progress on a test.\"\"\"\n    answers: list[DraftAttemptAnswer] = Field(..., min_length=0)\nclass ResumableTestInfo(BaseModel):\n    \"\"\"Info about a test that can be resumed.\"\"\"\n    test_id: int",
+        "detail": "study-app-backend.src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SaveDraftAttemptRequest",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.attempt_schema",
+        "description": "study-app-backend.src.schemas.attempt_schema",
+        "peekOfCode": "class SaveDraftAttemptRequest(BaseModel):\n    \"\"\"Save current progress on a test.\"\"\"\n    answers: list[DraftAttemptAnswer] = Field(..., min_length=0)\nclass ResumableTestInfo(BaseModel):\n    \"\"\"Info about a test that can be resumed.\"\"\"\n    test_id: int\n    test_title: str\n    attempt_id: int\n    attempt_number: int\n    exited_at: datetime",
+        "detail": "study-app-backend.src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "ResumableTestInfo",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.attempt_schema",
+        "description": "study-app-backend.src.schemas.attempt_schema",
+        "peekOfCode": "class ResumableTestInfo(BaseModel):\n    \"\"\"Info about a test that can be resumed.\"\"\"\n    test_id: int\n    test_title: str\n    attempt_id: int\n    attempt_number: int\n    exited_at: datetime\n    answered_question_count: int\n    total_question_count: int\nclass DraftAttemptResponse(BaseModel):",
+        "detail": "study-app-backend.src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "DraftAttemptResponse",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.attempt_schema",
+        "description": "study-app-backend.src.schemas.attempt_schema",
+        "peekOfCode": "class DraftAttemptResponse(BaseModel):\n    \"\"\"Response when loading a draft attempt for resuming.\"\"\"\n    attempt_id: int\n    attempt_number: int\n    answers: list[DraftAttemptAnswer]\n    exited_at: Optional[datetime] = None",
         "detail": "study-app-backend.src.schemas.attempt_schema",
         "documentation": {}
     },
@@ -6765,7 +7587,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.kojo_schema",
         "description": "study-app-backend.src.schemas.kojo_schema",
-        "peekOfCode": "class KojoChatRequest(BaseModel):\n    message: str = Field(..., min_length=1, max_length=2000)\n    provider: Optional[str] = Field(default=None, description=\"Optional LLM provider override: 'auto', 'groq', 'ollama', or 'gemini'\")\nclass KojoChatResponse(BaseModel):\n    response: str\n    conversation_id: int\n    message_id: int\n    flagged_uncertain: bool = False\nclass KojoClearResponse(BaseModel):\n    conversation_id: int",
+        "peekOfCode": "class KojoChatRequest(BaseModel):\n    message: str = Field(..., min_length=1, max_length=2000)\n    provider: Optional[str] = Field(default=None, description=\"Optional LLM provider override: 'auto', 'groq', 'ollama', or 'gemini'\")\n    beta_enabled: bool = Field(default=False)\nclass KojoChatResponse(BaseModel):\n    response: str\n    conversation_id: int\n    message_id: int\n    flagged_uncertain: bool = False\nclass KojoClearResponse(BaseModel):",
         "detail": "study-app-backend.src.schemas.kojo_schema",
         "documentation": {}
     },
@@ -6806,6 +7628,51 @@
         "documentation": {}
     },
     {
+        "label": "LeetCodeExample",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.leetcode_schema",
+        "description": "study-app-backend.src.schemas.leetcode_schema",
+        "peekOfCode": "class LeetCodeExample(BaseModel):\n    index: int\n    input_text: str\n    output_text: str\n    explanation_text: Optional[str] = None\nclass LeetCodeTopicTag(BaseModel):\n    name: str\n    slug: str\nclass LeetCodeProblemResponse(BaseModel):\n    title: str",
+        "detail": "study-app-backend.src.schemas.leetcode_schema",
+        "documentation": {}
+    },
+    {
+        "label": "LeetCodeTopicTag",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.leetcode_schema",
+        "description": "study-app-backend.src.schemas.leetcode_schema",
+        "peekOfCode": "class LeetCodeTopicTag(BaseModel):\n    name: str\n    slug: str\nclass LeetCodeProblemResponse(BaseModel):\n    title: str\n    title_slug: str\n    difficulty: str\n    content_html: str\n    examples: list[LeetCodeExample]\n    example_testcases: list[str]",
+        "detail": "study-app-backend.src.schemas.leetcode_schema",
+        "documentation": {}
+    },
+    {
+        "label": "LeetCodeProblemResponse",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.leetcode_schema",
+        "description": "study-app-backend.src.schemas.leetcode_schema",
+        "peekOfCode": "class LeetCodeProblemResponse(BaseModel):\n    title: str\n    title_slug: str\n    difficulty: str\n    content_html: str\n    examples: list[LeetCodeExample]\n    example_testcases: list[str]\n    python_snippet: Optional[str] = None\n    topic_tags: list[LeetCodeTopicTag]\nclass LeetCodeHintRequest(BaseModel):",
+        "detail": "study-app-backend.src.schemas.leetcode_schema",
+        "documentation": {}
+    },
+    {
+        "label": "LeetCodeHintRequest",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.leetcode_schema",
+        "description": "study-app-backend.src.schemas.leetcode_schema",
+        "peekOfCode": "class LeetCodeHintRequest(BaseModel):\n    title_slug: str = Field(..., min_length=1)\n    title: str = Field(..., min_length=1)\n    message: str = Field(..., min_length=1, max_length=2500)\n    user_code: str = Field(default=\"\", max_length=20000)\n    provider: Optional[str] = Field(default=None)\n    beta_enabled: bool = Field(default=False)\nclass LeetCodeHintResponse(BaseModel):\n    response: str\n    flagged_uncertain: bool = False",
+        "detail": "study-app-backend.src.schemas.leetcode_schema",
+        "documentation": {}
+    },
+    {
+        "label": "LeetCodeHintResponse",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.leetcode_schema",
+        "description": "study-app-backend.src.schemas.leetcode_schema",
+        "peekOfCode": "class LeetCodeHintResponse(BaseModel):\n    response: str\n    flagged_uncertain: bool = False",
+        "detail": "study-app-backend.src.schemas.leetcode_schema",
+        "documentation": {}
+    },
+    {
         "label": "MCQOptionPublic",
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
@@ -6819,7 +7686,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class MCQOptionEditable(BaseModel):\n    id: int\n    text: str\n    is_correct: bool\nclass MCQOptionInput(BaseModel):\n    text: str\n    is_correct: bool\nclass QuestionPublic(BaseModel):\n    id: int\n    type: str",
+        "peekOfCode": "class MCQOptionEditable(BaseModel):\n    id: int\n    text: str\n    is_correct: bool\nclass MCQOptionInput(BaseModel):\n    text: str\n    is_correct: bool\n# New question type schemas for beta features\nclass MatchingPair(BaseModel):\n    \"\"\"One term-definition or left-right pair for matching questions.\"\"\"",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -6828,7 +7695,52 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class MCQOptionInput(BaseModel):\n    text: str\n    is_correct: bool\nclass QuestionPublic(BaseModel):\n    id: int\n    type: str\n    question_text: str\n    options: list[MCQOptionPublic] = Field(default_factory=list)\nclass QuestionEditable(BaseModel):\n    id: int",
+        "peekOfCode": "class MCQOptionInput(BaseModel):\n    text: str\n    is_correct: bool\n# New question type schemas for beta features\nclass MatchingPair(BaseModel):\n    \"\"\"One term-definition or left-right pair for matching questions.\"\"\"\n    left: str\n    right: str\nclass MatchingPairInput(BaseModel):\n    left: str = Field(min_length=1)",
+        "detail": "study-app-backend.src.schemas.test_schema",
+        "documentation": {}
+    },
+    {
+        "label": "MatchingPair",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.test_schema",
+        "description": "study-app-backend.src.schemas.test_schema",
+        "peekOfCode": "class MatchingPair(BaseModel):\n    \"\"\"One term-definition or left-right pair for matching questions.\"\"\"\n    left: str\n    right: str\nclass MatchingPairInput(BaseModel):\n    left: str = Field(min_length=1)\n    right: str = Field(min_length=1)\nclass SelectAllOption(BaseModel):\n    \"\"\"Option for select-all question (like MCQ but multiple correct answers).\"\"\"\n    id: int",
+        "detail": "study-app-backend.src.schemas.test_schema",
+        "documentation": {}
+    },
+    {
+        "label": "MatchingPairInput",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.test_schema",
+        "description": "study-app-backend.src.schemas.test_schema",
+        "peekOfCode": "class MatchingPairInput(BaseModel):\n    left: str = Field(min_length=1)\n    right: str = Field(min_length=1)\nclass SelectAllOption(BaseModel):\n    \"\"\"Option for select-all question (like MCQ but multiple correct answers).\"\"\"\n    id: int\n    text: str\n    is_correct: None = None  # Hidden from student\nclass SelectAllOptionEditable(BaseModel):\n    id: int",
+        "detail": "study-app-backend.src.schemas.test_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SelectAllOption",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.test_schema",
+        "description": "study-app-backend.src.schemas.test_schema",
+        "peekOfCode": "class SelectAllOption(BaseModel):\n    \"\"\"Option for select-all question (like MCQ but multiple correct answers).\"\"\"\n    id: int\n    text: str\n    is_correct: None = None  # Hidden from student\nclass SelectAllOptionEditable(BaseModel):\n    id: int\n    text: str\n    is_correct: bool\nclass SelectAllOptionInput(BaseModel):",
+        "detail": "study-app-backend.src.schemas.test_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SelectAllOptionEditable",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.test_schema",
+        "description": "study-app-backend.src.schemas.test_schema",
+        "peekOfCode": "class SelectAllOptionEditable(BaseModel):\n    id: int\n    text: str\n    is_correct: bool\nclass SelectAllOptionInput(BaseModel):\n    text: str\n    is_correct: bool\nclass QuestionPublic(BaseModel):\n    id: int\n    type: str",
+        "detail": "study-app-backend.src.schemas.test_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SelectAllOptionInput",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.test_schema",
+        "description": "study-app-backend.src.schemas.test_schema",
+        "peekOfCode": "class SelectAllOptionInput(BaseModel):\n    text: str\n    is_correct: bool\nclass QuestionPublic(BaseModel):\n    id: int\n    type: str\n    question_text: str\n    # MCQ/select_all fields\n    options: list[MCQOptionPublic] = Field(default_factory=list)\n    # Matching fields",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -6837,7 +7749,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class QuestionPublic(BaseModel):\n    id: int\n    type: str\n    question_text: str\n    options: list[MCQOptionPublic] = Field(default_factory=list)\nclass QuestionEditable(BaseModel):\n    id: int\n    type: str\n    question_text: str\n    options: list[MCQOptionEditable] = Field(default_factory=list)",
+        "peekOfCode": "class QuestionPublic(BaseModel):\n    id: int\n    type: str\n    question_text: str\n    # MCQ/select_all fields\n    options: list[MCQOptionPublic] = Field(default_factory=list)\n    # Matching fields\n    matching_pairs: list[MatchingPair] = Field(default_factory=list)\n    # Ordering fields\n    ordering_items: list[str] = Field(default_factory=list)",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -6846,7 +7758,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class QuestionEditable(BaseModel):\n    id: int\n    type: str\n    question_text: str\n    options: list[MCQOptionEditable] = Field(default_factory=list)\n    expected_answer: Optional[str] = None\nclass QuestionCreate(BaseModel):\n    type: str\n    question_text: str = Field(min_length=1)\n    options: list[MCQOptionInput] = Field(default_factory=list)",
+        "peekOfCode": "class QuestionEditable(BaseModel):\n    id: int\n    type: str\n    question_text: str\n    # MCQ/select_all fields\n    options: list[MCQOptionEditable] = Field(default_factory=list)\n    # Matching fields\n    matching_pairs: list[MatchingPair] = Field(default_factory=list)\n    # Ordering fields\n    ordering_items: list[str] = Field(default_factory=list)",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -6855,7 +7767,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class QuestionCreate(BaseModel):\n    type: str\n    question_text: str = Field(min_length=1)\n    options: list[MCQOptionInput] = Field(default_factory=list)\n    expected_answer: Optional[str] = None\nclass QuestionUpdate(BaseModel):\n    question_text: Optional[str] = Field(default=None, min_length=1)\n    options: Optional[list[MCQOptionInput]] = None\n    expected_answer: Optional[str] = None\nclass TestResponse(BaseModel):",
+        "peekOfCode": "class QuestionCreate(BaseModel):\n    type: str\n    question_text: str = Field(min_length=1)\n    # MCQ/select_all fields\n    options: list[MCQOptionInput] = Field(default_factory=list)\n    # Matching fields\n    matching_pairs: list[MatchingPairInput] = Field(default_factory=list)\n    # Ordering fields\n    ordering_items: list[str] = Field(default_factory=list)\n    # FRQ/fill_blank expected answer",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -6864,7 +7776,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class QuestionUpdate(BaseModel):\n    question_text: Optional[str] = Field(default=None, min_length=1)\n    options: Optional[list[MCQOptionInput]] = None\n    expected_answer: Optional[str] = None\nclass TestResponse(BaseModel):\n    model_config = ConfigDict(from_attributes=True)\n    id: int\n    folder_id: int\n    title: str\n    description: Optional[str] = None",
+        "peekOfCode": "class QuestionUpdate(BaseModel):\n    question_text: Optional[str] = Field(default=None, min_length=1)\n    # MCQ/select_all fields\n    options: Optional[list[MCQOptionInput]] = None\n    # Matching fields\n    matching_pairs: Optional[list[MatchingPairInput]] = None\n    # Ordering fields\n    ordering_items: Optional[list[str]] = None\n    # FRQ/fill_blank expected answer\n    expected_answer: Optional[str] = None",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -6972,7 +7884,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.services.kojo_service",
         "description": "study-app-backend.src.services.kojo_service",
-        "peekOfCode": "class KojoService:\n    async def chat(\n        self,\n        user_id: int,\n        folder_id: int,\n        user_message: str,\n        session: AsyncSession,\n        provider: Optional[str] = None,\n    ) -> KojoChatResponse:\n        repo = KojoRepository(session)",
+        "peekOfCode": "class KojoService:\n    async def chat(\n        self,\n        user_id: int,\n        folder_id: int,\n        user_message: str,\n        session: AsyncSession,\n        provider: Optional[str] = None,\n        beta_enabled: bool = False,\n    ) -> KojoChatResponse:",
         "detail": "study-app-backend.src.services.kojo_service",
         "documentation": {}
     },
@@ -6981,7 +7893,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.kojo_service",
         "description": "study-app-backend.src.services.kojo_service",
-        "peekOfCode": "logger = get_logger(__name__)\n_NO_NOTES = \"[No study materials uploaded yet. Ask the student to upload notes first.]\"\n_CLEAR_WINDOW_HOURS = 5\nclass KojoService:\n    async def chat(\n        self,\n        user_id: int,\n        folder_id: int,\n        user_message: str,\n        session: AsyncSession,",
+        "peekOfCode": "logger = get_logger(__name__)\n_NO_NOTES = \"[No study materials uploaded yet. Ask the student to upload notes first.]\"\n_CLEAR_WINDOW_HOURS = 5\ndef _is_review_wrong_answers_request(user_message: str) -> bool:\n    \"\"\"Check if user is asking to review wrong answers from their test.\"\"\"\n    message_lower = user_message.lower()\n    review_keywords = [\n        \"review.*wrong\",\n        \"wrong.*answer\",\n        \"check.*wrong\",",
         "detail": "study-app-backend.src.services.kojo_service",
         "documentation": {}
     },
@@ -6990,7 +7902,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.kojo_service",
         "description": "study-app-backend.src.services.kojo_service",
-        "peekOfCode": "_NO_NOTES = \"[No study materials uploaded yet. Ask the student to upload notes first.]\"\n_CLEAR_WINDOW_HOURS = 5\nclass KojoService:\n    async def chat(\n        self,\n        user_id: int,\n        folder_id: int,\n        user_message: str,\n        session: AsyncSession,\n        provider: Optional[str] = None,",
+        "peekOfCode": "_NO_NOTES = \"[No study materials uploaded yet. Ask the student to upload notes first.]\"\n_CLEAR_WINDOW_HOURS = 5\ndef _is_review_wrong_answers_request(user_message: str) -> bool:\n    \"\"\"Check if user is asking to review wrong answers from their test.\"\"\"\n    message_lower = user_message.lower()\n    review_keywords = [\n        \"review.*wrong\",\n        \"wrong.*answer\",\n        \"check.*wrong\",\n        \"see.*wrong\",",
         "detail": "study-app-backend.src.services.kojo_service",
         "documentation": {}
     },
@@ -6999,7 +7911,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.kojo_service",
         "description": "study-app-backend.src.services.kojo_service",
-        "peekOfCode": "_CLEAR_WINDOW_HOURS = 5\nclass KojoService:\n    async def chat(\n        self,\n        user_id: int,\n        folder_id: int,\n        user_message: str,\n        session: AsyncSession,\n        provider: Optional[str] = None,\n    ) -> KojoChatResponse:",
+        "peekOfCode": "_CLEAR_WINDOW_HOURS = 5\ndef _is_review_wrong_answers_request(user_message: str) -> bool:\n    \"\"\"Check if user is asking to review wrong answers from their test.\"\"\"\n    message_lower = user_message.lower()\n    review_keywords = [\n        \"review.*wrong\",\n        \"wrong.*answer\",\n        \"check.*wrong\",\n        \"see.*wrong\",\n        \"what.*wrong\",",
         "detail": "study-app-backend.src.services.kojo_service",
         "documentation": {}
     },
@@ -7013,11 +7925,47 @@
         "documentation": {}
     },
     {
+        "label": "_FetchedProblem",
+        "kind": 6,
+        "importPath": "study-app-backend.src.services.leetcode_service",
+        "description": "study-app-backend.src.services.leetcode_service",
+        "peekOfCode": "class _FetchedProblem:\n    title: str\n    title_slug: str\n    difficulty: str\n    content_html: str\n    examples: list[LeetCodeExample]\n    example_testcases: list[str]\n    python_snippet: Optional[str]\n    topic_tags: list[LeetCodeTopicTag]\nclass LeetCodeService:",
+        "detail": "study-app-backend.src.services.leetcode_service",
+        "documentation": {}
+    },
+    {
+        "label": "LeetCodeService",
+        "kind": 6,
+        "importPath": "study-app-backend.src.services.leetcode_service",
+        "description": "study-app-backend.src.services.leetcode_service",
+        "peekOfCode": "class LeetCodeService:\n    async def get_problem(self, title_slug: str) -> LeetCodeProblemResponse:\n        problem = await self._fetch_problem(title_slug)\n        return LeetCodeProblemResponse(\n            title=problem.title,\n            title_slug=problem.title_slug,\n            difficulty=problem.difficulty,\n            content_html=problem.content_html,\n            examples=problem.examples,\n            example_testcases=problem.example_testcases,",
+        "detail": "study-app-backend.src.services.leetcode_service",
+        "documentation": {}
+    },
+    {
+        "label": "_LEETCODE_GRAPHQL_URL",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.leetcode_service",
+        "description": "study-app-backend.src.services.leetcode_service",
+        "peekOfCode": "_LEETCODE_GRAPHQL_URL = \"https://leetcode.com/graphql\"\n_REQUEST_TIMEOUT_SECONDS = 30\n@dataclass(frozen=True)\nclass _FetchedProblem:\n    title: str\n    title_slug: str\n    difficulty: str\n    content_html: str\n    examples: list[LeetCodeExample]\n    example_testcases: list[str]",
+        "detail": "study-app-backend.src.services.leetcode_service",
+        "documentation": {}
+    },
+    {
+        "label": "_REQUEST_TIMEOUT_SECONDS",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.leetcode_service",
+        "description": "study-app-backend.src.services.leetcode_service",
+        "peekOfCode": "_REQUEST_TIMEOUT_SECONDS = 30\n@dataclass(frozen=True)\nclass _FetchedProblem:\n    title: str\n    title_slug: str\n    difficulty: str\n    content_html: str\n    examples: list[LeetCodeExample]\n    example_testcases: list[str]\n    python_snippet: Optional[str]",
+        "detail": "study-app-backend.src.services.leetcode_service",
+        "documentation": {}
+    },
+    {
         "label": "GeneratedMCQ",
         "kind": 6,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "class GeneratedMCQ:\n    question_text: str\n    options: list[str]\n    correct_index: int\n@dataclass(frozen=True)\nclass GeneratedFRQ:\n    question_text: str\n    expected_answer: str\n@dataclass(frozen=True)\nclass GeneratedFlashcard:",
+        "peekOfCode": "class GeneratedMCQ:\n    question_text: str\n    options: list[str]\n    correct_index: int\n@dataclass(frozen=True)\nclass GeneratedFRQ:\n    question_text: str\n    expected_answer: str\n@dataclass(frozen=True)\nclass GeneratedMatching:",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -7026,7 +7974,43 @@
         "kind": 6,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "class GeneratedFRQ:\n    question_text: str\n    expected_answer: str\n@dataclass(frozen=True)\nclass GeneratedFlashcard:\n    front: str\n    back: str\n@dataclass(frozen=True)\nclass _ExtractedTerm:\n    term: str",
+        "peekOfCode": "class GeneratedFRQ:\n    question_text: str\n    expected_answer: str\n@dataclass(frozen=True)\nclass GeneratedMatching:\n    question_text: str\n    pairs: list[dict[str, str]]\n@dataclass(frozen=True)\nclass GeneratedOrdering:\n    question_text: str",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "GeneratedMatching",
+        "kind": 6,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "class GeneratedMatching:\n    question_text: str\n    pairs: list[dict[str, str]]\n@dataclass(frozen=True)\nclass GeneratedOrdering:\n    question_text: str\n    correct_order: list[str]\n@dataclass(frozen=True)\nclass GeneratedFillBlank:\n    question_text: str",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "GeneratedOrdering",
+        "kind": 6,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "class GeneratedOrdering:\n    question_text: str\n    correct_order: list[str]\n@dataclass(frozen=True)\nclass GeneratedFillBlank:\n    question_text: str\n    acceptable_answers: list[str]\n@dataclass(frozen=True)\nclass GeneratedSelectAll:\n    question_text: str",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "GeneratedFillBlank",
+        "kind": 6,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "class GeneratedFillBlank:\n    question_text: str\n    acceptable_answers: list[str]\n@dataclass(frozen=True)\nclass GeneratedSelectAll:\n    question_text: str\n    options: list[str]\n    correct_indices: list[int]\n@dataclass(frozen=True)\nclass GeneratedFlashcard:",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "GeneratedSelectAll",
+        "kind": 6,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "class GeneratedSelectAll:\n    question_text: str\n    options: list[str]\n    correct_indices: list[int]\n@dataclass(frozen=True)\nclass GeneratedFlashcard:\n    front: str\n    back: str\n@dataclass(frozen=True)\nclass _ExtractedTerm:",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -7044,7 +8028,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "class _ExtractedTerm:\n    term: str\n    definition: str\n@dataclass(frozen=True)\nclass _StudyContent:\n    title: str\n    terms: list[_ExtractedTerm]\n    concepts: list[str]\n_EXTRACT_CHAR_LIMIT = 10_000\n_GENERATE_CHAR_LIMIT = 8_000",
+        "peekOfCode": "class _ExtractedTerm:\n    term: str\n    definition: str\n@dataclass(frozen=True)\nclass _StudyContent:\n    title: str\n    terms: list[_ExtractedTerm]\n    concepts: list[str]\n@dataclass(frozen=True)\nclass _PracticeTestStyle:",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -7053,7 +8037,16 @@
         "kind": 6,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "class _StudyContent:\n    title: str\n    terms: list[_ExtractedTerm]\n    concepts: list[str]\n_EXTRACT_CHAR_LIMIT = 10_000\n_GENERATE_CHAR_LIMIT = 8_000\n_RETRIEVAL_EMBEDDING_DIM = 384\n_RETRIEVAL_CHUNK_WORDS = 160\n_RETRIEVAL_CHUNK_OVERLAP_WORDS = 40\n_RETRIEVAL_TOP_K = 6",
+        "peekOfCode": "class _StudyContent:\n    title: str\n    terms: list[_ExtractedTerm]\n    concepts: list[str]\n@dataclass(frozen=True)\nclass _PracticeTestStyle:\n    \"\"\"Analysis of a practice test's question style and format.\"\"\"\n    mcq_count: int\n    frq_count: int\n    mcq_patterns: list[str]  # Summary of MCQ phrasing/types",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_PracticeTestStyle",
+        "kind": 6,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "class _PracticeTestStyle:\n    \"\"\"Analysis of a practice test's question style and format.\"\"\"\n    mcq_count: int\n    frq_count: int\n    mcq_patterns: list[str]  # Summary of MCQ phrasing/types\n    frq_patterns: list[str]  # Summary of FRQ phrasing/types\n    difficulty_indicators: str  # Inferred difficulty level\n    subject_hints: str  # Domain/subject indicators from the test\n_EXTRACT_CHAR_LIMIT = 10_000\n_GENERATE_CHAR_LIMIT = 8_000",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -7161,7 +8154,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.services.test_service",
         "description": "study-app-backend.src.services.test_service",
-        "peekOfCode": "class TestService:\n    def __init__(\n        self,\n        llm_service: Optional[LLMService] = None,\n        file_service: Optional[FileService] = None,\n    ) -> None:\n        self.llm_service = llm_service or LLMService()\n        self.file_service = file_service or FileService()\n    async def create_test(\n        self,",
+        "peekOfCode": "class TestService:\n    def __init__(\n        self,\n        llm_service: Optional[LLMService] = None,\n        file_service: Optional[FileService] = None,\n    ) -> None:\n        self.llm_service = llm_service or LLMService()\n        self.file_service = file_service or FileService()\n    def _summarize_note_file_name(self, filenames: list[str], fallback: str) -> str:\n        names = [name.strip() for name in filenames if name and name.strip()]",
         "detail": "study-app-backend.src.services.test_service",
         "documentation": {}
     },
@@ -7211,6 +8204,15 @@
         "documentation": {}
     },
     {
+        "label": "normalize_latex",
+        "kind": 2,
+        "importPath": "study-app-backend.src.utils.latex_utils",
+        "description": "study-app-backend.src.utils.latex_utils",
+        "peekOfCode": "def normalize_latex(text: str) -> str:\n    \"\"\"Normalize common LaTeX usage in free text.\n    Heuristics applied:\n    - Convert `\\\\[...]` -> `$$...$$`, `\\\\(...)` -> `$...$`, and environments to display math\n    - Wrap bare LaTeX command sequences (e.g. `\\frac{a}{b}`, `\\sqrt{x}`) in `$...$` when they are\n      not already inside `$...$` or `$$...$$`.\n    This is intentionally conservative: it avoids attempting full TeX parsing and focuses on\n    common cases that cause inconsistent rendering in the app.\n    \"\"\"\n    if not text:",
+        "detail": "study-app-backend.src.utils.latex_utils",
+        "documentation": {}
+    },
+    {
         "label": "get_logger",
         "kind": 2,
         "importPath": "study-app-backend.src.utils.logger",
@@ -7233,7 +8235,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.utils.validators",
         "description": "study-app-backend.src.utils.validators",
-        "peekOfCode": "VALID_TEST_TYPES = {\"MCQ_only\", \"FRQ_only\", \"mixed\"}\nVALID_QUESTION_TYPES = {\"MCQ\", \"FRQ\"}\nALLOWED_FILE_TYPES = {\"pdf\", \"txt\", \"md\", \"docx\"}\nMAX_UPLOAD_DOCUMENTS = 30\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
+        "peekOfCode": "VALID_TEST_TYPES = {\"MCQ_only\", \"FRQ_only\", \"mixed\", \"Extreme\"}\nVALID_QUESTION_TYPES = {\"MCQ\", \"FRQ\", \"matching\", \"ordering\", \"fill_blank\", \"select_all\"}\nALLOWED_FILE_TYPES = {\"pdf\", \"txt\", \"md\", \"docx\"}\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\nMAX_UPLOAD_DOCUMENTS = 30\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
         "detail": "study-app-backend.src.utils.validators",
         "documentation": {}
     },
@@ -7242,7 +8244,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.utils.validators",
         "description": "study-app-backend.src.utils.validators",
-        "peekOfCode": "VALID_QUESTION_TYPES = {\"MCQ\", \"FRQ\"}\nALLOWED_FILE_TYPES = {\"pdf\", \"txt\", \"md\", \"docx\"}\nMAX_UPLOAD_DOCUMENTS = 30\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
+        "peekOfCode": "VALID_QUESTION_TYPES = {\"MCQ\", \"FRQ\", \"matching\", \"ordering\", \"fill_blank\", \"select_all\"}\nALLOWED_FILE_TYPES = {\"pdf\", \"txt\", \"md\", \"docx\"}\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\nMAX_UPLOAD_DOCUMENTS = 30\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
         "detail": "study-app-backend.src.utils.validators",
         "documentation": {}
     },
@@ -7251,7 +8253,16 @@
         "kind": 5,
         "importPath": "study-app-backend.src.utils.validators",
         "description": "study-app-backend.src.utils.validators",
-        "peekOfCode": "ALLOWED_FILE_TYPES = {\"pdf\", \"txt\", \"md\", \"docx\"}\nMAX_UPLOAD_DOCUMENTS = 30\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
+        "peekOfCode": "ALLOWED_FILE_TYPES = {\"pdf\", \"txt\", \"md\", \"docx\"}\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\nMAX_UPLOAD_DOCUMENTS = 30\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
+        "detail": "study-app-backend.src.utils.validators",
+        "documentation": {}
+    },
+    {
+        "label": "MAX_UPLOAD_FILE_SIZE_BYTES",
+        "kind": 5,
+        "importPath": "study-app-backend.src.utils.validators",
+        "description": "study-app-backend.src.utils.validators",
+        "peekOfCode": "MAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\nMAX_UPLOAD_DOCUMENTS = 30\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
         "detail": "study-app-backend.src.utils.validators",
         "documentation": {}
     },
@@ -7287,7 +8298,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.config",
         "description": "study-app-backend.src.config",
-        "peekOfCode": "settings = Settings()",
+        "peekOfCode": "settings = Settings()\n# If an Ollama API key is provided, prefer the cloud endpoint unless the user explicitly set another base URL.\ntry:\n    if settings.ollama_api_key:\n        # If still pointing at the local default, switch to Ollama Cloud API endpoint.\n        if settings.ollama_base_url.strip() in (\"http://localhost:11434\", \"http://127.0.0.1:11434\"):\n            settings.ollama_base_url = \"https://api.ollama.com\"\n        # Convenience boolean for other modules to detect cloud usage.\n        settings.ollama_is_cloud = True\nexcept Exception:",
         "detail": "study-app-backend.src.config",
         "documentation": {}
     },
@@ -7296,7 +8307,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.database",
         "description": "study-app-backend.src.database",
-        "peekOfCode": "engine = create_async_engine(settings.database_url, echo=False, future=True)\nasync_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)\nasync def get_session() -> AsyncIterator[AsyncSession]:\n    async with async_session_maker() as session:\n        yield session",
+        "peekOfCode": "engine = create_async_engine(\n    settings.database_url,\n    echo=False,\n    future=True,\n    pool_pre_ping=True,\n    pool_recycle=1800,\n)\nasync_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)\nasync def get_session() -> AsyncIterator[AsyncSession]:\n    async with async_session_maker() as session:",
         "detail": "study-app-backend.src.database",
         "documentation": {}
     },

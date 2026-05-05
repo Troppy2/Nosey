@@ -1,7 +1,8 @@
-import { AlertCircle, Bot, Check, ChevronUp, Maximize2, Minimize2, Send, Sparkles, Trash2, X } from "lucide-react";
+import { AlertCircle, Bot, Maximize2, Minimize2, Send, Sparkles, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { clearKojoConversation, fetchKojoConversation, fetchProviderStatus, kojoChat } from "../lib/api";
 import type { KojoMessage, ProviderStatus } from "../lib/types";
+import { useSettings } from "../lib/useSettings";
 import { MarkdownContent } from "./MarkdownContent";
 
 interface KojoChatProps {
@@ -25,14 +26,6 @@ const PROVIDER_LABELS: Record<string, string> = {
   ollama: "Ollama (local)",
 };
 
-const PROVIDER_SHORT: Record<string, string> = {
-  auto: "Auto",
-  claude: "Claude",
-  gemini: "Gemini",
-  groq: "Groq",
-  ollama: "Ollama",
-};
-
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
@@ -45,12 +38,10 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearNotice, setClearNotice] = useState<string | null>(null);
-  const [provider, setProvider] = useState<string>(() => localStorage.getItem("kojo_llm_provider") || "auto");
   const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
-  const [modelOpen, setModelOpen] = useState(false);
+  const { generationProvider } = useSettings();
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const modelPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchKojoConversation(folderId).then((conv) => {
@@ -71,19 +62,8 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
     return () => { document.body.style.overflow = ""; };
   }, [isFullscreen]);
 
-  useEffect(() => {
-    if (!modelOpen) return;
-    function handleClickOutside(e: MouseEvent) {
-      if (modelPickerRef.current && !modelPickerRef.current.contains(e.target as Node)) {
-        setModelOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [modelOpen]);
-
-  const isOllamaOffline = provider === "ollama" && providerStatus !== null && !providerStatus.ollama;
-  const isOllamaModelMissing = provider === "ollama" && providerStatus !== null && !!providerStatus.ollama && !providerStatus.ollama_model_available;
+  const isOllamaOffline = generationProvider === "ollama" && providerStatus !== null && !providerStatus.ollama;
+  const isOllamaModelMissing = generationProvider === "ollama" && providerStatus !== null && !!providerStatus.ollama && !providerStatus.ollama_model_available;
   const hasProviderWarn = isOllamaOffline || isOllamaModelMissing;
 
   async function handleSend(text?: string) {
@@ -104,7 +84,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
     setError(null);
 
     try {
-      const result = await kojoChat(folderId, messageText, provider);
+      const result = await kojoChat(folderId, messageText, generationProvider);
       const assistantMsg: KojoMessage = {
         id: result.message_id,
         role: "assistant",
@@ -154,46 +134,11 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
   }
 
   const modelPicker = (
-    <div ref={modelPickerRef} className="kojo-model-picker">
-      <button
-        className={`kojo-model-btn${modelOpen ? " kojo-model-btn--open" : ""}`}
-        onClick={() => setModelOpen((o) => !o)}
-        disabled={isLoading}
-        type="button"
-        title={`Model: ${PROVIDER_LABELS[provider]}`}
-        aria-label={`Select model, currently ${PROVIDER_LABELS[provider]}`}
-      >
-        <span>{PROVIDER_SHORT[provider] ?? provider}</span>
-        {hasProviderWarn && <span className="kojo-model-warn-dot" />}
-        <ChevronUp size={13} className={`kojo-model-chevron${modelOpen ? "" : " kojo-model-chevron--flipped"}`} />
-      </button>
-      {modelOpen && (
-        <div className="kojo-model-dropdown">
-          {Object.entries(PROVIDER_LABELS).map(([v, l]) => {
-            const ollamaOffline = v === "ollama" && providerStatus !== null && !providerStatus.ollama;
-            const ollamaModelMissing = v === "ollama" && providerStatus !== null && !!providerStatus.ollama && !providerStatus.ollama_model_available;
-            const warn = ollamaOffline ? "offline" : ollamaModelMissing ? "model missing" : null;
-            return (
-              <button
-                key={v}
-                className={`kojo-model-option${provider === v ? " kojo-model-option--active" : ""}`}
-                onClick={() => {
-                  setProvider(v);
-                  localStorage.setItem("kojo_llm_provider", v);
-                  setModelOpen(false);
-                }}
-                type="button"
-              >
-                <span>{l}</span>
-                <span className="kojo-model-option-right">
-                  {warn && <span className="kojo-model-option-warn">⚠ {warn}</span>}
-                  {provider === v && <Check size={13} />}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+    <div className="kojo-model-picker kojo-model-picker--locked" title={`Model: ${PROVIDER_LABELS[generationProvider] ?? generationProvider}`}>
+      <span className="kojo-model-btn kojo-model-btn--static">
+        {generationProvider in PROVIDER_LABELS ? generationProvider : "auto"}
+        {hasProviderWarn ? <span className="kojo-model-warn-dot" /> : null}
+      </span>
     </div>
   );
 

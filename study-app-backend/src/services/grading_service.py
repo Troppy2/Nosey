@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,7 +14,11 @@ from src.schemas.attempt_schema import (
     AttemptDetail,
     AttemptResult,
     AttemptSummary,
+    DraftAttemptAnswer,
+    DraftAttemptResponse,
     FRQGrade,
+    ResumableTestInfo,
+    SaveDraftAttemptRequest,
     SubmittedAnswer,
 )
 from src.schemas.test_schema import WeaknessResponse
@@ -99,6 +105,7 @@ class GradingService:
         attempt.correct_count = correct_count
         attempt.total_questions = total
         attempt.total_score = score
+        attempt.status = "submitted"  # Mark as submitted, no longer in-progress
         await session.commit()
 
         return AttemptResult(
@@ -119,8 +126,24 @@ class GradingService:
         is_coding_mode: bool = False,
         coding_language: str = "Python",
     ) -> FRQGrade:
-        if question.question_type == "MCQ":
+        qtype = question.question_type
+        
+        if qtype == "MCQ":
             return self._grade_mcq(question, user_answer)
+        
+        if qtype == "select_all":
+            return self._grade_select_all(question, user_answer)
+        
+        if qtype == "matching":
+            return self._grade_matching(question, user_answer)
+        
+        if qtype == "ordering":
+            return self._grade_ordering(question, user_answer)
+        
+        if qtype == "fill_blank":
+            return self._grade_fill_blank(question, user_answer)
+        
+        # FRQ grading (existing logic)
         if question.frq_answer is None:
             return FRQGrade(
                 is_correct=False,
@@ -172,12 +195,207 @@ class GradingService:
             confidence=1.0,
         )
 
+    def _grade_matching(self, question: Question, user_answer: str) -> FRQGrade:
+        """Grade matching question: all pairs must be correct for full credit."""
+        if question.matching_answer is None:
+            return FRQGrade(
+                is_correct=False,
+                feedback="This matching question has no answer key configured.",
+                flagged_uncertain=True,
+                confidence=0.0,
+            )
+        try:
+            correct_pairs = json.loads(question.matching_answer.pairs_json)
+            user_pairs = json.loads(user_answer)
+        except (json.JSONDecodeError, ValueError):
+            return FRQGrade(
+                is_correct=False,
+                feedback="Could not parse your answer. Please ensure all pairs are properly formatted.",
+                flagged_uncertain=False,
+                confidence=0.5,
+            )
+        
+        # Convert to sets of (left, right) tuples for comparison (order-independent)
+        correct_set = {(pair["left"].strip().lower(), pair["right"].strip().lower()) for pair in correct_pairs}
+        user_set = {(pair["left"].strip().lower(), pair["right"].strip().lower()) for pair in user_pairs}
+        
+        is_correct = correct_set == user_set
+        if is_correct:
+            feedback = None
+        else:
+            incorrect_pairs = user_set - correct_set
+            missing_pairs = correct_set - user_set
+            details = []
+            if incorrect_pairs:
+                details.append(f"Incorrect matches: {len(incorrect_pairs)}")
+            if missing_pairs:
+                details.append(f"Missing matches: {len(missing_pairs)}")
+            feedback = "Some pairs were incorrect. " + ", ".join(details)
+        
+        return FRQGrade(
+            is_correct=is_correct,
+            feedback=feedback,
+            flagged_uncertain=False,
+            confidence=1.0,
+        )
+
+    def _grade_ordering(self, question: Question, user_answer: str) -> FRQGrade:
+        """Grade ordering question: exact sequence must match. Partial credit for prefix matches."""
+        if question.ordering_answer is None:
+            return FRQGrade(
+                is_correct=False,
+                feedback="This ordering question has no answer key configured.",
+                flagged_uncertain=True,
+                confidence=0.0,
+            )
+        try:
+            correct_order = json.loads(question.ordering_answer.correct_order_json)
+            user_order = json.loads(user_answer)
+        except (json.JSONDecodeError, ValueError):
+            return FRQGrade(
+                is_correct=False,
+                feedback="Could not parse your answer. Please ensure the order is properly formatted.",
+                flagged_uncertain=False,
+                confidence=0.5,
+            )
+        
+        # Normalize for comparison (case-insensitive, whitespace-trimmed)
+        correct_normalized = [item.strip().lower() for item in correct_order]
+        user_normalized = [item.strip().lower() for item in user_order]
+        
+        is_correct = correct_normalized == user_normalized
+        if is_correct:
+            feedback = None
+        else:
+            # Calculate longest common prefix for partial credit insight
+            prefix_len = 0
+            for i in range(min(len(correct_normalized), len(user_normalized))):
+                if correct_normalized[i] == user_normalized[i]:
+                    prefix_len += 1
+                else:
+                    break
+            feedback = f"Incorrect order. First {prefix_len} items are correct."
+        
+        return FRQGrade(
+            is_correct=is_correct,
+            feedback=feedback,
+            flagged_uncertain=False,
+            confidence=1.0,
+        )
+
+    def _grade_fill_blank(self, question: Question, user_answer: str) -> FRQGrade:
+        """Grade fill-in-the-blank question: case-insensitive exact or synonym match."""
+        if question.fill_blank_answer is None:
+            return FRQGrade(
+                is_correct=False,
+                feedback="This fill-in-the-blank question has no answer key configured.",
+                flagged_uncertain=True,
+                confidence=0.0,
+            )
+        try:
+            acceptable = json.loads(question.fill_blank_answer.acceptable_answers_json)
+        except (json.JSONDecodeError, ValueError):
+            return FRQGrade(
+                is_correct=False,
+                feedback="Answer key could not be read.",
+                flagged_uncertain=True,
+                confidence=0.0,
+            )
+        
+        user_normalized = user_answer.strip().lower()
+        acceptable_normalized = [ans.strip().lower() for ans in acceptable]
+        
+        is_correct = user_normalized in acceptable_normalized
+        if is_correct:
+            feedback = None
+        else:
+            feedback = f"Incorrect. The correct answer was: {acceptable[0]}"
+        
+        return FRQGrade(
+            is_correct=is_correct,
+            feedback=feedback,
+            flagged_uncertain=False,
+            confidence=1.0,
+        )
+
+    def _grade_select_all(self, question: Question, user_answer: str) -> FRQGrade:
+        """Grade select-all question: user must select all correct and no incorrect options."""
+        if question.select_all_answer is None:
+            return FRQGrade(
+                is_correct=False,
+                feedback="This select-all question has no answer key configured.",
+                flagged_uncertain=True,
+                confidence=0.0,
+            )
+        try:
+            correct_indices = json.loads(question.select_all_answer.correct_indices_json)
+            user_indices = json.loads(user_answer)
+        except (json.JSONDecodeError, ValueError):
+            return FRQGrade(
+                is_correct=False,
+                feedback="Could not parse your selection. Please ensure indices are properly formatted.",
+                flagged_uncertain=False,
+                confidence=0.5,
+            )
+        
+        # Convert to sets for comparison
+        correct_set = set(correct_indices)
+        user_set = set(user_indices)
+        
+        is_correct = correct_set == user_set
+        if is_correct:
+            feedback = None
+        else:
+            missed = correct_set - user_set
+            incorrect = user_set - correct_set
+            details = []
+            if missed:
+                details.append(f"Missed {len(missed)} correct option(s)")
+            if incorrect:
+                details.append(f"Selected {len(incorrect)} incorrect option(s)")
+            feedback = "Incomplete. " + "; ".join(details)
+        
+        return FRQGrade(
+            is_correct=is_correct,
+            feedback=feedback,
+            flagged_uncertain=False,
+            confidence=1.0,
+        )
+
     def _correct_answer_text(self, question: Question) -> Optional[str]:
-        if question.question_type == "MCQ":
-            correct = next((o for o in question.mcq_options if o.is_correct), None)
-            return correct.option_text if correct else None
+        qtype = question.question_type
+        
+        if qtype == "MCQ" or qtype == "select_all":
+            # For MCQ and select_all, show correct options
+            correct = [o for o in question.mcq_options if o.is_correct]
+            if correct:
+                return " | ".join(o.option_text for o in correct)
+            return None
+        
+        if qtype == "matching" and question.matching_answer:
+            try:
+                pairs = json.loads(question.matching_answer.pairs_json)
+                return str(pairs)
+            except (json.JSONDecodeError, ValueError):
+                return None
+        
+        if qtype == "ordering" and question.ordering_answer:
+            try:
+                order = json.loads(question.ordering_answer.correct_order_json)
+                return " → ".join(order)
+            except (json.JSONDecodeError, ValueError):
+                return None
+        
+        if qtype == "fill_blank" and question.fill_blank_answer:
+            try:
+                answers = json.loads(question.fill_blank_answer.acceptable_answers_json)
+                return answers[0] if answers else None
+            except (json.JSONDecodeError, ValueError):
+                return None
+        
         if question.frq_answer is not None:
             return question.frq_answer.expected_answer
+        
         return None
 
     async def list_attempts(
@@ -212,6 +430,8 @@ class GradingService:
             correct_count=attempt.correct_count or 0,
             total=attempt.total_questions or 0,
             created_at=attempt.created_at,
+            test_id=attempt.test_id,
+            folder_id=attempt.test.folder_id if attempt.test else None,
             test_title=attempt.test.title if attempt.test else "",
             answers=[
                 AnswerResult(
@@ -252,3 +472,90 @@ class GradingService:
                 )
             )
         return responses
+
+    async def save_draft_attempt(
+        self,
+        test_id: int,
+        user_id: int,
+        answers: list[DraftAttemptAnswer],
+        session: AsyncSession,
+    ) -> DraftAttemptResponse:
+        """Save or update draft attempt with current answers."""
+        test = await TestRepository(session).get_owned_with_questions(test_id, user_id)
+        if test is None:
+            raise ResourceNotFoundException("Test")
+
+        # Get or create draft attempt (status='in_progress')
+        repo = AttemptRepository(session)
+        attempt = await repo.get_or_create_draft(user_id, test_id)
+
+        # Clear existing answers for this draft
+        await repo.clear_answers(attempt.id)
+
+        # Save new answers
+        submitted_by_id = {answer.question_id: answer.user_answer for answer in answers}
+        question_by_id = {question.id: question for question in test.questions}
+
+        for question_id in submitted_by_id:
+            if question_by_id.get(question_id) is None:
+                raise ValidationException(f"Question {question_id} does not belong to this test")
+
+        for question_id, user_answer in submitted_by_id.items():
+            # Draft answers: is_correct is None (not graded yet)
+            await repo.add_answer(
+                attempt.id,
+                question_id,
+                user_answer,
+                is_correct=None,
+                feedback=None,
+                confidence=None,
+                flagged_uncertain=False,
+            )
+
+        # Update exit timestamp
+        attempt.exited_at = datetime.utcnow()
+        await session.commit()
+
+        return DraftAttemptResponse(
+            attempt_id=attempt.id,
+            attempt_number=attempt.attempt_number,
+            answers=answers,
+            exited_at=attempt.exited_at,
+        )
+
+    async def get_draft_attempt(
+        self,
+        test_id: int,
+        user_id: int,
+        session: AsyncSession,
+    ) -> DraftAttemptResponse:
+        """Get the draft/in-progress attempt for a test."""
+        test = await TestRepository(session).get_owned_with_questions(test_id, user_id)
+        if test is None:
+            raise ResourceNotFoundException("Test")
+
+        repo = AttemptRepository(session)
+        attempt = await repo.get_draft(user_id, test_id)
+        if attempt is None:
+            raise ResourceNotFoundException("No draft attempt found for this test")
+
+        # Convert answers to response format
+        draft_answers = [
+            DraftAttemptAnswer(question_id=ans.question_id, user_answer=ans.user_answer)
+            for ans in attempt.answers
+        ]
+
+        return DraftAttemptResponse(
+            attempt_id=attempt.id,
+            attempt_number=attempt.attempt_number,
+            answers=draft_answers,
+            exited_at=attempt.exited_at,
+        )
+
+    async def get_resumable_tests(
+        self,
+        user_id: int,
+        session: AsyncSession,
+    ) -> list[ResumableTestInfo]:
+        """Get list of tests with in-progress attempts that can be resumed."""
+        return await AttemptRepository(session).get_resumable_tests(user_id)

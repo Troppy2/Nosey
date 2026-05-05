@@ -13,6 +13,7 @@ import httpx
 from src.config import settings
 from src.schemas.attempt_schema import FRQGrade
 from src.utils.logger import get_logger
+from src.utils.latex_utils import normalize_latex
 from typing import Any, Optional
 
 logger = get_logger(__name__)
@@ -37,6 +38,31 @@ class GeneratedFRQ:
 
 
 @dataclass(frozen=True)
+class GeneratedMatching:
+    question_text: str
+    pairs: list[dict[str, str]]
+
+
+@dataclass(frozen=True)
+class GeneratedOrdering:
+    question_text: str
+    correct_order: list[str]
+
+
+@dataclass(frozen=True)
+class GeneratedFillBlank:
+    question_text: str
+    acceptable_answers: list[str]
+
+
+@dataclass(frozen=True)
+class GeneratedSelectAll:
+    question_text: str
+    options: list[str]
+    correct_indices: list[int]
+
+
+@dataclass(frozen=True)
 class GeneratedFlashcard:
     front: str
     back: str
@@ -53,6 +79,17 @@ class _StudyContent:
     title: str
     terms: list[_ExtractedTerm]
     concepts: list[str]
+
+
+@dataclass(frozen=True)
+class _PracticeTestStyle:
+    """Analysis of a practice test's question style and format."""
+    mcq_count: int
+    frq_count: int
+    mcq_patterns: list[str]  # Summary of MCQ phrasing/types
+    frq_patterns: list[str]  # Summary of FRQ phrasing/types
+    difficulty_indicators: str  # Inferred difficulty level
+    subject_hints: str  # Domain/subject indicators from the test
 
 
 _EXTRACT_CHAR_LIMIT = 10_000
@@ -94,6 +131,26 @@ class LLMService:
         merged.update(meta)
         self._last_generation_meta = merged
 
+    def _is_extreme_mode(self, test_type: str) -> bool:
+        return test_type == "Extreme"
+
+    def _is_mcq_only_mode(self, test_type: str) -> bool:
+        return test_type in {"MCQ_only", "Extreme"}
+
+    def _mcq_distractor_guidance(self, test_type: str) -> str:
+        if self._is_extreme_mode(test_type):
+            return (
+                "  - Wrong answer options should be near-miss distractors: plausible, topic-adjacent, and separated by one key detail\n"
+                "  - The correct option should only be obviously correct after careful reading of the notes\n"
+                "  - Avoid copying note sentences verbatim; paraphrase the concept and make the distractors feel close\n"
+                "  - Make the choices look similar enough that the student must know the material, not just recognize a keyword\n"
+            )
+
+        return (
+            "  - Wrong answer options should be plausible but not copied verbatim from the notes\n"
+            "  - Keep the options about the topic, but vary the wording so the correct answer is not too obvious\n"
+        )
+
     async def generate_test_questions(
         self,
         notes: str,
@@ -109,7 +166,7 @@ class LLMService:
         provider: Optional[str] = None,
         enable_fallback: bool = True,
     ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
-        if test_type == "MCQ_only":
+        if self._is_mcq_only_mode(test_type):
             count_frq = 0
         elif test_type == "FRQ_only":
             count_mcq = 0
@@ -161,6 +218,7 @@ class LLMService:
                 prompt=prompt,
                 provider_candidates=provider_candidates,
                 notes=cleaned,
+                test_type=test_type,
                 count_mcq=count_mcq,
                 count_frq=count_frq,
                 diagnostics=diagnostics,
@@ -182,6 +240,7 @@ class LLMService:
                     prompt=prompt,
                     provider_candidates=provider_candidates,
                     notes=cleaned,
+                    test_type=test_type,
                     count_mcq=count_mcq,
                     count_frq=count_frq,
                     diagnostics=diagnostics,
@@ -204,6 +263,7 @@ class LLMService:
                 prompt=None,
                 provider_candidates=provider_candidates,
                 notes=cleaned,
+                test_type=test_type,
                 count_mcq=count_mcq,
                 count_frq=count_frq,
                 diagnostics=diagnostics,
@@ -285,6 +345,7 @@ class LLMService:
         study: _StudyContent,
         count_mcq: int,
         count_frq: int,
+        test_type: str,
         difficulty: str = "mixed",
         topic_focus: Optional[str] = None,
         custom_instructions: Optional[str] = None,
@@ -320,7 +381,7 @@ class LLMService:
                 f"Generate exactly {count_mcq} MCQ questions.\n"
                 "MCQ rules:\n"
                 "  - Each question must test understanding of a SPECIFIC term, definition, or concept above\n"
-                "  - Wrong answer options must be plausible but clearly incorrect\n"
+                f"{self._mcq_distractor_guidance(test_type)}"
                 "  - Do NOT ask 'what is the title of...' or reference authors/sources\n"
                 "  - Vary question style according to the difficulty level above\n"
             )
@@ -404,6 +465,281 @@ class LLMService:
             logger.warning("parse_practice_test failed: %s", exc)
             return [], []
 
+    async def _analyze_practice_test_style(
+        self,
+        content: str,
+        provider: Optional[str] = None,
+    ) -> _PracticeTestStyle:
+        """Analyze the style, patterns, and difficulty of a practice test to use as template for generation."""
+        cleaned = self._strip_metadata(content)
+        prompt = (
+            "Analyze the following practice test and provide a structured analysis of its question style.\n"
+            "Return JSON with these keys:\n"
+            "- mcq_count: number of MCQ questions found\n"
+            "- frq_count: number of FRQ/short-answer questions found\n"
+            "- mcq_patterns: array of 3-5 strings describing MCQ question types (e.g., 'definition recall', 'scenario-based application', 'comparing concepts')\n"
+            "- frq_patterns: array of 3-5 strings describing FRQ question types (e.g., 'explain with examples', 'apply rules to scenarios', 'step-by-step problem solving')\n"
+            "- difficulty_indicators: string describing the test difficulty ('easy/basic recall', 'moderate/applied', 'advanced/synthesis')\n"
+            "- subject_hints: string with domain indicators (e.g., 'database transactions, concurrency control' or 'biology, cellular processes')\n\n"
+            "Focus on PATTERNS not specific questions. Describe how the test asks questions, not what content it covers.\n\n"
+            f"PRACTICE TEST:\n{cleaned[:_EXTRACT_CHAR_LIMIT]}"
+        )
+        try:
+            data = await self._complete_json(prompt, provider=provider)
+            mcq_count = max(0, int(data.get("mcq_count", 0)))
+            frq_count = max(0, int(data.get("frq_count", 0)))
+            mcq_patterns = [
+                str(p).strip() 
+                for p in (data.get("mcq_patterns", []) if isinstance(data.get("mcq_patterns"), list) else [])
+                if str(p).strip()
+            ]
+            frq_patterns = [
+                str(p).strip() 
+                for p in (data.get("frq_patterns", []) if isinstance(data.get("frq_patterns"), list) else [])
+                if str(p).strip()
+            ]
+            difficulty_indicators = str(data.get("difficulty_indicators", "mixed")).strip()
+            subject_hints = str(data.get("subject_hints", "")).strip()
+            
+            style = _PracticeTestStyle(
+                mcq_count=mcq_count,
+                frq_count=frq_count,
+                mcq_patterns=mcq_patterns or ["standard multiple-choice questions"],
+                frq_patterns=frq_patterns or ["explanation and application questions"],
+                difficulty_indicators=difficulty_indicators,
+                subject_hints=subject_hints,
+            )
+            logger.info("Analyzed practice test style: %d MCQ, %d FRQ, patterns: %s", 
+                       mcq_count, frq_count, mcq_patterns + frq_patterns)
+            return style
+        except Exception as exc:
+            logger.warning("Practice test style analysis failed: %s", exc)
+            # Fallback: reasonable defaults
+            return _PracticeTestStyle(
+                mcq_count=0,
+                frq_count=0,
+                mcq_patterns=["standard multiple-choice questions"],
+                frq_patterns=["explanation and application questions"],
+                difficulty_indicators="mixed",
+                subject_hints="",
+            )
+
+    async def generate_from_practice_test_template(
+        self,
+        notes: str,
+        practice_test_content: str,
+        test_type: str,
+        count_mcq: int = 10,
+        count_frq: int = 5,
+        is_math_mode: bool = False,
+        difficulty: str = "mixed",
+        topic_focus: Optional[str] = None,
+        is_coding_mode: bool = False,
+        coding_language: Optional[str] = None,
+        custom_instructions: Optional[str] = None,
+        provider: Optional[str] = None,
+        enable_fallback: bool = True,
+    ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
+        """Generate questions from study notes using practice test as a style template.
+        
+        Analyzes the practice test to understand its question patterns, difficulty, and style,
+        then generates NEW questions that follow those patterns but draw from the study notes.
+        """
+        if self._is_mcq_only_mode(test_type):
+            count_frq = 0
+        elif test_type == "FRQ_only":
+            count_mcq = 0
+
+        # Analyze the practice test style
+        practice_style = await self._analyze_practice_test_style(practice_test_content, provider=provider)
+        
+        # Extract study content
+        cleaned_notes = self._strip_metadata(notes)
+        study = await self._extract_study_content(cleaned_notes, provider=provider)
+        
+        # Build a prompt that uses the practice test style as a template
+        context_header = f'SUBJECT: "{study.title}"\n\n' if study.title else ""
+        
+        # Use practice test difficulty if available, otherwise use requested difficulty
+        if practice_style.difficulty_indicators and "easy" in practice_style.difficulty_indicators.lower():
+            use_difficulty = "easy"
+        elif practice_style.difficulty_indicators and "hard" in practice_style.difficulty_indicators.lower():
+            use_difficulty = "hard"
+        elif practice_style.difficulty_indicators and "advanced" in practice_style.difficulty_indicators.lower():
+            use_difficulty = "hard"
+        elif practice_style.difficulty_indicators and "moderate" in practice_style.difficulty_indicators.lower():
+            use_difficulty = "medium"
+        else:
+            use_difficulty = difficulty
+            
+        difficulty_map = {
+            "easy": "straightforward recall questions — definitions, simple identification",
+            "medium": "application questions — use the concept, connect ideas",
+            "hard": "analysis and synthesis — compare, evaluate, multi-step reasoning",
+            "mixed": "a mix of easy recall, medium application, and hard analysis questions",
+        }
+        difficulty_line = f"DIFFICULTY: {difficulty_map.get(use_difficulty, difficulty_map['mixed'])}\n\n"
+        
+        # Add practice test pattern guidance
+        pattern_guidance = ""
+        if practice_style.mcq_patterns:
+            pattern_guidance += "MCQ STYLE FROM UPLOADED TEST:\n"
+            for i, pattern in enumerate(practice_style.mcq_patterns[:3], 1):
+                pattern_guidance += f"  {i}. {pattern}\n"
+            pattern_guidance += "\n"
+        if practice_style.frq_patterns:
+            pattern_guidance += "FRQ STYLE FROM UPLOADED TEST:\n"
+            for i, pattern in enumerate(practice_style.frq_patterns[:3], 1):
+                pattern_guidance += f"  {i}. {pattern}\n"
+            pattern_guidance += "\n"
+        
+        topic_line = f'TOPIC FOCUS: Only generate questions about "{topic_focus}".\n\n' if topic_focus else ""
+        custom_line = f"CUSTOM INSTRUCTIONS: {custom_instructions}\n\n" if custom_instructions else ""
+        
+        terms_block = ""
+        if study.terms:
+            lines = "\n".join(
+                f"  - {t.term}: {t.definition}" for t in study.terms[:60]
+            )
+            terms_block = f"TERMS AND DEFINITIONS:\n{lines}\n\n"
+        
+        concepts_block = ""
+        if study.concepts:
+            lines = "\n".join(f"  - {c}" for c in study.concepts[:40])
+            concepts_block = f"KEY CONCEPTS AND FACTS:\n{lines}\n\n"
+        
+        mcq_instructions = ""
+        if count_mcq > 0:
+            mcq_instructions = (
+                f"Generate exactly {count_mcq} MCQ questions.\n"
+                "MCQ rules:\n"
+                "  - Each question must test understanding of a SPECIFIC term, definition, or concept above\n"
+                f"{self._mcq_distractor_guidance(test_type)}"
+                "  - Do NOT ask 'what is the title of...' or reference authors/sources\n"
+                "  - MIRROR the question styles described above from the uploaded practice test\n"
+                "  - Vary question style according to the difficulty level above\n"
+            )
+        
+        frq_instructions = ""
+        if count_frq > 0:
+            frq_instructions = (
+                f"Generate exactly {count_frq} FRQ questions.\n"
+                "FRQ rules:\n"
+                "  - Ask the student to explain, compare, or apply a concept from the list above\n"
+                "  - Each expected_answer must be a complete, accurate explanation (2–4 sentences)\n"
+                "  - Do NOT ask students to list titles, authors, or sources\n"
+                "  - MIRROR the question styles and phrasing from the uploaded practice test\n"
+                "  - Match difficulty level above\n"
+            )
+        
+        prompt = (
+            "You are generating a new study test that MIRRORS the style of an uploaded practice test.\n"
+            "Use ONLY the terms, definitions, and concepts below as source material — do not invent facts.\n\n"
+            f"{context_header}"
+            f"{difficulty_line}"
+            f"{topic_line}"
+            f"{custom_line}"
+            f"{pattern_guidance}"
+            f"{terms_block}"
+            f"{concepts_block}"
+            f"{mcq_instructions}\n"
+            f"{frq_instructions}\n"
+            "Return JSON only with keys mcq and frq.\n"
+            "mcq items: {question_text, options: [4 strings], correct_index: 0-3}\n"
+            "frq items: {question_text, expected_answer}\n"
+        )
+        
+        diagnostics: dict[str, object] = {
+            "fallback_used": False,
+            "fallback_reason": None,
+            "note_grounded": True,
+            "retrieval_enabled": False,
+            "retrieval_total_chunks": 0,
+            "retrieval_selected_chunks": 0,
+            "retrieval_top_k": 0,
+            "retrieval_query": "practice_test_template",
+        }
+        
+        provider_candidates = await self._candidate_providers(provider)
+        if not provider_candidates:
+            from src.utils.exceptions import LLMException
+            raise LLMException(
+                "No AI provider is available. Add an API key in Settings or start Ollama."
+            )
+        
+        try:
+            return await self._generate_test_attempts(
+                prompt=prompt,
+                provider_candidates=provider_candidates,
+                notes=cleaned_notes,
+                test_type=test_type,
+                count_mcq=count_mcq,
+                count_frq=count_frq,
+                diagnostics=diagnostics,
+                enable_fallback=enable_fallback,
+            )
+        except Exception:
+            if not enable_fallback:
+                raise
+            diagnostics.update({
+                "fallback_used": True,
+                "fallback_reason": "template_generation_failed",
+                "note_grounded": False,
+            })
+            self._set_last_generation_meta(diagnostics)
+            return self._fallback_questions(cleaned_notes, count_mcq, count_frq)
+
+    async def generate_beta_questions(
+        self,
+        notes: str,
+        question_types: list[str],
+        provider: Optional[str] = None,
+        enable_fallback: bool = True,
+    ) -> tuple[list[GeneratedMatching], list[GeneratedOrdering], list[GeneratedFillBlank], list[GeneratedSelectAll]]:
+        selected = [qtype for qtype in ["matching", "ordering", "fill_blank", "select_all"] if qtype in question_types]
+        if not selected:
+            return [], [], [], []
+
+        cleaned = self._strip_metadata(notes)
+        study = await self._extract_study_content(cleaned, provider=provider)
+        prompt = self._build_beta_generation_prompt(study, selected)
+        diagnostics: dict[str, object] = {
+            "fallback_used": False,
+            "fallback_reason": None,
+            "note_grounded": True,
+            "retrieval_enabled": False,
+            "retrieval_total_chunks": 0,
+            "retrieval_selected_chunks": 0,
+            "retrieval_top_k": 0,
+            "retrieval_query": "beta_question_types",
+        }
+
+        provider_candidates = await self._candidate_providers(provider)
+        if not provider_candidates:
+            from src.utils.exceptions import LLMException
+            raise LLMException(
+                "No AI provider is available. Add an API key in Settings or start Ollama."
+            )
+
+        last_error: Optional[Exception] = None
+        for candidate in provider_candidates:
+            try:
+                data = await self._complete_json(prompt, provider=candidate)
+                matching, ordering, fill_blank, select_all = self._parse_beta_questions(data, selected)
+                if matching or ordering or fill_blank or select_all:
+                    self._set_last_generation_meta(diagnostics)
+                    return matching, ordering, fill_blank, select_all
+            except Exception as exc:
+                last_error = exc
+                logger.warning("Beta question generation failed with %s; trying next provider: %s", candidate, exc)
+
+        if not enable_fallback:
+            from src.utils.exceptions import LLMException
+            raise LLMException("The AI model could not generate the selected beta question types.") from last_error
+
+        self._set_last_generation_meta({**diagnostics, "fallback_used": True, "fallback_reason": "beta_generation_failed"})
+        return self._fallback_beta_questions(cleaned, selected)
+
     async def grade_frq_answer(
         self,
         notes: str,
@@ -468,12 +804,17 @@ If the notes do not support grading, set flagged_uncertain true and confidence 0
             mcq_block = (
                 f"Generate exactly {count_mcq} MCQ coding questions.\n"
                 "MCQ rules:\n"
-                f"  - Questions about {language} syntax, built-in functions, time/space complexity, or CS concepts\n"
+                f"  - TRACE QUESTIONS: Show code snippets and ask what output they produce, or what state a variable holds after execution\n"
+                f"  - IMPLEMENTATION INSIGHTS: Ask how a built-in function, operator, or language feature works; test understanding of syntax and semantics\n"
+                f"  - Questions about {language} syntax, operators, built-in functions, time/space complexity, or CS concepts\n"
+                "  - Include actual code snippets in questions (2-5 lines typical)\n"
+                f"{self._mcq_distractor_guidance(test_type)}"
                 "  - 4 answer options, only one is correct\n"
-                "  - Vary from conceptual to tricky code-reading questions\n"
+                "  - Distractors should be plausible outputs or common misconceptions from the code\n"
+                "  - Mix code-reading with conceptual understanding\n"
             )
         frq_block = ""
-        if count_frq > 0 and test_type != "MCQ_only":
+        if count_frq > 0 and not self._is_mcq_only_mode(test_type):
             frq_block = (
                 f"Generate exactly {count_frq} coding challenge questions.\n"
                 "Coding challenge rules:\n"
@@ -490,10 +831,176 @@ If the notes do not support grading, set flagged_uncertain true and confidence 0
             f"{mcq_block}\n"
             f"{frq_block}\n"
             "Return JSON only with keys mcq and frq.\n"
-            "mcq items: {question_text, options: [4 strings], correct_index: 0-3}\n"
+            "mcq items: {question_text (include code snippets where appropriate), options: [4 strings], correct_index: 0-3}\n"
             "frq items: {question_text, expected_answer}\n\n"
             f"CS NOTES:\n{notes[:_GENERATE_CHAR_LIMIT]}"
         )
+
+    def _build_beta_generation_prompt(self, study: _StudyContent, selected_types: list[str]) -> str:
+        context_header = f'SUBJECT: "{study.title}"\n\n' if study.title else ""
+        terms_block = ""
+        if study.terms:
+            lines = "\n".join(f"  - {term.term}: {term.definition}" for term in study.terms[:40])
+            terms_block = f"TERMS AND DEFINITIONS:\n{lines}\n\n"
+        concepts_block = ""
+        if study.concepts:
+            lines = "\n".join(f"  - {concept}" for concept in study.concepts[:30])
+            concepts_block = f"KEY CONCEPTS AND FACTS:\n{lines}\n\n"
+
+        instructions: list[str] = []
+        if "matching" in selected_types:
+            instructions.append(
+                "matching: one question with 3-4 left/right pairs, question_text should ask the student to match related terms and definitions"
+            )
+        if "ordering" in selected_types:
+            instructions.append(
+                "ordering: one question with 4-5 items that must be arranged in the correct sequence"
+            )
+        if "fill_blank" in selected_types:
+            instructions.append(
+                "fill_blank: one question with one blank and 2-4 acceptable answers"
+            )
+        if "select_all" in selected_types:
+            instructions.append(
+                "select_all: one question with 4-5 options and 2 or more correct answers"
+            )
+
+        return (
+            "You are building beta study questions from the notes below. Use only the provided material.\n\n"
+            f"{context_header}"
+            f"{terms_block}"
+            f"{concepts_block}"
+            "Generate exactly one question for each requested type.\n"
+            + "\n".join(f"- {item}" for item in instructions)
+            + "\n\nReturn JSON only with these keys: matching, ordering, fill_blank, select_all.\n"
+            "matching items: {question_text, pairs: [{left, right}]}\n"
+            "ordering items: {question_text, correct_order: [strings]}\n"
+            "fill_blank items: {question_text, acceptable_answers: [strings]}\n"
+            "select_all items: {question_text, options: [strings], correct_indices: [ints]}\n"
+        )
+
+    def _parse_beta_questions(
+        self,
+        data: dict[str, object],
+        selected_types: list[str],
+    ) -> tuple[list[GeneratedMatching], list[GeneratedOrdering], list[GeneratedFillBlank], list[GeneratedSelectAll]]:
+        matching: list[GeneratedMatching] = []
+        ordering: list[GeneratedOrdering] = []
+        fill_blank: list[GeneratedFillBlank] = []
+        select_all: list[GeneratedSelectAll] = []
+
+        if "matching" in selected_types:
+            raw_matching = data.get("matching", [])
+            if isinstance(raw_matching, list):
+                for item in raw_matching:
+                    if not isinstance(item, dict):
+                        continue
+                    question_text = str(item.get("question_text", "")).strip()
+                    raw_pairs = item.get("pairs", [])
+                    pairs: list[dict[str, str]] = []
+                    if isinstance(raw_pairs, list):
+                        for pair in raw_pairs:
+                            if isinstance(pair, dict):
+                                left = str(pair.get("left", "")).strip()
+                                right = str(pair.get("right", "")).strip()
+                                if left and right:
+                                    pairs.append({"left": left, "right": right})
+                    if question_text and len(pairs) >= 3:
+                        matching.append(GeneratedMatching(question_text=question_text, pairs=pairs))
+
+        if "ordering" in selected_types:
+            raw_ordering = data.get("ordering", [])
+            if isinstance(raw_ordering, list):
+                for item in raw_ordering:
+                    if not isinstance(item, dict):
+                        continue
+                    question_text = str(item.get("question_text", "")).strip()
+                    raw_order = item.get("correct_order", [])
+                    order = [str(entry).strip() for entry in raw_order] if isinstance(raw_order, list) else []
+                    order = [entry for entry in order if entry]
+                    if question_text and len(order) >= 3:
+                        ordering.append(GeneratedOrdering(question_text=question_text, correct_order=order))
+
+        if "fill_blank" in selected_types:
+            raw_fill_blank = data.get("fill_blank", [])
+            if isinstance(raw_fill_blank, list):
+                for item in raw_fill_blank:
+                    if not isinstance(item, dict):
+                        continue
+                    question_text = str(item.get("question_text", "")).strip()
+                    raw_answers = item.get("acceptable_answers", [])
+                    answers = [str(entry).strip() for entry in raw_answers] if isinstance(raw_answers, list) else []
+                    answers = [entry for entry in answers if entry]
+                    if question_text and answers:
+                        fill_blank.append(GeneratedFillBlank(question_text=question_text, acceptable_answers=answers))
+
+        if "select_all" in selected_types:
+            raw_select_all = data.get("select_all", [])
+            if isinstance(raw_select_all, list):
+                for item in raw_select_all:
+                    if not isinstance(item, dict):
+                        continue
+                    question_text = str(item.get("question_text", "")).strip()
+                    options_raw = item.get("options", [])
+                    options = [str(entry).strip() for entry in options_raw] if isinstance(options_raw, list) else []
+                    options = [entry for entry in options if entry]
+                    raw_indices = item.get("correct_indices", [])
+                    indices = [int(entry) for entry in raw_indices] if isinstance(raw_indices, list) else []
+                    indices = [entry for entry in indices if 0 <= entry < len(options)]
+                    if question_text and len(options) >= 4 and indices:
+                        select_all.append(
+                            GeneratedSelectAll(
+                                question_text=question_text,
+                                options=options,
+                                correct_indices=indices,
+                            )
+                        )
+
+        return matching, ordering, fill_blank, select_all
+
+    def _fallback_beta_questions(
+        self,
+        notes: str,
+        selected_types: list[str],
+    ) -> tuple[list[GeneratedMatching], list[GeneratedOrdering], list[GeneratedFillBlank], list[GeneratedSelectAll]]:
+        snippets = self._sentences(notes) or ["Review the uploaded notes and identify the key ideas."]
+        matching: list[GeneratedMatching] = []
+        ordering: list[GeneratedOrdering] = []
+        fill_blank: list[GeneratedFillBlank] = []
+        select_all: list[GeneratedSelectAll] = []
+
+        if "matching" in selected_types:
+            base = snippets[:4]
+            pairs = [{"left": item, "right": item} for item in base]
+            if len(pairs) >= 3:
+                matching.append(GeneratedMatching(question_text="Match each idea with the related concept.", pairs=pairs))
+
+        if "ordering" in selected_types:
+            order = snippets[:5]
+            if len(order) >= 3:
+                ordering.append(GeneratedOrdering(question_text="Arrange the ideas in the correct order.", correct_order=order))
+
+        if "fill_blank" in selected_types:
+            fill_blank.append(
+                GeneratedFillBlank(
+                    question_text="Complete the statement: ________",
+                    acceptable_answers=[snippets[0]],
+                )
+            )
+
+        if "select_all" in selected_types:
+            options = snippets[:4]
+            if len(options) < 4:
+                options = options + ["An unrelated distractor."] * (4 - len(options))
+            select_all.append(
+                GeneratedSelectAll(
+                    question_text="Select all statements supported by the notes.",
+                    options=options,
+                    correct_indices=[0],
+                )
+            )
+
+        return matching, ordering, fill_blank, select_all
 
     async def grade_code_answer(
         self,
@@ -604,12 +1111,13 @@ Be lenient on minor syntax errors if the logic is correct. Accept equivalent sol
                 f"Generate exactly {count_mcq} MCQ math problems.\n"
                 "MCQ rules:\n"
                 "  - Each question must be a concrete calculation or problem-solving question\n"
+                f"{self._mcq_distractor_guidance(test_type)}"
                 "  - All 4 answer options must be plausible numeric or algebraic expressions wrapped in $...$\n"
                 "  - Only one option is correct\n"
                 "  - Vary difficulty: some straightforward, some multi-step\n"
             )
         frq_block = ""
-        if count_frq > 0 and test_type != "MCQ_only":
+        if count_frq > 0 and not self._is_mcq_only_mode(test_type):
             frq_block = (
                 f"Generate exactly {count_frq} FRQ math problems.\n"
                 "FRQ rules:\n"
@@ -841,6 +1349,7 @@ Rules:
         prompt: Optional[str],
         provider_candidates: list[str],
         notes: str,
+        test_type: str,
         count_mcq: int,
         count_frq: int,
         diagnostics: dict[str, object],
@@ -861,6 +1370,7 @@ Rules:
                 study,
                 count_mcq,
                 count_frq,
+                test_type,
                 difficulty=difficulty,
                 topic_focus=topic_focus,
                 custom_instructions=custom_instructions,
@@ -946,7 +1456,8 @@ Rules:
             if fn is None:
                 raise LLMException(f"Unsupported LLM provider: {normalized}")
             try:
-                return await fn(prompt)
+                res = await fn(prompt)
+                return normalize_latex(res)
             except LLMException:
                 raise
             except Exception as exc:
@@ -965,7 +1476,8 @@ Rules:
             if fn is None:
                 continue
             try:
-                return await fn(prompt)
+                res = await fn(prompt)
+                return normalize_latex(res)
             except Exception as exc:
                 last_error = exc
                 logger.warning("Kojo provider %s failed; trying next: %s", candidate, exc)
@@ -1178,7 +1690,46 @@ Rules:
                 )
                 response.raise_for_status()
                 payload = response.json()
-            return self._loads_json(str(payload.get("response", "{}")))
+
+            # Ollama responses vary in shape. "response" may be a string, a dict, or nested.
+            raw_resp = payload.get("response")
+
+            # If Ollama already returned structured JSON, return it directly.
+            if isinstance(raw_resp, dict):
+                return raw_resp
+
+            if isinstance(raw_resp, list):
+                # If it's a list, try to find the first dict-like element.
+                for item in raw_resp:
+                    if isinstance(item, dict):
+                        return item
+                # Fall back to packaging the list under a key.
+                return {"response": raw_resp}
+
+            # Otherwise raw_resp is likely a string. Try safe parsing with several fallbacks.
+            raw_text = "" if raw_resp is None else str(raw_resp)
+            try:
+                return self._loads_json(raw_text)
+            except Exception:
+                # Try decoding common escaped sequences (handles things like "\\n" vs "\\\\n").
+                try:
+                    fixed = raw_text.encode("utf-8").decode("unicode_escape")
+                    return self._loads_json(fixed)
+                except Exception:
+                    # Last resort: escape lone backslashes and try again.
+                    try:
+                        escaped = raw_text.replace("\\", "\\\\")
+                        return self._loads_json(escaped)
+                    except Exception as exc:
+                        # Log helpful debug info and re-raise a user-friendly error.
+                        logger.warning(
+                            "Ollama response JSON parsing failed; payload keys=%s; response_preview=%s",
+                            list(payload.keys()),
+                            (raw_text[:1000] + "...") if len(raw_text) > 1000 else raw_text,
+                        )
+                        raise LLMException(
+                            "Ollama returned an unexpected response format that couldn't be parsed as JSON."
+                        ) from exc
         except httpx.ConnectError:
             raise LLMException(
                 f"Ollama is not running at {settings.ollama_base_url}. "
@@ -1307,10 +1858,11 @@ Rules:
         if isinstance(mcq_raw, list):
             for item in mcq_raw:
                 if mcq_validator(item):
-                    options = [str(o) for o in item["options"]][:4]  # type: ignore[index]
+                    raw_options = [str(o) for o in item["options"]][:4]  # type: ignore[index]
+                    options = [normalize_latex(o) for o in raw_options]
                     mcq.append(
                         GeneratedMCQ(
-                            question_text=str(item.get("question_text", "Study question")),  # type: ignore[union-attr]
+                            question_text=normalize_latex(str(item.get("question_text", "Study question"))),  # type: ignore[union-attr]
                             options=options,
                             correct_index=max(0, min(3, int(item.get("correct_index", 0)))),  # type: ignore[union-attr]
                         )
@@ -1320,8 +1872,8 @@ Rules:
                 if frq_validator(item):
                     frq.append(
                         GeneratedFRQ(
-                            question_text=str(item.get("question_text", "")).strip(),  # type: ignore[union-attr]
-                            expected_answer=str(item.get("expected_answer", "")).strip(),  # type: ignore[union-attr]
+                            question_text=normalize_latex(str(item.get("question_text", "")).strip()),  # type: ignore[union-attr]
+                            expected_answer=normalize_latex(str(item.get("expected_answer", "")).strip()),  # type: ignore[union-attr]
                         )
                     )
         if len(mcq) < count_mcq or len(frq) < count_frq:

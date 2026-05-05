@@ -52,11 +52,21 @@ export type MCQOption = {
   is_correct: null;
 };
 
+export type MatchingPair = {
+  left: string;
+  right: string;
+};
+
+export type QuestionType = "MCQ" | "FRQ" | "matching" | "ordering" | "fill_blank" | "select_all" | string;
+
 export type Question = {
   id: ID;
-  type: "MCQ" | "FRQ" | string;
+  type: QuestionType;
   question_text: string;
   options: MCQOption[];
+  matching_pairs: MatchingPair[];
+  ordering_items: string[];
+  expected_answer?: string | null;
 };
 
 export type MCQOptionEditable = {
@@ -72,22 +82,28 @@ export type MCQOptionInput = {
 
 export type QuestionEditable = {
   id: ID;
-  type: "MCQ" | "FRQ" | string;
+  type: QuestionType;
   question_text: string;
   options: MCQOptionEditable[];
+  matching_pairs: MatchingPair[];
+  ordering_items: string[];
   expected_answer?: string | null;
 };
 
 export type QuestionCreate = {
-  type: "MCQ" | "FRQ";
+  type: QuestionType;
   question_text: string;
   options: MCQOptionInput[];
+  matching_pairs?: MatchingPair[];
+  ordering_items?: string[];
   expected_answer?: string | null;
 };
 
 export type QuestionUpdate = {
   question_text?: string;
   options?: MCQOptionInput[];
+  matching_pairs?: MatchingPair[];
+  ordering_items?: string[];
   expected_answer?: string;
 };
 
@@ -138,8 +154,32 @@ export type AttemptSummary = {
 };
 
 export type AttemptDetail = AttemptSummary & {
+  test_id: ID;
+  folder_id?: ID | null;
   test_title: string;
   answers: AnswerResult[];
+};
+
+export type DraftAttemptAnswer = {
+  question_id: ID;
+  user_answer: string;
+};
+
+export type DraftAttemptResponse = {
+  attempt_id: ID;
+  attempt_number: number;
+  answers: DraftAttemptAnswer[];
+  exited_at?: string | null;
+};
+
+export type ResumableTestInfo = {
+  test_id: ID;
+  test_title: string;
+  attempt_id: ID;
+  attempt_number: number;
+  exited_at: string;
+  answered_question_count: number;
+  total_question_count: number;
 };
 
 export type FlashcardUpdate = {
@@ -209,6 +249,34 @@ export type KojoClearedConversation = {
   folder_name: string;
   cleared_at: string;
   restore_expires_at: string;
+};
+
+export type LeetCodeExample = {
+  index: number;
+  input_text: string;
+  output_text: string;
+  explanation_text?: string | null;
+};
+
+export type LeetCodeTopicTag = {
+  name: string;
+  slug: string;
+};
+
+export type LeetCodeProblemData = {
+  title: string;
+  title_slug: string;
+  difficulty: string;
+  content_html: string;
+  examples: LeetCodeExample[];
+  example_testcases: string[];
+  python_snippet?: string | null;
+  topic_tags: LeetCodeTopicTag[];
+};
+
+export type LeetCodeHintResponse = {
+  response: string;
+  flagged_uncertain: boolean;
 };
 
 export type ProviderStatus = {

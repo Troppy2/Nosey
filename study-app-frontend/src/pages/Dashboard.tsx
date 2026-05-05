@@ -1,12 +1,12 @@
-import { BookOpen, Brain, Edit3, FolderOpen, Plus, Trash2, TrendingUp } from "lucide-react";
+import { BookOpen, Brain, Edit3, FolderOpen, Plus, Trash2, TrendingUp, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
-import { deleteTest, fetchFlashcards, fetchFolders, fetchTests, updateTest } from "../lib/api";
+import { deleteTest, fetchFlashcards, fetchFolders, fetchTests, getResumableTests, getStoredUser, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
-import type { Flashcard, Folder, TestSummary } from "../lib/types";
+import type { Flashcard, Folder, ResumableTestInfo, TestSummary } from "../lib/types";
 
 const TYPE_START_DELAY_MS = 3000;
 const TYPE_ROTATE_INTERVAL_MS = 5 * 60 * 1000;
@@ -40,20 +40,35 @@ function readStatsResetBaseline(): StatsResetBaseline {
 
 const OTHER_MESSAGES = [
   "Stop doom scrolling and get to studying bud",
-  "Studying first doom scrolling later!",
   "Did you drink water yet?",
   "Time to lock in man",
-  "Look who it is",
-  "Put ur phone away and start practicing",
+  "Put your phone away and start studying",
   "Time to study perchance",
   "Put your phone on DND and get to work!",
 ];
 
+function getGreetingName() {
+  const user = getStoredUser();
+  const fullName = user?.full_name?.trim();
+
+  if (fullName) {
+    return fullName.split(/\s+/)[0];
+  }
+
+  const emailName = user?.email?.split("@")[0]?.trim();
+  if (emailName) {
+    return emailName.charAt(0).toUpperCase() + emailName.slice(1);
+  }
+
+  return "my goat";
+}
+
 function getTimeOfDayMessage(now = new Date()) {
   const hour = now.getHours();
-  if (hour < 12) return "Good morning, my goat, time to study!";
-  if (hour < 18) return "Good afternoon my goat study time!";
-  return "Good evening my goat study time!";
+  const name = getGreetingName();
+  if (hour < 12) return `Good morning, ${name}, time to study!`;
+  if (hour < 18) return `Good afternoon, ${name}, time to study!`;
+  return `Good evening, ${name}, time to study!`;
 }
 
 function getMessageQueue() {
@@ -64,6 +79,7 @@ export default function Dashboard() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [tests, setTests] = useState<TestSummary[]>([]);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
+  const [resumableTests, setResumableTests] = useState<ResumableTestInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [displayTitle, setDisplayTitle] = useState("Your study cockpit");
@@ -75,11 +91,12 @@ export default function Dashboard() {
   }, [displayTitle]);
 
   useEffect(() => {
-    Promise.all([fetchFolders(), fetchTests(), fetchFlashcards()])
-      .then(([folderData, testData, flashcardData]) => {
+    Promise.all([fetchFolders(), fetchTests(), fetchFlashcards(), getResumableTests()])
+      .then(([folderData, testData, flashcardData, resumableData]) => {
         setFolders(folderData);
         setTests(testData);
         setFlashcards(flashcardData);
+        setResumableTests(resumableData);
       })
       .catch((loadError) => {
         setError(loadError instanceof Error ? loadError.message : "Unable to load your study data.");
@@ -284,6 +301,33 @@ export default function Dashboard() {
                   ))}
                 </div>
               </section>
+
+              {resumableTests.length > 0 && (
+                <section>
+                  <div className="section-title">
+                    <h2>Continue Test</h2>
+                    <span style={{ fontSize: "14px", color: "var(--gray-600)" }}>{resumableTests.length} in progress</span>
+                  </div>
+                  <div className="test-list">
+                    {resumableTests.map((test) => (
+                      <Card key={test.attempt_id} interactive className="test-row">
+                        <Link className="test-row-main" to={`/test/${test.test_id}`}>
+                          <div>
+                            <h3>{test.test_title}</h3>
+                            <p className="muted small">
+                              {test.answered_question_count} of {test.total_question_count} answered · Last: {new Date(test.exited_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--green-dark)" }}>
+                            <Undo2 size={18} />
+                            <span style={{ fontSize: "14px", fontWeight: "500" }}>Resume</span>
+                          </div>
+                        </Link>
+                      </Card>
+                    ))}
+                  </div>
+                </section>
+              )}
 
               <section>
                 <div className="section-title">

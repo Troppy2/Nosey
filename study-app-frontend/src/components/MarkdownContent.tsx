@@ -57,6 +57,16 @@ function Inline({ text, pk }: { text: string; pk: string }) {
 }
 
 export function MarkdownContent({ content }: { content: string }) {
+  // Some LLM/provider outputs escape dollar signs or TeX delimiters (e.g. "\$r\$", "\\( ... \\)").
+  // Normalize a few common escaped forms so inline/block math renders consistently.
+  let normalized = content;
+  // unescape escaped dollar signs like "\$" -> "$"
+  normalized = normalized.replace(/\\\$/g, "$");
+  // convert escaped \( ... \) to $...$
+  normalized = normalized.replace(/\\\((.*?)\\\)/gs, (_m, g1) => `$${g1}$`);
+  // convert escaped \[ ... \] to $$...$$
+  normalized = normalized.replace(/\\\[(.*?)\\\]/gs, (_m, g1) => `$$${g1}$$`);
+  content = normalized;
   const nodes: React.ReactNode[] = [];
   const lines = content.split("\n");
   let i = 0;

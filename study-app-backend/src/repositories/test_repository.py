@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import json
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import selectinload
 
+from src.models.fill_blank_answer import FillBlankAnswer
 from src.models.frq_answer import FRQAnswer
 from src.models.folder import Folder
+from src.models.matching_answer import MatchingAnswer
 from src.models.mcq_option import MCQOption
 from src.models.note import Note
+from src.models.ordering_answer import OrderingAnswer
 from src.models.question import Question
+from src.models.select_all_answer import SelectAllAnswer
 from src.models.test import Test
 from src.models.user_attempt import UserAttempt
 from src.repositories.base_repository import BaseRepository
@@ -16,6 +21,10 @@ from typing import Optional
 _QUESTION_WITH_ANSWERS = (
     selectinload(Question.mcq_options),
     selectinload(Question.frq_answer),
+    selectinload(Question.matching_answer),
+    selectinload(Question.ordering_answer),
+    selectinload(Question.fill_blank_answer),
+    selectinload(Question.select_all_answer),
 )
 
 
@@ -55,8 +64,7 @@ class TestRepository(BaseRepository[Test]):
             select(Test)
             .where(Test.id == test_id)
             .options(
-                selectinload(Test.questions).selectinload(Question.mcq_options),
-                selectinload(Test.questions).selectinload(Question.frq_answer),
+                selectinload(Test.questions).options(*_QUESTION_WITH_ANSWERS),
                 selectinload(Test.notes),
             )
         )
@@ -68,8 +76,7 @@ class TestRepository(BaseRepository[Test]):
             .join(Folder, Folder.id == Test.folder_id)
             .where(Test.id == test_id, Folder.user_id == user_id)
             .options(
-                selectinload(Test.questions).selectinload(Question.mcq_options),
-                selectinload(Test.questions).selectinload(Question.frq_answer),
+                selectinload(Test.questions).options(*_QUESTION_WITH_ANSWERS),
                 selectinload(Test.notes),
             )
         )
@@ -157,6 +164,89 @@ class TestRepository(BaseRepository[Test]):
         self.session.add(question)
         await self.session.flush()
         self.session.add(FRQAnswer(question_id=question.id, expected_answer=expected_answer))
+        return question
+
+    async def add_matching_question(
+        self, test_id: int, text: str, display_order: int, pairs: list[dict[str, str]]
+    ) -> Question:
+        """Create a matching question with term-definition pairs."""
+        question = Question(
+            test_id=test_id,
+            question_text=text,
+            question_type="matching",
+            display_order=display_order,
+        )
+        self.session.add(question)
+        await self.session.flush()
+        self.session.add(
+            MatchingAnswer(question_id=question.id, pairs_json=json.dumps(pairs))
+        )
+        return question
+
+    async def add_ordering_question(
+        self, test_id: int, text: str, display_order: int, correct_order: list[str]
+    ) -> Question:
+        """Create an ordering question with a correct sequence."""
+        question = Question(
+            test_id=test_id,
+            question_text=text,
+            question_type="ordering",
+            display_order=display_order,
+        )
+        self.session.add(question)
+        await self.session.flush()
+        self.session.add(
+            OrderingAnswer(question_id=question.id, correct_order_json=json.dumps(correct_order))
+        )
+        return question
+
+    async def add_fill_blank_question(
+        self, test_id: int, text: str, display_order: int, acceptable_answers: list[str]
+    ) -> Question:
+        """Create a fill-in-the-blank question with acceptable answers."""
+        question = Question(
+            test_id=test_id,
+            question_text=text,
+            question_type="fill_blank",
+            display_order=display_order,
+        )
+        self.session.add(question)
+        await self.session.flush()
+        self.session.add(
+            FillBlankAnswer(
+                question_id=question.id,
+                acceptable_answers_json=json.dumps(acceptable_answers)
+            )
+        )
+        return question
+
+    async def add_select_all_question(
+        self, test_id: int, text: str, display_order: int, options: list[tuple[str, bool]], correct_indices: list[int]
+    ) -> Question:
+        """Create a select-all question with multiple correct options."""
+        question = Question(
+            test_id=test_id,
+            question_text=text,
+            question_type="select_all",
+            display_order=display_order,
+        )
+        self.session.add(question)
+        await self.session.flush()
+        for index, (option_text, is_correct) in enumerate(options, start=1):
+            self.session.add(
+                MCQOption(
+                    question_id=question.id,
+                    option_text=option_text,
+                    is_correct=is_correct,
+                    display_order=index,
+                )
+            )
+        self.session.add(
+            SelectAllAnswer(
+                question_id=question.id,
+                correct_indices_json=json.dumps(correct_indices)
+            )
+        )
         return question
 
     async def delete(self, test: Test) -> None:

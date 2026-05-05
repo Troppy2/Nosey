@@ -23,31 +23,102 @@ class MCQOptionInput(BaseModel):
     is_correct: bool
 
 
+# New question type schemas for beta features
+
+class MatchingPair(BaseModel):
+    """One term-definition or left-right pair for matching questions."""
+    left: str
+    right: str
+
+
+class MatchingPairInput(BaseModel):
+    left: str = Field(min_length=1)
+    right: str = Field(min_length=1)
+
+
+class SelectAllOption(BaseModel):
+    """Option for select-all question (like MCQ but multiple correct answers)."""
+    id: int
+    text: str
+    is_correct: None = None  # Hidden from student
+
+
+class SelectAllOptionEditable(BaseModel):
+    id: int
+    text: str
+    is_correct: bool
+
+
+class SelectAllOptionInput(BaseModel):
+    text: str
+    is_correct: bool
+
+
 class QuestionPublic(BaseModel):
     id: int
     type: str
     question_text: str
+    
+    # MCQ/select_all fields
     options: list[MCQOptionPublic] = Field(default_factory=list)
+    
+    # Matching fields
+    matching_pairs: list[MatchingPair] = Field(default_factory=list)
+    
+    # Ordering fields
+    ordering_items: list[str] = Field(default_factory=list)
+    
+    # Fill-in-the-blank: no extra fields (just question_text + text input)
 
 
 class QuestionEditable(BaseModel):
     id: int
     type: str
     question_text: str
+    
+    # MCQ/select_all fields
     options: list[MCQOptionEditable] = Field(default_factory=list)
+    
+    # Matching fields
+    matching_pairs: list[MatchingPair] = Field(default_factory=list)
+    
+    # Ordering fields
+    ordering_items: list[str] = Field(default_factory=list)
+    
+    # FRQ/fill_blank expected answer
     expected_answer: Optional[str] = None
 
 
 class QuestionCreate(BaseModel):
     type: str
     question_text: str = Field(min_length=1)
+    
+    # MCQ/select_all fields
     options: list[MCQOptionInput] = Field(default_factory=list)
+    
+    # Matching fields
+    matching_pairs: list[MatchingPairInput] = Field(default_factory=list)
+    
+    # Ordering fields
+    ordering_items: list[str] = Field(default_factory=list)
+    
+    # FRQ/fill_blank expected answer
     expected_answer: Optional[str] = None
 
 
 class QuestionUpdate(BaseModel):
     question_text: Optional[str] = Field(default=None, min_length=1)
+    
+    # MCQ/select_all fields
     options: Optional[list[MCQOptionInput]] = None
+    
+    # Matching fields
+    matching_pairs: Optional[list[MatchingPairInput]] = None
+    
+    # Ordering fields
+    ordering_items: Optional[list[str]] = None
+    
+    # FRQ/fill_blank expected answer
     expected_answer: Optional[str] = None
 
 

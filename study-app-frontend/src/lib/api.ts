@@ -4,6 +4,8 @@ import type {
   AttemptSummary,
   CreateTestResult,
   AuthUser,
+  DraftAttemptAnswer,
+  DraftAttemptResponse,
   KojoClearResponse,
   KojoClearedConversation,
   Flashcard,
@@ -11,11 +13,14 @@ import type {
   Folder,
   KojoChatResponse,
   KojoConversation,
+  LeetCodeHintResponse,
+  LeetCodeProblemData,
   KojoRestoreResponse,
   ProviderStatus,
   QuestionCreate,
   QuestionEditable,
   QuestionUpdate,
+  ResumableTestInfo,
   SubmittedAnswer,
   TestSummary,
   TestTake,
@@ -196,7 +201,9 @@ export async function createTest(input: {
   codingLanguage?: string;
   customInstructions?: string;
   generationProvider?: string;
+  betaEnabled?: boolean;
   enableFallback?: boolean;
+  questionTypes?: string[];
 }): Promise<CreateTestResult> {
   if (isGuestSession()) {
     const tests = await fetchTests();
@@ -219,7 +226,11 @@ export async function createTest(input: {
   if (input.codingLanguage) formData.append("coding_language", input.codingLanguage);
   if (input.customInstructions) formData.append("custom_instructions", input.customInstructions);
   if (input.generationProvider) formData.append("provider", input.generationProvider);
+  formData.append("beta_enabled", input.betaEnabled === false ? "false" : "true");
   formData.append("enable_fallback", input.enableFallback === false ? "false" : "true");
+  if (input.questionTypes && input.questionTypes.length > 0) {
+    formData.append("question_types", JSON.stringify(input.questionTypes));
+  }
   input.files.forEach((file) => formData.append("notes_files", file));
   if (input.practiceTestFile) formData.append("practice_test_file", input.practiceTestFile);
 
@@ -294,6 +305,35 @@ export async function submitAttempt(testId: number, answers: SubmittedAnswer[]):
   }
 }
 
+export async function saveDraftAttempt(testId: number, answers: DraftAttemptAnswer[]): Promise<DraftAttemptResponse> {
+  try {
+    return await request<DraftAttemptResponse>(`/tests/${testId}/attempts/draft`, {
+      method: "POST",
+      body: JSON.stringify({ answers }),
+    });
+  } catch (error) {
+    console.error("Failed to save draft attempt:", error);
+    // Don't throw - draft save is non-critical
+    return { attempt_id: 0, attempt_number: 0, answers };
+  }
+}
+
+export async function getDraftAttempt(testId: number): Promise<DraftAttemptResponse | null> {
+  try {
+    return await request<DraftAttemptResponse>(`/tests/${testId}/attempts/draft`);
+  } catch {
+    return null;
+  }
+}
+
+export async function getResumableTests(): Promise<ResumableTestInfo[]> {
+  try {
+    return await request<ResumableTestInfo[]>("/users/resumable-tests");
+  } catch {
+    return [];
+  }
+}
+
 export async function createFlashcard(folderId: number, data: { front: string; back: string }): Promise<Flashcard> {
   return request<Flashcard>(`/folders/${folderId}/flashcards`, {
     method: "POST",
@@ -343,9 +383,15 @@ export async function fetchProviderStatus(): Promise<ProviderStatus> {
   return request<ProviderStatus>("/kojo/providers/status");
 }
 
-export async function kojoChat(folderId: number, message: string, provider?: string): Promise<KojoChatResponse> {
+export async function kojoChat(
+  folderId: number,
+  message: string,
+  provider?: string,
+  betaEnabled?: boolean,
+): Promise<KojoChatResponse> {
   const body: any = { message };
   if (provider) body.provider = provider;
+  body.beta_enabled = betaEnabled === true;
   return request<KojoChatResponse>(`/kojo/folders/${folderId}/chat`, {
     method: "POST",
     body: JSON.stringify(body),
@@ -382,6 +428,32 @@ export async function fetchClearedKojoConversations(): Promise<KojoClearedConver
 
 export async function fetchAttemptDetail(attemptId: number): Promise<AttemptDetail> {
   return request<AttemptDetail>(`/attempts/${attemptId}`);
+}
+
+export async function fetchLeetCodeProblem(titleSlug: string): Promise<LeetCodeProblemData> {
+  return request<LeetCodeProblemData>(`/leetcode/problems/${titleSlug}`);
+}
+
+export async function fetchLeetCodeHint(
+  titleSlug: string,
+  title: string,
+  message: string,
+  userCode: string,
+  provider?: string,
+  betaEnabled?: boolean,
+): Promise<LeetCodeHintResponse> {
+  const body: Record<string, unknown> = {
+    title_slug: titleSlug,
+    title,
+    message,
+    user_code: userCode,
+    beta_enabled: betaEnabled === true,
+  };
+  if (provider) body.provider = provider;
+  return request<LeetCodeHintResponse>("/leetcode/hint", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
 
 export async function fetchAttempts(testId: number): Promise<AttemptSummary[]> {

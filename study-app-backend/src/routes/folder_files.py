@@ -78,12 +78,6 @@ async def upload_folder_files(
     )
     current_count = int(current_count_result or 0)
 
-    if current_count + len(files) > MAX_UPLOAD_DOCUMENTS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Folder already has {current_count} files. Max {MAX_UPLOAD_DOCUMENTS} per folder.",
-        )
-
     svc = FileService()
     created: list[FolderFileResponse] = []
     for upload in files:
@@ -94,6 +88,13 @@ async def upload_folder_files(
 
         # Read the raw size — file has already been read in extract_from_file so use content length
         size_bytes = len(content.encode("utf-8"))
+
+        # Enforce per-folder document count limit
+        if current_count + len(created) + 1 > MAX_UPLOAD_DOCUMENTS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Folder already has {current_count} files. Max {MAX_UPLOAD_DOCUMENTS} per folder.",
+            )
 
         record = FolderFile(
             folder_id=folder.id,

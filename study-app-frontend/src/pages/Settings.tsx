@@ -2,6 +2,7 @@ import { CheckCircle, LogIn, LogOut, RotateCcw, Sparkles, XCircle } from "lucide
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { SelectInput } from "../components/Field";
 import {
   fetchClearedKojoConversations,
   fetchFlashcards,
@@ -13,11 +14,19 @@ import {
   setGoogleSession,
   signOut,
 } from "../lib/api";
+import { useSettings } from "../lib/useSettings";
 import { useEffect, useRef, useState } from "react";
 import type { KojoClearedConversation } from "../lib/types";
 
+const GENERATION_PROVIDER_OPTIONS = [
+  { value: "auto", label: "Auto" },
+  { value: "groq", label: "Groq" },
+  { value: "gemini", label: "Google (Gemini)" },
+  { value: "claude", label: "Anthropic (Claude)" },
+  { value: "ollama", label: "Ollama" },
+];
+
 const STATS_RESET_BASELINE_KEY = "nosey_stats_reset_baseline";
-const QUESTION_FALLBACK_KEY = "nosey_question_fallback";
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -32,9 +41,14 @@ export default function Settings() {
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [resettingStats, setResettingStats] = useState(false);
   const [statsResetNotice, setStatsResetNotice] = useState<string | null>(null);
-  const [questionFallbackEnabled, setQuestionFallbackEnabled] = useState<boolean>(
-    () => localStorage.getItem(QUESTION_FALLBACK_KEY) !== "false"
-  );
+  const {
+    isBetaEnabled,
+    setIsBetaEnabled,
+    questionFallbackEnabled,
+    setQuestionFallbackEnabled,
+    generationProvider,
+    setGenerationProvider,
+  } = useSettings();
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const initialized = useRef(false);
 
@@ -131,7 +145,14 @@ export default function Settings() {
   function handleToggleFallback() {
     const next = !questionFallbackEnabled;
     setQuestionFallbackEnabled(next);
-    localStorage.setItem(QUESTION_FALLBACK_KEY, String(next));
+  }
+
+  function handleToggleBetaMode() {
+    setIsBetaEnabled(!isBetaEnabled);
+  }
+
+  function handleChangeGenerationProvider(nextProvider: string) {
+    setGenerationProvider(nextProvider);
   }
 
   async function handleRestore(folderId: number) {
@@ -226,6 +247,27 @@ export default function Settings() {
         </section>
 
         <section className="settings-appearance">
+          <h3>Beta Mode</h3>
+          <p className="muted small">
+            Enable experimental UI and API features like model overrides, coding workflows, and future question types.
+          </p>
+          <div className="settings-reset-row">
+            <button
+              type="button"
+              role="switch"
+              className={`settings-toggle-switch${isBetaEnabled ? " settings-toggle-switch--on" : ""}`}
+              onClick={handleToggleBetaMode}
+              aria-pressed={isBetaEnabled}
+            >
+              <span className="settings-toggle-track">
+                <span className="settings-toggle-thumb" />
+              </span>
+              <span className="settings-toggle-label">{isBetaEnabled ? "Beta on" : "Beta off"}</span>
+            </button>
+          </div>
+        </section>
+
+        <section className="settings-appearance">
           <h3>Question Fallback</h3>
           <p className="muted small">
             When enabled, if the AI model fails to generate questions, placeholder questions are shown instead.
@@ -247,6 +289,23 @@ export default function Settings() {
               </span>
             </button>
           </div>
+        </section>
+
+        <section className="settings-appearance">
+          <h3>LLM model override</h3>
+          <p className="muted small">
+            Choose the default provider Nosey should use for all LLM-powered features.
+          </p>
+          <SelectInput
+            label="Default provider"
+            value={generationProvider}
+            onChange={(event) => handleChangeGenerationProvider(event.target.value)}
+            hint="This setting feeds Create Test, Flashcards, Kojo, and other AI workflows."
+          >
+            {GENERATION_PROVIDER_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </SelectInput>
         </section>
 
         <section className="settings-restore">
