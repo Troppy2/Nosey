@@ -9,15 +9,8 @@ import { createTest, fetchFolderFiles, fetchFolders, fetchProviderStatus } from 
 import { useSettings } from "../lib/useSettings";
 import type { Folder, ProviderStatus } from "../lib/types";
 
-const MAX_UPLOAD_DOCUMENTS = 30;
 const MAX_UPLOAD_FILE_SIZE_MB = 10;
-
-const EXTRA_QUESTION_TYPE_OPTIONS = [
-  { value: "matching", label: "Matching" },
-  { value: "ordering", label: "Ordering" },
-  { value: "fill_blank", label: "Fill in the blank" },
-  { value: "select_all", label: "Select all" },
-];
+const MAX_UPLOAD_TOTAL_SIZE_MB = 100;
 
 export default function CreateTest() {
   const navigate = useNavigate();
@@ -44,14 +37,7 @@ export default function CreateTest() {
   const [isCodingMode, setIsCodingMode] = useState(false);
   const [codingLanguage, setCodingLanguage] = useState("Python");
   const [customInstructions, setCustomInstructions] = useState("");
-  const [questionTypes, setQuestionTypes] = useState<Record<string, boolean>>(() => ({
-    matching: false,
-    ordering: false,
-    fill_blank: false,
-    select_all: false,
-  }));
-  const CUSTOM_INSTRUCTIONS_WORD_LIMIT = 500;
-  const { isBetaEnabled, generationProvider, setGenerationProvider } = useSettings();
+  const { generationProvider, setGenerationProvider } = useSettings();
 
   function countWords(text: string) {
     return text.trim().split(/\s+/).filter(Boolean).length;
@@ -96,17 +82,6 @@ export default function CreateTest() {
     }
   }, [providerStatus, generationProvider, setGenerationProvider]);
 
-  const allowAdvancedFeatures = isBetaEnabled && advancedMode;
-
-  function toggleQuestionType(type: string) {
-    setQuestionTypes((current) => ({
-      ...current,
-      [type]: !current[type],
-    }));
-  }
-
-  const enabledQuestionTypes = EXTRA_QUESTION_TYPE_OPTIONS.filter((option) => questionTypes[option.value]).map((option) => option.value);
-
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!title.trim() || !folderId) return;
@@ -117,20 +92,17 @@ export default function CreateTest() {
         title: title.trim(),
         testType,
         files,
-        countMcq: allowAdvancedFeatures ? countMcq : undefined,
-        countFrq: allowAdvancedFeatures ? (testType === "Extreme" ? 0 : countFrq) : undefined,
-        practiceTestFile: allowAdvancedFeatures ? practiceTestFile : null,
+        countMcq: advancedMode ? countMcq : undefined,
+        countFrq: advancedMode ? (testType === "Extreme" ? 0 : countFrq) : undefined,
+        practiceTestFile: advancedMode ? practiceTestFile : null,
         isMathMode: isMathMode && !isCodingMode,
         isCodingMode,
         codingLanguage: isCodingMode ? codingLanguage : undefined,
-        difficulty: allowAdvancedFeatures ? difficulty : undefined,
-        topicFocus: allowAdvancedFeatures && topicFocus.trim() ? topicFocus.trim() : undefined,
-        customInstructions: allowAdvancedFeatures && customInstructions.trim() ? customInstructions.trim() : undefined,
-        // Always send the selected generation provider so backend respects user choice.
+        difficulty: advancedMode ? difficulty : undefined,
+        topicFocus: advancedMode && topicFocus.trim() ? topicFocus.trim() : undefined,
+        customInstructions: advancedMode && customInstructions.trim() ? customInstructions.trim() : undefined,
         generationProvider: generationProvider,
-        betaEnabled: isBetaEnabled,
         enableFallback: localStorage.getItem("nosey_question_fallback") !== "false",
-        questionTypes: allowAdvancedFeatures ? enabledQuestionTypes : undefined,
       });
       sessionStorage.setItem(
         `nosey_generation_meta_${result.test_id}`,
@@ -144,7 +116,7 @@ export default function CreateTest() {
           retrieval_top_k: result.retrieval_top_k,
         }),
       );
-      if (allowAdvancedFeatures && reviewBeforeTaking) {
+      if (advancedMode && reviewBeforeTaking) {
         navigate(`/test/${result.test_id}/edit`);
       } else {
         navigate(`/test/${result.test_id}`);
@@ -170,12 +142,17 @@ export default function CreateTest() {
       return allowedType && file.size <= MAX_UPLOAD_FILE_SIZE_MB * 1024 * 1024;
     });
     if (selected.length === 0) {
-      setError(`Upload up to ${MAX_UPLOAD_DOCUMENTS} PDF, DOCX, TXT, or Markdown documents, each under ${MAX_UPLOAD_FILE_SIZE_MB} MB.`);
+      setError(`Upload PDF, DOCX, TXT, or Markdown documents under ${MAX_UPLOAD_FILE_SIZE_MB} MB each.`);
       return;
     }
     setError(null);
     setFiles((current) => {
-      const merged = [...current, ...selected].slice(0, MAX_UPLOAD_DOCUMENTS);
+      const merged = [...current, ...selected];
+      const totalBytes = merged.reduce((sum, file) => sum + file.size, 0);
+      if (totalBytes > MAX_UPLOAD_TOTAL_SIZE_MB * 1024 * 1024) {
+        setError(`Combined uploads exceed ${MAX_UPLOAD_TOTAL_SIZE_MB} MB. Remove a file and try again.`);
+        return current;
+      }
       if (!title && merged[0]) setTitle(merged[0].name.replace(/\.[^/.]+$/, ""));
       return merged;
     });
@@ -221,21 +198,17 @@ export default function CreateTest() {
           <span className="eyebrow">Generate</span>
           <h1>Create a practice test</h1>
           <p className="muted">
-            Upload up to 30 PDF, DOCX, TXT, or Markdown documents (10 MB each), or use files already saved in the folder, and choose the question style Nosey should generate.
+            Upload PDF, DOCX, TXT, or Markdown documents (10 MB each, {MAX_UPLOAD_TOTAL_SIZE_MB} MB total), or use files already saved in the folder, and choose the question style Nosey should generate.
           </p>
         </div>
         <button
           type="button"
-          className={`choice ${advancedMode && isBetaEnabled ? "active" : ""}`}
+          className={`choice ${advancedMode ? "active" : ""}`}
           style={{ display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}
-          onClick={() => {
-            if (!isBetaEnabled) return;
-            setAdvancedMode((v) => !v);
-          }}
-          disabled={!isBetaEnabled}
+          onClick={() => setAdvancedMode((v) => !v)}
         >
           <Settings2 size={15} />
-          {isBetaEnabled ? "Advanced mode" : "Advanced mode locked"}
+          Advanced mode
         </button>
       </header>
 
@@ -416,23 +389,14 @@ export default function CreateTest() {
                     rows={6}
                     placeholder="e.g. Generate 5 word problems involving integration by parts, make all MCQ options close in value, include at least 2 proof questions…"
                     value={customInstructions}
-                    onChange={(e) => {
-                      const next = e.target.value;
-                      const words = countWords(next);
-                      if (words > CUSTOM_INSTRUCTIONS_WORD_LIMIT) {
-                        const trimmed = next.trim().split(/\s+/).slice(0, CUSTOM_INSTRUCTIONS_WORD_LIMIT).join(" ");
-                        setCustomInstructions(trimmed);
-                      } else {
-                        setCustomInstructions(next);
-                      }
-                    }}
-                    maxLength={10000}
+                    onChange={(e) => setCustomInstructions(e.target.value)}
+                    maxLength={100000}
                     style={{ resize: "vertical", fontFamily: "inherit" }}
                   />
                   <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.8rem" }}>
                     Natural language instructions that guide how questions are generated. Overrides topic focus when both are set.
                     <br />
-                    <strong>Up to {CUSTOM_INSTRUCTIONS_WORD_LIMIT} words</strong> — {countWords(customInstructions)} word{countWords(customInstructions) !== 1 ? "s" : ""} used.
+                    {countWords(customInstructions)} word{countWords(customInstructions) !== 1 ? "s" : ""} used.
                   </p>
                 </div>
 
@@ -471,32 +435,6 @@ export default function CreateTest() {
                   </div>
                 </div>
 
-                {/* Beta question types */}
-                <div>
-                  <span className="eyebrow" style={{ display: "block", marginBottom: 10 }}>Extra question types</span>
-                  <p className="muted" style={{ marginTop: 0, marginBottom: 10, fontSize: "0.875rem" }}>
-                    Choose which beta question formats the generator may include in this test.
-                  </p>
-                  <div className="choice-grid">
-                    {EXTRA_QUESTION_TYPE_OPTIONS.map((option) => {
-                      const active = questionTypes[option.value];
-                      return (
-                        <button
-                          key={option.value}
-                          type="button"
-                          className={`choice ${active ? "active" : ""}`}
-                          onClick={() => toggleQuestionType(option.value)}
-                        >
-                          {option.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="muted" style={{ marginTop: 10, fontSize: "0.8rem" }}>
-                    Leave these off for a standard MCQ/FRQ test. Turn them on to allow the matching, ordering, fill-blank, and select-all formats.
-                  </p>
-                </div>
-
                 {/* Practice test upload */}
                 <div>
                   <span className="eyebrow" style={{ display: "block", marginBottom: 8 }}>Upload practice test</span>
@@ -527,7 +465,7 @@ export default function CreateTest() {
                       <input
                         ref={practiceTestInputRef}
                         type="file"
-                        accept=".pdf,.docx,.txt,.md"
+                        accept=".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml"
                         style={{ display: "none" }}
                         onChange={(e) => acceptPracticeTestFile(e.target.files?.[0])}
                       />
@@ -566,7 +504,7 @@ export default function CreateTest() {
           >
             <input
               aria-label="Upload notes files"
-              accept=".pdf,.docx,.txt,.md"
+              accept=".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml"
               multiple
               onChange={(event) => acceptFiles(event.target.files ?? undefined)}
               type="file"
@@ -577,7 +515,9 @@ export default function CreateTest() {
                 <h2>
                   {files.length} document{files.length === 1 ? "" : "s"} selected
                 </h2>
-                <p>Each document must be {MAX_UPLOAD_FILE_SIZE_MB} MB or smaller. You can upload up to {MAX_UPLOAD_DOCUMENTS} documents.</p>
+                <p>
+                  Each document must be {MAX_UPLOAD_FILE_SIZE_MB} MB or smaller. Combined uploads must stay under {MAX_UPLOAD_TOTAL_SIZE_MB} MB.
+                </p>
                 <div className="selected-files">
                   {files.map((file, index) => (
                     <div className="selected-file" key={`${file.name}-${index}`}>

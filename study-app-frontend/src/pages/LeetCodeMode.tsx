@@ -461,7 +461,7 @@ function isRunnable(problemData?: LeetCodeProblemData) {
 }
 
 export default function LeetCodeMode() {
-  const { generationProvider, isBetaEnabled } = useSettings();
+  const { generationProvider } = useSettings();
   const [view, setView] = useState<View>({ type: "tree" });
   const [progress, setProgress] = useState<Record<string, boolean>>(() => loadJson(PROGRESS_KEY, {}));
   const [activityDates, setActivityDates] = useState<string[]>(() => loadJson(ACTIVITY_KEY, []));
@@ -600,7 +600,6 @@ export default function LeetCodeMode() {
         kojoInput,
         code,
         generationProvider,
-        isBetaEnabled,
       );
       setKojoResponse(result.response);
     } catch (error) {

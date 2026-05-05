@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 
 export const SETTINGS_KEYS = {
-  betaEnabled: "nosey_beta_mode",
   questionFallback: "nosey_question_fallback",
   generationProvider: "nosey_generation_provider",
 } as const;
@@ -25,9 +24,6 @@ function writeSetting(key: string, value: string) {
 }
 
 export function useSettings() {
-  const [isBetaEnabled, setIsBetaEnabledState] = useState(() =>
-    readBooleanSetting(SETTINGS_KEYS.betaEnabled, false),
-  );
   const [questionFallbackEnabled, setQuestionFallbackEnabledState] = useState(() =>
     readBooleanSetting(SETTINGS_KEYS.questionFallback, true),
   );
@@ -38,9 +34,6 @@ export function useSettings() {
   // Sync state when another instance of useSettings writes a setting.
   useEffect(() => {
     function handleStorage(e: StorageEvent) {
-      if (e.key === SETTINGS_KEYS.betaEnabled && e.newValue !== null) {
-        setIsBetaEnabledState(e.newValue !== "false");
-      }
       if (e.key === SETTINGS_KEYS.questionFallback && e.newValue !== null) {
         setQuestionFallbackEnabledState(e.newValue !== "false");
       }
@@ -51,11 +44,6 @@ export function useSettings() {
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
-
-  function setIsBetaEnabled(value: boolean) {
-    setIsBetaEnabledState(value);
-    writeSetting(SETTINGS_KEYS.betaEnabled, String(value));
-  }
 
   function setQuestionFallbackEnabled(value: boolean) {
     setQuestionFallbackEnabledState(value);
@@ -68,8 +56,6 @@ export function useSettings() {
   }
 
   return {
-    isBetaEnabled,
-    setIsBetaEnabled,
     questionFallbackEnabled,
     setQuestionFallbackEnabled,
     generationProvider,

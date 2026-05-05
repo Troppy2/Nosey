@@ -1,23 +1,18 @@
 import { BookOpen, Brain, Code2, FolderOpen, LayoutDashboard, Menu, MessageCircle, Settings, X } from "lucide-react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
-import { useSettings } from "../lib/useSettings";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/folders", label: "Folders", icon: FolderOpen },
   { to: "/flashcards", label: "Flashcards", icon: Brain },
-  { to: "/settings", label: "Settings", icon: Settings },
-];
-
-const betaNavItems = [
   { to: "/leetcode", label: "LeetCode mode", icon: Code2 },
   { to: "/kojo/chat", label: "Chat mode", icon: MessageCircle },
+  { to: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function AppShell() {
   const location = useLocation();
-  const { isBetaEnabled } = useSettings();
   const [isNavHidden, setIsNavHidden] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const lastScrollY = useRef(0);
@@ -136,20 +131,6 @@ export function AppShell() {
               </NavLink>
             );
           })}
-          {isBetaEnabled ? (
-            <div className="sidebar-beta-group">
-              <span className="sidebar-beta-label">Beta mode</span>
-              {betaNavItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <NavLink key={item.to} className="nav-link nav-link--beta" to={item.to}>
-                    <Icon size={19} />
-                    <span>{item.label}</span>
-                  </NavLink>
-                );
-              })}
-            </div>
-          ) : null}
         </nav>
       </aside>
 

@@ -39,7 +39,6 @@ async def kojo_chat(
             folder_id=folder_id,
             user_message=body.message,
             provider=body.provider,
-            beta_enabled=body.beta_enabled,
             session=session,
         )
     except ResourceNotFoundException as exc:
