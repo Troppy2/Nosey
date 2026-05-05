@@ -8,12 +8,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.models.base import BIGINT_ID, Base
 
 if TYPE_CHECKING:
-    from src.models.fill_blank_answer import FillBlankAnswer
     from src.models.frq_answer import FRQAnswer
-    from src.models.matching_answer import MatchingAnswer
     from src.models.mcq_option import MCQOption
-    from src.models.ordering_answer import OrderingAnswer
-    from src.models.select_all_answer import SelectAllAnswer
     from src.models.test import Test
     from src.models.user_answer import UserAnswer
 
@@ -38,18 +34,6 @@ class Question(Base):
     )
     frq_answer: Mapped[Optional[FRQAnswer]] = relationship(
         "FRQAnswer", back_populates="question", cascade="all, delete-orphan", uselist=False
-    )
-    matching_answer: Mapped[Optional[MatchingAnswer]] = relationship(
-        "MatchingAnswer", back_populates="question", cascade="all, delete-orphan", uselist=False
-    )
-    ordering_answer: Mapped[Optional[OrderingAnswer]] = relationship(
-        "OrderingAnswer", back_populates="question", cascade="all, delete-orphan", uselist=False
-    )
-    fill_blank_answer: Mapped[Optional[FillBlankAnswer]] = relationship(
-        "FillBlankAnswer", back_populates="question", cascade="all, delete-orphan", uselist=False
-    )
-    select_all_answer: Mapped[Optional[SelectAllAnswer]] = relationship(
-        "SelectAllAnswer", back_populates="question", cascade="all, delete-orphan", uselist=False
     )
     user_answers: Mapped[list[UserAnswer]] = relationship(
         "UserAnswer", back_populates="question", cascade="all, delete-orphan"

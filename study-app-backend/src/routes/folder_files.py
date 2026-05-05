@@ -14,7 +14,7 @@ from src.models.folder_file import FolderFile
 from src.models.user import User
 from src.services.file_service import FileService
 from src.utils.exceptions import ValidationException
-from src.utils.validators import MAX_UPLOAD_DOCUMENTS, MAX_UPLOAD_FILE_SIZE_BYTES
+from src.utils.validators import MAX_UPLOAD_TOTAL_SIZE_BYTES
 
 router = APIRouter(prefix="/folders", tags=["folder-files"])
 
@@ -69,32 +69,47 @@ async def upload_folder_files(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> list[FolderFileResponse]:
+    from src.utils.logger import logger
+    
     folder = await _get_owned_folder(folder_id, user, session)
 
-    # Count current files for limit check
     from sqlalchemy import func as sqlfunc
-    current_count_result = await session.scalar(
-        select(sqlfunc.count()).select_from(FolderFile).where(FolderFile.folder_id == folder_id)
+    current_total_result = await session.scalar(
+        select(sqlfunc.coalesce(sqlfunc.sum(FolderFile.size_bytes), 0)).where(FolderFile.folder_id == folder_id)
     )
-    current_count = int(current_count_result or 0)
+    current_total_bytes = int(current_total_result or 0)
 
     svc = FileService()
     created: list[FolderFileResponse] = []
+    pending_total_bytes = 0
     for upload in files:
         try:
             content, file_type = await svc.extract_from_file(upload)
+            logger.info(
+                "File extracted successfully",
+                extra={
+                    "filename": upload.filename,
+                    "file_type": file_type,
+                    "content_length": len(content),
+                    "folder_id": folder_id,
+                    "user_id": user.id,
+                }
+            )
         except ValidationException as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
         # Read the raw size — file has already been read in extract_from_file so use content length
         size_bytes = len(content.encode("utf-8"))
 
-        # Enforce per-folder document count limit
-        if current_count + len(created) + 1 > MAX_UPLOAD_DOCUMENTS:
+        if current_total_bytes + pending_total_bytes + size_bytes > MAX_UPLOAD_TOTAL_SIZE_BYTES:
             raise HTTPException(
                 status_code=400,
-                detail=f"Folder already has {current_count} files. Max {MAX_UPLOAD_DOCUMENTS} per folder.",
+                detail=(
+                    "Folder materials exceed total storage limit "
+                    f"({MAX_UPLOAD_TOTAL_SIZE_BYTES // (1024 * 1024)} MB)."
+                ),
             )
+        pending_total_bytes += size_bytes
 
         record = FolderFile(
             folder_id=folder.id,
