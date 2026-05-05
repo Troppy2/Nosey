@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+import json
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.datastructures import UploadFile
@@ -69,6 +70,18 @@ async def create_test(
         custom_instructions = str(custom_instructions_raw).strip()[:500] if custom_instructions_raw else None
         provider_raw = form.get("provider")
         provider = str(provider_raw).strip().lower() if provider_raw else None
+        beta_enabled = str(form.get("beta_enabled", "false")).lower() in ("true", "1", "yes")
+        question_types_raw = form.get("question_types")
+        question_types: list[str] = []
+        if question_types_raw:
+            try:
+                parsed_question_types = json.loads(str(question_types_raw))
+                if isinstance(parsed_question_types, list):
+                    question_types = [str(item).strip() for item in parsed_question_types if str(item).strip()]
+                elif isinstance(parsed_question_types, str) and parsed_question_types.strip():
+                    question_types = [parsed_question_types.strip()]
+            except json.JSONDecodeError:
+                question_types = [part.strip() for part in str(question_types_raw).split(",") if part.strip()]
         provider_aliases = {
             "google": "gemini",
             "anthropic": "claude",
@@ -79,6 +92,8 @@ async def create_test(
                 raise StudyAppException(
                     "provider must be auto, groq, google, anthropic, gemini, claude, or ollama"
                 )
+        if not beta_enabled:
+            provider = None
         enable_fallback = str(form.get("enable_fallback", "true")).lower() not in ("false", "0", "no")
 
         if not title or not test_type:
@@ -118,7 +133,9 @@ async def create_test(
             coding_language=coding_language,
             custom_instructions=custom_instructions,
             provider=provider,
+            beta_enabled=beta_enabled,
             enable_fallback=enable_fallback,
+            question_types=question_types,
         )
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

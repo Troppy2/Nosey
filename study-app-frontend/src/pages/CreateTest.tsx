@@ -6,16 +6,17 @@ import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { SelectInput, TextInput } from "../components/Field";
 import { createTest, fetchFolderFiles, fetchFolders, fetchProviderStatus } from "../lib/api";
+import { useSettings } from "../lib/useSettings";
 import type { Folder, ProviderStatus } from "../lib/types";
 
 const MAX_UPLOAD_DOCUMENTS = 30;
 const MAX_UPLOAD_FILE_SIZE_MB = 10;
-const GENERATION_PROVIDER_OPTIONS = [
-  { value: "auto", label: "Auto" },
-  { value: "groq", label: "Groq" },
-  { value: "gemini", label: "Google" },
-  { value: "claude", label: "Anthropic" },
-  { value: "ollama", label: "Ollama" },
+
+const EXTRA_QUESTION_TYPE_OPTIONS = [
+  { value: "matching", label: "Matching" },
+  { value: "ordering", label: "Ordering" },
+  { value: "fill_blank", label: "Fill in the blank" },
+  { value: "select_all", label: "Select all" },
 ];
 
 export default function CreateTest() {
@@ -43,8 +44,19 @@ export default function CreateTest() {
   const [isCodingMode, setIsCodingMode] = useState(false);
   const [codingLanguage, setCodingLanguage] = useState("Python");
   const [customInstructions, setCustomInstructions] = useState("");
+  const [questionTypes, setQuestionTypes] = useState<Record<string, boolean>>(() => ({
+    matching: false,
+    ordering: false,
+    fill_blank: false,
+    select_all: false,
+  }));
+  const CUSTOM_INSTRUCTIONS_WORD_LIMIT = 500;
+  const { isBetaEnabled, generationProvider, setGenerationProvider } = useSettings();
+
+  function countWords(text: string) {
+    return text.trim().split(/\s+/).filter(Boolean).length;
+  }
   const [folderFileCount, setFolderFileCount] = useState(0);
-  const [generationProvider, setGenerationProvider] = useState(() => localStorage.getItem("nosey_generation_provider") || "auto");
   const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
 
   useEffect(() => {
@@ -81,9 +93,19 @@ export default function CreateTest() {
       (generationProvider === "ollama" && !providerStatus.ollama);
     if (unavailable) {
       setGenerationProvider("auto");
-      localStorage.setItem("nosey_generation_provider", "auto");
     }
-  }, [providerStatus, generationProvider]);
+  }, [providerStatus, generationProvider, setGenerationProvider]);
+
+  const allowAdvancedFeatures = isBetaEnabled && advancedMode;
+
+  function toggleQuestionType(type: string) {
+    setQuestionTypes((current) => ({
+      ...current,
+      [type]: !current[type],
+    }));
+  }
+
+  const enabledQuestionTypes = EXTRA_QUESTION_TYPE_OPTIONS.filter((option) => questionTypes[option.value]).map((option) => option.value);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -95,17 +117,20 @@ export default function CreateTest() {
         title: title.trim(),
         testType,
         files,
-        countMcq: advancedMode ? countMcq : undefined,
-        countFrq: advancedMode ? countFrq : undefined,
-        practiceTestFile: advancedMode ? practiceTestFile : null,
+        countMcq: allowAdvancedFeatures ? countMcq : undefined,
+        countFrq: allowAdvancedFeatures ? (testType === "Extreme" ? 0 : countFrq) : undefined,
+        practiceTestFile: allowAdvancedFeatures ? practiceTestFile : null,
         isMathMode: isMathMode && !isCodingMode,
         isCodingMode,
         codingLanguage: isCodingMode ? codingLanguage : undefined,
-        difficulty: advancedMode ? difficulty : undefined,
-        topicFocus: advancedMode && topicFocus.trim() ? topicFocus.trim() : undefined,
-        customInstructions: advancedMode && customInstructions.trim() ? customInstructions.trim() : undefined,
-        generationProvider: advancedMode ? generationProvider : "auto",
+        difficulty: allowAdvancedFeatures ? difficulty : undefined,
+        topicFocus: allowAdvancedFeatures && topicFocus.trim() ? topicFocus.trim() : undefined,
+        customInstructions: allowAdvancedFeatures && customInstructions.trim() ? customInstructions.trim() : undefined,
+        // Always send the selected generation provider so backend respects user choice.
+        generationProvider: generationProvider,
+        betaEnabled: isBetaEnabled,
         enableFallback: localStorage.getItem("nosey_question_fallback") !== "false",
+        questionTypes: allowAdvancedFeatures ? enabledQuestionTypes : undefined,
       });
       sessionStorage.setItem(
         `nosey_generation_meta_${result.test_id}`,
@@ -119,7 +144,7 @@ export default function CreateTest() {
           retrieval_top_k: result.retrieval_top_k,
         }),
       );
-      if (advancedMode && reviewBeforeTaking) {
+      if (allowAdvancedFeatures && reviewBeforeTaking) {
         navigate(`/test/${result.test_id}/edit`);
       } else {
         navigate(`/test/${result.test_id}`);
@@ -201,12 +226,16 @@ export default function CreateTest() {
         </div>
         <button
           type="button"
-          className={`choice ${advancedMode ? "active" : ""}`}
+          className={`choice ${advancedMode && isBetaEnabled ? "active" : ""}`}
           style={{ display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}
-          onClick={() => setAdvancedMode((v) => !v)}
+          onClick={() => {
+            if (!isBetaEnabled) return;
+            setAdvancedMode((v) => !v);
+          }}
+          disabled={!isBetaEnabled}
         >
           <Settings2 size={15} />
-          Advanced mode
+          {isBetaEnabled ? "Advanced mode" : "Advanced mode locked"}
         </button>
       </header>
 
@@ -259,6 +288,7 @@ export default function CreateTest() {
                   ["MCQ_only", "Multiple choice"],
                   ["FRQ_only", "Free response"],
                   ["mixed", "Mixed"],
+                  ["Extreme", "Extreme MCQ"],
                 ].map(([value, label]) => (
                   <button
                     key={value}
@@ -325,42 +355,11 @@ export default function CreateTest() {
               </div>
             </div>
 
-            {advancedMode && (
-              <SelectInput
-                label="AI model"
-                value={generationProvider}
-                onChange={(e) => {
-                  setGenerationProvider(e.target.value);
-                  localStorage.setItem("nosey_generation_provider", e.target.value);
-                }}
-                hint="Choose which model generates your practice test."
-              >
-                {GENERATION_PROVIDER_OPTIONS.map((option) => {
-                  let label = option.label;
-                  let disabled = false;
-                  if (providerStatus) {
-                    if (option.value === "ollama") {
-                      disabled = !providerStatus.ollama;
-                      if (disabled) label += " (offline)";
-                    } else if (option.value === "groq") {
-                      disabled = !providerStatus.groq;
-                      if (disabled) label += " (no key)";
-                    } else if (option.value === "gemini") {
-                      disabled = !providerStatus.gemini;
-                      if (disabled) label += " (no key)";
-                    } else if (option.value === "claude") {
-                      disabled = !providerStatus.claude;
-                      if (disabled) label += " (no key)";
-                    }
-                  }
-                  return (
-                    <option key={option.value} value={option.value} disabled={disabled}>
-                      {label}
-                    </option>
-                  );
-                })}
-              </SelectInput>
-            )}
+            {advancedMode ? (
+              <div className="settings-note" style={{ marginTop: 8 }}>
+                <span>AI model override is managed in Settings.</span>
+              </div>
+            ) : null}
           </Card>
 
           {/* Advanced Mode panel */}
@@ -387,6 +386,7 @@ export default function CreateTest() {
                 </div>
 
                 {/* Topic focus */}
+
                 <div className="field">
                   <label className="field-label" htmlFor="topic-focus">
                     Topic focus <span className="muted" style={{ fontWeight: 400 }}>(optional)</span>
@@ -413,15 +413,26 @@ export default function CreateTest() {
                   <textarea
                     id="custom-instructions"
                     className="input"
-                    rows={3}
+                    rows={6}
                     placeholder="e.g. Generate 5 word problems involving integration by parts, make all MCQ options close in value, include at least 2 proof questions…"
                     value={customInstructions}
-                    onChange={(e) => setCustomInstructions(e.target.value)}
-                    maxLength={500}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      const words = countWords(next);
+                      if (words > CUSTOM_INSTRUCTIONS_WORD_LIMIT) {
+                        const trimmed = next.trim().split(/\s+/).slice(0, CUSTOM_INSTRUCTIONS_WORD_LIMIT).join(" ");
+                        setCustomInstructions(trimmed);
+                      } else {
+                        setCustomInstructions(next);
+                      }
+                    }}
+                    maxLength={10000}
                     style={{ resize: "vertical", fontFamily: "inherit" }}
                   />
-                  <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.8rem" }}>
+                  <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.8rem" }}>
                     Natural language instructions that guide how questions are generated. Overrides topic focus when both are set.
+                    <br />
+                    <strong>Up to {CUSTOM_INSTRUCTIONS_WORD_LIMIT} words</strong> — {countWords(customInstructions)} word{countWords(customInstructions) !== 1 ? "s" : ""} used.
                   </p>
                 </div>
 
@@ -453,11 +464,37 @@ export default function CreateTest() {
                         value={countFrq}
                         onChange={(e) => setCountFrq(Math.max(0, Math.min(50, Number(e.target.value))))}
                         className="input"
-                        disabled={testType === "MCQ_only"}
-                        style={{ opacity: testType === "MCQ_only" ? 0.4 : 1 }}
+                        disabled={testType === "MCQ_only" || testType === "Extreme"}
+                        style={{ opacity: testType === "MCQ_only" || testType === "Extreme" ? 0.4 : 1 }}
                       />
                     </div>
                   </div>
+                </div>
+
+                {/* Beta question types */}
+                <div>
+                  <span className="eyebrow" style={{ display: "block", marginBottom: 10 }}>Extra question types</span>
+                  <p className="muted" style={{ marginTop: 0, marginBottom: 10, fontSize: "0.875rem" }}>
+                    Choose which beta question formats the generator may include in this test.
+                  </p>
+                  <div className="choice-grid">
+                    {EXTRA_QUESTION_TYPE_OPTIONS.map((option) => {
+                      const active = questionTypes[option.value];
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          className={`choice ${active ? "active" : ""}`}
+                          onClick={() => toggleQuestionType(option.value)}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="muted" style={{ marginTop: 10, fontSize: "0.8rem" }}>
+                    Leave these off for a standard MCQ/FRQ test. Turn them on to allow the matching, ordering, fill-blank, and select-all formats.
+                  </p>
                 </div>
 
                 {/* Practice test upload */}

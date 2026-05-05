@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     ollama_base_url: str = Field(default="https://api.ollama.com", alias="OLLAMA_BASE_URL")
     ollama_model: str = Field(default="mistral:7b-instruct-q3_K_M", alias="OLLAMA_MODEL")
     ollama_api_key: Optional[str] = Field(default=None, alias="OLLAMA_API_KEY")
+    ollama_is_cloud: bool = Field(default=False, alias="OLLAMA_IS_CLOUD")
     groq_api_key: Optional[str] = Field(default=None, alias="GROQ_API_KEY")
     google_ai_api_key: Optional[str] = Field(default=None, alias="GOOGLE_AI_API_KEY")
     anthropic_api_key: Optional[str] = Field(default=None, alias="ANTHROPIC_API_KEY")
@@ -70,3 +71,15 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# If an Ollama API key is provided, prefer the cloud endpoint unless the user explicitly set another base URL.
+try:
+    if settings.ollama_api_key:
+        # If still pointing at the local default, switch to Ollama Cloud API endpoint.
+        if settings.ollama_base_url.strip() in ("http://localhost:11434", "http://127.0.0.1:11434"):
+            settings.ollama_base_url = "https://api.ollama.com"
+        # Convenience boolean for other modules to detect cloud usage.
+        settings.ollama_is_cloud = True
+except Exception:
+    # Be defensive — do not crash on config mutations
+    pass

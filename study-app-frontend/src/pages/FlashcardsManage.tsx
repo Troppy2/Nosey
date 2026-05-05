@@ -14,15 +14,8 @@ import {
   generateFlashcardsFromFile,
   updateFlashcard,
 } from "../lib/api";
+import { useSettings } from "../lib/useSettings";
 import type { Flashcard, ProviderStatus } from "../lib/types";
-
-const GENERATION_PROVIDER_OPTIONS = [
-  { value: "auto", label: "Auto" },
-  { value: "groq", label: "Groq" },
-  { value: "gemini", label: "Google" },
-  { value: "claude", label: "Anthropic" },
-  { value: "ollama", label: "Ollama" },
-];
 
 export default function FlashcardsManage() {
   const { folderId } = useParams();
@@ -38,10 +31,10 @@ export default function FlashcardsManage() {
   const [generatingMore, setGeneratingMore] = useState(false);
   const [generateCount, setGenerateCount] = useState(10);
   const [folderFileCount, setFolderFileCount] = useState(0);
-  const [generationProvider, setGenerationProvider] = useState(() => localStorage.getItem("nosey_generation_provider") || "auto");
   const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
+  const { generationProvider, setGenerationProvider } = useSettings();
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -72,9 +65,8 @@ export default function FlashcardsManage() {
       (generationProvider === "ollama" && !providerStatus.ollama);
     if (unavailable) {
       setGenerationProvider("auto");
-      localStorage.setItem("nosey_generation_provider", "auto");
     }
-  }, [providerStatus, generationProvider]);
+  }, [providerStatus, generationProvider, setGenerationProvider]);
 
   function startEdit(card: Flashcard) {
     setEditingId(card.id);
@@ -233,43 +225,9 @@ export default function FlashcardsManage() {
             style={{ width: 92, padding: "8px 10px" }}
           />
         </label>
-        <label className="muted small" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          AI model
-          <select
-            className="input select"
-            value={generationProvider}
-            onChange={(e) => {
-              setGenerationProvider(e.target.value);
-              localStorage.setItem("nosey_generation_provider", e.target.value);
-            }}
-            style={{ width: 160, padding: "8px 10px" }}
-          >
-            {GENERATION_PROVIDER_OPTIONS.map((option) => {
-              let label = option.label;
-              let disabled = false;
-              if (providerStatus) {
-                if (option.value === "ollama") {
-                  disabled = !providerStatus.ollama;
-                  if (disabled) label += " (offline)";
-                } else if (option.value === "groq") {
-                  disabled = !providerStatus.groq;
-                  if (disabled) label += " (no key)";
-                } else if (option.value === "gemini") {
-                  disabled = !providerStatus.gemini;
-                  if (disabled) label += " (no key)";
-                } else if (option.value === "claude") {
-                  disabled = !providerStatus.claude;
-                  if (disabled) label += " (no key)";
-                }
-              }
-              return (
-                <option key={option.value} value={option.value} disabled={disabled}>
-                  {label}
-                </option>
-              );
-            })}
-          </select>
-        </label>
+        <span className="muted small" style={{ alignSelf: "center" }}>
+          AI model is set in Settings.
+        </span>
         <span className="muted small" style={{ alignSelf: "center" }}>
           {folderFileCount > 0
             ? `${folderFileCount} saved file${folderFileCount === 1 ? "" : "s"} will be used as source context.`

@@ -7,6 +7,8 @@ import FlashcardsManage from "../pages/FlashcardsManage";
 import FolderDetail from "../pages/FolderDetail";
 import Folders from "../pages/Folders";
 import Landing from "../pages/Landing";
+import KojoMode from "../pages/KojoMode";
+import LeetCodeMode from "../pages/LeetCodeMode";
 import QuestionEditor from "../pages/QuestionEditor";
 import Results from "../pages/Results";
 import TakeTest from "../pages/TakeTest";
@@ -28,6 +30,8 @@ export default function App() {
           <Route path="/flashcards" element={<Flashcards />} />
           <Route path="/flashcards/:folderId" element={<Flashcards />} />
           <Route path="/folders/:folderId/flashcards/manage" element={<FlashcardsManage />} />
+          <Route path="/leetcode" element={<LeetCodeMode />} />
+          <Route path="/kojo/chat" element={<KojoMode />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

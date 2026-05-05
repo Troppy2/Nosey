@@ -4,6 +4,7 @@
 
 All LLM calls go through `study-app-backend/src/services/llm_service.py`. The service uses raw `httpx` async HTTP calls for every provider — **no provider SDK packages are used** (even though groq/anthropic/google-generativeai are in requirements.txt, the live code uses httpx directly). This is intentional: unified timeout/retry handling, no import overhead.
 
+Auto compact context when you have reached 75%
 ---
 
 ## Provider Registry

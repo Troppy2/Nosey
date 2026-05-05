@@ -101,6 +101,8 @@ export const mockTestTake: TestTake = {
         { id: 3, text: "Golgi apparatus", is_correct: null },
         { id: 4, text: "Ribosome", is_correct: null },
       ],
+      matching_pairs: [],
+      ordering_items: [],
     },
     {
       id: 101,
@@ -112,18 +114,24 @@ export const mockTestTake: TestTake = {
         { id: 7, text: "ATP", is_correct: null },
         { id: 8, text: "Carbon dioxide", is_correct: null },
       ],
+      matching_pairs: [],
+      ordering_items: [],
     },
     {
       id: 102,
       type: "FRQ",
       question_text: "Explain why oxygen is important in aerobic respiration.",
       options: [],
+      matching_pairs: [],
+      ordering_items: [],
     },
     {
       id: 103,
       type: "FRQ",
       question_text: "Compare glycolysis and the Krebs cycle in terms of location and output.",
       options: [],
+      matching_pairs: [],
+      ordering_items: [],
     },
   ],
 };
