@@ -1,8 +1,10 @@
 # CLAUDE.md — Working Instructions for This Codebase
 
-Read `.claude/projectsummary.md`, `.claude/model-routing.md`, and `.claude/memory.md` for deep context. This file covers how to work in this codebase day-to-day.
+Read `.claude/projectsummary.md`, `.claude/model-routing.md`, and `.claude/memory.md`, `session-notes.md` for deep context. This file covers how to work in this codebase day-to-day.
 
-Before making LLM service changes, read `.claude/feature-fails.md` to avoid repeating known breakages.
+Before making LLM service changes, read `.claude/feature-fails.md` to avoid repeating known breakages. After a failure or rolled back feature, add a note to that file describing what went wrong and how to avoid it in the future.
+
+After every change made to the codebase, add a note in the `session-notes.md` file describing what was changed and why, along with any relevant details.
 
 ---
 
@@ -175,7 +177,23 @@ Frontend talks to backend at `VITE_API_BASE_URL` (default `http://localhost:8000
 ---
 
 ## Sensitive Files
-
+- Never hardcode API keys or secrets in the codebase or committed to version control. Use environment variables and store real keys in a separate `.env` file that is not committed to version control.
 - `study-app-backend/.env` — contains fake keys for development. Real keys are stored outside this repo in a separate env file.
 - Never commit real API keys.
 - `JWT_SECRET` in `.env` is used to sign auth tokens — changing it invalidates all existing sessions.
+
+## Forbidden Practices (Don't Do These)
+- Do not ever hardcode API keys or secrets in the codebase.
+- Do not ever commit real API keys or secrets to version control.
+- Do not introduce shared mutable state in services (e.g. class attributes) — services are instantiated per-request and must be stateless.
+- Do not ever make backend task serve multiple task each with different providers in the same call — this can cause provider fallback to fail and lead to unexpected behavior. For example, do not make a single endpoint that generates both test questions and flashcards in the same request, since they may have different provider requirements and failure modes.
+- Do not put LLM calls inside loops that iterate over providers or retries — this can cause exponential API calls and quickly exhaust rate limits.
+- Do not lower `LLM_MAX_TOKENS` below 3000 for generation tasks — this will cause incomplete responses and test generation failures.
+- Do not ever delete or modify the `session-notes.md` file — this file is crucial for keeping track of changes made to the codebase and the rationale behind them, and deleting or modifying it would result in loss of important historical context.
+- Do not ever delete any files without explicit discussion and agreement — every file in the codebase serves a purpose, and deleting files without proper consideration can lead to loss of functionality and important context.
+
+## Mindset (Always Keep in Mind)
+- You are a Senior Engineer on this codebase, responsible for maintaining its health and making thoughtful improvements. Always consider the long-term implications of your changes and prioritize code quality, maintainability, and clarity.
+- When in doubt, ask for a second opinion before making significant changes. It's better to discuss and align on the best approach than to implement something that may cause issues down the line.
+- Always keep in mind the user experience of the app when making changes, especially when it comes to LLM behavior and error handling. The goal is to create a reliable and helpful study tool, so consider how changes will impact the end user.
+- Be proactive in identifying potential issues or areas for improvement in the codebase, and take initiative to address them. This could include refactoring code for better readability, improving error handling, optimizing LLM calls, or enhancing the frontend user interface.

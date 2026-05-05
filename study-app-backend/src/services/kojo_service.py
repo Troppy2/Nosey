@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.repositories.attempt_repository import AttemptRepository
 from src.repositories.folder_repository import FolderRepository
 from src.repositories.kojo_repository import KojoRepository
 from src.schemas.kojo_schema import (
@@ -27,6 +28,48 @@ _NO_NOTES = "[No study materials uploaded yet. Ask the student to upload notes f
 _CLEAR_WINDOW_HOURS = 5
 
 
+def _is_review_wrong_answers_request(user_message: str) -> bool:
+    """Check if user is asking to review wrong answers from their test."""
+    message_lower = user_message.lower()
+    review_keywords = [
+        "review.*wrong",
+        "wrong.*answer",
+        "check.*wrong",
+        "see.*wrong",
+        "what.*wrong",
+        "missed",
+        "incorrect",
+        "fail",
+        "got wrong",
+        "did i get wrong",
+        "i got wrong",
+    ]
+    return any(re.search(kw, message_lower) for kw in review_keywords)
+
+
+def _format_wrong_answers_context(wrong_answers_data: list[tuple]) -> str:
+    """Format wrong answers into a readable context for the LLM."""
+    lines = ["STUDENT'S RECENT WRONG ANSWERS:\n"]
+    for i, (question, user_answer) in enumerate(wrong_answers_data, 1):
+        lines.append(f"\n--- Question {i} ---")
+        lines.append(f"Type: {question.question_type.upper()}")
+        lines.append(f"Question: {question.question_text}")
+        lines.append(f"Student's Answer: {user_answer.user_answer}")
+
+        if question.question_type == "MCQ":
+            correct_option = next(
+                (opt for opt in question.mcq_options if opt.is_correct),
+                None,
+            )
+            if correct_option:
+                lines.append(f"Correct Answer: {correct_option.option_text}")
+        elif question.question_type == "FRQ":
+            if question.frq_answer:
+                lines.append(f"Correct Answer: {question.frq_answer.expected_answer}")
+
+    return "\n".join(lines)
+
+
 class KojoService:
     async def chat(
         self,
@@ -35,6 +78,7 @@ class KojoService:
         user_message: str,
         session: AsyncSession,
         provider: Optional[str] = None,
+        beta_enabled: bool = False,
     ) -> KojoChatResponse:
         repo = KojoRepository(session)
 
@@ -49,23 +93,40 @@ class KojoService:
         context_parts = [part for part in (notes, folder_files) if part]
         notes_context = "\n\n---\n\n".join(context_parts) if context_parts else _NO_NOTES
 
-        await repo.add_message(conversation.id, "user", user_message)
+        # Check if user is asking to review wrong answers
+        if _is_review_wrong_answers_request(user_message):
+            wrong_answers_result = await AttemptRepository(session).get_recent_wrong_answers(user_id)
+            if wrong_answers_result:
+                attempt, wrong_answers_data = wrong_answers_result
+                await repo.add_message(conversation.id, "user", user_message)
+                history = await repo.get_history(conversation.id, limit=10, after=conversation.cleared_at)
+                wrong_answers_context = _format_wrong_answers_context(wrong_answers_data)
+                prompt = _build_review_wrong_answers_prompt(notes_context, wrong_answers_context, user_message, history)
+            else:
+                # No recent wrong answers found
+                await repo.add_message(conversation.id, "user", user_message)
+                response = "You don't have any wrong answers from your most recent test to review. Keep practicing!"
+                kojo_msg = await repo.add_message(conversation.id, "assistant", response)
+                await session.commit()
+                return KojoChatResponse(
+                    response=response,
+                    conversation_id=conversation.id,
+                    message_id=kojo_msg.id,
+                    flagged_uncertain=False,
+                )
+        else:
+            # Regular Kojo chat
+            await repo.add_message(conversation.id, "user", user_message)
+            history = await repo.get_history(conversation.id, limit=10, after=conversation.cleared_at)
+            prompt = _build_prompt(notes_context, user_message, history)
 
-        history = await repo.get_history(
-            conversation.id,
-            limit=10,
-            after=conversation.cleared_at,
-        )
-
-        prompt = _build_prompt(notes_context, user_message, history)
+        active_provider = provider
 
         try:
-            if provider:
-                kojo_response = await LLMService().call_kojo(prompt if isinstance(prompt, str) else str(prompt), provider=provider)
+            if active_provider:
+                kojo_response = await LLMService().call_kojo(prompt if isinstance(prompt, str) else str(prompt), provider=active_provider)
             else:
                 kojo_response = await LLMService().call_kojo(prompt if isinstance(prompt, str) else str(prompt))
-        except LLMException:
-            raise
         except Exception as exc:
             logger.warning("Kojo LLM call failed: %s", exc)
             raise LLMException("Kojo failed to generate a response. Try again.") from exc
@@ -222,6 +283,71 @@ def _extract_relevant_sections(notes: str, user_message: str, max_sections: int 
 
     scored.sort(key=lambda x: x[0], reverse=True)
     return "\n\n".join(para for _, para in scored[:max_sections])
+
+
+def _build_review_wrong_answers_prompt(notes: str, wrong_answers: str, user_message: str, history: list) -> str:
+    """Build prompt for reviewing wrong answers with RAG-enhanced feedback."""
+    history_lines: list[str] = []
+    for msg in history[:-1]:
+        role_label = "Student" if msg.role == "user" else "Kojo"
+        history_lines.append(f"{role_label}: {msg.content}")
+    history_block = "\n\nCONVERSATION SO FAR:\n" + "\n".join(history_lines) if history_lines else ""
+
+    has_notes = notes != _NO_NOTES
+
+    if has_notes:
+        relevant = _extract_relevant_sections(notes, wrong_answers)
+        relevant_block = (
+            "RELEVANT SECTIONS FROM STUDENT'S NOTES (pre-matched to their answers):\n"
+            f"{relevant}\n\n"
+            if relevant else
+            "NOTE: No closely matching sections found in their notes for these answers.\n\n"
+        )
+        notes_block = (
+            f"{relevant_block}"
+            f"FULL STUDENT NOTES AND FOLDER FILES:\n{notes[:12000]}"
+        )
+    else:
+        relevant_block = ""
+        notes_block = (
+            "NOTE: The student has not uploaded any study materials yet. "
+            "Provide the correct answers and explanations, and suggest they cross-reference with online resources or their textbook."
+        )
+
+    return f"""You are Kojo, an intelligent and supportive AI study companion built into Nosey, a study tool.
+Your role is to help students learn from their mistakes in a constructive and encouraging way.
+
+{wrong_answers}
+
+{notes_block}
+{history_block}
+
+STUDENT'S REQUEST: {user_message}
+
+REVIEW GUIDELINES - FOLLOW THESE STRICTLY:
+1. For each wrong answer, provide:
+   - The correct answer (clearly stated)
+   - Why it is correct (concise explanation, 2-3 sentences max)
+   - Where in their notes this information appears (if found)
+
+2. Reference handling:
+   - ALWAYS check if the answer is covered in the RELEVANT SECTIONS above
+   - If found: Say "From your notes: [quote relevant section]" and explain why it matters
+   - If NOT found: Say explicitly "This question is not covered in your notes, but here's what you need to know: [answer + explanation]"
+   - Then suggest they cross-reference with online resources or their class materials
+
+3. Keep responses:
+   - Focused and structured (use bullet points for clarity)
+   - Concise (not essays — 2-4 sentences per question max)
+   - Encouraging and supportive in tone
+   - Direct: no fluff or unnecessary preamble
+
+4. Formatting:
+   - For math: wrap expressions in KaTeX ($...$ for inline, $$...$$ for display)
+   - For code: use fenced blocks with language tags
+   - For each question, use clear headers like "Question 1:" or "MCQ Question:"
+
+Respond now:"""
 
 
 def _build_prompt(notes: str, user_message: str, history: list) -> str:

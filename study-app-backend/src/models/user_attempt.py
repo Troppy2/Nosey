@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Integer, Numeric, UniqueConstraint
+from sqlalchemy import ForeignKey, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import BIGINT_ID, Base, TimestampMixin
@@ -28,9 +29,11 @@ class UserAttempt(Base, TimestampMixin):
         BIGINT_ID, ForeignKey("tests.id", ondelete="CASCADE"), nullable=False, index=True
     )
     attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="in_progress", nullable=False)  # in_progress, submitted
     total_score: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2))
     total_questions: Mapped[Optional[int]] = mapped_column(Integer)
     correct_count: Mapped[Optional[int]] = mapped_column(Integer)
+    exited_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)  # When user last exited the test
 
     user: Mapped[User] = relationship("User", back_populates="user_attempts")
     test: Mapped[Test] = relationship("Test", back_populates="attempts")

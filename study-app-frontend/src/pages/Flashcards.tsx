@@ -26,6 +26,41 @@ export default function Flashcards() {
   }, []);
 
   useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName;
+      if (target && (target.isContentEditable || tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT")) {
+        return;
+      }
+      if (showDeleteAllModal) {
+        return;
+      }
+
+      if (event.key === " " || event.key === "Spacebar") {
+        event.preventDefault();
+        setFlipped((currentFlipped) => !currentFlipped);
+        return;
+      }
+
+      if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
+        event.preventDefault();
+        setIndex((currentIndex) => Math.max(currentIndex - 1, 0));
+        setFlipped(false);
+        return;
+      }
+
+      if (event.key === "ArrowRight" || event.key === "ArrowUp") {
+        event.preventDefault();
+        setIndex((currentIndex) => Math.min(currentIndex + 1, cards.length - 1));
+        setFlipped(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [cards.length, showDeleteAllModal]);
+
+  useEffect(() => {
     setSelectedFolderId(folderId ? Number(folderId) : null);
   }, [folderId]);
 

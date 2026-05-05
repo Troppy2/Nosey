@@ -6,7 +6,14 @@ from src.config import settings
 from src import models as _models
 
 
-engine = create_async_engine(settings.database_url, echo=False, future=True)
+# Pre-ping avoids stale pooled connections after Neon/pgbouncer closes an idle session.
+engine = create_async_engine(
+    settings.database_url,
+    echo=False,
+    future=True,
+    pool_pre_ping=True,
+    pool_recycle=1800,
+)
 async_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 

@@ -6,6 +6,7 @@ import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { FileManager } from "../components/FileManager";
 import { KojoChat } from "../components/KojoChat";
+import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
 import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
 import type { AttemptSummary, Flashcard, Folder, TestSummary } from "../lib/types";
@@ -73,7 +74,7 @@ export default function FolderDetail() {
     );
   }
 
-  return (
+  const pageContent = (
     <div className={`page ${kojoOpen ? "page--kojo-open" : ""}`}>
       <header className="page-header">
         <div>
@@ -203,6 +204,14 @@ export default function FolderDetail() {
         </span>
       </div>
     </div>
+  );
+
+  return folder ? (
+    <SelectionKojoAssistant folderId={id} folderName={folder.name}>
+      {pageContent}
+    </SelectionKojoAssistant>
+  ) : (
+    pageContent
   );
 }
 
