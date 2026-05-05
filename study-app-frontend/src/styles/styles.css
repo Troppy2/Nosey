@@ -1813,6 +1813,8 @@ h3 {
   /* Nav links stack vertically inside drawer */
   .sidebar-nav {
     width: 100%;
+    flex: 0 0 auto;
+    justify-content: flex-start;
     flex-direction: column;
     flex-wrap: nowrap;
     overflow-x: visible;
