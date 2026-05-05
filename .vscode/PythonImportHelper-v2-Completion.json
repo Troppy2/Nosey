@@ -260,14 +260,6 @@
         "documentation": {}
     },
     {
-        "label": "TYPE_CHECKING",
-        "importPath": "typing",
-        "description": "typing",
-        "isExtraImport": true,
-        "detail": "typing",
-        "documentation": {}
-    },
-    {
         "label": "Optional",
         "importPath": "typing",
         "description": "typing",
@@ -356,31 +348,7 @@
         "documentation": {}
     },
     {
-        "label": "TYPE_CHECKING",
-        "importPath": "typing",
-        "description": "typing",
-        "isExtraImport": true,
-        "detail": "typing",
-        "documentation": {}
-    },
-    {
-        "label": "TYPE_CHECKING",
-        "importPath": "typing",
-        "description": "typing",
-        "isExtraImport": true,
-        "detail": "typing",
-        "documentation": {}
-    },
-    {
         "label": "Optional",
-        "importPath": "typing",
-        "description": "typing",
-        "isExtraImport": true,
-        "detail": "typing",
-        "documentation": {}
-    },
-    {
-        "label": "TYPE_CHECKING",
         "importPath": "typing",
         "description": "typing",
         "isExtraImport": true,
@@ -1095,6 +1063,14 @@
         "documentation": {}
     },
     {
+        "label": "op",
+        "importPath": "alembic",
+        "description": "alembic",
+        "isExtraImport": true,
+        "detail": "alembic",
+        "documentation": {}
+    },
+    {
         "label": "context",
         "importPath": "alembic",
         "description": "alembic",
@@ -1152,14 +1128,6 @@
         "documentation": {}
     },
     {
-        "label": "ForeignKey",
-        "importPath": "sqlalchemy",
-        "description": "sqlalchemy",
-        "isExtraImport": true,
-        "detail": "sqlalchemy",
-        "documentation": {}
-    },
-    {
         "label": "Boolean",
         "importPath": "sqlalchemy",
         "description": "sqlalchemy",
@@ -1344,14 +1312,6 @@
         "documentation": {}
     },
     {
-        "label": "ForeignKey",
-        "importPath": "sqlalchemy",
-        "description": "sqlalchemy",
-        "isExtraImport": true,
-        "detail": "sqlalchemy",
-        "documentation": {}
-    },
-    {
         "label": "Boolean",
         "importPath": "sqlalchemy",
         "description": "sqlalchemy",
@@ -1432,14 +1392,6 @@
         "documentation": {}
     },
     {
-        "label": "ForeignKey",
-        "importPath": "sqlalchemy",
-        "description": "sqlalchemy",
-        "isExtraImport": true,
-        "detail": "sqlalchemy",
-        "documentation": {}
-    },
-    {
         "label": "Integer",
         "importPath": "sqlalchemy",
         "description": "sqlalchemy",
@@ -1457,14 +1409,6 @@
     },
     {
         "label": "Text",
-        "importPath": "sqlalchemy",
-        "description": "sqlalchemy",
-        "isExtraImport": true,
-        "detail": "sqlalchemy",
-        "documentation": {}
-    },
-    {
-        "label": "ForeignKey",
         "importPath": "sqlalchemy",
         "description": "sqlalchemy",
         "isExtraImport": true,
@@ -2345,6 +2289,14 @@
         "documentation": {}
     },
     {
+        "label": "AsyncSession",
+        "importPath": "sqlalchemy.ext.asyncio",
+        "description": "sqlalchemy.ext.asyncio",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.ext.asyncio",
+        "documentation": {}
+    },
+    {
         "label": "settings",
         "importPath": "src.config",
         "description": "src.config",
@@ -2937,102 +2889,6 @@
         "documentation": {}
     },
     {
-        "label": "Mapped",
-        "importPath": "sqlalchemy.orm",
-        "description": "sqlalchemy.orm",
-        "isExtraImport": true,
-        "detail": "sqlalchemy.orm",
-        "documentation": {}
-    },
-    {
-        "label": "mapped_column",
-        "importPath": "sqlalchemy.orm",
-        "description": "sqlalchemy.orm",
-        "isExtraImport": true,
-        "detail": "sqlalchemy.orm",
-        "documentation": {}
-    },
-    {
-        "label": "relationship",
-        "importPath": "sqlalchemy.orm",
-        "description": "sqlalchemy.orm",
-        "isExtraImport": true,
-        "detail": "sqlalchemy.orm",
-        "documentation": {}
-    },
-    {
-        "label": "Mapped",
-        "importPath": "sqlalchemy.orm",
-        "description": "sqlalchemy.orm",
-        "isExtraImport": true,
-        "detail": "sqlalchemy.orm",
-        "documentation": {}
-    },
-    {
-        "label": "mapped_column",
-        "importPath": "sqlalchemy.orm",
-        "description": "sqlalchemy.orm",
-        "isExtraImport": true,
-        "detail": "sqlalchemy.orm",
-        "documentation": {}
-    },
-    {
-        "label": "relationship",
-        "importPath": "sqlalchemy.orm",
-        "description": "sqlalchemy.orm",
-        "isExtraImport": true,
-        "detail": "sqlalchemy.orm",
-        "documentation": {}
-    },
-    {
-        "label": "Mapped",
-        "importPath": "sqlalchemy.orm",
-        "description": "sqlalchemy.orm",
-        "isExtraImport": true,
-        "detail": "sqlalchemy.orm",
-        "documentation": {}
-    },
-    {
-        "label": "mapped_column",
-        "importPath": "sqlalchemy.orm",
-        "description": "sqlalchemy.orm",
-        "isExtraImport": true,
-        "detail": "sqlalchemy.orm",
-        "documentation": {}
-    },
-    {
-        "label": "relationship",
-        "importPath": "sqlalchemy.orm",
-        "description": "sqlalchemy.orm",
-        "isExtraImport": true,
-        "detail": "sqlalchemy.orm",
-        "documentation": {}
-    },
-    {
-        "label": "Mapped",
-        "importPath": "sqlalchemy.orm",
-        "description": "sqlalchemy.orm",
-        "isExtraImport": true,
-        "detail": "sqlalchemy.orm",
-        "documentation": {}
-    },
-    {
-        "label": "mapped_column",
-        "importPath": "sqlalchemy.orm",
-        "description": "sqlalchemy.orm",
-        "isExtraImport": true,
-        "detail": "sqlalchemy.orm",
-        "documentation": {}
-    },
-    {
-        "label": "relationship",
-        "importPath": "sqlalchemy.orm",
-        "description": "sqlalchemy.orm",
-        "isExtraImport": true,
-        "detail": "sqlalchemy.orm",
-        "documentation": {}
-    },
-    {
         "label": "selectinload",
         "importPath": "sqlalchemy.orm",
         "description": "sqlalchemy.orm",
@@ -3057,14 +2913,6 @@
         "documentation": {}
     },
     {
-        "label": "Base",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
         "label": "BIGINT_ID",
         "importPath": "src.models.base",
         "description": "src.models.base",
@@ -3193,14 +3041,6 @@
         "documentation": {}
     },
     {
-        "label": "Base",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
         "label": "BIGINT_ID",
         "importPath": "src.models.base",
         "description": "src.models.base",
@@ -3233,23 +3073,7 @@
         "documentation": {}
     },
     {
-        "label": "Base",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
         "label": "BIGINT_ID",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
-        "label": "Base",
         "importPath": "src.models.base",
         "description": "src.models.base",
         "isExtraImport": true,
@@ -3745,23 +3569,6 @@
         "documentation": {}
     },
     {
-        "label": "json",
-        "kind": 6,
-        "isExtraImport": true,
-        "importPath": "json",
-        "description": "json",
-        "detail": "json",
-        "documentation": {}
-    },
-    {
-        "label": "FillBlankAnswer",
-        "importPath": "src.models.fill_blank_answer",
-        "description": "src.models.fill_blank_answer",
-        "isExtraImport": true,
-        "detail": "src.models.fill_blank_answer",
-        "documentation": {}
-    },
-    {
         "label": "FRQAnswer",
         "importPath": "src.models.frq_answer",
         "description": "src.models.frq_answer",
@@ -3770,35 +3577,11 @@
         "documentation": {}
     },
     {
-        "label": "MatchingAnswer",
-        "importPath": "src.models.matching_answer",
-        "description": "src.models.matching_answer",
-        "isExtraImport": true,
-        "detail": "src.models.matching_answer",
-        "documentation": {}
-    },
-    {
         "label": "MCQOption",
         "importPath": "src.models.mcq_option",
         "description": "src.models.mcq_option",
         "isExtraImport": true,
         "detail": "src.models.mcq_option",
-        "documentation": {}
-    },
-    {
-        "label": "OrderingAnswer",
-        "importPath": "src.models.ordering_answer",
-        "description": "src.models.ordering_answer",
-        "isExtraImport": true,
-        "detail": "src.models.ordering_answer",
-        "documentation": {}
-    },
-    {
-        "label": "SelectAllAnswer",
-        "importPath": "src.models.select_all_answer",
-        "description": "src.models.select_all_answer",
-        "isExtraImport": true,
-        "detail": "src.models.select_all_answer",
         "documentation": {}
     },
     {
@@ -4211,6 +3994,14 @@
     },
     {
         "label": "FastAPI",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "UploadFile",
         "importPath": "fastapi",
         "description": "fastapi",
         "isExtraImport": true,
@@ -4971,11 +4762,11 @@
         "documentation": {}
     },
     {
-        "label": "FileService",
-        "importPath": "src.services.file_service",
-        "description": "src.services.file_service",
+        "label": "FolderFile",
+        "importPath": "src.models.folder_file",
+        "description": "src.models.folder_file",
         "isExtraImport": true,
-        "detail": "src.services.file_service",
+        "detail": "src.models.folder_file",
         "documentation": {}
     },
     {
@@ -5011,7 +4802,39 @@
         "documentation": {}
     },
     {
-        "label": "MAX_UPLOAD_DOCUMENTS",
+        "label": "FileService",
+        "importPath": "src.services.file_service",
+        "description": "src.services.file_service",
+        "isExtraImport": true,
+        "detail": "src.services.file_service",
+        "documentation": {}
+    },
+    {
+        "label": "FileService",
+        "importPath": "src.services.file_service",
+        "description": "src.services.file_service",
+        "isExtraImport": true,
+        "detail": "src.services.file_service",
+        "documentation": {}
+    },
+    {
+        "label": "FileService",
+        "importPath": "src.services.file_service",
+        "description": "src.services.file_service",
+        "isExtraImport": true,
+        "detail": "src.services.file_service",
+        "documentation": {}
+    },
+    {
+        "label": "FileService",
+        "importPath": "src.services.file_service",
+        "description": "src.services.file_service",
+        "isExtraImport": true,
+        "detail": "src.services.file_service",
+        "documentation": {}
+    },
+    {
+        "label": "MAX_UPLOAD_TOTAL_SIZE_BYTES",
         "importPath": "src.utils.validators",
         "description": "src.utils.validators",
         "isExtraImport": true,
@@ -5019,15 +4842,7 @@
         "documentation": {}
     },
     {
-        "label": "MAX_UPLOAD_FILE_SIZE_BYTES",
-        "importPath": "src.utils.validators",
-        "description": "src.utils.validators",
-        "isExtraImport": true,
-        "detail": "src.utils.validators",
-        "documentation": {}
-    },
-    {
-        "label": "MAX_UPLOAD_DOCUMENTS",
+        "label": "MAX_UPLOAD_TOTAL_SIZE_BYTES",
         "importPath": "src.utils.validators",
         "description": "src.utils.validators",
         "isExtraImport": true,
@@ -5043,7 +4858,7 @@
         "documentation": {}
     },
     {
-        "label": "MAX_UPLOAD_DOCUMENTS",
+        "label": "MAX_UPLOAD_FILE_SIZE_BYTES",
         "importPath": "src.utils.validators",
         "description": "src.utils.validators",
         "isExtraImport": true,
@@ -5051,7 +4866,7 @@
         "documentation": {}
     },
     {
-        "label": "MAX_UPLOAD_FILE_SIZE_BYTES",
+        "label": "MAX_UPLOAD_TOTAL_SIZE_BYTES",
         "importPath": "src.utils.validators",
         "description": "src.utils.validators",
         "isExtraImport": true,
@@ -5331,6 +5146,14 @@
         "documentation": {}
     },
     {
+        "label": "LLMService",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
         "label": "GeneratedFRQ",
         "importPath": "src.services.llm_service",
         "description": "src.services.llm_service",
@@ -5348,6 +5171,30 @@
     },
     {
         "label": "GeneratedMCQ",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "LLMService",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "LLMService",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "LLMService",
         "importPath": "src.services.llm_service",
         "description": "src.services.llm_service",
         "isExtraImport": true,
@@ -5523,14 +5370,6 @@
         "documentation": {}
     },
     {
-        "label": "MatchingPair",
-        "importPath": "src.schemas.test_schema",
-        "description": "src.schemas.test_schema",
-        "isExtraImport": true,
-        "detail": "src.schemas.test_schema",
-        "documentation": {}
-    },
-    {
         "label": "MCQOptionEditable",
         "importPath": "src.schemas.test_schema",
         "description": "src.schemas.test_schema",
@@ -5644,6 +5483,23 @@
         "documentation": {}
     },
     {
+        "label": "html",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "html",
+        "description": "html",
+        "detail": "html",
+        "documentation": {}
+    },
+    {
+        "label": "unescape",
+        "importPath": "html",
+        "description": "html",
+        "isExtraImport": true,
+        "detail": "html",
+        "documentation": {}
+    },
+    {
         "label": "os",
         "kind": 6,
         "isExtraImport": true,
@@ -5653,11 +5509,61 @@
         "documentation": {}
     },
     {
+        "label": "unicodedata",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "unicodedata",
+        "description": "unicodedata",
+        "detail": "unicodedata",
+        "documentation": {}
+    },
+    {
         "label": "ProcessPoolExecutor",
         "importPath": "concurrent.futures",
         "description": "concurrent.futures",
         "isExtraImport": true,
         "detail": "concurrent.futures",
+        "documentation": {}
+    },
+    {
+        "label": "collections",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "collections",
+        "description": "collections",
+        "detail": "collections",
+        "documentation": {}
+    },
+    {
+        "label": "defaultdict",
+        "importPath": "collections",
+        "description": "collections",
+        "isExtraImport": true,
+        "detail": "collections",
+        "documentation": {}
+    },
+    {
+        "label": "OrderedDict",
+        "importPath": "collections",
+        "description": "collections",
+        "isExtraImport": true,
+        "detail": "collections",
+        "documentation": {}
+    },
+    {
+        "label": "BytesIO",
+        "importPath": "io",
+        "description": "io",
+        "isExtraImport": true,
+        "detail": "io",
+        "documentation": {}
+    },
+    {
+        "label": "BytesIO",
+        "importPath": "io",
+        "description": "io",
+        "isExtraImport": true,
+        "detail": "io",
         "documentation": {}
     },
     {
@@ -5678,6 +5584,14 @@
     },
     {
         "label": "get_context",
+        "importPath": "multiprocessing",
+        "description": "multiprocessing",
+        "isExtraImport": true,
+        "detail": "multiprocessing",
+        "documentation": {}
+    },
+    {
+        "label": "Process",
         "importPath": "multiprocessing",
         "description": "multiprocessing",
         "isExtraImport": true,
@@ -5758,6 +5672,15 @@
         "documentation": {}
     },
     {
+        "label": "json",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "json",
+        "description": "json",
+        "detail": "json",
+        "documentation": {}
+    },
+    {
         "label": "AttemptRepository",
         "importPath": "src.repositories.attempt_repository",
         "description": "src.repositories.attempt_repository",
@@ -5819,14 +5742,6 @@
         "description": "dataclasses",
         "isExtraImport": true,
         "detail": "dataclasses",
-        "documentation": {}
-    },
-    {
-        "label": "unescape",
-        "importPath": "html",
-        "description": "html",
-        "isExtraImport": true,
-        "detail": "html",
         "documentation": {}
     },
     {
@@ -5836,6 +5751,14 @@
         "importPath": "hashlib",
         "description": "hashlib",
         "detail": "hashlib",
+        "documentation": {}
+    },
+    {
+        "label": "log",
+        "importPath": "math",
+        "description": "math",
+        "isExtraImport": true,
+        "detail": "math",
         "documentation": {}
     },
     {
@@ -5860,15 +5783,6 @@
         "description": "src.utils.latex_utils",
         "isExtraImport": true,
         "detail": "src.utils.latex_utils",
-        "documentation": {}
-    },
-    {
-        "label": "random",
-        "kind": 6,
-        "isExtraImport": true,
-        "importPath": "random",
-        "description": "random",
-        "detail": "random",
         "documentation": {}
     },
     {
@@ -6080,6 +5994,62 @@
         "documentation": {}
     },
     {
+        "label": "AsyncMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "MagicMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "MagicMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "AsyncMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "patch",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "AsyncMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "MagicMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
         "label": "pytest",
         "kind": 6,
         "isExtraImport": true,
@@ -6129,6 +6099,15 @@
         "documentation": {}
     },
     {
+        "label": "threading",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "threading",
+        "description": "threading",
+        "detail": "threading",
+        "documentation": {}
+    },
+    {
         "label": "TTFont",
         "importPath": "fontTools.ttLib",
         "description": "fontTools.ttLib",
@@ -6158,15 +6137,6 @@
         "description": "fontTools.misc.timeTools",
         "isExtraImport": true,
         "detail": "fontTools.misc.timeTools",
-        "documentation": {}
-    },
-    {
-        "label": "collections",
-        "kind": 6,
-        "isExtraImport": true,
-        "importPath": "collections",
-        "description": "collections",
-        "detail": "collections",
         "documentation": {}
     },
     {
@@ -6910,6 +6880,60 @@
     {
         "label": "upgrade",
         "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.008_drop_beta_question_type_tables",
+        "description": "study-app-backend.src.migrations.versions.008_drop_beta_question_type_tables",
+        "peekOfCode": "def upgrade() -> None:\n    op.drop_table('matching_answers')\n    op.drop_table('ordering_answers')\n    op.drop_table('fill_blank_answers')\n    op.drop_table('select_all_answers')\ndef downgrade() -> None:\n    import sqlalchemy as sa\n    op.create_table(\n        'select_all_answers',\n        sa.Column('id', sa.Integer(), nullable=False),",
+        "detail": "study-app-backend.src.migrations.versions.008_drop_beta_question_type_tables",
+        "documentation": {}
+    },
+    {
+        "label": "downgrade",
+        "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.008_drop_beta_question_type_tables",
+        "description": "study-app-backend.src.migrations.versions.008_drop_beta_question_type_tables",
+        "peekOfCode": "def downgrade() -> None:\n    import sqlalchemy as sa\n    op.create_table(\n        'select_all_answers',\n        sa.Column('id', sa.Integer(), nullable=False),\n        sa.Column('question_id', sa.Integer(), nullable=False),\n        sa.Column('correct_indices_json', sa.Text(), nullable=False),\n        sa.ForeignKeyConstraint(['question_id'], ['questions.id'], ondelete='CASCADE'),\n        sa.PrimaryKeyConstraint('id'),\n    )",
+        "detail": "study-app-backend.src.migrations.versions.008_drop_beta_question_type_tables",
+        "documentation": {}
+    },
+    {
+        "label": "revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.008_drop_beta_question_type_tables",
+        "description": "study-app-backend.src.migrations.versions.008_drop_beta_question_type_tables",
+        "peekOfCode": "revision = '008_drop_beta_tables'\ndown_revision = '9449496ba921'\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.drop_table('matching_answers')\n    op.drop_table('ordering_answers')\n    op.drop_table('fill_blank_answers')\n    op.drop_table('select_all_answers')\ndef downgrade() -> None:",
+        "detail": "study-app-backend.src.migrations.versions.008_drop_beta_question_type_tables",
+        "documentation": {}
+    },
+    {
+        "label": "down_revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.008_drop_beta_question_type_tables",
+        "description": "study-app-backend.src.migrations.versions.008_drop_beta_question_type_tables",
+        "peekOfCode": "down_revision = '9449496ba921'\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.drop_table('matching_answers')\n    op.drop_table('ordering_answers')\n    op.drop_table('fill_blank_answers')\n    op.drop_table('select_all_answers')\ndef downgrade() -> None:\n    import sqlalchemy as sa",
+        "detail": "study-app-backend.src.migrations.versions.008_drop_beta_question_type_tables",
+        "documentation": {}
+    },
+    {
+        "label": "branch_labels",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.008_drop_beta_question_type_tables",
+        "description": "study-app-backend.src.migrations.versions.008_drop_beta_question_type_tables",
+        "peekOfCode": "branch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.drop_table('matching_answers')\n    op.drop_table('ordering_answers')\n    op.drop_table('fill_blank_answers')\n    op.drop_table('select_all_answers')\ndef downgrade() -> None:\n    import sqlalchemy as sa\n    op.create_table(",
+        "detail": "study-app-backend.src.migrations.versions.008_drop_beta_question_type_tables",
+        "documentation": {}
+    },
+    {
+        "label": "depends_on",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.008_drop_beta_question_type_tables",
+        "description": "study-app-backend.src.migrations.versions.008_drop_beta_question_type_tables",
+        "peekOfCode": "depends_on = None\ndef upgrade() -> None:\n    op.drop_table('matching_answers')\n    op.drop_table('ordering_answers')\n    op.drop_table('fill_blank_answers')\n    op.drop_table('select_all_answers')\ndef downgrade() -> None:\n    import sqlalchemy as sa\n    op.create_table(\n        'select_all_answers',",
+        "detail": "study-app-backend.src.migrations.versions.008_drop_beta_question_type_tables",
+        "documentation": {}
+    },
+    {
+        "label": "upgrade",
+        "kind": 2,
         "importPath": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
         "description": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
         "peekOfCode": "def upgrade() -> None:\n    # ### commands auto generated by Alembic - please adjust! ###\n    op.create_table('fill_blank_answers',\n    sa.Column('id', sa.Integer(), nullable=False),\n    sa.Column('question_id', sa.BigInteger().with_variant(sa.Integer(), 'sqlite'), nullable=False),\n    sa.Column('acceptable_answers_json', sa.String(), nullable=False),\n    sa.ForeignKeyConstraint(['question_id'], ['questions.id'], ondelete='CASCADE'),\n    sa.PrimaryKeyConstraint('id'),\n    sa.UniqueConstraint('question_id')\n    )",
@@ -7025,15 +7049,6 @@
         "documentation": {}
     },
     {
-        "label": "FillBlankAnswer",
-        "kind": 6,
-        "importPath": "study-app-backend.src.models.fill_blank_answer",
-        "description": "study-app-backend.src.models.fill_blank_answer",
-        "peekOfCode": "class FillBlankAnswer(Base):\n    \"\"\"Correct answer for a fill-in-the-blank question.\n    Stores one or more acceptable answers (for case-insensitive matching or synonyms).\n    Stored as JSON array of strings.\n    \"\"\"\n    __tablename__ = \"fill_blank_answers\"\n    id: Mapped[int] = mapped_column(primary_key=True)\n    question_id: Mapped[int] = mapped_column(ForeignKey(\"questions.id\", ondelete=\"CASCADE\"), unique=True)\n    # JSON: [\"correct_answer1\", \"acceptable_synonym\", \"another_valid_answer\"]\n    # Stored as string; caller must serialize/deserialize",
-        "detail": "study-app-backend.src.models.fill_blank_answer",
-        "documentation": {}
-    },
-    {
         "label": "Flashcard",
         "kind": 6,
         "importPath": "study-app-backend.src.models.flashcard",
@@ -7097,15 +7112,6 @@
         "documentation": {}
     },
     {
-        "label": "MatchingAnswer",
-        "kind": 6,
-        "importPath": "study-app-backend.src.models.matching_answer",
-        "description": "study-app-backend.src.models.matching_answer",
-        "peekOfCode": "class MatchingAnswer(Base):\n    \"\"\"Correct answer for a matching question.\n    Stores pairs of items (left: left_item, right: right_item) that students must match.\n    Stored as JSON string to support flexible pair structures.\n    \"\"\"\n    __tablename__ = \"matching_answers\"\n    id: Mapped[int] = mapped_column(primary_key=True)\n    question_id: Mapped[int] = mapped_column(ForeignKey(\"questions.id\", ondelete=\"CASCADE\"), unique=True)\n    # JSON: [{\"left\": \"term1\", \"right\": \"def1\"}, {\"left\": \"term2\", \"right\": \"def2\"}]\n    # Stored as string; caller must serialize/deserialize",
-        "detail": "study-app-backend.src.models.matching_answer",
-        "documentation": {}
-    },
-    {
         "label": "MCQOption",
         "kind": 6,
         "importPath": "study-app-backend.src.models.mcq_option",
@@ -7124,30 +7130,12 @@
         "documentation": {}
     },
     {
-        "label": "OrderingAnswer",
-        "kind": 6,
-        "importPath": "study-app-backend.src.models.ordering_answer",
-        "description": "study-app-backend.src.models.ordering_answer",
-        "peekOfCode": "class OrderingAnswer(Base):\n    \"\"\"Correct answer for an ordering question.\n    Stores the correct sequence of items that students must arrange.\n    Stored as JSON array to maintain order.\n    \"\"\"\n    __tablename__ = \"ordering_answers\"\n    id: Mapped[int] = mapped_column(primary_key=True)\n    question_id: Mapped[int] = mapped_column(ForeignKey(\"questions.id\", ondelete=\"CASCADE\"), unique=True)\n    # JSON: [\"item1\", \"item2\", \"item3\"]\n    # Stored as string; caller must serialize/deserialize",
-        "detail": "study-app-backend.src.models.ordering_answer",
-        "documentation": {}
-    },
-    {
         "label": "Question",
         "kind": 6,
         "importPath": "study-app-backend.src.models.question",
         "description": "study-app-backend.src.models.question",
         "peekOfCode": "class Question(Base):\n    __tablename__ = \"questions\"\n    id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)\n    test_id: Mapped[int] = mapped_column(\n        BIGINT_ID, ForeignKey(\"tests.id\", ondelete=\"CASCADE\"), nullable=False, index=True\n    )\n    question_text: Mapped[str] = mapped_column(Text, nullable=False)\n    question_type: Mapped[str] = mapped_column(String(10), nullable=False)\n    display_order: Mapped[int] = mapped_column(Integer, nullable=False)\n    test: Mapped[Test] = relationship(\"Test\", back_populates=\"questions\")",
         "detail": "study-app-backend.src.models.question",
-        "documentation": {}
-    },
-    {
-        "label": "SelectAllAnswer",
-        "kind": 6,
-        "importPath": "study-app-backend.src.models.select_all_answer",
-        "description": "study-app-backend.src.models.select_all_answer",
-        "peekOfCode": "class SelectAllAnswer(Base):\n    \"\"\"Correct answer for a select-all question.\n    Stores which options are correct (the set of correct option indices or texts).\n    Uses options table but with multiple correct answers rather than exactly one.\n    Stored as JSON array of indices or texts.\n    \"\"\"\n    __tablename__ = \"select_all_answers\"\n    id: Mapped[int] = mapped_column(primary_key=True)\n    question_id: Mapped[int] = mapped_column(ForeignKey(\"questions.id\", ondelete=\"CASCADE\"), unique=True)\n    # JSON: [0, 2, 3]  — indices of correct options",
-        "detail": "study-app-backend.src.models.select_all_answer",
         "documentation": {}
     },
     {
@@ -7263,7 +7251,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.repositories.test_repository",
         "description": "study-app-backend.src.repositories.test_repository",
-        "peekOfCode": "_QUESTION_WITH_ANSWERS = (\n    selectinload(Question.mcq_options),\n    selectinload(Question.frq_answer),\n    selectinload(Question.matching_answer),\n    selectinload(Question.ordering_answer),\n    selectinload(Question.fill_blank_answer),\n    selectinload(Question.select_all_answer),\n)\nclass TestRepository(BaseRepository[Test]):\n    async def create(",
+        "peekOfCode": "_QUESTION_WITH_ANSWERS = (\n    selectinload(Question.mcq_options),\n    selectinload(Question.frq_answer),\n)\nclass TestRepository(BaseRepository[Test]):\n    async def create(\n        self,\n        folder_id: int,\n        title: str,\n        test_type: str,",
         "detail": "study-app-backend.src.repositories.test_repository",
         "documentation": {}
     },
@@ -7587,7 +7575,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.kojo_schema",
         "description": "study-app-backend.src.schemas.kojo_schema",
-        "peekOfCode": "class KojoChatRequest(BaseModel):\n    message: str = Field(..., min_length=1, max_length=2000)\n    provider: Optional[str] = Field(default=None, description=\"Optional LLM provider override: 'auto', 'groq', 'ollama', or 'gemini'\")\n    beta_enabled: bool = Field(default=False)\nclass KojoChatResponse(BaseModel):\n    response: str\n    conversation_id: int\n    message_id: int\n    flagged_uncertain: bool = False\nclass KojoClearResponse(BaseModel):",
+        "peekOfCode": "class KojoChatRequest(BaseModel):\n    message: str = Field(..., min_length=1, max_length=2000)\n    provider: Optional[str] = Field(default=None, description=\"Optional LLM provider override: 'auto', 'groq', 'ollama', or 'gemini'\")\nclass KojoChatResponse(BaseModel):\n    response: str\n    conversation_id: int\n    message_id: int\n    flagged_uncertain: bool = False\nclass KojoClearResponse(BaseModel):\n    conversation_id: int",
         "detail": "study-app-backend.src.schemas.kojo_schema",
         "documentation": {}
     },
@@ -7686,7 +7674,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class MCQOptionEditable(BaseModel):\n    id: int\n    text: str\n    is_correct: bool\nclass MCQOptionInput(BaseModel):\n    text: str\n    is_correct: bool\n# New question type schemas for beta features\nclass MatchingPair(BaseModel):\n    \"\"\"One term-definition or left-right pair for matching questions.\"\"\"",
+        "peekOfCode": "class MCQOptionEditable(BaseModel):\n    id: int\n    text: str\n    is_correct: bool\nclass MCQOptionInput(BaseModel):\n    text: str\n    is_correct: bool\nclass QuestionPublic(BaseModel):\n    id: int\n    type: str",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -7695,52 +7683,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class MCQOptionInput(BaseModel):\n    text: str\n    is_correct: bool\n# New question type schemas for beta features\nclass MatchingPair(BaseModel):\n    \"\"\"One term-definition or left-right pair for matching questions.\"\"\"\n    left: str\n    right: str\nclass MatchingPairInput(BaseModel):\n    left: str = Field(min_length=1)",
-        "detail": "study-app-backend.src.schemas.test_schema",
-        "documentation": {}
-    },
-    {
-        "label": "MatchingPair",
-        "kind": 6,
-        "importPath": "study-app-backend.src.schemas.test_schema",
-        "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class MatchingPair(BaseModel):\n    \"\"\"One term-definition or left-right pair for matching questions.\"\"\"\n    left: str\n    right: str\nclass MatchingPairInput(BaseModel):\n    left: str = Field(min_length=1)\n    right: str = Field(min_length=1)\nclass SelectAllOption(BaseModel):\n    \"\"\"Option for select-all question (like MCQ but multiple correct answers).\"\"\"\n    id: int",
-        "detail": "study-app-backend.src.schemas.test_schema",
-        "documentation": {}
-    },
-    {
-        "label": "MatchingPairInput",
-        "kind": 6,
-        "importPath": "study-app-backend.src.schemas.test_schema",
-        "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class MatchingPairInput(BaseModel):\n    left: str = Field(min_length=1)\n    right: str = Field(min_length=1)\nclass SelectAllOption(BaseModel):\n    \"\"\"Option for select-all question (like MCQ but multiple correct answers).\"\"\"\n    id: int\n    text: str\n    is_correct: None = None  # Hidden from student\nclass SelectAllOptionEditable(BaseModel):\n    id: int",
-        "detail": "study-app-backend.src.schemas.test_schema",
-        "documentation": {}
-    },
-    {
-        "label": "SelectAllOption",
-        "kind": 6,
-        "importPath": "study-app-backend.src.schemas.test_schema",
-        "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class SelectAllOption(BaseModel):\n    \"\"\"Option for select-all question (like MCQ but multiple correct answers).\"\"\"\n    id: int\n    text: str\n    is_correct: None = None  # Hidden from student\nclass SelectAllOptionEditable(BaseModel):\n    id: int\n    text: str\n    is_correct: bool\nclass SelectAllOptionInput(BaseModel):",
-        "detail": "study-app-backend.src.schemas.test_schema",
-        "documentation": {}
-    },
-    {
-        "label": "SelectAllOptionEditable",
-        "kind": 6,
-        "importPath": "study-app-backend.src.schemas.test_schema",
-        "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class SelectAllOptionEditable(BaseModel):\n    id: int\n    text: str\n    is_correct: bool\nclass SelectAllOptionInput(BaseModel):\n    text: str\n    is_correct: bool\nclass QuestionPublic(BaseModel):\n    id: int\n    type: str",
-        "detail": "study-app-backend.src.schemas.test_schema",
-        "documentation": {}
-    },
-    {
-        "label": "SelectAllOptionInput",
-        "kind": 6,
-        "importPath": "study-app-backend.src.schemas.test_schema",
-        "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class SelectAllOptionInput(BaseModel):\n    text: str\n    is_correct: bool\nclass QuestionPublic(BaseModel):\n    id: int\n    type: str\n    question_text: str\n    # MCQ/select_all fields\n    options: list[MCQOptionPublic] = Field(default_factory=list)\n    # Matching fields",
+        "peekOfCode": "class MCQOptionInput(BaseModel):\n    text: str\n    is_correct: bool\nclass QuestionPublic(BaseModel):\n    id: int\n    type: str\n    question_text: str\n    options: list[MCQOptionPublic] = Field(default_factory=list)\nclass QuestionEditable(BaseModel):\n    id: int",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -7749,7 +7692,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class QuestionPublic(BaseModel):\n    id: int\n    type: str\n    question_text: str\n    # MCQ/select_all fields\n    options: list[MCQOptionPublic] = Field(default_factory=list)\n    # Matching fields\n    matching_pairs: list[MatchingPair] = Field(default_factory=list)\n    # Ordering fields\n    ordering_items: list[str] = Field(default_factory=list)",
+        "peekOfCode": "class QuestionPublic(BaseModel):\n    id: int\n    type: str\n    question_text: str\n    options: list[MCQOptionPublic] = Field(default_factory=list)\nclass QuestionEditable(BaseModel):\n    id: int\n    type: str\n    question_text: str\n    options: list[MCQOptionEditable] = Field(default_factory=list)",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -7758,7 +7701,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class QuestionEditable(BaseModel):\n    id: int\n    type: str\n    question_text: str\n    # MCQ/select_all fields\n    options: list[MCQOptionEditable] = Field(default_factory=list)\n    # Matching fields\n    matching_pairs: list[MatchingPair] = Field(default_factory=list)\n    # Ordering fields\n    ordering_items: list[str] = Field(default_factory=list)",
+        "peekOfCode": "class QuestionEditable(BaseModel):\n    id: int\n    type: str\n    question_text: str\n    options: list[MCQOptionEditable] = Field(default_factory=list)\n    expected_answer: Optional[str] = None\nclass QuestionCreate(BaseModel):\n    type: str\n    question_text: str = Field(min_length=1)\n    options: list[MCQOptionInput] = Field(default_factory=list)",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -7767,7 +7710,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class QuestionCreate(BaseModel):\n    type: str\n    question_text: str = Field(min_length=1)\n    # MCQ/select_all fields\n    options: list[MCQOptionInput] = Field(default_factory=list)\n    # Matching fields\n    matching_pairs: list[MatchingPairInput] = Field(default_factory=list)\n    # Ordering fields\n    ordering_items: list[str] = Field(default_factory=list)\n    # FRQ/fill_blank expected answer",
+        "peekOfCode": "class QuestionCreate(BaseModel):\n    type: str\n    question_text: str = Field(min_length=1)\n    options: list[MCQOptionInput] = Field(default_factory=list)\n    expected_answer: Optional[str] = None\nclass QuestionUpdate(BaseModel):\n    question_text: Optional[str] = Field(default=None, min_length=1)\n    options: Optional[list[MCQOptionInput]] = None\n    expected_answer: Optional[str] = None\nclass TestResponse(BaseModel):",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -7776,7 +7719,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class QuestionUpdate(BaseModel):\n    question_text: Optional[str] = Field(default=None, min_length=1)\n    # MCQ/select_all fields\n    options: Optional[list[MCQOptionInput]] = None\n    # Matching fields\n    matching_pairs: Optional[list[MatchingPairInput]] = None\n    # Ordering fields\n    ordering_items: Optional[list[str]] = None\n    # FRQ/fill_blank expected answer\n    expected_answer: Optional[str] = None",
+        "peekOfCode": "class QuestionUpdate(BaseModel):\n    question_text: Optional[str] = Field(default=None, min_length=1)\n    options: Optional[list[MCQOptionInput]] = None\n    expected_answer: Optional[str] = None\nclass TestResponse(BaseModel):\n    model_config = ConfigDict(from_attributes=True)\n    id: int\n    folder_id: int\n    title: str\n    description: Optional[str] = None",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -7848,7 +7791,16 @@
         "kind": 6,
         "importPath": "study-app-backend.src.services.file_service",
         "description": "study-app-backend.src.services.file_service",
-        "peekOfCode": "class FileService:\n    async def extract_from_file(self, notes_file: UploadFile) -> tuple[str, str]:\n        file_type = normalize_file_extension(notes_file.filename)\n        if file_type not in ALLOWED_FILE_TYPES:\n            raise ValidationException(\"Only PDF, DOCX, TXT, and MD notes are supported\")\n        data = await notes_file.read()\n        if len(data) > MAX_UPLOAD_FILE_SIZE_BYTES:\n            raise ValidationException(\"Uploaded notes file is too large\")\n        if not data:\n            raise ValidationException(\"Uploaded notes file is empty\")",
+        "peekOfCode": "class FileService:\n    async def extract_from_file(self, notes_file: UploadFile) -> tuple[str, str]:\n        file_type = normalize_file_extension(notes_file.filename)\n        if file_type not in ALLOWED_FILE_TYPES:\n            raise ValidationException(\n                \"Supported file types: PDF, DOCX, TXT, MD, HTML, PPTX, and common code files\"\n            )\n        data = await notes_file.read()\n        if len(data) > MAX_UPLOAD_FILE_SIZE_BYTES:\n            raise ValidationException(\"Uploaded notes file is too large\")",
+        "detail": "study-app-backend.src.services.file_service",
+        "documentation": {}
+    },
+    {
+        "label": "_CODE_FILE_TYPES",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.file_service",
+        "description": "study-app-backend.src.services.file_service",
+        "peekOfCode": "_CODE_FILE_TYPES = {\n    \"py\", \"js\", \"ts\", \"tsx\", \"jsx\", \"java\", \"c\", \"cpp\", \"h\", \"hpp\",\n    \"cs\", \"go\", \"rs\", \"swift\", \"kt\", \"scala\", \"rb\", \"php\", \"sql\", \"json\", \"xml\", \"yaml\", \"yml\",\n}\ndef _preferred_pdf_workers() -> int:\n    return max(1, min(os.cpu_count() or 1, 4))\ndef _chunk_page_indexes(page_count: int, worker_count: int) -> list[list[int]]:\n    if page_count <= 0:\n        return []\n    worker_count = max(1, min(worker_count, page_count))",
         "detail": "study-app-backend.src.services.file_service",
         "documentation": {}
     },
@@ -7884,7 +7836,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.services.kojo_service",
         "description": "study-app-backend.src.services.kojo_service",
-        "peekOfCode": "class KojoService:\n    async def chat(\n        self,\n        user_id: int,\n        folder_id: int,\n        user_message: str,\n        session: AsyncSession,\n        provider: Optional[str] = None,\n        beta_enabled: bool = False,\n    ) -> KojoChatResponse:",
+        "peekOfCode": "class KojoService:\n    async def chat(\n        self,\n        user_id: int,\n        folder_id: int,\n        user_message: str,\n        session: AsyncSession,\n        provider: Optional[str] = None,\n    ) -> KojoChatResponse:\n        repo = KojoRepository(session)",
         "detail": "study-app-backend.src.services.kojo_service",
         "documentation": {}
     },
@@ -7893,7 +7845,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.kojo_service",
         "description": "study-app-backend.src.services.kojo_service",
-        "peekOfCode": "logger = get_logger(__name__)\n_NO_NOTES = \"[No study materials uploaded yet. Ask the student to upload notes first.]\"\n_CLEAR_WINDOW_HOURS = 5\ndef _is_review_wrong_answers_request(user_message: str) -> bool:\n    \"\"\"Check if user is asking to review wrong answers from their test.\"\"\"\n    message_lower = user_message.lower()\n    review_keywords = [\n        \"review.*wrong\",\n        \"wrong.*answer\",\n        \"check.*wrong\",",
+        "peekOfCode": "logger = get_logger(__name__)\n_NO_NOTES = \"[No study materials uploaded yet. Ask the student to upload notes first.]\"\n_CLEAR_WINDOW_HOURS = 5\n_MAP_REDUCE_NOTES_MIN_CHARS = 6000\ndef _is_review_wrong_answers_request(user_message: str) -> bool:\n    \"\"\"Check if user is asking to review wrong answers from their test.\"\"\"\n    message_lower = user_message.lower()\n    review_keywords = [\n        \"review.*wrong\",\n        \"wrong.*answer\",",
         "detail": "study-app-backend.src.services.kojo_service",
         "documentation": {}
     },
@@ -7902,7 +7854,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.kojo_service",
         "description": "study-app-backend.src.services.kojo_service",
-        "peekOfCode": "_NO_NOTES = \"[No study materials uploaded yet. Ask the student to upload notes first.]\"\n_CLEAR_WINDOW_HOURS = 5\ndef _is_review_wrong_answers_request(user_message: str) -> bool:\n    \"\"\"Check if user is asking to review wrong answers from their test.\"\"\"\n    message_lower = user_message.lower()\n    review_keywords = [\n        \"review.*wrong\",\n        \"wrong.*answer\",\n        \"check.*wrong\",\n        \"see.*wrong\",",
+        "peekOfCode": "_NO_NOTES = \"[No study materials uploaded yet. Ask the student to upload notes first.]\"\n_CLEAR_WINDOW_HOURS = 5\n_MAP_REDUCE_NOTES_MIN_CHARS = 6000\ndef _is_review_wrong_answers_request(user_message: str) -> bool:\n    \"\"\"Check if user is asking to review wrong answers from their test.\"\"\"\n    message_lower = user_message.lower()\n    review_keywords = [\n        \"review.*wrong\",\n        \"wrong.*answer\",\n        \"check.*wrong\",",
         "detail": "study-app-backend.src.services.kojo_service",
         "documentation": {}
     },
@@ -7911,7 +7863,16 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.kojo_service",
         "description": "study-app-backend.src.services.kojo_service",
-        "peekOfCode": "_CLEAR_WINDOW_HOURS = 5\ndef _is_review_wrong_answers_request(user_message: str) -> bool:\n    \"\"\"Check if user is asking to review wrong answers from their test.\"\"\"\n    message_lower = user_message.lower()\n    review_keywords = [\n        \"review.*wrong\",\n        \"wrong.*answer\",\n        \"check.*wrong\",\n        \"see.*wrong\",\n        \"what.*wrong\",",
+        "peekOfCode": "_CLEAR_WINDOW_HOURS = 5\n_MAP_REDUCE_NOTES_MIN_CHARS = 6000\ndef _is_review_wrong_answers_request(user_message: str) -> bool:\n    \"\"\"Check if user is asking to review wrong answers from their test.\"\"\"\n    message_lower = user_message.lower()\n    review_keywords = [\n        \"review.*wrong\",\n        \"wrong.*answer\",\n        \"check.*wrong\",\n        \"see.*wrong\",",
+        "detail": "study-app-backend.src.services.kojo_service",
+        "documentation": {}
+    },
+    {
+        "label": "_MAP_REDUCE_NOTES_MIN_CHARS",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.kojo_service",
+        "description": "study-app-backend.src.services.kojo_service",
+        "peekOfCode": "_MAP_REDUCE_NOTES_MIN_CHARS = 6000\ndef _is_review_wrong_answers_request(user_message: str) -> bool:\n    \"\"\"Check if user is asking to review wrong answers from their test.\"\"\"\n    message_lower = user_message.lower()\n    review_keywords = [\n        \"review.*wrong\",\n        \"wrong.*answer\",\n        \"check.*wrong\",\n        \"see.*wrong\",\n        \"what.*wrong\",",
         "detail": "study-app-backend.src.services.kojo_service",
         "documentation": {}
     },
@@ -7965,7 +7926,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "class GeneratedMCQ:\n    question_text: str\n    options: list[str]\n    correct_index: int\n@dataclass(frozen=True)\nclass GeneratedFRQ:\n    question_text: str\n    expected_answer: str\n@dataclass(frozen=True)\nclass GeneratedMatching:",
+        "peekOfCode": "class GeneratedMCQ:\n    question_text: str\n    options: list[str]\n    correct_index: int\n@dataclass(frozen=True)\nclass GeneratedFRQ:\n    question_text: str\n    expected_answer: str\n@dataclass(frozen=True)\nclass GeneratedFlashcard:",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -7974,43 +7935,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "class GeneratedFRQ:\n    question_text: str\n    expected_answer: str\n@dataclass(frozen=True)\nclass GeneratedMatching:\n    question_text: str\n    pairs: list[dict[str, str]]\n@dataclass(frozen=True)\nclass GeneratedOrdering:\n    question_text: str",
-        "detail": "study-app-backend.src.services.llm_service",
-        "documentation": {}
-    },
-    {
-        "label": "GeneratedMatching",
-        "kind": 6,
-        "importPath": "study-app-backend.src.services.llm_service",
-        "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "class GeneratedMatching:\n    question_text: str\n    pairs: list[dict[str, str]]\n@dataclass(frozen=True)\nclass GeneratedOrdering:\n    question_text: str\n    correct_order: list[str]\n@dataclass(frozen=True)\nclass GeneratedFillBlank:\n    question_text: str",
-        "detail": "study-app-backend.src.services.llm_service",
-        "documentation": {}
-    },
-    {
-        "label": "GeneratedOrdering",
-        "kind": 6,
-        "importPath": "study-app-backend.src.services.llm_service",
-        "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "class GeneratedOrdering:\n    question_text: str\n    correct_order: list[str]\n@dataclass(frozen=True)\nclass GeneratedFillBlank:\n    question_text: str\n    acceptable_answers: list[str]\n@dataclass(frozen=True)\nclass GeneratedSelectAll:\n    question_text: str",
-        "detail": "study-app-backend.src.services.llm_service",
-        "documentation": {}
-    },
-    {
-        "label": "GeneratedFillBlank",
-        "kind": 6,
-        "importPath": "study-app-backend.src.services.llm_service",
-        "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "class GeneratedFillBlank:\n    question_text: str\n    acceptable_answers: list[str]\n@dataclass(frozen=True)\nclass GeneratedSelectAll:\n    question_text: str\n    options: list[str]\n    correct_indices: list[int]\n@dataclass(frozen=True)\nclass GeneratedFlashcard:",
-        "detail": "study-app-backend.src.services.llm_service",
-        "documentation": {}
-    },
-    {
-        "label": "GeneratedSelectAll",
-        "kind": 6,
-        "importPath": "study-app-backend.src.services.llm_service",
-        "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "class GeneratedSelectAll:\n    question_text: str\n    options: list[str]\n    correct_indices: list[int]\n@dataclass(frozen=True)\nclass GeneratedFlashcard:\n    front: str\n    back: str\n@dataclass(frozen=True)\nclass _ExtractedTerm:",
+        "peekOfCode": "class GeneratedFRQ:\n    question_text: str\n    expected_answer: str\n@dataclass(frozen=True)\nclass GeneratedFlashcard:\n    front: str\n    back: str\n@dataclass(frozen=True)\nclass _ExtractedTerm:\n    term: str",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -8046,7 +7971,25 @@
         "kind": 6,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "class _PracticeTestStyle:\n    \"\"\"Analysis of a practice test's question style and format.\"\"\"\n    mcq_count: int\n    frq_count: int\n    mcq_patterns: list[str]  # Summary of MCQ phrasing/types\n    frq_patterns: list[str]  # Summary of FRQ phrasing/types\n    difficulty_indicators: str  # Inferred difficulty level\n    subject_hints: str  # Domain/subject indicators from the test\n_EXTRACT_CHAR_LIMIT = 10_000\n_GENERATE_CHAR_LIMIT = 8_000",
+        "peekOfCode": "class _PracticeTestStyle:\n    \"\"\"Analysis of a practice test's question style and format.\"\"\"\n    mcq_count: int\n    frq_count: int\n    mcq_patterns: list[str]  # Summary of MCQ phrasing/types\n    frq_patterns: list[str]  # Summary of FRQ phrasing/types\n    difficulty_indicators: str  # Inferred difficulty level\n    subject_hints: str  # Domain/subject indicators from the test\n@dataclass(frozen=True)\nclass _RetrievalChunk:",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_RetrievalChunk",
+        "kind": 6,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "class _RetrievalChunk:\n    index: int\n    source: str\n    text: str\n    tokens: tuple[str, ...]\n@dataclass(frozen=True)\nclass _MapEvidence:\n    source: str\n    answer: str\n    evidence: list[str]",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_MapEvidence",
+        "kind": 6,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "class _MapEvidence:\n    source: str\n    answer: str\n    evidence: list[str]\n    confidence: float\n_EXTRACT_CHAR_LIMIT = 10_000\n_GENERATE_CHAR_LIMIT = 8_000\n_RETRIEVAL_EMBEDDING_DIM = 384\n_RETRIEVAL_CHUNK_WORDS = 160\n_RETRIEVAL_CHUNK_OVERLAP_WORDS = 40",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -8055,7 +7998,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "class LLMService:\n    def __init__(self) -> None:\n        self._last_generation_meta: dict[str, object] = {\n            \"fallback_used\": False,\n            \"fallback_reason\": None,\n            \"note_grounded\": True,\n            \"retrieval_enabled\": False,\n            \"retrieval_total_chunks\": 0,\n            \"retrieval_selected_chunks\": 0,\n            \"retrieval_top_k\": 0,",
+        "peekOfCode": "class LLMService:\n    _embed_cache: OrderedDict[str, list[float]] = OrderedDict()\n    _retrieval_cache: OrderedDict[str, tuple[str, dict[str, object]]] = OrderedDict()\n    def __init__(self) -> None:\n        self._last_generation_meta: dict[str, object] = {\n            \"fallback_used\": False,\n            \"fallback_reason\": None,\n            \"note_grounded\": True,\n            \"retrieval_enabled\": False,\n            \"retrieval_total_chunks\": 0,",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -8082,7 +8025,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "_EXTRACT_CHAR_LIMIT = 10_000\n_GENERATE_CHAR_LIMIT = 8_000\n_RETRIEVAL_EMBEDDING_DIM = 384\n_RETRIEVAL_CHUNK_WORDS = 160\n_RETRIEVAL_CHUNK_OVERLAP_WORDS = 40\n_RETRIEVAL_TOP_K = 6\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)\n# Matches any meaningful math content: numbers, operators, LaTeX commands, KaTeX delimiters",
+        "peekOfCode": "_EXTRACT_CHAR_LIMIT = 10_000\n_GENERATE_CHAR_LIMIT = 8_000\n_RETRIEVAL_EMBEDDING_DIM = 384\n_RETRIEVAL_CHUNK_WORDS = 160\n_RETRIEVAL_CHUNK_OVERLAP_WORDS = 40\n_RETRIEVAL_TOP_K = 6\n_RETRIEVAL_CONTEXT_SENTENCES = 3\n_RETRIEVAL_MAX_QUERY_REWRITES = 4\n_RETRIEVAL_STAGE_MULTIPLIER = 2\n_RETRIEVAL_EMBED_CACHE_SIZE = 4096",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -8091,7 +8034,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "_GENERATE_CHAR_LIMIT = 8_000\n_RETRIEVAL_EMBEDDING_DIM = 384\n_RETRIEVAL_CHUNK_WORDS = 160\n_RETRIEVAL_CHUNK_OVERLAP_WORDS = 40\n_RETRIEVAL_TOP_K = 6\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)\n# Matches any meaningful math content: numbers, operators, LaTeX commands, KaTeX delimiters\n_MATH_CONTENT_RE = re.compile(",
+        "peekOfCode": "_GENERATE_CHAR_LIMIT = 8_000\n_RETRIEVAL_EMBEDDING_DIM = 384\n_RETRIEVAL_CHUNK_WORDS = 160\n_RETRIEVAL_CHUNK_OVERLAP_WORDS = 40\n_RETRIEVAL_TOP_K = 6\n_RETRIEVAL_CONTEXT_SENTENCES = 3\n_RETRIEVAL_MAX_QUERY_REWRITES = 4\n_RETRIEVAL_STAGE_MULTIPLIER = 2\n_RETRIEVAL_EMBED_CACHE_SIZE = 4096\n_RETRIEVAL_RESULT_CACHE_SIZE = 512",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -8100,7 +8043,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "_RETRIEVAL_EMBEDDING_DIM = 384\n_RETRIEVAL_CHUNK_WORDS = 160\n_RETRIEVAL_CHUNK_OVERLAP_WORDS = 40\n_RETRIEVAL_TOP_K = 6\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)\n# Matches any meaningful math content: numbers, operators, LaTeX commands, KaTeX delimiters\n_MATH_CONTENT_RE = re.compile(\n    r\"\\$|\\d+[\\./]\\d+|[+\\-*/=^<>%]|\\\\(?:frac|sqrt|int|sum|lim|sin|cos|tan|log|ln|pi|theta|alpha|beta|infty|vec|hat)\"",
+        "peekOfCode": "_RETRIEVAL_EMBEDDING_DIM = 384\n_RETRIEVAL_CHUNK_WORDS = 160\n_RETRIEVAL_CHUNK_OVERLAP_WORDS = 40\n_RETRIEVAL_TOP_K = 6\n_RETRIEVAL_CONTEXT_SENTENCES = 3\n_RETRIEVAL_MAX_QUERY_REWRITES = 4\n_RETRIEVAL_STAGE_MULTIPLIER = 2\n_RETRIEVAL_EMBED_CACHE_SIZE = 4096\n_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -8109,7 +8052,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "_RETRIEVAL_CHUNK_WORDS = 160\n_RETRIEVAL_CHUNK_OVERLAP_WORDS = 40\n_RETRIEVAL_TOP_K = 6\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)\n# Matches any meaningful math content: numbers, operators, LaTeX commands, KaTeX delimiters\n_MATH_CONTENT_RE = re.compile(\n    r\"\\$|\\d+[\\./]\\d+|[+\\-*/=^<>%]|\\\\(?:frac|sqrt|int|sum|lim|sin|cos|tan|log|ln|pi|theta|alpha|beta|infty|vec|hat)\"\n    r\"|\\b(?:solve|simplify|evaluate|calculate|compute|differentiate|integrate|factor|expand)\\b\",",
+        "peekOfCode": "_RETRIEVAL_CHUNK_WORDS = 160\n_RETRIEVAL_CHUNK_OVERLAP_WORDS = 40\n_RETRIEVAL_TOP_K = 6\n_RETRIEVAL_CONTEXT_SENTENCES = 3\n_RETRIEVAL_MAX_QUERY_REWRITES = 4\n_RETRIEVAL_STAGE_MULTIPLIER = 2\n_RETRIEVAL_EMBED_CACHE_SIZE = 4096\n_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -8118,7 +8061,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "_RETRIEVAL_CHUNK_OVERLAP_WORDS = 40\n_RETRIEVAL_TOP_K = 6\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)\n# Matches any meaningful math content: numbers, operators, LaTeX commands, KaTeX delimiters\n_MATH_CONTENT_RE = re.compile(\n    r\"\\$|\\d+[\\./]\\d+|[+\\-*/=^<>%]|\\\\(?:frac|sqrt|int|sum|lim|sin|cos|tan|log|ln|pi|theta|alpha|beta|infty|vec|hat)\"\n    r\"|\\b(?:solve|simplify|evaluate|calculate|compute|differentiate|integrate|factor|expand)\\b\",\n    re.IGNORECASE,",
+        "peekOfCode": "_RETRIEVAL_CHUNK_OVERLAP_WORDS = 40\n_RETRIEVAL_TOP_K = 6\n_RETRIEVAL_CONTEXT_SENTENCES = 3\n_RETRIEVAL_MAX_QUERY_REWRITES = 4\n_RETRIEVAL_STAGE_MULTIPLIER = 2\n_RETRIEVAL_EMBED_CACHE_SIZE = 4096\n_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -8127,7 +8070,70 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "_RETRIEVAL_TOP_K = 6\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)\n# Matches any meaningful math content: numbers, operators, LaTeX commands, KaTeX delimiters\n_MATH_CONTENT_RE = re.compile(\n    r\"\\$|\\d+[\\./]\\d+|[+\\-*/=^<>%]|\\\\(?:frac|sqrt|int|sum|lim|sin|cos|tan|log|ln|pi|theta|alpha|beta|infty|vec|hat)\"\n    r\"|\\b(?:solve|simplify|evaluate|calculate|compute|differentiate|integrate|factor|expand)\\b\",\n    re.IGNORECASE,\n)",
+        "peekOfCode": "_RETRIEVAL_TOP_K = 6\n_RETRIEVAL_CONTEXT_SENTENCES = 3\n_RETRIEVAL_MAX_QUERY_REWRITES = 4\n_RETRIEVAL_STAGE_MULTIPLIER = 2\n_RETRIEVAL_EMBED_CACHE_SIZE = 4096\n_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_RETRIEVAL_CONTEXT_SENTENCES",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "_RETRIEVAL_CONTEXT_SENTENCES = 3\n_RETRIEVAL_MAX_QUERY_REWRITES = 4\n_RETRIEVAL_STAGE_MULTIPLIER = 2\n_RETRIEVAL_EMBED_CACHE_SIZE = 4096\n_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_RETRIEVAL_MAX_QUERY_REWRITES",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "_RETRIEVAL_MAX_QUERY_REWRITES = 4\n_RETRIEVAL_STAGE_MULTIPLIER = 2\n_RETRIEVAL_EMBED_CACHE_SIZE = 4096\n_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)\n_RETRIEVAL_STOPWORDS = {",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_RETRIEVAL_STAGE_MULTIPLIER",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "_RETRIEVAL_STAGE_MULTIPLIER = 2\n_RETRIEVAL_EMBED_CACHE_SIZE = 4096\n_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)\n_RETRIEVAL_STOPWORDS = {\n    \"the\", \"and\", \"for\", \"are\", \"but\", \"not\", \"you\", \"all\", \"can\", \"had\", \"was\", \"one\", \"our\",",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_RETRIEVAL_EMBED_CACHE_SIZE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "_RETRIEVAL_EMBED_CACHE_SIZE = 4096\n_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)\n_RETRIEVAL_STOPWORDS = {\n    \"the\", \"and\", \"for\", \"are\", \"but\", \"not\", \"you\", \"all\", \"can\", \"had\", \"was\", \"one\", \"our\",\n    \"out\", \"has\", \"how\", \"its\", \"may\", \"new\", \"now\", \"old\", \"two\", \"way\", \"did\", \"each\", \"from\",",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_RETRIEVAL_RESULT_CACHE_SIZE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)\n_RETRIEVAL_STOPWORDS = {\n    \"the\", \"and\", \"for\", \"are\", \"but\", \"not\", \"you\", \"all\", \"can\", \"had\", \"was\", \"one\", \"our\",\n    \"out\", \"has\", \"how\", \"its\", \"may\", \"new\", \"now\", \"old\", \"two\", \"way\", \"did\", \"each\", \"from\",\n    \"have\", \"what\", \"this\", \"that\", \"with\", \"want\", \"help\", \"explain\", \"show\", \"tell\", \"give\", \"does\",",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_MAP_REDUCE_MAX_DOCS",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)\n_RETRIEVAL_STOPWORDS = {\n    \"the\", \"and\", \"for\", \"are\", \"but\", \"not\", \"you\", \"all\", \"can\", \"had\", \"was\", \"one\", \"our\",\n    \"out\", \"has\", \"how\", \"its\", \"may\", \"new\", \"now\", \"old\", \"two\", \"way\", \"did\", \"each\", \"from\",\n    \"have\", \"what\", \"this\", \"that\", \"with\", \"want\", \"help\", \"explain\", \"show\", \"tell\", \"give\", \"does\",\n    \"work\", \"will\", \"would\", \"could\", \"should\", \"about\", \"into\", \"there\", \"their\", \"then\", \"than\", \"when\",",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_SAME_PROVIDER_TOPUP_ATTEMPTS",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)\n_RETRIEVAL_STOPWORDS = {\n    \"the\", \"and\", \"for\", \"are\", \"but\", \"not\", \"you\", \"all\", \"can\", \"had\", \"was\", \"one\", \"our\",\n    \"out\", \"has\", \"how\", \"its\", \"may\", \"new\", \"now\", \"old\", \"two\", \"way\", \"did\", \"each\", \"from\",\n    \"have\", \"what\", \"this\", \"that\", \"with\", \"want\", \"help\", \"explain\", \"show\", \"tell\", \"give\", \"does\",\n    \"work\", \"will\", \"would\", \"could\", \"should\", \"about\", \"into\", \"there\", \"their\", \"then\", \"than\", \"when\",\n    \"where\", \"which\", \"while\", \"also\", \"more\", \"like\", \"just\", \"here\", \"even\", \"know\", \"come\", \"said\",",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -8136,7 +8142,16 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)\n# Matches any meaningful math content: numbers, operators, LaTeX commands, KaTeX delimiters\n_MATH_CONTENT_RE = re.compile(\n    r\"\\$|\\d+[\\./]\\d+|[+\\-*/=^<>%]|\\\\(?:frac|sqrt|int|sum|lim|sin|cos|tan|log|ln|pi|theta|alpha|beta|infty|vec|hat)\"\n    r\"|\\b(?:solve|simplify|evaluate|calculate|compute|differentiate|integrate|factor|expand)\\b\",\n    re.IGNORECASE,\n)\nclass LLMService:",
+        "peekOfCode": "_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)\n_RETRIEVAL_STOPWORDS = {\n    \"the\", \"and\", \"for\", \"are\", \"but\", \"not\", \"you\", \"all\", \"can\", \"had\", \"was\", \"one\", \"our\",\n    \"out\", \"has\", \"how\", \"its\", \"may\", \"new\", \"now\", \"old\", \"two\", \"way\", \"did\", \"each\", \"from\",\n    \"have\", \"what\", \"this\", \"that\", \"with\", \"want\", \"help\", \"explain\", \"show\", \"tell\", \"give\", \"does\",\n    \"work\", \"will\", \"would\", \"could\", \"should\", \"about\", \"into\", \"there\", \"their\", \"then\", \"than\", \"when\",\n    \"where\", \"which\", \"while\", \"also\", \"more\", \"like\", \"just\", \"here\", \"even\", \"know\", \"come\", \"said\",\n    \"make\", \"look\", \"use\", \"some\", \"very\", \"over\", \"such\", \"been\", \"they\", \"them\", \"these\",",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_RETRIEVAL_STOPWORDS",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "_RETRIEVAL_STOPWORDS = {\n    \"the\", \"and\", \"for\", \"are\", \"but\", \"not\", \"you\", \"all\", \"can\", \"had\", \"was\", \"one\", \"our\",\n    \"out\", \"has\", \"how\", \"its\", \"may\", \"new\", \"now\", \"old\", \"two\", \"way\", \"did\", \"each\", \"from\",\n    \"have\", \"what\", \"this\", \"that\", \"with\", \"want\", \"help\", \"explain\", \"show\", \"tell\", \"give\", \"does\",\n    \"work\", \"will\", \"would\", \"could\", \"should\", \"about\", \"into\", \"there\", \"their\", \"then\", \"than\", \"when\",\n    \"where\", \"which\", \"while\", \"also\", \"more\", \"like\", \"just\", \"here\", \"even\", \"know\", \"come\", \"said\",\n    \"make\", \"look\", \"use\", \"some\", \"very\", \"over\", \"such\", \"been\", \"they\", \"them\", \"these\",\n}\n# Matches any meaningful math content: numbers, operators, LaTeX commands, KaTeX delimiters\n_MATH_CONTENT_RE = re.compile(",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -8145,7 +8160,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "_MATH_CONTENT_RE = re.compile(\n    r\"\\$|\\d+[\\./]\\d+|[+\\-*/=^<>%]|\\\\(?:frac|sqrt|int|sum|lim|sin|cos|tan|log|ln|pi|theta|alpha|beta|infty|vec|hat)\"\n    r\"|\\b(?:solve|simplify|evaluate|calculate|compute|differentiate|integrate|factor|expand)\\b\",\n    re.IGNORECASE,\n)\nclass LLMService:\n    def __init__(self) -> None:\n        self._last_generation_meta: dict[str, object] = {\n            \"fallback_used\": False,\n            \"fallback_reason\": None,",
+        "peekOfCode": "_MATH_CONTENT_RE = re.compile(\n    r\"\\$|\\d+[\\./]\\d+|[+\\-*/=^<>%]|\\\\(?:frac|sqrt|int|sum|lim|sin|cos|tan|log|ln|pi|theta|alpha|beta|infty|vec|hat)\"\n    r\"|\\b(?:solve|simplify|evaluate|calculate|compute|differentiate|integrate|factor|expand)\\b\",\n    re.IGNORECASE,\n)\nclass LLMService:\n    _embed_cache: OrderedDict[str, list[float]] = OrderedDict()\n    _retrieval_cache: OrderedDict[str, tuple[str, dict[str, object]]] = OrderedDict()\n    def __init__(self) -> None:\n        self._last_generation_meta: dict[str, object] = {",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -8235,7 +8250,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.utils.validators",
         "description": "study-app-backend.src.utils.validators",
-        "peekOfCode": "VALID_TEST_TYPES = {\"MCQ_only\", \"FRQ_only\", \"mixed\", \"Extreme\"}\nVALID_QUESTION_TYPES = {\"MCQ\", \"FRQ\", \"matching\", \"ordering\", \"fill_blank\", \"select_all\"}\nALLOWED_FILE_TYPES = {\"pdf\", \"txt\", \"md\", \"docx\"}\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\nMAX_UPLOAD_DOCUMENTS = 30\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
+        "peekOfCode": "VALID_TEST_TYPES = {\"MCQ_only\", \"FRQ_only\", \"mixed\", \"Extreme\"}\nVALID_QUESTION_TYPES = {\"MCQ\", \"FRQ\"}\nALLOWED_FILE_TYPES = {\n    \"pdf\", \"txt\", \"md\", \"docx\", \"html\", \"htm\", \"pptx\",\n    \"py\", \"js\", \"ts\", \"tsx\", \"jsx\", \"java\", \"c\", \"cpp\", \"h\", \"hpp\",\n    \"cs\", \"go\", \"rs\", \"swift\", \"kt\", \"scala\", \"rb\", \"php\", \"sql\", \"json\", \"xml\", \"yaml\", \"yml\",\n}\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\nMAX_UPLOAD_TOTAL_SIZE_BYTES = 100 * 1024 * 1024  # 100 MB across uploaded files\ndef normalize_file_extension(filename: Optional[str]) -> str:",
         "detail": "study-app-backend.src.utils.validators",
         "documentation": {}
     },
@@ -8244,7 +8259,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.utils.validators",
         "description": "study-app-backend.src.utils.validators",
-        "peekOfCode": "VALID_QUESTION_TYPES = {\"MCQ\", \"FRQ\", \"matching\", \"ordering\", \"fill_blank\", \"select_all\"}\nALLOWED_FILE_TYPES = {\"pdf\", \"txt\", \"md\", \"docx\"}\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\nMAX_UPLOAD_DOCUMENTS = 30\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
+        "peekOfCode": "VALID_QUESTION_TYPES = {\"MCQ\", \"FRQ\"}\nALLOWED_FILE_TYPES = {\n    \"pdf\", \"txt\", \"md\", \"docx\", \"html\", \"htm\", \"pptx\",\n    \"py\", \"js\", \"ts\", \"tsx\", \"jsx\", \"java\", \"c\", \"cpp\", \"h\", \"hpp\",\n    \"cs\", \"go\", \"rs\", \"swift\", \"kt\", \"scala\", \"rb\", \"php\", \"sql\", \"json\", \"xml\", \"yaml\", \"yml\",\n}\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\nMAX_UPLOAD_TOTAL_SIZE_BYTES = 100 * 1024 * 1024  # 100 MB across uploaded files\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:",
         "detail": "study-app-backend.src.utils.validators",
         "documentation": {}
     },
@@ -8253,7 +8268,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.utils.validators",
         "description": "study-app-backend.src.utils.validators",
-        "peekOfCode": "ALLOWED_FILE_TYPES = {\"pdf\", \"txt\", \"md\", \"docx\"}\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\nMAX_UPLOAD_DOCUMENTS = 30\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
+        "peekOfCode": "ALLOWED_FILE_TYPES = {\n    \"pdf\", \"txt\", \"md\", \"docx\", \"html\", \"htm\", \"pptx\",\n    \"py\", \"js\", \"ts\", \"tsx\", \"jsx\", \"java\", \"c\", \"cpp\", \"h\", \"hpp\",\n    \"cs\", \"go\", \"rs\", \"swift\", \"kt\", \"scala\", \"rb\", \"php\", \"sql\", \"json\", \"xml\", \"yaml\", \"yml\",\n}\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\nMAX_UPLOAD_TOTAL_SIZE_BYTES = 100 * 1024 * 1024  # 100 MB across uploaded files\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"",
         "detail": "study-app-backend.src.utils.validators",
         "documentation": {}
     },
@@ -8262,25 +8277,16 @@
         "kind": 5,
         "importPath": "study-app-backend.src.utils.validators",
         "description": "study-app-backend.src.utils.validators",
-        "peekOfCode": "MAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\nMAX_UPLOAD_DOCUMENTS = 30\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
+        "peekOfCode": "MAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\nMAX_UPLOAD_TOTAL_SIZE_BYTES = 100 * 1024 * 1024  # 100 MB across uploaded files\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
         "detail": "study-app-backend.src.utils.validators",
         "documentation": {}
     },
     {
-        "label": "MAX_UPLOAD_DOCUMENTS",
+        "label": "MAX_UPLOAD_TOTAL_SIZE_BYTES",
         "kind": 5,
         "importPath": "study-app-backend.src.utils.validators",
         "description": "study-app-backend.src.utils.validators",
-        "peekOfCode": "MAX_UPLOAD_DOCUMENTS = 30\nMAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
-        "detail": "study-app-backend.src.utils.validators",
-        "documentation": {}
-    },
-    {
-        "label": "MAX_UPLOAD_FILE_SIZE_BYTES",
-        "kind": 5,
-        "importPath": "study-app-backend.src.utils.validators",
-        "description": "study-app-backend.src.utils.validators",
-        "peekOfCode": "MAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
+        "peekOfCode": "MAX_UPLOAD_TOTAL_SIZE_BYTES = 100 * 1024 * 1024  # 100 MB across uploaded files\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"\n    return filename.rsplit(\".\", 1)[1].lower()",
         "detail": "study-app-backend.src.utils.validators",
         "documentation": {}
     },
@@ -8615,6 +8621,69 @@
         "description": "study-app-backend.tests.test_llm_service",
         "peekOfCode": "EXTRACTION_RESP = {\n    \"title\": \"Database Transactions\",\n    \"terms\": [{\"term\": \"Atomicity\", \"definition\": \"All-or-nothing execution\"}],\n    \"concepts\": [\"ACID properties ensure transaction correctness\"],\n}\nclass TestGenerateTestQuestions:\n    async def test_mcq_only_mode_sets_frq_count_to_zero(self):\n        svc = LLMService()\n        svc._candidate_providers = AsyncMock(return_value=[\"groq\"])\n        svc._complete_json = AsyncMock(side_effect=[",
         "detail": "study-app-backend.tests.test_llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "TestRAGDiagnostics",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_rag_diagnostics",
+        "description": "study-app-backend.tests.test_rag_diagnostics",
+        "peekOfCode": "class TestRAGDiagnostics:\n    \"\"\"Test the RAG pipeline step-by-step to identify content loss.\"\"\"\n    def test_retrieval_with_sample_notes(self):\n        \"\"\"Test if retrieval pipeline works with real markdown content.\"\"\"\n        llm_svc = LLMService()\n        # Sample markdown study notes with clear content\n        sample_notes = \"\"\"\n# Threading and Multiprocessing Study Guide\n## Key Terms\n### Thread",
+        "detail": "study-app-backend.tests.test_rag_diagnostics",
+        "documentation": {}
+    },
+    {
+        "label": "TestFileExtractionDiagnostics",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_rag_diagnostics",
+        "description": "study-app-backend.tests.test_rag_diagnostics",
+        "peekOfCode": "class TestFileExtractionDiagnostics:\n    \"\"\"Test file extraction and storage.\"\"\"\n    @pytest.mark.asyncio\n    async def test_markdown_extraction_preserves_content(self):\n        \"\"\"Test if markdown extraction preserves text content.\"\"\"\n        file_svc = FileService()\n        # Create a mock file\n        md_content = b\"\"\"# Study Guide\n## Introduction\nThis is an important introduction to the topic.",
+        "detail": "study-app-backend.tests.test_rag_diagnostics",
+        "documentation": {}
+    },
+    {
+        "label": "TestKojoChatRetrieval",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_rag_diagnostics",
+        "description": "study-app-backend.tests.test_rag_diagnostics",
+        "peekOfCode": "class TestKojoChatRetrieval:\n    \"\"\"Test if Kojo chat can retrieve and access folder file content.\"\"\"\n    def test_map_reduce_context_building(self):\n        \"\"\"Test if map-reduce builds context correctly for Kojo chat.\"\"\"\n        llm_svc = LLMService()\n        # Simulate folder file content (what would come from database)\n        folder_content = \"\"\"\n[Threads_and_Processes.md]\n# Threading vs Multiprocessing\n## Threads",
+        "detail": "study-app-backend.tests.test_rag_diagnostics",
+        "documentation": {}
+    },
+    {
+        "label": "worker",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_realistic_scenario",
+        "description": "study-app-backend.tests.test_realistic_scenario",
+        "peekOfCode": "def worker():\n    print(\"Thread working\")\nt = threading.Thread(target=worker)\nt.start()\n```\n### Thread Safety\nWhen multiple threads access shared data, we need synchronization:\n- **Lock**: Mutex lock for exclusive access\n- **Semaphore**: Counter-based synchronization\n- **Event**: Thread communication",
+        "detail": "study-app-backend.tests.test_realistic_scenario",
+        "documentation": {}
+    },
+    {
+        "label": "worker",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_realistic_scenario",
+        "description": "study-app-backend.tests.test_realistic_scenario",
+        "peekOfCode": "def worker():\n    print(\"Process working\")\np = Process(target=worker)\np.start()\n```\n### Process Communication\nProcesses communicate through:\n- **Queues**: Thread-safe FIFO queues\n- **Pipes**: Bidirectional communication\n- **Shared Memory**: Via multiprocessing.Value and Array",
+        "detail": "study-app-backend.tests.test_realistic_scenario",
+        "documentation": {}
+    },
+    {
+        "label": "t",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_realistic_scenario",
+        "description": "study-app-backend.tests.test_realistic_scenario",
+        "peekOfCode": "t = threading.Thread(target=worker)\nt.start()\n```\n### Thread Safety\nWhen multiple threads access shared data, we need synchronization:\n- **Lock**: Mutex lock for exclusive access\n- **Semaphore**: Counter-based synchronization\n- **Event**: Thread communication\n### The GIL Problem\nPython's Global Interpreter Lock (GIL) prevents true parallelism.",
+        "detail": "study-app-backend.tests.test_realistic_scenario",
+        "documentation": {}
+    },
+    {
+        "label": "p",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_realistic_scenario",
+        "description": "study-app-backend.tests.test_realistic_scenario",
+        "peekOfCode": "p = Process(target=worker)\np.start()\n```\n### Process Communication\nProcesses communicate through:\n- **Queues**: Thread-safe FIFO queues\n- **Pipes**: Bidirectional communication\n- **Shared Memory**: Via multiprocessing.Value and Array\n## Chapter 4: Practical Considerations\n### When to Use Threads",
+        "detail": "study-app-backend.tests.test_realistic_scenario",
         "documentation": {}
     },
     {

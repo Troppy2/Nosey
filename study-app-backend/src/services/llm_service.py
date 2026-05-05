@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-from math import sqrt
+from collections import OrderedDict
+from math import log, sqrt
 import re
 from fractions import Fraction
 from dataclasses import dataclass
@@ -38,31 +39,6 @@ class GeneratedFRQ:
 
 
 @dataclass(frozen=True)
-class GeneratedMatching:
-    question_text: str
-    pairs: list[dict[str, str]]
-
-
-@dataclass(frozen=True)
-class GeneratedOrdering:
-    question_text: str
-    correct_order: list[str]
-
-
-@dataclass(frozen=True)
-class GeneratedFillBlank:
-    question_text: str
-    acceptable_answers: list[str]
-
-
-@dataclass(frozen=True)
-class GeneratedSelectAll:
-    question_text: str
-    options: list[str]
-    correct_indices: list[int]
-
-
-@dataclass(frozen=True)
 class GeneratedFlashcard:
     front: str
     back: str
@@ -92,15 +68,47 @@ class _PracticeTestStyle:
     subject_hints: str  # Domain/subject indicators from the test
 
 
+@dataclass(frozen=True)
+class _RetrievalChunk:
+    index: int
+    source: str
+    text: str
+    tokens: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _MapEvidence:
+    source: str
+    answer: str
+    evidence: list[str]
+    confidence: float
+
+
 _EXTRACT_CHAR_LIMIT = 10_000
 _GENERATE_CHAR_LIMIT = 8_000
 _RETRIEVAL_EMBEDDING_DIM = 384
 _RETRIEVAL_CHUNK_WORDS = 160
 _RETRIEVAL_CHUNK_OVERLAP_WORDS = 40
 _RETRIEVAL_TOP_K = 6
+_RETRIEVAL_CONTEXT_SENTENCES = 3
+_RETRIEVAL_MAX_QUERY_REWRITES = 4
+_RETRIEVAL_STAGE_MULTIPLIER = 2
+_RETRIEVAL_EMBED_CACHE_SIZE = 4096
+_RETRIEVAL_RESULT_CACHE_SIZE = 512
+_MAP_REDUCE_MAX_DOCS = 6
+_SAME_PROVIDER_TOPUP_ATTEMPTS = 2
 _AI_SERVICES_UNAVAILABLE_MESSAGE = (
     "An error has occurred. Test generation can't happen right now because AI services are unavailable."
 )
+
+_RETRIEVAL_STOPWORDS = {
+    "the", "and", "for", "are", "but", "not", "you", "all", "can", "had", "was", "one", "our",
+    "out", "has", "how", "its", "may", "new", "now", "old", "two", "way", "did", "each", "from",
+    "have", "what", "this", "that", "with", "want", "help", "explain", "show", "tell", "give", "does",
+    "work", "will", "would", "could", "should", "about", "into", "there", "their", "then", "than", "when",
+    "where", "which", "while", "also", "more", "like", "just", "here", "even", "know", "come", "said",
+    "make", "look", "use", "some", "very", "over", "such", "been", "they", "them", "these",
+}
 
 # Matches any meaningful math content: numbers, operators, LaTeX commands, KaTeX delimiters
 _MATH_CONTENT_RE = re.compile(
@@ -111,6 +119,9 @@ _MATH_CONTENT_RE = re.compile(
 
 
 class LLMService:
+    _embed_cache: OrderedDict[str, list[float]] = OrderedDict()
+    _retrieval_cache: OrderedDict[str, tuple[str, dict[str, object]]] = OrderedDict()
+
     def __init__(self) -> None:
         self._last_generation_meta: dict[str, object] = {
             "fallback_used": False,
@@ -689,57 +700,6 @@ class LLMService:
             self._set_last_generation_meta(diagnostics)
             return self._fallback_questions(cleaned_notes, count_mcq, count_frq)
 
-    async def generate_beta_questions(
-        self,
-        notes: str,
-        question_types: list[str],
-        provider: Optional[str] = None,
-        enable_fallback: bool = True,
-    ) -> tuple[list[GeneratedMatching], list[GeneratedOrdering], list[GeneratedFillBlank], list[GeneratedSelectAll]]:
-        selected = [qtype for qtype in ["matching", "ordering", "fill_blank", "select_all"] if qtype in question_types]
-        if not selected:
-            return [], [], [], []
-
-        cleaned = self._strip_metadata(notes)
-        study = await self._extract_study_content(cleaned, provider=provider)
-        prompt = self._build_beta_generation_prompt(study, selected)
-        diagnostics: dict[str, object] = {
-            "fallback_used": False,
-            "fallback_reason": None,
-            "note_grounded": True,
-            "retrieval_enabled": False,
-            "retrieval_total_chunks": 0,
-            "retrieval_selected_chunks": 0,
-            "retrieval_top_k": 0,
-            "retrieval_query": "beta_question_types",
-        }
-
-        provider_candidates = await self._candidate_providers(provider)
-        if not provider_candidates:
-            from src.utils.exceptions import LLMException
-            raise LLMException(
-                "No AI provider is available. Add an API key in Settings or start Ollama."
-            )
-
-        last_error: Optional[Exception] = None
-        for candidate in provider_candidates:
-            try:
-                data = await self._complete_json(prompt, provider=candidate)
-                matching, ordering, fill_blank, select_all = self._parse_beta_questions(data, selected)
-                if matching or ordering or fill_blank or select_all:
-                    self._set_last_generation_meta(diagnostics)
-                    return matching, ordering, fill_blank, select_all
-            except Exception as exc:
-                last_error = exc
-                logger.warning("Beta question generation failed with %s; trying next provider: %s", candidate, exc)
-
-        if not enable_fallback:
-            from src.utils.exceptions import LLMException
-            raise LLMException("The AI model could not generate the selected beta question types.") from last_error
-
-        self._set_last_generation_meta({**diagnostics, "fallback_used": True, "fallback_reason": "beta_generation_failed"})
-        return self._fallback_beta_questions(cleaned, selected)
-
     async def grade_frq_answer(
         self,
         notes: str,
@@ -835,172 +795,6 @@ If the notes do not support grading, set flagged_uncertain true and confidence 0
             "frq items: {question_text, expected_answer}\n\n"
             f"CS NOTES:\n{notes[:_GENERATE_CHAR_LIMIT]}"
         )
-
-    def _build_beta_generation_prompt(self, study: _StudyContent, selected_types: list[str]) -> str:
-        context_header = f'SUBJECT: "{study.title}"\n\n' if study.title else ""
-        terms_block = ""
-        if study.terms:
-            lines = "\n".join(f"  - {term.term}: {term.definition}" for term in study.terms[:40])
-            terms_block = f"TERMS AND DEFINITIONS:\n{lines}\n\n"
-        concepts_block = ""
-        if study.concepts:
-            lines = "\n".join(f"  - {concept}" for concept in study.concepts[:30])
-            concepts_block = f"KEY CONCEPTS AND FACTS:\n{lines}\n\n"
-
-        instructions: list[str] = []
-        if "matching" in selected_types:
-            instructions.append(
-                "matching: one question with 3-4 left/right pairs, question_text should ask the student to match related terms and definitions"
-            )
-        if "ordering" in selected_types:
-            instructions.append(
-                "ordering: one question with 4-5 items that must be arranged in the correct sequence"
-            )
-        if "fill_blank" in selected_types:
-            instructions.append(
-                "fill_blank: one question with one blank and 2-4 acceptable answers"
-            )
-        if "select_all" in selected_types:
-            instructions.append(
-                "select_all: one question with 4-5 options and 2 or more correct answers"
-            )
-
-        return (
-            "You are building beta study questions from the notes below. Use only the provided material.\n\n"
-            f"{context_header}"
-            f"{terms_block}"
-            f"{concepts_block}"
-            "Generate exactly one question for each requested type.\n"
-            + "\n".join(f"- {item}" for item in instructions)
-            + "\n\nReturn JSON only with these keys: matching, ordering, fill_blank, select_all.\n"
-            "matching items: {question_text, pairs: [{left, right}]}\n"
-            "ordering items: {question_text, correct_order: [strings]}\n"
-            "fill_blank items: {question_text, acceptable_answers: [strings]}\n"
-            "select_all items: {question_text, options: [strings], correct_indices: [ints]}\n"
-        )
-
-    def _parse_beta_questions(
-        self,
-        data: dict[str, object],
-        selected_types: list[str],
-    ) -> tuple[list[GeneratedMatching], list[GeneratedOrdering], list[GeneratedFillBlank], list[GeneratedSelectAll]]:
-        matching: list[GeneratedMatching] = []
-        ordering: list[GeneratedOrdering] = []
-        fill_blank: list[GeneratedFillBlank] = []
-        select_all: list[GeneratedSelectAll] = []
-
-        if "matching" in selected_types:
-            raw_matching = data.get("matching", [])
-            if isinstance(raw_matching, list):
-                for item in raw_matching:
-                    if not isinstance(item, dict):
-                        continue
-                    question_text = str(item.get("question_text", "")).strip()
-                    raw_pairs = item.get("pairs", [])
-                    pairs: list[dict[str, str]] = []
-                    if isinstance(raw_pairs, list):
-                        for pair in raw_pairs:
-                            if isinstance(pair, dict):
-                                left = str(pair.get("left", "")).strip()
-                                right = str(pair.get("right", "")).strip()
-                                if left and right:
-                                    pairs.append({"left": left, "right": right})
-                    if question_text and len(pairs) >= 3:
-                        matching.append(GeneratedMatching(question_text=question_text, pairs=pairs))
-
-        if "ordering" in selected_types:
-            raw_ordering = data.get("ordering", [])
-            if isinstance(raw_ordering, list):
-                for item in raw_ordering:
-                    if not isinstance(item, dict):
-                        continue
-                    question_text = str(item.get("question_text", "")).strip()
-                    raw_order = item.get("correct_order", [])
-                    order = [str(entry).strip() for entry in raw_order] if isinstance(raw_order, list) else []
-                    order = [entry for entry in order if entry]
-                    if question_text and len(order) >= 3:
-                        ordering.append(GeneratedOrdering(question_text=question_text, correct_order=order))
-
-        if "fill_blank" in selected_types:
-            raw_fill_blank = data.get("fill_blank", [])
-            if isinstance(raw_fill_blank, list):
-                for item in raw_fill_blank:
-                    if not isinstance(item, dict):
-                        continue
-                    question_text = str(item.get("question_text", "")).strip()
-                    raw_answers = item.get("acceptable_answers", [])
-                    answers = [str(entry).strip() for entry in raw_answers] if isinstance(raw_answers, list) else []
-                    answers = [entry for entry in answers if entry]
-                    if question_text and answers:
-                        fill_blank.append(GeneratedFillBlank(question_text=question_text, acceptable_answers=answers))
-
-        if "select_all" in selected_types:
-            raw_select_all = data.get("select_all", [])
-            if isinstance(raw_select_all, list):
-                for item in raw_select_all:
-                    if not isinstance(item, dict):
-                        continue
-                    question_text = str(item.get("question_text", "")).strip()
-                    options_raw = item.get("options", [])
-                    options = [str(entry).strip() for entry in options_raw] if isinstance(options_raw, list) else []
-                    options = [entry for entry in options if entry]
-                    raw_indices = item.get("correct_indices", [])
-                    indices = [int(entry) for entry in raw_indices] if isinstance(raw_indices, list) else []
-                    indices = [entry for entry in indices if 0 <= entry < len(options)]
-                    if question_text and len(options) >= 4 and indices:
-                        select_all.append(
-                            GeneratedSelectAll(
-                                question_text=question_text,
-                                options=options,
-                                correct_indices=indices,
-                            )
-                        )
-
-        return matching, ordering, fill_blank, select_all
-
-    def _fallback_beta_questions(
-        self,
-        notes: str,
-        selected_types: list[str],
-    ) -> tuple[list[GeneratedMatching], list[GeneratedOrdering], list[GeneratedFillBlank], list[GeneratedSelectAll]]:
-        snippets = self._sentences(notes) or ["Review the uploaded notes and identify the key ideas."]
-        matching: list[GeneratedMatching] = []
-        ordering: list[GeneratedOrdering] = []
-        fill_blank: list[GeneratedFillBlank] = []
-        select_all: list[GeneratedSelectAll] = []
-
-        if "matching" in selected_types:
-            base = snippets[:4]
-            pairs = [{"left": item, "right": item} for item in base]
-            if len(pairs) >= 3:
-                matching.append(GeneratedMatching(question_text="Match each idea with the related concept.", pairs=pairs))
-
-        if "ordering" in selected_types:
-            order = snippets[:5]
-            if len(order) >= 3:
-                ordering.append(GeneratedOrdering(question_text="Arrange the ideas in the correct order.", correct_order=order))
-
-        if "fill_blank" in selected_types:
-            fill_blank.append(
-                GeneratedFillBlank(
-                    question_text="Complete the statement: ________",
-                    acceptable_answers=[snippets[0]],
-                )
-            )
-
-        if "select_all" in selected_types:
-            options = snippets[:4]
-            if len(options) < 4:
-                options = options + ["An unrelated distractor."] * (4 - len(options))
-            select_all.append(
-                GeneratedSelectAll(
-                    question_text="Select all statements supported by the notes.",
-                    options=options,
-                    correct_indices=[0],
-                )
-            )
-
-        return matching, ordering, fill_blank, select_all
 
     async def grade_code_answer(
         self,
@@ -1379,8 +1173,6 @@ Rules:
             shared_prompt = prompt
 
         last_error: Optional[Exception] = None
-        best_mcq: list[GeneratedMCQ] = []
-        best_frq: list[GeneratedFRQ] = []
 
         for candidate in provider_candidates:
             try:
@@ -1394,38 +1186,151 @@ Rules:
                     diagnostics=diagnostics,
                     allow_fallback=False,
                 )
+
+                # Same-provider top-up first to avoid expensive cross-provider retries
+                # when output is near-complete (e.g., 19/20).
+                attempts = 0
+                while (
+                    (len(mcq) < count_mcq or len(frq) < count_frq)
+                    and attempts < _SAME_PROVIDER_TOPUP_ATTEMPTS
+                ):
+                    remaining_mcq = max(0, count_mcq - len(mcq))
+                    remaining_frq = max(0, count_frq - len(frq))
+                    if remaining_mcq == 0 and remaining_frq == 0:
+                        break
+
+                    topup_prompt = self._build_provider_topup_prompt(
+                        shared_prompt=shared_prompt,
+                        existing_mcq=mcq,
+                        existing_frq=frq,
+                        remaining_mcq=remaining_mcq,
+                        remaining_frq=remaining_frq,
+                    )
+                    try:
+                        retry_data = await self._complete_json(topup_prompt, provider=candidate)
+                        add_mcq, add_frq = self._parse_generated_test(
+                            retry_data,
+                            remaining_mcq,
+                            remaining_frq,
+                            notes,
+                            math_mode=math_mode,
+                            diagnostics=diagnostics,
+                            allow_fallback=False,
+                        )
+                        mcq, frq = self._merge_generated_questions(
+                            mcq, frq, add_mcq, add_frq, count_mcq, count_frq
+                        )
+                    except Exception as topup_exc:
+                        logger.warning(
+                            "Provider %s top-up attempt failed; keeping partial output: %s",
+                            candidate,
+                            topup_exc,
+                        )
+                        break
+                    attempts += 1
+
                 if len(mcq) >= count_mcq and len(frq) >= count_frq:
                     self._set_last_generation_meta(diagnostics)
                     return mcq[:count_mcq], frq[:count_frq]
-                if len(mcq) + len(frq) > len(best_mcq) + len(best_frq):
-                    best_mcq, best_frq = mcq, frq
+
+                if enable_fallback:
+                    remaining_mcq = max(0, count_mcq - len(mcq))
+                    remaining_frq = max(0, count_frq - len(frq))
+                    used_partial_fallback_fill = remaining_mcq > 0 or remaining_frq > 0
+                    if remaining_mcq > 0 or remaining_frq > 0:
+                        fallback_builder = self._fallback_math_questions if math_mode else self._fallback_questions
+                        fallback_mcq, fallback_frq = fallback_builder(notes, remaining_mcq, remaining_frq)
+                        mcq, frq = self._merge_generated_questions(
+                            mcq, frq, fallback_mcq, fallback_frq, count_mcq, count_frq
+                        )
+
+                    diagnostics.update({
+                        "fallback_used": used_partial_fallback_fill,
+                        "fallback_reason": "provider_partial_output_filled" if used_partial_fallback_fill else None,
+                        "note_grounded": len(mcq) >= count_mcq and len(frq) >= count_frq,
+                    })
+                    self._set_last_generation_meta(diagnostics)
+                    return mcq[:count_mcq], frq[:count_frq]
+
                 logger.warning(
-                    "Provider %s returned insufficient test output (%d MCQ, %d FRQ of %d/%d requested); trying next provider",
+                    "Provider %s returned insufficient test output (%d MCQ, %d FRQ of %d/%d requested) after top-up attempts",
                     candidate, len(mcq), len(frq), count_mcq, count_frq,
                 )
             except Exception as exc:
                 last_error = exc
                 logger.warning("Provider %s failed test generation; trying next provider: %s", candidate, exc)
 
-        if best_mcq or best_frq:
-            if not enable_fallback:
-                raise LLMException(
-                    "The AI model is unavailable right now. Try again later."
-                ) from last_error
-            self._set_last_generation_meta(diagnostics)
-            return best_mcq[:count_mcq], best_frq[:count_frq]
-
         raise LLMException(
             "Practice test could not be generated. The selected AI provider may be rate-limited or temporarily unavailable. "
             "Try a different provider or try again in a moment."
         ) from last_error
+
+    def _build_provider_topup_prompt(
+        self,
+        shared_prompt: str,
+        existing_mcq: list[GeneratedMCQ],
+        existing_frq: list[GeneratedFRQ],
+        remaining_mcq: int,
+        remaining_frq: int,
+    ) -> str:
+        existing_mcq_text = "\n".join(f"- {item.question_text}" for item in existing_mcq[:60])
+        existing_frq_text = "\n".join(f"- {item.question_text}" for item in existing_frq[:60])
+        return (
+            f"{shared_prompt}\n\n"
+            "OVERRIDE INSTRUCTIONS (FOLLOW STRICTLY):\n"
+            f"- You already generated some valid questions.\n"
+            f"- Generate ONLY the missing amount: {remaining_mcq} MCQ and {remaining_frq} FRQ.\n"
+            "- Do NOT regenerate or rephrase previous questions.\n"
+            "- Return JSON only with keys mcq and frq.\n"
+            "- If one type has 0 remaining, return an empty array for that key.\n\n"
+            "EXISTING MCQ QUESTION TEXTS (DO NOT REPEAT):\n"
+            f"{existing_mcq_text or '- (none)'}\n\n"
+            "EXISTING FRQ QUESTION TEXTS (DO NOT REPEAT):\n"
+            f"{existing_frq_text or '- (none)'}\n"
+        )
+
+    def _merge_generated_questions(
+        self,
+        base_mcq: list[GeneratedMCQ],
+        base_frq: list[GeneratedFRQ],
+        add_mcq: list[GeneratedMCQ],
+        add_frq: list[GeneratedFRQ],
+        count_mcq: int,
+        count_frq: int,
+    ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
+        def norm(text: str) -> str:
+            return re.sub(r"\s+", " ", text.strip().lower())
+
+        merged_mcq = list(base_mcq)
+        seen_mcq = {norm(item.question_text) for item in base_mcq}
+        for item in add_mcq:
+            key = norm(item.question_text)
+            if not key or key in seen_mcq:
+                continue
+            seen_mcq.add(key)
+            merged_mcq.append(item)
+            if len(merged_mcq) >= count_mcq:
+                break
+
+        merged_frq = list(base_frq)
+        seen_frq = {norm(item.question_text) for item in base_frq}
+        for item in add_frq:
+            key = norm(item.question_text)
+            if not key or key in seen_frq:
+                continue
+            seen_frq.add(key)
+            merged_frq.append(item)
+            if len(merged_frq) >= count_frq:
+                break
+
+        return merged_mcq[:count_mcq], merged_frq[:count_frq]
 
     async def _complete_json_for_provider(self, prompt: str, provider: str) -> dict[str, object]:
         from src.utils.exceptions import LLMException
 
         if provider == "gemini":
             if not settings.google_ai_api_key:
-                raise LLMException("Google AI is not configured. Add your Google AI API key in Settings.")
+                raise LLMException("DeepSeek is not configured. Add your AI API key in Settings.")
             return await self._complete_gemini(prompt)
         if provider == "groq":
             if not settings.groq_api_key:
@@ -1438,6 +1343,118 @@ Rules:
         if provider == "ollama":
             return await self._complete_ollama(prompt)
         raise LLMException(f"Unsupported LLM provider: {provider}")
+
+    def retrieve_context_for_query(
+        self,
+        notes: str,
+        query: str,
+        top_k: int = _RETRIEVAL_TOP_K,
+    ) -> tuple[str, dict[str, object]]:
+        return self._retrieve_relevant_context(notes, query, top_k=top_k)
+
+    async def map_reduce_long_answer(
+        self,
+        notes: str,
+        user_query: str,
+        history_block: str = "",
+        provider: Optional[str] = None,
+    ) -> str:
+        documents = self._extract_document_blocks(self._strip_metadata(notes))
+        if not documents:
+            logger.warning("map_reduce_long_answer: No documents found in notes")
+            return await self.call_kojo(user_query, provider=provider)
+
+        logger.info(
+            "map_reduce_long_answer started",
+            extra={
+                "documents_count": len(documents),
+                "query": user_query[:100],
+                "notes_length": len(notes),
+            }
+        )
+
+        map_results: list[_MapEvidence] = []
+        for doc_idx, (source, doc_text) in enumerate(documents[:_MAP_REDUCE_MAX_DOCS]):
+            logger.info(
+                "map_reduce: Processing document",
+                extra={
+                    "document_index": doc_idx,
+                    "source": source,
+                    "doc_length": len(doc_text),
+                }
+            )
+            retrieved, retrieval_meta = self._retrieve_relevant_context(doc_text, user_query, top_k=max(2, _RETRIEVAL_TOP_K // 2))
+            logger.info(
+                "map_reduce: Retrieved context for document",
+                extra={
+                    "document_index": doc_idx,
+                    "source": source,
+                    "retrieved_length": len(retrieved),
+                    **retrieval_meta,
+                }
+            )
+            map_prompt = (
+                "You are doing MAP-stage RAG extraction for one source document.\n"
+                "Return JSON only with keys:\n"
+                "- answer: short answer from this source only\n"
+                "- evidence: array of 1-3 direct supporting snippets\n"
+                "- confidence: number between 0 and 1\n"
+                "If source is not relevant, return low confidence and empty evidence.\n\n"
+                f"QUESTION:\n{user_query}\n\n"
+                f"SOURCE NAME: {source}\n"
+                f"SOURCE CONTEXT:\n{retrieved[:6000]}"
+            )
+            try:
+                data = await self._complete_json(map_prompt, provider=provider)
+                answer = str(data.get("answer", "")).strip()
+                evidence = [
+                    str(item).strip()
+                    for item in (data.get("evidence", []) if isinstance(data.get("evidence"), list) else [])
+                    if str(item).strip()
+                ][:3]
+                confidence = max(0.0, min(1.0, float(data.get("confidence", 0.2))))
+                map_results.append(_MapEvidence(source=source, answer=answer, evidence=evidence, confidence=confidence))
+            except Exception:
+                snippet = retrieved[:360].strip()
+                map_results.append(
+                    _MapEvidence(
+                        source=source,
+                        answer="",
+                        evidence=[snippet] if snippet else [],
+                        confidence=0.1,
+                    )
+                )
+
+        if not map_results:
+            return await self.call_kojo(user_query, provider=provider)
+
+        map_block_parts: list[str] = []
+        for idx, item in enumerate(map_results, start=1):
+            ev_lines = "\n".join(f"- {ev}" for ev in item.evidence) if item.evidence else "- (no strong evidence extracted)"
+            map_block_parts.append(
+                f"SOURCE {idx}: {item.source}\n"
+                f"Confidence: {item.confidence:.2f}\n"
+                f"Map Answer: {item.answer or '(none)'}\n"
+                f"Evidence:\n{ev_lines}"
+            )
+        map_outputs_text = "\n\n".join(map_block_parts)
+
+        reduce_prompt = (
+            "You are doing REDUCE-stage RAG synthesis.\n"
+            "Merge the map-stage outputs into one final student-facing answer.\n"
+            "Rules:\n"
+            "- Cite sources inline using [source: SOURCE NAME].\n"
+            "- If sources conflict, explicitly note the conflict and provide safest interpretation.\n"
+            "- Prefer high-confidence evidence and avoid unsupported claims.\n"
+            "- Keep answer clear and concise.\n\n"
+            f"{history_block}\n\n"
+            f"USER QUESTION:\n{user_query}\n\n"
+            "MAP OUTPUTS:\n"
+            f"{map_outputs_text}\n\n"
+            "Return the final answer with citations."
+        )
+
+        return await self.call_kojo(reduce_prompt, provider=provider)
 
     async def call_kojo(self, prompt: str, provider: Optional[str] = None) -> str:
         from src.utils.exceptions import LLMException
@@ -1492,7 +1509,7 @@ Rules:
         async def _do() -> str:
             async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
                 response = await client.post(
-                    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+                    "https://generativelanguage.googleapis.com/v1beta/models/deepseek-v4-flash:cloud:generateContent",
                     params={"key": settings.google_ai_api_key},
                     json={
                         "contents": [{"parts": [{"text": prompt}]}],
@@ -1504,7 +1521,7 @@ Rules:
                 )
                 response.raise_for_status()
             return str(response.json()["candidates"][0]["content"]["parts"][0]["text"]).strip()
-        return await self._with_retry(_do, "Gemini")
+        return await self._with_retry(_do, "DeepSeek")
 
     async def check_providers_status(self) -> dict:
         ollama_ok = False
@@ -1654,7 +1671,7 @@ Rules:
         async def _do() -> dict[str, object]:
             async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
                 response = await client.post(
-                    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+                    "https://generativelanguage.googleapis.com/v1beta/models/deepseek-v4-flash:cloud:generateContent",
                     params={"key": settings.google_ai_api_key},
                     json={
                         "contents": [{"parts": [{"text": prompt}]}],
@@ -1668,7 +1685,7 @@ Rules:
                 response.raise_for_status()
             content = str(response.json()["candidates"][0]["content"]["parts"][0]["text"]).strip()
             return self._loads_json(content)
-        return await self._with_retry(_do, "Gemini")
+        return await self._with_retry(_do, "DeepSeek")
 
     async def _complete_ollama(self, prompt: str) -> dict[str, object]:
         from src.utils.exceptions import LLMException
@@ -1779,6 +1796,26 @@ Rules:
             raise ValueError("LLM response was not a JSON object")
         return parsed
 
+    def _normalize_mcq_item(self, item: object) -> object:
+        """Coerce common LLM deviations so _is_valid_mcq has the best chance of accepting the item."""
+        if not isinstance(item, dict):
+            return item
+        item = dict(item)
+        if "question_text" not in item:
+            for alt in ("question", "text", "prompt"):
+                if alt in item:
+                    item["question_text"] = item[alt]
+                    break
+        if "correct_index" not in item:
+            for alt in ("answer", "correct", "answer_index", "correct_answer"):
+                if alt in item:
+                    item["correct_index"] = item[alt]
+                    break
+        options = item.get("options")
+        if isinstance(options, dict):
+            item["options"] = list(options.values())
+        return item
+
     def _is_valid_mcq(self, item: object) -> bool:
         if not isinstance(item, dict):
             return False
@@ -1857,6 +1894,7 @@ Rules:
         frq_validator = self._is_valid_math_frq if math_mode else self._is_valid_frq
         if isinstance(mcq_raw, list):
             for item in mcq_raw:
+                item = self._normalize_mcq_item(item)
                 if mcq_validator(item):
                     raw_options = [str(o) for o in item["options"]][:4]  # type: ignore[index]
                     options = [normalize_latex(o) for o in raw_options]
@@ -1915,68 +1953,328 @@ Rules:
             parts.append(custom_instructions)
         return " | ".join(parts)
 
+    def _rewrite_query_for_retrieval(self, query: str) -> list[str]:
+        base = re.sub(r"\s+", " ", query).strip()
+        if not base:
+            return [""]
+
+        variants: list[str] = [base]
+        split_parts = [p.strip() for p in re.split(r"[|,:;]", base) if p.strip()]
+        variants.extend(split_parts)
+
+        tokens = [
+            token
+            for token in self._tokenize_for_retrieval(base)
+            if token not in _RETRIEVAL_STOPWORDS and len(token) > 2
+        ]
+        if tokens:
+            variants.append(" ".join(tokens[:16]))
+            unique = list(dict.fromkeys(tokens))
+            variants.append(" ".join(unique[:12]))
+
+        seen: set[str] = set()
+        deduped: list[str] = []
+        for item in variants:
+            normalized = re.sub(r"\s+", " ", item).strip().lower()
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            deduped.append(item.strip())
+            if len(deduped) >= _RETRIEVAL_MAX_QUERY_REWRITES:
+                break
+
+        return deduped or [base]
+
+    def _retrieval_cache_get(self, key: str) -> Optional[tuple[str, dict[str, object]]]:
+        value = self._retrieval_cache.get(key)
+        if value is None:
+            return None
+        self._retrieval_cache.move_to_end(key)
+        return value[0], dict(value[1])
+
+    def _retrieval_cache_set(self, key: str, value: tuple[str, dict[str, object]]) -> None:
+        self._retrieval_cache[key] = (value[0], dict(value[1]))
+        self._retrieval_cache.move_to_end(key)
+        while len(self._retrieval_cache) > _RETRIEVAL_RESULT_CACHE_SIZE:
+            self._retrieval_cache.popitem(last=False)
+
+    def _embed_cache_get(self, key: str) -> Optional[list[float]]:
+        value = self._embed_cache.get(key)
+        if value is None:
+            return None
+        self._embed_cache.move_to_end(key)
+        return value
+
+    def _embed_cache_set(self, key: str, value: list[float]) -> None:
+        self._embed_cache[key] = value
+        self._embed_cache.move_to_end(key)
+        while len(self._embed_cache) > _RETRIEVAL_EMBED_CACHE_SIZE:
+            self._embed_cache.popitem(last=False)
+
+    def _metadata_filter_bonus(self, query_tokens: set[str], chunk: _RetrievalChunk) -> float:
+        bonus = 0.0
+        source_lower = chunk.source.lower()
+        if query_tokens and any(token in source_lower for token in query_tokens):
+            bonus += 0.05
+
+        math_query = any(token in {"math", "equation", "algebra", "calculus", "integral", "derivative"} for token in query_tokens)
+        code_query = any(token in {"coding", "programming", "python", "java", "algorithm", "function"} for token in query_tokens)
+
+        if math_query and re.search(r"\$|\\frac|\\int|\\sum|\b\d+\b|[+\-*/=^]", chunk.text):
+            bonus += 0.05
+        if code_query and re.search(r"\b(def|class|function|return|for|while|if|else|const|let|var|public|private)\b", chunk.text):
+            bonus += 0.05
+        return bonus
+
+    def _compress_chunk_for_query(self, chunk: str, query_variants: list[str], max_sentences: int = _RETRIEVAL_CONTEXT_SENTENCES) -> str:
+        sentences = [
+            s.strip()
+            for s in re.split(r"(?<=[.!?])\s+|\n+", chunk)
+            if s and s.strip()
+        ]
+        if not sentences:
+            return chunk[:1200]
+
+        query_tokens = {
+            token
+            for variant in query_variants
+            for token in self._tokenize_for_retrieval(variant)
+            if token not in _RETRIEVAL_STOPWORDS
+        }
+        if not query_tokens:
+            return " ".join(sentences[:max_sentences])
+
+        scored: list[tuple[int, int, str]] = []
+        for idx, sentence in enumerate(sentences):
+            stokens = set(self._tokenize_for_retrieval(sentence))
+            score = len(query_tokens.intersection(stokens))
+            if score > 0:
+                scored.append((score, idx, sentence))
+
+        if not scored:
+            return " ".join(sentences[:max_sentences])
+
+        scored.sort(key=lambda item: item[0], reverse=True)
+        selected = sorted(scored[:max_sentences], key=lambda item: item[1])
+        return " ".join(sentence for _, _, sentence in selected)
+
+    def _bm25_scores(self, chunks: list[_RetrievalChunk], query_tokens: list[str]) -> list[float]:
+        if not chunks or not query_tokens:
+            return [0.0 for _ in chunks]
+
+        doc_count = len(chunks)
+        avg_len = sum(len(chunk.tokens) for chunk in chunks) / max(1, doc_count)
+        term_doc_freq: dict[str, int] = {}
+        for token in set(query_tokens):
+            term_doc_freq[token] = sum(1 for chunk in chunks if token in chunk.tokens)
+
+        k1 = 1.2
+        b = 0.75
+        scores: list[float] = []
+        for chunk in chunks:
+            token_freq: dict[str, int] = {}
+            for token in chunk.tokens:
+                token_freq[token] = token_freq.get(token, 0) + 1
+            chunk_len = max(1, len(chunk.tokens))
+            score = 0.0
+            for token in query_tokens:
+                tf = token_freq.get(token, 0)
+                if tf <= 0:
+                    continue
+                df = term_doc_freq.get(token, 0)
+                idf = log(1 + ((doc_count - df + 0.5) / (df + 0.5)))
+                numerator = tf * (k1 + 1)
+                denominator = tf + k1 * (1 - b + b * (chunk_len / max(1.0, avg_len)))
+                score += idf * (numerator / max(1e-9, denominator))
+            scores.append(score)
+        return scores
+
+    def _normalize_scores(self, values: list[float]) -> list[float]:
+        if not values:
+            return []
+        high = max(values)
+        low = min(values)
+        if high <= low:
+            return [0.0 for _ in values]
+        span = high - low
+        return [(value - low) / span for value in values]
+
     def _retrieve_relevant_context(
         self,
         notes: str,
         query: str,
         top_k: int = _RETRIEVAL_TOP_K,
     ) -> tuple[str, dict[str, object]]:
+        query_variants = self._rewrite_query_for_retrieval(query)
+        filters_fingerprint = "|".join(sorted(query_variants))
+        cache_key = hashlib.sha256(
+            f"{hashlib.sha256(notes.encode('utf-8', errors='ignore')).hexdigest()}::{filters_fingerprint}::{top_k}".encode("utf-8")
+        ).hexdigest()
+        cached = self._retrieval_cache_get(cache_key)
+        if cached is not None:
+            cached_context, cached_meta = cached
+            cached_meta["retrieval_cache_hit"] = True
+            return cached_context, cached_meta
+
         chunks = self._chunk_notes_for_retrieval(notes)
         meta: dict[str, object] = {
             "retrieval_enabled": True,
             "retrieval_total_chunks": len(chunks),
             "retrieval_selected_chunks": 0,
             "retrieval_top_k": 0,
+            "retrieval_query_rewrites": len(query_variants),
+            "retrieval_hybrid": True,
+            "retrieval_compression": True,
+            "retrieval_cache_hit": False,
         }
         if not chunks:
-            return notes[:_GENERATE_CHAR_LIMIT], meta
+            result = (notes[:_GENERATE_CHAR_LIMIT], meta)
+            self._retrieval_cache_set(cache_key, result)
+            return result
 
-        query_vec = self._embed_text_for_retrieval(query)
-        scored: list[tuple[float, int, str]] = []
+        combined_scores = [0.0 for _ in chunks]
+        chunk_query_overlap = [0.0 for _ in chunks]
+        query_token_set: set[str] = set()
+
+        for variant in query_variants:
+            query_tokens = [
+                token
+                for token in self._tokenize_for_retrieval(variant)
+                if token not in _RETRIEVAL_STOPWORDS
+            ]
+            if not query_tokens:
+                continue
+            query_token_set.update(query_tokens)
+
+            query_vec = self._embed_text_for_retrieval(variant)
+            dense = [self._cosine_similarity(query_vec, self._embed_text_for_retrieval(chunk.text)) for chunk in chunks]
+            dense_norm = self._normalize_scores(dense)
+
+            bm25 = self._bm25_scores(chunks, query_tokens)
+            bm25_norm = self._normalize_scores(bm25)
+
+            for idx, chunk in enumerate(chunks):
+                overlap = len(set(query_tokens).intersection(set(chunk.tokens))) / max(1.0, float(len(set(query_tokens))))
+                chunk_query_overlap[idx] = max(chunk_query_overlap[idx], overlap)
+                hybrid = 0.6 * dense_norm[idx] + 0.4 * bm25_norm[idx]
+                combined_scores[idx] = max(combined_scores[idx], hybrid)
+
+        scored: list[tuple[float, _RetrievalChunk]] = []
         for idx, chunk in enumerate(chunks):
-            chunk_vec = self._embed_text_for_retrieval(chunk)
-            score = self._cosine_similarity(query_vec, chunk_vec)
-            scored.append((score, idx, chunk))
+            bonus = self._metadata_filter_bonus(query_token_set, chunk)
+            score = combined_scores[idx] + 0.1 * chunk_query_overlap[idx] + bonus
+            scored.append((score, chunk))
 
         scored.sort(key=lambda item: item[0], reverse=True)
-        take = max(1, min(top_k, len(scored)))
-        selected = sorted(scored[:take], key=lambda item: item[1])
-        meta["retrieval_selected_chunks"] = len(selected)
-        meta["retrieval_top_k"] = take
+        take = max(1, min(top_k * _RETRIEVAL_STAGE_MULTIPLIER, len(scored)))
+        selected_candidates = scored[:take]
 
-        context_parts = [f"[Retrieved chunk {idx + 1}]\n{chunk}" for _, idx, chunk in selected]
+        compressed: list[tuple[int, str]] = []
+        for _, chunk in selected_candidates:
+            snippet = self._compress_chunk_for_query(chunk.text, query_variants)
+            if snippet:
+                compressed.append((chunk.index, f"[Source: {chunk.source} | Chunk {chunk.index + 1}]\n{snippet}"))
+
+        # Deduplicate repeated snippets while preserving order.
+        seen_snippets: set[str] = set()
+        deduped: list[tuple[int, str]] = []
+        for idx, text in compressed:
+            key = re.sub(r"\s+", " ", text).strip().lower()
+            if not key or key in seen_snippets:
+                continue
+            seen_snippets.add(key)
+            deduped.append((idx, text))
+
+        deduped = sorted(deduped[: max(1, min(top_k, len(deduped)))], key=lambda item: item[0])
+        meta["retrieval_selected_chunks"] = len(deduped)
+        meta["retrieval_top_k"] = min(top_k, len(deduped))
+
+        context_parts = [chunk_text for _, chunk_text in deduped]
         context = "\n\n".join(context_parts).strip()
         if not context:
             context = notes
-        return context[:_GENERATE_CHAR_LIMIT], meta
+        result = (context[:_GENERATE_CHAR_LIMIT], meta)
+        self._retrieval_cache_set(cache_key, result)
+        return result
 
     def _chunk_notes_for_retrieval(
         self,
         notes: str,
         chunk_words: int = _RETRIEVAL_CHUNK_WORDS,
         overlap_words: int = _RETRIEVAL_CHUNK_OVERLAP_WORDS,
-    ) -> list[str]:
+    ) -> list[_RetrievalChunk]:
         cleaned = self._strip_metadata(notes)
-        words = cleaned.split()
-        if not words:
+        documents = self._extract_document_blocks(cleaned)
+        if not documents:
             return []
-        if len(words) <= chunk_words:
-            return [cleaned]
 
-        chunks: list[str] = []
+        chunks: list[_RetrievalChunk] = []
+        global_index = 0
         step = max(1, chunk_words - overlap_words)
-        start = 0
-        while start < len(words):
-            chunk = " ".join(words[start:start + chunk_words]).strip()
-            if chunk:
-                chunks.append(chunk)
-            start += step
+        for source, body in documents:
+            words = body.split()
+            if not words:
+                continue
+            if len(words) <= chunk_words:
+                text = body.strip()
+                if text:
+                    tokens = tuple(self._tokenize_for_retrieval(text))
+                    chunks.append(_RetrievalChunk(index=global_index, source=source, text=text, tokens=tokens))
+                    global_index += 1
+                continue
+
+            start = 0
+            while start < len(words):
+                text = " ".join(words[start:start + chunk_words]).strip()
+                if text:
+                    tokens = tuple(self._tokenize_for_retrieval(text))
+                    chunks.append(_RetrievalChunk(index=global_index, source=source, text=text, tokens=tokens))
+                    global_index += 1
+                start += step
         return chunks
 
+    def _extract_document_blocks(self, notes: str) -> list[tuple[str, str]]:
+        lines = (notes or "").splitlines()
+        docs: list[tuple[str, str]] = []
+        current_source = "document"
+        current_lines: list[str] = []
+
+        def flush() -> None:
+            nonlocal current_lines, current_source
+            content = "\n".join(current_lines).strip()
+            if content:
+                docs.append((current_source, content))
+            current_lines = []
+
+        for line in lines:
+            marker_doc = re.match(r"^---\s*Document\s+\d+\s*:\s*(.+?)\s*---\s*$", line.strip(), re.IGNORECASE)
+            marker_file = re.match(r"^\[(.+?)\]\s*$", line.strip())
+            if marker_doc:
+                flush()
+                current_source = marker_doc.group(1).strip()
+                continue
+            if marker_file:
+                flush()
+                current_source = marker_file.group(1).strip()
+                continue
+            current_lines.append(line)
+
+        flush()
+        if not docs and notes.strip():
+            docs.append(("document", notes.strip()))
+        return docs
+
     def _embed_text_for_retrieval(self, text: str, dimensions: int = _RETRIEVAL_EMBEDDING_DIM) -> list[float]:
+        cache_key = hashlib.sha256(f"{dimensions}:{text}".encode("utf-8", errors="ignore")).hexdigest()
+        cached = self._embed_cache_get(cache_key)
+        if cached is not None:
+            return cached
+
         tokens = self._tokenize_for_retrieval(text)
         if not tokens:
-            return [0.0] * dimensions
+            zero = [0.0] * dimensions
+            self._embed_cache_set(cache_key, zero)
+            return zero
 
         vector = [0.0] * dimensions
         for token in tokens:
@@ -1988,7 +2286,10 @@ Rules:
 
         norm = sqrt(sum(value * value for value in vector))
         if norm > 0:
-            return [value / norm for value in vector]
+            normalized = [value / norm for value in vector]
+            self._embed_cache_set(cache_key, normalized)
+            return normalized
+        self._embed_cache_set(cache_key, vector)
         return vector
 
     def _tokenize_for_retrieval(self, text: str) -> list[str]:
@@ -2149,15 +2450,46 @@ Rules:
         return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]+", " ", text.lower())).strip()
 
     def _strip_metadata(self, notes: str) -> str:
+        cleaned = (notes or "")
+        cleaned = cleaned.replace("\r\n", "\n").replace("\r", "\n")
+        cleaned = cleaned.replace("\ufffd", " ")
+        cleaned = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", cleaned)
         # Remove [filename] document markers added by the repository
-        cleaned = re.sub(r"^\[.+\]\s*$", "", notes, flags=re.MULTILINE)
+        cleaned = re.sub(r"^\[.+\]\s*$", "", cleaned, flags=re.MULTILINE)
         # Remove single-line --- label --- markers (e.g. --- Document 1: file.md ---)
         cleaned = re.sub(r"^---[^-\n].+---\s*$", "", cleaned, flags=re.MULTILINE)
         # Remove YAML frontmatter blocks (--- ... ---), possibly multiple in one string
         cleaned = re.sub(r"(?sm)^---\s*\n.*?\n---\s*$", "", cleaned)
         # Remove any remaining standalone horizontal rule lines
         cleaned = re.sub(r"^[-*=]{3,}\s*$", "", cleaned, flags=re.MULTILINE)
+
+        # Drop heavily repeated short lines (headers/footers) and OCR-like symbol noise.
+        lines = [line.strip() for line in cleaned.split("\n")]
+        freq: dict[str, int] = {}
+        for line in lines:
+            if line:
+                key = line.lower()
+                freq[key] = freq.get(key, 0) + 1
+
+        filtered: list[str] = []
+        prev = ""
+        for line in lines:
+            if not line:
+                filtered.append("")
+                continue
+            key = line.lower()
+            if len(key) < 90 and freq.get(key, 0) >= 4:
+                continue
+            if re.fullmatch(r"[\W_]+", line):
+                continue
+            if key == prev:
+                continue
+            filtered.append(line)
+            prev = key
+        cleaned = "\n".join(filtered)
+
         # Collapse excess blank lines
+        cleaned = re.sub(r"[ \t]+", " ", cleaned)
         cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
         return cleaned.strip()
 

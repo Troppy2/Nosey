@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-import random
 from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,7 +7,6 @@ from src.repositories.folder_repository import FolderRepository
 from src.repositories.test_repository import TestRepository
 from src.schemas.test_schema import (
     CreateTestResponse,
-    MatchingPair,
     MCQOptionEditable,
     MCQOptionPublic,
     QuestionCreate,
@@ -67,26 +64,6 @@ class TestService:
                 id=q.id, type="MCQ", question_text=q.question_text,
                 options=[MCQOptionEditable(id=opt.id, text=opt.option_text, is_correct=opt.is_correct) for opt in q.mcq_options],
             )
-        if qtype == "select_all":
-            return QuestionEditable(
-                id=q.id, type="select_all", question_text=q.question_text,
-                options=[MCQOptionEditable(id=opt.id, text=opt.option_text, is_correct=opt.is_correct) for opt in q.mcq_options],
-            )
-        if qtype == "matching" and q.matching_answer:
-            pairs = json.loads(q.matching_answer.pairs_json)
-            return QuestionEditable(
-                id=q.id, type="matching", question_text=q.question_text,
-                matching_pairs=[MatchingPair(left=p["left"], right=p["right"]) for p in pairs],
-            )
-        if qtype == "ordering" and q.ordering_answer:
-            items = json.loads(q.ordering_answer.correct_order_json)
-            return QuestionEditable(id=q.id, type="ordering", question_text=q.question_text, ordering_items=items)
-        if qtype == "fill_blank" and q.fill_blank_answer:
-            acceptable = json.loads(q.fill_blank_answer.acceptable_answers_json)
-            return QuestionEditable(
-                id=q.id, type="fill_blank", question_text=q.question_text,
-                expected_answer=acceptable[0] if acceptable else None,
-            )
         return QuestionEditable(
             id=q.id, type=qtype or "FRQ", question_text=q.question_text,
             expected_answer=q.frq_answer.expected_answer if q.frq_answer else None,
@@ -94,25 +71,11 @@ class TestService:
 
     def _serialize_question_public(self, q) -> QuestionPublic:
         qtype = q.question_type
-        if qtype in ("MCQ", "select_all"):
+        if qtype == "MCQ":
             return QuestionPublic(
-                id=q.id, type=qtype, question_text=q.question_text,
+                id=q.id, type="MCQ", question_text=q.question_text,
                 options=[MCQOptionPublic(id=opt.id, text=opt.option_text) for opt in q.mcq_options],
             )
-        if qtype == "matching" and q.matching_answer:
-            pairs = json.loads(q.matching_answer.pairs_json)
-            shuffled = pairs[:]
-            random.shuffle(shuffled)
-            return QuestionPublic(
-                id=q.id, type=qtype, question_text=q.question_text,
-                matching_pairs=[MatchingPair(left=p["left"], right=p["right"]) for p in shuffled],
-            )
-        if qtype == "ordering" and q.ordering_answer:
-            items = json.loads(q.ordering_answer.correct_order_json)
-            shuffled = items[:]
-            random.shuffle(shuffled)
-            return QuestionPublic(id=q.id, type=qtype, question_text=q.question_text, ordering_items=shuffled)
-        # fill_blank and FRQ: question_text only
         return QuestionPublic(id=q.id, type=qtype or "FRQ", question_text=q.question_text)
 
     async def create_test(
@@ -134,9 +97,7 @@ class TestService:
         coding_language: Optional[str] = None,
         custom_instructions: Optional[str] = None,
         provider: Optional[str] = None,
-        beta_enabled: bool = False,
         enable_fallback: bool = True,
-        question_types: Optional[list[str]] = None,
     ) -> CreateTestResponse:
         if test_type not in VALID_TEST_TYPES:
             raise ValidationException("test_type must be MCQ_only, FRQ_only, mixed, or Extreme")
@@ -169,8 +130,6 @@ class TestService:
         # If the user uploaded notes on the generate-test page, use only those notes.
         # Folder-level study files are still available when no notes were uploaded.
         use_folder_files = not notes_files
-        
-        selected_question_types = [qtype for qtype in (question_types or []) if qtype in {"matching", "ordering", "fill_blank", "select_all"}]
 
         if practice_test_file is not None and has_study_content:
             # CASE 1: Practice test as TEMPLATE + Study content
@@ -308,18 +267,6 @@ class TestService:
             except Exception:
                 generation_meta = {}
 
-        matching_questions = []
-        ordering_questions = []
-        fill_blank_questions = []
-        select_all_questions = []
-        if beta_enabled and selected_question_types:
-            matching_questions, ordering_questions, fill_blank_questions, select_all_questions = await self.llm_service.generate_beta_questions(
-                notes=beta_source_notes,
-                question_types=selected_question_types,
-                provider=active_provider,
-                enable_fallback=enable_fallback,
-            )
-
         display_order = 1
         for item in mcq_questions:
             options = [
@@ -330,19 +277,6 @@ class TestService:
             display_order += 1
         for item in frq_questions:
             await repo.add_frq_question(test.id, item.question_text, display_order, item.expected_answer)
-            display_order += 1
-        for item in matching_questions:
-            await repo.add_matching_question(test.id, item.question_text, display_order, item.pairs)
-            display_order += 1
-        for item in ordering_questions:
-            await repo.add_ordering_question(test.id, item.question_text, display_order, item.correct_order)
-            display_order += 1
-        for item in fill_blank_questions:
-            await repo.add_fill_blank_question(test.id, item.question_text, display_order, item.acceptable_answers)
-            display_order += 1
-        for item in select_all_questions:
-            options = [(option_text, index in item.correct_indices) for index, option_text in enumerate(item.options)]
-            await repo.add_select_all_question(test.id, item.question_text, display_order, options, item.correct_indices)
             display_order += 1
 
         await session.commit()
@@ -388,16 +322,6 @@ class TestService:
             if correct_count != 1:
                 raise ValidationException("Exactly one option must be marked correct")
             await repo.update_mcq_options(question, [(o.text, o.is_correct) for o in data.options])
-        elif qtype == "select_all" and data.options is not None:
-            await repo.update_mcq_options(question, [(o.text, o.is_correct) for o in data.options])
-        elif qtype == "matching" and data.matching_pairs is not None and question.matching_answer is not None:
-            question.matching_answer.pairs_json = json.dumps(
-                [{"left": p.left, "right": p.right} for p in data.matching_pairs]
-            )
-        elif qtype == "ordering" and data.ordering_items is not None and question.ordering_answer is not None:
-            question.ordering_answer.correct_order_json = json.dumps(data.ordering_items)
-        elif qtype == "fill_blank" and data.expected_answer is not None and question.fill_blank_answer is not None:
-            question.fill_blank_answer.acceptable_answers_json = json.dumps([data.expected_answer])
         elif qtype == "FRQ" and data.expected_answer is not None and question.frq_answer is not None:
             question.frq_answer.expected_answer = data.expected_answer
         await session.commit()
@@ -439,33 +363,8 @@ class TestService:
             question = await repo.add_frq_question(
                 test_id, data.question_text, display_order, data.expected_answer
             )
-        elif data.type == "matching":
-            if not data.matching_pairs:
-                raise ValidationException("Matching questions require at least one pair")
-            question = await repo.add_matching_question(
-                test_id, data.question_text, display_order,
-                [{"left": p.left, "right": p.right} for p in data.matching_pairs],
-            )
-        elif data.type == "ordering":
-            if not data.ordering_items:
-                raise ValidationException("Ordering questions require at least one item")
-            question = await repo.add_ordering_question(test_id, data.question_text, display_order, data.ordering_items)
-        elif data.type == "fill_blank":
-            if not data.expected_answer:
-                raise ValidationException("Fill-in-the-blank questions require an expected_answer")
-            question = await repo.add_fill_blank_question(test_id, data.question_text, display_order, [data.expected_answer])
-        elif data.type == "select_all":
-            if len(data.options) < 2:
-                raise ValidationException("Select-all questions require at least 2 options")
-            if not any(o.is_correct for o in data.options):
-                raise ValidationException("At least one option must be marked correct")
-            correct_indices = [i for i, o in enumerate(data.options) if o.is_correct]
-            question = await repo.add_select_all_question(
-                test_id, data.question_text, display_order,
-                [(o.text, o.is_correct) for o in data.options], correct_indices,
-            )
         else:
-            raise ValidationException("type must be MCQ, FRQ, matching, ordering, fill_blank, or select_all")
+            raise ValidationException("type must be MCQ or FRQ")
         await session.commit()
         refreshed = await repo.get_question_owned(question.id, user_id)
         assert refreshed is not None

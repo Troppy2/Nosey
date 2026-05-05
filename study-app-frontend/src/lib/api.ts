@@ -201,18 +201,18 @@ export async function createTest(input: {
   codingLanguage?: string;
   customInstructions?: string;
   generationProvider?: string;
-  betaEnabled?: boolean;
   enableFallback?: boolean;
-  questionTypes?: string[];
 }): Promise<CreateTestResult> {
+  const MAX_NOTES_UPLOAD_TOTAL_BYTES = 100 * 1024 * 1024;
   if (isGuestSession()) {
     const tests = await fetchTests();
     if (tests.length >= 1) {
       throw new Error("Guest accounts can only create one practice test. Sign in to make more.");
     }
   }
-  if (input.files.length > 30) {
-    throw new Error("You can upload at most 30 documents.");
+  const totalUploadBytes = input.files.reduce((sum, file) => sum + file.size, 0);
+  if (totalUploadBytes > MAX_NOTES_UPLOAD_TOTAL_BYTES) {
+    throw new Error("Combined uploaded files exceed 100 MB.");
   }
   const formData = new FormData();
   formData.append("title", input.title);
@@ -226,11 +226,7 @@ export async function createTest(input: {
   if (input.codingLanguage) formData.append("coding_language", input.codingLanguage);
   if (input.customInstructions) formData.append("custom_instructions", input.customInstructions);
   if (input.generationProvider) formData.append("provider", input.generationProvider);
-  formData.append("beta_enabled", input.betaEnabled === false ? "false" : "true");
   formData.append("enable_fallback", input.enableFallback === false ? "false" : "true");
-  if (input.questionTypes && input.questionTypes.length > 0) {
-    formData.append("question_types", JSON.stringify(input.questionTypes));
-  }
   input.files.forEach((file) => formData.append("notes_files", file));
   if (input.practiceTestFile) formData.append("practice_test_file", input.practiceTestFile);
 
@@ -387,11 +383,9 @@ export async function kojoChat(
   folderId: number,
   message: string,
   provider?: string,
-  betaEnabled?: boolean,
 ): Promise<KojoChatResponse> {
   const body: any = { message };
   if (provider) body.provider = provider;
-  body.beta_enabled = betaEnabled === true;
   return request<KojoChatResponse>(`/kojo/folders/${folderId}/chat`, {
     method: "POST",
     body: JSON.stringify(body),
@@ -440,14 +434,12 @@ export async function fetchLeetCodeHint(
   message: string,
   userCode: string,
   provider?: string,
-  betaEnabled?: boolean,
 ): Promise<LeetCodeHintResponse> {
   const body: Record<string, unknown> = {
     title_slug: titleSlug,
     title,
     message,
     user_code: userCode,
-    beta_enabled: betaEnabled === true,
   };
   if (provider) body.provider = provider;
   return request<LeetCodeHintResponse>("/leetcode/hint", {

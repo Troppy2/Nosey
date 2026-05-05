@@ -52,20 +52,13 @@ export type MCQOption = {
   is_correct: null;
 };
 
-export type MatchingPair = {
-  left: string;
-  right: string;
-};
-
-export type QuestionType = "MCQ" | "FRQ" | "matching" | "ordering" | "fill_blank" | "select_all" | string;
+export type QuestionType = "MCQ" | "FRQ" | string;
 
 export type Question = {
   id: ID;
   type: QuestionType;
   question_text: string;
   options: MCQOption[];
-  matching_pairs: MatchingPair[];
-  ordering_items: string[];
   expected_answer?: string | null;
 };
 
@@ -85,8 +78,6 @@ export type QuestionEditable = {
   type: QuestionType;
   question_text: string;
   options: MCQOptionEditable[];
-  matching_pairs: MatchingPair[];
-  ordering_items: string[];
   expected_answer?: string | null;
 };
 
@@ -94,16 +85,12 @@ export type QuestionCreate = {
   type: QuestionType;
   question_text: string;
   options: MCQOptionInput[];
-  matching_pairs?: MatchingPair[];
-  ordering_items?: string[];
   expected_answer?: string | null;
 };
 
 export type QuestionUpdate = {
   question_text?: string;
   options?: MCQOptionInput[];
-  matching_pairs?: MatchingPair[];
-  ordering_items?: string[];
   expected_answer?: string;
 };
 

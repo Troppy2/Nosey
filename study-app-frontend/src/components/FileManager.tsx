@@ -2,8 +2,8 @@ import { FileText, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type FolderFile, deleteFolderFile, fetchFolderFiles, uploadFolderFiles } from "../lib/api";
 
-const MAX_FILES = 30;
 const MAX_FILE_SIZE_MB = 10;
+const MAX_TOTAL_SIZE_MB = 100;
 const ALLOWED_TYPES = [
   "application/pdf",
   "text/plain",
@@ -56,8 +56,10 @@ export function FileManager({ folderId, onClose }: Props) {
       valid.push(f);
     });
 
-    if (current.length + valid.length > MAX_FILES) {
-      setError(`Cannot exceed ${MAX_FILES} files in a folder.`);
+    const currentTotalBytes = current.reduce((sum, file) => sum + file.size_bytes, 0);
+    const pendingTotalBytes = valid.reduce((sum, file) => sum + file.size, 0);
+    if (currentTotalBytes + pendingTotalBytes > MAX_TOTAL_SIZE_MB * 1024 * 1024) {
+      setError(`Combined folder materials exceed ${MAX_TOTAL_SIZE_MB} MB.`);
       return;
     }
     if (errs.length > 0) { setError(errs.join(" · ")); return; }
@@ -109,7 +111,7 @@ export function FileManager({ folderId, onClose }: Props) {
         </div>
 
         <p className="muted" style={{ marginTop: 0, marginBottom: 16, fontSize: "0.875rem" }}>
-          Upload notes files (PDF, DOCX, TXT, Markdown) to this folder — up to {MAX_FILES} files, {MAX_FILE_SIZE_MB} MB each.
+          Upload notes files (PDF, DOCX, TXT, Markdown) to this folder — {MAX_FILE_SIZE_MB} MB per file, {MAX_TOTAL_SIZE_MB} MB total.
           These files are available when generating tests.
         </p>
 
@@ -134,12 +136,14 @@ export function FileManager({ folderId, onClose }: Props) {
             {isUploading ? "Uploading…" : "Choose files to upload"}
           </span>
           <span className="muted" style={{ fontSize: "0.8rem", marginLeft: "auto" }}>
-            {(files ?? []).length}/{MAX_FILES} files used
+            {(files ?? []).reduce((sum, file) => sum + file.size_bytes, 0) / (1024 * 1024) > 0
+              ? `${((files ?? []).reduce((sum, file) => sum + file.size_bytes, 0) / (1024 * 1024)).toFixed(1)} MB used`
+              : "0 MB used"}
           </span>
           <input
             ref={inputRef}
             type="file"
-            accept=".pdf,.docx,.txt,.md"
+            accept=".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml"
             multiple
             disabled={isUploading}
             style={{ display: "none" }}

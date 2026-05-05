@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-import json
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.datastructures import UploadFile
@@ -23,7 +22,7 @@ from src.schemas.test_schema import (
 from src.services.grading_service import GradingService
 from src.services.test_service import TestService
 from src.utils.exceptions import LLMException, ResourceNotFoundException, StudyAppException
-from src.utils.validators import MAX_UPLOAD_DOCUMENTS
+from src.utils.validators import MAX_UPLOAD_TOTAL_SIZE_BYTES
 
 router = APIRouter(tags=["tests"])
 
@@ -70,18 +69,6 @@ async def create_test(
         custom_instructions = str(custom_instructions_raw).strip()[:500] if custom_instructions_raw else None
         provider_raw = form.get("provider")
         provider = str(provider_raw).strip().lower() if provider_raw else None
-        beta_enabled = str(form.get("beta_enabled", "false")).lower() in ("true", "1", "yes")
-        question_types_raw = form.get("question_types")
-        question_types: list[str] = []
-        if question_types_raw:
-            try:
-                parsed_question_types = json.loads(str(question_types_raw))
-                if isinstance(parsed_question_types, list):
-                    question_types = [str(item).strip() for item in parsed_question_types if str(item).strip()]
-                elif isinstance(parsed_question_types, str) and parsed_question_types.strip():
-                    question_types = [parsed_question_types.strip()]
-            except json.JSONDecodeError:
-                question_types = [part.strip() for part in str(question_types_raw).split(",") if part.strip()]
         provider_aliases = {
             "google": "gemini",
             "anthropic": "claude",
@@ -92,8 +79,6 @@ async def create_test(
                 raise StudyAppException(
                     "provider must be auto, groq, google, anthropic, gemini, claude, or ollama"
                 )
-        if not beta_enabled:
-            provider = None
         enable_fallback = str(form.get("enable_fallback", "true")).lower() not in ("false", "0", "no")
 
         if not title or not test_type:
@@ -110,11 +95,18 @@ async def create_test(
             raise StudyAppException(
                 "Provide at least one notes document, a saved folder file, or a practice test file"
             )
-        if len(notes_files) > MAX_UPLOAD_DOCUMENTS:
-            raise StudyAppException(f"You can upload at most {MAX_UPLOAD_DOCUMENTS} documents")
         valid_files = [f for f in notes_files if isinstance(f, UploadFile)]
         if len(valid_files) != len(notes_files):
             raise StudyAppException("All uploaded documents must be valid files")
+        total_size_bytes = 0
+        for upload in valid_files:
+            file_bytes = await upload.read()
+            total_size_bytes += len(file_bytes)
+            await upload.seek(0)
+        if total_size_bytes > MAX_UPLOAD_TOTAL_SIZE_BYTES:
+            raise StudyAppException(
+                f"Combined uploaded files exceed the {MAX_UPLOAD_TOTAL_SIZE_BYTES // (1024 * 1024)} MB limit"
+            )
         return await TestService().create_test(
             folder_id=folder_id,
             user_id=user.id,
@@ -133,9 +125,7 @@ async def create_test(
             coding_language=coding_language,
             custom_instructions=custom_instructions,
             provider=provider,
-            beta_enabled=beta_enabled,
             enable_fallback=enable_fallback,
-            question_types=question_types,
         )
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
