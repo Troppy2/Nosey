@@ -21,7 +21,7 @@ import type { KojoClearedConversation } from "../lib/types";
 const GENERATION_PROVIDER_OPTIONS = [
   { value: "auto", label: "Auto" },
   { value: "groq", label: "Groq" },
-  { value: "gemini", label: "Google (Gemini)" },
+  { value: "gemini", label: "DeepSeek" },
   { value: "claude", label: "Anthropic (Claude)" },
   { value: "ollama", label: "Ollama" },
 ];
@@ -42,8 +42,6 @@ export default function Settings() {
   const [resettingStats, setResettingStats] = useState(false);
   const [statsResetNotice, setStatsResetNotice] = useState<string | null>(null);
   const {
-    isBetaEnabled,
-    setIsBetaEnabled,
     questionFallbackEnabled,
     setQuestionFallbackEnabled,
     generationProvider,
@@ -147,10 +145,6 @@ export default function Settings() {
     setQuestionFallbackEnabled(next);
   }
 
-  function handleToggleBetaMode() {
-    setIsBetaEnabled(!isBetaEnabled);
-  }
-
   function handleChangeGenerationProvider(nextProvider: string) {
     setGenerationProvider(nextProvider);
   }
@@ -243,27 +237,6 @@ export default function Settings() {
               {resettingStats ? "Resetting..." : "Reset Stats"}
             </Button>
             {statsResetNotice ? <span className="muted small">{statsResetNotice}</span> : null}
-          </div>
-        </section>
-
-        <section className="settings-appearance">
-          <h3>Beta Mode</h3>
-          <p className="muted small">
-            Enable experimental UI and API features like model overrides, coding workflows, and future question types.
-          </p>
-          <div className="settings-reset-row">
-            <button
-              type="button"
-              role="switch"
-              className={`settings-toggle-switch${isBetaEnabled ? " settings-toggle-switch--on" : ""}`}
-              onClick={handleToggleBetaMode}
-              aria-pressed={isBetaEnabled}
-            >
-              <span className="settings-toggle-track">
-                <span className="settings-toggle-thumb" />
-              </span>
-              <span className="settings-toggle-label">{isBetaEnabled ? "Beta on" : "Beta off"}</span>
-            </button>
           </div>
         </section>
 

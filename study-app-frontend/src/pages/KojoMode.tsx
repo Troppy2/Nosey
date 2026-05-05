@@ -34,7 +34,7 @@ function formatTime(iso: string) {
 }
 
 export default function KojoMode() {
-  const { generationProvider, isBetaEnabled } = useSettings();
+  const { generationProvider } = useSettings();
 
   const [folders, setFolders] = useState<Folder[]>([]);
   const [folderId, setFolderId] = useState<number | null>(null);
@@ -98,7 +98,7 @@ export default function KojoMode() {
     setError(null);
 
     try {
-      const result = await kojoChat(folderId, msg, generationProvider, isBetaEnabled);
+      const result = await kojoChat(folderId, msg, generationProvider);
       const assistantMsg: KojoMessage = {
         id: result.message_id,
         role: "assistant",

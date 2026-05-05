@@ -179,7 +179,7 @@ export default function FlashcardsManage() {
         </div>
         <div className="toolbar">
           <input
-            accept=".pdf,.docx,.txt,.md"
+            accept=".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml"
             multiple
             onChange={handleGenerateFromFile}
             ref={fileRef}

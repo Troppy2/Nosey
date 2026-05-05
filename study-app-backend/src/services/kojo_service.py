@@ -26,6 +26,7 @@ logger = get_logger(__name__)
 
 _NO_NOTES = "[No study materials uploaded yet. Ask the student to upload notes first.]"
 _CLEAR_WINDOW_HOURS = 5
+_MAP_REDUCE_NOTES_MIN_CHARS = 6000
 
 
 def _is_review_wrong_answers_request(user_message: str) -> bool:
@@ -45,6 +46,23 @@ def _is_review_wrong_answers_request(user_message: str) -> bool:
         "i got wrong",
     ]
     return any(re.search(kw, message_lower) for kw in review_keywords)
+
+
+def _is_long_answer_request(user_message: str) -> bool:
+    message = user_message.lower()
+    long_intent_phrases = [
+        "explain in detail",
+        "long answer",
+        "compare and contrast",
+        "synthesize",
+        "summarize",
+        "analyze",
+        "walk me through",
+        "step by step",
+    ]
+    if any(phrase in message for phrase in long_intent_phrases):
+        return True
+    return len(re.findall(r"[a-zA-Z]{3,}", message)) >= 18
 
 
 def _format_wrong_answers_context(wrong_answers_data: list[tuple]) -> str:
@@ -78,7 +96,6 @@ class KojoService:
         user_message: str,
         session: AsyncSession,
         provider: Optional[str] = None,
-        beta_enabled: bool = False,
     ) -> KojoChatResponse:
         repo = KojoRepository(session)
 
@@ -90,6 +107,15 @@ class KojoService:
 
         notes = await repo.get_folder_notes_content(folder_id)
         folder_files = await FileService().get_folder_files_content(folder_id, session)
+        logger.info(
+            "Folder context loaded for Kojo chat",
+            extra={
+                "user_id": user_id,
+                "folder_id": folder_id,
+                "notes_length": len(notes),
+                "folder_files_length": len(folder_files),
+            }
+        )
         context_parts = [part for part in (notes, folder_files) if part]
         notes_context = "\n\n---\n\n".join(context_parts) if context_parts else _NO_NOTES
 
@@ -123,10 +149,25 @@ class KojoService:
         active_provider = provider
 
         try:
-            if active_provider:
-                kojo_response = await LLMService().call_kojo(prompt if isinstance(prompt, str) else str(prompt), provider=active_provider)
+            llm = LLMService()
+            use_map_reduce = (
+                notes_context != _NO_NOTES
+                and len(notes_context) >= _MAP_REDUCE_NOTES_MIN_CHARS
+                and _is_long_answer_request(user_message)
+                and not _is_review_wrong_answers_request(user_message)
+            )
+            if use_map_reduce:
+                history_block = _build_history_block(history)
+                kojo_response = await llm.map_reduce_long_answer(
+                    notes=notes_context,
+                    user_query=user_message,
+                    history_block=history_block,
+                    provider=active_provider,
+                )
+            elif active_provider:
+                kojo_response = await llm.call_kojo(prompt if isinstance(prompt, str) else str(prompt), provider=active_provider)
             else:
-                kojo_response = await LLMService().call_kojo(prompt if isinstance(prompt, str) else str(prompt))
+                kojo_response = await llm.call_kojo(prompt if isinstance(prompt, str) else str(prompt))
         except Exception as exc:
             logger.warning("Kojo LLM call failed: %s", exc)
             raise LLMException("Kojo failed to generate a response. Try again.") from exc
@@ -400,3 +441,13 @@ RESPONSE GUIDELINES:
 - Be warm, encouraging, and treat the student as capable — never condescending.
 
 Respond now:"""
+
+
+def _build_history_block(history: list) -> str:
+    history_lines: list[str] = []
+    for msg in history[:-1]:
+        role_label = "Student" if msg.role == "user" else "Kojo"
+        history_lines.append(f"{role_label}: {msg.content}")
+    if not history_lines:
+        return ""
+    return "CONVERSATION SO FAR:\n" + "\n".join(history_lines)
