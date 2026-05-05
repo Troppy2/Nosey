@@ -148,6 +148,7 @@ class AttemptRepository(BaseRepository[UserAttempt]):
             .where(
                 UserAttempt.user_id == user_id,
                 UserAttempt.status == "in_progress",
+                UserAttempt.exited_at.is_not(None),
             )
             .group_by(UserAttempt.id, UserAttempt.attempt_number, Test.id, Test.title, UserAttempt.exited_at)
             .order_by(UserAttempt.exited_at.desc())

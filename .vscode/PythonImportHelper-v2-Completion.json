@@ -8325,7 +8325,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.main",
         "description": "study-app-backend.src.main",
-        "peekOfCode": "app = FastAPI(title=\"Study App\", version=\"0.1.0\")\napp.add_middleware(\n    CORSMiddleware,\n    allow_origins=_resolve_cors_origins(),\n    allow_credentials=True,\n    allow_methods=[\"*\"],\n    allow_headers=[\"*\"],\n)\napp.include_router(health.router)\napp.include_router(auth.router)",
+        "peekOfCode": "app = FastAPI(title=\"Study App\", version=\"0.1.0\")\napp.add_middleware(\n    CORSMiddleware,\n    allow_origins=settings.cors_origins,\n    allow_credentials=True,\n    allow_methods=[\"*\"],\n    allow_headers=[\"*\"],\n)\napp.include_router(health.router)\napp.include_router(auth.router)",
         "detail": "study-app-backend.src.main",
         "documentation": {}
     },
