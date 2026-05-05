@@ -33,6 +33,20 @@ Added `_JSON_MAX_TOKENS = 8192` constant in `llm_service.py` (module level). App
 
 ---
 
+## 2026-05-03 — Extreme Mode Generation Crashed on Missing `test_type`
+
+### What happened
+Submitting an Extreme practice test hit a backend `NameError` in `src/services/llm_service.py`. `_generate_test_attempts()` used `test_type` when building the generation prompt, but the helper signature did not accept that argument.
+
+### Fix
+- Added `test_type` to `_generate_test_attempts()`.
+- Threaded `test_type` through every caller, including the practice-test-template path.
+
+### Lesson
+Mode-specific generation needs the selected mode all the way through the helper stack. Frontend controls can exist and still fail if the backend drops the mode before prompt assembly.
+
+---
+
 ## 2026-05-01 — `gemma4:31b-cloud` Model Name Does Not Exist
 
 ### What happened
@@ -46,3 +60,16 @@ Changed `OLLAMA_MODEL=gemma4:31b-cloud` → `OLLAMA_MODEL=gemma4:31b`.
 curl -s -H "Authorization: Bearer <OLLAMA_API_KEY>" https://api.ollama.com/api/tags | python3 -m json.tool | grep '"name"'
 ```
 Always verify the exact model name against the API catalog before setting `OLLAMA_MODEL`.
+
+---
+
+## 2026-05-03 — Stale Neon Connection Broke Auth Lookup
+
+### What happened
+`POST /folders/:id/tests` failed in `get_current_user` with `psycopg.OperationalError: server closed the connection unexpectedly` while selecting from `users`.
+
+### Fix
+- Enabled `pool_pre_ping=True` and `pool_recycle=1800` in `src/database.py` so dead pooled connections are detected and replaced before request handling.
+
+### Lesson
+Managed PostgreSQL / pooler setups can drop idle sessions underneath SQLAlchemy. Pre-ping is cheap insurance for auth-dependent request paths.

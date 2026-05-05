@@ -1,23 +1,67 @@
 import { AlertTriangle, Brain, Calculator, CheckCircle2, ChevronDown, RotateCcw, XCircle } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { MarkdownContent } from "../components/MarkdownContent";
+import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
+import { fetchAttemptDetail, fetchFolder } from "../lib/api";
 import { scoreTone } from "../lib/format";
-import type { AnswerResult, AttemptResult } from "../lib/types";
+import type { AnswerResult, AttemptDetail } from "../lib/types";
 
 export default function Results() {
   const { attemptId } = useParams();
-  const stored = attemptId ? sessionStorage.getItem(`nosey_attempt_${attemptId}`) : null;
-  if (!stored) {
+  const [attempt, setAttempt] = useState<AttemptDetail | null>(null);
+  const [folderName, setFolderName] = useState("Selected text");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadAttempt() {
+      if (!attemptId) {
+        setError("No attempt id provided.");
+        return;
+      }
+
+      const numericAttemptId = Number(attemptId);
+      const stored = sessionStorage.getItem(`nosey_attempt_${attemptId}`);
+      const fallbackAttempt = stored ? (JSON.parse(stored) as AttemptDetail) : null;
+
+      try {
+        const detail = await fetchAttemptDetail(numericAttemptId);
+        setAttempt(detail);
+
+        if (detail.folder_id) {
+          fetchFolder(detail.folder_id)
+            .then((folder) => setFolderName(folder.name))
+            .catch(() => {
+              setFolderName(detail.test_title || "Selected text");
+            });
+        } else {
+          setFolderName(detail.test_title || "Selected text");
+        }
+        setError(null);
+      } catch {
+        if (fallbackAttempt) {
+          setAttempt(fallbackAttempt);
+          setFolderName(fallbackAttempt.test_title || "Selected text");
+          setError(null);
+          return;
+        }
+        setError("Unable to load this attempt.");
+      }
+    }
+
+    loadAttempt();
+  }, [attemptId]);
+
+  if (error && !attempt) {
     return (
       <div className="page page-narrow">
         <EmptyState
           icon={<Brain />}
           title="No saved attempt"
-          body="Take a test first to see a result breakdown here."
+          body={error}
           action={
             <Link to="/create-test">
               <Button>Make a Test</Button>
@@ -27,12 +71,19 @@ export default function Results() {
       </div>
     );
   }
-  const attempt: AttemptResult = JSON.parse(stored) as AttemptResult;
-  const tone = scoreTone(attempt.score);
-  const missed = useMemo(() => attempt.answers.filter((answer) => !answer.is_correct), [attempt.answers]);
-  const hasMath = attempt.answers.some((a) => a.is_math);
 
-  return (
+  if (!attempt) {
+    return (
+      <div className="page centered-block">
+        <span className="loader" />
+      </div>
+    );
+  }
+
+  const tone = scoreTone(attempt.score);
+  const missed = attempt.answers.filter((answer) => !answer.is_correct);
+  const hasMath = attempt.answers.some((a) => a.is_math);
+  const content = (
     <div className="page page-narrow">
       <Card className={`score-hero score-${tone}`}>
         <span className="eyebrow">Attempt {attempt.attempt_number}</span>
@@ -97,6 +148,16 @@ export default function Results() {
       </section>
     </div>
   );
+
+  return (
+    attempt.folder_id ? (
+      <SelectionKojoAssistant folderId={attempt.folder_id} folderName={folderName}>
+        {content}
+      </SelectionKojoAssistant>
+    ) : (
+      content
+    )
+  );
 }
 
 function ReviewItem({ answer, number }: { answer: AnswerResult; number: number }) {
@@ -109,7 +170,9 @@ function ReviewItem({ answer, number }: { answer: AnswerResult; number: number }
         <Icon size={22} />
         <div>
           <span className="small muted">Question {number}</span>
-          <h3>{answer.question_text ?? `Question ${answer.question_id}`}</h3>
+          <div className="review-question-markdown">
+            <MarkdownContent content={answer.question_text ?? `Question ${answer.question_id}`} />
+          </div>
         </div>
         <ChevronDown className={open ? "rotated" : ""} size={20} />
       </button>
@@ -117,18 +180,14 @@ function ReviewItem({ answer, number }: { answer: AnswerResult; number: number }
         <div className="review-detail">
           <div>
             <span>Your answer</span>
-            <p className="math-answer-text">{answer.user_answer}</p>
+            <div className="math-answer-text review-answer-markdown">
+              <MarkdownContent content={answer.user_answer} />
+            </div>
           </div>
-          {answer.is_math && answer.feedback ? (
-            <div className="math-explanation">
-              <MarkdownContent content={answer.feedback} />
-            </div>
-          ) : (
-            <div>
-              <span>Feedback</span>
-              <p>{answer.feedback ?? "No feedback returned for this answer."}</p>
-            </div>
-          )}
+          <div className="math-explanation">
+            <span>Feedback</span>
+            <MarkdownContent content={answer.feedback ?? "No feedback returned for this answer."} />
+          </div>
           {answer.confidence !== null && answer.confidence !== undefined ? (
             <span className="pill">{Math.round(answer.confidence * 100)}% confidence</span>
           ) : null}

@@ -54,6 +54,8 @@ class AttemptSummary(BaseModel):
 
 
 class AttemptDetail(AttemptSummary):
+    test_id: int
+    folder_id: Optional[int] = None
     test_title: str = ""
     answers: list[AnswerResult]
 
@@ -63,3 +65,33 @@ class FRQGrade(BaseModel):
     feedback: Optional[str] = None
     flagged_uncertain: bool = False
     confidence: float = 0.0
+
+
+class DraftAttemptAnswer(BaseModel):
+    """A draft answer saved while test is in progress."""
+    question_id: int
+    user_answer: str = Field(..., min_length=0, max_length=5000)  # Allow empty for drafts
+
+
+class SaveDraftAttemptRequest(BaseModel):
+    """Save current progress on a test."""
+    answers: list[DraftAttemptAnswer] = Field(..., min_length=0)
+
+
+class ResumableTestInfo(BaseModel):
+    """Info about a test that can be resumed."""
+    test_id: int
+    test_title: str
+    attempt_id: int
+    attempt_number: int
+    exited_at: datetime
+    answered_question_count: int
+    total_question_count: int
+
+
+class DraftAttemptResponse(BaseModel):
+    """Response when loading a draft attempt for resuming."""
+    attempt_id: int
+    attempt_number: int
+    answers: list[DraftAttemptAnswer]
+    exited_at: Optional[datetime] = None
