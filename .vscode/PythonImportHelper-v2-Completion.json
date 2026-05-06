@@ -999,6 +999,22 @@
         "documentation": {}
     },
     {
+        "label": "BadZipFile",
+        "importPath": "zipfile",
+        "description": "zipfile",
+        "isExtraImport": true,
+        "detail": "zipfile",
+        "documentation": {}
+    },
+    {
+        "label": "ZipFile",
+        "importPath": "zipfile",
+        "description": "zipfile",
+        "isExtraImport": true,
+        "detail": "zipfile",
+        "documentation": {}
+    },
+    {
         "label": "op",
         "importPath": "alembic",
         "description": "alembic",
@@ -5210,6 +5226,22 @@
         "documentation": {}
     },
     {
+        "label": "LeetCodeGradeRequest",
+        "importPath": "src.schemas.leetcode_schema",
+        "description": "src.schemas.leetcode_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.leetcode_schema",
+        "documentation": {}
+    },
+    {
+        "label": "LeetCodeGradeResponse",
+        "importPath": "src.schemas.leetcode_schema",
+        "description": "src.schemas.leetcode_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.leetcode_schema",
+        "documentation": {}
+    },
+    {
         "label": "LeetCodeHintRequest",
         "importPath": "src.schemas.leetcode_schema",
         "description": "src.schemas.leetcode_schema",
@@ -5235,6 +5267,14 @@
     },
     {
         "label": "LeetCodeExample",
+        "importPath": "src.schemas.leetcode_schema",
+        "description": "src.schemas.leetcode_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.leetcode_schema",
+        "documentation": {}
+    },
+    {
+        "label": "LeetCodeGradeResponse",
         "importPath": "src.schemas.leetcode_schema",
         "description": "src.schemas.leetcode_schema",
         "isExtraImport": true,
@@ -6500,6 +6540,33 @@
         "documentation": {}
     },
     {
+        "label": "extract_file",
+        "kind": 2,
+        "importPath": "study-app-backend..venv.bin.vba_extract",
+        "description": "study-app-backend..venv.bin.vba_extract",
+        "peekOfCode": "def extract_file(xlsm_zip, filename):\n    # Extract a single file from an Excel xlsm macro file.\n    data = xlsm_zip.read(\"xl/\" + filename)\n    # Write the data to a local file.\n    file = open(filename, \"wb\")\n    file.write(data)\n    file.close()\n# The VBA project file and project signature file we want to extract.\nvba_filename = \"vbaProject.bin\"\nvba_signature_filename = \"vbaProjectSignature.bin\"",
+        "detail": "study-app-backend..venv.bin.vba_extract",
+        "documentation": {}
+    },
+    {
+        "label": "vba_filename",
+        "kind": 5,
+        "importPath": "study-app-backend..venv.bin.vba_extract",
+        "description": "study-app-backend..venv.bin.vba_extract",
+        "peekOfCode": "vba_filename = \"vbaProject.bin\"\nvba_signature_filename = \"vbaProjectSignature.bin\"\n# Get the xlsm file name from the commandline.\nif len(sys.argv) > 1:\n    xlsm_file = sys.argv[1]\nelse:\n    print(\n        \"\\nUtility to extract a vbaProject.bin binary from an Excel 2007+ \"\n        \"xlsm macro file for insertion into an XlsxWriter file.\\n\"\n        \"If the macros are digitally signed, extracts also a vbaProjectSignature.bin \"",
+        "detail": "study-app-backend..venv.bin.vba_extract",
+        "documentation": {}
+    },
+    {
+        "label": "vba_signature_filename",
+        "kind": 5,
+        "importPath": "study-app-backend..venv.bin.vba_extract",
+        "description": "study-app-backend..venv.bin.vba_extract",
+        "peekOfCode": "vba_signature_filename = \"vbaProjectSignature.bin\"\n# Get the xlsm file name from the commandline.\nif len(sys.argv) > 1:\n    xlsm_file = sys.argv[1]\nelse:\n    print(\n        \"\\nUtility to extract a vbaProject.bin binary from an Excel 2007+ \"\n        \"xlsm macro file for insertion into an XlsxWriter file.\\n\"\n        \"If the macros are digitally signed, extracts also a vbaProjectSignature.bin \"\n        \"file.\\n\"",
+        "detail": "study-app-backend..venv.bin.vba_extract",
+        "documentation": {}
+    },
+    {
         "label": "upgrade",
         "kind": 2,
         "importPath": "study-app-backend.src.migrations.versions.001_initial_schema",
@@ -7575,7 +7642,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.kojo_schema",
         "description": "study-app-backend.src.schemas.kojo_schema",
-        "peekOfCode": "class KojoChatRequest(BaseModel):\n    message: str = Field(..., min_length=1, max_length=2000)\n    provider: Optional[str] = Field(default=None, description=\"Optional LLM provider override: 'auto', 'groq', 'ollama', or 'gemini'\")\nclass KojoChatResponse(BaseModel):\n    response: str\n    conversation_id: int\n    message_id: int\n    flagged_uncertain: bool = False\nclass KojoClearResponse(BaseModel):\n    conversation_id: int",
+        "peekOfCode": "class KojoChatRequest(BaseModel):\n    message: str = Field(..., min_length=1, max_length=2000)\n    provider: Optional[str] = Field(default=None, description=\"Optional LLM provider override: 'auto', 'groq', 'ollama', or 'gemini'\")\n    strictness: Optional[str] = Field(default=\"medium\", description=\"Constitution strictness: 'strict', 'medium', or 'none'\")\nclass KojoChatResponse(BaseModel):\n    response: str\n    conversation_id: int\n    message_id: int\n    flagged_uncertain: bool = False\nclass KojoClearResponse(BaseModel):",
         "detail": "study-app-backend.src.schemas.kojo_schema",
         "documentation": {}
     },
@@ -7656,7 +7723,25 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.leetcode_schema",
         "description": "study-app-backend.src.schemas.leetcode_schema",
-        "peekOfCode": "class LeetCodeHintResponse(BaseModel):\n    response: str\n    flagged_uncertain: bool = False",
+        "peekOfCode": "class LeetCodeHintResponse(BaseModel):\n    response: str\n    flagged_uncertain: bool = False\nclass LeetCodeGradeRequest(BaseModel):\n    title_slug: str = Field(..., min_length=1)\n    title: str = Field(..., min_length=1)\n    user_code: str = Field(default=\"\", max_length=20000)\n    test_results: str = Field(..., max_length=5000, description=\"JSON-serialized test case results\")\n    all_passed: bool = Field(default=False)\n    provider: Optional[str] = Field(default=None)",
+        "detail": "study-app-backend.src.schemas.leetcode_schema",
+        "documentation": {}
+    },
+    {
+        "label": "LeetCodeGradeRequest",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.leetcode_schema",
+        "description": "study-app-backend.src.schemas.leetcode_schema",
+        "peekOfCode": "class LeetCodeGradeRequest(BaseModel):\n    title_slug: str = Field(..., min_length=1)\n    title: str = Field(..., min_length=1)\n    user_code: str = Field(default=\"\", max_length=20000)\n    test_results: str = Field(..., max_length=5000, description=\"JSON-serialized test case results\")\n    all_passed: bool = Field(default=False)\n    provider: Optional[str] = Field(default=None)\nclass LeetCodeGradeResponse(BaseModel):\n    feedback: str\n    flagged_uncertain: bool = False",
+        "detail": "study-app-backend.src.schemas.leetcode_schema",
+        "documentation": {}
+    },
+    {
+        "label": "LeetCodeGradeResponse",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.leetcode_schema",
+        "description": "study-app-backend.src.schemas.leetcode_schema",
+        "peekOfCode": "class LeetCodeGradeResponse(BaseModel):\n    feedback: str\n    flagged_uncertain: bool = False",
         "detail": "study-app-backend.src.schemas.leetcode_schema",
         "documentation": {}
     },
@@ -7836,7 +7921,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.services.kojo_service",
         "description": "study-app-backend.src.services.kojo_service",
-        "peekOfCode": "class KojoService:\n    async def chat(\n        self,\n        user_id: int,\n        folder_id: int,\n        user_message: str,\n        session: AsyncSession,\n        provider: Optional[str] = None,\n    ) -> KojoChatResponse:\n        repo = KojoRepository(session)",
+        "peekOfCode": "class KojoService:\n    async def chat(\n        self,\n        user_id: int,\n        folder_id: int,\n        user_message: str,\n        session: AsyncSession,\n        provider: Optional[str] = None,\n        strictness: Optional[str] = \"medium\",\n    ) -> KojoChatResponse:",
         "detail": "study-app-backend.src.services.kojo_service",
         "documentation": {}
     },

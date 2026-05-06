@@ -40,3 +40,17 @@ class LeetCodeHintRequest(BaseModel):
 class LeetCodeHintResponse(BaseModel):
     response: str
     flagged_uncertain: bool = False
+
+
+class LeetCodeGradeRequest(BaseModel):
+    title_slug: str = Field(..., min_length=1)
+    title: str = Field(..., min_length=1)
+    user_code: str = Field(default="", max_length=20000)
+    test_results: str = Field(..., max_length=5000, description="JSON-serialized test case results")
+    all_passed: bool = Field(default=False)
+    provider: Optional[str] = Field(default=None)
+
+
+class LeetCodeGradeResponse(BaseModel):
+    feedback: str
+    flagged_uncertain: bool = False

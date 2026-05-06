@@ -96,6 +96,7 @@ class KojoService:
         user_message: str,
         session: AsyncSession,
         provider: Optional[str] = None,
+        strictness: Optional[str] = "medium",
     ) -> KojoChatResponse:
         repo = KojoRepository(session)
 
@@ -144,7 +145,7 @@ class KojoService:
             # Regular Kojo chat
             await repo.add_message(conversation.id, "user", user_message)
             history = await repo.get_history(conversation.id, limit=10, after=conversation.cleared_at)
-            prompt = _build_prompt(notes_context, user_message, history)
+            prompt = _build_prompt(notes_context, user_message, history, strictness=strictness or "medium")
 
         active_provider = provider
 
@@ -391,7 +392,7 @@ REVIEW GUIDELINES - FOLLOW THESE STRICTLY:
 Respond now:"""
 
 
-def _build_prompt(notes: str, user_message: str, history: list) -> str:
+def _build_prompt(notes: str, user_message: str, history: list, strictness: str = "medium") -> str:
     history_lines: list[str] = []
     for msg in history[:-1]:
         role_label = "Student" if msg.role == "user" else "Kojo"
@@ -419,6 +420,35 @@ def _build_prompt(notes: str, user_message: str, history: list) -> str:
             "You can still answer general questions, but encourage them to upload notes for personalized help."
         )
 
+    if strictness == "strict":
+        constitution = """RESPONSE GUIDELINES (STRICT — stay within the student's notes):
+- Only answer from what is explicitly in the student's uploaded notes and files above.
+- If the topic is NOT covered in the notes, say: "I don't see this in your notes — check with your instructor or textbook."
+- Do NOT draw on general knowledge to fill gaps, even if you know the answer.
+- Quote or reference specific note sections to anchor every claim.
+- For math: wrap expressions in KaTeX ($...$ inline, $$...$$ display).
+- For code: use fenced code blocks with language tag.
+- Be warm and encouraging, but don't go beyond the notes."""
+    elif strictness == "none":
+        constitution = """RESPONSE GUIDELINES (OPEN — answer freely):
+- Answer the student's question as thoroughly as possible using your full knowledge.
+- You may use the student's notes as helpful context, but you are not limited to them.
+- If your answer goes beyond what's in their notes, tell the student to fact-check it: "This is from my general knowledge — verify with your course materials."
+- Use concrete examples, analogies, and step-by-step explanations.
+- For math: wrap expressions in KaTeX ($...$ inline, $$...$$ display).
+- For code: use fenced code blocks with language tag.
+- Be warm, encouraging, and thorough."""
+    else:  # medium (default)
+        constitution = """RESPONSE GUIDELINES:
+- Check the RELEVANT SECTIONS first — they are pre-matched to the student's question.
+- Ground your answer in the student's notes where possible; quote specific sections when relevant.
+- If the notes don't fully cover the topic, fill the gap with your general knowledge — but flag it: "This part isn't in your notes, but generally speaking…"
+- Use concrete examples, analogies, and step-by-step breakdowns.
+- Ask a follow-up question if the student seems confused or needs more context.
+- For math: wrap ALL expressions in KaTeX ($...$ inline, $$...$$ display).
+- For code: use fenced code blocks with language tag.
+- Keep responses focused and well-structured. Be warm and encouraging."""
+
     return f"""You are Kojo, an intelligent and supportive AI study companion built into Nosey, a study tool.
 Your role is to help students genuinely understand their course material — not to give them answers to memorize.
 
@@ -427,18 +457,7 @@ Your role is to help students genuinely understand their course material — not
 
 STUDENT'S MESSAGE: {user_message}
 
-RESPONSE GUIDELINES:
-- ALWAYS check the RELEVANT SECTIONS above first before answering — they are pre-matched to the student's question from their uploaded files.
-- Ground your explanation in what the student's own notes say. Quote or reference specific sections to anchor your answer.
-- If the relevant sections contain a formula, definition, or procedure that applies to the question, use it as your primary source — do not substitute your own version.
-- Use concrete examples, analogies, and step-by-step breakdowns to explain difficult concepts.
-- Ask a follow-up question if the student seems confused or hasn't given you enough context.
-- If the student asks you to "just give the answer" to a test question, gently redirect: explain the underlying concept instead.
-- If the topic is not in the notes and is highly specific, say so clearly and suggest they check with their instructor or textbook.
-- For math topics: wrap ALL math expressions in KaTeX delimiters — inline math in $...$, display/block math in $$...$$. Example: "The derivative is $\\frac{{dy}}{{dx}} = 3t^{{2}} + 1$." Never write bare LaTeX without dollar signs.
-- For coding topics: provide short code snippets in fenced code blocks with the language tag.
-- Keep responses focused and well-structured. Use bullet points or numbered steps when listing multiple ideas.
-- Be warm, encouraging, and treat the student as capable — never condescending.
+{constitution}
 
 Respond now:"""
 

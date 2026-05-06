@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ConfirmModal, RenameModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
 import { deleteTest, fetchFlashcards, fetchFolders, fetchTests, getResumableTests, getStoredUser, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
@@ -82,6 +83,8 @@ export default function Dashboard() {
   const [resumableTests, setResumableTests] = useState<ResumableTestInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [renamingTest, setRenamingTest] = useState<TestSummary | null>(null);
+  const [deletingTest, setDeletingTest] = useState<TestSummary | null>(null);
   const [displayTitle, setDisplayTitle] = useState("Your study cockpit");
   const [statsResetVersion, setStatsResetVersion] = useState(0);
   const displayTitleRef = useRef(displayTitle);
@@ -209,11 +212,12 @@ export default function Dashboard() {
 
   const weakCards = [...flashcards].sort((a, b) => b.difficulty - a.difficulty).slice(0, 3);
 
-  async function handleRenameTest(test: TestSummary) {
-    const nextTitle = window.prompt("Rename practice test", test.title);
-    if (!nextTitle?.trim()) return;
+  async function commitRename(nextTitle: string) {
+    if (!renamingTest) return;
+    const test = renamingTest;
+    setRenamingTest(null);
     try {
-      const updated = await updateTest(test.id, { title: nextTitle.trim(), description: test.description });
+      const updated = await updateTest(test.id, { title: nextTitle, description: test.description });
       setTests((current) =>
         current.map((item) =>
           item.id === test.id
@@ -227,8 +231,10 @@ export default function Dashboard() {
     }
   }
 
-  async function handleDeleteTest(test: TestSummary) {
-    if (!window.confirm(`Delete ${test.title}? This cannot be undone.`)) return;
+  async function commitDelete() {
+    if (!deletingTest) return;
+    const test = deletingTest;
+    setDeletingTest(null);
     try {
       await deleteTest(test.id);
       setTests((current) => current.filter((item) => item.id !== test.id));
@@ -239,6 +245,25 @@ export default function Dashboard() {
   }
 
   return (
+    <>
+    {renamingTest ? (
+      <RenameModal
+        title="Rename practice test"
+        initialValue={renamingTest.title}
+        onSave={commitRename}
+        onCancel={() => setRenamingTest(null)}
+      />
+    ) : null}
+    {deletingTest ? (
+      <ConfirmModal
+        title="Delete test"
+        message={`Delete "${deletingTest.title}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        danger
+        onConfirm={commitDelete}
+        onCancel={() => setDeletingTest(null)}
+      />
+    ) : null}
     <div className="page">
       <header className="page-header">
         <div>
@@ -361,10 +386,10 @@ export default function Dashboard() {
                           <div className="score-badge">{formatPercent(test.best_score)}</div>
                         </Link>
                         <div className="row-actions">
-                          <button aria-label={`Rename ${test.title}`} onClick={() => handleRenameTest(test)} type="button">
+                          <button aria-label={`Rename ${test.title}`} onClick={() => setRenamingTest(test)} type="button">
                             <Edit3 size={17} />
                           </button>
-                          <button aria-label={`Delete ${test.title}`} onClick={() => handleDeleteTest(test)} type="button">
+                          <button aria-label={`Delete ${test.title}`} onClick={() => setDeletingTest(test)} type="button">
                             <Trash2 size={17} />
                           </button>
                         </div>
@@ -409,5 +434,6 @@ export default function Dashboard() {
         </>
       )}
     </div>
+    </>
   );
 }

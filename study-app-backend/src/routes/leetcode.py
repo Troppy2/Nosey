@@ -5,6 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from src.dependencies import get_current_user
 from src.models.user import User
 from src.schemas.leetcode_schema import (
+    LeetCodeGradeRequest,
+    LeetCodeGradeResponse,
     LeetCodeHintRequest,
     LeetCodeHintResponse,
     LeetCodeProblemResponse,
@@ -41,6 +43,26 @@ async def kojo_leetcode_hint(
             title=body.title,
             user_message=body.message,
             user_code=body.user_code,
+            provider=body.provider,
+        )
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except LLMException as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/grade", response_model=LeetCodeGradeResponse)
+async def grade_leetcode_submission(
+    body: LeetCodeGradeRequest,
+    user: User = Depends(get_current_user),
+) -> LeetCodeGradeResponse:
+    try:
+        return await LeetCodeService().grade(
+            title_slug=body.title_slug,
+            title=body.title,
+            user_code=body.user_code,
+            test_results=body.test_results,
+            all_passed=body.all_passed,
             provider=body.provider,
         )
     except ResourceNotFoundException as exc:
