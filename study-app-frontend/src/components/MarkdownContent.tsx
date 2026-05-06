@@ -19,8 +19,9 @@ function renderKatex(src: string, display: boolean): string {
 
 function tokenizeInline(text: string): InlineToken[] {
   const tokens: InlineToken[] = [];
-  // Order matters: check $...$ before bold/italic so dollar signs don't interfere
-  const pattern = /(\$([^$\n]+?)\$|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|`([^`\n]+)`)/g;
+  // Order matters: check $...$ before bold/italic so dollar signs don't interfere.
+  // Use [^$]+ to allow whitespace inside inline math (e.g. $\frac{a}{b}$).
+  const pattern = /(\$([^$]+?)\$|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|`([^`\n]+)`)/g;
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = pattern.exec(text)) !== null) {
@@ -56,17 +57,81 @@ function Inline({ text, pk }: { text: string; pk: string }) {
   );
 }
 
+/** Indicators that a piece of text is LaTeX math content. */
+const LATEX_CMD_RE = /\\(?:frac|int|sum|prod|sqrt|left|right|text|over|partial|nabla|infty|cdot|times|div|pm|mp|alpha|beta|gamma|delta|epsilon|zeta|eta|theta|iota|kappa|lambda|mu|nu|xi|pi|rho|sigma|tau|upsilon|phi|chi|psi|omega|Alpha|Beta|Gamma|Delta|Theta|Lambda|Pi|Sigma|Phi|Psi|Omega|hbar|ell|lim|sin|cos|tan|log|ln|exp|det|dim|ker|max|min|sup|inf|vec|hat|bar|dot|ddot|tilde|widehat|widetilde|overline|underline|oplus|otimes|forall|exists|in|notin|subset|supset|cup|cap|leq|geq|neq|approx|equiv|sim|to|rightarrow|leftarrow|Rightarrow|Leftarrow|cdots|ldots|vdots)\b/;
+
+/** Greek letter and common math word → LaTeX command, for LLM outputs that skipped backslashes. */
+// "pi" is intentionally NOT included here — too common in English ("pitch", "pilot", etc.)
+// It's handled separately via convertFracPiShorthand and the \bpi\b math-context check.
+const GREEK_WORD_RE =
+  /\b(theta|alpha|beta|gamma|delta|epsilon|zeta|eta|iota|kappa|lambda|nu|xi|rho|sigma|tau|upsilon|phi|chi|psi|omega|Gamma|Delta|Theta|Lambda|Xi|Sigma|Upsilon|Phi|Psi|Omega)\b/g;
+
+/**
+ * Replace bare Greek-letter words (theta, pi, alpha, …) that appear outside of existing
+ * $…$ delimiters with their $\cmd$ equivalents. Only applied to math-looking contexts
+ * (the surrounding text contains digits, operators, or LaTeX commands).
+ */
+function convertBareGreekWords(text: string): string {
+  // Don't touch lines that already have $ delimiters — they're already handled.
+  return text
+    .split("\n")
+    .map((line) => {
+      if (line.includes("$") || !GREEK_WORD_RE.test(line)) return line;
+      GREEK_WORD_RE.lastIndex = 0;
+      // Only convert if the line looks mathematical (has digits/operators/common math words)
+      const looksLikeMath = /[\d=+\-*/^_()[\]{}]|\\[a-zA-Z]|\bfrac\b|\bsqrt\b|\bint\b|\bsum\b|\bpi\b|\binfty\b/.test(line);
+      if (!looksLikeMath) return line;
+      GREEK_WORD_RE.lastIndex = 0;
+      let converted = line.replace(GREEK_WORD_RE, (_m, word) => `$\\${word}$`);
+      // Also convert standalone "pi" in math context (word boundary, not inside a word)
+      converted = converted.replace(/\bpi\b/g, "$\\pi$");
+      return converted;
+    })
+    .join("\n");
+}
+
+/** Handle "frac<num>pi<denom>" patterns (e.g. "frac5pi6" → "$\frac{5\pi}{6}$"). */
+function convertFracPiShorthand(text: string): string {
+  // Matches patterns like frac5pi6, frac2pi3, frac7pi4, etc.
+  return text.replace(/\bfrac(\d+)pi(\d+)\b/g, (_m, num, denom) => `$\\frac{${num}\\pi}{${denom}}$`);
+}
+
+function normalizeMathContent(text: string): string {
+  // 1. Unescape escaped dollar signs and convert \(...\) / \[...\] delimiters.
+  let out = text.replace(/\\\$/g, "$");
+  out = out.replace(/\\\(([\s\S]*?)\\\)/g, (_m, g1) => `$${g1}$`);
+  out = out.replace(/\\\[([\s\S]*?)\\\]/g, (_m, g1) => `$$${g1}$$`);
+
+  // 2. Fix LLM outputs that skipped LaTeX formatting.
+  out = convertFracPiShorthand(out);
+  out = convertBareGreekWords(out);
+
+  // 3. Pull $$ blocks that appear mid-line onto their own lines so the block
+  //    math handler can process them. E.g. "text $$expr$$ more" becomes:
+  //    "text\n$$expr$$\nmore".
+  out = out.replace(/([^\n$])\$\$([\s\S]*?)\$\$/g, (_m, before, inner) => `${before}\n$$${inner}$$\n`);
+
+  // 4. For each line: if it contains LaTeX commands but no $ delimiters,
+  //    treat the whole line as display math.
+  out = out
+    .split("\n")
+    .map((line) => {
+      if (line.includes("$") || line.trim() === "" || line.startsWith("```") || line.startsWith("#")) {
+        return line;
+      }
+      const cmdMatches = (line.match(/\\[a-zA-Z]+/g) ?? []).length;
+      if (cmdMatches >= 2 && LATEX_CMD_RE.test(line)) {
+        return `$$${line.trim()}$$`;
+      }
+      return line;
+    })
+    .join("\n");
+
+  return out;
+}
+
 export function MarkdownContent({ content }: { content: string }) {
-  // Some LLM/provider outputs escape dollar signs or TeX delimiters (e.g. "\$r\$", "\\( ... \\)").
-  // Normalize a few common escaped forms so inline/block math renders consistently.
-  let normalized = content;
-  // unescape escaped dollar signs like "\$" -> "$"
-  normalized = normalized.replace(/\\\$/g, "$");
-  // convert escaped \( ... \) to $...$
-  normalized = normalized.replace(/\\\((.*?)\\\)/gs, (_m, g1) => `$${g1}$`);
-  // convert escaped \[ ... \] to $$...$$
-  normalized = normalized.replace(/\\\[(.*?)\\\]/gs, (_m, g1) => `$$${g1}$$`);
-  content = normalized;
+  content = normalizeMathContent(content);
   const nodes: React.ReactNode[] = [];
   const lines = content.split("\n");
   let i = 0;
@@ -119,12 +184,38 @@ export function MarkdownContent({ content }: { content: string }) {
         i++;
       }
       i++;
-      nodes.push(
-        <pre key={k++} className="kojo-code-block">
-          {lang && <span className="kojo-code-lang">{lang}</span>}
-          <code>{code.join("\n")}</code>
-        </pre>,
-      );
+      const codeContent = code.join("\n").trim();
+      // Detect when the LLM wrapped math in a code fence instead of $$ delimiters
+      const looksLikeMath =
+        !lang &&
+        (codeContent.startsWith("$$") ||
+          codeContent.startsWith("\\[") ||
+          codeContent.startsWith("\\(") ||
+          /^\\[a-zA-Z]/.test(codeContent));
+      if (looksLikeMath) {
+        let mathExpr = codeContent;
+        if (mathExpr.startsWith("$$") && mathExpr.endsWith("$$")) {
+          mathExpr = mathExpr.slice(2, -2).trim();
+        } else if (mathExpr.startsWith("\\[") && mathExpr.endsWith("\\]")) {
+          mathExpr = mathExpr.slice(2, -2).trim();
+        } else if (mathExpr.startsWith("\\(") && mathExpr.endsWith("\\)")) {
+          mathExpr = mathExpr.slice(2, -2).trim();
+        }
+        nodes.push(
+          <div
+            key={k++}
+            className="math-block"
+            dangerouslySetInnerHTML={{ __html: renderKatex(mathExpr, true) }}
+          />,
+        );
+      } else {
+        nodes.push(
+          <pre key={k++} className="kojo-code-block">
+            {lang && <span className="kojo-code-lang">{lang}</span>}
+            <code>{codeContent}</code>
+          </pre>,
+        );
+      }
       continue;
     }
 

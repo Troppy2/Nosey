@@ -15,12 +15,16 @@ def _replace_bracketed_math(text: str) -> str:
 
 
 def _math_spans(text: str) -> List[Tuple[int, int]]:
-    # find $$...$$ and $...$ spans so we don't double-wrap
-    spans: List[Tuple[int, int]] = []
+    # Find $$...$$ spans first (higher priority). Only add $...$ spans
+    # that don't overlap with any $$...$$ span, to prevent duplication.
+    double_spans: List[Tuple[int, int]] = []
     for m in re.finditer(r"\$\$[\s\S]*?\$\$", text):
-        spans.append((m.start(), m.end()))
+        double_spans.append((m.start(), m.end()))
+    spans: List[Tuple[int, int]] = list(double_spans)
     for m in re.finditer(r"\$(?:[^$\n]|\\\$)+\$", text):
-        spans.append((m.start(), m.end()))
+        start, end = m.start(), m.end()
+        if not any(a <= start < b for a, b in double_spans):
+            spans.append((start, end))
     spans.sort()
     return spans
 
@@ -54,6 +58,9 @@ def normalize_latex(text: str) -> str:
     parts: List[str] = []
     last = 0
     for a, b in spans:
+        if a < last:
+            # skip span that overlaps with one already emitted
+            continue
         if last < a:
             parts.append(_wrap_commands_in_segment(text[last:a]))
         parts.append(text[a:b])
@@ -69,16 +76,32 @@ def normalize_latex(text: str) -> str:
 
 
 def _wrap_commands_in_segment(seg: str) -> str:
-    # Wrap LaTeX command sequences that look like \cmd{...} or \cmd^... in $...$
+    # Wrap LaTeX command sequences in $...$ when outside math delimiters.
+    # Handles both \cmd{...} forms and bare Greek letters / common symbols.
     if not seg:
         return seg
 
-    # Regex matches a backslash command followed by one or more braced groups, optionally with ^/_
-    cmd_re = re.compile(r"(\\[a-zA-Z@]+(?:\s*\{[^}]*\})+(?:[_\^](?:\{[^}]*\}|[^\s\\]))*)")
+    _BARE_SYMBOLS = (
+        r"alpha|beta|gamma|delta|epsilon|varepsilon|zeta|eta|theta|vartheta"
+        r"|iota|kappa|lambda|mu|nu|xi|pi|varpi|rho|varrho|sigma|varsigma"
+        r"|tau|upsilon|phi|varphi|chi|psi|omega"
+        r"|Alpha|Beta|Gamma|Delta|Epsilon|Zeta|Eta|Theta|Iota|Kappa|Lambda"
+        r"|Mu|Nu|Xi|Pi|Rho|Sigma|Tau|Upsilon|Phi|Chi|Psi|Omega"
+        r"|pm|mp|times|div|cdot|circ|bullet|star|infty|nabla|partial"
+        r"|forall|exists|in|notin|subset|supset|subseteq|supseteq|cup|cap"
+        r"|leq|geq|neq|approx|equiv|sim|propto|perp|parallel"
+        r"|to|rightarrow|leftarrow|Rightarrow|Leftarrow|leftrightarrow|Leftrightarrow"
+        r"|cdots|ldots|vdots|ddots|hbar|ell|Re|Im|wp"
+    )
+
+    # First alternative: \cmd{...} with one or more braced groups (and optional ^/_ suffixes)
+    # Second alternative: bare known Greek letters / symbols not followed by a letter or {
+    cmd_re = re.compile(
+        r"(\\[a-zA-Z@]+(?:\s*\{[^}]*\})+(?:[_\^](?:\{[^}]*\}|[^\s\\]))*"
+        r"|\\(?:" + _BARE_SYMBOLS + r")(?![a-zA-Z{]))"
+    )
 
     def _wrap(m: re.Match) -> str:
-        s = m.group(0)
-        # avoid wrapping if immediately adjacent to $ (shouldn't happen in non-math segment)
-        return f"${s}$"
+        return f"${m.group(0)}$"
 
     return cmd_re.sub(_wrap, seg)
