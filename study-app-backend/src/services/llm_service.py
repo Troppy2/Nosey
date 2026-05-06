@@ -111,6 +111,11 @@ _RETRIEVAL_STOPWORDS = {
 }
 
 # Matches any meaningful math content: numbers, operators, LaTeX commands, KaTeX delimiters
+"""
+TODO:
+1. Find a way to better format the math_content rendering for for LLM latex generation---in back end, there shold be an LLM that acts as a jude to pass the the content over.
+Example: if Gemma makes text claude will act as a judge, to see if the content there are about to upload meets the standard---if there isn't an LLM the text can be generated anyway to stop high API usage.
+"""
 _MATH_CONTENT_RE = re.compile(
     r"\$|\d+[\./]\d+|[+\-*/=^<>%]|\\(?:frac|sqrt|int|sum|lim|sin|cos|tan|log|ln|pi|theta|alpha|beta|infty|vec|hat)"
     r"|\b(?:solve|simplify|evaluate|calculate|compute|differentiate|integrate|factor|expand)\b",
