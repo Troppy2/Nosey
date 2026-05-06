@@ -179,8 +179,20 @@ RESULT = {"ok": False, "output": "", "cases": []}
 user_code = ${JSON.stringify(code)}
 test_cases = json.loads(${JSON.stringify(payload)})
 
+_PRELUDE = """from typing import *
+from collections import deque, defaultdict, Counter, OrderedDict
+from heapq import *
+import math
+import bisect
+import functools
+import itertools
+"""
+
 try:
     namespace = {}
+    exec(_PRELUDE, namespace)
+    namespace["ListNode"] = ListNode
+    namespace["TreeNode"] = TreeNode
     exec(user_code, namespace)
     solution_cls = namespace.get("Solution")
     if solution_cls is None:

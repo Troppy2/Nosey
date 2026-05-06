@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ConfirmModal, RenameModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
 import { FileManager } from "../components/FileManager";
 import { KojoChat } from "../components/KojoChat";
@@ -20,6 +21,8 @@ export default function FolderDetail() {
   const [error, setError] = useState<string | null>(null);
   const [kojoOpen, setKojoOpen] = useState(false);
   const [filesOpen, setFilesOpen] = useState(false);
+  const [renamingTest, setRenamingTest] = useState<TestSummary | null>(null);
+  const [deletingTest, setDeletingTest] = useState<TestSummary | null>(null);
 
   const id = Number(folderId);
 
@@ -37,11 +40,12 @@ export default function FolderDetail() {
       .finally(() => setIsLoading(false));
   }, [id]);
 
-  async function handleRenameTest(test: TestSummary) {
-    const nextTitle = window.prompt("Rename practice test", test.title);
-    if (!nextTitle?.trim()) return;
+  async function commitRename(nextTitle: string) {
+    if (!renamingTest) return;
+    const test = renamingTest;
+    setRenamingTest(null);
     try {
-      const updated = await updateTest(test.id, { title: nextTitle.trim(), description: test.description });
+      const updated = await updateTest(test.id, { title: nextTitle, description: test.description });
       setTests((current) =>
         current.map((item) =>
           item.id === test.id
@@ -54,8 +58,10 @@ export default function FolderDetail() {
     }
   }
 
-  async function handleDeleteTest(test: TestSummary) {
-    if (!window.confirm(`Delete ${test.title}? This cannot be undone.`)) return;
+  async function commitDelete() {
+    if (!deletingTest) return;
+    const test = deletingTest;
+    setDeletingTest(null);
     try {
       await deleteTest(test.id);
       setTests((current) => current.filter((item) => item.id !== test.id));
@@ -191,7 +197,7 @@ export default function FolderDetail() {
           </div>
           <div className="test-list">
             {tests.map((test) => (
-              <TestRow key={test.id} test={test} onRename={handleRenameTest} onDelete={handleDeleteTest} />
+              <TestRow key={test.id} test={test} onRename={setRenamingTest} onDelete={setDeletingTest} />
             ))}
           </div>
         </section>
@@ -206,12 +212,41 @@ export default function FolderDetail() {
     </div>
   );
 
+  const modals = (
+    <>
+      {renamingTest ? (
+        <RenameModal
+          title="Rename practice test"
+          initialValue={renamingTest.title}
+          onSave={commitRename}
+          onCancel={() => setRenamingTest(null)}
+        />
+      ) : null}
+      {deletingTest ? (
+        <ConfirmModal
+          title="Delete test"
+          message={`Delete "${deletingTest.title}"? This cannot be undone.`}
+          confirmLabel="Delete"
+          danger
+          onConfirm={commitDelete}
+          onCancel={() => setDeletingTest(null)}
+        />
+      ) : null}
+    </>
+  );
+
   return folder ? (
-    <SelectionKojoAssistant folderId={id} folderName={folder.name}>
-      {pageContent}
-    </SelectionKojoAssistant>
+    <>
+      <SelectionKojoAssistant folderId={id} folderName={folder.name}>
+        {pageContent}
+      </SelectionKojoAssistant>
+      {modals}
+    </>
   ) : (
-    pageContent
+    <>
+      {pageContent}
+      {modals}
+    </>
   );
 }
 

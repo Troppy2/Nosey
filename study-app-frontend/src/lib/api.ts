@@ -13,6 +13,7 @@ import type {
   Folder,
   KojoChatResponse,
   KojoConversation,
+  LeetCodeGradeResponse,
   LeetCodeHintResponse,
   LeetCodeProblemData,
   KojoRestoreResponse,
@@ -66,6 +67,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     throw new Error(message);
   }
 
+  if (response.status === 204 || response.headers.get("content-length") === "0") {
+    return undefined as T;
+  }
   return response.json() as Promise<T>;
 }
 
@@ -383,10 +387,34 @@ export async function kojoChat(
   folderId: number,
   message: string,
   provider?: string,
+  strictness?: string,
 ): Promise<KojoChatResponse> {
-  const body: any = { message };
+  const body: Record<string, unknown> = { message };
   if (provider) body.provider = provider;
+  if (strictness) body.strictness = strictness;
   return request<KojoChatResponse>(`/kojo/folders/${folderId}/chat`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function gradeLeetCodeSubmission(
+  titleSlug: string,
+  title: string,
+  userCode: string,
+  testResults: string,
+  allPassed: boolean,
+  provider?: string,
+): Promise<LeetCodeGradeResponse> {
+  const body: Record<string, unknown> = {
+    title_slug: titleSlug,
+    title,
+    user_code: userCode,
+    test_results: testResults,
+    all_passed: allPassed,
+  };
+  if (provider) body.provider = provider;
+  return request<LeetCodeGradeResponse>("/leetcode/grade", {
     method: "POST",
     body: JSON.stringify(body),
   });

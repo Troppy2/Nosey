@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 export const SETTINGS_KEYS = {
   questionFallback: "nosey_question_fallback",
   generationProvider: "nosey_generation_provider",
+  kojoStrictness: "nosey_kojo_strictness",
 } as const;
 
 function readBooleanSetting(key: string, defaultValue: boolean) {
@@ -30,6 +31,9 @@ export function useSettings() {
   const [generationProvider, setGenerationProviderState] = useState(() =>
     readStringSetting(SETTINGS_KEYS.generationProvider, "auto"),
   );
+  const [kojoStrictness, setKojoStrictnessState] = useState(() =>
+    readStringSetting(SETTINGS_KEYS.kojoStrictness, "medium"),
+  );
 
   // Sync state when another instance of useSettings writes a setting.
   useEffect(() => {
@@ -39,6 +43,9 @@ export function useSettings() {
       }
       if (e.key === SETTINGS_KEYS.generationProvider && e.newValue !== null) {
         setGenerationProviderState(e.newValue);
+      }
+      if (e.key === SETTINGS_KEYS.kojoStrictness && e.newValue !== null) {
+        setKojoStrictnessState(e.newValue);
       }
     }
     window.addEventListener("storage", handleStorage);
@@ -55,10 +62,17 @@ export function useSettings() {
     writeSetting(SETTINGS_KEYS.generationProvider, value);
   }
 
+  function setKojoStrictness(value: string) {
+    setKojoStrictnessState(value);
+    writeSetting(SETTINGS_KEYS.kojoStrictness, value);
+  }
+
   return {
     questionFallbackEnabled,
     setQuestionFallbackEnabled,
     generationProvider,
     setGenerationProvider,
+    kojoStrictness,
+    setKojoStrictness,
   };
 }

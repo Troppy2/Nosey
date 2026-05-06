@@ -266,6 +266,11 @@ export type LeetCodeHintResponse = {
   flagged_uncertain: boolean;
 };
 
+export type LeetCodeGradeResponse = {
+  feedback: string;
+  flagged_uncertain: boolean;
+};
+
 export type ProviderStatus = {
   gemini: boolean;
   groq: boolean;

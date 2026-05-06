@@ -35,7 +35,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { SlashCommandMenu, type SlashCommand } from "../components/SlashCommandMenu";
-import { fetchLeetCodeHint, fetchLeetCodeProblem } from "../lib/api";
+import { fetchLeetCodeHint, fetchLeetCodeProblem, gradeLeetCodeSubmission } from "../lib/api";
 import { runPythonLeetCode, type RunnerResult } from "../lib/pyodideRunner";
 import type { LeetCodeProblemData } from "../lib/types";
 import { useSettings } from "../lib/useSettings";
@@ -472,6 +472,8 @@ export default function LeetCodeMode() {
   const [customCases, setCustomCases] = useState<Record<string, CustomCase[]>>({});
   const [runnerLoading, setRunnerLoading] = useState(false);
   const [runnerResult, setRunnerResult] = useState<RunnerResult | null>(null);
+  const [gradeLoading, setGradeLoading] = useState(false);
+  const [gradeFeedback, setGradeFeedback] = useState<string | null>(null);
   const [kojoOpen, setKojoOpen] = useState(false);
   const [kojoInput, setKojoInput] = useState("");
   const [kojoResponse, setKojoResponse] = useState<string | null>(null);
@@ -560,6 +562,7 @@ export default function LeetCodeMode() {
     setView({ type: "problem", categoryId, problemSlug });
     setKojoOpen(false);
     setRunnerResult(null);
+    setGradeFeedback(null);
     setKojoResponse(null);
     setKojoError(null);
   }
@@ -573,8 +576,27 @@ export default function LeetCodeMode() {
     editorRef.current?.getAction("editor.action.formatDocument")?.run();
   }
 
-  function handleMonacoMount(editor: any, _monaco: Monaco) {
+  function handleMonacoMount(editor: any, monaco: Monaco) {
     editorRef.current = editor;
+    monaco.languages.registerDocumentFormattingEditProvider("python", {
+      provideDocumentFormattingEdits(model) {
+        const lines = model.getValue().split("\n").map((l) => l.trimEnd());
+        const result: string[] = [];
+        let blanks = 0;
+        for (const line of lines) {
+          if (line === "") {
+            blanks++;
+            if (blanks <= 2) result.push(line);
+          } else {
+            blanks = 0;
+            result.push(line);
+          }
+        }
+        while (result.length > 0 && result[result.length - 1] === "") result.pop();
+        result.push("");
+        return [{ range: model.getFullModelRange(), text: result.join("\n") }];
+      },
+    });
   }
 
   function openKojo(problem: Problem) {
@@ -630,7 +652,7 @@ export default function LeetCodeMode() {
   }
 
   async function handleRunCode() {
-    if (!currentProblemData || !isRunnable(currentProblemData)) return;
+    if (!currentProblem || !currentProblemData || !isRunnable(currentProblemData)) return;
     const officialCases = currentProblemData.examples.map((example) => ({
       label: `Official ${example.index}`,
       inputText: example.input_text,
@@ -644,9 +666,35 @@ export default function LeetCodeMode() {
 
     setRunnerLoading(true);
     setRunnerResult(null);
+    setGradeFeedback(null);
     try {
       const result = await runPythonLeetCode(code, [...officialCases, ...validCustomCases]);
       setRunnerResult(result);
+
+      if (result.cases?.length) {
+        setGradeLoading(true);
+        const testResultsSummary = JSON.stringify(result.cases.map((c) => ({
+          label: c.label,
+          passed: c.passed,
+          actual: c.actual,
+          expected: c.expected,
+        })));
+        try {
+          const grade = await gradeLeetCodeSubmission(
+            currentProblem.slug,
+            currentProblem.title,
+            code,
+            testResultsSummary,
+            result.ok,
+            generationProvider,
+          );
+          setGradeFeedback(grade.feedback);
+        } catch {
+          // grading is best-effort — don't block the run result
+        } finally {
+          setGradeLoading(false);
+        }
+      }
     } finally {
       setRunnerLoading(false);
     }
@@ -941,6 +989,23 @@ export default function LeetCodeMode() {
                     ))}
                   </div>
                 ) : null}
+              </div>
+            ) : null}
+
+            {gradeLoading ? (
+              <div className="lc-grade-loading">
+                <Loader2 size={14} className="spin" />
+                <span>Kojo is grading your submission…</span>
+              </div>
+            ) : null}
+
+            {gradeFeedback && !gradeLoading ? (
+              <div className="lc-grade-feedback">
+                <div className="lc-grade-feedback-header">
+                  <Bot size={14} />
+                  <span>Kojo's feedback</span>
+                </div>
+                <MarkdownContent content={gradeFeedback} />
               </div>
             ) : null}
           </div>
