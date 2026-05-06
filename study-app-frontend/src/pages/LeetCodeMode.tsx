@@ -579,8 +579,8 @@ export default function LeetCodeMode() {
   function handleMonacoMount(editor: any, monaco: Monaco) {
     editorRef.current = editor;
     monaco.languages.registerDocumentFormattingEditProvider("python", {
-      provideDocumentFormattingEdits(model) {
-        const lines = model.getValue().split("\n").map((l) => l.trimEnd());
+      provideDocumentFormattingEdits(model: Monaco['editor']['ITextModel']) {
+        const lines = model.getValue().split("\n").map((l: string) => l.trimEnd());
         const result: string[] = [];
         let blanks = 0;
         for (const line of lines) {
