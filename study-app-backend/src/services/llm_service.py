@@ -881,14 +881,28 @@ Be lenient on minor syntax errors if the logic is correct. Accept equivalent sol
         custom_instructions: Optional[str] = None,
     ) -> str:
         latex_rule = (
-            "KATEX RENDERING RULES — follow exactly:\n"
-            "  - This interface renders math using KaTeX. Wrap ALL math in dollar signs.\n"
-            "  - Inline math: $expression$ — e.g. $\\frac{dx}{dt}$, $x^{2} + y^{2}$, $\\sqrt{x}$\n"
-            "  - Block/display math: $$expression$$ — use for standalone equations\n"
-            "  - Example question: 'Find $\\frac{dx}{dt}$ when $x = t^{3} + t$ at $t = 2$'\n"
-            "  - Example MCQ option: '$3t^{2} + 1$' or '$\\frac{1}{2}$'\n"
+            "KATEX RENDERING RULES — follow exactly or the math will not display:\n"
+            "  - EVERY math symbol, number, variable, and expression MUST be wrapped in $...$\n"
+            "  - Inline math: $expression$ — e.g. $\\frac{dx}{dt}$, $x^{2}+y^{2}$, $\\sqrt{x}$\n"
+            "  - Block/display math on its own line: $$expression$$\n"
+            "\n"
+            "  GREEK LETTERS — NEVER write them as words, ALWAYS use LaTeX commands inside $...$:\n"
+            "  - theta → $\\theta$   pi → $\\pi$   alpha → $\\alpha$   beta → $\\beta$\n"
+            "  - omega → $\\omega$  phi → $\\phi$  lambda → $\\lambda$  sigma → $\\sigma$\n"
+            "  - delta → $\\delta$  epsilon → $\\epsilon$  rho → $\\rho$  mu → $\\mu$\n"
+            "\n"
+            "  FRACTIONS — NEVER write as a/b or frac notation, ALWAYS use \\frac:\n"
+            "  - 5pi/6 → $\\frac{5\\pi}{6}$    1/2 → $\\frac{1}{2}$    3x/4 → $\\frac{3x}{4}$\n"
+            "\n"
+            "  Example question using polar coordinates:\n"
+            "    BAD:  'the polar point (r, theta) = (6, 5pi/6)'\n"
+            "    GOOD: 'the polar point $(r, \\theta) = \\left(6, \\frac{5\\pi}{6}\\right)$'\n"
+            "\n"
+            "  Example question using calculus:\n"
+            "    GOOD: 'Find $\\frac{dy}{dx}$ for $x = t^{2}+1$, $y = t^{3}-t$ at $t=2$.'\n"
+            "    GOOD: 'Evaluate $\\int_{0}^{3} (2x^{2}+3x)\\,dx$.'\n"
+            "  - MCQ option example: '$3t^{2}+1$' or '$\\frac{5\\pi}{6}$'\n"
             "  - Do NOT write bare math like x^2 or x² — always wrap in $...$\n"
-            "  - Do NOT write fractions as a/b — write $\\frac{a}{b}$\n"
         )
         strict_math_rules = (
             "STRICT CONTENT RULES:\n"
@@ -1789,9 +1803,19 @@ Rules:
             parsed = json.loads(raw)
         except json.JSONDecodeError:
             match = re.search(r"\{.*\}", raw, flags=re.DOTALL)
-            if match is None:
-                raise
-            parsed = json.loads(match.group(0))
+            extracted = match.group(0) if match else raw
+            try:
+                parsed = json.loads(extracted)
+            except json.JSONDecodeError:
+                # LLM outputs bare LaTeX backslashes (e.g. \theta) that aren't valid JSON
+                # escape sequences. Double-escape lone backslashes and retry.
+                escaped = re.sub(r'\\(?!["\\/bfnrtu0-9])', r'\\\\', extracted)
+                try:
+                    parsed = json.loads(escaped)
+                except json.JSONDecodeError:
+                    if match is None:
+                        raise
+                    raise ValueError("LLM response was not parseable JSON")
         if not isinstance(parsed, dict):
             raise ValueError("LLM response was not a JSON object")
         return parsed

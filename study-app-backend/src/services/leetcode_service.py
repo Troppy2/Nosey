@@ -10,6 +10,7 @@ import httpx
 
 from src.schemas.leetcode_schema import (
     LeetCodeExample,
+    LeetCodeGradeResponse,
     LeetCodeHintResponse,
     LeetCodeProblemResponse,
     LeetCodeTopicTag,
@@ -73,6 +74,30 @@ class LeetCodeService:
             for phrase in ("can't help", "cannot help", "not sure", "unsure")
         )
         return LeetCodeHintResponse(response=response, flagged_uncertain=flagged)
+
+    async def grade(
+        self,
+        title_slug: str,
+        title: str,
+        user_code: str,
+        test_results: str,
+        all_passed: bool,
+        provider: Optional[str] = None,
+    ) -> LeetCodeGradeResponse:
+        problem = await self._fetch_problem(title_slug)
+        prompt = self._build_grade_prompt(
+            title=title or problem.title,
+            statement_html=problem.content_html,
+            user_code=user_code,
+            test_results=test_results,
+            all_passed=all_passed,
+        )
+        try:
+            response = await LLMService().call_kojo(prompt, provider=provider)
+        except Exception as exc:
+            raise LLMException("Kojo failed to grade the submission. Try again.") from exc
+
+        return LeetCodeGradeResponse(response=response, flagged_uncertain=False)
 
     async def _fetch_problem(self, title_slug: str) -> _FetchedProblem:
         payload = {
@@ -212,3 +237,39 @@ STRICT RULES:
 - Keep the response focused, practical, and encouraging.
 
 Respond with a coaching hint now:"""
+
+    def _build_grade_prompt(
+        self,
+        title: str,
+        statement_html: str,
+        user_code: str,
+        test_results: str,
+        all_passed: bool,
+    ) -> str:
+        condensed_statement = self._html_to_text(statement_html)[:6000]
+        verdict = "ALL TESTS PASSED" if all_passed else "SOME TESTS FAILED"
+        return f"""You are Kojo, a supportive coding coach inside Nosey's LeetCode mode.
+The student just ran their code against test cases for "{title}".
+
+PROBLEM STATEMENT:
+{condensed_statement}
+
+STUDENT'S CODE:
+```python
+{user_code.strip() or "# No code"}
+```
+
+TEST RESULTS ({verdict}):
+{test_results}
+
+YOUR TASK — grade this submission and give actionable coaching feedback:
+
+1. **Correctness** (1–2 sentences): Are the results correct? What passed/failed and why?
+2. **What's wrong** (if any tests failed): Point to the specific bug or logic error in their code. Be precise — line numbers or variable names if possible.
+3. **How to fix it** (if any tests failed): Give a concrete hint about what to change — but do NOT rewrite the whole solution for them.
+4. **Optimality** (always): Even if all tests passed, comment on time and space complexity. Is this the most efficient approach? What would the optimal solution's complexity be? Suggest the direction if there's a better approach.
+5. **One encouragement** (1 sentence): End with something genuinely encouraging.
+
+Keep the response concise and structured. Use markdown formatting.
+
+Respond now:"""

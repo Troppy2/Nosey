@@ -46,6 +46,8 @@ export default function Settings() {
     setQuestionFallbackEnabled,
     generationProvider,
     setGenerationProvider,
+    kojoStrictness,
+    setKojoStrictness,
   } = useSettings();
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const initialized = useRef(false);
@@ -279,6 +281,34 @@ export default function Settings() {
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </SelectInput>
+        </section>
+
+        <section className="settings-appearance">
+          <h3>Kojo constitution strictness</h3>
+          <p className="muted small">
+            Controls how strictly Kojo sticks to your uploaded notes when answering questions.
+          </p>
+          <div className="settings-strictness-row">
+            {(["strict", "medium", "none"] as const).map((level) => (
+              <button
+                key={level}
+                type="button"
+                className={`settings-strictness-btn${kojoStrictness === level ? " settings-strictness-btn--active" : ""}`}
+                onClick={() => setKojoStrictness(level)}
+              >
+                <span className="settings-strictness-label">
+                  {level === "strict" ? "Strict" : level === "medium" ? "Medium" : "Not at all"}
+                </span>
+                <span className="settings-strictness-desc muted small">
+                  {level === "strict"
+                    ? "Only answers from your notes"
+                    : level === "medium"
+                    ? "Prefers notes, fills gaps with general knowledge"
+                    : "Answers freely, tells you to fact-check"}
+                </span>
+              </button>
+            ))}
+          </div>
         </section>
 
         <section className="settings-restore">

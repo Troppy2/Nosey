@@ -28,6 +28,7 @@ class KojoConversationDTO(BaseModel):
 class KojoChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=2000)
     provider: Optional[str] = Field(default=None, description="Optional LLM provider override: 'auto', 'groq', 'ollama', or 'gemini'")
+    strictness: Optional[str] = Field(default="medium", description="Constitution strictness: 'strict', 'medium', or 'none'")
 
 
 class KojoChatResponse(BaseModel):
