@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -14,7 +15,10 @@ from src.models.folder_file import FolderFile
 from src.models.user import User
 from src.services.file_service import FileService
 from src.utils.exceptions import ValidationException
+from src.utils.logger import get_logger
 from src.utils.validators import MAX_UPLOAD_TOTAL_SIZE_BYTES
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/folders", tags=["folder-files"])
 
@@ -28,6 +32,16 @@ class FolderFileResponse(BaseModel):
     uploaded_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class SkippedFile(BaseModel):
+    file_name: str
+    reason: str
+
+
+class UploadResult(BaseModel):
+    uploaded: list[FolderFileResponse]
+    skipped: list[SkippedFile]
 
 
 async def _get_owned_folder(
@@ -60,7 +74,7 @@ async def list_folder_files(
 
 @router.post(
     "/{folder_id}/files",
-    response_model=list[FolderFileResponse],
+    response_model=UploadResult,
     status_code=status.HTTP_201_CREATED,
 )
 async def upload_folder_files(
@@ -68,9 +82,7 @@ async def upload_folder_files(
     files: list[UploadFile] = File(...),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
-) -> list[FolderFileResponse]:
-    from src.utils.logger import logger
-    
+) -> UploadResult:
     folder = await _get_owned_folder(folder_id, user, session)
 
     from sqlalchemy import func as sqlfunc
@@ -81,49 +93,62 @@ async def upload_folder_files(
 
     svc = FileService()
     created: list[FolderFileResponse] = []
+    skipped: list[SkippedFile] = []
     pending_total_bytes = 0
+
     for upload in files:
+        name = upload.filename or "untitled"
+
         try:
             content, file_type = await svc.extract_from_file(upload)
-            logger.info(
-                "File extracted successfully",
-                extra={
-                    "filename": upload.filename,
-                    "file_type": file_type,
-                    "content_length": len(content),
-                    "folder_id": folder_id,
-                    "user_id": user.id,
-                }
-            )
         except ValidationException as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            skipped.append(SkippedFile(file_name=name, reason=str(exc)))
+            continue
 
-        # Read the raw size — file has already been read in extract_from_file so use content length
+        content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+        duplicate = await session.scalar(
+            select(FolderFile).where(
+                FolderFile.folder_id == folder_id,
+                FolderFile.content_hash == content_hash,
+            )
+        )
+        if duplicate is not None:
+            skipped.append(SkippedFile(
+                file_name=name,
+                reason=f"Identical content already exists as '{duplicate.file_name}'",
+            ))
+            continue
+
         size_bytes = len(content.encode("utf-8"))
 
         if current_total_bytes + pending_total_bytes + size_bytes > MAX_UPLOAD_TOTAL_SIZE_BYTES:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "Folder materials exceed total storage limit "
-                    f"({MAX_UPLOAD_TOTAL_SIZE_BYTES // (1024 * 1024)} MB)."
-                ),
-            )
+            skipped.append(SkippedFile(
+                file_name=name,
+                reason=f"Adding this file would exceed the {MAX_UPLOAD_TOTAL_SIZE_BYTES // (1024 * 1024)} MB folder limit",
+            ))
+            continue
+
         pending_total_bytes += size_bytes
 
         record = FolderFile(
             folder_id=folder.id,
-            file_name=upload.filename or "untitled",
+            file_name=name,
             file_type=file_type,
             size_bytes=size_bytes,
             content=content,
+            content_hash=content_hash,
         )
         session.add(record)
         await session.flush()
         created.append(FolderFileResponse.model_validate(record))
+        logger.info(
+            "File uploaded",
+            extra={"upload_filename": name, "file_type": file_type, "folder_id": folder_id},
+        )
 
     await session.commit()
-    return created
+    return UploadResult(uploaded=created, skipped=skipped)
 
 
 @router.delete("/{folder_id}/files/{file_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
