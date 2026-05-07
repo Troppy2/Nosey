@@ -2523,6 +2523,7 @@ h3 {
 .kojo-markdown .kojo-md-list      { margin: 6px 0 10px; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
 .kojo-markdown .kojo-md-list:last-child { margin-bottom: 0; }
 .kojo-markdown .kojo-md-list li   { line-height: 1.6; }
+.kojo-markdown .kojo-md-hr       { border: none; border-top: 1.5px solid var(--green-light-mid); margin: 14px 0; }
 
 .kojo-inline-code {
   background: rgba(113, 131, 85, 0.12);
