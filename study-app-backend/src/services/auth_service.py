@@ -25,9 +25,13 @@ class AuthService:
         audience = payload.get("aud")
         if settings.google_client_id != "replace-me" and audience != settings.google_client_id:
             raise ValidationException("Google token audience does not match this app")
+        google_id = payload.get("sub")
+        email = payload.get("email")
+        if not google_id or not email:
+            raise ValidationException("Google token is missing required fields")
         return {
-            "google_id": str(payload["sub"]),
-            "email": str(payload["email"]),
+            "google_id": str(google_id),
+            "email": str(email),
             "full_name": payload.get("name"),
             "profile_picture_url": payload.get("picture"),
         }
