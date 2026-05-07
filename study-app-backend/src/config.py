@@ -33,7 +33,12 @@ class Settings(BaseSettings):
     environment: str = Field(default="production", alias="ENVIRONMENT")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     cors_origins: Any = Field(
-        default_factory=lambda: ["https://nosey-eosin.vercel.app"],
+        default_factory=lambda: [
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "http://localhost:5174",
+            "https://nosey-eosin.vercel.app",
+        ],
         alias="CORS_ORIGINS",
     )
     max_file_size_bytes: int = Field(default=52_428_800, alias="MAX_FILE_SIZE_BYTES")

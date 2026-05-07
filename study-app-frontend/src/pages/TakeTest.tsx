@@ -8,7 +8,7 @@ import { EmptyState } from "../components/EmptyState";
 import { TextArea } from "../components/Field";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { MathInput } from "../components/MathInput";
-import { fetchTest, getDraftAttempt, saveDraftAttempt, submitAttempt } from "../lib/api";
+import { API_BASE_URL, fetchTest, getDraftAttempt, saveDraftAttempt, submitAttempt } from "../lib/api";
 import type { DraftAttemptAnswer, Question, SubmittedAnswer, TestTake } from "../lib/types";
 
 type GenerationMeta = {
@@ -127,7 +127,7 @@ export default function TakeTest() {
           answers: draftAnswers,
         });
         navigator.sendBeacon(
-          `${import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"}/tests/${numericTestId}/attempts/draft`,
+          `${API_BASE_URL}/tests/${numericTestId}/attempts/draft`,
           payload,
         );
       }
