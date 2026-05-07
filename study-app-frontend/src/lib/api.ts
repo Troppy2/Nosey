@@ -27,7 +27,7 @@ import type {
   TestTake,
 } from "./types";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "https://noesy.onrender.com";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "https://noesy.onrender.com";
 const TOKEN_KEY = "nosey_access_token";
 const USER_KEY = "nosey_user";
 const GUEST_TOKEN = "nosey_guest_token";
