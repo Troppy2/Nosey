@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import BIGINT_ID, Base
@@ -14,6 +14,9 @@ if TYPE_CHECKING:
 
 class FolderFile(Base):
     __tablename__ = "folder_files"
+    __table_args__ = (
+        Index("ix_folder_files_folder_id_content_hash", "folder_id", "content_hash"),
+    )
 
     id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)
     folder_id: Mapped[int] = mapped_column(
@@ -23,6 +26,7 @@ class FolderFile(Base):
     file_type: Mapped[str] = mapped_column(String(10), nullable=False)
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
 
     folder: Mapped[Folder] = relationship("Folder", back_populates="files")

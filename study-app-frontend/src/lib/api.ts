@@ -530,10 +530,20 @@ export async function fetchFolderFiles(folderId: number): Promise<FolderFile[]> 
   }
 }
 
-export async function uploadFolderFiles(folderId: number, files: File[]): Promise<FolderFile[]> {
+export interface SkippedFile {
+  file_name: string;
+  reason: string;
+}
+
+export interface UploadResult {
+  uploaded: FolderFile[];
+  skipped: SkippedFile[];
+}
+
+export async function uploadFolderFiles(folderId: number, files: File[]): Promise<UploadResult> {
   const formData = new FormData();
   files.forEach((f) => formData.append("files", f));
-  return request<FolderFile[]>(`/folders/${folderId}/files`, {
+  return request<UploadResult>(`/folders/${folderId}/files`, {
     method: "POST",
     body: formData,
   });

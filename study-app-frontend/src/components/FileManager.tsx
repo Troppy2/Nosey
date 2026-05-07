@@ -1,6 +1,6 @@
 import { FileText, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { type FolderFile, deleteFolderFile, fetchFolderFiles, uploadFolderFiles } from "../lib/api";
+import { type FolderFile, type SkippedFile, deleteFolderFile, fetchFolderFiles, uploadFolderFiles } from "../lib/api";
 
 const MAX_FILE_SIZE_MB = 10;
 const MAX_TOTAL_SIZE_MB = 100;
@@ -10,6 +10,7 @@ const ALLOWED_TYPES = [
   "text/markdown",
   "text/x-markdown",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 ];
 
 function formatBytes(bytes: number): string {
@@ -32,6 +33,7 @@ export function FileManager({ folderId, onClose }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [skippedFiles, setSkippedFiles] = useState<SkippedFile[]>([]);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -50,7 +52,7 @@ export function FileManager({ folderId, onClose }: Props) {
 
     Array.from(selected).forEach((f) => {
       const allowed =
-        ALLOWED_TYPES.includes(f.type) || /\.(pdf|txt|md|docx)$/i.test(f.name);
+        ALLOWED_TYPES.includes(f.type) || /\.(pdf|txt|md|docx|pptx)$/i.test(f.name);
       if (!allowed) { errs.push(`${f.name}: unsupported type`); return; }
       if (f.size > MAX_FILE_SIZE_MB * 1024 * 1024) { errs.push(`${f.name}: exceeds ${MAX_FILE_SIZE_MB} MB`); return; }
       valid.push(f);
@@ -66,10 +68,16 @@ export function FileManager({ folderId, onClose }: Props) {
     if (valid.length === 0) return;
 
     setError(null);
+    setSkippedFiles([]);
     setIsUploading(true);
     try {
-      const created = await uploadFolderFiles(folderId, valid);
-      setFiles((prev) => [...created, ...(prev ?? [])]);
+      const result = await uploadFolderFiles(folderId, valid);
+      if (result.uploaded.length > 0) {
+        setFiles((prev) => [...result.uploaded, ...(prev ?? [])]);
+      }
+      if (result.skipped.length > 0) {
+        setSkippedFiles(result.skipped);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed.");
     } finally {
@@ -111,7 +119,7 @@ export function FileManager({ folderId, onClose }: Props) {
         </div>
 
         <p className="muted" style={{ marginTop: 0, marginBottom: 16, fontSize: "0.875rem" }}>
-          Upload notes files (PDF, DOCX, TXT, Markdown) to this folder — {MAX_FILE_SIZE_MB} MB per file, {MAX_TOTAL_SIZE_MB} MB total.
+          Upload notes files (PDF, DOCX, TXT, Markdown, PPTX) to this folder — {MAX_FILE_SIZE_MB} MB per file, {MAX_TOTAL_SIZE_MB} MB total.
           These files are available when generating tests.
         </p>
 
@@ -154,6 +162,31 @@ export function FileManager({ folderId, onClose }: Props) {
         {error && (
           <div className="form-error" style={{ marginBottom: 12 }}>
             {error}
+          </div>
+        )}
+
+        {skippedFiles.length > 0 && (
+          <div
+            style={{
+              marginBottom: 12,
+              padding: "10px 14px",
+              borderRadius: 8,
+              background: "var(--yellow-lightest, #fffbeb)",
+              border: "1.5px solid var(--yellow-mid, #f59e0b)",
+              fontSize: "0.85rem",
+              color: "var(--yellow-dark, #92400e)",
+            }}
+          >
+            <strong>
+              {skippedFiles.length === 1 ? "1 file was skipped:" : `${skippedFiles.length} files were skipped:`}
+            </strong>
+            <ul style={{ margin: "6px 0 0 0", paddingLeft: 18 }}>
+              {skippedFiles.map((s) => (
+                <li key={s.file_name}>
+                  <strong>{s.file_name}</strong> — {s.reason}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 
