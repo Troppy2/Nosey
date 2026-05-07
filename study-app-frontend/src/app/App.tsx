@@ -14,6 +14,21 @@ import Results from "../pages/Results";
 import TakeTest from "../pages/TakeTest";
 import Settings from "../pages/Settings";
 
+// Dependency imports for tracking the last visited path
+import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
+
+// Saves user last visted page
+function PathTracker() {
+  const location = useLocation();
+
+  useEffect(() => {
+    localStorage.setItem("lastVisitedPath", location.pathname);
+  }, [location.pathname]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <BrowserRouter>

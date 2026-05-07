@@ -29,6 +29,7 @@ export function AppShell() {
     setIsDrawerOpen(false);
   }, [location.pathname]);
 
+
   useEffect(() => {
     localStorage.setItem(sidebarStorageKey, String(isSidebarCollapsed));
   }, [isSidebarCollapsed]);

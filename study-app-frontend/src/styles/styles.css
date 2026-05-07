@@ -224,6 +224,7 @@ h3 {
   min-width: 0;
 }
 
+/* Desktop-only sidebar collapse button */
 .sidebar-collapse-btn {
   display: none;
   align-items: center;
@@ -241,8 +242,9 @@ h3 {
 }
 
 .sidebar-collapse-btn:hover {
-  background: rgba(255, 255, 255, 0.76);
   color: var(--green-dark);
+  transform: translateY(-1px);
+  transform: translateY(-1px) scale(1.04);
 }
 
 .sidebar-collapse-btn:active {
@@ -311,7 +313,8 @@ h3 {
   .shell[data-sidebar-collapsed="true"] {
     --sidebar-width: 76px;
   }
-
+  
+/* Collapsed sidebar styles */
   .sidebar-header {
     display: flex;
     align-items: center;

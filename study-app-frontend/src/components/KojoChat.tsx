@@ -4,6 +4,7 @@ import { clearKojoConversation, fetchKojoConversation, fetchProviderStatus, kojo
 import type { KojoMessage, ProviderStatus } from "../lib/types";
 import { useSettings } from "../lib/useSettings";
 import { MarkdownContent } from "./MarkdownContent";
+import { useLocation } from 'react-router-dom'
 
 interface KojoChatProps {
   folderId: number;
@@ -43,11 +44,13 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+
+
   useEffect(() => {
     fetchKojoConversation(folderId).then((conv) => {
       if (conv) setMessages(conv.messages);
     });
-    fetchProviderStatus().then(setProviderStatus).catch(() => {});
+    fetchProviderStatus().then(setProviderStatus).catch(() => { });
     setConfirmClear(false);
     setClearNotice(null);
     inputRef.current?.focus();
