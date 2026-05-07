@@ -1,4 +1,4 @@
-# Nosey — AI Study Tool
+# Nosey: AI Study Tool
 
 An AI-powered study platform that generates personalized practice tests, flashcards, and interactive tutoring from your study materials.
 
@@ -6,11 +6,11 @@ An AI-powered study platform that generates personalized practice tests, flashca
 
 Nosey helps students study smarter by:
 
-- **Generating Practice Tests** — Upload your notes or study materials (PDF, DOCX, TXT, Markdown) and let AI create custom multiple-choice and free-response practice questions tailored to your content.
-- **Creating Flashcards** — Automatically generate flashcard sets from your materials with deduplication and difficulty tracking.
-- **Interactive Tutoring** — Chat with Kojo, an in-app AI tutor that answers questions about your study materials in a natural conversation.
-- **Grading & Feedback** — Receive instant grading on multiple-choice answers and detailed feedback on free-response answers.
-- **Multi-Modal Support** — Create math-focused tests with LaTeX rendering, coding challenges with syntax highlighting, or traditional question sets.
+- **Generating Practice Tests**: Upload your notes or study materials (PDF, DOCX, TXT, Markdown) and let AI create custom multiple-choice and free-response practice questions tailored to your content.
+- **Creating Flashcards**: Automatically generate flashcard sets from your materials with deduplication and difficulty tracking.
+- **Interactive Tutoring**: Chat with Kojo, an in-app AI tutor that answers questions about your study materials in a natural conversation.
+- **Grading & Feedback**: Receive instant grading on multiple-choice answers and detailed feedback on free-response answers.
+- **Multi-Modal Support**: Create math-focused tests with LaTeX rendering, coding challenges with syntax highlighting, or traditional question sets.
 
 Nosey works completely offline after deployment and never stores or shares your study materials.
 
