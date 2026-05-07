@@ -115,7 +115,7 @@ Backend will run on `localhost:8000`, frontend on `localhost:80`.
 
 ## How to Contribute
 
-We welcome contributions! Here's how to help:
+Contributions are welcome! Here's how to help:
 
 ### 1. Create a Branch
 
