@@ -97,6 +97,7 @@ const PROGRESS_KEY = "nosey_lc_progress";
 const ACTIVITY_KEY = "nosey_lc_activity_dates";
 const LEETCODE_BASE_URL = "https://leetcode.com/problems";
 const CUSTOM_TEST_LIMIT = 2;
+const MAX_CODE_TABS = 5;
 const CODE_TAB_ID_KEY = "nosey_lc_tab_id";
 const CODE_WORKSPACE_KEY_PREFIX = "nosey_lc_code_tabs";
 const CODE_KEY_PREFIX = "nosey_lc_code";
@@ -693,6 +694,8 @@ export default function LeetCodeMode() {
 
     setCodeWorkspaces((prev) => {
       const workspace = prev[currentProblem.slug] ?? loadCodeWorkspace(currentProblem.slug);
+      if (workspace.tabs.length >= MAX_CODE_TABS) return prev;
+
       const nextTab = {
         id: makeTabId(),
         name: `Tab ${workspace.tabs.length + 1}`,
@@ -1206,6 +1209,7 @@ export default function LeetCodeMode() {
             onSelectTab={handleSelectCodeTab}
             onAddTab={handleAddCodeTab}
             onDeleteTab={handleDeleteCodeTab}
+            canAddTab={(currentCodeWorkspace?.tabs?.length ?? 0) < MAX_CODE_TABS}
           />
 
           <div className="lc-editor-surface">
