@@ -36,6 +36,7 @@ import {
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MarkdownContent } from "../components/MarkdownContent";
+import CodingTabs from "../components/Tab";
 import { SlashCommandMenu, type SlashCommand } from "../components/SlashCommandMenu";
 import { fetchLeetCodeHint, fetchLeetCodeProblem, gradeLeetCodeSubmission } from "../lib/api";
 import { runPythonLeetCode, type RunnerResult } from "../lib/pyodideRunner";
@@ -81,10 +82,24 @@ type CustomCase = {
   expectedOutput: string;
 };
 
+type CodeTab = {
+  id: string;
+  name: string;
+  code: string;
+};
+
+type CodeWorkspace = {
+  tabs: CodeTab[];
+  activeTabId: string;
+};
+
 const PROGRESS_KEY = "nosey_lc_progress";
 const ACTIVITY_KEY = "nosey_lc_activity_dates";
 const LEETCODE_BASE_URL = "https://leetcode.com/problems";
 const CUSTOM_TEST_LIMIT = 2;
+const CODE_TAB_ID_KEY = "nosey_lc_tab_id";
+const CODE_WORKSPACE_KEY_PREFIX = "nosey_lc_code_tabs";
+const CODE_KEY_PREFIX = "nosey_lc_code";
 
 const CHAT_COMMANDS: SlashCommand[] = [
   { slash: "/hint", label: "Hint", description: "Get the next nudge without the full answer.", prompt: "Give me one focused hint. Do not give me the full solution." },
@@ -372,16 +387,97 @@ function saveActivityDates(dates: string[]) {
   localStorage.setItem(ACTIVITY_KEY, JSON.stringify(dates));
 }
 
-function getCodeKey(problemSlug: string) {
-  return `nosey_lc_code_${problemSlug}`;
+function getTabStorageId() {
+  if (typeof window === "undefined") return "server";
+
+  const existing = sessionStorage.getItem(CODE_TAB_ID_KEY);
+  if (existing) return existing;
+
+  const tabId = typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+  sessionStorage.setItem(CODE_TAB_ID_KEY, tabId);
+  return tabId;
 }
 
-function loadSavedCode(problemSlug: string) {
-  return localStorage.getItem(getCodeKey(problemSlug)) ?? "";
+function makeTabId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function saveCode(problemSlug: string, value: string) {
-  localStorage.setItem(getCodeKey(problemSlug), value);
+function getCodeWorkspaceKey(problemSlug: string) {
+  return `${CODE_WORKSPACE_KEY_PREFIX}:${getTabStorageId()}:${problemSlug}`;
+}
+
+function getLegacyCodeKey(problemSlug: string) {
+  return `${CODE_KEY_PREFIX}:${getTabStorageId()}:${problemSlug}`;
+}
+
+function createDefaultWorkspace(initialCode = ""): CodeWorkspace {
+  const firstTab = {
+    id: makeTabId(),
+    name: "Tab 1",
+    code: initialCode,
+  };
+
+  return {
+    tabs: [firstTab],
+    activeTabId: firstTab.id,
+  };
+}
+
+function normalizeCodeWorkspace(value: unknown): CodeWorkspace | null {
+  if (!value || typeof value !== "object") return null;
+
+  const rawWorkspace = value as Partial<CodeWorkspace>;
+  const tabs = Array.isArray(rawWorkspace.tabs)
+    ? rawWorkspace.tabs
+        .filter((tab): tab is CodeTab => Boolean(tab) && typeof tab.id === "string" && typeof tab.name === "string" && typeof tab.code === "string")
+        .map((tab) => ({ id: tab.id, name: tab.name, code: tab.code }))
+    : [];
+
+  if (!tabs.length) return null;
+
+  const activeTabId = typeof rawWorkspace.activeTabId === "string" && tabs.some((tab) => tab.id === rawWorkspace.activeTabId)
+    ? rawWorkspace.activeTabId
+    : tabs[0].id;
+
+  return { tabs, activeTabId };
+}
+
+function saveCodeWorkspace(problemSlug: string, workspace: CodeWorkspace) {
+  localStorage.setItem(getCodeWorkspaceKey(problemSlug), JSON.stringify(workspace));
+  const activeTab = workspace.tabs.find((tab) => tab.id === workspace.activeTabId) ?? workspace.tabs[0];
+  if (activeTab) {
+    localStorage.setItem(getLegacyCodeKey(problemSlug), activeTab.code);
+  }
+}
+
+function loadCodeWorkspace(problemSlug: string) {
+  const scopedWorkspace = localStorage.getItem(getCodeWorkspaceKey(problemSlug));
+  if (scopedWorkspace) {
+    try {
+      const parsed = normalizeCodeWorkspace(JSON.parse(scopedWorkspace));
+      if (parsed) return parsed;
+    } catch {
+      // fall through to legacy formats
+    }
+  }
+
+  const legacyCurrentTabCode = localStorage.getItem(getLegacyCodeKey(problemSlug));
+  if (legacyCurrentTabCode !== null) {
+    return createDefaultWorkspace(legacyCurrentTabCode);
+  }
+
+  const legacyKey = `${CODE_KEY_PREFIX}_${problemSlug}`;
+  const legacyValue = localStorage.getItem(legacyKey);
+  if (legacyValue !== null) {
+    return createDefaultWorkspace(legacyValue);
+  }
+
+  return createDefaultWorkspace();
 }
 
 function todayKey() {
@@ -469,7 +565,7 @@ export default function LeetCodeMode() {
   const [activityDates, setActivityDates] = useState<string[]>(() => loadJson(ACTIVITY_KEY, []));
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
-  const [code, setCode] = useState("");
+  const [codeWorkspaces, setCodeWorkspaces] = useState<Record<string, CodeWorkspace>>({});
   const [problemStates, setProblemStates] = useState<Record<string, CachedProblemState>>({});
   const [customCases, setCustomCases] = useState<Record<string, CustomCase[]>>({});
   const [runnerLoading, setRunnerLoading] = useState(false);
@@ -491,6 +587,9 @@ export default function LeetCodeMode() {
   const currentProblemState = currentProblem ? problemStates[currentProblem.slug] : undefined;
   const currentProblemData = currentProblemState?.data;
   const currentCustomCases = currentProblem ? customCases[currentProblem.slug] ?? [] : [];
+  const currentCodeWorkspace = currentProblem ? codeWorkspaces[currentProblem.slug] ?? null : null;
+  const currentCodeTab = currentCodeWorkspace?.tabs.find((tab) => tab.id === currentCodeWorkspace.activeTabId) ?? currentCodeWorkspace?.tabs[0] ?? null;
+  const currentCode = currentCodeTab?.code ?? "";
   const kojoShowsCommands = kojoOpen && kojoInput.trimStart().startsWith("/");
 
   useEffect(() => {
@@ -501,14 +600,6 @@ export default function LeetCodeMode() {
     fetchLeetCodeProblem(currentProblem.slug)
       .then((data) => {
         setProblemStates((prev) => ({ ...prev, [currentProblem.slug]: { loading: false, data } }));
-        const savedCode = loadSavedCode(currentProblem.slug);
-        if (!savedCode.trim()) {
-          const starter = data.python_snippet?.trimEnd() ?? "";
-          setCode(starter);
-          saveCode(currentProblem.slug, starter);
-        } else {
-          setCode(savedCode);
-        }
       })
       .catch((error) => {
         setProblemStates((prev) => ({
@@ -549,18 +640,32 @@ export default function LeetCodeMode() {
     if (nextDone) recordSolvedToday();
   }
 
+  function markProblemDone(problem: Problem) {
+    if (progress[problem.slug]) return;
+    const next = { ...progress, [problem.slug]: true };
+    setProgress(next);
+    saveProgress(next);
+    recordSolvedToday();
+  }
+
   function openProblem(categoryId: string, problemSlug: string) {
-    const savedCode = loadSavedCode(problemSlug);
     const cached = problemStates[problemSlug]?.data;
-    if (savedCode.trim()) {
-      setCode(savedCode);
-    } else if (cached?.python_snippet?.trim()) {
-      const starter = cached.python_snippet.trimEnd();
-      setCode(starter);
-      saveCode(problemSlug, starter);
+    const initialCode = cached?.python_snippet?.trimEnd() ?? "";
+    const workspace = loadCodeWorkspace(problemSlug);
+
+    if (!workspace.tabs.length || (!workspace.tabs[0].code.trim() && initialCode.trim())) {
+      const starter = initialCode;
+      const nextWorkspace = {
+        tabs: [{ id: workspace.tabs[0]?.id ?? makeTabId(), name: workspace.tabs[0]?.name ?? "Tab 1", code: starter }, ...workspace.tabs.slice(1)],
+        activeTabId: workspace.activeTabId,
+      };
+      const normalizedWorkspace = normalizeCodeWorkspace(nextWorkspace) ?? createDefaultWorkspace(starter);
+      setCodeWorkspaces((prev) => ({ ...prev, [problemSlug]: normalizedWorkspace }));
+      saveCodeWorkspace(problemSlug, normalizedWorkspace);
     } else {
-      setCode("");
+      setCodeWorkspaces((prev) => ({ ...prev, [problemSlug]: workspace }));
     }
+
     setView({ type: "problem", categoryId, problemSlug });
     setKojoOpen(false);
     setRunnerResult(null);
@@ -570,8 +675,80 @@ export default function LeetCodeMode() {
   }
 
   function handleCodeChange(value: string) {
-    setCode(value);
-    if (currentProblem) saveCode(currentProblem.slug, value);
+    if (!currentProblem) return;
+
+    setCodeWorkspaces((prev) => {
+      const workspace = prev[currentProblem.slug] ?? loadCodeWorkspace(currentProblem.slug);
+      const nextWorkspace = {
+        ...workspace,
+        tabs: workspace.tabs.map((tab) => (tab.id === workspace.activeTabId ? { ...tab, code: value } : tab)),
+      };
+      saveCodeWorkspace(currentProblem.slug, nextWorkspace);
+      return { ...prev, [currentProblem.slug]: nextWorkspace };
+    });
+  }
+
+  function handleAddCodeTab() {
+    if (!currentProblem) return;
+
+    setCodeWorkspaces((prev) => {
+      const workspace = prev[currentProblem.slug] ?? loadCodeWorkspace(currentProblem.slug);
+      const nextTab = {
+        id: makeTabId(),
+        name: `Tab ${workspace.tabs.length + 1}`,
+        code: "",
+      };
+      const nextWorkspace = {
+        tabs: [...workspace.tabs, nextTab],
+        activeTabId: nextTab.id,
+      };
+      saveCodeWorkspace(currentProblem.slug, nextWorkspace);
+      return { ...prev, [currentProblem.slug]: nextWorkspace };
+    });
+  }
+
+  function handleDeleteCodeTab(tabId: string) {
+    if (!currentProblem) return;
+
+    setCodeWorkspaces((prev) => {
+      const workspace = prev[currentProblem.slug] ?? loadCodeWorkspace(currentProblem.slug);
+      if (workspace.tabs.length <= 1) {
+        const nextWorkspace = createDefaultWorkspace("");
+        saveCodeWorkspace(currentProblem.slug, nextWorkspace);
+        return { ...prev, [currentProblem.slug]: nextWorkspace };
+      }
+
+      const tabIndex = workspace.tabs.findIndex((tab) => tab.id === tabId);
+      if (tabIndex < 0) return prev;
+
+      const nextTabs = workspace.tabs.filter((tab) => tab.id !== tabId);
+      const nextActiveTabId = workspace.activeTabId === tabId
+        ? nextTabs[Math.max(0, tabIndex - 1)]?.id ?? nextTabs[0].id
+        : workspace.activeTabId;
+
+      const nextWorkspace = {
+        tabs: nextTabs,
+        activeTabId: nextActiveTabId,
+      };
+
+      saveCodeWorkspace(currentProblem.slug, nextWorkspace);
+      return { ...prev, [currentProblem.slug]: nextWorkspace };
+    });
+  }
+
+  function handleSelectCodeTab(tabId: string) {
+    if (!currentProblem) return;
+
+    setCodeWorkspaces((prev) => {
+      const workspace = prev[currentProblem.slug] ?? loadCodeWorkspace(currentProblem.slug);
+      if (workspace.activeTabId === tabId) return prev;
+      const nextWorkspace = {
+        ...workspace,
+        activeTabId: tabId,
+      };
+      saveCodeWorkspace(currentProblem.slug, nextWorkspace);
+      return { ...prev, [currentProblem.slug]: nextWorkspace };
+    });
   }
 
   function handleFormat() {
@@ -622,7 +799,7 @@ export default function LeetCodeMode() {
         currentProblem.slug,
         currentProblem.title,
         kojoInput,
-        code,
+        currentCode,
         generationProvider,
       );
       setKojoResponse(result.response);
@@ -655,6 +832,7 @@ export default function LeetCodeMode() {
 
   async function handleRunCode() {
     if (!currentProblem || !currentProblemData || !isRunnable(currentProblemData)) return;
+    const problemAtRun = currentProblem;
     const officialCases = currentProblemData.examples.map((example) => ({
       label: `Official ${example.index}`,
       inputText: example.input_text,
@@ -670,7 +848,7 @@ export default function LeetCodeMode() {
     setRunnerResult(null);
     setGradeFeedback(null);
     try {
-      const result = await runPythonLeetCode(code, [...officialCases, ...validCustomCases]);
+      const result = await runPythonLeetCode(currentCode, [...officialCases, ...validCustomCases]);
       setRunnerResult(result);
 
       if (result.cases?.length) {
@@ -683,9 +861,9 @@ export default function LeetCodeMode() {
         })));
         try {
           const grade = await gradeLeetCodeSubmission(
-            currentProblem.slug,
-            currentProblem.title,
-            code,
+            problemAtRun.slug,
+            problemAtRun.title,
+            currentCode,
             testResultsSummary,
             result.ok,
             generationProvider,
@@ -696,6 +874,10 @@ export default function LeetCodeMode() {
         } finally {
           setGradeLoading(false);
         }
+      }
+
+      if (result.ok) {
+        markProblemDone(problemAtRun);
       }
     } finally {
       setRunnerLoading(false);
@@ -852,12 +1034,10 @@ export default function LeetCodeMode() {
           <span>{currentProblem.title}</span>
           <span className={`lc-difficulty lc-difficulty--${difficultyClass(currentProblem.difficulty)}`}>{currentProblem.difficulty}</span>
         </div>
-
         <a className="lc-toolbar-btn" href={`https://www.youtube.com/results?search_query=neetcode+${encodeURIComponent(currentProblem.title)}`} target="_blank" rel="noreferrer">
           <Youtube size={16} />
           NeetCode
         </a>
-        
         <div className="lc-editor-actions">
           <a className="lc-toolbar-btn" href={currentProblem.url} target="_blank" rel="noreferrer">
             <ExternalLink size={16} />
@@ -1020,28 +1200,38 @@ export default function LeetCodeMode() {
         </aside>
 
         <div className="lc-editor-pane">
-          <Editor
-            height="100%"
-            defaultLanguage="python"
-            value={code}
-            onChange={(value) => handleCodeChange(value ?? "")}
-            onMount={handleMonacoMount}
-            theme="vs-dark"
-            options={{
-              fontSize: 14,
-              fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-              minimap: { enabled: false },
-              quickSuggestions: false,
-              suggestOnTriggerCharacters: false,
-              parameterHints: { enabled: false },
-              wordBasedSuggestions: "off",
-              tabSize: 4,
-              scrollBeyondLastLine: false,
-              lineNumbers: "on",
-              renderLineHighlight: "line",
-              padding: { top: 16, bottom: 16 },
-            }}
+          <CodingTabs
+            tabs={(currentCodeWorkspace?.tabs ?? []).map((tab) => ({ id: tab.id, name: tab.name }))}
+            activeTabId={currentCodeWorkspace?.activeTabId ?? ""}
+            onSelectTab={handleSelectCodeTab}
+            onAddTab={handleAddCodeTab}
+            onDeleteTab={handleDeleteCodeTab}
           />
+
+          <div className="lc-editor-surface">
+            <Editor
+              height="100%"
+              defaultLanguage="python"
+              value={currentCode}
+              onChange={(value) => handleCodeChange(value ?? "")}
+              onMount={handleMonacoMount}
+              theme="vs-dark"
+              options={{
+                fontSize: 14,
+                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                minimap: { enabled: false },
+                quickSuggestions: false,
+                suggestOnTriggerCharacters: false,
+                parameterHints: { enabled: false },
+                wordBasedSuggestions: "off",
+                tabSize: 4,
+                scrollBeyondLastLine: false,
+                lineNumbers: "on",
+                renderLineHighlight: "line",
+                padding: { top: 16, bottom: 16 },
+              }}
+            />
+          </div>
         </div>
       </div>
 
