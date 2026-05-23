@@ -6191,6 +6191,30 @@
         "documentation": {}
     },
     {
+        "label": "ModuleType",
+        "importPath": "types",
+        "description": "types",
+        "isExtraImport": true,
+        "detail": "types",
+        "documentation": {}
+    },
+    {
+        "label": "SimpleNamespace",
+        "importPath": "types",
+        "description": "types",
+        "isExtraImport": true,
+        "detail": "types",
+        "documentation": {}
+    },
+    {
+        "label": "SimpleNamespace",
+        "importPath": "types",
+        "description": "types",
+        "isExtraImport": true,
+        "detail": "types",
+        "documentation": {}
+    },
+    {
         "label": "pdfplumber",
         "kind": 6,
         "isExtraImport": true,
@@ -6658,22 +6682,6 @@
         "importPath": "pytest",
         "description": "pytest",
         "detail": "pytest",
-        "documentation": {}
-    },
-    {
-        "label": "SimpleNamespace",
-        "importPath": "types",
-        "description": "types",
-        "isExtraImport": true,
-        "detail": "types",
-        "documentation": {}
-    },
-    {
-        "label": "SimpleNamespace",
-        "importPath": "types",
-        "description": "types",
-        "isExtraImport": true,
-        "detail": "types",
         "documentation": {}
     },
     {
