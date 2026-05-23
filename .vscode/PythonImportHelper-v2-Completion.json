@@ -260,6 +260,118 @@
         "documentation": {}
     },
     {
+        "label": "Any",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Container",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Dict",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Iterable",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "TextIO",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Union",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "cast",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Any",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Container",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Iterable",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
         "label": "Optional",
         "importPath": "typing",
         "description": "typing",
@@ -293,6 +405,14 @@
     },
     {
         "label": "TYPE_CHECKING",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
         "importPath": "typing",
         "description": "typing",
         "isExtraImport": true,
@@ -516,6 +636,30 @@
         "documentation": {}
     },
     {
+        "label": "Tuple",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
         "label": "Optional",
         "importPath": "typing",
         "description": "typing",
@@ -709,6 +853,14 @@
         "documentation": {}
     },
     {
+        "label": "ArgumentParser",
+        "importPath": "argparse",
+        "description": "argparse",
+        "isExtraImport": true,
+        "detail": "argparse",
+        "documentation": {}
+    },
+    {
         "label": "pdfminer",
         "kind": 6,
         "isExtraImport": true,
@@ -766,6 +918,38 @@
         "documentation": {}
     },
     {
+        "label": "PDFDocument",
+        "importPath": "pdfminer.pdfdocument",
+        "description": "pdfminer.pdfdocument",
+        "isExtraImport": true,
+        "detail": "pdfminer.pdfdocument",
+        "documentation": {}
+    },
+    {
+        "label": "PDFNoOutlines",
+        "importPath": "pdfminer.pdfdocument",
+        "description": "pdfminer.pdfdocument",
+        "isExtraImport": true,
+        "detail": "pdfminer.pdfdocument",
+        "documentation": {}
+    },
+    {
+        "label": "PDFXRefFallback",
+        "importPath": "pdfminer.pdfdocument",
+        "description": "pdfminer.pdfdocument",
+        "isExtraImport": true,
+        "detail": "pdfminer.pdfdocument",
+        "documentation": {}
+    },
+    {
+        "label": "PDFPage",
+        "importPath": "pdfminer.pdfpage",
+        "description": "pdfminer.pdfpage",
+        "isExtraImport": true,
+        "detail": "pdfminer.pdfpage",
+        "documentation": {}
+    },
+    {
         "label": "PDFPage",
         "importPath": "pdfminer.pdfpage",
         "description": "pdfminer.pdfpage",
@@ -795,6 +979,62 @@
         "description": "pdfminer.pdfparser",
         "isExtraImport": true,
         "detail": "pdfminer.pdfparser",
+        "documentation": {}
+    },
+    {
+        "label": "PDFParser",
+        "importPath": "pdfminer.pdfparser",
+        "description": "pdfminer.pdfparser",
+        "isExtraImport": true,
+        "detail": "pdfminer.pdfparser",
+        "documentation": {}
+    },
+    {
+        "label": "PDFObjectNotFound",
+        "importPath": "pdfminer.pdftypes",
+        "description": "pdfminer.pdftypes",
+        "isExtraImport": true,
+        "detail": "pdfminer.pdftypes",
+        "documentation": {}
+    },
+    {
+        "label": "PDFValueError",
+        "importPath": "pdfminer.pdftypes",
+        "description": "pdfminer.pdftypes",
+        "isExtraImport": true,
+        "detail": "pdfminer.pdftypes",
+        "documentation": {}
+    },
+    {
+        "label": "PDFStream",
+        "importPath": "pdfminer.pdftypes",
+        "description": "pdfminer.pdftypes",
+        "isExtraImport": true,
+        "detail": "pdfminer.pdftypes",
+        "documentation": {}
+    },
+    {
+        "label": "PDFObjRef",
+        "importPath": "pdfminer.pdftypes",
+        "description": "pdfminer.pdftypes",
+        "isExtraImport": true,
+        "detail": "pdfminer.pdftypes",
+        "documentation": {}
+    },
+    {
+        "label": "resolve1",
+        "importPath": "pdfminer.pdftypes",
+        "description": "pdfminer.pdftypes",
+        "isExtraImport": true,
+        "detail": "pdfminer.pdftypes",
+        "documentation": {}
+    },
+    {
+        "label": "stream_value",
+        "importPath": "pdfminer.pdftypes",
+        "description": "pdfminer.pdftypes",
+        "isExtraImport": true,
+        "detail": "pdfminer.pdftypes",
         "documentation": {}
     },
     {
@@ -939,6 +1179,46 @@
         "description": "pdfminer.psparser",
         "isExtraImport": true,
         "detail": "pdfminer.psparser",
+        "documentation": {}
+    },
+    {
+        "label": "PSKeyword",
+        "importPath": "pdfminer.psparser",
+        "description": "pdfminer.psparser",
+        "isExtraImport": true,
+        "detail": "pdfminer.psparser",
+        "documentation": {}
+    },
+    {
+        "label": "PSLiteral",
+        "importPath": "pdfminer.psparser",
+        "description": "pdfminer.psparser",
+        "isExtraImport": true,
+        "detail": "pdfminer.psparser",
+        "documentation": {}
+    },
+    {
+        "label": "LIT",
+        "importPath": "pdfminer.psparser",
+        "description": "pdfminer.psparser",
+        "isExtraImport": true,
+        "detail": "pdfminer.psparser",
+        "documentation": {}
+    },
+    {
+        "label": "isnumber",
+        "importPath": "pdfminer.utils",
+        "description": "pdfminer.utils",
+        "isExtraImport": true,
+        "detail": "pdfminer.utils",
+        "documentation": {}
+    },
+    {
+        "label": "AnyIO",
+        "importPath": "pdfminer.utils",
+        "description": "pdfminer.utils",
+        "isExtraImport": true,
+        "detail": "pdfminer.utils",
         "documentation": {}
     },
     {
@@ -999,6 +1279,86 @@
         "documentation": {}
     },
     {
+        "label": "LAParams",
+        "importPath": "pdfminer.layout",
+        "description": "pdfminer.layout",
+        "isExtraImport": true,
+        "detail": "pdfminer.layout",
+        "documentation": {}
+    },
+    {
+        "label": "glob",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "glob",
+        "description": "glob",
+        "detail": "glob",
+        "documentation": {}
+    },
+    {
+        "label": "os",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "os",
+        "description": "os",
+        "detail": "os",
+        "documentation": {}
+    },
+    {
+        "label": "shutil",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "shutil",
+        "description": "shutil",
+        "detail": "shutil",
+        "documentation": {}
+    },
+    {
+        "label": "sysconfig",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "sysconfig",
+        "description": "sysconfig",
+        "detail": "sysconfig",
+        "documentation": {}
+    },
+    {
+        "label": "tempfile",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "tempfile",
+        "description": "tempfile",
+        "detail": "tempfile",
+        "documentation": {}
+    },
+    {
+        "label": "winreg",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "winreg",
+        "description": "winreg",
+        "detail": "winreg",
+        "documentation": {}
+    },
+    {
+        "label": "site",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "site",
+        "description": "site",
+        "detail": "site",
+        "documentation": {}
+    },
+    {
+        "label": "subprocess",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "subprocess",
+        "description": "subprocess",
+        "detail": "subprocess",
+        "documentation": {}
+    },
+    {
         "label": "BadZipFile",
         "importPath": "zipfile",
         "description": "zipfile",
@@ -1012,6 +1372,38 @@
         "description": "zipfile",
         "isExtraImport": true,
         "detail": "zipfile",
+        "documentation": {}
+    },
+    {
+        "label": "BadZipFile",
+        "importPath": "zipfile",
+        "description": "zipfile",
+        "isExtraImport": true,
+        "detail": "zipfile",
+        "documentation": {}
+    },
+    {
+        "label": "ZipFile",
+        "importPath": "zipfile",
+        "description": "zipfile",
+        "isExtraImport": true,
+        "detail": "zipfile",
+        "documentation": {}
+    },
+    {
+        "label": "op",
+        "importPath": "alembic",
+        "description": "alembic",
+        "isExtraImport": true,
+        "detail": "alembic",
+        "documentation": {}
+    },
+    {
+        "label": "op",
+        "importPath": "alembic",
+        "description": "alembic",
+        "isExtraImport": true,
+        "detail": "alembic",
         "documentation": {}
     },
     {
@@ -1257,6 +1649,14 @@
     },
     {
         "label": "func",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "Index",
         "importPath": "sqlalchemy",
         "description": "sqlalchemy",
         "isExtraImport": true,
@@ -3265,6 +3665,14 @@
         "documentation": {}
     },
     {
+        "label": "Test",
+        "importPath": "src.models.test",
+        "description": "src.models.test",
+        "isExtraImport": true,
+        "detail": "src.models.test",
+        "documentation": {}
+    },
+    {
         "label": "UserAnswer",
         "importPath": "src.models.user_answer",
         "description": "src.models.user_answer",
@@ -3801,6 +4209,46 @@
         "documentation": {}
     },
     {
+        "label": "HTTPException",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "status",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "APIRouter",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "BackgroundTasks",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "Depends",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
         "label": "File",
         "importPath": "fastapi",
         "description": "fastapi",
@@ -3841,38 +4289,6 @@
         "documentation": {}
     },
     {
-        "label": "Depends",
-        "importPath": "fastapi",
-        "description": "fastapi",
-        "isExtraImport": true,
-        "detail": "fastapi",
-        "documentation": {}
-    },
-    {
-        "label": "HTTPException",
-        "importPath": "fastapi",
-        "description": "fastapi",
-        "isExtraImport": true,
-        "detail": "fastapi",
-        "documentation": {}
-    },
-    {
-        "label": "status",
-        "importPath": "fastapi",
-        "description": "fastapi",
-        "isExtraImport": true,
-        "detail": "fastapi",
-        "documentation": {}
-    },
-    {
-        "label": "APIRouter",
-        "importPath": "fastapi",
-        "description": "fastapi",
-        "isExtraImport": true,
-        "detail": "fastapi",
-        "documentation": {}
-    },
-    {
         "label": "APIRouter",
         "importPath": "fastapi",
         "description": "fastapi",
@@ -3922,6 +4338,14 @@
     },
     {
         "label": "APIRouter",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "BackgroundTasks",
         "importPath": "fastapi",
         "description": "fastapi",
         "isExtraImport": true,
@@ -4065,7 +4489,23 @@
         "documentation": {}
     },
     {
+        "label": "async_session_maker",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
         "label": "get_session",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
+        "label": "async_session_maker",
         "importPath": "src.database",
         "description": "src.database",
         "isExtraImport": true,
@@ -4186,6 +4626,22 @@
     },
     {
         "label": "StudyAppException",
+        "importPath": "src.utils.exceptions",
+        "description": "src.utils.exceptions",
+        "isExtraImport": true,
+        "detail": "src.utils.exceptions",
+        "documentation": {}
+    },
+    {
+        "label": "StudyAppException",
+        "importPath": "src.utils.exceptions",
+        "description": "src.utils.exceptions",
+        "isExtraImport": true,
+        "detail": "src.utils.exceptions",
+        "documentation": {}
+    },
+    {
+        "label": "ResourceNotFoundException",
         "importPath": "src.utils.exceptions",
         "description": "src.utils.exceptions",
         "isExtraImport": true,
@@ -4218,22 +4674,6 @@
     },
     {
         "label": "ValidationException",
-        "importPath": "src.utils.exceptions",
-        "description": "src.utils.exceptions",
-        "isExtraImport": true,
-        "detail": "src.utils.exceptions",
-        "documentation": {}
-    },
-    {
-        "label": "ResourceNotFoundException",
-        "importPath": "src.utils.exceptions",
-        "description": "src.utils.exceptions",
-        "isExtraImport": true,
-        "detail": "src.utils.exceptions",
-        "documentation": {}
-    },
-    {
-        "label": "StudyAppException",
         "importPath": "src.utils.exceptions",
         "description": "src.utils.exceptions",
         "isExtraImport": true,
@@ -4570,6 +5010,103 @@
         "documentation": {}
     },
     {
+        "label": "FolderCreate",
+        "importPath": "src.schemas.folder_schema",
+        "description": "src.schemas.folder_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.folder_schema",
+        "documentation": {}
+    },
+    {
+        "label": "FolderResponse",
+        "importPath": "src.schemas.folder_schema",
+        "description": "src.schemas.folder_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.folder_schema",
+        "documentation": {}
+    },
+    {
+        "label": "FolderUpdate",
+        "importPath": "src.schemas.folder_schema",
+        "description": "src.schemas.folder_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.folder_schema",
+        "documentation": {}
+    },
+    {
+        "label": "FolderCreate",
+        "importPath": "src.schemas.folder_schema",
+        "description": "src.schemas.folder_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.folder_schema",
+        "documentation": {}
+    },
+    {
+        "label": "FolderResponse",
+        "importPath": "src.schemas.folder_schema",
+        "description": "src.schemas.folder_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.folder_schema",
+        "documentation": {}
+    },
+    {
+        "label": "FolderUpdate",
+        "importPath": "src.schemas.folder_schema",
+        "description": "src.schemas.folder_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.folder_schema",
+        "documentation": {}
+    },
+    {
+        "label": "FolderService",
+        "importPath": "src.services.folder_service",
+        "description": "src.services.folder_service",
+        "isExtraImport": true,
+        "detail": "src.services.folder_service",
+        "documentation": {}
+    },
+    {
+        "label": "hashlib",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "hashlib",
+        "description": "hashlib",
+        "detail": "hashlib",
+        "documentation": {}
+    },
+    {
+        "label": "BytesIO",
+        "importPath": "io",
+        "description": "io",
+        "isExtraImport": true,
+        "detail": "io",
+        "documentation": {}
+    },
+    {
+        "label": "BytesIO",
+        "importPath": "io",
+        "description": "io",
+        "isExtraImport": true,
+        "detail": "io",
+        "documentation": {}
+    },
+    {
+        "label": "BytesIO",
+        "importPath": "io",
+        "description": "io",
+        "isExtraImport": true,
+        "detail": "io",
+        "documentation": {}
+    },
+    {
+        "label": "BytesIO",
+        "importPath": "io",
+        "description": "io",
+        "isExtraImport": true,
+        "detail": "io",
+        "documentation": {}
+    },
+    {
         "label": "BaseModel",
         "importPath": "pydantic",
         "description": "pydantic",
@@ -4850,7 +5387,71 @@
         "documentation": {}
     },
     {
+        "label": "FileService",
+        "importPath": "src.services.file_service",
+        "description": "src.services.file_service",
+        "isExtraImport": true,
+        "detail": "src.services.file_service",
+        "documentation": {}
+    },
+    {
+        "label": "get_logger",
+        "importPath": "src.utils.logger",
+        "description": "src.utils.logger",
+        "isExtraImport": true,
+        "detail": "src.utils.logger",
+        "documentation": {}
+    },
+    {
+        "label": "get_logger",
+        "importPath": "src.utils.logger",
+        "description": "src.utils.logger",
+        "isExtraImport": true,
+        "detail": "src.utils.logger",
+        "documentation": {}
+    },
+    {
+        "label": "get_logger",
+        "importPath": "src.utils.logger",
+        "description": "src.utils.logger",
+        "isExtraImport": true,
+        "detail": "src.utils.logger",
+        "documentation": {}
+    },
+    {
+        "label": "get_logger",
+        "importPath": "src.utils.logger",
+        "description": "src.utils.logger",
+        "isExtraImport": true,
+        "detail": "src.utils.logger",
+        "documentation": {}
+    },
+    {
+        "label": "ALLOWED_FILE_TYPES",
+        "importPath": "src.utils.validators",
+        "description": "src.utils.validators",
+        "isExtraImport": true,
+        "detail": "src.utils.validators",
+        "documentation": {}
+    },
+    {
+        "label": "MAX_UPLOAD_FILE_SIZE_BYTES",
+        "importPath": "src.utils.validators",
+        "description": "src.utils.validators",
+        "isExtraImport": true,
+        "detail": "src.utils.validators",
+        "documentation": {}
+    },
+    {
         "label": "MAX_UPLOAD_TOTAL_SIZE_BYTES",
+        "importPath": "src.utils.validators",
+        "description": "src.utils.validators",
+        "isExtraImport": true,
+        "detail": "src.utils.validators",
+        "documentation": {}
+    },
+    {
+        "label": "normalize_file_extension",
         "importPath": "src.utils.validators",
         "description": "src.utils.validators",
         "isExtraImport": true,
@@ -4903,62 +5504,6 @@
         "description": "src.utils.validators",
         "isExtraImport": true,
         "detail": "src.utils.validators",
-        "documentation": {}
-    },
-    {
-        "label": "FolderCreate",
-        "importPath": "src.schemas.folder_schema",
-        "description": "src.schemas.folder_schema",
-        "isExtraImport": true,
-        "detail": "src.schemas.folder_schema",
-        "documentation": {}
-    },
-    {
-        "label": "FolderResponse",
-        "importPath": "src.schemas.folder_schema",
-        "description": "src.schemas.folder_schema",
-        "isExtraImport": true,
-        "detail": "src.schemas.folder_schema",
-        "documentation": {}
-    },
-    {
-        "label": "FolderUpdate",
-        "importPath": "src.schemas.folder_schema",
-        "description": "src.schemas.folder_schema",
-        "isExtraImport": true,
-        "detail": "src.schemas.folder_schema",
-        "documentation": {}
-    },
-    {
-        "label": "FolderCreate",
-        "importPath": "src.schemas.folder_schema",
-        "description": "src.schemas.folder_schema",
-        "isExtraImport": true,
-        "detail": "src.schemas.folder_schema",
-        "documentation": {}
-    },
-    {
-        "label": "FolderResponse",
-        "importPath": "src.schemas.folder_schema",
-        "description": "src.schemas.folder_schema",
-        "isExtraImport": true,
-        "detail": "src.schemas.folder_schema",
-        "documentation": {}
-    },
-    {
-        "label": "FolderUpdate",
-        "importPath": "src.schemas.folder_schema",
-        "description": "src.schemas.folder_schema",
-        "isExtraImport": true,
-        "detail": "src.schemas.folder_schema",
-        "documentation": {}
-    },
-    {
-        "label": "FolderService",
-        "importPath": "src.services.folder_service",
-        "description": "src.services.folder_service",
-        "isExtraImport": true,
-        "detail": "src.services.folder_service",
         "documentation": {}
     },
     {
@@ -5087,6 +5632,14 @@
         "description": "src.services.kojo_service",
         "isExtraImport": true,
         "detail": "src.services.kojo_service",
+        "documentation": {}
+    },
+    {
+        "label": "LLMService",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
         "documentation": {}
     },
     {
@@ -5322,6 +5875,38 @@
         "documentation": {}
     },
     {
+        "label": "TestRepository",
+        "importPath": "src.repositories.test_repository",
+        "description": "src.repositories.test_repository",
+        "isExtraImport": true,
+        "detail": "src.repositories.test_repository",
+        "documentation": {}
+    },
+    {
+        "label": "TestRepository",
+        "importPath": "src.repositories.test_repository",
+        "description": "src.repositories.test_repository",
+        "isExtraImport": true,
+        "detail": "src.repositories.test_repository",
+        "documentation": {}
+    },
+    {
+        "label": "TestRepository",
+        "importPath": "src.repositories.test_repository",
+        "description": "src.repositories.test_repository",
+        "isExtraImport": true,
+        "detail": "src.repositories.test_repository",
+        "documentation": {}
+    },
+    {
+        "label": "TestRepository",
+        "importPath": "src.repositories.test_repository",
+        "description": "src.repositories.test_repository",
+        "isExtraImport": true,
+        "detail": "src.repositories.test_repository",
+        "documentation": {}
+    },
+    {
         "label": "CreateTestResponse",
         "importPath": "src.schemas.test_schema",
         "description": "src.schemas.test_schema",
@@ -5540,15 +6125,6 @@
         "documentation": {}
     },
     {
-        "label": "os",
-        "kind": 6,
-        "isExtraImport": true,
-        "importPath": "os",
-        "description": "os",
-        "detail": "os",
-        "documentation": {}
-    },
-    {
         "label": "unicodedata",
         "kind": 6,
         "isExtraImport": true,
@@ -5588,30 +6164,6 @@
         "description": "collections",
         "isExtraImport": true,
         "detail": "collections",
-        "documentation": {}
-    },
-    {
-        "label": "BytesIO",
-        "importPath": "io",
-        "description": "io",
-        "isExtraImport": true,
-        "detail": "io",
-        "documentation": {}
-    },
-    {
-        "label": "BytesIO",
-        "importPath": "io",
-        "description": "io",
-        "isExtraImport": true,
-        "detail": "io",
-        "documentation": {}
-    },
-    {
-        "label": "BytesIO",
-        "importPath": "io",
-        "description": "io",
-        "isExtraImport": true,
-        "detail": "io",
         "documentation": {}
     },
     {
@@ -5688,30 +6240,6 @@
         "documentation": {}
     },
     {
-        "label": "TestRepository",
-        "importPath": "src.repositories.test_repository",
-        "description": "src.repositories.test_repository",
-        "isExtraImport": true,
-        "detail": "src.repositories.test_repository",
-        "documentation": {}
-    },
-    {
-        "label": "TestRepository",
-        "importPath": "src.repositories.test_repository",
-        "description": "src.repositories.test_repository",
-        "isExtraImport": true,
-        "detail": "src.repositories.test_repository",
-        "documentation": {}
-    },
-    {
-        "label": "TestRepository",
-        "importPath": "src.repositories.test_repository",
-        "description": "src.repositories.test_repository",
-        "isExtraImport": true,
-        "detail": "src.repositories.test_repository",
-        "documentation": {}
-    },
-    {
         "label": "json",
         "kind": 6,
         "isExtraImport": true,
@@ -5753,22 +6281,6 @@
         "documentation": {}
     },
     {
-        "label": "get_logger",
-        "importPath": "src.utils.logger",
-        "description": "src.utils.logger",
-        "isExtraImport": true,
-        "detail": "src.utils.logger",
-        "documentation": {}
-    },
-    {
-        "label": "get_logger",
-        "importPath": "src.utils.logger",
-        "description": "src.utils.logger",
-        "isExtraImport": true,
-        "detail": "src.utils.logger",
-        "documentation": {}
-    },
-    {
         "label": "dataclass",
         "importPath": "dataclasses",
         "description": "dataclasses",
@@ -5782,15 +6294,6 @@
         "description": "dataclasses",
         "isExtraImport": true,
         "detail": "dataclasses",
-        "documentation": {}
-    },
-    {
-        "label": "hashlib",
-        "kind": 6,
-        "isExtraImport": true,
-        "importPath": "hashlib",
-        "description": "hashlib",
-        "detail": "hashlib",
         "documentation": {}
     },
     {
@@ -5874,6 +6377,15 @@
         "documentation": {}
     },
     {
+        "label": "socket",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "socket",
+        "description": "socket",
+        "detail": "socket",
+        "documentation": {}
+    },
+    {
         "label": "CORSMiddleware",
         "importPath": "fastapi.middleware.cors",
         "description": "fastapi.middleware.cors",
@@ -5951,6 +6463,56 @@
         "description": "src.routes",
         "isExtraImport": true,
         "detail": "src.routes",
+        "documentation": {}
+    },
+    {
+        "label": "random",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "random",
+        "description": "random",
+        "detail": "random",
+        "documentation": {}
+    },
+    {
+        "label": "string",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "string",
+        "description": "string",
+        "detail": "string",
+        "documentation": {}
+    },
+    {
+        "label": "HttpUser",
+        "importPath": "locust",
+        "description": "locust",
+        "isExtraImport": true,
+        "detail": "locust",
+        "documentation": {}
+    },
+    {
+        "label": "between",
+        "importPath": "locust",
+        "description": "locust",
+        "isExtraImport": true,
+        "detail": "locust",
+        "documentation": {}
+    },
+    {
+        "label": "task",
+        "importPath": "locust",
+        "description": "locust",
+        "isExtraImport": true,
+        "detail": "locust",
+        "documentation": {}
+    },
+    {
+        "label": "TaskSet",
+        "importPath": "locust",
+        "description": "locust",
+        "isExtraImport": true,
+        "detail": "locust",
         "documentation": {}
     },
     {
@@ -6189,15 +6751,6 @@
         "documentation": {}
     },
     {
-        "label": "subprocess",
-        "kind": 6,
-        "isExtraImport": true,
-        "importPath": "subprocess",
-        "description": "subprocess",
-        "detail": "subprocess",
-        "documentation": {}
-    },
-    {
         "label": "escape",
         "kind": 2,
         "importPath": ".venv.bin.dumppdf",
@@ -6366,6 +6919,483 @@
         "description": ".venv.bin.pdf2txt",
         "peekOfCode": "OUTPUT_TYPES = ((\".htm\", \"html\"), (\".html\", \"html\"), (\".xml\", \"xml\"), (\".tag\", \"tag\"))\ndef float_or_disabled(x: str) -> Optional[float]:\n    if x.lower().strip() == \"disabled\":\n        return None\n    try:\n        return float(x)\n    except ValueError:\n        raise argparse.ArgumentTypeError(\"invalid float value: {}\".format(x))\ndef extract_text(\n    files: Iterable[str] = [],",
         "detail": ".venv.bin.pdf2txt",
+        "documentation": {}
+    },
+    {
+        "label": "escape",
+        "kind": 2,
+        "importPath": ".venv.Scripts.dumppdf",
+        "description": ".venv.Scripts.dumppdf",
+        "peekOfCode": "def escape(s: Union[str, bytes]) -> str:\n    if isinstance(s, bytes):\n        us = str(s, \"latin-1\")\n    else:\n        us = s\n    return ESC_PAT.sub(lambda m: \"&#%d;\" % ord(m.group(0)), us)\ndef dumpxml(out: TextIO, obj: object, codec: Optional[str] = None) -> None:\n    if obj is None:\n        out.write(\"<null />\")\n        return",
+        "detail": ".venv.Scripts.dumppdf",
+        "documentation": {}
+    },
+    {
+        "label": "dumpxml",
+        "kind": 2,
+        "importPath": ".venv.Scripts.dumppdf",
+        "description": ".venv.Scripts.dumppdf",
+        "peekOfCode": "def dumpxml(out: TextIO, obj: object, codec: Optional[str] = None) -> None:\n    if obj is None:\n        out.write(\"<null />\")\n        return\n    if isinstance(obj, dict):\n        out.write('<dict size=\"%d\">\\n' % len(obj))\n        for (k, v) in obj.items():\n            out.write(\"<key>%s</key>\\n\" % k)\n            out.write(\"<value>\")\n            dumpxml(out, v)",
+        "detail": ".venv.Scripts.dumppdf",
+        "documentation": {}
+    },
+    {
+        "label": "dumptrailers",
+        "kind": 2,
+        "importPath": ".venv.Scripts.dumppdf",
+        "description": ".venv.Scripts.dumppdf",
+        "peekOfCode": "def dumptrailers(\n    out: TextIO, doc: PDFDocument, show_fallback_xref: bool = False\n) -> None:\n    for xref in doc.xrefs:\n        if not isinstance(xref, PDFXRefFallback) or show_fallback_xref:\n            out.write(\"<trailer>\\n\")\n            dumpxml(out, xref.get_trailer())\n            out.write(\"\\n</trailer>\\n\\n\")\n    no_xrefs = all(isinstance(xref, PDFXRefFallback) for xref in doc.xrefs)\n    if no_xrefs and not show_fallback_xref:",
+        "detail": ".venv.Scripts.dumppdf",
+        "documentation": {}
+    },
+    {
+        "label": "dumpallobjs",
+        "kind": 2,
+        "importPath": ".venv.Scripts.dumppdf",
+        "description": ".venv.Scripts.dumppdf",
+        "peekOfCode": "def dumpallobjs(\n    out: TextIO,\n    doc: PDFDocument,\n    codec: Optional[str] = None,\n    show_fallback_xref: bool = False,\n) -> None:\n    visited = set()\n    out.write(\"<pdf>\")\n    for xref in doc.xrefs:\n        for objid in xref.get_objids():",
+        "detail": ".venv.Scripts.dumppdf",
+        "documentation": {}
+    },
+    {
+        "label": "dumpoutline",
+        "kind": 2,
+        "importPath": ".venv.Scripts.dumppdf",
+        "description": ".venv.Scripts.dumppdf",
+        "peekOfCode": "def dumpoutline(\n    outfp: TextIO,\n    fname: str,\n    objids: Any,\n    pagenos: Container[int],\n    password: str = \"\",\n    dumpall: bool = False,\n    codec: Optional[str] = None,\n    extractdir: Optional[str] = None,\n) -> None:",
+        "detail": ".venv.Scripts.dumppdf",
+        "documentation": {}
+    },
+    {
+        "label": "extractembedded",
+        "kind": 2,
+        "importPath": ".venv.Scripts.dumppdf",
+        "description": ".venv.Scripts.dumppdf",
+        "peekOfCode": "def extractembedded(fname: str, password: str, extractdir: str) -> None:\n    def extract1(objid: int, obj: Dict[str, Any]) -> None:\n        filename = os.path.basename(obj.get(\"UF\") or cast(bytes, obj.get(\"F\")).decode())\n        fileref = obj[\"EF\"].get(\"UF\") or obj[\"EF\"].get(\"F\")\n        fileobj = doc.getobj(fileref.objid)\n        if not isinstance(fileobj, PDFStream):\n            error_msg = (\n                \"unable to process PDF: reference for %r is not a \"\n                \"PDFStream\" % filename\n            )",
+        "detail": ".venv.Scripts.dumppdf",
+        "documentation": {}
+    },
+    {
+        "label": "dumppdf",
+        "kind": 2,
+        "importPath": ".venv.Scripts.dumppdf",
+        "description": ".venv.Scripts.dumppdf",
+        "peekOfCode": "def dumppdf(\n    outfp: TextIO,\n    fname: str,\n    objids: Iterable[int],\n    pagenos: Container[int],\n    password: str = \"\",\n    dumpall: bool = False,\n    codec: Optional[str] = None,\n    extractdir: Optional[str] = None,\n    show_fallback_xref: bool = False,",
+        "detail": ".venv.Scripts.dumppdf",
+        "documentation": {}
+    },
+    {
+        "label": "create_parser",
+        "kind": 2,
+        "importPath": ".venv.Scripts.dumppdf",
+        "description": ".venv.Scripts.dumppdf",
+        "peekOfCode": "def create_parser() -> ArgumentParser:\n    parser = ArgumentParser(description=__doc__, add_help=True)\n    parser.add_argument(\n        \"files\",\n        type=str,\n        default=None,\n        nargs=\"+\",\n        help=\"One or more paths to PDF files.\",\n    )\n    parser.add_argument(",
+        "detail": ".venv.Scripts.dumppdf",
+        "documentation": {}
+    },
+    {
+        "label": "main",
+        "kind": 2,
+        "importPath": ".venv.Scripts.dumppdf",
+        "description": ".venv.Scripts.dumppdf",
+        "peekOfCode": "def main(argv: Optional[List[str]] = None) -> None:\n    parser = create_parser()\n    args = parser.parse_args(args=argv)\n    if args.debug:\n        logging.getLogger().setLevel(logging.DEBUG)\n    if args.outfile == \"-\":\n        outfp = sys.stdout\n    else:\n        outfp = open(args.outfile, \"w\")\n    if args.objects:",
+        "detail": ".venv.Scripts.dumppdf",
+        "documentation": {}
+    },
+    {
+        "label": "logger",
+        "kind": 5,
+        "importPath": ".venv.Scripts.dumppdf",
+        "description": ".venv.Scripts.dumppdf",
+        "peekOfCode": "logger = logging.getLogger(__name__)\nESC_PAT = re.compile(r'[\\000-\\037&<>()\"\\042\\047\\134\\177-\\377]')\ndef escape(s: Union[str, bytes]) -> str:\n    if isinstance(s, bytes):\n        us = str(s, \"latin-1\")\n    else:\n        us = s\n    return ESC_PAT.sub(lambda m: \"&#%d;\" % ord(m.group(0)), us)\ndef dumpxml(out: TextIO, obj: object, codec: Optional[str] = None) -> None:\n    if obj is None:",
+        "detail": ".venv.Scripts.dumppdf",
+        "documentation": {}
+    },
+    {
+        "label": "ESC_PAT",
+        "kind": 5,
+        "importPath": ".venv.Scripts.dumppdf",
+        "description": ".venv.Scripts.dumppdf",
+        "peekOfCode": "ESC_PAT = re.compile(r'[\\000-\\037&<>()\"\\042\\047\\134\\177-\\377]')\ndef escape(s: Union[str, bytes]) -> str:\n    if isinstance(s, bytes):\n        us = str(s, \"latin-1\")\n    else:\n        us = s\n    return ESC_PAT.sub(lambda m: \"&#%d;\" % ord(m.group(0)), us)\ndef dumpxml(out: TextIO, obj: object, codec: Optional[str] = None) -> None:\n    if obj is None:\n        out.write(\"<null />\")",
+        "detail": ".venv.Scripts.dumppdf",
+        "documentation": {}
+    },
+    {
+        "label": "LITERAL_FILESPEC",
+        "kind": 5,
+        "importPath": ".venv.Scripts.dumppdf",
+        "description": ".venv.Scripts.dumppdf",
+        "peekOfCode": "LITERAL_FILESPEC = LIT(\"Filespec\")\nLITERAL_EMBEDDEDFILE = LIT(\"EmbeddedFile\")\ndef extractembedded(fname: str, password: str, extractdir: str) -> None:\n    def extract1(objid: int, obj: Dict[str, Any]) -> None:\n        filename = os.path.basename(obj.get(\"UF\") or cast(bytes, obj.get(\"F\")).decode())\n        fileref = obj[\"EF\"].get(\"UF\") or obj[\"EF\"].get(\"F\")\n        fileobj = doc.getobj(fileref.objid)\n        if not isinstance(fileobj, PDFStream):\n            error_msg = (\n                \"unable to process PDF: reference for %r is not a \"",
+        "detail": ".venv.Scripts.dumppdf",
+        "documentation": {}
+    },
+    {
+        "label": "LITERAL_EMBEDDEDFILE",
+        "kind": 5,
+        "importPath": ".venv.Scripts.dumppdf",
+        "description": ".venv.Scripts.dumppdf",
+        "peekOfCode": "LITERAL_EMBEDDEDFILE = LIT(\"EmbeddedFile\")\ndef extractembedded(fname: str, password: str, extractdir: str) -> None:\n    def extract1(objid: int, obj: Dict[str, Any]) -> None:\n        filename = os.path.basename(obj.get(\"UF\") or cast(bytes, obj.get(\"F\")).decode())\n        fileref = obj[\"EF\"].get(\"UF\") or obj[\"EF\"].get(\"F\")\n        fileobj = doc.getobj(fileref.objid)\n        if not isinstance(fileobj, PDFStream):\n            error_msg = (\n                \"unable to process PDF: reference for %r is not a \"\n                \"PDFStream\" % filename",
+        "detail": ".venv.Scripts.dumppdf",
+        "documentation": {}
+    },
+    {
+        "label": "float_or_disabled",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pdf2txt",
+        "description": ".venv.Scripts.pdf2txt",
+        "peekOfCode": "def float_or_disabled(x: str) -> Optional[float]:\n    if x.lower().strip() == \"disabled\":\n        return None\n    try:\n        return float(x)\n    except ValueError:\n        raise argparse.ArgumentTypeError(\"invalid float value: {}\".format(x))\ndef extract_text(\n    files: Iterable[str] = [],\n    outfile: str = \"-\",",
+        "detail": ".venv.Scripts.pdf2txt",
+        "documentation": {}
+    },
+    {
+        "label": "extract_text",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pdf2txt",
+        "description": ".venv.Scripts.pdf2txt",
+        "peekOfCode": "def extract_text(\n    files: Iterable[str] = [],\n    outfile: str = \"-\",\n    laparams: Optional[LAParams] = None,\n    output_type: str = \"text\",\n    codec: str = \"utf-8\",\n    strip_control: bool = False,\n    maxpages: int = 0,\n    page_numbers: Optional[Container[int]] = None,\n    password: str = \"\",",
+        "detail": ".venv.Scripts.pdf2txt",
+        "documentation": {}
+    },
+    {
+        "label": "create_parser",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pdf2txt",
+        "description": ".venv.Scripts.pdf2txt",
+        "peekOfCode": "def create_parser() -> argparse.ArgumentParser:\n    parser = argparse.ArgumentParser(description=__doc__, add_help=True)\n    parser.add_argument(\n        \"files\",\n        type=str,\n        default=None,\n        nargs=\"+\",\n        help=\"One or more paths to PDF files.\",\n    )\n    parser.add_argument(",
+        "detail": ".venv.Scripts.pdf2txt",
+        "documentation": {}
+    },
+    {
+        "label": "parse_args",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pdf2txt",
+        "description": ".venv.Scripts.pdf2txt",
+        "peekOfCode": "def parse_args(args: Optional[List[str]]) -> argparse.Namespace:\n    parsed_args = create_parser().parse_args(args=args)\n    # Propagate parsed layout parameters to LAParams object\n    if parsed_args.no_laparams:\n        parsed_args.laparams = None\n    else:\n        parsed_args.laparams = LAParams(\n            line_overlap=parsed_args.line_overlap,\n            char_margin=parsed_args.char_margin,\n            line_margin=parsed_args.line_margin,",
+        "detail": ".venv.Scripts.pdf2txt",
+        "documentation": {}
+    },
+    {
+        "label": "main",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pdf2txt",
+        "description": ".venv.Scripts.pdf2txt",
+        "peekOfCode": "def main(args: Optional[List[str]] = None) -> int:\n    parsed_args = parse_args(args)\n    outfp = extract_text(**vars(parsed_args))\n    outfp.close()\n    return 0\nif __name__ == \"__main__\":\n    sys.exit(main())",
+        "detail": ".venv.Scripts.pdf2txt",
+        "documentation": {}
+    },
+    {
+        "label": "OUTPUT_TYPES",
+        "kind": 5,
+        "importPath": ".venv.Scripts.pdf2txt",
+        "description": ".venv.Scripts.pdf2txt",
+        "peekOfCode": "OUTPUT_TYPES = ((\".htm\", \"html\"), (\".html\", \"html\"), (\".xml\", \"xml\"), (\".tag\", \"tag\"))\ndef float_or_disabled(x: str) -> Optional[float]:\n    if x.lower().strip() == \"disabled\":\n        return None\n    try:\n        return float(x)\n    except ValueError:\n        raise argparse.ArgumentTypeError(\"invalid float value: {}\".format(x))\ndef extract_text(\n    files: Iterable[str] = [],",
+        "detail": ".venv.Scripts.pdf2txt",
+        "documentation": {}
+    },
+    {
+        "label": "Tee",
+        "kind": 6,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "class Tee:\n    def __init__(self, file):\n        self.f = file\n    def write(self, what):\n        if self.f is not None:\n            try:\n                self.f.write(what.replace(\"\\n\", \"\\r\\n\"))\n            except OSError:\n                pass\n        tee_f.write(what)",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "get_root_hkey",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "def get_root_hkey():\n    try:\n        winreg.OpenKey(\n            winreg.HKEY_LOCAL_MACHINE, root_key_name, 0, winreg.KEY_CREATE_SUB_KEY\n        )\n        return winreg.HKEY_LOCAL_MACHINE\n    except OSError:\n        # Either not exist, or no permissions to create subkey means\n        # must be HKCU\n        return winreg.HKEY_CURRENT_USER",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "create_shortcut",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "def create_shortcut(\n    path, description, filename, arguments=\"\", workdir=\"\", iconpath=\"\", iconindex=0\n):\n    import pythoncom\n    from win32com.shell import shell\n    ilink = pythoncom.CoCreateInstance(\n        shell.CLSID_ShellLink,\n        None,\n        pythoncom.CLSCTX_INPROC_SERVER,\n        shell.IID_IShellLink,",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "get_special_folder_path",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "def get_special_folder_path(path_name):\n    from win32com.shell import shell, shellcon\n    for maybe in \"\"\"\n        CSIDL_COMMON_STARTMENU CSIDL_STARTMENU CSIDL_COMMON_APPDATA\n        CSIDL_LOCAL_APPDATA CSIDL_APPDATA CSIDL_COMMON_DESKTOPDIRECTORY\n        CSIDL_DESKTOPDIRECTORY CSIDL_COMMON_STARTUP CSIDL_STARTUP\n        CSIDL_COMMON_PROGRAMS CSIDL_PROGRAMS CSIDL_PROGRAM_FILES_COMMON\n        CSIDL_PROGRAM_FILES CSIDL_FONTS\"\"\".split():\n        if maybe == path_name:\n            csidl = getattr(shellcon, maybe)",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "CopyTo",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "def CopyTo(desc, src, dest):\n    import win32api\n    import win32con\n    while 1:\n        try:\n            win32api.CopyFile(src, dest, 0)\n            return\n        except win32api.error as details:\n            if details.winerror == 5:  # access denied - user not admin.\n                raise",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "LoadSystemModule",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "def LoadSystemModule(lib_dir, modname):\n    # See if this is a debug build.\n    import importlib.machinery\n    import importlib.util\n    suffix = \"_d\" if \"_d.pyd\" in importlib.machinery.EXTENSION_SUFFIXES else \"\"\n    filename = \"%s%d%d%s.dll\" % (\n        modname,\n        sys.version_info.major,\n        sys.version_info.minor,\n        suffix,",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "SetPyKeyVal",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "def SetPyKeyVal(key_name, value_name, value):\n    root_hkey = get_root_hkey()\n    root_key = winreg.OpenKey(root_hkey, root_key_name)\n    try:\n        my_key = winreg.CreateKey(root_key, key_name)\n        try:\n            winreg.SetValueEx(my_key, value_name, 0, winreg.REG_SZ, value)\n            if verbose:\n                print(f\"-> {root_key_name}\\\\{key_name}[{value_name}]={value!r}\")\n        finally:",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "UnsetPyKeyVal",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "def UnsetPyKeyVal(key_name, value_name, delete_key=False):\n    root_hkey = get_root_hkey()\n    root_key = winreg.OpenKey(root_hkey, root_key_name)\n    try:\n        my_key = winreg.OpenKey(root_key, key_name, 0, winreg.KEY_SET_VALUE)\n        try:\n            winreg.DeleteValue(my_key, value_name)\n            if verbose:\n                print(f\"-> DELETE {root_key_name}\\\\{key_name}[{value_name}]\")\n        finally:",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "RegisterCOMObjects",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "def RegisterCOMObjects(register=True):\n    import win32com.server.register\n    if register:\n        func = win32com.server.register.RegisterClasses\n    else:\n        func = win32com.server.register.UnregisterClasses\n    flags = {}\n    if not verbose:\n        flags[\"quiet\"] = 1\n    for module, klass_name in com_modules:",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "RegisterHelpFile",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "def RegisterHelpFile(register=True, lib_dir=None):\n    if lib_dir is None:\n        lib_dir = sysconfig.get_paths()[\"platlib\"]\n    if register:\n        # Register the .chm help file.\n        chm_file = os.path.join(lib_dir, \"PyWin32.chm\")\n        if os.path.isfile(chm_file):\n            # This isn't recursive, so if 'Help' doesn't exist, we croak\n            SetPyKeyVal(\"Help\", None, None)\n            SetPyKeyVal(\"Help\\\\Pythonwin Reference\", None, chm_file)",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "RegisterPythonwin",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "def RegisterPythonwin(register=True, lib_dir=None):\n    \"\"\"Add (or remove) Pythonwin to context menu for python scripts.\n    ??? Should probably also add Edit command for pys files also.\n    Also need to remove these keys on uninstall, but there's no function\n    to add registry entries to uninstall log ???\n    \"\"\"\n    import os\n    if lib_dir is None:\n        lib_dir = sysconfig.get_paths()[\"platlib\"]\n    classes_root = get_root_hkey()",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "get_shortcuts_folder",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "def get_shortcuts_folder():\n    if get_root_hkey() == winreg.HKEY_LOCAL_MACHINE:\n        try:\n            fldr = get_special_folder_path(\"CSIDL_COMMON_PROGRAMS\")\n        except OSError:\n            # No CSIDL_COMMON_PROGRAMS on this platform\n            fldr = get_special_folder_path(\"CSIDL_PROGRAMS\")\n    else:\n        # non-admin install - always goes in this user's start menu.\n        fldr = get_special_folder_path(\"CSIDL_PROGRAMS\")",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "get_system_dir",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "def get_system_dir():\n    import win32api  # we assume this exists.\n    try:\n        import pythoncom\n        import win32process\n        from win32com.shell import shell, shellcon\n        try:\n            if win32process.IsWow64Process():\n                return shell.SHGetSpecialFolderPath(0, shellcon.CSIDL_SYSTEMX86)\n            return shell.SHGetSpecialFolderPath(0, shellcon.CSIDL_SYSTEM)",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "fixup_dbi",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "def fixup_dbi():\n    # We used to have a dbi.pyd with our .pyd files, but now have a .py file.\n    # If the user didn't uninstall, they will find the .pyd which will cause\n    # problems - so handle that.\n    import win32api\n    import win32con\n    pyd_name = os.path.join(os.path.dirname(win32api.__file__), \"dbi.pyd\")\n    pyd_d_name = os.path.join(os.path.dirname(win32api.__file__), \"dbi_d.pyd\")\n    py_name = os.path.join(os.path.dirname(win32con.__file__), \"dbi.py\")\n    for this_pyd in (pyd_name, pyd_d_name):",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "install",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "def install(lib_dir):\n    import traceback\n    # The .pth file is now installed as a regular file.\n    # Create the .pth file in the site-packages dir, and use only relative paths\n    # We used to write a .pth directly to sys.prefix - clobber it.\n    if os.path.isfile(os.path.join(sys.prefix, \"pywin32.pth\")):\n        os.unlink(os.path.join(sys.prefix, \"pywin32.pth\"))\n    # The .pth may be new and therefore not loaded in this session.\n    # Setup the paths just in case.\n    for name in \"win32 win32\\\\lib Pythonwin\".split():",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "uninstall",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "def uninstall(lib_dir):\n    # First ensure our system modules are loaded from pywin32_system, so\n    # we can remove the ones we copied...\n    LoadSystemModule(lib_dir, \"pywintypes\")\n    LoadSystemModule(lib_dir, \"pythoncom\")\n    try:\n        RegisterCOMObjects(False)\n    except Exception as why:\n        print(f\"Failed to unregister COM objects: {why}\")\n    try:",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "verify_destination",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "def verify_destination(location: str) -> str:\n    location = os.path.abspath(location)\n    if not os.path.isdir(location):\n        raise argparse.ArgumentTypeError(\n            f'Path \"{location}\" is not an existing directory!'\n        )\n    return location\ndef main():\n    parser = argparse.ArgumentParser(\n        formatter_class=argparse.RawDescriptionHelpFormatter,",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "main",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "def main():\n    parser = argparse.ArgumentParser(\n        formatter_class=argparse.RawDescriptionHelpFormatter,\n        description=\"\"\"A post-install script for the pywin32 extensions.\n    * Typical usage:\n    > python -m pywin32_postinstall -install\n    * or (shorter but you don't have control over which python environment is used)\n    > pywin32_postinstall -install\n    You need to execute this script, with a '-install' parameter,\n    to ensure the environment is setup correctly to install COM objects, services, etc.",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "tee_f",
+        "kind": 5,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "tee_f = open(\n    os.path.join(\n        tempfile.gettempdir(),  # Send output somewhere so it can be found if necessary...\n        \"pywin32_postinstall.log\",\n    ),\n    \"w\",\n)\nclass Tee:\n    def __init__(self, file):\n        self.f = file",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "sys.stderr",
+        "kind": 5,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "sys.stderr = Tee(sys.stderr)\nsys.stdout = Tee(sys.stdout)\ncom_modules = [\n    # module_name,                      class_names\n    (\"win32com.servers.interp\", \"Interpreter\"),\n    (\"win32com.servers.dictionary\", \"DictionaryPolicy\"),\n    (\"win32com.axscript.client.pyscript\", \"PyScript\"),\n]\n# Is this a 'silent' install - ie, avoid all dialogs.\n# Different than 'verbose'",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "sys.stdout",
+        "kind": 5,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "sys.stdout = Tee(sys.stdout)\ncom_modules = [\n    # module_name,                      class_names\n    (\"win32com.servers.interp\", \"Interpreter\"),\n    (\"win32com.servers.dictionary\", \"DictionaryPolicy\"),\n    (\"win32com.axscript.client.pyscript\", \"PyScript\"),\n]\n# Is this a 'silent' install - ie, avoid all dialogs.\n# Different than 'verbose'\nsilent = 0",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "com_modules",
+        "kind": 5,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "com_modules = [\n    # module_name,                      class_names\n    (\"win32com.servers.interp\", \"Interpreter\"),\n    (\"win32com.servers.dictionary\", \"DictionaryPolicy\"),\n    (\"win32com.axscript.client.pyscript\", \"PyScript\"),\n]\n# Is this a 'silent' install - ie, avoid all dialogs.\n# Different than 'verbose'\nsilent = 0\n# Verbosity of output messages.",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "silent",
+        "kind": 5,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "silent = 0\n# Verbosity of output messages.\nverbose = 1\nroot_key_name = \"Software\\\\Python\\\\PythonCore\\\\\" + sys.winver\ndef get_root_hkey():\n    try:\n        winreg.OpenKey(\n            winreg.HKEY_LOCAL_MACHINE, root_key_name, 0, winreg.KEY_CREATE_SUB_KEY\n        )\n        return winreg.HKEY_LOCAL_MACHINE",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "verbose",
+        "kind": 5,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "verbose = 1\nroot_key_name = \"Software\\\\Python\\\\PythonCore\\\\\" + sys.winver\ndef get_root_hkey():\n    try:\n        winreg.OpenKey(\n            winreg.HKEY_LOCAL_MACHINE, root_key_name, 0, winreg.KEY_CREATE_SUB_KEY\n        )\n        return winreg.HKEY_LOCAL_MACHINE\n    except OSError:\n        # Either not exist, or no permissions to create subkey means",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "root_key_name",
+        "kind": 5,
+        "importPath": ".venv.Scripts.pywin32_postinstall",
+        "description": ".venv.Scripts.pywin32_postinstall",
+        "peekOfCode": "root_key_name = \"Software\\\\Python\\\\PythonCore\\\\\" + sys.winver\ndef get_root_hkey():\n    try:\n        winreg.OpenKey(\n            winreg.HKEY_LOCAL_MACHINE, root_key_name, 0, winreg.KEY_CREATE_SUB_KEY\n        )\n        return winreg.HKEY_LOCAL_MACHINE\n    except OSError:\n        # Either not exist, or no permissions to create subkey means\n        # must be HKCU",
+        "detail": ".venv.Scripts.pywin32_postinstall",
+        "documentation": {}
+    },
+    {
+        "label": "run_test",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pywin32_testall",
+        "description": ".venv.Scripts.pywin32_testall",
+        "peekOfCode": "def run_test(script, cmdline_extras):\n    dirname, scriptname = os.path.split(script)\n    # some tests prefer to be run from their directory.\n    cmd = [sys.executable, \"-u\", scriptname] + cmdline_extras\n    print(\"--- Running '%s' ---\" % script)\n    sys.stdout.flush()\n    result = subprocess.run(cmd, check=False, cwd=dirname)\n    print(f\"*** Test script '{script}' exited with {result.returncode}\")\n    sys.stdout.flush()\n    if result.returncode:",
+        "detail": ".venv.Scripts.pywin32_testall",
+        "documentation": {}
+    },
+    {
+        "label": "find_and_run",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pywin32_testall",
+        "description": ".venv.Scripts.pywin32_testall",
+        "peekOfCode": "def find_and_run(possible_locations, extras):\n    for maybe in possible_locations:\n        if os.path.isfile(maybe):\n            run_test(maybe, extras)\n            break\n    else:\n        raise RuntimeError(\n            \"Failed to locate a test script in one of %s\" % possible_locations\n        )\ndef main():",
+        "detail": ".venv.Scripts.pywin32_testall",
+        "documentation": {}
+    },
+    {
+        "label": "main",
+        "kind": 2,
+        "importPath": ".venv.Scripts.pywin32_testall",
+        "description": ".venv.Scripts.pywin32_testall",
+        "peekOfCode": "def main():\n    import argparse\n    code_directories = [project_root] + site_packages\n    parser = argparse.ArgumentParser(\n        description=\"A script to trigger tests in all subprojects of PyWin32.\"\n    )\n    parser.add_argument(\n        \"-no-user-interaction\",\n        default=False,\n        action=\"store_true\",",
+        "detail": ".venv.Scripts.pywin32_testall",
+        "documentation": {}
+    },
+    {
+        "label": "project_root",
+        "kind": 5,
+        "importPath": ".venv.Scripts.pywin32_testall",
+        "description": ".venv.Scripts.pywin32_testall",
+        "peekOfCode": "project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))\nsite_packages = [site.getusersitepackages()] + site.getsitepackages()\nfailures = []\n# Run a test using subprocess and wait for the result.\n# If we get an returncode != 0, we know that there was an error, but we don't\n# abort immediately - we run as many tests as we can.\ndef run_test(script, cmdline_extras):\n    dirname, scriptname = os.path.split(script)\n    # some tests prefer to be run from their directory.\n    cmd = [sys.executable, \"-u\", scriptname] + cmdline_extras",
+        "detail": ".venv.Scripts.pywin32_testall",
+        "documentation": {}
+    },
+    {
+        "label": "site_packages",
+        "kind": 5,
+        "importPath": ".venv.Scripts.pywin32_testall",
+        "description": ".venv.Scripts.pywin32_testall",
+        "peekOfCode": "site_packages = [site.getusersitepackages()] + site.getsitepackages()\nfailures = []\n# Run a test using subprocess and wait for the result.\n# If we get an returncode != 0, we know that there was an error, but we don't\n# abort immediately - we run as many tests as we can.\ndef run_test(script, cmdline_extras):\n    dirname, scriptname = os.path.split(script)\n    # some tests prefer to be run from their directory.\n    cmd = [sys.executable, \"-u\", scriptname] + cmdline_extras\n    print(\"--- Running '%s' ---\" % script)",
+        "detail": ".venv.Scripts.pywin32_testall",
+        "documentation": {}
+    },
+    {
+        "label": "failures",
+        "kind": 5,
+        "importPath": ".venv.Scripts.pywin32_testall",
+        "description": ".venv.Scripts.pywin32_testall",
+        "peekOfCode": "failures = []\n# Run a test using subprocess and wait for the result.\n# If we get an returncode != 0, we know that there was an error, but we don't\n# abort immediately - we run as many tests as we can.\ndef run_test(script, cmdline_extras):\n    dirname, scriptname = os.path.split(script)\n    # some tests prefer to be run from their directory.\n    cmd = [sys.executable, \"-u\", scriptname] + cmdline_extras\n    print(\"--- Running '%s' ---\" % script)\n    sys.stdout.flush()",
+        "detail": ".venv.Scripts.pywin32_testall",
+        "documentation": {}
+    },
+    {
+        "label": "extract_file",
+        "kind": 2,
+        "importPath": ".venv.Scripts.vba_extract",
+        "description": ".venv.Scripts.vba_extract",
+        "peekOfCode": "def extract_file(xlsm_zip, filename):\n    # Extract a single file from an Excel xlsm macro file.\n    data = xlsm_zip.read(\"xl/\" + filename)\n    # Write the data to a local file.\n    file = open(filename, \"wb\")\n    file.write(data)\n    file.close()\n# The VBA project file and project signature file we want to extract.\nvba_filename = \"vbaProject.bin\"\nvba_signature_filename = \"vbaProjectSignature.bin\"",
+        "detail": ".venv.Scripts.vba_extract",
+        "documentation": {}
+    },
+    {
+        "label": "vba_filename",
+        "kind": 5,
+        "importPath": ".venv.Scripts.vba_extract",
+        "description": ".venv.Scripts.vba_extract",
+        "peekOfCode": "vba_filename = \"vbaProject.bin\"\nvba_signature_filename = \"vbaProjectSignature.bin\"\n# Get the xlsm file name from the commandline.\nif len(sys.argv) > 1:\n    xlsm_file = sys.argv[1]\nelse:\n    print(\n        \"\\nUtility to extract a vbaProject.bin binary from an Excel 2007+ \"\n        \"xlsm macro file for insertion into an XlsxWriter file.\\n\"\n        \"If the macros are digitally signed, extracts also a vbaProjectSignature.bin \"",
+        "detail": ".venv.Scripts.vba_extract",
+        "documentation": {}
+    },
+    {
+        "label": "vba_signature_filename",
+        "kind": 5,
+        "importPath": ".venv.Scripts.vba_extract",
+        "description": ".venv.Scripts.vba_extract",
+        "peekOfCode": "vba_signature_filename = \"vbaProjectSignature.bin\"\n# Get the xlsm file name from the commandline.\nif len(sys.argv) > 1:\n    xlsm_file = sys.argv[1]\nelse:\n    print(\n        \"\\nUtility to extract a vbaProject.bin binary from an Excel 2007+ \"\n        \"xlsm macro file for insertion into an XlsxWriter file.\\n\"\n        \"If the macros are digitally signed, extracts also a vbaProjectSignature.bin \"\n        \"file.\\n\"",
+        "detail": ".venv.Scripts.vba_extract",
         "documentation": {}
     },
     {
@@ -7001,6 +8031,60 @@
     {
         "label": "upgrade",
         "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.009_add_folder_file_content_hash",
+        "description": "study-app-backend.src.migrations.versions.009_add_folder_file_content_hash",
+        "peekOfCode": "def upgrade() -> None:\n    op.add_column(\n        'folder_files',\n        sa.Column('content_hash', sa.String(64), nullable=False, server_default=''),\n    )\n    op.create_index(\n        'ix_folder_files_folder_id_content_hash',\n        'folder_files',\n        ['folder_id', 'content_hash'],\n    )",
+        "detail": "study-app-backend.src.migrations.versions.009_add_folder_file_content_hash",
+        "documentation": {}
+    },
+    {
+        "label": "downgrade",
+        "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.009_add_folder_file_content_hash",
+        "description": "study-app-backend.src.migrations.versions.009_add_folder_file_content_hash",
+        "peekOfCode": "def downgrade() -> None:\n    op.drop_index('ix_folder_files_folder_id_content_hash', table_name='folder_files')\n    op.drop_column('folder_files', 'content_hash')",
+        "detail": "study-app-backend.src.migrations.versions.009_add_folder_file_content_hash",
+        "documentation": {}
+    },
+    {
+        "label": "revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.009_add_folder_file_content_hash",
+        "description": "study-app-backend.src.migrations.versions.009_add_folder_file_content_hash",
+        "peekOfCode": "revision = '009_content_hash'\ndown_revision = '008_drop_beta_tables'\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.add_column(\n        'folder_files',\n        sa.Column('content_hash', sa.String(64), nullable=False, server_default=''),\n    )\n    op.create_index(",
+        "detail": "study-app-backend.src.migrations.versions.009_add_folder_file_content_hash",
+        "documentation": {}
+    },
+    {
+        "label": "down_revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.009_add_folder_file_content_hash",
+        "description": "study-app-backend.src.migrations.versions.009_add_folder_file_content_hash",
+        "peekOfCode": "down_revision = '008_drop_beta_tables'\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.add_column(\n        'folder_files',\n        sa.Column('content_hash', sa.String(64), nullable=False, server_default=''),\n    )\n    op.create_index(\n        'ix_folder_files_folder_id_content_hash',",
+        "detail": "study-app-backend.src.migrations.versions.009_add_folder_file_content_hash",
+        "documentation": {}
+    },
+    {
+        "label": "branch_labels",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.009_add_folder_file_content_hash",
+        "description": "study-app-backend.src.migrations.versions.009_add_folder_file_content_hash",
+        "peekOfCode": "branch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.add_column(\n        'folder_files',\n        sa.Column('content_hash', sa.String(64), nullable=False, server_default=''),\n    )\n    op.create_index(\n        'ix_folder_files_folder_id_content_hash',\n        'folder_files',",
+        "detail": "study-app-backend.src.migrations.versions.009_add_folder_file_content_hash",
+        "documentation": {}
+    },
+    {
+        "label": "depends_on",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.009_add_folder_file_content_hash",
+        "description": "study-app-backend.src.migrations.versions.009_add_folder_file_content_hash",
+        "peekOfCode": "depends_on = None\ndef upgrade() -> None:\n    op.add_column(\n        'folder_files',\n        sa.Column('content_hash', sa.String(64), nullable=False, server_default=''),\n    )\n    op.create_index(\n        'ix_folder_files_folder_id_content_hash',\n        'folder_files',\n        ['folder_id', 'content_hash'],",
+        "detail": "study-app-backend.src.migrations.versions.009_add_folder_file_content_hash",
+        "documentation": {}
+    },
+    {
+        "label": "upgrade",
+        "kind": 2,
         "importPath": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
         "description": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
         "peekOfCode": "def upgrade() -> None:\n    # ### commands auto generated by Alembic - please adjust! ###\n    op.create_table('fill_blank_answers',\n    sa.Column('id', sa.Integer(), nullable=False),\n    sa.Column('question_id', sa.BigInteger().with_variant(sa.Integer(), 'sqlite'), nullable=False),\n    sa.Column('acceptable_answers_json', sa.String(), nullable=False),\n    sa.ForeignKeyConstraint(['question_id'], ['questions.id'], ondelete='CASCADE'),\n    sa.PrimaryKeyConstraint('id'),\n    sa.UniqueConstraint('question_id')\n    )",
@@ -7050,6 +8134,60 @@
         "description": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
         "peekOfCode": "depends_on = None\ndef upgrade() -> None:\n    # ### commands auto generated by Alembic - please adjust! ###\n    op.create_table('fill_blank_answers',\n    sa.Column('id', sa.Integer(), nullable=False),\n    sa.Column('question_id', sa.BigInteger().with_variant(sa.Integer(), 'sqlite'), nullable=False),\n    sa.Column('acceptable_answers_json', sa.String(), nullable=False),\n    sa.ForeignKeyConstraint(['question_id'], ['questions.id'], ondelete='CASCADE'),\n    sa.PrimaryKeyConstraint('id'),\n    sa.UniqueConstraint('question_id')",
         "detail": "study-app-backend.src.migrations.versions.9449496ba921_add_new_question_types_matching_",
+        "documentation": {}
+    },
+    {
+        "label": "upgrade",
+        "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.d66f3a7e3e9d_add_upload_status_to_folder_files_and_",
+        "description": "study-app-backend.src.migrations.versions.d66f3a7e3e9d_add_upload_status_to_folder_files_and_",
+        "peekOfCode": "def upgrade() -> None:\n    # ### commands auto generated by Alembic - please adjust! ###\n    op.add_column('folder_files', sa.Column('upload_status', sa.String(length=20), nullable=True))\n    op.add_column('folder_files', sa.Column('upload_error', sa.Text(), nullable=True))\n    op.add_column('tests', sa.Column('generation_status', sa.String(length=20), server_default='ready', nullable=False))\n    op.add_column('tests', sa.Column('generation_error', sa.Text(), nullable=True))\n    # ### end Alembic commands ###\ndef downgrade() -> None:\n    # ### commands auto generated by Alembic - please adjust! ###\n    op.drop_column('tests', 'generation_error')",
+        "detail": "study-app-backend.src.migrations.versions.d66f3a7e3e9d_add_upload_status_to_folder_files_and_",
+        "documentation": {}
+    },
+    {
+        "label": "downgrade",
+        "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.d66f3a7e3e9d_add_upload_status_to_folder_files_and_",
+        "description": "study-app-backend.src.migrations.versions.d66f3a7e3e9d_add_upload_status_to_folder_files_and_",
+        "peekOfCode": "def downgrade() -> None:\n    # ### commands auto generated by Alembic - please adjust! ###\n    op.drop_column('tests', 'generation_error')\n    op.drop_column('tests', 'generation_status')\n    op.drop_column('folder_files', 'upload_error')\n    op.drop_column('folder_files', 'upload_status')\n    # ### end Alembic commands ###",
+        "detail": "study-app-backend.src.migrations.versions.d66f3a7e3e9d_add_upload_status_to_folder_files_and_",
+        "documentation": {}
+    },
+    {
+        "label": "revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.d66f3a7e3e9d_add_upload_status_to_folder_files_and_",
+        "description": "study-app-backend.src.migrations.versions.d66f3a7e3e9d_add_upload_status_to_folder_files_and_",
+        "peekOfCode": "revision = 'd66f3a7e3e9d'\ndown_revision = '009_content_hash'\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    # ### commands auto generated by Alembic - please adjust! ###\n    op.add_column('folder_files', sa.Column('upload_status', sa.String(length=20), nullable=True))\n    op.add_column('folder_files', sa.Column('upload_error', sa.Text(), nullable=True))\n    op.add_column('tests', sa.Column('generation_status', sa.String(length=20), server_default='ready', nullable=False))\n    op.add_column('tests', sa.Column('generation_error', sa.Text(), nullable=True))",
+        "detail": "study-app-backend.src.migrations.versions.d66f3a7e3e9d_add_upload_status_to_folder_files_and_",
+        "documentation": {}
+    },
+    {
+        "label": "down_revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.d66f3a7e3e9d_add_upload_status_to_folder_files_and_",
+        "description": "study-app-backend.src.migrations.versions.d66f3a7e3e9d_add_upload_status_to_folder_files_and_",
+        "peekOfCode": "down_revision = '009_content_hash'\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    # ### commands auto generated by Alembic - please adjust! ###\n    op.add_column('folder_files', sa.Column('upload_status', sa.String(length=20), nullable=True))\n    op.add_column('folder_files', sa.Column('upload_error', sa.Text(), nullable=True))\n    op.add_column('tests', sa.Column('generation_status', sa.String(length=20), server_default='ready', nullable=False))\n    op.add_column('tests', sa.Column('generation_error', sa.Text(), nullable=True))\n    # ### end Alembic commands ###",
+        "detail": "study-app-backend.src.migrations.versions.d66f3a7e3e9d_add_upload_status_to_folder_files_and_",
+        "documentation": {}
+    },
+    {
+        "label": "branch_labels",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.d66f3a7e3e9d_add_upload_status_to_folder_files_and_",
+        "description": "study-app-backend.src.migrations.versions.d66f3a7e3e9d_add_upload_status_to_folder_files_and_",
+        "peekOfCode": "branch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    # ### commands auto generated by Alembic - please adjust! ###\n    op.add_column('folder_files', sa.Column('upload_status', sa.String(length=20), nullable=True))\n    op.add_column('folder_files', sa.Column('upload_error', sa.Text(), nullable=True))\n    op.add_column('tests', sa.Column('generation_status', sa.String(length=20), server_default='ready', nullable=False))\n    op.add_column('tests', sa.Column('generation_error', sa.Text(), nullable=True))\n    # ### end Alembic commands ###\ndef downgrade() -> None:",
+        "detail": "study-app-backend.src.migrations.versions.d66f3a7e3e9d_add_upload_status_to_folder_files_and_",
+        "documentation": {}
+    },
+    {
+        "label": "depends_on",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.d66f3a7e3e9d_add_upload_status_to_folder_files_and_",
+        "description": "study-app-backend.src.migrations.versions.d66f3a7e3e9d_add_upload_status_to_folder_files_and_",
+        "peekOfCode": "depends_on = None\ndef upgrade() -> None:\n    # ### commands auto generated by Alembic - please adjust! ###\n    op.add_column('folder_files', sa.Column('upload_status', sa.String(length=20), nullable=True))\n    op.add_column('folder_files', sa.Column('upload_error', sa.Text(), nullable=True))\n    op.add_column('tests', sa.Column('generation_status', sa.String(length=20), server_default='ready', nullable=False))\n    op.add_column('tests', sa.Column('generation_error', sa.Text(), nullable=True))\n    # ### end Alembic commands ###\ndef downgrade() -> None:\n    # ### commands auto generated by Alembic - please adjust! ###",
+        "detail": "study-app-backend.src.migrations.versions.d66f3a7e3e9d_add_upload_status_to_folder_files_and_",
         "documentation": {}
     },
     {
@@ -7147,7 +8285,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.models.folder_file",
         "description": "study-app-backend.src.models.folder_file",
-        "peekOfCode": "class FolderFile(Base):\n    __tablename__ = \"folder_files\"\n    id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)\n    folder_id: Mapped[int] = mapped_column(\n        BIGINT_ID, ForeignKey(\"folders.id\", ondelete=\"CASCADE\"), nullable=False, index=True\n    )\n    file_name: Mapped[str] = mapped_column(String(255), nullable=False)\n    file_type: Mapped[str] = mapped_column(String(10), nullable=False)\n    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)\n    content: Mapped[str] = mapped_column(Text, nullable=False)",
+        "peekOfCode": "class FolderFile(Base):\n    __tablename__ = \"folder_files\"\n    __table_args__ = (\n        Index(\"ix_folder_files_folder_id_content_hash\", \"folder_id\", \"content_hash\"),\n    )\n    id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)\n    folder_id: Mapped[int] = mapped_column(\n        BIGINT_ID, ForeignKey(\"folders.id\", ondelete=\"CASCADE\"), nullable=False, index=True\n    )\n    file_name: Mapped[str] = mapped_column(String(255), nullable=False)",
         "detail": "study-app-backend.src.models.folder_file",
         "documentation": {}
     },
@@ -7341,6 +8479,15 @@
         "documentation": {}
     },
     {
+        "label": "logger",
+        "kind": 5,
+        "importPath": "study-app-backend.src.routes.auth",
+        "description": "study-app-backend.src.routes.auth",
+        "peekOfCode": "logger = logging.getLogger(__name__)\nrouter = APIRouter(prefix=\"/auth\", tags=[\"auth\"])\n@router.post(\"/google\", response_model=AuthResponse)\nasync def google_auth(\n    request: GoogleAuthRequest,\n    session: AsyncSession = Depends(get_session),\n) -> AuthResponse:\n    try:\n        return await AuthService().authenticate_google_token(request.token, session)\n    except httpx.HTTPStatusError as exc:",
+        "detail": "study-app-backend.src.routes.auth",
+        "documentation": {}
+    },
+    {
         "label": "router",
         "kind": 5,
         "importPath": "study-app-backend.src.routes.auth",
@@ -7359,30 +8506,66 @@
         "documentation": {}
     },
     {
-        "label": "FolderFileResponse",
-        "kind": 6,
-        "importPath": "study-app-backend.src.routes.folder_files",
-        "description": "study-app-backend.src.routes.folder_files",
-        "peekOfCode": "class FolderFileResponse(BaseModel):\n    id: int\n    folder_id: int\n    file_name: str\n    file_type: str\n    size_bytes: int\n    uploaded_at: datetime\n    model_config = {\"from_attributes\": True}\nasync def _get_owned_folder(\n    folder_id: int,",
-        "detail": "study-app-backend.src.routes.folder_files",
-        "documentation": {}
-    },
-    {
-        "label": "router",
-        "kind": 5,
-        "importPath": "study-app-backend.src.routes.folder_files",
-        "description": "study-app-backend.src.routes.folder_files",
-        "peekOfCode": "router = APIRouter(prefix=\"/folders\", tags=[\"folder-files\"])\nclass FolderFileResponse(BaseModel):\n    id: int\n    folder_id: int\n    file_name: str\n    file_type: str\n    size_bytes: int\n    uploaded_at: datetime\n    model_config = {\"from_attributes\": True}\nasync def _get_owned_folder(",
-        "detail": "study-app-backend.src.routes.folder_files",
-        "documentation": {}
-    },
-    {
         "label": "router",
         "kind": 5,
         "importPath": "study-app-backend.src.routes.folders",
         "description": "study-app-backend.src.routes.folders",
         "peekOfCode": "router = APIRouter(prefix=\"/folders\", tags=[\"folders\"])\n@router.get(\"\", response_model=list[FolderResponse])\nasync def list_folders(\n    session: AsyncSession = Depends(get_session),\n    user: User = Depends(get_current_user),\n) -> list[FolderResponse]:\n    return await FolderService().list_folders(user.id, session)\n@router.post(\"\", response_model=FolderResponse, status_code=status.HTTP_201_CREATED)\nasync def create_folder(\n    data: FolderCreate,",
         "detail": "study-app-backend.src.routes.folders",
+        "documentation": {}
+    },
+    {
+        "label": "FolderFileResponse",
+        "kind": 6,
+        "importPath": "study-app-backend.src.routes.folder_files",
+        "description": "study-app-backend.src.routes.folder_files",
+        "peekOfCode": "class FolderFileResponse(BaseModel):\n    id: int\n    folder_id: int\n    file_name: str\n    file_type: str\n    size_bytes: int\n    upload_status: Optional[str] = None\n    upload_error: Optional[str] = None\n    uploaded_at: datetime\n    model_config = {\"from_attributes\": True}",
+        "detail": "study-app-backend.src.routes.folder_files",
+        "documentation": {}
+    },
+    {
+        "label": "SkippedFile",
+        "kind": 6,
+        "importPath": "study-app-backend.src.routes.folder_files",
+        "description": "study-app-backend.src.routes.folder_files",
+        "peekOfCode": "class SkippedFile(BaseModel):\n    file_name: str\n    reason: str\nclass UploadResult(BaseModel):\n    uploaded: list[FolderFileResponse]\n    skipped: list[SkippedFile]\nasync def _get_owned_folder(\n    folder_id: int,\n    user: User,\n    session: AsyncSession,",
+        "detail": "study-app-backend.src.routes.folder_files",
+        "documentation": {}
+    },
+    {
+        "label": "UploadResult",
+        "kind": 6,
+        "importPath": "study-app-backend.src.routes.folder_files",
+        "description": "study-app-backend.src.routes.folder_files",
+        "peekOfCode": "class UploadResult(BaseModel):\n    uploaded: list[FolderFileResponse]\n    skipped: list[SkippedFile]\nasync def _get_owned_folder(\n    folder_id: int,\n    user: User,\n    session: AsyncSession,\n) -> Folder:\n    folder = await session.scalar(\n        select(Folder).where(Folder.id == folder_id, Folder.user_id == user.id)",
+        "detail": "study-app-backend.src.routes.folder_files",
+        "documentation": {}
+    },
+    {
+        "label": "_BytesUploadFile",
+        "kind": 6,
+        "importPath": "study-app-backend.src.routes.folder_files",
+        "description": "study-app-backend.src.routes.folder_files",
+        "peekOfCode": "class _BytesUploadFile:\n    \"\"\"Minimal UploadFile stand-in backed by in-memory bytes for background tasks.\"\"\"\n    def __init__(self, data: bytes, filename: str) -> None:\n        self._data = data\n        self.filename = filename\n    async def read(self) -> bytes:\n        return self._data\nasync def _extract_and_update(\n    file_id: int,\n    data: bytes,",
+        "detail": "study-app-backend.src.routes.folder_files",
+        "documentation": {}
+    },
+    {
+        "label": "logger",
+        "kind": 5,
+        "importPath": "study-app-backend.src.routes.folder_files",
+        "description": "study-app-backend.src.routes.folder_files",
+        "peekOfCode": "logger = get_logger(__name__)\nrouter = APIRouter(prefix=\"/folders\", tags=[\"folder-files\"])\nclass FolderFileResponse(BaseModel):\n    id: int\n    folder_id: int\n    file_name: str\n    file_type: str\n    size_bytes: int\n    upload_status: Optional[str] = None\n    upload_error: Optional[str] = None",
+        "detail": "study-app-backend.src.routes.folder_files",
+        "documentation": {}
+    },
+    {
+        "label": "router",
+        "kind": 5,
+        "importPath": "study-app-backend.src.routes.folder_files",
+        "description": "study-app-backend.src.routes.folder_files",
+        "peekOfCode": "router = APIRouter(prefix=\"/folders\", tags=[\"folder-files\"])\nclass FolderFileResponse(BaseModel):\n    id: int\n    folder_id: int\n    file_name: str\n    file_type: str\n    size_bytes: int\n    upload_status: Optional[str] = None\n    upload_error: Optional[str] = None\n    uploaded_at: datetime",
+        "detail": "study-app-backend.src.routes.folder_files",
         "documentation": {}
     },
     {
@@ -7413,11 +8596,29 @@
         "documentation": {}
     },
     {
+        "label": "_BytesUploadFile",
+        "kind": 6,
+        "importPath": "study-app-backend.src.routes.tests",
+        "description": "study-app-backend.src.routes.tests",
+        "peekOfCode": "class _BytesUploadFile:\n    \"\"\"Minimal UploadFile stand-in backed by in-memory bytes.\"\"\"\n    def __init__(self, data: bytes, filename: str) -> None:\n        self._data = data\n        self.filename = filename\n    async def read(self) -> bytes:\n        return self._data\n    async def seek(self, pos: int) -> None:\n        pass  # no-op; bytes are always fully available\nasync def _generate_questions_background(",
+        "detail": "study-app-backend.src.routes.tests",
+        "documentation": {}
+    },
+    {
         "label": "router",
         "kind": 5,
         "importPath": "study-app-backend.src.routes.tests",
         "description": "study-app-backend.src.routes.tests",
-        "peekOfCode": "router = APIRouter(tags=[\"tests\"])\n@router.post(\n    \"/folders/{folder_id}/tests\",\n    response_model=CreateTestResponse,\n    status_code=status.HTTP_201_CREATED,\n)\nasync def create_test(\n    folder_id: int,\n    request: Request,\n    session: AsyncSession = Depends(get_session),",
+        "peekOfCode": "router = APIRouter(tags=[\"tests\"])\nlogger = get_logger(__name__)\nclass _BytesUploadFile:\n    \"\"\"Minimal UploadFile stand-in backed by in-memory bytes.\"\"\"\n    def __init__(self, data: bytes, filename: str) -> None:\n        self._data = data\n        self.filename = filename\n    async def read(self) -> bytes:\n        return self._data\n    async def seek(self, pos: int) -> None:",
+        "detail": "study-app-backend.src.routes.tests",
+        "documentation": {}
+    },
+    {
+        "label": "logger",
+        "kind": 5,
+        "importPath": "study-app-backend.src.routes.tests",
+        "description": "study-app-backend.src.routes.tests",
+        "peekOfCode": "logger = get_logger(__name__)\nclass _BytesUploadFile:\n    \"\"\"Minimal UploadFile stand-in backed by in-memory bytes.\"\"\"\n    def __init__(self, data: bytes, filename: str) -> None:\n        self._data = data\n        self.filename = filename\n    async def read(self) -> bytes:\n        return self._data\n    async def seek(self, pos: int) -> None:\n        pass  # no-op; bytes are always fully available",
         "detail": "study-app-backend.src.routes.tests",
         "documentation": {}
     },
@@ -7822,7 +9023,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class TestSummary(BaseModel):\n    id: int\n    title: str\n    description: Optional[str] = None\n    test_type: str\n    question_count: int = 0\n    best_score: Optional[float] = None\n    attempt_count: int = 0\n    created_at: datetime\nclass TestUpdate(BaseModel):",
+        "peekOfCode": "class TestSummary(BaseModel):\n    id: int\n    title: str\n    description: Optional[str] = None\n    test_type: str\n    question_count: int = 0\n    best_score: Optional[float] = None\n    attempt_count: int = 0\n    created_at: datetime\n    generation_status: str = \"ready\"",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -7849,7 +9050,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.test_schema",
         "description": "study-app-backend.src.schemas.test_schema",
-        "peekOfCode": "class CreateTestResponse(BaseModel):\n    test_id: int\n    title: str\n    questions_generated: int\n    message: str = \"Test created. Ready to take.\"\n    fallback_used: bool = False\n    fallback_reason: Optional[str] = None\n    note_grounded: bool = True\n    retrieval_enabled: bool = False\n    retrieval_total_chunks: int = 0",
+        "peekOfCode": "class CreateTestResponse(BaseModel):\n    test_id: int\n    title: str\n    questions_generated: int = 0\n    message: str = \"Test created. Ready to take.\"\n    generation_status: str = \"ready\"\n    fallback_used: bool = False\n    fallback_reason: Optional[str] = None\n    note_grounded: bool = True\n    retrieval_enabled: bool = False",
         "detail": "study-app-backend.src.schemas.test_schema",
         "documentation": {}
     },
@@ -7886,6 +9087,15 @@
         "importPath": "study-app-backend.src.services.file_service",
         "description": "study-app-backend.src.services.file_service",
         "peekOfCode": "_CODE_FILE_TYPES = {\n    \"py\", \"js\", \"ts\", \"tsx\", \"jsx\", \"java\", \"c\", \"cpp\", \"h\", \"hpp\",\n    \"cs\", \"go\", \"rs\", \"swift\", \"kt\", \"scala\", \"rb\", \"php\", \"sql\", \"json\", \"xml\", \"yaml\", \"yml\",\n}\ndef _preferred_pdf_workers() -> int:\n    return max(1, min(os.cpu_count() or 1, 4))\ndef _chunk_page_indexes(page_count: int, worker_count: int) -> list[list[int]]:\n    if page_count <= 0:\n        return []\n    worker_count = max(1, min(worker_count, page_count))",
+        "detail": "study-app-backend.src.services.file_service",
+        "documentation": {}
+    },
+    {
+        "label": "_MATH_KEEP_CHARS",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.file_service",
+        "description": "study-app-backend.src.services.file_service",
+        "peekOfCode": "_MATH_KEEP_CHARS = frozenset(\n    \"∫∬∭∮∯∰∑∏√∂∇∞±×÷≤≥≠≈∈∉⊂⊃∪∩ΣΠΩαβγδεζηθλμπρστφψω\"\n)\ndef _is_ocr_noise_line(line: str) -> bool:\n    stripped = line.strip()\n    if not stripped:\n        return True\n    if len(stripped) <= 2:\n        # Preserve lone math/Greek symbols — dropping them erases integral signs\n        # from indefinite-integral questions where no bound follows on the same line.",
         "detail": "study-app-backend.src.services.file_service",
         "documentation": {}
     },
@@ -8236,7 +9446,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "_RETRIEVAL_STOPWORDS = {\n    \"the\", \"and\", \"for\", \"are\", \"but\", \"not\", \"you\", \"all\", \"can\", \"had\", \"was\", \"one\", \"our\",\n    \"out\", \"has\", \"how\", \"its\", \"may\", \"new\", \"now\", \"old\", \"two\", \"way\", \"did\", \"each\", \"from\",\n    \"have\", \"what\", \"this\", \"that\", \"with\", \"want\", \"help\", \"explain\", \"show\", \"tell\", \"give\", \"does\",\n    \"work\", \"will\", \"would\", \"could\", \"should\", \"about\", \"into\", \"there\", \"their\", \"then\", \"than\", \"when\",\n    \"where\", \"which\", \"while\", \"also\", \"more\", \"like\", \"just\", \"here\", \"even\", \"know\", \"come\", \"said\",\n    \"make\", \"look\", \"use\", \"some\", \"very\", \"over\", \"such\", \"been\", \"they\", \"them\", \"these\",\n}\n# Matches any meaningful math content: numbers, operators, LaTeX commands, KaTeX delimiters\n_MATH_CONTENT_RE = re.compile(",
+        "peekOfCode": "_RETRIEVAL_STOPWORDS = {\n    \"the\", \"and\", \"for\", \"are\", \"but\", \"not\", \"you\", \"all\", \"can\", \"had\", \"was\", \"one\", \"our\",\n    \"out\", \"has\", \"how\", \"its\", \"may\", \"new\", \"now\", \"old\", \"two\", \"way\", \"did\", \"each\", \"from\",\n    \"have\", \"what\", \"this\", \"that\", \"with\", \"want\", \"help\", \"explain\", \"show\", \"tell\", \"give\", \"does\",\n    \"work\", \"will\", \"would\", \"could\", \"should\", \"about\", \"into\", \"there\", \"their\", \"then\", \"than\", \"when\",\n    \"where\", \"which\", \"while\", \"also\", \"more\", \"like\", \"just\", \"here\", \"even\", \"know\", \"come\", \"said\",\n    \"make\", \"look\", \"use\", \"some\", \"very\", \"over\", \"such\", \"been\", \"they\", \"them\", \"these\",\n}\n# Matches any meaningful math content: numbers, operators, LaTeX commands, KaTeX delimiters\n\"\"\"",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -8412,12 +9622,120 @@
         "documentation": {}
     },
     {
+        "label": "_orig_getaddrinfo",
+        "kind": 5,
+        "importPath": "study-app-backend.src.main",
+        "description": "study-app-backend.src.main",
+        "peekOfCode": "_orig_getaddrinfo = _socket.getaddrinfo\ndef _prefer_ipv4(host, port, family=0, type=0, proto=0, flags=0):\n    results = _orig_getaddrinfo(host, port, family, type, proto, flags)\n    ipv4 = [r for r in results if r[0] == _socket.AF_INET]\n    ipv6 = [r for r in results if r[0] != _socket.AF_INET]\n    return ipv4 + ipv6\n_socket.getaddrinfo = _prefer_ipv4\nfrom fastapi import FastAPI\nfrom fastapi.middleware.cors import CORSMiddleware\nfrom src.config import settings",
+        "detail": "study-app-backend.src.main",
+        "documentation": {}
+    },
+    {
+        "label": "_socket.getaddrinfo",
+        "kind": 5,
+        "importPath": "study-app-backend.src.main",
+        "description": "study-app-backend.src.main",
+        "peekOfCode": "_socket.getaddrinfo = _prefer_ipv4\nfrom fastapi import FastAPI\nfrom fastapi.middleware.cors import CORSMiddleware\nfrom src.config import settings\nfrom src.routes import attempts, auth, flashcards, folder_files, folders, health, kojo, leetcode, tests\napp = FastAPI(title=\"Study App\", version=\"0.1.0\")\napp.add_middleware(\n    CORSMiddleware,\n    allow_origins=settings.cors_origins,\n    allow_credentials=True,",
+        "detail": "study-app-backend.src.main",
+        "documentation": {}
+    },
+    {
         "label": "app",
         "kind": 5,
         "importPath": "study-app-backend.src.main",
         "description": "study-app-backend.src.main",
         "peekOfCode": "app = FastAPI(title=\"Study App\", version=\"0.1.0\")\napp.add_middleware(\n    CORSMiddleware,\n    allow_origins=settings.cors_origins,\n    allow_credentials=True,\n    allow_methods=[\"*\"],\n    allow_headers=[\"*\"],\n)\napp.include_router(health.router)\napp.include_router(auth.router)",
         "detail": "study-app-backend.src.main",
+        "documentation": {}
+    },
+    {
+        "label": "FolderTasks",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.locust_load_testing",
+        "description": "study-app-backend.tests.locust_load_testing",
+        "peekOfCode": "class FolderTasks(TaskSet):\n    \"\"\"CRUD operations on folders. Read-heavy, low write rate.\"\"\"\n    folder_ids: list[int]\n    def on_start(self):\n        self.folder_ids = self.user.folder_ids  # shared from parent\n    # weight 5 — most common action\n    @task(5)\n    def list_folders(self):\n        self.client.get(\"/folders\", headers=_auth(self.user.token), name=\"/folders [GET]\")\n    @task(2)",
+        "detail": "study-app-backend.tests.locust_load_testing",
+        "documentation": {}
+    },
+    {
+        "label": "FileTasks",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.locust_load_testing",
+        "description": "study-app-backend.tests.locust_load_testing",
+        "peekOfCode": "class FileTasks(TaskSet):\n    \"\"\"List files in folders — upload is excluded from load tests because it\n    involves heavy extraction; test it separately with a small user count.\"\"\"\n    def on_start(self):\n        self.folder_ids = self.user.folder_ids\n    @task(3)\n    def list_files(self):\n        if not self.folder_ids:\n            return\n        fid = random.choice(self.folder_ids)",
+        "detail": "study-app-backend.tests.locust_load_testing",
+        "documentation": {}
+    },
+    {
+        "label": "TestTasks",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.locust_load_testing",
+        "description": "study-app-backend.tests.locust_load_testing",
+        "peekOfCode": "class TestTasks(TaskSet):\n    \"\"\"Read-heavy test browsing. Generation (LLM) is in a separate low-weight user.\"\"\"\n    def on_start(self):\n        self.folder_ids = self.user.folder_ids\n        self.test_ids: list[int] = []\n        self._refresh_tests()\n    def _refresh_tests(self):\n        r = self.client.get(\"/tests\", headers=_auth(self.user.token), name=\"/tests [GET]\")\n        if r.status_code == 200:\n            self.test_ids = [t[\"id\"] for t in r.json()]",
+        "detail": "study-app-backend.tests.locust_load_testing",
+        "documentation": {}
+    },
+    {
+        "label": "FlashcardTasks",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.locust_load_testing",
+        "description": "study-app-backend.tests.locust_load_testing",
+        "peekOfCode": "class FlashcardTasks(TaskSet):\n    \"\"\"Flashcard browsing and attempt recording.\"\"\"\n    def on_start(self):\n        self.folder_ids = self.user.folder_ids\n        self.flashcard_ids_by_folder: dict[int, list[int]] = {}\n    def _get_flashcards(self, folder_id: int) -> list[int]:\n        if folder_id not in self.flashcard_ids_by_folder:\n            r = self.client.get(\n                f\"/folders/{folder_id}/flashcards\",\n                headers=_auth(self.user.token),",
+        "detail": "study-app-backend.tests.locust_load_testing",
+        "documentation": {}
+    },
+    {
+        "label": "KojoTasks",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.locust_load_testing",
+        "description": "study-app-backend.tests.locust_load_testing",
+        "peekOfCode": "class KojoTasks(TaskSet):\n    \"\"\"Kojo AI tutor — read-only endpoints only. Chat is in LLMUser.\"\"\"\n    def on_start(self):\n        self.folder_ids = self.user.folder_ids\n    @task(3)\n    def get_conversation(self):\n        if not self.folder_ids:\n            return\n        fid = random.choice(self.folder_ids)\n        self.client.get(",
+        "detail": "study-app-backend.tests.locust_load_testing",
+        "documentation": {}
+    },
+    {
+        "label": "BrowsingUser",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.locust_load_testing",
+        "description": "study-app-backend.tests.locust_load_testing",
+        "peekOfCode": "class BrowsingUser(HttpUser):\n    \"\"\"\n    Simulates a student browsing their study materials.\n    High volume, no LLM calls, fast response expected.\n    Represents the majority of traffic.\n    \"\"\"\n    weight = 10\n    wait_time = between(1, 3)\n    token: str = TOKEN\n    folder_ids: list[int] = []",
+        "detail": "study-app-backend.tests.locust_load_testing",
+        "documentation": {}
+    },
+    {
+        "label": "ActiveUser",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.locust_load_testing",
+        "description": "study-app-backend.tests.locust_load_testing",
+        "peekOfCode": "class ActiveUser(HttpUser):\n    \"\"\"\n    Simulates a student actively studying: reads + writes drafts + records attempts.\n    Medium volume.\n    \"\"\"\n    weight = 5\n    wait_time = between(2, 5)\n    token: str = TOKEN\n    folder_ids: list[int] = []\n    def on_start(self):",
+        "detail": "study-app-backend.tests.locust_load_testing",
+        "documentation": {}
+    },
+    {
+        "label": "LLMUser",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.locust_load_testing",
+        "description": "study-app-backend.tests.locust_load_testing",
+        "peekOfCode": "class LLMUser(HttpUser):\n    \"\"\"\n    Simulates users triggering LLM-backed endpoints (Kojo chat, test generation).\n    Kept at very low weight — these are slow and expensive.\n    Increase --users carefully; each request hits Claude/OpenAI.\n    \"\"\"\n    weight = 1\n    wait_time = between(10, 30)\n    token: str = TOKEN\n    folder_ids: list[int] = []",
+        "detail": "study-app-backend.tests.locust_load_testing",
+        "documentation": {}
+    },
+    {
+        "label": "TOKEN",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.locust_load_testing",
+        "description": "study-app-backend.tests.locust_load_testing",
+        "peekOfCode": "TOKEN = os.getenv(\"LOCUST_TOKEN\", \"\")\nSEED_FOLDER_ID = os.getenv(\"LOCUST_FOLDER\", \"\")\ndef _auth(token: str) -> dict:\n    return {\"Authorization\": f\"Bearer {token}\"}\ndef _rand(n: int = 6) -> str:\n    return \"\".join(random.choices(string.ascii_lowercase, k=n))\n# ---------------------------------------------------------------------------\n# Task sets — grouped by feature area\n# ---------------------------------------------------------------------------\nclass FolderTasks(TaskSet):",
+        "detail": "study-app-backend.tests.locust_load_testing",
+        "documentation": {}
+    },
+    {
+        "label": "SEED_FOLDER_ID",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.locust_load_testing",
+        "description": "study-app-backend.tests.locust_load_testing",
+        "peekOfCode": "SEED_FOLDER_ID = os.getenv(\"LOCUST_FOLDER\", \"\")\ndef _auth(token: str) -> dict:\n    return {\"Authorization\": f\"Bearer {token}\"}\ndef _rand(n: int = 6) -> str:\n    return \"\".join(random.choices(string.ascii_lowercase, k=n))\n# ---------------------------------------------------------------------------\n# Task sets — grouped by feature area\n# ---------------------------------------------------------------------------\nclass FolderTasks(TaskSet):\n    \"\"\"CRUD operations on folders. Read-heavy, low write rate.\"\"\"",
+        "detail": "study-app-backend.tests.locust_load_testing",
         "documentation": {}
     },
     {

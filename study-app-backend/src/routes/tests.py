@@ -1,13 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from typing import Optional, Tuple
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.datastructures import UploadFile
 
-from src.database import get_session
+from src.database import async_session_maker, get_session
 from src.dependencies import get_current_user
 from src.models.folder import Folder
 from src.models.folder_file import FolderFile
+from src.models.test import Test
 from src.models.user import User
+from src.repositories.test_repository import TestRepository
 from src.schemas.test_schema import (
     CreateTestResponse,
     QuestionCreate,
@@ -19,12 +23,118 @@ from src.schemas.test_schema import (
     TestUpdate,
     WeaknessResponse,
 )
+from src.services.file_service import FileService
 from src.services.grading_service import GradingService
+from src.services.llm_service import LLMService
 from src.services.test_service import TestService
 from src.utils.exceptions import LLMException, ResourceNotFoundException, StudyAppException
+from src.utils.logger import get_logger
 from src.utils.validators import MAX_UPLOAD_TOTAL_SIZE_BYTES
 
 router = APIRouter(tags=["tests"])
+logger = get_logger(__name__)
+
+
+class _BytesUploadFile:
+    """Minimal UploadFile stand-in backed by in-memory bytes."""
+
+    def __init__(self, data: bytes, filename: str) -> None:
+        self._data = data
+        self.filename = filename
+
+    async def read(self) -> bytes:
+        return self._data
+
+    async def seek(self, pos: int) -> None:
+        pass  # no-op; bytes are always fully available
+
+
+async def _generate_questions_background(
+    test_id: int,
+    notes_content: str,
+    practice_test_content: str,
+    test_type: str,
+    count_mcq: int,
+    count_frq: int,
+    is_math_mode: bool,
+    difficulty: str,
+    topic_focus: Optional[str],
+    is_coding_mode: bool,
+    coding_language: Optional[str],
+    custom_instructions: Optional[str],
+    provider: Optional[str],
+    enable_fallback: bool,
+) -> None:
+    """Run LLM generation and save questions; called as a FastAPI background task."""
+    async with async_session_maker() as session:
+        try:
+            repo = TestRepository(session)
+            llm = LLMService()
+
+            if practice_test_content and notes_content:
+                mcq_questions, frq_questions = await llm.generate_from_practice_test_template(
+                    notes=notes_content,
+                    practice_test_content=practice_test_content,
+                    test_type=test_type,
+                    count_mcq=count_mcq if test_type != "FRQ_only" else 0,
+                    count_frq=count_frq if test_type != "MCQ_only" else 0,
+                    is_math_mode=is_math_mode,
+                    difficulty=difficulty,
+                    topic_focus=topic_focus,
+                    is_coding_mode=is_coding_mode,
+                    coding_language=coding_language,
+                    custom_instructions=custom_instructions,
+                    provider=provider,
+                    enable_fallback=enable_fallback,
+                )
+            elif practice_test_content:
+                mcq_questions, frq_questions = await llm.parse_practice_test(
+                    content=practice_test_content,
+                    count_mcq=count_mcq if test_type != "FRQ_only" else 0,
+                    count_frq=count_frq if test_type != "MCQ_only" else 0,
+                    provider=provider,
+                )
+            else:
+                mcq_questions, frq_questions = await llm.generate_test_questions(
+                    notes=notes_content,
+                    test_type=test_type,
+                    count_mcq=count_mcq,
+                    count_frq=count_frq,
+                    is_math_mode=is_math_mode,
+                    difficulty=difficulty,
+                    topic_focus=topic_focus,
+                    is_coding_mode=is_coding_mode,
+                    coding_language=coding_language,
+                    custom_instructions=custom_instructions,
+                    provider=provider,
+                    enable_fallback=enable_fallback,
+                )
+
+            display_order = 1
+            for item in mcq_questions:
+                options = [
+                    (option_text, index == item.correct_index)
+                    for index, option_text in enumerate(item.options)
+                ]
+                await repo.add_mcq_question(test_id, item.question_text, display_order, options)
+                display_order += 1
+            for item in frq_questions:
+                await repo.add_frq_question(test_id, item.question_text, display_order, item.expected_answer)
+                display_order += 1
+
+            test = await session.get(Test, test_id)
+            if test is not None:
+                test.generation_status = "ready"
+            await session.commit()
+            logger.info("Background test generation complete", extra={"test_id": test_id})
+        except Exception as exc:
+            logger.warning("Background test generation failed for test_id=%s: %s", test_id, exc)
+            async with async_session_maker() as err_session:
+                test = await err_session.get(Test, test_id)
+                if test is not None:
+                    test.generation_status = "failed"
+                    test.generation_error = str(exc)[:500]
+                    await err_session.commit()
 
 
 @router.post(
@@ -35,6 +145,7 @@ router = APIRouter(tags=["tests"])
 async def create_test(
     folder_id: int,
     request: Request,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> CreateTestResponse:
@@ -48,7 +159,6 @@ async def create_test(
         practice_test_raw = form.get("practice_test_file")
         practice_test_file = practice_test_raw if isinstance(practice_test_raw, UploadFile) else None
 
-        # count params (advanced mode)
         try:
             count_mcq = max(0, min(50, int(str(form.get("count_mcq", "10")))))
         except (ValueError, TypeError):
@@ -57,6 +167,8 @@ async def create_test(
             count_frq = max(0, min(50, int(str(form.get("count_frq", "5")))))
         except (ValueError, TypeError):
             count_frq = 5
+        if test_type == "Extreme":
+            count_frq = 0
         is_math_mode = str(form.get("is_math_mode", "false")).lower() in ("true", "1", "yes")
         difficulty_raw = str(form.get("difficulty", "mixed")).strip().lower()
         difficulty = difficulty_raw if difficulty_raw in ("easy", "medium", "hard", "mixed") else "mixed"
@@ -69,10 +181,7 @@ async def create_test(
         custom_instructions = str(custom_instructions_raw).strip()[:500] if custom_instructions_raw else None
         provider_raw = form.get("provider")
         provider = str(provider_raw).strip().lower() if provider_raw else None
-        provider_aliases = {
-            "google": "gemini",
-            "anthropic": "claude",
-        }
+        provider_aliases = {"google": "gemini", "anthropic": "claude"}
         if provider:
             provider = provider_aliases.get(provider, provider)
             if provider not in ("auto", "groq", "gemini", "claude", "ollama"):
@@ -98,26 +207,77 @@ async def create_test(
         valid_files = [f for f in notes_files if isinstance(f, UploadFile)]
         if len(valid_files) != len(notes_files):
             raise StudyAppException("All uploaded documents must be valid files")
+
+        # ── Read file bytes NOW, before the request context ends ──────────────
+        notes_bytes: list[Tuple[bytes, str]] = []
         total_size_bytes = 0
         for upload in valid_files:
-            file_bytes = await upload.read()
-            total_size_bytes += len(file_bytes)
-            await upload.seek(0)
+            data = await upload.read()
+            total_size_bytes += len(data)
+            notes_bytes.append((data, upload.filename or "notes"))
+
+        pt_bytes: Optional[Tuple[bytes, str]] = None
+        if practice_test_file is not None:
+            pt_data = await practice_test_file.read()
+            pt_bytes = (pt_data, practice_test_file.filename or "practice_test")
+            total_size_bytes += len(pt_data)
+
         if total_size_bytes > MAX_UPLOAD_TOTAL_SIZE_BYTES:
             raise StudyAppException(
                 f"Combined uploaded files exceed the {MAX_UPLOAD_TOTAL_SIZE_BYTES // (1024 * 1024)} MB limit"
             )
-        return await TestService().create_test(
-            folder_id=folder_id,
-            user_id=user.id,
-            title=title,
+
+        # ── Extract text synchronously (fast, CPU-only, no LLM) ──────────────
+        svc = FileService()
+        if notes_bytes:
+            mock_files = [_BytesUploadFile(d, n) for d, n in notes_bytes]
+            notes_content, notes_file_types = await svc.extract_from_files(mock_files)  # type: ignore[arg-type]
+        else:
+            notes_content, notes_file_types = "", []
+
+        practice_test_content = ""
+        if pt_bytes is not None:
+            mock_pt = _BytesUploadFile(pt_bytes[0], pt_bytes[1])
+            practice_test_content, _ = await svc.extract_from_files([mock_pt])  # type: ignore[arg-type]
+
+        folder_files_content = await svc.get_folder_files_content(folder_id, session)
+
+        use_folder_files = not notes_bytes
+        combined_notes = "\n\n---\n\n".join(
+            p for p in [notes_content, folder_files_content if use_folder_files else ""] if p
+        )
+
+        # ── Create test record immediately ────────────────────────────────────
+        repo = TestRepository(session)
+        test = await repo.create(
+            folder_id,
+            title,
+            test_type,
+            description,
+            is_math_mode=is_math_mode,
+            is_coding_mode=is_coding_mode,
+            coding_language=coding_language,
+        )
+        test.generation_status = "generating"
+
+        if combined_notes:
+            note_label = ", ".join(n for _, n in notes_bytes) or "folder files"
+            await repo.add_note(test.id, note_label[:255], "combined", combined_notes)
+        if practice_test_content:
+            pt_label = pt_bytes[1] if pt_bytes else "practice_test"
+            await repo.add_note(test.id, pt_label[:255], "pdf", practice_test_content)
+
+        await session.commit()
+
+        # ── Schedule LLM generation in the background ─────────────────────────
+        background_tasks.add_task(
+            _generate_questions_background,
+            test_id=test.id,
+            notes_content=combined_notes,
+            practice_test_content=practice_test_content,
             test_type=test_type,
-            notes_files=valid_files,
-            session=session,
-            description=description,
             count_mcq=count_mcq,
             count_frq=count_frq,
-            practice_test_file=practice_test_file,
             is_math_mode=is_math_mode,
             difficulty=difficulty,
             topic_focus=topic_focus,
@@ -127,6 +287,15 @@ async def create_test(
             provider=provider,
             enable_fallback=enable_fallback,
         )
+
+        return CreateTestResponse(
+            test_id=test.id,
+            title=test.title,
+            questions_generated=0,
+            message="Your test is being generated. Check back in a moment — it'll be ready shortly.",
+            generation_status="generating",
+        )
+
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except LLMException as exc:

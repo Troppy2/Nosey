@@ -1347,10 +1347,14 @@ h3 {
 .test-question-markdown .kojo-markdown {
   font-size: clamp(1.2rem, 2vw, 1.8rem);
   line-height: 1.35;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .test-question-markdown .kojo-md-p {
   margin: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .option-grid {
@@ -1400,10 +1404,14 @@ h3 {
 .test-option-markdown .kojo-markdown {
   font-size: 1rem;
   line-height: 1.45;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .test-option-markdown .kojo-md-p {
   margin: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* Code blocks in test options (for coding mode trace questions) */
@@ -1561,20 +1569,28 @@ h3 {
 
 .review-question-markdown .kojo-markdown {
   font-size: 1rem;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .review-question-markdown .kojo-markdown .kojo-md-p {
   margin: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .review-answer-markdown .kojo-markdown,
 .math-explanation .kojo-markdown {
   font-size: 0.92rem;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .review-answer-markdown .kojo-markdown .kojo-md-p,
 .math-explanation .kojo-markdown .kojo-md-p {
   margin: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .flash-header {
@@ -2516,8 +2532,8 @@ h3 {
 }
 
 /* ── Markdown ── */
-.kojo-markdown { font-size: 0.9rem; line-height: 1.7; color: var(--ink); }
-.kojo-markdown .kojo-md-p         { margin: 0 0 10px; }
+.kojo-markdown { font-size: 0.9rem; line-height: 1.7; color: var(--ink); word-break: break-word; overflow-wrap: break-word; }
+.kojo-markdown .kojo-md-p         { margin: 0 0 10px; word-break: break-word; overflow-wrap: break-word; }
 .kojo-markdown .kojo-md-p:last-child { margin-bottom: 0; }
 .kojo-markdown .kojo-md-heading   { font-family: var(--font-serif); color: var(--ink); margin: 12px 0 6px; font-size: 1rem; line-height: 1.3; }
 .kojo-markdown .kojo-md-list      { margin: 6px 0 10px; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
@@ -3271,6 +3287,8 @@ h3 {
   border-left: 3px solid var(--green-dark);
   border-radius: 0 6px 6px 0;
   text-align: center;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* ── MathInput preview ── */
@@ -4218,6 +4236,8 @@ h3 {
   padding: 22px;
   border-right: 1px solid rgba(113, 131, 85, 0.22);
   background: var(--white);
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .lc-problem-source {
@@ -4243,6 +4263,8 @@ h3 {
   font-family: var(--font-sans);
   font-size: 1.35rem;
   line-height: 1.2;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .lc-problem-meta {

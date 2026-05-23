@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import hashlib
 from datetime import datetime
+from io import BytesIO
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from typing import Optional
+
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database import get_session
+from src.database import get_session, async_session_maker
 from src.dependencies import get_current_user
 from src.models.folder import Folder
 from src.models.folder_file import FolderFile
@@ -16,7 +19,12 @@ from src.models.user import User
 from src.services.file_service import FileService
 from src.utils.exceptions import ValidationException
 from src.utils.logger import get_logger
-from src.utils.validators import MAX_UPLOAD_TOTAL_SIZE_BYTES
+from src.utils.validators import (
+    ALLOWED_FILE_TYPES,
+    MAX_UPLOAD_FILE_SIZE_BYTES,
+    MAX_UPLOAD_TOTAL_SIZE_BYTES,
+    normalize_file_extension,
+)
 
 logger = get_logger(__name__)
 
@@ -29,6 +37,8 @@ class FolderFileResponse(BaseModel):
     file_name: str
     file_type: str
     size_bytes: int
+    upload_status: Optional[str] = None
+    upload_error: Optional[str] = None
     uploaded_at: datetime
 
     model_config = {"from_attributes": True}
@@ -57,6 +67,69 @@ async def _get_owned_folder(
     return folder
 
 
+class _BytesUploadFile:
+    """Minimal UploadFile stand-in backed by in-memory bytes for background tasks."""
+
+    def __init__(self, data: bytes, filename: str) -> None:
+        self._data = data
+        self.filename = filename
+
+    async def read(self) -> bytes:
+        return self._data
+
+
+async def _extract_and_update(
+    file_id: int,
+    data: bytes,
+    file_name: str,
+    file_type: str,
+    folder_id: int,
+) -> None:
+    """Background task: extract text from bytes and update the folder_file record."""
+    async with async_session_maker() as session:
+        try:
+            svc = FileService()
+            mock_file = _BytesUploadFile(data, file_name)
+            content, _ = await svc.extract_from_file(mock_file)  # type: ignore[arg-type]
+
+            content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+            duplicate = await session.scalar(
+                select(FolderFile).where(
+                    FolderFile.folder_id == folder_id,
+                    FolderFile.content_hash == content_hash,
+                    FolderFile.id != file_id,
+                )
+            )
+
+            record = await session.get(FolderFile, file_id)
+            if record is None:
+                return
+
+            if duplicate is not None:
+                record.upload_status = "error"
+                record.upload_error = f"Identical content already exists as '{duplicate.file_name}'"
+            else:
+                record.content = content
+                record.content_hash = content_hash
+                record.size_bytes = len(content.encode("utf-8"))
+                record.upload_status = "ready"
+
+            await session.commit()
+            logger.info(
+                "Background extraction complete",
+                extra={"file_id": file_id, "file_name": file_name, "status": record.upload_status},
+            )
+        except Exception as exc:
+            logger.warning("Background extraction failed for file_id=%s: %s", file_id, exc)
+            async with async_session_maker() as err_session:
+                record = await err_session.get(FolderFile, file_id)
+                if record is not None:
+                    record.upload_status = "error"
+                    record.upload_error = str(exc)[:500]
+                    await err_session.commit()
+
+
 @router.get("/{folder_id}/files", response_model=list[FolderFileResponse])
 async def list_folder_files(
     folder_id: int,
@@ -80,6 +153,7 @@ async def list_folder_files(
 async def upload_folder_files(
     folder_id: int,
     files: list[UploadFile] = File(...),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> UploadResult:
@@ -91,59 +165,60 @@ async def upload_folder_files(
     )
     current_total_bytes = int(current_total_result or 0)
 
-    svc = FileService()
     created: list[FolderFileResponse] = []
     skipped: list[SkippedFile] = []
     pending_total_bytes = 0
 
     for upload in files:
         name = upload.filename or "untitled"
+        file_type = normalize_file_extension(name)
 
-        try:
-            content, file_type = await svc.extract_from_file(upload)
-        except ValidationException as exc:
-            skipped.append(SkippedFile(file_name=name, reason=str(exc)))
-            continue
-
-        content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
-
-        duplicate = await session.scalar(
-            select(FolderFile).where(
-                FolderFile.folder_id == folder_id,
-                FolderFile.content_hash == content_hash,
-            )
-        )
-        if duplicate is not None:
+        if file_type not in ALLOWED_FILE_TYPES:
             skipped.append(SkippedFile(
                 file_name=name,
-                reason=f"Identical content already exists as '{duplicate.file_name}'",
+                reason="Supported file types: PDF, DOCX, TXT, MD, HTML, PPTX, and common code files",
             ))
             continue
 
-        size_bytes = len(content.encode("utf-8"))
-
-        if current_total_bytes + pending_total_bytes + size_bytes > MAX_UPLOAD_TOTAL_SIZE_BYTES:
+        # Read bytes NOW before the request context ends.
+        data = await upload.read()
+        if not data:
+            skipped.append(SkippedFile(file_name=name, reason="File is empty"))
+            continue
+        if len(data) > MAX_UPLOAD_FILE_SIZE_BYTES:
+            skipped.append(SkippedFile(
+                file_name=name,
+                reason=f"Exceeds {MAX_UPLOAD_FILE_SIZE_BYTES // (1024 * 1024)} MB per-file limit",
+            ))
+            continue
+        if current_total_bytes + pending_total_bytes + len(data) > MAX_UPLOAD_TOTAL_SIZE_BYTES:
             skipped.append(SkippedFile(
                 file_name=name,
                 reason=f"Adding this file would exceed the {MAX_UPLOAD_TOTAL_SIZE_BYTES // (1024 * 1024)} MB folder limit",
             ))
             continue
 
-        pending_total_bytes += size_bytes
+        pending_total_bytes += len(data)
 
+        # Insert a placeholder record immediately so the frontend can display it.
         record = FolderFile(
             folder_id=folder.id,
             file_name=name,
             file_type=file_type,
-            size_bytes=size_bytes,
-            content=content,
-            content_hash=content_hash,
+            size_bytes=len(data),
+            content="",
+            content_hash="",
+            upload_status="processing",
         )
         session.add(record)
         await session.flush()
+
+        # Schedule text extraction in the background — user can navigate away.
+        background_tasks.add_task(_extract_and_update, record.id, data, name, file_type, folder_id)
+
         created.append(FolderFileResponse.model_validate(record))
         logger.info(
-            "File uploaded",
+            "File queued for background extraction",
             extra={"upload_filename": name, "file_type": file_type, "folder_id": folder_id},
         )
 
