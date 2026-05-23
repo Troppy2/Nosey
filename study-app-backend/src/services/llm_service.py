@@ -1330,10 +1330,14 @@ Rules:
         remaining_frq = max(0, count_frq - len(fill_frq))
 
         if remaining_mcq > 0 or remaining_frq > 0:
+            fallback_reason = None
             if enable_fallback:
                 fallback_builder = self._fallback_math_questions if math_mode else self._fallback_questions
                 gap_mcq, gap_frq = fallback_builder(notes, remaining_mcq, remaining_frq)
-                fallback_reason = "provider_partial_output_filled"
+                if not best_mcq and not best_frq and last_error is not None:
+                    fallback_reason = "llm_exception_math" if math_mode else "llm_exception"
+                else:
+                    fallback_reason = "provider_partial_output_filled"
             else:
                 gap_mcq = [
                     GeneratedMCQ(
@@ -1911,12 +1915,14 @@ Rules:
         # Strip markdown code fences that LLMs sometimes wrap around JSON
         raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.IGNORECASE)
         raw = re.sub(r"\s*```$", "", raw.strip())
+        non_object_detected = False
 
         # Try direct parse first
         try:
             parsed = json.loads(raw)
             if isinstance(parsed, dict):
                 return parsed
+            non_object_detected = True
         except json.JSONDecodeError:
             pass
 
@@ -1928,6 +1934,7 @@ Rules:
                 parsed = json.loads(extracted)
                 if isinstance(parsed, dict):
                     return parsed
+                non_object_detected = True
             except json.JSONDecodeError:
                 pass
 
@@ -1938,9 +1945,11 @@ Rules:
                 parsed = json.loads(escaped)
                 if isinstance(parsed, dict):
                     return parsed
+                non_object_detected = True
             except json.JSONDecodeError:
                 pass
-
+        if non_object_detected:
+            raise ValueError("LLM response was not a JSON object")
         raise ValueError("LLM response was not parseable JSON")
 
     def _normalize_mcq_item(self, item: object) -> object:

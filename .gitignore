@@ -15,8 +15,7 @@ __pycache__/
 .pytest_cache/
 
 .claude/
-
-RUNNING.md
+.vscode/
 .claude/CLAUDE.md
 .claude/feature-fails.md
 .claude/memory.md
