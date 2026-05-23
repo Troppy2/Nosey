@@ -1,3 +1,5 @@
+import type { MouseEvent } from "react";
+
 export type CodingTabItem = {
     id: string;
     name: string;
@@ -10,9 +12,10 @@ type CodingTabsProps = {
     onSelectTab: (tabId: string) => void;
     onAddTab: () => void;
     onDeleteTab: (tabId: string) => void;
+    canAddTab?: boolean;
 };
 
-export default function CodingTabs({ tabs, activeTabId, onSelectTab, onAddTab, onDeleteTab }: CodingTabsProps) {
+export default function CodingTabs({ tabs, activeTabId, onSelectTab, onAddTab, onDeleteTab, canAddTab = true }: CodingTabsProps) {
     return (
         <div className="lc-code-tabs" role="tablist" aria-label="Coding tabs">
             <div className="lc-code-tabs__list">
@@ -33,7 +36,7 @@ export default function CodingTabs({ tabs, activeTabId, onSelectTab, onAddTab, o
                                     className="closeTab"
                                     role="button"
                                     aria-label={`Delete ${tab.name}`}
-                                    onClick={(event) => {
+                                    onClick={(event: MouseEvent<HTMLSpanElement>) => {
                                         event.stopPropagation();
                                         onDeleteTab(tab.id);
                                     }}
@@ -45,8 +48,8 @@ export default function CodingTabs({ tabs, activeTabId, onSelectTab, onAddTab, o
                     );
                 })}
             </div>
-            
-            <button type="button" className="lc-coding-tab lc-coding-tab--add" onClick={onAddTab}>
+
+            <button type="button" className="lc-coding-tab lc-coding-tab--add" onClick={onAddTab} disabled={!canAddTab} aria-disabled={!canAddTab}>
                 + New Tab
             </button>
         </div>
