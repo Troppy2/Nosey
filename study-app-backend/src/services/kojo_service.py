@@ -309,7 +309,10 @@ def _extract_relevant_sections(notes: str, user_message: str, max_sections: int 
         w for w in re.findall(r"[a-zA-Z]{3,}", user_message.lower())
         if w not in _STOPWORDS
     ]
-    if not keywords:
+    # Capture digit sequences so "question 7" can find the paragraph containing "7."
+    number_tokens = re.findall(r"\d+", user_message)
+
+    if not keywords and not number_tokens:
         return ""
 
     # Split on blank lines or section separators into meaningful chunks
@@ -320,6 +323,11 @@ def _extract_relevant_sections(notes: str, user_message: str, max_sections: int 
     for para in paragraphs:
         para_lower = para.lower()
         score = sum(1 for kw in keywords if kw in para_lower)
+        # Boost paragraphs that explicitly reference the queried question number
+        # (e.g. "7." or "7)" at a word boundary), so "question 7" finds the right chunk.
+        for num in number_tokens:
+            if re.search(rf"(?<!\d){re.escape(num)}[.):]", para):
+                score += 2
         if score > 0:
             scored.append((score, para))
 
@@ -347,7 +355,7 @@ def _build_review_wrong_answers_prompt(notes: str, wrong_answers: str, user_mess
         )
         notes_block = (
             f"{relevant_block}"
-            f"FULL STUDENT NOTES AND FOLDER FILES:\n{notes[:12000]}"
+            f"FULL STUDENT NOTES AND FOLDER FILES:\n{notes[:25000]}"
         )
     else:
         relevant_block = ""
@@ -411,7 +419,7 @@ def _build_prompt(notes: str, user_message: str, history: list, strictness: str 
         )
         notes_block = (
             f"{relevant_block}"
-            f"FULL STUDENT NOTES AND FOLDER FILES:\n{notes[:12000]}"
+            f"FULL STUDENT NOTES AND FOLDER FILES:\n{notes[:25000]}"
         )
     else:
         relevant_block = ""

@@ -519,6 +519,8 @@ export interface FolderFile {
   file_name: string;
   file_type: string;
   size_bytes: number;
+  upload_status?: string | null;
+  upload_error?: string | null;
   uploaded_at: string;
 }
 

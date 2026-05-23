@@ -424,9 +424,9 @@ class LLMService:
             f"{concepts_block}"
             f"{mcq_instructions}\n"
             f"{frq_instructions}\n"
-            "Return JSON only with keys mcq and frq.\n"
-            "mcq items: {question_text, options: [4 strings], correct_index: 0-3}\n"
-            "frq items: {question_text, expected_answer}\n"
+            "CRITICAL: Return ONLY valid JSON. No markdown, no text before or after.\n"
+            "Response must be EXACTLY this format:\n"
+            '{"mcq": [{"question_text": "...", "options": ["a", "b", "c", "d"], "correct_index": 0}], "frq": [{"question_text": "...", "expected_answer": "..."}]}\n'
         )
 
     async def parse_practice_test(
@@ -1192,10 +1192,20 @@ Rules:
             shared_prompt = prompt
 
         last_error: Optional[Exception] = None
+        # Best partial output seen across all providers — used for cross-provider topup.
+        best_mcq: list[GeneratedMCQ] = []
+        best_frq: list[GeneratedFRQ] = []
 
         for candidate in provider_candidates:
             try:
-                data = await self._complete_json(shared_prompt, provider=candidate)
+                # For Haiku, add aggressive truncation if prompt would be too large
+                candidate_prompt = shared_prompt
+                if candidate == "claude" and len(candidate_prompt) > 10_000:
+                    # Truncate the shared prompt to keep Haiku manageable
+                    candidate_prompt = candidate_prompt[:9_000] + "\n[...truncated for brevity...]"
+                    logger.info("Truncated prompt for Claude to %d chars", len(candidate_prompt))
+
+                data = await self._complete_json(candidate_prompt, provider=candidate)
                 mcq, frq = self._parse_generated_test(
                     data,
                     count_mcq,
@@ -1252,32 +1262,106 @@ Rules:
                     self._set_last_generation_meta(diagnostics)
                     return mcq[:count_mcq], frq[:count_frq]
 
-                if enable_fallback:
-                    remaining_mcq = max(0, count_mcq - len(mcq))
-                    remaining_frq = max(0, count_frq - len(frq))
-                    used_partial_fallback_fill = remaining_mcq > 0 or remaining_frq > 0
-                    if remaining_mcq > 0 or remaining_frq > 0:
-                        fallback_builder = self._fallback_math_questions if math_mode else self._fallback_questions
-                        fallback_mcq, fallback_frq = fallback_builder(notes, remaining_mcq, remaining_frq)
-                        mcq, frq = self._merge_generated_questions(
-                            mcq, frq, fallback_mcq, fallback_frq, count_mcq, count_frq
-                        )
-
-                    diagnostics.update({
-                        "fallback_used": used_partial_fallback_fill,
-                        "fallback_reason": "provider_partial_output_filled" if used_partial_fallback_fill else None,
-                        "note_grounded": len(mcq) >= count_mcq and len(frq) >= count_frq,
-                    })
-                    self._set_last_generation_meta(diagnostics)
-                    return mcq[:count_mcq], frq[:count_frq]
+                # Keep track of the richest partial output seen across providers.
+                if len(mcq) + len(frq) > len(best_mcq) + len(best_frq):
+                    best_mcq, best_frq = list(mcq), list(frq)
 
                 logger.warning(
-                    "Provider %s returned insufficient test output (%d MCQ, %d FRQ of %d/%d requested) after top-up attempts",
+                    "Provider %s returned insufficient output (%d MCQ, %d FRQ of %d/%d); "
+                    "will try cross-provider topup",
                     candidate, len(mcq), len(frq), count_mcq, count_frq,
                 )
             except Exception as exc:
                 last_error = exc
                 logger.warning("Provider %s failed test generation; trying next provider: %s", candidate, exc)
+
+        # Phase 2: cross-provider topup — use every available provider to fill the remaining
+        # slots from the best partial output, rather than starting over from scratch.
+        if best_mcq or best_frq:
+            remaining_mcq = max(0, count_mcq - len(best_mcq))
+            remaining_frq = max(0, count_frq - len(best_frq))
+            for topup_candidate in provider_candidates:
+                if remaining_mcq == 0 and remaining_frq == 0:
+                    break
+                try:
+                    topup_prompt = self._build_provider_topup_prompt(
+                        shared_prompt=shared_prompt,
+                        existing_mcq=best_mcq,
+                        existing_frq=best_frq,
+                        remaining_mcq=remaining_mcq,
+                        remaining_frq=remaining_frq,
+                    )
+                    topup_data = await self._complete_json(topup_prompt, provider=topup_candidate)
+                    add_mcq, add_frq = self._parse_generated_test(
+                        topup_data,
+                        remaining_mcq,
+                        remaining_frq,
+                        notes,
+                        math_mode=math_mode,
+                        diagnostics=diagnostics,
+                        allow_fallback=False,
+                    )
+                    best_mcq, best_frq = self._merge_generated_questions(
+                        best_mcq, best_frq, add_mcq, add_frq, count_mcq, count_frq
+                    )
+                    remaining_mcq = max(0, count_mcq - len(best_mcq))
+                    remaining_frq = max(0, count_frq - len(best_frq))
+                    logger.info(
+                        "Cross-provider topup via %s filled to %d MCQ, %d FRQ",
+                        topup_candidate, len(best_mcq), len(best_frq),
+                    )
+                except Exception as topup_exc:
+                    logger.warning(
+                        "Provider %s cross-provider topup failed: %s", topup_candidate, topup_exc
+                    )
+
+            if len(best_mcq) >= count_mcq and len(best_frq) >= count_frq:
+                diagnostics.update({"fallback_used": False, "fallback_reason": None, "note_grounded": True})
+                self._set_last_generation_meta(diagnostics)
+                return best_mcq[:count_mcq], best_frq[:count_frq]
+
+        # Phase 3: fill any remaining slots.
+        # With enable_fallback, use note-based placeholder questions.
+        # Without enable_fallback, use blank placeholders rather than failing outright —
+        # a test with a few blank slots is better than no test at all.
+        fill_mcq = best_mcq[:]
+        fill_frq = best_frq[:]
+        remaining_mcq = max(0, count_mcq - len(fill_mcq))
+        remaining_frq = max(0, count_frq - len(fill_frq))
+
+        if remaining_mcq > 0 or remaining_frq > 0:
+            if enable_fallback:
+                fallback_builder = self._fallback_math_questions if math_mode else self._fallback_questions
+                gap_mcq, gap_frq = fallback_builder(notes, remaining_mcq, remaining_frq)
+                fallback_reason = "provider_partial_output_filled"
+            else:
+                gap_mcq = [
+                    GeneratedMCQ(
+                        question_text="[Question could not be generated]",
+                        options=["[Not available]", "[Not available]", "[Not available]", "[Not available]"],
+                        correct_index=0,
+                    )
+                    for _ in range(remaining_mcq)
+                ]
+                gap_frq = [
+                    GeneratedFRQ(
+                        question_text="[Question could not be generated]",
+                        expected_answer="[Not available]",
+                    )
+                    for _ in range(remaining_frq)
+                ]
+                fallback_reason = "blank_placeholder_fill"
+
+            fill_mcq, fill_frq = self._merge_generated_questions(
+                fill_mcq, fill_frq, gap_mcq, gap_frq, count_mcq, count_frq
+            )
+            diagnostics.update({
+                "fallback_used": True,
+                "fallback_reason": fallback_reason,
+                "note_grounded": False,
+            })
+            self._set_last_generation_meta(diagnostics)
+            return fill_mcq[:count_mcq], fill_frq[:count_frq]
 
         raise LLMException(
             "Practice test could not be generated. The selected AI provider may be rate-limited or temporarily unavailable. "
@@ -1647,6 +1731,14 @@ Rules:
 
     async def _complete_anthropic(self, prompt: str) -> dict[str, object]:
         async def _do() -> dict[str, object]:
+            # Haiku has limited context. If prompt is very large, truncate notes/examples.
+            actual_prompt = prompt
+            if len(actual_prompt) > 12_000:
+                logger.warning("Prompt size %d exceeds Haiku optimum; may cause parsing failures. Consider breaking into smaller requests.", len(actual_prompt))
+                # Truncate trailing notes/context sections to ~10k
+                if len(actual_prompt) > 15_000:
+                    actual_prompt = actual_prompt[:12_000] + "\n[... context truncated ...]"
+
             async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
                 response = await client.post(
                     "https://api.anthropic.com/v1/messages",
@@ -1658,11 +1750,22 @@ Rules:
                     json={
                         "model": settings.anthropic_model,
                         "max_tokens": _JSON_MAX_TOKENS,
-                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.1,
+                        "system": "You MUST respond with ONLY valid JSON. No text before or after. No markdown. No backticks. No explanation. Start with { or [. End with } or ]. Every response must be valid JSON that can be parsed by json.loads().",
+                        "messages": [{"role": "user", "content": actual_prompt}],
                     },
                 )
                 response.raise_for_status()
-            content = str(response.json()["content"][0]["text"]).strip()
+            resp_data = response.json()
+            if resp_data.get("stop_reason") == "max_tokens":
+                raise ValueError("Claude response was truncated (max_tokens reached) — response incomplete for JSON generation")
+            if not resp_data.get("content") or not isinstance(resp_data["content"], list) or len(resp_data["content"]) == 0:
+                raise ValueError(f"Claude response missing content: {resp_data}")
+            content = str(resp_data["content"][0].get("text", "")).strip()
+            if not content:
+                raise ValueError(f"Claude response content was empty: {resp_data}")
+
+            logger.debug("Claude raw response (%d chars): %s...", len(content), content[:300])
             return self._loads_json(content)
         return await self._with_retry(_do, "Claude")
 
@@ -1804,26 +1907,41 @@ Rules:
         return await self._with_retry(_do, "Groq")
 
     def _loads_json(self, raw: str) -> dict[str, object]:
+        raw = raw.strip()
+        # Strip markdown code fences that LLMs sometimes wrap around JSON
+        raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.IGNORECASE)
+        raw = re.sub(r"\s*```$", "", raw.strip())
+
+        # Try direct parse first
         try:
             parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                return parsed
         except json.JSONDecodeError:
-            match = re.search(r"\{.*\}", raw, flags=re.DOTALL)
-            extracted = match.group(0) if match else raw
+            pass
+
+        # Try to extract JSON object {... }
+        match = re.search(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", raw, flags=re.DOTALL)
+        if match:
+            extracted = match.group(0)
             try:
                 parsed = json.loads(extracted)
+                if isinstance(parsed, dict):
+                    return parsed
             except json.JSONDecodeError:
-                # LLM outputs bare LaTeX backslashes (e.g. \theta) that aren't valid JSON
-                # escape sequences. Double-escape lone backslashes and retry.
-                escaped = re.sub(r'\\(?!["\\/bfnrtu0-9])', r'\\\\', extracted)
-                try:
-                    parsed = json.loads(escaped)
-                except json.JSONDecodeError:
-                    if match is None:
-                        raise
-                    raise ValueError("LLM response was not parseable JSON")
-        if not isinstance(parsed, dict):
-            raise ValueError("LLM response was not a JSON object")
-        return parsed
+                pass
+
+        # Try escaping bare backslashes for LaTeX
+        for candidate in [raw] + ([extracted] if match else []):
+            escaped = re.sub(r'\\(?!["\\/bfnrtu0-9])', r'\\\\', candidate)
+            try:
+                parsed = json.loads(escaped)
+                if isinstance(parsed, dict):
+                    return parsed
+            except json.JSONDecodeError:
+                pass
+
+        raise ValueError("LLM response was not parseable JSON")
 
     def _normalize_mcq_item(self, item: object) -> object:
         """Coerce common LLM deviations so _is_valid_mcq has the best chance of accepting the item."""

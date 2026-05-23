@@ -116,10 +116,16 @@ export default function CreateTest() {
           retrieval_top_k: result.retrieval_top_k,
         }),
       );
-      if (advancedMode && reviewBeforeTaking) {
-        navigate(`/test/${result.test_id}/edit`);
+      // Navigate to folder so the user can see the test generating in the list.
+      // When generation_status is already 'ready' (e.g. fast run), go straight to the test.
+      if (result.generation_status === "ready") {
+        if (advancedMode && reviewBeforeTaking) {
+          navigate(`/test/${result.test_id}/edit`);
+        } else {
+          navigate(`/test/${result.test_id}`);
+        }
       } else {
-        navigate(`/test/${result.test_id}`);
+        navigate(`/folders/${folderId}`);
       }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to create that practice test.");

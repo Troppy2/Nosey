@@ -22,6 +22,7 @@ export type TestSummary = {
   best_score?: number | null;
   attempt_count: number;
   created_at: string;
+  generation_status?: string;
 };
 
 export type TestUpdate = {
@@ -44,6 +45,7 @@ export type CreateTestResult = {
   title: string;
   questions_generated: number;
   message: string;
+  generation_status: string;
 } & GenerationDiagnostics;
 
 export type MCQOption = {

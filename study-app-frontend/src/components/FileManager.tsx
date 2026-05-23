@@ -1,4 +1,4 @@
-import { FileText, Trash2, Upload, X } from "lucide-react";
+import { AlertCircle, FileText, Loader2, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type FolderFile, type SkippedFile, deleteFolderFile, fetchFolderFiles, uploadFolderFiles } from "../lib/api";
 
@@ -43,6 +43,16 @@ export function FileManager({ folderId, onClose }: Props) {
       setIsLoading(false);
     });
   }, [folderId]);
+
+  // Poll while any file is still processing
+  useEffect(() => {
+    const hasProcessing = (files ?? []).some((f) => f.upload_status === "processing");
+    if (!hasProcessing) return;
+    const id = setInterval(() => {
+      fetchFolderFiles(folderId).then((data) => setFiles(data));
+    }, 3000);
+    return () => clearInterval(id);
+  }, [folderId, files]);
 
   async function handleUpload(selected: FileList | null) {
     if (!selected || selected.length === 0) return;
@@ -209,7 +219,19 @@ export function FileManager({ folderId, onClose }: Props) {
                       {f.file_name}
                     </p>
                     <p className="muted" style={{ margin: 0, fontSize: "0.75rem" }}>
-                      {f.file_type.toUpperCase()} · {formatBytes(f.size_bytes)} · {formatDate(f.uploaded_at)}
+                      {f.upload_status === "processing" ? (
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--green-dark)" }}>
+                          <Loader2 size={11} className="spin" />
+                          Extracting text…
+                        </span>
+                      ) : f.upload_status === "error" ? (
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--red, #e53e3e)" }} title={f.upload_error ?? undefined}>
+                          <AlertCircle size={11} />
+                          {f.upload_error ?? "Upload failed"}
+                        </span>
+                      ) : (
+                        <>{f.file_type.toUpperCase()} · {formatBytes(f.size_bytes)} · {formatDate(f.uploaded_at)}</>
+                      )}
                     </p>
                   </div>
                   <button

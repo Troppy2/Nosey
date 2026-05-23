@@ -1,4 +1,4 @@
-import { BookOpen, Bot, Brain, Edit3, Files, FolderOpen, History, Plus, Settings, Trash2 } from "lucide-react";
+import { BookOpen, Bot, Brain, Edit3, Files, FolderOpen, History, Loader2, Plus, Settings, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -39,6 +39,16 @@ export default function FolderDetail() {
       })
       .finally(() => setIsLoading(false));
   }, [id]);
+
+  // Poll while any test is still generating
+  useEffect(() => {
+    const hasGenerating = tests.some((t) => t.generation_status === "generating");
+    if (!hasGenerating) return;
+    const pollId = setInterval(() => {
+      fetchTests(id).then(setTests).catch(() => {});
+    }, 4000);
+    return () => clearInterval(pollId);
+  }, [id, tests]);
 
   async function commitRename(nextTitle: string) {
     if (!renamingTest) return;
@@ -269,19 +279,43 @@ function TestRow({
     setShowAttempts(true);
   }
 
+  const isGenerating = test.generation_status === "generating";
+  const isFailed = test.generation_status === "failed";
+
   return (
     <Card className={`test-row${showAttempts ? " test-row--attempts-open" : ""}`}>
-      <Link className="test-row-main" to={`/test/${test.id}`}>
-        <div>
-          <h3>{test.title}</h3>
-          <p className="muted small">
-            {test.question_count} questions · {formatDate(test.created_at)}
-          </p>
+      {isGenerating ? (
+        <div className="test-row-main" style={{ cursor: "default", opacity: 0.75 }}>
+          <div>
+            <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {test.title}
+              <Loader2 size={15} className="spin" style={{ color: "var(--green-dark)" }} />
+            </h3>
+            <p className="muted small">Generating questions…</p>
+          </div>
         </div>
-        <div className="score-badge">{formatPercent(test.best_score)}</div>
-      </Link>
+      ) : isFailed ? (
+        <div className="test-row-main" style={{ cursor: "default" }}>
+          <div>
+            <h3>{test.title}</h3>
+            <p className="muted small" style={{ color: "var(--red, #e53e3e)" }}>
+              Generation failed — delete and try again
+            </p>
+          </div>
+        </div>
+      ) : (
+        <Link className="test-row-main" to={`/test/${test.id}`}>
+          <div>
+            <h3>{test.title}</h3>
+            <p className="muted small">
+              {test.question_count} questions · {formatDate(test.created_at)}
+            </p>
+          </div>
+          <div className="score-badge">{formatPercent(test.best_score)}</div>
+        </Link>
+      )}
       <div className="row-actions">
-        {test.attempt_count > 0 ? (
+        {!isGenerating && test.attempt_count > 0 ? (
           <button
             aria-label="View attempt history"
             className={`attempt-toggle-btn${showAttempts ? " attempt-toggle-btn--active" : ""}`}
@@ -292,9 +326,11 @@ function TestRow({
             <History size={17} />
           </button>
         ) : null}
-        <button aria-label={`Rename ${test.title}`} onClick={() => onRename(test)} type="button">
-          <Edit3 size={17} />
-        </button>
+        {!isGenerating && (
+          <button aria-label={`Rename ${test.title}`} onClick={() => onRename(test)} type="button">
+            <Edit3 size={17} />
+          </button>
+        )}
         <button aria-label={`Delete ${test.title}`} onClick={() => onDelete(test)} type="button">
           <Trash2 size={17} />
         </button>

@@ -395,6 +395,7 @@ class TestService:
                 best_score=float(best_score) if best_score is not None else None,
                 attempt_count=attempt_count,
                 created_at=test.created_at,
+                generation_status=test.generation_status,
             )
             for test, question_count, best_score, attempt_count in rows
         ]
@@ -411,6 +412,7 @@ class TestService:
                 best_score=float(best_score) if best_score is not None else None,
                 attempt_count=attempt_count,
                 created_at=test.created_at,
+                generation_status=test.generation_status,
             )
             for test, question_count, best_score, attempt_count in rows
         ]

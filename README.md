@@ -21,7 +21,7 @@ Nosey works completely offline after deployment and never stores or shares your 
 ### Prerequisites
 
 - **Node.js** (v18+) and npm or pnpm
-- **Python 3.9+** with pip and virtualenv
+- **Python 3.13+** with pip and virtualenv
 - **PostgreSQL 16** (or a managed PostgreSQL service for deployment)
 - **Docker** and **docker-compose** (optional, for containerized setup)
 
@@ -44,8 +44,9 @@ Nosey works completely offline after deployment and never stores or shares your 
 
 ```bash
 # Create and activate Python virtual environment
-python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+py -3.13 -m venv .venv
+# On Windows:
+.venv\Scripts\activate
 
 # Install dependencies
 pip install -r study-app-backend/requirements.txt

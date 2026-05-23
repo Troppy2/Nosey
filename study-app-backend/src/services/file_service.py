@@ -32,6 +32,11 @@ except ImportError:  # pragma: no cover - optional dependency
     fitz = None  # type: ignore[assignment]
 
 try:
+    import pymupdf4llm  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover - optional dependency
+    pymupdf4llm = None  # type: ignore[assignment]
+
+try:
     import docx as python_docx  # type: ignore[import-not-found]
 except ImportError:  # pragma: no cover - optional dependency
     python_docx = None  # type: ignore[assignment]
@@ -86,11 +91,22 @@ def _collapse_whitespace_lines(text: str) -> str:
     return text.strip()
 
 
+# Math symbols that should survive the short-line noise filter even when alone on a line.
+# Integral signs appear as single chars (∫) when the PDF has no bounds on the same line.
+_MATH_KEEP_CHARS = frozenset(
+    "∫∬∭∮∯∰∑∏√∂∇∞±×÷≤≥≠≈∈∉⊂⊃∪∩ΣΠΩαβγδεζηθλμπρστφψω"
+)
+
+
 def _is_ocr_noise_line(line: str) -> bool:
     stripped = line.strip()
     if not stripped:
         return True
     if len(stripped) <= 2:
+        # Preserve lone math/Greek symbols — dropping them erases integral signs
+        # from indefinite-integral questions where no bound follows on the same line.
+        if any(ch in _MATH_KEEP_CHARS for ch in stripped):
+            return False
         return True
     if re.fullmatch(r"[\W_]+", stripped):
         return True
@@ -324,9 +340,19 @@ class FileService:
         header = f"Code file ({file_type})"
         return f"{header}\n\n{text.strip()}"
 
+    def _extract_pdf_with_pymupdf4llm(self, data: bytes) -> str:
+        if pymupdf4llm is None:
+            raise ImportError("pymupdf4llm is not installed")
+        md = pymupdf4llm.to_markdown(fitz.open(stream=data, filetype="pdf"))
+        if not md or not md.strip():
+            raise ValueError("pymupdf4llm returned empty output")
+        return md
+
     def _extract_pdf(self, data: bytes) -> str:
         attempts: list[tuple[str, Callable[[bytes], str]]] = []
-        if fitz is not None:
+        if pymupdf4llm is not None and fitz is not None:
+            attempts.append(("pymupdf4llm", self._extract_pdf_with_pymupdf4llm))
+        elif fitz is not None:
             attempts.append(("PyMuPDF", self._extract_pdf_with_pymupdf))
         attempts.append(("pdfplumber", self._extract_pdf_with_pdfplumber))
 

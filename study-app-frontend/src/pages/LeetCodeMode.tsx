@@ -12,6 +12,7 @@ import {
   Code2,
   ExternalLink,
   Flame,
+  Youtube,
   GitBranch,
   Hash,
   Layers3,
@@ -30,6 +31,7 @@ import {
   WrapText,
   X,
   type LucideIcon,
+  Code,
 } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -850,6 +852,12 @@ export default function LeetCodeMode() {
           <span>{currentProblem.title}</span>
           <span className={`lc-difficulty lc-difficulty--${difficultyClass(currentProblem.difficulty)}`}>{currentProblem.difficulty}</span>
         </div>
+
+        <a className="lc-toolbar-btn" href={`https://www.youtube.com/results?search_query=neetcode+${encodeURIComponent(currentProblem.title)}`} target="_blank" rel="noreferrer">
+          <Youtube size={16} />
+          NeetCode
+        </a>
+        
         <div className="lc-editor-actions">
           <a className="lc-toolbar-btn" href={currentProblem.url} target="_blank" rel="noreferrer">
             <ExternalLink size={16} />
