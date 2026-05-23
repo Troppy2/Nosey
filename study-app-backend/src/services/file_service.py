@@ -10,6 +10,7 @@ from collections import defaultdict
 from io import BytesIO
 from itertools import repeat
 from multiprocessing import get_context
+from types import ModuleType
 from typing import Callable, Optional
 
 import pdfplumber
@@ -350,9 +351,9 @@ class FileService:
 
     def _extract_pdf(self, data: bytes) -> str:
         attempts: list[tuple[str, Callable[[bytes], str]]] = []
-        if pymupdf4llm is not None and fitz is not None:
+        if pymupdf4llm is not None and fitz is not None and isinstance(fitz, ModuleType):
             attempts.append(("pymupdf4llm", self._extract_pdf_with_pymupdf4llm))
-        elif fitz is not None:
+        if fitz is not None:
             attempts.append(("PyMuPDF", self._extract_pdf_with_pymupdf))
         attempts.append(("pdfplumber", self._extract_pdf_with_pdfplumber))
 
