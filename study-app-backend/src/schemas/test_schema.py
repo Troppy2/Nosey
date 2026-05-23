@@ -75,6 +75,7 @@ class TestSummary(BaseModel):
     best_score: Optional[float] = None
     attempt_count: int = 0
     created_at: datetime
+    generation_status: str = "ready"
 
 
 class TestUpdate(BaseModel):
@@ -96,8 +97,9 @@ class TestTakeResponse(BaseModel):
 class CreateTestResponse(BaseModel):
     test_id: int
     title: str
-    questions_generated: int
+    questions_generated: int = 0
     message: str = "Test created. Ready to take."
+    generation_status: str = "ready"
     fallback_used: bool = False
     fallback_reason: Optional[str] = None
     note_grounded: bool = True

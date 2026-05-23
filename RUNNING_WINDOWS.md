@@ -4,7 +4,7 @@ This file describes how to start Ollama, the backend, and the frontend on Window
 
 ## Prerequisites
 - Install Ollama from https://ollama.com.
-- Python 3.9, with a project virtualenv at `.venv` created from the project root.
+- Python 3.13, with a project virtualenv at `.venv` created from the project root.
 - Node.js and npm, or pnpm, for the frontend.
 - PowerShell 7 or Windows PowerShell 5.1.
 
@@ -63,7 +63,7 @@ Check and install Python dependencies (recommended):
 From the project root, create the virtualenv if it doesn't exist:
 
 ```powershell
-py -3 -m venv .venv
+py -3.13 -m venv .venv
 ```
 
 - Activate the virtualenv:
@@ -77,25 +77,25 @@ py -3 -m venv .venv
 - Upgrade pip and install the backend requirements:
 
 ```powershell
-python -m pip install --upgrade pip
-pip install -r .\study-app-backend\requirements.txt
+..\.venv\Scripts\python.exe -m pip install --upgrade pip
+..\.venv\Scripts\python.exe -m pip install -r requirements.txt
 # or, after changing into study-app-backend:
-# pip install -r requirements.txt
+# ..\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
 - Verify installed packages have no conflicts:
 
 ```powershell
-python -m pip check
+..\.venv\Scripts\python.exe -m pip check
 ```
 
 - If you see issues, recreate the venv and reinstall:
 
 ```powershell
 Remove-Item -Recurse -Force .venv
-py -3 -m venv .venv
+py -3.13 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+..\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
 After dependencies are installed, apply migrations:
@@ -113,7 +113,7 @@ Set-Location study-app-backend
 ..\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
-uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+..\.venv\Scripts\python.exe -m uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 API base: `http://localhost:8000` (docs at `/docs`).
@@ -203,10 +203,11 @@ $env:LOCUST_FOLDER = "3"
 ---
 
 ## Troubleshooting
-- If the backend fails at import time with syntax errors, ensure your Python version is 3.9 and the virtualenv is active.
+- If the backend fails at import time with syntax errors, ensure your Python version is 3.13 and the virtualenv is active.
 - If Ollama calls timeout, confirm `ollama serve` is running and the pulled model exists.
 - If migrations fail, verify `DATABASE_URL` in [study-app-backend/.env](study-app-backend/.env) points to a running Postgres and then run `alembic upgrade head`.
 - If PowerShell blocks venv activation, run `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` in the current shell and try again.
+- If `python` is not found, use the venv interpreter directly: `..\.venv\Scripts\python.exe -m uvicorn src.main:app --reload --host 0.0.0.0 --port 8000`.
 - If port 8000 is in use, use `Get-NetTCPConnection -LocalPort 8000 -State Listen` to find the process ID, then stop it with `Stop-Process -Id <PID>`.
 
 ---

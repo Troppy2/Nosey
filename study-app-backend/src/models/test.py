@@ -27,6 +27,8 @@ class Test(Base, TimestampMixin):
     is_math_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     is_coding_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     coding_language: Mapped[Optional[str]] = mapped_column(String(50))
+    generation_status: Mapped[str] = mapped_column(String(20), nullable=False, default="ready", server_default="ready")
+    generation_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     folder: Mapped[Folder] = relationship("Folder", back_populates="tests")
     questions: Mapped[list[Question]] = relationship(
