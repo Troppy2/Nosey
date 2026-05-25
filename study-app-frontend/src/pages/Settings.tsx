@@ -303,14 +303,13 @@ export default function Settings() {
                   {level === "strict"
                     ? "Only answers from your notes"
                     : level === "medium"
-                    ? "Prefers notes, fills gaps with general knowledge"
-                    : "Answers freely, tells you to fact-check"}
+                      ? "Prefers notes, fills gaps with general knowledge"
+                      : "Answers freely, tells you to fact-check"}
                 </span>
               </button>
             ))}
           </div>
         </section>
-
         <section className="settings-restore">
           <h3>Kojo chat history restore</h3>
           <p className="muted small">
