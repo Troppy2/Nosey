@@ -32,6 +32,7 @@ import {
   X,
   type LucideIcon,
   Code,
+  Timer,
 } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -101,6 +102,7 @@ const MAX_CODE_TABS = 5;
 const CODE_TAB_ID_KEY = "nosey_lc_tab_id";
 const CODE_WORKSPACE_KEY_PREFIX = "nosey_lc_code_tabs";
 const CODE_KEY_PREFIX = "nosey_lc_code";
+const TIMER_PRESETS = [15, 25, 45];
 
 const CHAT_COMMANDS: SlashCommand[] = [
   { slash: "/hint", label: "Hint", description: "Get the next nudge without the full answer.", prompt: "Give me one focused hint. Do not give me the full solution." },
@@ -573,12 +575,21 @@ export default function LeetCodeMode() {
   const [runnerResult, setRunnerResult] = useState<RunnerResult | null>(null);
   const [gradeLoading, setGradeLoading] = useState(false);
   const [gradeFeedback, setGradeFeedback] = useState<string | null>(null);
+  const [timerMinutesInput, setTimerMinutesInput] = useState("25");
+  const [timerRemainingSeconds, setTimerRemainingSeconds] = useState<number | null>(null);
+  const [timerPickerOpen, setTimerPickerOpen] = useState(false);
+  const [timeoutModalOpen, setTimeoutModalOpen] = useState(false);
+  const [timeoutModalMessage, setTimeoutModalMessage] = useState<string | null>(null);
   const [kojoOpen, setKojoOpen] = useState(false);
   const [kojoInput, setKojoInput] = useState("");
   const [kojoResponse, setKojoResponse] = useState<string | null>(null);
   const [kojoLoading, setKojoLoading] = useState(false);
   const [kojoError, setKojoError] = useState<string | null>(null);
   const editorRef = useRef<any>(null);
+  const currentCodeRef = useRef("");
+  const currentProblemDataRef = useRef<LeetCodeProblemData | undefined>(undefined);
+  const currentCustomCasesRef = useRef<CustomCase[]>([]);
+  const timerExpiryHandledRef = useRef(false);
 
   const currentProblem =
     view.type === "problem"
@@ -592,6 +603,19 @@ export default function LeetCodeMode() {
   const currentCodeTab = currentCodeWorkspace?.tabs.find((tab) => tab.id === currentCodeWorkspace.activeTabId) ?? currentCodeWorkspace?.tabs[0] ?? null;
   const currentCode = currentCodeTab?.code ?? "";
   const kojoShowsCommands = kojoOpen && kojoInput.trimStart().startsWith("/");
+  const timerButtonLabel = timerRemainingSeconds == null ? "Timer" : `${Math.floor(timerRemainingSeconds / 60)}:${String(timerRemainingSeconds % 60).padStart(2, "0")}`;
+
+  useEffect(() => {
+    currentCodeRef.current = currentCode;
+  }, [currentCode]);
+
+  useEffect(() => {
+    currentProblemDataRef.current = currentProblemData;
+  }, [currentProblemData]);
+
+  useEffect(() => {
+    currentCustomCasesRef.current = currentCustomCases;
+  }, [currentCustomCases]);
 
   useEffect(() => {
     if (!currentProblem || !currentProblem.isOfficial) return;
@@ -612,6 +636,25 @@ export default function LeetCodeMode() {
         }));
       });
   }, [currentProblem, problemStates]);
+
+  useEffect(() => {
+    if (!currentProblem || timerRemainingSeconds == null || timeoutModalOpen) return;
+    if (timerRemainingSeconds <= 0) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setTimerRemainingSeconds((previous) => (previous == null ? previous : Math.max(previous - 1, 0)));
+    }, 1000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [currentProblem?.slug, timerRemainingSeconds, timeoutModalOpen]);
+
+  useEffect(() => {
+    if (!currentProblem || timerRemainingSeconds == null || timerRemainingSeconds > 0 || timeoutModalOpen) return;
+    if (timerExpiryHandledRef.current) return;
+
+    timerExpiryHandledRef.current = true;
+    void handleTimerExpired(currentProblem);
+  }, [currentProblem?.slug, timerRemainingSeconds, timeoutModalOpen]);
 
   const stats = useMemo(() => {
     const solved = UNIQUE_PROBLEMS.filter((problem) => progress[problem.slug]);
@@ -649,6 +692,161 @@ export default function LeetCodeMode() {
     recordSolvedToday();
   }
 
+  function closeTimerPicker() {
+    setTimerPickerOpen(false);
+  }
+
+  function closeTimeoutModal() {
+    setTimeoutModalOpen(false);
+    setTimeoutModalMessage(null);
+  }
+
+  function resetTimerState() {
+    timerExpiryHandledRef.current = false;
+    setTimerRemainingSeconds(null);
+    closeTimerPicker();
+    closeTimeoutModal();
+  }
+
+  function startTimer(minutes: number) {
+    if (!currentProblem || !Number.isFinite(minutes) || minutes <= 0) return;
+
+    timerExpiryHandledRef.current = false;
+    closeTimerPicker();
+    closeTimeoutModal();
+    setTimerRemainingSeconds(Math.round(minutes * 60));
+  }
+
+  function openTimerPicker() {
+    setTimerPickerOpen(true);
+  }
+
+  function applyTimerFromInput() {
+    const parsed = Number(timerMinutesInput);
+    if (!Number.isFinite(parsed) || parsed <= 0) return;
+
+    startTimer(parsed);
+    setTimerMinutesInput(String(Math.round(parsed)));
+  }
+
+  function clearActiveTabWork() {
+    if (!currentProblem) return;
+
+    setCodeWorkspaces((prev) => {
+      const workspace = prev[currentProblem.slug] ?? loadCodeWorkspace(currentProblem.slug);
+      const nextWorkspace = {
+        ...workspace,
+        tabs: workspace.tabs.map((tab) => (tab.id === workspace.activeTabId ? { ...tab, code: "" } : tab)),
+      };
+      saveCodeWorkspace(currentProblem.slug, nextWorkspace);
+      return { ...prev, [currentProblem.slug]: nextWorkspace };
+    });
+  }
+
+  async function runAndGradeCurrentCode(
+    problemAtRun: Problem,
+    codeToRun: string,
+    problemDataAtRun: LeetCodeProblemData | undefined,
+    customCasesAtRun: CustomCase[],
+  ) {
+    if (!problemDataAtRun || !isRunnable(problemDataAtRun)) return null;
+
+    const officialCases = problemDataAtRun.examples.map((example) => ({
+      label: `Official ${example.index}`,
+      inputText: example.input_text,
+      expectedOutput: example.output_text,
+    }));
+    const validCustomCases = customCasesAtRun
+      .filter((item) => item.inputText.trim() && item.expectedOutput.trim())
+      .map((item, index) => ({
+        label: `Custom ${index + 1}`,
+        inputText: item.inputText.trim(),
+        expectedOutput: item.expectedOutput.trim(),
+      }));
+
+    setRunnerLoading(true);
+    setRunnerResult(null);
+    setGradeFeedback(null);
+    try {
+      const result = await runPythonLeetCode(codeToRun, [...officialCases, ...validCustomCases]);
+      setRunnerResult(result);
+
+      if (result.cases?.length) {
+        setGradeLoading(true);
+        const testResultsSummary = JSON.stringify(
+          result.cases.map((c) => ({
+            label: c.label,
+            passed: c.passed,
+            actual: c.actual,
+            expected: c.expected,
+          })),
+        );
+        try {
+          const grade = await gradeLeetCodeSubmission(
+            problemAtRun.slug,
+            problemAtRun.title,
+            codeToRun,
+            testResultsSummary,
+            result.ok,
+            generationProvider,
+          );
+          setGradeFeedback(grade.feedback);
+        } catch {
+          // grading is best-effort — don't block the run result
+        } finally {
+          setGradeLoading(false);
+        }
+      }
+
+      if (result.ok) {
+        markProblemDone(problemAtRun);
+      }
+
+      return result;
+    } finally {
+      setRunnerLoading(false);
+    }
+  }
+
+  function renderTimerPreset(minutes: number) {
+    return (
+      <button
+        key={minutes}
+        type="button"
+        className="lc-timer-modal-preset"
+        onClick={() => {
+          setTimerMinutesInput(String(minutes));
+          startTimer(minutes);
+        }}
+      >
+        {minutes}m
+      </button>
+    );
+  }
+
+  async function handleTimerExpired(problemAtTimeout: Problem) {
+    if (runnerLoading || gradeLoading) {
+      setTimeoutModalMessage("Time ran out while Kojo was still grading your current run. You can continue without the timer or clear the active tab.");
+      setTimeoutModalOpen(true);
+      return;
+    }
+
+    const result = await runAndGradeCurrentCode(
+      problemAtTimeout,
+      currentCodeRef.current,
+      currentProblemDataRef.current,
+      currentCustomCasesRef.current,
+    );
+
+    if (result?.ok) {
+      resetTimerState();
+      return;
+    }
+
+    setTimeoutModalMessage("Time's up. Kojo graded your attempt and it still needs more work.");
+    setTimeoutModalOpen(true);
+  }
+
   function openProblem(categoryId: string, problemSlug: string) {
     const cached = problemStates[problemSlug]?.data;
     const initialCode = cached?.python_snippet?.trimEnd() ?? "";
@@ -673,6 +871,7 @@ export default function LeetCodeMode() {
     setGradeFeedback(null);
     setKojoResponse(null);
     setKojoError(null);
+    resetTimerState();
   }
 
   function handleCodeChange(value: string) {
@@ -836,55 +1035,7 @@ export default function LeetCodeMode() {
   async function handleRunCode() {
     if (!currentProblem || !currentProblemData || !isRunnable(currentProblemData)) return;
     const problemAtRun = currentProblem;
-    const officialCases = currentProblemData.examples.map((example) => ({
-      label: `Official ${example.index}`,
-      inputText: example.input_text,
-      expectedOutput: example.output_text,
-    }));
-    const validCustomCases = currentCustomCases.filter((item) => item.inputText.trim() && item.expectedOutput.trim()).map((item, index) => ({
-      label: `Custom ${index + 1}`,
-      inputText: item.inputText.trim(),
-      expectedOutput: item.expectedOutput.trim(),
-    }));
-
-    setRunnerLoading(true);
-    setRunnerResult(null);
-    setGradeFeedback(null);
-    try {
-      const result = await runPythonLeetCode(currentCode, [...officialCases, ...validCustomCases]);
-      setRunnerResult(result);
-
-      if (result.cases?.length) {
-        setGradeLoading(true);
-        const testResultsSummary = JSON.stringify(result.cases.map((c) => ({
-          label: c.label,
-          passed: c.passed,
-          actual: c.actual,
-          expected: c.expected,
-        })));
-        try {
-          const grade = await gradeLeetCodeSubmission(
-            problemAtRun.slug,
-            problemAtRun.title,
-            currentCode,
-            testResultsSummary,
-            result.ok,
-            generationProvider,
-          );
-          setGradeFeedback(grade.feedback);
-        } catch {
-          // grading is best-effort — don't block the run result
-        } finally {
-          setGradeLoading(false);
-        }
-      }
-
-      if (result.ok) {
-        markProblemDone(problemAtRun);
-      }
-    } finally {
-      setRunnerLoading(false);
-    }
+    await runAndGradeCurrentCode(problemAtRun, currentCode, currentProblemData, currentCustomCases);
   }
 
   if (view.type === "tree") {
@@ -1037,11 +1188,16 @@ export default function LeetCodeMode() {
           <span>{currentProblem.title}</span>
           <span className={`lc-difficulty lc-difficulty--${difficultyClass(currentProblem.difficulty)}`}>{currentProblem.difficulty}</span>
         </div>
-        <a className="lc-toolbar-btn" href={`https://www.youtube.com/results?search_query=neetcode+${encodeURIComponent(currentProblem.title)}`} target="_blank" rel="noreferrer">
-          <Youtube size={16} />
-          NeetCode
-        </a>
-        <div className="lc-editor-actions">
+        <div className="lc-editor-actions lc-editor-actions--timer">
+          <button type="button" className="lc-toolbar-btn lc-toolbar-btn--timer" onClick={openTimerPicker}>
+            <Timer size={16} />
+            {timerButtonLabel}
+          </button>
+          <a className="lc-toolbar-btn" href={`https://www.youtube.com/results?search_query=neetcode+${encodeURIComponent(currentProblem.title)}`} target="_blank" rel="noreferrer">
+            <Youtube size={16} />
+            NeetCode
+          </a>
+          <div className="lc-editor-actions">
           <a className="lc-toolbar-btn" href={currentProblem.url} target="_blank" rel="noreferrer">
             <ExternalLink size={16} />
             Open
@@ -1062,6 +1218,7 @@ export default function LeetCodeMode() {
             {progress[currentProblem.slug] ? <CheckCircle2 size={16} /> : <Circle size={16} />}
             {progress[currentProblem.slug] ? "Done" : "Mark done"}
           </button>
+        </div>
         </div>
       </div>
 
@@ -1281,6 +1438,98 @@ export default function LeetCodeMode() {
                   {kojoResponse ? "Ask again" : "Ask Kojo"}
                 </button>
               )}
+            </div>
+          </div>
+        </>
+      ) : null}
+
+      {timerPickerOpen ? (
+        <>
+          <div className="lc-kojo-backdrop" onClick={closeTimerPicker} />
+          <div className="lc-kojo-modal lc-timer-modal">
+            <div className="lc-kojo-modal-header lc-timer-modal-header">
+              <div className="kojo-avatar lc-timer-avatar"><Timer size={16} /></div>
+              <span>Set timer</span>
+              <button type="button" className="lc-kojo-close" onClick={closeTimerPicker} aria-label="Close timer modal">
+                <X size={17} />
+              </button>
+            </div>
+
+            <div className="lc-timer-modal-body">
+              <div className="lc-timer-modal-presets" role="group" aria-label="Problem timer presets">
+                {TIMER_PRESETS.map(renderTimerPreset)}
+              </div>
+
+              <label className="lc-timer-modal-input">
+                <span>Custom minutes</span>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={timerMinutesInput}
+                  onChange={(event) => setTimerMinutesInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      applyTimerFromInput();
+                    }
+                  }}
+                />
+              </label>
+            </div>
+
+            <div className="lc-timer-modal-actions">
+              <button type="button" className="button lc-timeout-action lc-timeout-action--ghost" onClick={closeTimerPicker}>
+                Cancel
+              </button>
+              <button type="button" className="button button--primary lc-timeout-action" onClick={applyTimerFromInput}>
+                Start timer
+              </button>
+            </div>
+          </div>
+        </>
+      ) : null}
+
+      {timeoutModalOpen ? (
+        <>
+          <div className="lc-kojo-backdrop" onClick={closeTimeoutModal} />
+          <div className="lc-kojo-modal lc-timeout-modal">
+            <div className="lc-kojo-modal-header lc-timeout-modal-header">
+              <div className="kojo-avatar lc-timeout-avatar"><AlertCircle size={16} /></div>
+              <span>Time&apos;s up</span>
+              <button
+                type="button"
+                className="lc-kojo-close"
+                onClick={closeTimeoutModal}
+                aria-label="Close timeout modal"
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+            <div className="lc-kojo-contract lc-timeout-copy">
+              <p>{timeoutModalMessage ?? "You ran out of time before finishing this problem."}</p>
+              <p>Kojo graded your current attempt. You can clear the active tab or keep working without the timer.</p>
+            </div>
+
+            <div className="lc-timeout-actions">
+              <button
+                type="button"
+                className="button lc-timeout-action lc-timeout-action--ghost"
+                onClick={() => {
+                  clearActiveTabWork();
+                  resetTimerState();
+                }}
+              >
+                Clear all work
+              </button>
+              <button
+                type="button"
+                className="button button--primary lc-timeout-action"
+                onClick={resetTimerState}
+              >
+                Continue without timer
+              </button>
             </div>
           </div>
         </>

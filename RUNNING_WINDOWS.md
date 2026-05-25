@@ -4,7 +4,7 @@ This file describes how to start Ollama, the backend, and the frontend on Window
 
 ## Prerequisites
 - Install Ollama from https://ollama.com.
-- Python 3.13, with a project virtualenv at `.venv` created from the project root.
+- Python 3.11, with a project virtualenv at `.venv` created from the project root.
 - Node.js and npm, or pnpm, for the frontend.
 - PowerShell 7 or Windows PowerShell 5.1.
 
@@ -63,7 +63,7 @@ Check and install Python dependencies (recommended):
 From the project root, create the virtualenv if it doesn't exist:
 
 ```powershell
-py -3.13 -m venv .venv
+py -3.11 -m venv .venv
 ```
 
 - Activate the virtualenv:
@@ -93,7 +93,7 @@ py -3.13 -m venv .venv
 
 ```powershell
 Remove-Item -Recurse -Force .venv
-py -3.13 -m venv .venv
+py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ..\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
