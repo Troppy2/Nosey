@@ -97,7 +97,7 @@ class LeetCodeService:
         except Exception as exc:
             raise LLMException("Kojo failed to grade the submission. Try again.") from exc
 
-        return LeetCodeGradeResponse(response=response, flagged_uncertain=False)
+        return LeetCodeGradeResponse(feedback=response, flagged_uncertain=False)
 
     async def _fetch_problem(self, title_slug: str) -> _FetchedProblem:
         payload = {

@@ -9,7 +9,7 @@ const navItems = [
   { to: "/folders", label: "Folders", icon: FolderOpen },
   { to: "/flashcards", label: "Flashcards", icon: Brain },
   { to: "/leetcode", label: "LeetCode mode", icon: Code2 },
-  { to: "/kojo/chat", label: "Chat mode", icon: MessageCircle },
+  { to: "/kojo/chat", label: "Chat", icon: MessageCircle },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
