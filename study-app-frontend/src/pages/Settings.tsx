@@ -1,4 +1,4 @@
-import { CheckCircle, LogIn, LogOut, RotateCcw, Sparkles, XCircle } from "lucide-react";
+import { CheckCircle, LogIn, LogOut, RotateCcw, Sparkles, X, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -17,6 +17,7 @@ import {
 import { useSettings } from "../lib/useSettings";
 import { useEffect, useRef, useState } from "react";
 import type { KojoClearedConversation } from "../lib/types";
+import SlashCommandManager from "../components/SlashCommandManager";
 
 const GENERATION_PROVIDER_OPTIONS = [
   { value: "auto", label: "Auto" },
@@ -41,6 +42,7 @@ export default function Settings() {
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [resettingStats, setResettingStats] = useState(false);
   const [statsResetNotice, setStatsResetNotice] = useState<string | null>(null);
+  const [slashCommandModalOpen, setSlashCommandModalOpen] = useState(false);
   const {
     questionFallbackEnabled,
     setQuestionFallbackEnabled,
@@ -101,6 +103,19 @@ export default function Settings() {
     void loadClearedConversations();
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!slashCommandModalOpen) return;
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setSlashCommandModalOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [slashCommandModalOpen]);
+
   function handleSignIn() {
     setSignInError(null);
     setSignInSuccess(false);
@@ -145,6 +160,14 @@ export default function Settings() {
   function handleToggleFallback() {
     const next = !questionFallbackEnabled;
     setQuestionFallbackEnabled(next);
+  }
+
+  function openSlashCommandModal() {
+    setSlashCommandModalOpen(true);
+  }
+
+  function closeSlashCommandModal() {
+    setSlashCommandModalOpen(false);
   }
 
   function handleChangeGenerationProvider(nextProvider: string) {
@@ -310,6 +333,17 @@ export default function Settings() {
             ))}
           </div>
         </section>
+        
+        <section className="slash-command-manager">
+          <h3>Slash command manager</h3>
+          <p className="muted small">
+            Open the prompt studio to create custom Kojo slash commands.
+          </p>
+          <Button type="button" variant="secondary" onClick={openSlashCommandModal}>
+            Create slash command
+          </Button>
+        </section>
+
         <section className="settings-restore">
           <h3>Kojo chat history restore</h3>
           <p className="muted small">
@@ -348,6 +382,25 @@ export default function Settings() {
           )}
         </section>
       </Card>
+
+      {slashCommandModalOpen ? (
+        <div className="modal-backdrop" onClick={closeSlashCommandModal}>
+          <div className="modal slash-command-modal" role="dialog" aria-modal="true" aria-label="Create slash command" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3>Create slash command</h3>
+                <p className="muted small">Draft a new Kojo prompt without leaving Settings.</p>
+              </div>
+              <button type="button" className="modal-close" onClick={closeSlashCommandModal} aria-label="Close modal">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body slash-command-modal-body">
+              <SlashCommandManager />
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
