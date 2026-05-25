@@ -4218,7 +4218,7 @@ h3 {
 .lc-row-link,
 .lc-problem-source a,
 .lc-toolbar-btn,
-.lc-coding-tab {
+.lc-coding-tab, .lc-toolbar-timer {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4238,10 +4238,94 @@ h3 {
 .lc-official-link:hover,
 .lc-row-link:hover,
 .lc-problem-source a:hover,
-.lc-toolbar-btn:hover {
+.lc-toolbar-btn:hover, .lc-toolbar-timer:hover {
   transform: translateY(-1px);
   border-color: var(--green-dark);
   background: var(--green-lightest);
+}
+
+.lc-toolbar-timer--urgent {
+  border-color: rgba(220, 38, 38, 0.38);
+  background: rgba(254, 242, 242, 0.92);
+  color: #991b1b;
+}
+
+.lc-toolbar-timer--urgent:hover {
+  border-color: rgba(220, 38, 38, 0.54);
+  background: rgba(254, 226, 226, 0.96);
+  color: #7f1d1d;
+}
+
+.lc-editor-actions--timer {
+  flex-wrap: wrap;
+}
+
+.lc-timer-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lc-timer-presets {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--lc-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.lc-timer-preset {
+  min-height: 30px;
+  padding: 6px 10px;
+  border-radius: 7px;
+  background: transparent;
+  color: #516142;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+
+.lc-timer-preset:hover {
+  transform: translateY(-1px);
+  background: var(--green-lightest);
+  color: var(--ink);
+}
+
+.lc-timer-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--lc-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.lc-timer-input span {
+  color: #5e6f4c;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.lc-timer-input input {
+  width: 58px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 700;
+  outline: none;
+}
+
+.lc-toolbar-btn--timer {
+  min-width: 96px;
 }
 
 .lc-coding-tab:hover {
@@ -4899,6 +4983,126 @@ h3 {
   border-radius: 8px;
   background: var(--white);
   box-shadow: var(--shadow-lg);
+}
+
+.lc-timeout-modal {
+  width: 460px;
+}
+
+.lc-timer-modal {
+  width: 420px;
+}
+
+.lc-timer-modal-header {
+  background: rgba(233, 245, 219, 0.58);
+}
+
+.lc-timer-avatar {
+  color: var(--green-lightest);
+  background: var(--green-dark);
+}
+
+.lc-timer-modal-body {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.lc-timer-modal-presets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.lc-timer-modal-preset {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--lc-border);
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.lc-timer-modal-preset:hover {
+  transform: translateY(-1px);
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+}
+
+.lc-timer-modal-input {
+  display: grid;
+  gap: 6px;
+}
+
+.lc-timer-modal-input span {
+  color: #5e6f4c;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.lc-timer-modal-input input {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid var(--lc-border);
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 700;
+  outline: none;
+}
+
+.lc-timer-modal-input input:focus {
+  border-color: var(--green-dark);
+}
+
+.lc-timer-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0 14px 14px;
+}
+
+.lc-timeout-modal-header {
+  background: rgba(254, 242, 242, 0.82);
+  border-bottom-color: rgba(220, 38, 38, 0.16);
+}
+
+.lc-timeout-avatar {
+  color: #fee2e2;
+  background: #dc2626;
+}
+
+.lc-timeout-copy {
+  gap: 10px;
+}
+
+.lc-timeout-copy p + p {
+  color: #516142;
+}
+
+.lc-timeout-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 14px 14px;
+}
+
+.lc-timeout-action {
+  min-height: 40px;
+}
+
+.lc-timeout-action--ghost {
+  background: var(--white);
 }
 
 .lc-kojo-modal-header {
