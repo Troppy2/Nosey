@@ -615,6 +615,10 @@ export async function deleteFolderFile(folderId: number, fileId: number): Promis
   await request(`/folders/${folderId}/files/${fileId}`, { method: "DELETE" });
 }
 
+export async function reindexFolderFiles(folderId: number): Promise<{ reindexed: number; still_failed: number }> {
+  return request(`/folders/${folderId}/files/reindex`, { method: "POST" });
+}
+
 export async function fetchSlashCommands(): Promise<SlashCommand[]> {
   try {
     return await request<SlashCommand[]>("/slash-commands");

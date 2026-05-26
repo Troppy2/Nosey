@@ -448,7 +448,7 @@ class KojoService:
         results: list[ConversationFileDTO] = []
         for upload in files:
             data = await upload.read()
-            async def _async_read(d=data):
+            async def _async_read(self, d=data):
                 return d
             mock = type("_F", (), {"read": _async_read, "seek": lambda self, p: None, "filename": upload.filename or "file"})()
             content, _ = await svc.extract_from_files([mock])

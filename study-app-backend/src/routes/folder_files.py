@@ -226,6 +226,39 @@ async def upload_folder_files(
     return UploadResult(uploaded=created, skipped=skipped)
 
 
+class ReindexResult(BaseModel):
+    reindexed: int
+    still_failed: int
+
+
+@router.post("/{folder_id}/files/reindex", response_model=ReindexResult)
+async def reindex_folder_files(
+    folder_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> ReindexResult:
+    await _get_owned_folder(folder_id, user, session)
+    rows = await session.scalars(
+        select(FolderFile).where(
+            FolderFile.folder_id == folder_id,
+            FolderFile.upload_status != "ready",
+        )
+    )
+    files = list(rows.all())
+    reindexed = 0
+    still_failed = 0
+    for f in files:
+        if f.content and f.content.strip():
+            f.upload_status = "ready"
+            f.upload_error = None
+            reindexed += 1
+        else:
+            still_failed += 1
+    if reindexed:
+        await session.commit()
+    return ReindexResult(reindexed=reindexed, still_failed=still_failed)
+
+
 @router.delete("/{folder_id}/files/{file_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_folder_file(
     folder_id: int,
