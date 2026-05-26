@@ -10,6 +10,10 @@ export type Folder = {
   test_count: number;
   flashcard_count: number;
   color?: string;
+  kojo_sync_default?: boolean;
+  kojo_allow_artifacts?: boolean;
+  kojo_auto_index?: boolean;
+  kojo_persona?: string | null;
 };
 
 export type TestSummary = {
@@ -198,19 +202,50 @@ export type AuthUser = {
   profile_picture_url?: string | null;
 };
 
+export type ConversationFile = {
+  id: ID;
+  file_name: string;
+  file_type: string;
+  size_bytes: number;
+  uploaded_at: string;
+};
+
+export type TestBlueprint = {
+  title: string;
+  test_type: "MCQ_only" | "FRQ_only" | "mixed";
+  count_mcq: number;
+  count_frq: number;
+  difficulty: "easy" | "medium" | "hard" | "mixed";
+  topic_focus: string | null;
+  intro: string;
+};
+
+export type KojoMessageType = "chat" | "blueprint" | "blueprint_done" | "blueprint_cancelled";
+
 export type KojoMessage = {
   id: ID;
   role: "user" | "assistant";
   content: string;
   created_at: string;
+  display?: string; // frontend-only: slash command label shown in bubble instead of raw prompt
+  message_type?: KojoMessageType; // frontend-only: distinguishes blueprint messages
+  blueprint?: TestBlueprint; // frontend-only: attached to blueprint messages
+  blueprint_test_id?: ID; // frontend-only: set after successful generation
 };
 
 export type KojoConversation = {
   id: ID;
-  folder_id: ID;
+  folder_id?: ID | null;
   messages: KojoMessage[];
   created_at: string;
   cleared_at?: string | null;
+};
+
+export type KojoConversationSummary = {
+  id: ID;
+  name?: string | null;
+  folder_id?: ID | null;
+  created_at: string;
 };
 
 export type KojoChatResponse = {
@@ -218,6 +253,7 @@ export type KojoChatResponse = {
   conversation_id: ID;
   message_id: ID;
   flagged_uncertain: boolean;
+  conversation_name?: string | null;
 };
 
 export type KojoClearResponse = {
@@ -280,4 +316,26 @@ export type ProviderStatus = {
   ollama: boolean;
   ollama_model: string;
   ollama_model_available: boolean;
+};
+
+export type SlashCommand = {
+  id: ID;
+  user_id: ID;
+  slash: string;
+  label: string;
+  description: string;
+  prompt: string;
+  is_pinned: boolean;
+  position: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SlashCommandInput = {
+  slash: string;
+  label: string;
+  description: string;
+  prompt: string;
+  is_pinned?: boolean;
+  position?: number;
 };

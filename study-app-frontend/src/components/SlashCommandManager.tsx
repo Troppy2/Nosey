@@ -1,232 +1,248 @@
-import { Bot, Layers3, MessageCircle, Plus, RotateCcw, Search, Sparkles, Trash2, type LucideIcon } from "lucide-react";
-import { SlashCommandMenu, type SlashCommand } from "../components/SlashCommandMenu";
+import { Check, Edit3, Pin, Plus, Search, Trash2, X } from "lucide-react";
+import type { FormEvent } from "react";
+import { useMemo, useState } from "react";
+import { Button } from "./Button";
+import { TextArea, TextInput } from "./Field";
+import {
+  createSlashCommand,
+  deleteSlashCommand,
+  updateSlashCommand,
+} from "../lib/api";
+import type { SlashCommand, SlashCommandInput } from "../lib/types";
 
-type PromptState = "Published" | "Draft" | "Pinned";
+type FormState = SlashCommandInput;
 
-type ManagedPrompt = {
-    slash: string;
-    label: string;
-    description: string;
-    prompt: string;
-    status: PromptState;
-    icon: LucideIcon;
+type Props = {
+  commands: SlashCommand[];
+  loading?: boolean;
+  onChange: (commands: SlashCommand[]) => void;
 };
 
-const CHAT_COMMANDS: SlashCommand[] = [
-    { slash: "/summarize", label: "Summarize", description: "Pull out the big ideas from this folder.", prompt: "Summarize the most important ideas in this folder." },
-    { slash: "/quiz", label: "Quiz Me", description: "Turn the notes into quick review questions.", prompt: "Quiz me on the most important material in this folder." },
-    { slash: "/review", label: "Review Mistakes", description: "Go over recent wrong answers.", prompt: "Review the wrong answers from my most recent test." },
-    { slash: "/focus", label: "Study Focus", description: "Prioritize what to study next.", prompt: "What should I focus on next based on these notes?" },
-    { slash: "/explain", label: "Explain", description: "Break down a confusing concept.", prompt: "Help me understand the hardest idea in these notes." },
-    { slash: "/flashcards", label: "Flashcards", description: "Surface terms worth memorizing.", prompt: "What terms or facts from this folder would make strong flashcards?" },
-];
+const EMPTY_FORM: FormState = {
+  slash: "",
+  label: "",
+  description: "",
+  prompt: "",
+  is_pinned: false,
+};
 
-const MANAGED_PROMPTS: ManagedPrompt[] = [
-    {
-        slash: "/teach-back",
-        label: "Teach Back",
-        description: "Ask Kojo to explain the idea in plain language and end with a quick check question.",
-        prompt: "Explain this topic like I am teaching it to someone else. Keep it simple, concrete, and end with one question I should answer.",
-        status: "Published",
-        icon: Bot,
-    },
-    {
-        slash: "/quiz-me-hard",
-        label: "Quiz Me Hard",
-        description: "Turn notes into a tougher practice prompt that pushes beyond memorization.",
-        prompt: "Quiz me with a harder-than-usual prompt that tests understanding, not just recall.",
-        status: "Pinned",
-        icon: Layers3,
-    },
-    {
-        slash: "/simple-example",
-        label: "Simple Example",
-        description: "Request a short example that makes a concept easier to picture.",
-        prompt: "Give me one simple example that makes this idea easier to understand.",
-        status: "Draft",
-        icon: Sparkles,
-    },
-];
+function normalizeSlash(value: string) {
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return "";
+  return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+}
 
-const PROMPT_STATS = [
-    { label: "Published", value: "6" },
-    { label: "Drafts", value: "3" },
-    { label: "Pinned", value: "2" },
-];
+function toForm(command: SlashCommand): FormState {
+  return {
+    slash: command.slash,
+    label: command.label,
+    description: command.description,
+    prompt: command.prompt,
+    is_pinned: command.is_pinned,
+    position: command.position,
+  };
+}
 
-export default function SlashCommandManager() {
-    return (
-        <section className="slash-manager" aria-label="Slash command manager">
-            <div className="slash-manager-hero">
-                <div className="slash-manager-kicker">
-                    <Sparkles size={14} />
-                    <span>Kojo prompt studio</span>
-                </div>
+export default function SlashCommandManager({ commands, loading = false, onChange }: Props) {
+  const [query, setQuery] = useState("");
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-                <div className="slash-manager-hero-row">
-                    <div>
-                        <h2>Slash command manager</h2>
-                        <p>
-                            Draft custom prompts, organize the ones you want to keep, and preview how they will appear in Kojo.
-                        </p>
-                    </div>
+  const visibleCommands = useMemo(() => {
+    const needle = query.trim().toLowerCase().replace(/^\//, "");
+    if (!needle) return commands;
+    return commands.filter((command) => {
+      return (
+        command.slash.toLowerCase().includes(needle) ||
+        command.label.toLowerCase().includes(needle) ||
+        command.description.toLowerCase().includes(needle)
+      );
+    });
+  }, [commands, query]);
 
-                    <div className="slash-manager-stats" aria-label="Prompt counts">
-                        {PROMPT_STATS.map((stat) => (
-                            <div key={stat.label} className="slash-manager-stat">
-                                <strong>{stat.value}</strong>
-                                <span>{stat.label}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
+  const pinnedCount = commands.filter((command) => command.is_pinned).length;
 
-            <div className="slash-manager-grid">
-                <article className="slash-manager-panel slash-manager-panel--composer">
-                    <div className="slash-manager-panel-header">
-                        <div>
-                            <span className="slash-manager-eyebrow">
-                                <Plus size={13} />
-                                <span>Create prompt</span>
-                            </span>
-                            <h3>Design a reusable Kojo command</h3>
-                        </div>
+  function resetForm() {
+    setForm(EMPTY_FORM);
+    setEditingId(null);
+    setError(null);
+  }
 
-                        <span className="slash-manager-panel-note">Draft only for now</span>
-                    </div>
+  function editCommand(command: SlashCommand) {
+    setForm(toForm(command));
+    setEditingId(command.id);
+    setError(null);
+  }
 
-                    <div className="slash-manager-form">
-                        <label className="slash-manager-field">
-                            <span>Slash trigger</span>
-                            <input type="text" placeholder="/my-prompt" aria-label="Slash trigger" />
-                        </label>
+  async function saveCommand(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError(null);
+    const payload: SlashCommandInput = {
+      ...form,
+      slash: normalizeSlash(form.slash),
+      label: form.label.trim(),
+      description: form.description.trim(),
+      prompt: form.prompt.trim(),
+    };
 
-                        <label className="slash-manager-field">
-                            <span>Prompt name</span>
-                            <input type="text" placeholder="Explain simply" aria-label="Prompt name" />
-                        </label>
+    try {
+      const saved = editingId
+        ? await updateSlashCommand(editingId, payload)
+        : await createSlashCommand({ ...payload, position: commands.length });
+      const next = editingId
+        ? commands.map((command) => (command.id === saved.id ? saved : command))
+        : [saved, ...commands];
+      onChange(next.sort(sortCommands));
+      resetForm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save slash command.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
-                        <label className="slash-manager-field">
-                            <span>Kojo instruction</span>
-                            <textarea rows={6} placeholder="Tell Kojo exactly what you want it to do..." aria-label="Kojo instruction" />
-                        </label>
+  async function togglePinned(command: SlashCommand) {
+    try {
+      const updated = await updateSlashCommand(command.id, { is_pinned: !command.is_pinned });
+      onChange(commands.map((item) => (item.id === command.id ? updated : item)).sort(sortCommands));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to update slash command.");
+    }
+  }
 
-                        <div className="slash-manager-row">
-                            <label className="slash-manager-field">
-                                <span>Category</span>
-                                <select aria-label="Prompt category" defaultValue="study-help">
-                                    <option value="study-help">Study help</option>
-                                    <option value="quiz">Quiz</option>
-                                    <option value="review">Review</option>
-                                    <option value="summary">Summary</option>
-                                </select>
-                            </label>
+  async function removeCommand(command: SlashCommand) {
+    try {
+      await deleteSlashCommand(command.id);
+      onChange(commands.filter((item) => item.id !== command.id));
+      if (editingId === command.id) resetForm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to delete slash command.");
+    }
+  }
 
-                            <label className="slash-manager-field">
-                                <span>Visibility</span>
-                                <select aria-label="Prompt visibility" defaultValue="private">
-                                    <option value="private">Private</option>
-                                    <option value="pinned">Pinned</option>
-                                    <option value="shared">Shared pack</option>
-                                </select>
-                            </label>
-                        </div>
+  return (
+    <section className="slash-manager" aria-label="Slash command manager">
+      <div className="slash-manager-header">
+        <div>
+          <h3>Slash commands</h3>
+          <p className="muted small">Reusable Kojo prompts that show up when you type `/`.</p>
+        </div>
+        <div className="slash-manager-counts" aria-label="Command counts">
+          <span className="pill">{commands.length} total</span>
+          <span className="pill">{pinnedCount} pinned</span>
+        </div>
+      </div>
 
-                        <div className="slash-manager-actions">
-                            <button type="button" className="slash-manager-secondary-button">
-                                <MessageCircle size={14} />
-                                <span>Preview prompt</span>
-                            </button>
-                            <button type="button" className="slash-manager-primary-button">
-                                <Sparkles size={14} />
-                                <span>Save prompt</span>
-                            </button>
-                        </div>
-                    </div>
-                </article>
+      <form className="slash-manager-composer card" onSubmit={saveCommand}>
+        <div className="grid grid-2 slash-manager-form-row">
+          <TextInput
+            label="Command"
+            value={form.slash}
+            onChange={(event) => setForm((cur) => ({ ...cur, slash: event.target.value }))}
+            placeholder="/teach-back"
+            required
+          />
+          <TextInput
+            label="Name"
+            value={form.label}
+            onChange={(event) => setForm((cur) => ({ ...cur, label: event.target.value }))}
+            placeholder="Teach Back"
+            required
+          />
+        </div>
 
-                <aside className="slash-manager-panel slash-manager-panel--preview">
-                    <div className="slash-manager-panel-header">
-                        <div>
-                            <span className="slash-manager-eyebrow">
-                                <Search size={13} />
-                                <span>Live menu preview</span>
-                            </span>
-                            <h3>How Kojo will show it</h3>
-                        </div>
+        <TextInput
+          label="Description"
+          value={form.description}
+          onChange={(event) => setForm((cur) => ({ ...cur, description: event.target.value }))}
+          placeholder="Explain an idea and end with a check question"
+          required
+        />
 
-                        <span className="slash-manager-panel-note">Menu-only view</span>
-                    </div>
+        <TextArea
+          label="Prompt"
+          rows={3}
+          value={form.prompt}
+          onChange={(event) => setForm((cur) => ({ ...cur, prompt: event.target.value }))}
+          placeholder="Tell Kojo exactly what to send when this command is selected."
+          required
+        />
 
-                    <div className="slash-manager-preview-stage">
-                        <div className="slash-manager-preview-input">
-                            <Search size={14} />
-                            <div>
-                                <strong>/ex</strong>
-                                <span>Type a slash command to narrow the list.</span>
-                            </div>
-                        </div>
+        {error ? <p className="slash-manager-error">{error}</p> : null}
 
-                        <SlashCommandMenu commands={CHAT_COMMANDS} query="" onSelect={() => undefined} />
-                    </div>
-                </aside>
-            </div>
+        <div className="slash-manager-actions">
+          <Button
+            type="button"
+            variant="primary"
+            icon={<Pin size={15} className="icon-pin" />}
+            onClick={() => setForm((cur) => ({ ...cur, is_pinned: !cur.is_pinned }))}
+          >
+            {form.is_pinned ? "Pinned" : "Pin"}
+          </Button>
+          {editingId ? (
+            <Button type="button" variant="primary" icon={<X size={15} className="icon-cancel" />} onClick={resetForm}>
+              Cancel
+            </Button>
+          ) : null}
+          <Button type="submit" icon={saving ? <Check size={15} className="icon-check" /> : <Plus size={15} className="icon-plus" />} disabled={saving}>
+            {saving ? "Saving" : editingId ? "Update" : "Create"}
+          </Button>
+        </div>
+      </form>
 
-            <section className="slash-manager-library" aria-label="Saved prompts">
-                <div className="slash-manager-library-header">
-                    <div>
-                        <span className="slash-manager-eyebrow">
-                            <Layers3 size={13} />
-                            <span>Saved prompts</span>
-                        </span>
-                        <h3>Prompt library</h3>
-                    </div>
+      <div className="slash-manager-search">
+        <Search size={15} className="icon-search" />
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search commands" />
+      </div>
 
-                    <p>Keep a small set of commands ready to ship before they are connected to Kojo.</p>
-                </div>
+      <div className="slash-manager-list" aria-live="polite">
+        {loading ? (
+          <p className="muted small">Loading slash commands...</p>
+        ) : visibleCommands.length === 0 ? (
+          <p className="muted small">{commands.length === 0 ? "No custom commands yet." : "No commands match that search."}</p>
+        ) : (
+          visibleCommands.map((command) => (
+            <article
+              key={command.id}
+              className={`slash-manager-item card${command.is_pinned ? " slash-manager-item--pinned" : ""}`}
+            >
+              <button type="button" className="slash-manager-item-main" onClick={() => editCommand(command)}>
+                <span className="slash-manager-trigger">{command.slash}</span>
+                <span className="slash-manager-item-copy">
+                  <strong>{command.label}</strong>
+                  <small>{command.description}</small>
+                </span>
+              </button>
+              <div className="slash-manager-item-actions">
+                <button
+                  type="button"
+                  className={`slash-action-btn action-pin${command.is_pinned ? " slash-action-btn--pinned" : ""}`}
+                  onClick={() => togglePinned(command)}
+                  aria-label={command.is_pinned ? "Unpin command" : "Pin command"}
+                  title={command.is_pinned ? "Unpin" : "Pin"}
+                >
+                  <Pin size={16} />
+                </button>
+                <button type="button" className="slash-action-btn action-edit" onClick={() => editCommand(command)} aria-label="Edit command" title="Edit">
+                  <Edit3 size={16} />
+                </button>
+                <button type="button" className="slash-action-btn action-delete" onClick={() => removeCommand(command)} aria-label="Delete command" title="Delete">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </article>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
 
-                <div className="slash-manager-card-grid">
-                    {MANAGED_PROMPTS.map((prompt) => {
-                        const Icon = prompt.icon;
-
-                        return (
-                            <article key={prompt.slash} className="slash-manager-card">
-                                <div className="slash-manager-card-top">
-                                    <div className="slash-manager-card-title">
-                                        <span className="slash-manager-card-icon">
-                                            <Icon size={15} />
-                                        </span>
-                                        <div>
-                                            <strong>{prompt.label}</strong>
-                                            <span>{prompt.slash}</span>
-                                        </div>
-                                    </div>
-
-                                    <span className={`slash-manager-status slash-manager-status--${prompt.status.toLowerCase()}`}>
-                                        {prompt.status}
-                                    </span>
-                                </div>
-
-                                <p>{prompt.description}</p>
-
-                                <div className="slash-manager-card-prompt">{prompt.prompt}</div>
-
-                                <div className="slash-manager-card-actions">
-                                    <button type="button">
-                                        <RotateCcw size={13} />
-                                        <span>Duplicate</span>
-                                    </button>
-                                    <button type="button">
-                                        <Trash2 size={13} />
-                                        <span>Remove</span>
-                                    </button>
-                                </div>
-                            </article>
-                        );
-                    })}
-                </div>
-            </section>
-        </section>
-    );
+function sortCommands(a: SlashCommand, b: SlashCommand) {
+  if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
+  if (a.position !== b.position) return a.position - b.position;
+  return a.slash.localeCompare(b.slash);
 }

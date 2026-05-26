@@ -1,6 +1,7 @@
 import Editor, { type Monaco } from "@monaco-editor/react";
 import {
   AlertCircle,
+  ArrowRight,
   Binary,
   BookOpen,
   Bot,
@@ -613,6 +614,25 @@ export default function LeetCodeMode() {
     currentProblemDataRef.current = currentProblemData;
   }, [currentProblemData]);
 
+  // Seed starter snippet after async fetch completes (first open when cache is cold)
+  useEffect(() => {
+    if (!currentProblem || !currentProblemData?.python_snippet) return;
+    const snippet = currentProblemData.python_snippet.trimEnd();
+    if (!snippet) return;
+
+    setCodeWorkspaces((prev) => {
+      const workspace = prev[currentProblem.slug] ?? loadCodeWorkspace(currentProblem.slug);
+      const firstTab = workspace.tabs[0];
+      if (!firstTab || firstTab.code.trim()) return prev;
+      const nextWorkspace = {
+        ...workspace,
+        tabs: workspace.tabs.map((tab, i) => (i === 0 ? { ...tab, code: snippet } : tab)),
+      };
+      saveCodeWorkspace(currentProblem.slug, nextWorkspace);
+      return { ...prev, [currentProblem.slug]: nextWorkspace };
+    });
+  }, [currentProblemData?.python_snippet, currentProblem?.slug]);
+
   useEffect(() => {
     currentCustomCasesRef.current = currentCustomCases;
   }, [currentCustomCases]);
@@ -988,11 +1008,13 @@ export default function LeetCodeMode() {
   }
 
   function selectKojoCommand(command: SlashCommand) {
-    setKojoInput(command.prompt);
+    setKojoInput("");
+    void handleKojoSend(command.prompt);
   }
 
-  async function handleKojoSend() {
-    if (!currentProblem || !kojoInput.trim() || kojoLoading) return;
+  async function handleKojoSend(messageOverride?: string) {
+    const message = (messageOverride ?? kojoInput).trim();
+    if (!currentProblem || !message || kojoLoading) return;
     setKojoLoading(true);
     setKojoError(null);
     setKojoResponse(null);
@@ -1000,7 +1022,7 @@ export default function LeetCodeMode() {
       const result = await fetchLeetCodeHint(
         currentProblem.slug,
         currentProblem.title,
-        kojoInput,
+        message,
         currentCode,
         generationProvider,
       );
@@ -1172,6 +1194,31 @@ export default function LeetCodeMode() {
   }
 
   if (!currentProblem) return null;
+
+  const currentCategoryForNav = CATEGORIES.find((c) => c.id === currentProblem.categoryId);
+  const currentProblemIndexInCategory = currentCategoryForNav
+    ? currentCategoryForNav.problems.findIndex((p) => p.slug === currentProblem.slug)
+    : -1;
+  const nextProblemInCategory =
+    currentCategoryForNav &&
+    currentProblemIndexInCategory >= 0 &&
+    currentProblemIndexInCategory < currentCategoryForNav.problems.length - 1
+      ? currentCategoryForNav.problems[currentProblemIndexInCategory + 1]
+      : null;
+
+  let suggestedNext: { problem: Problem; category: Category } | null = null;
+  if (!nextProblemInCategory) {
+    const catIdx = CATEGORIES.findIndex((c) => c.id === currentProblem.categoryId);
+    for (let i = catIdx + 1; i < CATEGORIES.length; i++) {
+      const undone = CATEGORIES[i].problems.find((p) => !progress[p.slug]);
+      if (undone) {
+        suggestedNext = { problem: undone, category: CATEGORIES[i] };
+        break;
+      }
+    }
+  }
+
+  const showNextButton = Boolean(progress[currentProblem.slug]) || Boolean(runnerResult?.ok);
 
   const problemLoading = currentProblem.isOfficial && currentProblemState?.loading;
   const problemError = currentProblemState?.error;
@@ -1356,6 +1403,37 @@ export default function LeetCodeMode() {
                 <MarkdownContent content={gradeFeedback} />
               </div>
             ) : null}
+
+            {showNextButton && (nextProblemInCategory || suggestedNext) ? (
+              <div className="lc-next-problem">
+                <span className="lc-next-problem-eyebrow">
+                  {nextProblemInCategory ? "Up next" : `Continue — ${suggestedNext!.category.label}`}
+                </span>
+                <button
+                  type="button"
+                  className="lc-next-problem-btn"
+                  onClick={() => {
+                    const target = nextProblemInCategory ?? suggestedNext!.problem;
+                    const targetCategoryId = nextProblemInCategory
+                      ? currentProblem.categoryId
+                      : suggestedNext!.category.id;
+                    openProblem(targetCategoryId, target.slug);
+                  }}
+                >
+                  <div className="lc-next-problem-info">
+                    <span className="lc-next-problem-title">
+                      {nextProblemInCategory ? nextProblemInCategory.title : suggestedNext!.problem.title}
+                    </span>
+                  </div>
+                  <span className={`lc-difficulty lc-difficulty--${difficultyClass(
+                    nextProblemInCategory ? nextProblemInCategory.difficulty : suggestedNext!.problem.difficulty
+                  )}`}>
+                    {nextProblemInCategory ? nextProblemInCategory.difficulty : suggestedNext!.problem.difficulty}
+                  </span>
+                  <ArrowRight size={16} className="lc-next-arrow" />
+                </button>
+              </div>
+            ) : null}
           </div>
         </aside>
 
@@ -1433,7 +1511,7 @@ export default function LeetCodeMode() {
               {kojoLoading ? (
                 <div className="kojo-thinking"><span /><span /><span /></div>
               ) : (
-                <button type="button" className="button button--primary lc-kojo-send" onClick={handleKojoSend} disabled={!kojoInput.trim()}>
+                <button type="button" className="button button--primary lc-kojo-send" onClick={() => handleKojoSend()} disabled={!kojoInput.trim()}>
                   <Send size={15} />
                   {kojoResponse ? "Ask again" : "Ask Kojo"}
                 </button>

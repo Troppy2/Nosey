@@ -1,6 +1,6 @@
-import { Bot, ChevronDown, ChevronUp, Sparkles, X } from "lucide-react";
+import { Bot, ChevronDown, ChevronUp, Layers, MessageSquare, Sparkles, X } from "lucide-react";
 import { ReactNode, useEffect, useRef, useState } from "react";
-import { kojoChat } from "../lib/api";
+import { createFlashcard, kojoChat } from "../lib/api";
 import { MarkdownContent } from "./MarkdownContent";
 
 type Position = { x: number; y: number };
@@ -9,12 +9,17 @@ type Props = {
   folderId: number;
   folderName: string;
   children: ReactNode;
+  /** When provided, "Ask Kojo" inserts into the parent's chat input instead of opening a panel. */
+  onAskKojo?: (text: string) => void;
 };
+
+type Mode = "toolbar" | "explain";
 
 const TEXT_TRUNCATE_LEN = 120;
 const PANEL_WIDTH = 480;
+const TOOLBAR_MIN_WIDTH = 240;
 
-export function SelectionKojoAssistant({ folderId, folderName, children }: Props) {
+export function SelectionKojoAssistant({ folderId, folderName, children, onAskKojo }: Props) {
   const scopeRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const isOpenRef = useRef(false);
@@ -24,17 +29,19 @@ export function SelectionKojoAssistant({ folderId, folderName, children }: Props
   const [selectedText, setSelectedText] = useState<string | null>(null);
   const [position, setPosition] = useState<Position | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [mode, setMode] = useState<Mode>("toolbar");
   const [response, setResponse] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [textExpanded, setTextExpanded] = useState(false);
+  const [flashcardDone, setFlashcardDone] = useState(false);
+  const [flashcardError, setFlashcardError] = useState<string | null>(null);
 
   isOpenRef.current = isOpen;
 
   useEffect(() => {
     function handleMouseUp(event: MouseEvent) {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
-      // Keep existing panel open — don't replace it with a new selection
       if (isOpenRef.current) return;
 
       window.setTimeout(() => {
@@ -56,19 +63,23 @@ export function SelectionKojoAssistant({ folderId, folderName, children }: Props
         const rect = range.getBoundingClientRect();
         if (!rect.width && !rect.height) return;
 
-        const panelW = Math.min(PANEL_WIDTH, window.innerWidth - 32);
-        const rawX = rect.left + rect.width / 2 - panelW / 2;
-        const x = Math.max(16, Math.min(rawX, window.innerWidth - panelW - 16));
-        // prefer above selection; fall back to below
-        const aboveY = rect.top - 16;
-        const belowY = rect.bottom + 12;
-        const y = aboveY > 80 ? aboveY : belowY;
+        const toolbarW = Math.min(PANEL_WIDTH, window.innerWidth - 32);
+        const rawX = rect.left + rect.width / 2 - TOOLBAR_MIN_WIDTH / 2;
+        const x = Math.max(16, Math.min(rawX, window.innerWidth - TOOLBAR_MIN_WIDTH - 16));
+        const aboveY = rect.top - 50;
+        const belowY = rect.bottom + 10;
+        const y = aboveY > 60 ? aboveY : belowY;
+
+        void toolbarW; // suppress unused
 
         setSelectedText(text);
         setPosition({ x, y: Math.max(16, y) });
         setResponse(null);
         setError(null);
+        setFlashcardDone(false);
+        setFlashcardError(null);
         setTextExpanded(false);
+        setMode("toolbar");
         setIsOpen(true);
       }, 0);
     }
@@ -85,9 +96,10 @@ export function SelectionKojoAssistant({ folderId, folderName, children }: Props
     };
   }, []);
 
+  // Fire the Kojo query only when mode switches to "explain"
   useEffect(() => {
     async function explainSelection() {
-      if (!isOpen || !selectedText || response || isLoading) return;
+      if (mode !== "explain" || !selectedText || response || isLoading) return;
       setIsLoading(true);
       setError(null);
       try {
@@ -109,8 +121,8 @@ export function SelectionKojoAssistant({ folderId, folderName, children }: Props
         setIsLoading(false);
       }
     }
-    explainSelection();
-  }, [folderId, folderName, isOpen, selectedText, response, isLoading]);
+    void explainSelection();
+  }, [mode, folderId, folderName, selectedText, response, isLoading]);
 
   function close() {
     setIsOpen(false);
@@ -119,11 +131,46 @@ export function SelectionKojoAssistant({ folderId, folderName, children }: Props
     setResponse(null);
     setError(null);
     setTextExpanded(false);
+    setFlashcardDone(false);
+    setFlashcardError(null);
+    setMode("toolbar");
     isDragging.current = false;
   }
 
+  function handleAskKojo() {
+    if (!selectedText) return;
+    if (onAskKojo) {
+      onAskKojo(selectedText);
+      close();
+      return;
+    }
+    // Expand panel width for full explain mode
+    if (position) {
+      const panelW = Math.min(PANEL_WIDTH, window.innerWidth - 32);
+      const rawX = position.x + TOOLBAR_MIN_WIDTH / 2 - panelW / 2;
+      const x = Math.max(16, Math.min(rawX, window.innerWidth - panelW - 16));
+      setPosition((p) => p ? { ...p, x } : p);
+    }
+    setMode("explain");
+  }
+
+  async function handleMakeFlashcard() {
+    if (!selectedText || !folderId) return;
+    setFlashcardDone(false);
+    setFlashcardError(null);
+    try {
+      await createFlashcard(folderId, {
+        front: selectedText.slice(0, 500),
+        back: "(Add your answer here)",
+      });
+      setFlashcardDone(true);
+      setTimeout(close, 1600);
+    } catch (err) {
+      setFlashcardError(err instanceof Error ? err.message : "Failed to create flashcard.");
+    }
+  }
+
   function handleDragStart(event: React.MouseEvent) {
-    // Only drag on the header itself, not its buttons
     if ((event.target as HTMLElement).closest("button")) return;
     event.preventDefault();
     const panel = panelRef.current;
@@ -159,6 +206,44 @@ export function SelectionKojoAssistant({ folderId, folderName, children }: Props
     return <div ref={scopeRef} className="selection-kojo-scope">{children}</div>;
   }
 
+  // ── Compact action toolbar ──────────────────────────────────────────────────
+  if (mode === "toolbar") {
+    return (
+      <div ref={scopeRef} className="selection-kojo-scope">
+        {children}
+        <div
+          className="sel-kojo-toolbar"
+          style={position ? { left: `${position.x}px`, top: `${position.y}px` } : undefined}
+          role="toolbar"
+          aria-label="Selection actions"
+        >
+          <button className="sel-kojo-btn" type="button" onClick={handleAskKojo}>
+            <Bot size={13} />
+            Ask Kojo
+          </button>
+          <div className="sel-kojo-toolbar-sep" />
+          <button
+            className={`sel-kojo-btn${flashcardDone ? " sel-kojo-btn--done" : ""}`}
+            type="button"
+            onClick={() => void handleMakeFlashcard()}
+            disabled={flashcardDone}
+          >
+            <Layers size={13} />
+            {flashcardDone ? "Saved!" : "Make Flashcard"}
+          </button>
+          {flashcardError && (
+            <span className="sel-kojo-error">{flashcardError}</span>
+          )}
+          <div className="sel-kojo-toolbar-sep" />
+          <button className="sel-kojo-btn sel-kojo-btn--close" type="button" onClick={close} aria-label="Close">
+            <X size={13} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Full explanation panel ──────────────────────────────────────────────────
   return (
     <div ref={scopeRef} className="selection-kojo-scope">
       {children}
@@ -188,6 +273,15 @@ export function SelectionKojoAssistant({ folderId, folderName, children }: Props
           </div>
 
           <div className="kojo-header-actions">
+            <button
+              className="kojo-header-btn"
+              type="button"
+              onClick={() => { setMode("toolbar"); setResponse(null); setError(null); }}
+              aria-label="Back to actions"
+              title="Back"
+            >
+              <MessageSquare size={16} />
+            </button>
             <button className="kojo-header-btn" type="button" onClick={close} aria-label="Close">
               <X size={18} />
             </button>

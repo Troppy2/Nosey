@@ -9,12 +9,16 @@ from src.repositories.attempt_repository import AttemptRepository
 from src.repositories.folder_repository import FolderRepository
 from src.repositories.kojo_repository import KojoRepository
 from src.schemas.kojo_schema import (
+    ConversationFileDTO,
     KojoChatResponse,
     KojoClearResponse,
     KojoClearedConversationDTO,
     KojoConversationDTO,
+    KojoConversationSummaryDTO,
     KojoMessageDTO,
     KojoRestoreResponse,
+    TestBlueprintResponse,
+    GeneralChatRequest,
 )
 from src.services.file_service import FileService
 from src.services.llm_service import LLMService
@@ -89,6 +93,116 @@ def _format_wrong_answers_context(wrong_answers_data: list[tuple]) -> str:
 
 
 class KojoService:
+    async def create_general_conversation(
+        self,
+        user_id: int,
+        session: AsyncSession,
+    ) -> KojoConversationSummaryDTO:
+        conversation = await KojoRepository(session).create_general_conversation(user_id)
+        await session.commit()
+        return KojoConversationSummaryDTO(
+            id=conversation.id,
+            name=conversation.name,
+            folder_id=None,
+            created_at=conversation.created_at,
+        )
+
+    async def list_general_conversations(
+        self,
+        user_id: int,
+        session: AsyncSession,
+    ) -> list[KojoConversationSummaryDTO]:
+        conversations = await KojoRepository(session).list_general_conversations(user_id)
+        return [
+            KojoConversationSummaryDTO(id=c.id, name=c.name, folder_id=None, created_at=c.created_at)
+            for c in conversations
+        ]
+
+    async def general_chat(
+        self,
+        user_id: int,
+        conversation_id: int,
+        user_message: str,
+        session: AsyncSession,
+        provider: Optional[str] = None,
+        strictness: Optional[str] = "medium",
+    ) -> KojoChatResponse:
+        repo = KojoRepository(session)
+        conversation = await repo.get_conversation_by_id(conversation_id, user_id)
+        if conversation is None:
+            raise ResourceNotFoundException("Conversation")
+
+        session_files = await repo.get_conversation_files(conversation.id)
+        session_files_content = "\n\n---\n\n".join(
+            f"[Session upload: {f.file_name}]\n{f.content}" for f in session_files if f.content
+        )
+        notes_context = session_files_content if session_files_content else _NO_NOTES
+
+        await repo.add_message(conversation.id, "user", user_message)
+        history = await repo.get_history(conversation.id, limit=10, after=conversation.cleared_at)
+        prompt = _build_prompt(notes_context, user_message, history, strictness=strictness or "medium")
+
+        try:
+            llm = LLMService()
+            if provider:
+                kojo_response = await llm.call_kojo(prompt, provider=provider)
+            else:
+                kojo_response = await llm.call_kojo(prompt)
+        except Exception as exc:
+            logger.warning("Kojo general chat LLM call failed: %s", exc)
+            raise LLMException("Kojo failed to generate a response. Try again.") from exc
+
+        kojo_msg = await repo.add_message(conversation.id, "assistant", kojo_response)
+
+        auto_name: Optional[str] = None
+        if conversation.name is None:
+            raw = user_message.strip()
+            auto_name = (raw[:57] + "…") if len(raw) > 60 else raw
+            await repo.set_conversation_name(conversation.id, auto_name)
+
+        await session.commit()
+
+        return KojoChatResponse(
+            response=kojo_response,
+            conversation_id=conversation.id,
+            message_id=kojo_msg.id,
+            flagged_uncertain=False,
+            conversation_name=auto_name,
+        )
+
+    async def create_conversation(
+        self,
+        user_id: int,
+        folder_id: int,
+        session: AsyncSession,
+    ) -> KojoConversationSummaryDTO:
+        folder = await FolderRepository(session).get_owned(folder_id, user_id)
+        if folder is None:
+            raise ResourceNotFoundException("Folder")
+        conversation = await KojoRepository(session).create_conversation(user_id, folder_id)
+        await session.commit()
+        return KojoConversationSummaryDTO(
+            id=conversation.id,
+            name=conversation.name,
+            folder_id=conversation.folder_id,
+            created_at=conversation.created_at,
+        )
+
+    async def list_conversations(
+        self,
+        user_id: int,
+        folder_id: int,
+        session: AsyncSession,
+    ) -> list[KojoConversationSummaryDTO]:
+        folder = await FolderRepository(session).get_owned(folder_id, user_id)
+        if folder is None:
+            raise ResourceNotFoundException("Folder")
+        conversations = await KojoRepository(session).list_conversations_by_folder(user_id, folder_id)
+        return [
+            KojoConversationSummaryDTO(id=c.id, name=c.name, folder_id=c.folder_id, created_at=c.created_at)
+            for c in conversations
+        ]
+
     async def chat(
         self,
         user_id: int,
@@ -97,6 +211,7 @@ class KojoService:
         session: AsyncSession,
         provider: Optional[str] = None,
         strictness: Optional[str] = "medium",
+        conversation_id: Optional[int] = None,
     ) -> KojoChatResponse:
         repo = KojoRepository(session)
 
@@ -104,10 +219,19 @@ class KojoService:
         if folder is None:
             raise ResourceNotFoundException("Folder")
 
-        conversation = await repo.get_or_create_conversation(user_id, folder_id)
+        if conversation_id is not None:
+            conversation = await repo.get_conversation_by_id(conversation_id, user_id)
+            if conversation is None:
+                raise ResourceNotFoundException("Conversation")
+        else:
+            conversation = await repo.get_or_create_conversation(user_id, folder_id)
 
         notes = await repo.get_folder_notes_content(folder_id)
         folder_files = await FileService().get_folder_files_content(folder_id, session)
+        session_files = await repo.get_conversation_files(conversation.id)
+        session_files_content = "\n\n---\n\n".join(
+            f"[Session upload: {f.file_name}]\n{f.content}" for f in session_files if f.content
+        )
         logger.info(
             "Folder context loaded for Kojo chat",
             extra={
@@ -115,9 +239,10 @@ class KojoService:
                 "folder_id": folder_id,
                 "notes_length": len(notes),
                 "folder_files_length": len(folder_files),
+                "session_files_count": len(session_files),
             }
         )
-        context_parts = [part for part in (notes, folder_files) if part]
+        context_parts = [part for part in (notes, folder_files, session_files_content) if part]
         notes_context = "\n\n---\n\n".join(context_parts) if context_parts else _NO_NOTES
 
         # Check if user is asking to review wrong answers
@@ -180,6 +305,14 @@ class KojoService:
         )
 
         kojo_msg = await repo.add_message(conversation.id, "assistant", kojo_response)
+
+        # Auto-name the conversation from the first user message
+        auto_name: Optional[str] = None
+        if conversation.name is None:
+            raw = user_message.strip()
+            auto_name = (raw[:57] + "…") if len(raw) > 60 else raw
+            await repo.set_conversation_name(conversation.id, auto_name)
+
         await session.commit()
 
         logger.info(
@@ -192,7 +325,42 @@ class KojoService:
             conversation_id=conversation.id,
             message_id=kojo_msg.id,
             flagged_uncertain=flagged,
+            conversation_name=auto_name,
         )
+
+    async def get_conversation_detail(
+        self,
+        user_id: int,
+        conversation_id: int,
+        session: AsyncSession,
+    ) -> KojoConversationDTO:
+        conversation = await KojoRepository(session).get_conversation_by_id(conversation_id, user_id)
+        if conversation is None:
+            raise ResourceNotFoundException("Conversation")
+        visible_messages = conversation.messages
+        if conversation.cleared_at is not None:
+            visible_messages = [msg for msg in conversation.messages if msg.created_at > conversation.cleared_at]
+        return KojoConversationDTO(
+            id=conversation.id,
+            folder_id=conversation.folder_id,
+            messages=[
+                KojoMessageDTO(id=m.id, role=m.role, content=m.content, created_at=m.created_at)
+                for m in visible_messages
+            ],
+            created_at=conversation.created_at,
+            cleared_at=conversation.cleared_at,
+        )
+
+    async def delete_conversation(
+        self,
+        user_id: int,
+        conversation_id: int,
+        session: AsyncSession,
+    ) -> None:
+        deleted = await KojoRepository(session).delete_conversation(conversation_id, user_id)
+        if not deleted:
+            raise ResourceNotFoundException("Conversation")
+        await session.commit()
 
     async def get_conversation(
         self,
@@ -242,6 +410,7 @@ class KojoService:
             conversation.cleared_at = datetime.utcnow()
             await session.flush()
 
+        await repo.delete_conversation_files(conversation.id)
         await session.commit()
 
         cleared_at = conversation.cleared_at or datetime.utcnow()
@@ -267,6 +436,166 @@ class KojoService:
             await session.commit()
 
         return KojoRestoreResponse(folder_id=folder_id, restored=restored)
+
+    async def _do_upload_files(
+        self,
+        repo: KojoRepository,
+        conversation_id: int,
+        files: list,
+        session: AsyncSession,
+    ) -> list[ConversationFileDTO]:
+        svc = FileService()
+        results: list[ConversationFileDTO] = []
+        for upload in files:
+            data = await upload.read()
+            async def _async_read(d=data):
+                return d
+            mock = type("_F", (), {"read": _async_read, "seek": lambda self, p: None, "filename": upload.filename or "file"})()
+            content, _ = await svc.extract_from_files([mock])
+            cf = await repo.add_conversation_file(
+                conversation_id=conversation_id,
+                file_name=upload.filename or "file",
+                file_type=getattr(upload, "content_type", "") or "",
+                size_bytes=len(data),
+                content=content,
+            )
+            results.append(ConversationFileDTO(
+                id=cf.id,
+                file_name=cf.file_name,
+                file_type=cf.file_type,
+                size_bytes=cf.size_bytes,
+                uploaded_at=cf.uploaded_at,
+            ))
+        await session.commit()
+        return results
+
+    async def upload_conversation_files_by_id(
+        self,
+        user_id: int,
+        conversation_id: int,
+        files: list,
+        session: AsyncSession,
+    ) -> list[ConversationFileDTO]:
+        repo = KojoRepository(session)
+        conversation = await repo.get_conversation_by_id(conversation_id, user_id)
+        if conversation is None:
+            raise ResourceNotFoundException("Conversation")
+        return await self._do_upload_files(repo, conversation.id, files, session)
+
+    async def list_conversation_files_by_id(
+        self,
+        user_id: int,
+        conversation_id: int,
+        session: AsyncSession,
+    ) -> list[ConversationFileDTO]:
+        repo = KojoRepository(session)
+        conversation = await repo.get_conversation_by_id(conversation_id, user_id)
+        if conversation is None:
+            raise ResourceNotFoundException("Conversation")
+        files = await repo.get_conversation_files(conversation.id)
+        return [
+            ConversationFileDTO(id=f.id, file_name=f.file_name, file_type=f.file_type, size_bytes=f.size_bytes, uploaded_at=f.uploaded_at)
+            for f in files
+        ]
+
+    async def delete_conversation_file_by_id(
+        self,
+        user_id: int,
+        conversation_id: int,
+        file_id: int,
+        session: AsyncSession,
+    ) -> None:
+        repo = KojoRepository(session)
+        conversation = await repo.get_conversation_by_id(conversation_id, user_id)
+        if conversation is None:
+            raise ResourceNotFoundException("Conversation")
+        cf = await repo.get_conversation_file_owned(file_id, conversation.id)
+        if cf is None:
+            raise ResourceNotFoundException("ConversationFile")
+        await session.delete(cf)
+        await session.commit()
+
+    async def upload_conversation_files(
+        self,
+        user_id: int,
+        folder_id: int,
+        files: list,
+        session: AsyncSession,
+    ) -> list[ConversationFileDTO]:
+        folder = await FolderRepository(session).get_owned(folder_id, user_id)
+        if folder is None:
+            raise ResourceNotFoundException("Folder")
+        repo = KojoRepository(session)
+        conversation = await repo.get_or_create_conversation(user_id, folder_id)
+        return await self._do_upload_files(repo, conversation.id, files, session)
+
+    async def list_conversation_files(
+        self,
+        user_id: int,
+        folder_id: int,
+        session: AsyncSession,
+    ) -> list[ConversationFileDTO]:
+        folder = await FolderRepository(session).get_owned(folder_id, user_id)
+        if folder is None:
+            raise ResourceNotFoundException("Folder")
+
+        repo = KojoRepository(session)
+        conversation = await repo.get_or_create_conversation(user_id, folder_id)
+        files = await repo.get_conversation_files(conversation.id)
+        return [
+            ConversationFileDTO(
+                id=f.id,
+                file_name=f.file_name,
+                file_type=f.file_type,
+                size_bytes=f.size_bytes,
+                uploaded_at=f.uploaded_at,
+            )
+            for f in files
+        ]
+
+    async def delete_conversation_file(
+        self,
+        user_id: int,
+        folder_id: int,
+        file_id: int,
+        session: AsyncSession,
+    ) -> None:
+        folder = await FolderRepository(session).get_owned(folder_id, user_id)
+        if folder is None:
+            raise ResourceNotFoundException("Folder")
+
+        repo = KojoRepository(session)
+        conversation = await repo.get_or_create_conversation(user_id, folder_id)
+        cf = await repo.get_conversation_file_owned(file_id, conversation.id)
+        if cf is None:
+            raise ResourceNotFoundException("ConversationFile")
+
+        await session.delete(cf)
+        await session.commit()
+
+    async def propose_test_blueprint(
+        self,
+        user_id: int,
+        folder_id: int,
+        user_message: str,
+        session: AsyncSession,
+        provider: Optional[str] = None,
+    ) -> TestBlueprintResponse:
+        folder = await FolderRepository(session).get_owned(folder_id, user_id)
+        if folder is None:
+            raise ResourceNotFoundException("Folder")
+
+        notes = await KojoRepository(session).get_folder_notes_content(folder_id)
+        folder_files = await FileService().get_folder_files_content(folder_id, session)
+        context_parts = [part for part in (notes, folder_files) if part]
+        notes_context = "\n\n---\n\n".join(context_parts) if context_parts else ""
+
+        result = await LLMService().generate_test_blueprint(
+            user_message=user_message,
+            notes_context=notes_context,
+            provider=provider,
+        )
+        return TestBlueprintResponse(**result)
 
     async def get_cleared_conversations(
         self,

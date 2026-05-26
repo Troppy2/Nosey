@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import BIGINT_ID, Base, TimestampMixin
@@ -26,6 +26,10 @@ class Folder(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     subject: Mapped[Optional[str]] = mapped_column(String(255))
     description: Mapped[Optional[str]] = mapped_column(Text)
+    kojo_sync_default: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    kojo_allow_artifacts: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    kojo_auto_index: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    kojo_persona: Mapped[Optional[str]] = mapped_column(String(32))
 
     user: Mapped[User] = relationship("User", back_populates="folders")
     tests: Mapped[list[Test]] = relationship(

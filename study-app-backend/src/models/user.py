@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from src.models.flashcard import Flashcard, FlashcardAttempt
     from src.models.folder import Folder
     from src.models.kojo_conversation import KojoConversation
+    from src.models.slash_command import SlashCommand
     from src.models.user_attempt import UserAttempt
 
 
@@ -34,6 +35,9 @@ class User(Base, TimestampMixin):
     )
     kojo_conversations: Mapped[list[KojoConversation]] = relationship(
         "KojoConversation", back_populates="user", cascade="all, delete-orphan"
+    )
+    slash_commands: Mapped[list[SlashCommand]] = relationship(
+        "SlashCommand", back_populates="user", cascade="all, delete-orphan"
     )
 
     @property
