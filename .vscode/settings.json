@@ -1,4 +1,9 @@
 {
     "claudeCode.allowDangerouslySkipPermissions": true,
-    "git.addAICoAuthor": "off"
+    "git.addAICoAuthor": "off",
+    "python.testing.pytestArgs": [
+        "study-app-backend"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
 }

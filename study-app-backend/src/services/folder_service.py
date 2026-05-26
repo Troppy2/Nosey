@@ -51,6 +51,14 @@ class FolderService:
             folder.subject = data.subject
         if data.description is not None:
             folder.description = data.description
+        if data.kojo_sync_default is not None:
+            folder.kojo_sync_default = data.kojo_sync_default
+        if data.kojo_allow_artifacts is not None:
+            folder.kojo_allow_artifacts = data.kojo_allow_artifacts
+        if data.kojo_auto_index is not None:
+            folder.kojo_auto_index = data.kojo_auto_index
+        if data.kojo_persona is not None:
+            folder.kojo_persona = data.kojo_persona
         await session.commit()
         await session.refresh(folder)
         return FolderResponse.model_validate(folder)

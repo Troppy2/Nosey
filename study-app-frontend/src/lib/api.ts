@@ -2,6 +2,7 @@ import type {
   AttemptDetail,
   AttemptResult,
   AttemptSummary,
+  ConversationFile,
   CreateTestResult,
   AuthUser,
   DraftAttemptAnswer,
@@ -13,6 +14,7 @@ import type {
   Folder,
   KojoChatResponse,
   KojoConversation,
+  KojoConversationSummary,
   LeetCodeGradeResponse,
   LeetCodeHintResponse,
   LeetCodeProblemData,
@@ -22,7 +24,10 @@ import type {
   QuestionEditable,
   QuestionUpdate,
   ResumableTestInfo,
+  SlashCommand,
+  SlashCommandInput,
   SubmittedAnswer,
+  TestBlueprint,
   TestSummary,
   TestTake,
 } from "./types";
@@ -165,7 +170,7 @@ export async function createFolder(input: Pick<Folder, "name" | "subject" | "des
 
 export async function updateFolder(
   folderId: number,
-  input: Pick<Folder, "name" | "subject" | "description">,
+  input: Partial<Pick<Folder, "name" | "subject" | "description" | "kojo_sync_default" | "kojo_allow_artifacts" | "kojo_auto_index" | "kojo_persona">>,
 ): Promise<Folder> {
   return request<Folder>(`/folders/${folderId}`, {
     method: "PATCH",
@@ -388,11 +393,66 @@ export async function kojoChat(
   message: string,
   provider?: string,
   strictness?: string,
+  conversationId?: number,
 ): Promise<KojoChatResponse> {
   const body: Record<string, unknown> = { message };
   if (provider) body.provider = provider;
   if (strictness) body.strictness = strictness;
+  if (conversationId !== undefined) body.conversation_id = conversationId;
   return request<KojoChatResponse>(`/kojo/folders/${folderId}/chat`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function listKojoConversations(folderId: number): Promise<KojoConversationSummary[]> {
+  try {
+    return await request<KojoConversationSummary[]>(`/kojo/folders/${folderId}/conversations`);
+  } catch {
+    return [];
+  }
+}
+
+export async function createKojoConversation(folderId: number): Promise<KojoConversationSummary> {
+  return request<KojoConversationSummary>(`/kojo/folders/${folderId}/conversations`, {
+    method: "POST",
+  });
+}
+
+export async function fetchKojoConversationById(conversationId: number): Promise<KojoConversation | null> {
+  try {
+    return await request<KojoConversation>(`/kojo/conversations/${conversationId}`);
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteKojoConversation(conversationId: number): Promise<void> {
+  await request(`/kojo/conversations/${conversationId}`, { method: "DELETE" });
+}
+
+export async function listGeneralKojoConversations(): Promise<KojoConversationSummary[]> {
+  try {
+    return await request<KojoConversationSummary[]>("/kojo/conversations/general");
+  } catch {
+    return [];
+  }
+}
+
+export async function createGeneralKojoConversation(): Promise<KojoConversationSummary> {
+  return request<KojoConversationSummary>("/kojo/conversations/general", { method: "POST" });
+}
+
+export async function kojoChatGeneral(
+  conversationId: number,
+  message: string,
+  provider?: string,
+  strictness?: string,
+): Promise<KojoChatResponse> {
+  const body: Record<string, unknown> = { message };
+  if (provider) body.provider = provider;
+  if (strictness) body.strictness = strictness;
+  return request<KojoChatResponse>(`/kojo/conversations/${conversationId}/chat`, {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -553,4 +613,67 @@ export async function uploadFolderFiles(folderId: number, files: File[]): Promis
 
 export async function deleteFolderFile(folderId: number, fileId: number): Promise<void> {
   await request(`/folders/${folderId}/files/${fileId}`, { method: "DELETE" });
+}
+
+export async function fetchSlashCommands(): Promise<SlashCommand[]> {
+  try {
+    return await request<SlashCommand[]>("/slash-commands");
+  } catch {
+    return [];
+  }
+}
+
+export async function createSlashCommand(input: SlashCommandInput): Promise<SlashCommand> {
+  return request<SlashCommand>("/slash-commands", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateSlashCommand(
+  commandId: number,
+  input: Partial<SlashCommandInput>,
+): Promise<SlashCommand> {
+  return request<SlashCommand>(`/slash-commands/${commandId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteSlashCommand(commandId: number): Promise<void> {
+  await request(`/slash-commands/${commandId}`, { method: "DELETE" });
+}
+
+export async function fetchConversationFiles(conversationId: number): Promise<ConversationFile[]> {
+  try {
+    return await request<ConversationFile[]>(`/kojo/conversations/${conversationId}/files`);
+  } catch {
+    return [];
+  }
+}
+
+export async function uploadConversationFiles(conversationId: number, files: File[]): Promise<ConversationFile[]> {
+  const formData = new FormData();
+  files.forEach((f) => formData.append("files", f));
+  return request<ConversationFile[]>(`/kojo/conversations/${conversationId}/files`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export async function deleteConversationFile(conversationId: number, fileId: number): Promise<void> {
+  await request(`/kojo/conversations/${conversationId}/files/${fileId}`, { method: "DELETE" });
+}
+
+export async function kojoTestBlueprint(
+  folderId: number,
+  message: string,
+  provider?: string,
+): Promise<TestBlueprint> {
+  const body: Record<string, unknown> = { message };
+  if (provider) body.provider = provider;
+  return request<TestBlueprint>(`/kojo/folders/${folderId}/test-blueprint`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }

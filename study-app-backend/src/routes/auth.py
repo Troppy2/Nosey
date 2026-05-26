@@ -23,6 +23,8 @@ async def google_auth(
         return await AuthService().authenticate_google_token(request.token, session)
     except httpx.HTTPStatusError as exc:
         raise HTTPException(status_code=401, detail="Invalid Google token") from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=503, detail="Could not reach Google authentication service") from exc
     except StudyAppException as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:

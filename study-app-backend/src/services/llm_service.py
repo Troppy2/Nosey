@@ -2660,3 +2660,73 @@ Rules:
             and "---" not in s
             and not re.match(r"^[a-z][a-z_]+:\s", s)
         ][:50]
+
+    async def generate_test_blueprint(
+        self,
+        user_message: str,
+        notes_context: str,
+        provider: Optional[str] = None,
+    ) -> dict[str, object]:
+        """Propose a test blueprint (title, type, counts, difficulty, topic) from the user's request."""
+        notes_preview = notes_context[:3000] if notes_context else "[No notes uploaded yet]"
+        prompt = f"""You are a test planning assistant inside a study tool called Nosey.
+Based on the student's request and their study materials, propose a test blueprint.
+
+STUDENT'S REQUEST: {user_message}
+
+STUDY MATERIALS PREVIEW:
+{notes_preview}
+
+Return ONLY valid JSON with exactly these fields:
+{{
+  "title": "<descriptive test title derived from the subject matter>",
+  "test_type": "<MCQ_only|FRQ_only|mixed>",
+  "count_mcq": <integer 0-20>,
+  "count_frq": <integer 0-10>,
+  "difficulty": "<easy|medium|hard|mixed>",
+  "topic_focus": "<specific topic string, or null if not specified>",
+  "intro": "<one friendly sentence summarizing the proposed test plan>"
+}}
+
+Rules:
+- Derive the title from the notes subject matter, not generic words like "Practice Test"
+- mixed: both count_mcq > 0 and count_frq > 0
+- MCQ_only: count_frq must be 0; FRQ_only: count_mcq must be 0
+- Default when vague: mixed, count_mcq=8, count_frq=4, difficulty=mixed
+- topic_focus is null unless the student specified a chapter, topic, or concept
+- intro should be warm and specific, e.g. "I've put together a 8-question mixed test on cellular respiration at medium difficulty."
+"""
+        result = await self._complete_json(prompt, provider=provider)
+
+        # Validate and normalise the returned dict
+        valid_types = {"MCQ_only", "FRQ_only", "mixed"}
+        valid_diffs = {"easy", "medium", "hard", "mixed"}
+        test_type = str(result.get("test_type", "mixed"))
+        if test_type not in valid_types:
+            test_type = "mixed"
+        difficulty = str(result.get("difficulty", "mixed"))
+        if difficulty not in valid_diffs:
+            difficulty = "mixed"
+
+        def _clamp(val: object, lo: int, hi: int, default: int) -> int:
+            try:
+                return max(lo, min(hi, int(val)))  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                return default
+
+        count_mcq = _clamp(result.get("count_mcq"), 0, 20, 8)
+        count_frq = _clamp(result.get("count_frq"), 0, 10, 4)
+        if test_type == "MCQ_only":
+            count_frq = 0
+        elif test_type == "FRQ_only":
+            count_mcq = 0
+
+        return {
+            "title": str(result.get("title", "Practice Test"))[:200],
+            "test_type": test_type,
+            "count_mcq": count_mcq,
+            "count_frq": count_frq,
+            "difficulty": difficulty,
+            "topic_focus": str(result["topic_focus"])[:200] if result.get("topic_focus") else None,
+            "intro": str(result.get("intro", "Here's a test plan based on your notes."))[:500],
+        }

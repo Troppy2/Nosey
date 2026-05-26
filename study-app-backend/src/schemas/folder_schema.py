@@ -16,6 +16,10 @@ class FolderUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=255)
     subject: Optional[str] = Field(default=None, max_length=255)
     description: Optional[str] = None
+    kojo_sync_default: Optional[bool] = None
+    kojo_allow_artifacts: Optional[bool] = None
+    kojo_auto_index: Optional[bool] = None
+    kojo_persona: Optional[str] = Field(default=None, max_length=32)
 
 
 class FolderResponse(BaseModel):
@@ -25,6 +29,10 @@ class FolderResponse(BaseModel):
     name: str
     subject: Optional[str] = None
     description: Optional[str] = None
+    kojo_sync_default: bool = True
+    kojo_allow_artifacts: bool = True
+    kojo_auto_index: bool = True
+    kojo_persona: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     test_count: int = 0

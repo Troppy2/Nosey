@@ -1,4 +1,4 @@
-import { BookOpen, Bot, Brain, Edit3, Files, FolderOpen, History, Loader2, Plus, Settings, Trash2 } from "lucide-react";
+import { BookOpen, Bot, Brain, ChevronDown, ChevronUp, Edit3, Files, FolderOpen, History, Loader2, Plus, Settings, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -8,7 +8,7 @@ import { EmptyState } from "../components/EmptyState";
 import { FileManager } from "../components/FileManager";
 import { KojoChat } from "../components/KojoChat";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
-import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, updateTest } from "../lib/api";
+import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, updateFolder, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
 import type { AttemptSummary, Flashcard, Folder, TestSummary } from "../lib/types";
 
@@ -21,6 +21,7 @@ export default function FolderDetail() {
   const [error, setError] = useState<string | null>(null);
   const [kojoOpen, setKojoOpen] = useState(false);
   const [filesOpen, setFilesOpen] = useState(false);
+  const [kojoSettingsOpen, setKojoSettingsOpen] = useState(false);
   const [renamingTest, setRenamingTest] = useState<TestSummary | null>(null);
   const [deletingTest, setDeletingTest] = useState<TestSummary | null>(null);
 
@@ -80,6 +81,16 @@ export default function FolderDetail() {
     }
   }
 
+  async function updateKojoSetting(patch: Partial<Pick<Folder, "kojo_sync_default" | "kojo_allow_artifacts" | "kojo_auto_index" | "kojo_persona">>) {
+    if (!folder) return;
+    try {
+      const updated = await updateFolder(id, patch);
+      setFolder(updated);
+    } catch {
+      // non-critical — silently ignore
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="page">
@@ -113,6 +124,13 @@ export default function FolderDetail() {
           >
             {kojoOpen ? "Close Kojo" : "Ask Kojo"}
           </Button>
+          <Button
+            variant="secondary"
+            icon={kojoSettingsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            onClick={() => setKojoSettingsOpen((o) => !o)}
+          >
+            Chat Settings
+          </Button>
           <Link to={`/flashcards/${id}`}>
             <Button variant="secondary" icon={<Brain size={18} />}>
               Study Flashcards
@@ -135,6 +153,82 @@ export default function FolderDetail() {
 
       {filesOpen ? (
         <FileManager folderId={id} onClose={() => setFilesOpen(false)} />
+      ) : null}
+
+      {kojoSettingsOpen && folder ? (
+        <div className="folder-kojo-settings">
+          <div className="folder-kojo-settings-header">
+            <Bot size={16} />
+            <span>Kojo Chat Settings</span>
+            <span className="muted small">Controls how Kojo behaves with this folder</span>
+          </div>
+          <div className="folder-kojo-settings-body">
+            <label className="folder-kojo-toggle-row">
+              <div className="folder-kojo-toggle-info">
+                <span className="folder-kojo-toggle-label">Sync folder into Chat Kojo by default</span>
+                <span className="folder-kojo-toggle-desc">Kojo will use this folder's notes as context automatically when you open Chat mode.</span>
+              </div>
+              <button
+                type="button"
+                className={`folder-kojo-toggle${folder.kojo_sync_default !== false ? " folder-kojo-toggle--on" : ""}`}
+                onClick={() => void updateKojoSetting({ kojo_sync_default: !(folder.kojo_sync_default !== false) })}
+                aria-checked={folder.kojo_sync_default !== false}
+                role="switch"
+              >
+                <span className="folder-kojo-toggle-thumb" />
+              </button>
+            </label>
+
+            <label className="folder-kojo-toggle-row">
+              <div className="folder-kojo-toggle-info">
+                <span className="folder-kojo-toggle-label">Allow Kojo to create study artifacts</span>
+                <span className="folder-kojo-toggle-desc">Permits Kojo to generate tests and flashcards from this folder's content.</span>
+              </div>
+              <button
+                type="button"
+                className={`folder-kojo-toggle${folder.kojo_allow_artifacts !== false ? " folder-kojo-toggle--on" : ""}`}
+                onClick={() => void updateKojoSetting({ kojo_allow_artifacts: !(folder.kojo_allow_artifacts !== false) })}
+                aria-checked={folder.kojo_allow_artifacts !== false}
+                role="switch"
+              >
+                <span className="folder-kojo-toggle-thumb" />
+              </button>
+            </label>
+
+            <label className="folder-kojo-toggle-row">
+              <div className="folder-kojo-toggle-info">
+                <span className="folder-kojo-toggle-label">Auto-index new files</span>
+                <span className="folder-kojo-toggle-desc">Newly uploaded files are indexed for Kojo immediately.</span>
+              </div>
+              <button
+                type="button"
+                className={`folder-kojo-toggle${folder.kojo_auto_index !== false ? " folder-kojo-toggle--on" : ""}`}
+                onClick={() => void updateKojoSetting({ kojo_auto_index: !(folder.kojo_auto_index !== false) })}
+                aria-checked={folder.kojo_auto_index !== false}
+                role="switch"
+              >
+                <span className="folder-kojo-toggle-thumb" />
+              </button>
+            </label>
+
+            <div className="folder-kojo-persona-row">
+              <div className="folder-kojo-toggle-info">
+                <span className="folder-kojo-toggle-label">Default persona style</span>
+                <span className="folder-kojo-toggle-desc">How Kojo responds in chat sessions for this folder.</span>
+              </div>
+              <select
+                className="folder-kojo-persona-select"
+                value={folder.kojo_persona ?? "balanced"}
+                onChange={(e) => void updateKojoSetting({ kojo_persona: e.target.value })}
+              >
+                <option value="balanced">Balanced</option>
+                <option value="concise">Concise</option>
+                <option value="tutorial">Tutorial</option>
+                <option value="socratic">Socratic</option>
+              </select>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {error ? <div className="form-error">{error}</div> : null}
