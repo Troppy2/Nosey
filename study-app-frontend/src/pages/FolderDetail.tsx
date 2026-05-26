@@ -1,4 +1,4 @@
-import { BookOpen, Bot, Brain, ChevronDown, ChevronUp, Edit3, Files, FolderOpen, History, Loader2, Plus, Settings, Trash2 } from "lucide-react";
+import { BookOpen, Bot, Brain, ChevronDown, ChevronUp, Edit3, Files, FolderOpen, History, Info, Loader2, Plus, RotateCcw, Settings, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -8,9 +8,16 @@ import { EmptyState } from "../components/EmptyState";
 import { FileManager } from "../components/FileManager";
 import { KojoChat } from "../components/KojoChat";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
-import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, updateFolder, updateTest } from "../lib/api";
+import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, reindexFolderFiles, updateFolder, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
 import type { AttemptSummary, Flashcard, Folder, TestSummary } from "../lib/types";
+
+const PERSONA_DESCRIPTIONS: Record<string, string> = {
+  balanced: "Conversational and thorough. Explains concepts clearly, gives examples, and checks understanding without being overwhelming.",
+  concise: "Short, direct answers only. No elaboration unless you ask. Best when you just need a quick fact or definition.",
+  tutorial: "Step-by-step teacher mode. Breaks concepts into structured lessons with explanations and worked examples.",
+  socratic: "Answers questions with guiding questions. Pushes you to reason through problems yourself instead of just telling you the answer.",
+};
 
 export default function FolderDetail() {
   const { folderId } = useParams();
@@ -24,6 +31,8 @@ export default function FolderDetail() {
   const [kojoSettingsOpen, setKojoSettingsOpen] = useState(false);
   const [renamingTest, setRenamingTest] = useState<TestSummary | null>(null);
   const [deletingTest, setDeletingTest] = useState<TestSummary | null>(null);
+  const [reindexing, setReindexing] = useState(false);
+  const [reindexMessage, setReindexMessage] = useState<string | null>(null);
 
   const id = Number(folderId);
 
@@ -88,6 +97,27 @@ export default function FolderDetail() {
       setFolder(updated);
     } catch {
       // non-critical — silently ignore
+    }
+  }
+
+  async function handleReindex() {
+    setReindexing(true);
+    setReindexMessage(null);
+    try {
+      const result = await reindexFolderFiles(id);
+      if (result.reindexed === 0 && result.still_failed === 0) {
+        setReindexMessage("All files are already indexed.");
+      } else if (result.reindexed > 0 && result.still_failed === 0) {
+        setReindexMessage(`${result.reindexed} file${result.reindexed === 1 ? "" : "s"} re-indexed successfully.`);
+      } else if (result.reindexed > 0) {
+        setReindexMessage(`${result.reindexed} re-indexed. ${result.still_failed} still failed — re-upload those files.`);
+      } else {
+        setReindexMessage(`${result.still_failed} file${result.still_failed === 1 ? "" : "s"} could not be re-indexed. Re-upload them to fix.`);
+      }
+    } catch (err) {
+      setReindexMessage(err instanceof Error ? err.message : "Re-index failed.");
+    } finally {
+      setReindexing(false);
     }
   }
 
@@ -211,21 +241,48 @@ export default function FolderDetail() {
               </button>
             </label>
 
+            <div className="folder-kojo-reindex-row">
+              <div className="folder-kojo-toggle-info">
+                <span className="folder-kojo-toggle-label">Re-index files</span>
+                <span className="folder-kojo-toggle-desc">Retry indexing for files that failed or were not auto-indexed.</span>
+              </div>
+              <div className="folder-kojo-reindex-action">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  icon={<RotateCcw size={15} />}
+                  onClick={() => void handleReindex()}
+                  disabled={reindexing}
+                >
+                  {reindexing ? "Re-indexing…" : "Re-index"}
+                </Button>
+                {reindexMessage ? <span className="folder-kojo-reindex-msg muted small">{reindexMessage}</span> : null}
+              </div>
+            </div>
+
             <div className="folder-kojo-persona-row">
               <div className="folder-kojo-toggle-info">
                 <span className="folder-kojo-toggle-label">Default persona style</span>
                 <span className="folder-kojo-toggle-desc">How Kojo responds in chat sessions for this folder.</span>
               </div>
-              <select
-                className="folder-kojo-persona-select"
-                value={folder.kojo_persona ?? "balanced"}
-                onChange={(e) => void updateKojoSetting({ kojo_persona: e.target.value })}
-              >
-                <option value="balanced">Balanced</option>
-                <option value="concise">Concise</option>
-                <option value="tutorial">Tutorial</option>
-                <option value="socratic">Socratic</option>
-              </select>
+              <div className="folder-kojo-persona-field">
+                <select
+                  className="folder-kojo-persona-select"
+                  value={folder.kojo_persona ?? "balanced"}
+                  onChange={(e) => void updateKojoSetting({ kojo_persona: e.target.value })}
+                >
+                  <option value="balanced">Balanced</option>
+                  <option value="concise">Concise</option>
+                  <option value="tutorial">Tutorial</option>
+                  <option value="socratic">Socratic</option>
+                </select>
+                <span className="folder-kojo-persona-tooltip-wrap">
+                  <Info size={15} className="folder-kojo-persona-info-icon" />
+                  <span className="folder-kojo-persona-tooltip">
+                    {PERSONA_DESCRIPTIONS[folder.kojo_persona ?? "balanced"]}
+                  </span>
+                </span>
+              </div>
             </div>
           </div>
         </div>

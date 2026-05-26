@@ -2,6 +2,7 @@ import { CheckCircle, LogIn, LogOut, RotateCcw, Sparkles, XCircle } from "lucide
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { CollapsibleSection } from "../components/CollapsibleSection";
 import { SelectInput } from "../components/Field";
 import {
   fetchClearedKojoConversations,
@@ -234,8 +235,7 @@ export default function Settings() {
           <span>Use the guest session to try the full flow before connecting a real account.</span>
         </div>
 
-        <section className="settings-appearance">
-          <h3><RotateCcw size={16} /> Reset Study Stats</h3>
+        <CollapsibleSection title="Reset Study Stats">
           <p className="muted small">
             Reset dashboard counters for Tests Taken, Cards Reviewed, and Average Score.
           </p>
@@ -251,10 +251,9 @@ export default function Settings() {
             </Button>
             {statsResetNotice ? <span className="muted small">{statsResetNotice}</span> : null}
           </div>
-        </section>
+        </CollapsibleSection>
 
-        <section className="settings-appearance">
-          <h3>Question Fallback</h3>
+        <CollapsibleSection title="Question Fallback">
           <p className="muted small">
             When enabled, if the AI model fails to generate questions, placeholder questions are shown instead.
             When disabled, you'll see an error and can try again once the AI is available.
@@ -275,10 +274,9 @@ export default function Settings() {
               </span>
             </button>
           </div>
-        </section>
+        </CollapsibleSection>
 
-        <section className="settings-appearance">
-          <h3>LLM model override</h3>
+        <CollapsibleSection title="LLM model override">
           <p className="muted small">
             Choose the default provider Nosey should use for all LLM-powered features.
           </p>
@@ -292,10 +290,9 @@ export default function Settings() {
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </SelectInput>
-        </section>
+        </CollapsibleSection>
 
-        <section className="settings-appearance">
-          <h3>Kojo constitution strictness</h3>
+        <CollapsibleSection title="Kojo constitution strictness">
           <p className="muted small">
             Controls how strictly Kojo sticks to your uploaded notes when answering questions.
           </p>
@@ -320,18 +317,17 @@ export default function Settings() {
               </button>
             ))}
           </div>
-        </section>
-        
-        <section className="settings-slash-commands">
+        </CollapsibleSection>
+
+        <CollapsibleSection title="Slash commands">
           <SlashCommandManager
             commands={slashCommands}
             loading={loadingSlashCommands}
             onChange={setSlashCommands}
           />
-        </section>
+        </CollapsibleSection>
 
-        <section className="settings-restore">
-          <h3>Kojo chat history restore</h3>
+        <CollapsibleSection title="Kojo chat history restore">
           <p className="muted small">
             Cleared Kojo chats are available here for up to 5 hours.
           </p>
@@ -366,7 +362,7 @@ export default function Settings() {
               ))}
             </div>
           )}
-        </section>
+        </CollapsibleSection>
       </Card>
 
     </div>
