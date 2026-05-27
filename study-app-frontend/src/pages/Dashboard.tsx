@@ -13,6 +13,17 @@ const TYPE_START_DELAY_MS = 3000;
 const TYPE_ROTATE_INTERVAL_MS = 5 * 60 * 1000;
 const TYPE_STEP_MS = 28;
 const STATS_RESET_BASELINE_KEY = "nosey_stats_reset_baseline";
+const COMPLETED_TEST_IDS_KEY = "nosey_completed_test_ids";
+
+function readCompletedTestIds(): Set<number> {
+  try {
+    const raw = localStorage.getItem(COMPLETED_TEST_IDS_KEY);
+    if (!raw) return new Set();
+    return new Set(JSON.parse(raw) as number[]);
+  } catch {
+    return new Set();
+  }
+}
 
 type StatsResetBaseline = {
   attempts: number;
@@ -211,6 +222,8 @@ export default function Dashboard() {
   }, [flashcards, tests, statsResetVersion]);
 
   const weakCards = [...flashcards].sort((a, b) => b.difficulty - a.difficulty).slice(0, 3);
+  const completedTestIds = readCompletedTestIds();
+  const pendingResumableTests = resumableTests.filter((t) => !completedTestIds.has(t.test_id));
 
   async function commitRename(nextTitle: string) {
     if (!renamingTest) return;
@@ -327,14 +340,14 @@ export default function Dashboard() {
                 </div>
               </section>
 
-              {resumableTests.length > 0 && (
+              {pendingResumableTests.length > 0 && (
                 <section>
                   <div className="section-title">
                     <h2>Continue Test</h2>
-                    <span style={{ fontSize: "14px", color: "var(--gray-600)" }}>{resumableTests.length} in progress</span>
+                    <span style={{ fontSize: "14px", color: "var(--gray-600)" }}>{pendingResumableTests.length} in progress</span>
                   </div>
                   <div className="test-list">
-                    {resumableTests.map((test) => (
+                    {pendingResumableTests.map((test) => (
                       <Card key={test.attempt_id} interactive className="test-row">
                         <Link className="test-row-main" to={`/test/${test.test_id}`}>
                           <div>

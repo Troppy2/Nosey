@@ -41,7 +41,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MarkdownContent } from "../components/MarkdownContent";
 import CodingTabs from "../components/Tab";
-import { SlashCommandMenu, type SlashCommand } from "../components/SlashCommandMenu";
+import { SlashCommandMenu, type CommandOption as SlashCommand } from "../components/SlashCommandMenu";
 import {
   fetchLCProgress,
   fetchLCWorkspace,
@@ -1627,7 +1627,7 @@ export default function LeetCodeMode() {
                 disabled={kojoLoading}
               />
               {kojoShowsCommands ? (
-                <SlashCommandMenu commands={CHAT_COMMANDS} query={kojoInput.trimStart()} onSelect={selectKojoCommand} />
+                <SlashCommandMenu commands={CHAT_COMMANDS} onSelect={selectKojoCommand} />
               ) : null}
             </div>
 
