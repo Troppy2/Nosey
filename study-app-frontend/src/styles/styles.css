@@ -7065,4 +7065,98 @@ h3 {
   color: var(--error);
 }
 
+/* LeetCode visualize button */
+.lc-visualize-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  background: rgba(113, 131, 85, 0.1);
+  border: 1px solid rgba(113, 131, 85, 0.28);
+  border-radius: 5px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.lc-visualize-btn:hover {
+  background: rgba(113, 131, 85, 0.2);
+}
+
+.lc-test-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* LeetCode solution panel */
+.lc-solution-panel {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(113, 131, 85, 0.18);
+  padding-bottom: 20px;
+}
+
+.lc-solution-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  background: none;
+  border: 1px solid rgba(113, 131, 85, 0.22);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.lc-solution-toggle:hover:not(:disabled) {
+  background: rgba(113, 131, 85, 0.07);
+}
+
+.lc-solution-toggle:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.lc-solution-chevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: transform 0.18s;
+}
+
+.lc-solution-chevron--open {
+  transform: rotate(180deg);
+}
+
+.lc-solution-locked {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--muted, #888);
+  font-style: italic;
+  flex-shrink: 0;
+}
+
+.lc-solution-frame-wrap {
+  margin-top: 10px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(113, 131, 85, 0.18);
+}
+
+.lc-solution-iframe {
+  width: 100%;
+  height: 420px;
+  border: none;
+  display: block;
+}
+
 

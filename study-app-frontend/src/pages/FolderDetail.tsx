@@ -105,17 +105,22 @@ export default function FolderDetail() {
     setReindexMessage(null);
     try {
       const result = await reindexFolderFiles(id);
+      let msg: string;
       if (result.reindexed === 0 && result.still_failed === 0) {
-        setReindexMessage("All files are already indexed.");
+        msg = "All files are already indexed.";
       } else if (result.reindexed > 0 && result.still_failed === 0) {
-        setReindexMessage(`${result.reindexed} file${result.reindexed === 1 ? "" : "s"} re-indexed successfully.`);
+        msg = `${result.reindexed} file${result.reindexed === 1 ? "" : "s"} re-indexed successfully.`;
       } else if (result.reindexed > 0) {
-        setReindexMessage(`${result.reindexed} re-indexed. ${result.still_failed} still failed — re-upload those files.`);
+        msg = `${result.reindexed} re-indexed. ${result.still_failed} still failed — re-upload those files.`;
       } else {
-        setReindexMessage(`${result.still_failed} file${result.still_failed === 1 ? "" : "s"} could not be re-indexed. Re-upload them to fix.`);
+        msg = `${result.still_failed} file${result.still_failed === 1 ? "" : "s"} could not be re-indexed. Re-upload them to fix.`;
       }
+      setReindexMessage(msg);
+      setTimeout(() => setReindexMessage(null), 5000);
     } catch (err) {
-      setReindexMessage(err instanceof Error ? err.message : "Re-index failed.");
+      const msg = err instanceof Error ? err.message : "Re-index failed.";
+      setReindexMessage(msg);
+      setTimeout(() => setReindexMessage(null), 5000);
     } finally {
       setReindexing(false);
     }

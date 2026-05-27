@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
 import { deleteFlashcard, fetchFlashcards, fetchFolders, recordFlashcardAttempt } from "../lib/api";
 import type { Flashcard, Folder } from "../lib/types";
@@ -272,20 +273,14 @@ export default function Flashcards() {
       </main>
 
       {showDeleteAllModal ? (
-        <div className="modal-backdrop" onMouseDown={() => setShowDeleteAllModal(false)}>
-          <div className="modal-card" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
-            <h2>Delete All Flashcards?</h2>
-            <p className="muted">Are you sure? This permanently removes all flashcards in this class.</p>
-            <div className="button-row">
-              <Button type="button" variant="danger" onClick={handleDeleteAllFlashcards} disabled={deletingAll}>
-                {deletingAll ? "Deleting..." : "Yes"}
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => setShowDeleteAllModal(false)} disabled={deletingAll}>
-                No
-              </Button>
-            </div>
-          </div>
-        </div>
+        <ConfirmModal
+          title="Delete All Flashcards"
+          message="This permanently removes all flashcards in this folder. This cannot be undone."
+          confirmLabel={deletingAll ? "Deleting…" : "Delete All"}
+          danger
+          onConfirm={() => void handleDeleteAllFlashcards()}
+          onCancel={() => setShowDeleteAllModal(false)}
+        />
       ) : null}
     </div>
   );

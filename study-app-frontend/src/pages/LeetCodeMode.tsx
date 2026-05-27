@@ -8,8 +8,10 @@ import {
   Braces,
   Calculator,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   Circle,
+  Eye,
   Code2,
   ExternalLink,
   Flame,
@@ -40,7 +42,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MarkdownContent } from "../components/MarkdownContent";
 import CodingTabs from "../components/Tab";
 import { SlashCommandMenu, type SlashCommand } from "../components/SlashCommandMenu";
-import { fetchLeetCodeHint, fetchLeetCodeProblem, gradeLeetCodeSubmission } from "../lib/api";
+import {
+  fetchLCProgress,
+  fetchLCWorkspace,
+  isGuestSession,
+  syncLCProgress,
+  syncLCWorkspace,
+  fetchLeetCodeHint,
+  fetchLeetCodeProblem,
+  gradeLeetCodeSubmission,
+} from "../lib/api";
 import { runPythonLeetCode, type RunnerResult } from "../lib/pyodideRunner";
 import type { LeetCodeProblemData } from "../lib/types";
 import { useSettings } from "../lib/useSettings";
@@ -562,6 +573,48 @@ function isRunnable(problemData?: LeetCodeProblemData) {
   return snippet.includes("class Solution") && problemData?.examples.length;
 }
 
+function buildPythonTutorUrl(code: string, inputText: string, snippet: string): string {
+  if (!code.trim() || !snippet) return '';
+
+  const methodMatch = snippet.match(/def\s+(\w+)\s*\(self/);
+  const methodName = methodMatch?.[1];
+  if (!methodName) return '';
+
+  const sigMatch = snippet.match(/def\s+\w+\s*\(self(?:,\s*([^)]+))?\s*\)/);
+  const rawParams = sigMatch?.[1] ?? '';
+  const paramNames = rawParams
+    .split(',')
+    .map((p) => p.trim().split(':')[0].trim().split('=')[0].trim())
+    .filter(Boolean);
+
+  const preamble = [
+    'from typing import List, Optional, Dict, Tuple, Set',
+    '',
+    'class TreeNode:',
+    '    def __init__(self, val=0, left=None, right=None):',
+    '        self.val = val',
+    '        self.left = left',
+    '        self.right = right',
+    '',
+    'class ListNode:',
+    '    def __init__(self, val=0, next=None):',
+    '        self.val = val',
+    '        self.next = next',
+    '',
+  ].join('\n');
+
+  const fullCode = [
+    preamble + code.trimEnd(),
+    '',
+    '# --- test case ---',
+    inputText.trim(),
+    `result = Solution().${methodName}(${paramNames.join(', ')})`,
+    'print(result)',
+  ].join('\n');
+
+  return `https://pythontutor.com/render.html#code=${encodeURIComponent(fullCode)}&cumulative=false&curInstr=0&heapPrimitives=nestedPointerArrs&mode=display&origin=opt-frontend.js&py=3&rawInputLstJSON=%5B%5D&textReferences=false`;
+}
+
 export default function LeetCodeMode() {
   const { generationProvider } = useSettings();
   const [view, setView] = useState<View>({ type: "tree" });
@@ -581,6 +634,7 @@ export default function LeetCodeMode() {
   const [timerPickerOpen, setTimerPickerOpen] = useState(false);
   const [timeoutModalOpen, setTimeoutModalOpen] = useState(false);
   const [timeoutModalMessage, setTimeoutModalMessage] = useState<string | null>(null);
+  const [solutionOpen, setSolutionOpen] = useState(false);
   const [kojoOpen, setKojoOpen] = useState(false);
   const [kojoInput, setKojoInput] = useState("");
   const [kojoResponse, setKojoResponse] = useState<string | null>(null);
@@ -591,6 +645,7 @@ export default function LeetCodeMode() {
   const currentProblemDataRef = useRef<LeetCodeProblemData | undefined>(undefined);
   const currentCustomCasesRef = useRef<CustomCase[]>([]);
   const timerExpiryHandledRef = useRef(false);
+  const workspaceSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentProblem =
     view.type === "problem"
@@ -613,6 +668,29 @@ export default function LeetCodeMode() {
   useEffect(() => {
     currentProblemDataRef.current = currentProblemData;
   }, [currentProblemData]);
+
+  // On mount: fetch DB progress/dates, merge with localStorage, push merged result back
+  useEffect(() => {
+    if (isGuestSession()) return;
+    fetchLCProgress()
+      .then(({ progress: dbProgress, activity_dates: dbDates }) => {
+        setProgress((localProgress) => {
+          const merged: Record<string, boolean> = { ...localProgress };
+          for (const [slug, done] of Object.entries(dbProgress)) {
+            merged[slug] = (merged[slug] ?? false) || done;
+          }
+          saveProgress(merged);
+          return merged;
+        });
+        setActivityDates((localDates) => {
+          const merged = Array.from(new Set([...localDates, ...dbDates]));
+          saveActivityDates(merged);
+          return merged;
+        });
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Seed starter snippet after async fetch completes (first open when cache is cold)
   useEffect(() => {
@@ -690,10 +768,29 @@ export default function LeetCodeMode() {
     };
   }, [activityDates, progress]);
 
-  function recordSolvedToday() {
+  function pushProgressToDb(nextProgress: Record<string, boolean>, nextDates: string[]) {
+    if (isGuestSession()) return;
+    syncLCProgress({ progress: nextProgress, activity_dates: nextDates }).catch(() => {});
+  }
+
+  function pushWorkspaceToDb(problemSlug: string, workspace: CodeWorkspace) {
+    if (isGuestSession()) return;
+    syncLCWorkspace(problemSlug, workspace).catch(() => {});
+  }
+
+  function schedulePushWorkspaceToDb(problemSlug: string, workspace: CodeWorkspace) {
+    if (isGuestSession()) return;
+    if (workspaceSyncTimerRef.current) clearTimeout(workspaceSyncTimerRef.current);
+    workspaceSyncTimerRef.current = setTimeout(() => {
+      syncLCWorkspace(problemSlug, workspace).catch(() => {});
+    }, 1500);
+  }
+
+  function recordSolvedToday(): string[] {
     const nextDates = [...activityDates, todayKey()];
     setActivityDates(nextDates);
     saveActivityDates(nextDates);
+    return nextDates;
   }
 
   function toggleProgress(problem: Problem) {
@@ -701,7 +798,8 @@ export default function LeetCodeMode() {
     const next = { ...progress, [problem.slug]: nextDone };
     setProgress(next);
     saveProgress(next);
-    if (nextDone) recordSolvedToday();
+    const nextDates = nextDone ? recordSolvedToday() : activityDates;
+    pushProgressToDb(next, nextDates);
   }
 
   function markProblemDone(problem: Problem) {
@@ -709,7 +807,8 @@ export default function LeetCodeMode() {
     const next = { ...progress, [problem.slug]: true };
     setProgress(next);
     saveProgress(next);
-    recordSolvedToday();
+    const nextDates = recordSolvedToday();
+    pushProgressToDb(next, nextDates);
   }
 
   function closeTimerPicker() {
@@ -751,16 +850,15 @@ export default function LeetCodeMode() {
 
   function clearActiveTabWork() {
     if (!currentProblem) return;
-
-    setCodeWorkspaces((prev) => {
-      const workspace = prev[currentProblem.slug] ?? loadCodeWorkspace(currentProblem.slug);
-      const nextWorkspace = {
-        ...workspace,
-        tabs: workspace.tabs.map((tab) => (tab.id === workspace.activeTabId ? { ...tab, code: "" } : tab)),
-      };
-      saveCodeWorkspace(currentProblem.slug, nextWorkspace);
-      return { ...prev, [currentProblem.slug]: nextWorkspace };
-    });
+    const slug = currentProblem.slug;
+    const workspace = codeWorkspaces[slug] ?? loadCodeWorkspace(slug);
+    const nextWorkspace = {
+      ...workspace,
+      tabs: workspace.tabs.map((tab) => (tab.id === workspace.activeTabId ? { ...tab, code: "" } : tab)),
+    };
+    saveCodeWorkspace(slug, nextWorkspace);
+    pushWorkspaceToDb(slug, nextWorkspace);
+    setCodeWorkspaces((prev) => ({ ...prev, [slug]: nextWorkspace }));
   }
 
   async function runAndGradeCurrentCode(
@@ -871,6 +969,7 @@ export default function LeetCodeMode() {
     const cached = problemStates[problemSlug]?.data;
     const initialCode = cached?.python_snippet?.trimEnd() ?? "";
     const workspace = loadCodeWorkspace(problemSlug);
+    const hasLocalCode = workspace.tabs.some((tab) => tab.code.trim());
 
     if (!workspace.tabs.length || (!workspace.tabs[0].code.trim() && initialCode.trim())) {
       const starter = initialCode;
@@ -885,8 +984,26 @@ export default function LeetCodeMode() {
       setCodeWorkspaces((prev) => ({ ...prev, [problemSlug]: workspace }));
     }
 
+    // DB fallback: if localStorage has no user code, fetch from DB (cross-device restore)
+    if (!hasLocalCode && !initialCode.trim() && !isGuestSession()) {
+      fetchLCWorkspace(problemSlug)
+        .then((result) => {
+          if (!result?.workspace) return;
+          const parsed = normalizeCodeWorkspace(result.workspace);
+          if (!parsed || !parsed.tabs.some((tab) => tab.code.trim())) return;
+          setCodeWorkspaces((prev) => {
+            const current = prev[problemSlug];
+            if (current?.tabs.some((tab) => tab.code.trim())) return prev;
+            saveCodeWorkspace(problemSlug, parsed);
+            return { ...prev, [problemSlug]: parsed };
+          });
+        })
+        .catch(() => {});
+    }
+
     setView({ type: "problem", categoryId, problemSlug });
     setKojoOpen(false);
+    setSolutionOpen(false);
     setRunnerResult(null);
     setGradeFeedback(null);
     setKojoResponse(null);
@@ -896,81 +1013,62 @@ export default function LeetCodeMode() {
 
   function handleCodeChange(value: string) {
     if (!currentProblem) return;
-
-    setCodeWorkspaces((prev) => {
-      const workspace = prev[currentProblem.slug] ?? loadCodeWorkspace(currentProblem.slug);
-      const nextWorkspace = {
-        ...workspace,
-        tabs: workspace.tabs.map((tab) => (tab.id === workspace.activeTabId ? { ...tab, code: value } : tab)),
-      };
-      saveCodeWorkspace(currentProblem.slug, nextWorkspace);
-      return { ...prev, [currentProblem.slug]: nextWorkspace };
-    });
+    const slug = currentProblem.slug;
+    const workspace = codeWorkspaces[slug] ?? loadCodeWorkspace(slug);
+    const nextWorkspace = {
+      ...workspace,
+      tabs: workspace.tabs.map((tab) => (tab.id === workspace.activeTabId ? { ...tab, code: value } : tab)),
+    };
+    saveCodeWorkspace(slug, nextWorkspace);
+    schedulePushWorkspaceToDb(slug, nextWorkspace);
+    setCodeWorkspaces((prev) => ({ ...prev, [slug]: nextWorkspace }));
   }
 
   function handleAddCodeTab() {
     if (!currentProblem) return;
+    const slug = currentProblem.slug;
+    const workspace = codeWorkspaces[slug] ?? loadCodeWorkspace(slug);
+    if (workspace.tabs.length >= MAX_CODE_TABS) return;
 
-    setCodeWorkspaces((prev) => {
-      const workspace = prev[currentProblem.slug] ?? loadCodeWorkspace(currentProblem.slug);
-      if (workspace.tabs.length >= MAX_CODE_TABS) return prev;
-
-      const nextTab = {
-        id: makeTabId(),
-        name: `Tab ${workspace.tabs.length + 1}`,
-        code: "",
-      };
-      const nextWorkspace = {
-        tabs: [...workspace.tabs, nextTab],
-        activeTabId: nextTab.id,
-      };
-      saveCodeWorkspace(currentProblem.slug, nextWorkspace);
-      return { ...prev, [currentProblem.slug]: nextWorkspace };
-    });
+    const nextTab = { id: makeTabId(), name: `Tab ${workspace.tabs.length + 1}`, code: "" };
+    const nextWorkspace = { tabs: [...workspace.tabs, nextTab], activeTabId: nextTab.id };
+    saveCodeWorkspace(slug, nextWorkspace);
+    pushWorkspaceToDb(slug, nextWorkspace);
+    setCodeWorkspaces((prev) => ({ ...prev, [slug]: nextWorkspace }));
   }
 
   function handleDeleteCodeTab(tabId: string) {
     if (!currentProblem) return;
+    const slug = currentProblem.slug;
+    const workspace = codeWorkspaces[slug] ?? loadCodeWorkspace(slug);
 
-    setCodeWorkspaces((prev) => {
-      const workspace = prev[currentProblem.slug] ?? loadCodeWorkspace(currentProblem.slug);
-      if (workspace.tabs.length <= 1) {
-        const nextWorkspace = createDefaultWorkspace("");
-        saveCodeWorkspace(currentProblem.slug, nextWorkspace);
-        return { ...prev, [currentProblem.slug]: nextWorkspace };
-      }
-
+    let nextWorkspace: CodeWorkspace;
+    if (workspace.tabs.length <= 1) {
+      nextWorkspace = createDefaultWorkspace("");
+    } else {
       const tabIndex = workspace.tabs.findIndex((tab) => tab.id === tabId);
-      if (tabIndex < 0) return prev;
-
+      if (tabIndex < 0) return;
       const nextTabs = workspace.tabs.filter((tab) => tab.id !== tabId);
       const nextActiveTabId = workspace.activeTabId === tabId
         ? nextTabs[Math.max(0, tabIndex - 1)]?.id ?? nextTabs[0].id
         : workspace.activeTabId;
+      nextWorkspace = { tabs: nextTabs, activeTabId: nextActiveTabId };
+    }
 
-      const nextWorkspace = {
-        tabs: nextTabs,
-        activeTabId: nextActiveTabId,
-      };
-
-      saveCodeWorkspace(currentProblem.slug, nextWorkspace);
-      return { ...prev, [currentProblem.slug]: nextWorkspace };
-    });
+    saveCodeWorkspace(slug, nextWorkspace);
+    pushWorkspaceToDb(slug, nextWorkspace);
+    setCodeWorkspaces((prev) => ({ ...prev, [slug]: nextWorkspace }));
   }
 
   function handleSelectCodeTab(tabId: string) {
     if (!currentProblem) return;
-
-    setCodeWorkspaces((prev) => {
-      const workspace = prev[currentProblem.slug] ?? loadCodeWorkspace(currentProblem.slug);
-      if (workspace.activeTabId === tabId) return prev;
-      const nextWorkspace = {
-        ...workspace,
-        activeTabId: tabId,
-      };
-      saveCodeWorkspace(currentProblem.slug, nextWorkspace);
-      return { ...prev, [currentProblem.slug]: nextWorkspace };
-    });
+    const slug = currentProblem.slug;
+    const workspace = codeWorkspaces[slug] ?? loadCodeWorkspace(slug);
+    if (workspace.activeTabId === tabId) return;
+    const nextWorkspace = { ...workspace, activeTabId: tabId };
+    saveCodeWorkspace(slug, nextWorkspace);
+    pushWorkspaceToDb(slug, nextWorkspace);
+    setCodeWorkspaces((prev) => ({ ...prev, [slug]: nextWorkspace }));
   }
 
   function handleFormat() {
@@ -1219,6 +1317,7 @@ export default function LeetCodeMode() {
   }
 
   const showNextButton = Boolean(progress[currentProblem.slug]) || Boolean(runnerResult?.ok);
+  const hasAttempted = runnerResult !== null || Boolean(progress[currentProblem.slug]);
 
   const problemLoading = currentProblem.isOfficial && currentProblemState?.loading;
   const problemError = currentProblemState?.error;
@@ -1323,6 +1422,18 @@ export default function LeetCodeMode() {
                 <div key={example.index} className="lc-test-card">
                   <div className="lc-test-card-top">
                     <strong>Official {example.index}</strong>
+                    {currentCode.trim() && currentProblemData?.python_snippet ? (
+                      <a
+                        href={buildPythonTutorUrl(currentCode, example.input_text, currentProblemData.python_snippet)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="lc-visualize-btn"
+                        title="Step through this test case in Python Tutor"
+                      >
+                        <Eye size={12} />
+                        Visualize
+                      </a>
+                    ) : null}
                   </div>
                   <label>
                     <span>Input</span>
@@ -1339,9 +1450,23 @@ export default function LeetCodeMode() {
                 <div key={testCase.id} className="lc-test-card lc-test-card--custom">
                   <div className="lc-test-card-top">
                     <strong>Custom {index + 1}</strong>
-                    <button type="button" className="lc-inline-icon-btn" onClick={() => removeCustomCase(testCase.id)} aria-label="Remove custom test case">
-                      <X size={14} />
-                    </button>
+                    <div className="lc-test-card-actions">
+                      {currentCode.trim() && currentProblemData?.python_snippet && testCase.inputText.trim() ? (
+                        <a
+                          href={buildPythonTutorUrl(currentCode, testCase.inputText, currentProblemData.python_snippet)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="lc-visualize-btn"
+                          title="Step through this test case in Python Tutor"
+                        >
+                          <Eye size={12} />
+                          Visualize
+                        </a>
+                      ) : null}
+                      <button type="button" className="lc-inline-icon-btn" onClick={() => removeCustomCase(testCase.id)} aria-label="Remove custom test case">
+                        <X size={14} />
+                      </button>
+                    </div>
                   </div>
                   <label>
                     <span>Input</span>
@@ -1432,6 +1557,35 @@ export default function LeetCodeMode() {
                   </span>
                   <ArrowRight size={16} className="lc-next-arrow" />
                 </button>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="lc-solution-panel">
+            <button
+              type="button"
+              className="lc-solution-toggle"
+              onClick={() => hasAttempted && setSolutionOpen((prev) => !prev)}
+              disabled={!hasAttempted}
+              title={hasAttempted ? "Toggle NeetCode solution" : "Attempt the problem to unlock"}
+            >
+              <Youtube size={15} />
+              <span>NeetCode solution</span>
+              {!hasAttempted ? (
+                <small className="lc-solution-locked">Attempt first to unlock</small>
+              ) : (
+                <ChevronDown size={14} className={solutionOpen ? "lc-solution-chevron lc-solution-chevron--open" : "lc-solution-chevron"} />
+              )}
+            </button>
+            {solutionOpen && hasAttempted ? (
+              <div className="lc-solution-frame-wrap">
+                <iframe
+                  src={`https://neetcode.io/solutions/${currentProblem.slug}`}
+                  title={`NeetCode solution for ${currentProblem.title}`}
+                  className="lc-solution-iframe"
+                  allow="autoplay; encrypted-media"
+                  allowFullScreen
+                />
               </div>
             ) : null}
           </div>

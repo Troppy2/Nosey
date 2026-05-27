@@ -7,6 +7,7 @@ from src.models.folder_file import FolderFile
 from src.models.frq_answer import FRQAnswer
 from src.models.kojo_conversation import KojoConversation
 from src.models.kojo_message import KojoMessage
+from src.models.lc_sync import LCActivityDate, LCCodeWorkspace, LCProgress
 from src.models.mcq_option import MCQOption
 from src.models.note import Note
 from src.models.question import Question
@@ -26,6 +27,9 @@ __all__ = [
     "FRQAnswer",
     "KojoConversation",
     "KojoMessage",
+    "LCActivityDate",
+    "LCCodeWorkspace",
+    "LCProgress",
     "MCQOption",
     "Note",
     "Question",

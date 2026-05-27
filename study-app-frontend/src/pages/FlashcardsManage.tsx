@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { TextInput } from "../components/Field";
 import {
   createFlashcard,
@@ -34,6 +35,7 @@ export default function FlashcardsManage() {
   const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
+  const [confirmDeleteCard, setConfirmDeleteCard] = useState<Flashcard | null>(null);
   const { generationProvider, setGenerationProvider } = useSettings();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -86,7 +88,6 @@ export default function FlashcardsManage() {
   }
 
   async function handleDelete(card: Flashcard) {
-    if (!window.confirm("Delete this flashcard?")) return;
     try {
       await deleteFlashcard(id, card.id);
       setCards((prev) => prev.filter((c) => c.id !== card.id));
@@ -305,7 +306,7 @@ export default function FlashcardsManage() {
                     <button aria-label="Edit card" onClick={() => startEdit(card)} type="button">
                       <Edit3 size={17} />
                     </button>
-                    <button aria-label="Delete card" onClick={() => handleDelete(card)} type="button">
+                    <button aria-label="Delete card" onClick={() => setConfirmDeleteCard(card)} type="button">
                       <Trash2 size={17} />
                     </button>
                   </div>
@@ -316,33 +317,26 @@ export default function FlashcardsManage() {
         )}
       </section>
 
+      {confirmDeleteCard ? (
+        <ConfirmModal
+          title="Delete Flashcard"
+          message={<>Delete this flashcard? This cannot be undone.</>}
+          confirmLabel="Delete"
+          danger
+          onConfirm={() => { void handleDelete(confirmDeleteCard); setConfirmDeleteCard(null); }}
+          onCancel={() => setConfirmDeleteCard(null)}
+        />
+      ) : null}
+
       {showDeleteAllModal ? (
-        <div className="modal-backdrop" onMouseDown={() => setShowDeleteAllModal(false)}>
-          <div className="modal-card" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
-            <h2>Delete All Flashcards?</h2>
-            <p className="muted">
-              This will permanently remove all flashcards in this class folder. Are you sure?
-            </p>
-            <div className="button-row">
-              <Button
-                type="button"
-                variant="danger"
-                onClick={handleDeleteAllFlashcards}
-                disabled={deletingAll}
-              >
-                {deletingAll ? "Deleting..." : "Yes"}
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setShowDeleteAllModal(false)}
-                disabled={deletingAll}
-              >
-                No
-              </Button>
-            </div>
-          </div>
-        </div>
+        <ConfirmModal
+          title="Delete All Flashcards"
+          message="This permanently removes all flashcards in this folder. This cannot be undone."
+          confirmLabel={deletingAll ? "Deleting…" : "Delete All"}
+          danger
+          onConfirm={() => void handleDeleteAllFlashcards()}
+          onCancel={() => setShowDeleteAllModal(false)}
+        />
       ) : null}
     </div>
   );
