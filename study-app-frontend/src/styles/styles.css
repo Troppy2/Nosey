@@ -4175,6 +4175,7 @@ h3 {
 }
 
 .chat-mode-input-wrap .kojo-input {
+  flex: none;
   border: none;
   background: transparent;
   padding: 0;
@@ -7543,4 +7544,194 @@ h3 {
   display: block;
 }
 
+/* ── Drafts section ── */
+
+.draft-section {
+  margin-top: 32px;
+}
+
+.draft-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.draft-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  flex-wrap: wrap;
+}
+
+.draft-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.draft-card-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.draft-card-status {
+  color: var(--red, #e53e3e) !important;
+}
+
+.draft-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.draft-card-actions > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--muted, #6b7a6b);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.draft-card-actions > button:hover {
+  background: rgba(229, 62, 62, 0.1);
+  color: var(--red, #e53e3e);
+}
+
+/* ── Prompt modal ── */
+
+.prompt-modal {
+  max-width: 520px;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: min(88vh, 680px);
+}
+
+.prompt-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border, rgba(113, 131, 85, 0.15));
+  flex-shrink: 0;
+}
+
+.prompt-modal-header h2 {
+  margin: 0 0 2px;
+  font-size: 1.05rem;
+}
+
+.prompt-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--muted, #6b7a6b);
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.prompt-modal-close:hover {
+  background: var(--green-lightest);
+}
+
+.prompt-modal-body {
+  padding: 18px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.prompt-modal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.prompt-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.prompt-modal-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--green-mid);
+}
+
+.prompt-modal-value {
+  font-size: 0.9rem;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.prompt-modal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.prompt-modal-text {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--ink);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  background: var(--green-lightest);
+  border: 1px solid var(--border, rgba(113, 131, 85, 0.15));
+  border-radius: 8px;
+  padding: 10px 12px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.prompt-modal-date {
+  margin-top: 4px;
+  border-top: 1px solid var(--border, rgba(113, 131, 85, 0.1));
+  padding-top: 12px;
+}
+
+@media (max-width: 480px) {
+  .prompt-modal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .draft-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .draft-card-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
 

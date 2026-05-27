@@ -195,6 +195,22 @@ export type Flashcard = {
   last_attempted?: string | null;
 };
 
+export type TestCreationParams = {
+  title: string;
+  folderId: number;
+  testType: string;
+  countMcq: number;
+  countFrq: number;
+  isMathMode: boolean;
+  isCodingMode: boolean;
+  codingLanguage: string;
+  difficulty: "easy" | "medium" | "hard" | "mixed";
+  topicFocus: string;
+  customInstructions: string;
+  advancedMode: boolean;
+  savedAt: string;
+};
+
 export type AuthUser = {
   id: ID;
   email: string;
