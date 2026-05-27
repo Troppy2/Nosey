@@ -1,3 +1,26 @@
+export type SerializedValue =
+  | { type: 'none' }
+  | { type: 'bool'; value: boolean }
+  | { type: 'number'; value: number }
+  | { type: 'string'; value: string }
+  | { type: 'list'; value: SerializedValue[]; length: number }
+  | { type: 'tuple'; value: SerializedValue[]; length: number }
+  | { type: 'set'; value: SerializedValue[]; length: number }
+  | { type: 'dict'; value: Record<string, SerializedValue>; length: number }
+  | { type: 'other'; repr: string };
+
+export type TraceStep = {
+  line: number;
+  locals: Record<string, SerializedValue>;
+  method: string;
+};
+
+export type TraceResult = {
+  steps: TraceStep[];
+  result: string | null;
+  error: string | null;
+};
+
 type TestCase = {
   label: string;
   inputText: string;
@@ -245,6 +268,146 @@ json.dumps(RESULT)
       ok: false,
       output: "Execution failed.",
       error: error instanceof Error ? error.message : "Unknown Python runner error.",
+    };
+  }
+}
+
+export async function traceLeetCodeExecution(
+  code: string,
+  inputText: string,
+): Promise<TraceResult> {
+  const pyodide = await loadPyodideInstance();
+
+  const tracer = `
+import sys as _sys
+import json as _json
+import inspect as _inspect
+import ast as _ast
+import traceback as _tb
+from typing import *
+from collections import deque, defaultdict, Counter, OrderedDict
+from heapq import *
+import math, bisect, functools, itertools
+
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val = val
+        self.next = next
+
+class TreeNode:
+    def __init__(self, val=0, left=None, right=None):
+        self.val = val
+        self.left = left
+        self.right = right
+
+def _bln(vals):
+    d = ListNode(); c = d
+    for v in vals:
+        c.next = ListNode(v); c = c.next
+    return d.next
+
+def _bt(vals):
+    if not vals: return None
+    items = list(vals)
+    if items[0] is None: return None
+    root = TreeNode(items[0]); q = deque([root]); idx = 1
+    while q and idx < len(items):
+        n = q.popleft()
+        if idx < len(items):
+            l = items[idx]; idx += 1
+            if l is not None: n.left = TreeNode(l); q.append(n.left)
+        if idx < len(items):
+            r = items[idx]; idx += 1
+            if r is not None: n.right = TreeNode(r); q.append(n.right)
+    return root
+
+def _norm_ann(ann):
+    if ann is _inspect._empty: return ""
+    return ann if isinstance(ann, str) else getattr(ann, "__name__", str(ann))
+
+def _adapt(val, ann):
+    a = ann.lower()
+    if "treenode" in a and isinstance(val, list): return _bt(val)
+    if "listnode" in a and isinstance(val, list): return _bln(val)
+    return val
+
+def _parse_args(text):
+    call = _ast.parse("f(" + text + ")", mode="eval").body
+    return [(kw.arg or "", _ast.literal_eval(kw.value)) for kw in call.keywords]
+
+_MAX_STEPS = 500
+_STEPS = []
+
+def _sz(v, d=0):
+    if d > 3: return {"type": "other", "repr": "..."}
+    if v is None: return {"type": "none"}
+    if isinstance(v, bool): return {"type": "bool", "value": v}
+    if isinstance(v, int): return {"type": "number", "value": v}
+    if isinstance(v, float): return {"type": "number", "value": v}
+    if isinstance(v, str): return {"type": "string", "value": v[:200]}
+    if isinstance(v, (list, tuple)):
+        t = "list" if isinstance(v, list) else "tuple"
+        return {"type": t, "value": [_sz(i, d+1) for i in v[:30]], "length": len(v)}
+    if isinstance(v, dict):
+        return {"type": "dict", "value": {str(k): _sz(vv, d+1) for k, vv in list(v.items())[:15]}, "length": len(v)}
+    if isinstance(v, (set, frozenset)):
+        return {"type": "set", "value": [_sz(i, d+1) for i in list(v)[:20]], "length": len(v)}
+    try: return {"type": "other", "repr": repr(v)[:150]}
+    except: return {"type": "other", "repr": "<?>"}
+
+def _tracer(frame, event, arg):
+    if len(_STEPS) >= _MAX_STEPS:
+        _sys.settrace(None)
+        return None
+    if event == "call":
+        return _tracer if frame.f_code.co_filename == "<user_solution>" else None
+    if event == "line" and frame.f_code.co_filename == "<user_solution>":
+        locs = {k: _sz(v) for k, v in frame.f_locals.items() if k != "self" and not k.startswith("_")}
+        _STEPS.append({"line": frame.f_lineno, "locals": locs, "method": frame.f_code.co_name})
+    return _tracer
+
+_ns = {"ListNode": ListNode, "TreeNode": TreeNode}
+exec(compile(
+    "from typing import *\\nfrom collections import deque, defaultdict, Counter, OrderedDict\\nfrom heapq import *\\nimport math, bisect, functools, itertools",
+    "<prelude>", "exec"
+), _ns)
+
+_user_code = ${JSON.stringify(code)}
+_input_text = ${JSON.stringify(inputText)}
+_TRACE_RESULT = {"steps": [], "result": None, "error": None}
+
+try:
+    exec(compile(_user_code, "<user_solution>", "exec"), _ns)
+    _cls = _ns["Solution"]
+    _mn = [n for n, v in _cls.__dict__.items() if callable(v) and not n.startswith("_")][0]
+    _inst = _cls()
+    _meth = getattr(_inst, _mn)
+    _sig = _inspect.signature(_meth)
+    _params = list(_sig.parameters.values())
+    _raw = _parse_args(_input_text)
+    _args = [_adapt(v, _norm_ann(p.annotation)) for (_, v), p in zip(_raw, _params)]
+    _sys.settrace(_tracer)
+    try:
+        _res = _meth(*_args)
+        _sys.settrace(None)
+        _TRACE_RESULT = {"steps": _STEPS, "result": repr(_res), "error": None}
+    except Exception as _e:
+        _sys.settrace(None)
+        _TRACE_RESULT = {"steps": _STEPS, "result": None, "error": _tb.format_exc()}
+except Exception as _e:
+    _TRACE_RESULT = {"steps": [], "result": None, "error": _tb.format_exc()}
+
+_json.dumps(_TRACE_RESULT)
+`;
+
+  try {
+    const result = await pyodide.runPythonAsync(tracer);
+    return JSON.parse(String(result)) as TraceResult;
+  } catch (error) {
+    return {
+      steps: [],
+      result: null,
+      error: error instanceof Error ? error.message : "Tracer failed.",
     };
   }
 }
