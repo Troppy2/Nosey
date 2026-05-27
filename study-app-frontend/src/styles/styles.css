@@ -6559,6 +6559,13 @@ h3 {
   padding: 5px 6px;
   box-shadow: 0 4px 16px rgba(38, 48, 31, 0.28);
   animation: kojo-fade-in 0.12s ease;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.sel-kojo-toolbar--dismissing {
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
 }
 
 .sel-kojo-btn {

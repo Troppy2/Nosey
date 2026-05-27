@@ -23,12 +23,16 @@ export function SelectionKojoAssistant({ folderId, folderName, children, onAskKo
   const scopeRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const isOpenRef = useRef(false);
+  const modeRef = useRef<Mode>("toolbar");
+  const suppressDismissRef = useRef(false);
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDragging = useRef(false);
   const dragOffset = useRef<Position>({ x: 0, y: 0 });
 
   const [selectedText, setSelectedText] = useState<string | null>(null);
   const [position, setPosition] = useState<Position | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [dismissing, setDismissing] = useState(false);
   const [mode, setMode] = useState<Mode>("toolbar");
   const [response, setResponse] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -38,6 +42,7 @@ export function SelectionKojoAssistant({ folderId, folderName, children, onAskKo
   const [flashcardError, setFlashcardError] = useState<string | null>(null);
 
   isOpenRef.current = isOpen;
+  modeRef.current = mode;
 
   useEffect(() => {
     function handleMouseUp(event: MouseEvent) {
@@ -84,14 +89,40 @@ export function SelectionKojoAssistant({ folderId, folderName, children, onAskKo
       }, 0);
     }
 
+    function handleSelectionChange() {
+      if (!isOpenRef.current || modeRef.current !== "toolbar") return;
+      if (suppressDismissRef.current) return;
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.toString().trim()) {
+        if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+        setDismissing(true);
+        dismissTimerRef.current = setTimeout(() => {
+          dismissTimerRef.current = null;
+          setDismissing(false);
+          setIsOpen(false);
+          setSelectedText(null);
+          setPosition(null);
+          setResponse(null);
+          setError(null);
+          setTextExpanded(false);
+          setFlashcardDone(false);
+          setFlashcardError(null);
+          setMode("toolbar");
+          isDragging.current = false;
+        }, 180);
+      }
+    }
+
     function handleEscape(event: KeyboardEvent) {
       if (event.key === "Escape") close();
     }
 
     document.addEventListener("mouseup", handleMouseUp);
+    document.addEventListener("selectionchange", handleSelectionChange);
     document.addEventListener("keyup", handleEscape);
     return () => {
       document.removeEventListener("mouseup", handleMouseUp);
+      document.removeEventListener("selectionchange", handleSelectionChange);
       document.removeEventListener("keyup", handleEscape);
     };
   }, []);
@@ -125,6 +156,11 @@ export function SelectionKojoAssistant({ folderId, folderName, children, onAskKo
   }, [mode, folderId, folderName, selectedText, response, isLoading]);
 
   function close() {
+    if (dismissTimerRef.current) {
+      clearTimeout(dismissTimerRef.current);
+      dismissTimerRef.current = null;
+    }
+    setDismissing(false);
     setIsOpen(false);
     setSelectedText(null);
     setPosition(null);
@@ -212,10 +248,14 @@ export function SelectionKojoAssistant({ folderId, folderName, children, onAskKo
       <div ref={scopeRef} className="selection-kojo-scope">
         {children}
         <div
-          className="sel-kojo-toolbar"
+          className={`sel-kojo-toolbar${dismissing ? " sel-kojo-toolbar--dismissing" : ""}`}
           style={position ? { left: `${position.x}px`, top: `${position.y}px` } : undefined}
           role="toolbar"
           aria-label="Selection actions"
+          onMouseDown={() => {
+            suppressDismissRef.current = true;
+            setTimeout(() => { suppressDismissRef.current = false; }, 300);
+          }}
         >
           <button className="sel-kojo-btn" type="button" onClick={handleAskKojo}>
             <Bot size={13} />
