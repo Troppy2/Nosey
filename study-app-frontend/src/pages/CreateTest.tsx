@@ -7,7 +7,7 @@ import { EmptyState } from "../components/EmptyState";
 import { SelectInput, TextInput } from "../components/Field";
 import { createTest, fetchFolderFiles, fetchFolders, fetchProviderStatus } from "../lib/api";
 import { useSettings } from "../lib/useSettings";
-import type { Folder, ProviderStatus } from "../lib/types";
+import type { Folder, ProviderStatus, TestCreationParams } from "../lib/types";
 
 const MAX_UPLOAD_FILE_SIZE_MB = 10;
 const MAX_UPLOAD_TOTAL_SIZE_MB = 100;
@@ -52,6 +52,35 @@ export default function CreateTest() {
       const nextFolderId =
         data.find((folder) => folder.id === requestedFolderId)?.id ?? data[0]?.id ?? null;
       setFolderId(nextFolderId);
+
+      // Restore form state from localStorage
+      const regenerateTestId = Number(searchParams.get("regenerateTestId")) || null;
+      const storageKey = regenerateTestId
+        ? `nosey_test_params_${regenerateTestId}`
+        : nextFolderId
+          ? `nosey_create_test_form_${nextFolderId}`
+          : null;
+      if (storageKey) {
+        try {
+          const raw = localStorage.getItem(storageKey);
+          if (raw) {
+            const p = JSON.parse(raw) as Partial<TestCreationParams>;
+            if (p.title !== undefined) setTitle(p.title);
+            if (p.testType) setTestType(p.testType);
+            if (p.countMcq !== undefined) setCountMcq(p.countMcq);
+            if (p.countFrq !== undefined) setCountFrq(p.countFrq);
+            if (p.isMathMode !== undefined) setIsMathMode(p.isMathMode);
+            if (p.isCodingMode !== undefined) setIsCodingMode(p.isCodingMode);
+            if (p.codingLanguage) setCodingLanguage(p.codingLanguage);
+            if (p.difficulty) setDifficulty(p.difficulty);
+            if (p.topicFocus !== undefined) setTopicFocus(p.topicFocus);
+            if (p.customInstructions !== undefined) setCustomInstructions(p.customInstructions);
+            if (p.advancedMode !== undefined) setAdvancedMode(p.advancedMode);
+          }
+        } catch {
+          // ignore malformed draft
+        }
+      }
     });
   }, [searchParams]);
 
@@ -69,6 +98,19 @@ export default function CreateTest() {
   useEffect(() => {
     fetchProviderStatus().then(setProviderStatus).catch(() => {});
   }, []);
+
+  // Persist form state to localStorage while the user fills in the form
+  useEffect(() => {
+    if (!folderId) return;
+    if (!title.trim() && !topicFocus.trim() && !customInstructions.trim()) return;
+    const draft: TestCreationParams = {
+      title, folderId, testType, countMcq, countFrq,
+      isMathMode, isCodingMode, codingLanguage, difficulty,
+      topicFocus, customInstructions, advancedMode,
+      savedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(`nosey_create_test_form_${folderId}`, JSON.stringify(draft));
+  }, [title, folderId, testType, countMcq, countFrq, isMathMode, isCodingMode, codingLanguage, difficulty, topicFocus, customInstructions, advancedMode]);
 
   useEffect(() => {
     if (!providerStatus) return;
@@ -116,6 +158,17 @@ export default function CreateTest() {
           retrieval_top_k: result.retrieval_top_k,
         }),
       );
+      // Save creation params so FolderDetail can show the prompt later
+      if (folderId) {
+        const params: TestCreationParams = {
+          title: title.trim(), folderId, testType, countMcq, countFrq,
+          isMathMode, isCodingMode, codingLanguage, difficulty,
+          topicFocus, customInstructions, advancedMode,
+          savedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(`nosey_test_params_${result.test_id}`, JSON.stringify(params));
+        localStorage.removeItem(`nosey_create_test_form_${folderId}`);
+      }
       // Navigate to folder so the user can see the test generating in the list.
       // When generation_status is already 'ready' (e.g. fast run), go straight to the test.
       if (result.generation_status === "ready") {

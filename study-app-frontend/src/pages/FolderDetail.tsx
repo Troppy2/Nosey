@@ -1,4 +1,4 @@
-import { BookOpen, Bot, Brain, ChevronDown, ChevronUp, Edit3, Files, FolderOpen, History, Info, Loader2, Plus, RotateCcw, Settings, Trash2 } from "lucide-react";
+import { BookOpen, Bot, Brain, ChevronDown, ChevronUp, Edit3, Files, FolderOpen, History, Info, Loader2, Plus, RotateCcw, ScrollText, Settings, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -10,7 +10,7 @@ import { KojoChat } from "../components/KojoChat";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
 import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, reindexFolderFiles, updateFolder, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
-import type { AttemptSummary, Flashcard, Folder, TestSummary } from "../lib/types";
+import type { AttemptSummary, Flashcard, Folder, TestCreationParams, TestSummary } from "../lib/types";
 
 const PERSONA_DESCRIPTIONS: Record<string, string> = {
   balanced: "Conversational and thorough. Explains concepts clearly, gives examples, and checks understanding without being overwhelming.",
@@ -33,6 +33,9 @@ export default function FolderDetail() {
   const [deletingTest, setDeletingTest] = useState<TestSummary | null>(null);
   const [reindexing, setReindexing] = useState(false);
   const [reindexMessage, setReindexMessage] = useState<string | null>(null);
+  const [formDraft, setFormDraft] = useState<TestCreationParams | null>(null);
+  const [viewingPromptTest, setViewingPromptTest] = useState<TestSummary | null>(null);
+  const [viewingPromptParams, setViewingPromptParams] = useState<TestCreationParams | null>(null);
 
   const id = Number(folderId);
 
@@ -59,6 +62,36 @@ export default function FolderDetail() {
     }, 4000);
     return () => clearInterval(pollId);
   }, [id, tests]);
+
+  useEffect(() => {
+    if (!id) return;
+    try {
+      const raw = localStorage.getItem(`nosey_create_test_form_${id}`);
+      if (!raw) return;
+      const draft = JSON.parse(raw) as TestCreationParams;
+      if (draft.title?.trim() || draft.topicFocus?.trim() || draft.customInstructions?.trim()) {
+        setFormDraft(draft);
+      }
+    } catch {
+      // ignore malformed draft
+    }
+  }, [id]);
+
+  function clearFormDraft() {
+    localStorage.removeItem(`nosey_create_test_form_${id}`);
+    setFormDraft(null);
+  }
+
+  function openPromptViewer(test: TestSummary) {
+    try {
+      const raw = localStorage.getItem(`nosey_test_params_${test.id}`);
+      if (!raw) return;
+      setViewingPromptParams(JSON.parse(raw) as TestCreationParams);
+      setViewingPromptTest(test);
+    } catch {
+      // ignore
+    }
+  }
 
   async function commitRename(nextTitle: string) {
     if (!renamingTest) return;
@@ -342,32 +375,88 @@ export default function FolderDetail() {
         )}
       </section>
 
-      {tests.length === 0 ? (
-        <EmptyState
-          icon={<BookOpen />}
-          title="No tests yet"
-          body="Upload notes to generate a practice test for this folder."
-          action={
-            <Link to={`/create-test?folderId=${id}`}>
-              <Button>Create Test</Button>
-            </Link>
-          }
-        />
-      ) : (
-        <section>
-          <div className="section-title">
-            <h2>Practice Tests</h2>
-            <span className="muted small">
-              {tests.length} test{tests.length === 1 ? "" : "s"}
-            </span>
-          </div>
-          <div className="test-list">
-            {tests.map((test) => (
-              <TestRow key={test.id} test={test} onRename={setRenamingTest} onDelete={setDeletingTest} />
-            ))}
-          </div>
-        </section>
-      )}
+      {(() => {
+        const failedTests = tests.filter((t) => t.generation_status === "failed");
+        const activeTests = tests.filter((t) => t.generation_status !== "failed");
+        const hasDrafts = failedTests.length > 0 || formDraft !== null;
+        return (
+          <>
+            {activeTests.length === 0 && failedTests.length === 0 ? (
+              <EmptyState
+                icon={<BookOpen />}
+                title="No tests yet"
+                body="Upload notes to generate a practice test for this folder."
+                action={
+                  <Link to={`/create-test?folderId=${id}`}>
+                    <Button>Create Test</Button>
+                  </Link>
+                }
+              />
+            ) : activeTests.length > 0 ? (
+              <section>
+                <div className="section-title">
+                  <h2>Practice Tests</h2>
+                  <span className="muted small">
+                    {activeTests.length} test{activeTests.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <div className="test-list">
+                  {activeTests.map((test) => (
+                    <TestRow key={test.id} test={test} onRename={setRenamingTest} onDelete={setDeletingTest} onViewPrompt={openPromptViewer} />
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {hasDrafts && (
+              <section className="draft-section">
+                <div className="section-title">
+                  <h2>Drafts</h2>
+                  <span className="muted small">
+                    {failedTests.length + (formDraft ? 1 : 0)} item{failedTests.length + (formDraft ? 1 : 0) === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <div className="draft-list">
+                  {failedTests.map((test) => (
+                    <div key={test.id} className="draft-card card">
+                      <div className="draft-card-info">
+                        <span className="draft-card-title">{test.title}</span>
+                        <span className="muted small draft-card-status">Generation failed</span>
+                      </div>
+                      <div className="draft-card-actions">
+                        <Link to={`/create-test?folderId=${id}&regenerateTestId=${test.id}`}>
+                          <Button variant="secondary" icon={<RotateCcw size={14} />}>Regenerate</Button>
+                        </Link>
+                        <button aria-label={`Delete ${test.title}`} onClick={() => setDeletingTest(test)} type="button">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {formDraft && (
+                    <div className="draft-card card">
+                      <div className="draft-card-info">
+                        <span className="draft-card-title">{formDraft.title || "Untitled draft"}</span>
+                        <span className="muted small draft-card-status">
+                          Unsaved form · {formatDate(formDraft.savedAt)}
+                        </span>
+                      </div>
+                      <div className="draft-card-actions">
+                        <Link to={`/create-test?folderId=${id}`}>
+                          <Button variant="secondary" icon={<Edit3 size={14} />}>Continue</Button>
+                        </Link>
+                        <button aria-label="Clear draft" onClick={clearFormDraft} type="button">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+          </>
+        );
+      })()}
 
       <div className="folder-detail-footer">
         <FolderOpen size={18} style={{ color: folder?.color ?? "var(--green-dark)" }} />
@@ -398,6 +487,13 @@ export default function FolderDetail() {
           onCancel={() => setDeletingTest(null)}
         />
       ) : null}
+      {viewingPromptTest && viewingPromptParams ? (
+        <PromptModal
+          test={viewingPromptTest}
+          params={viewingPromptParams}
+          onClose={() => { setViewingPromptTest(null); setViewingPromptParams(null); }}
+        />
+      ) : null}
     </>
   );
 
@@ -420,13 +516,16 @@ function TestRow({
   test,
   onRename,
   onDelete,
+  onViewPrompt,
 }: {
   test: TestSummary;
   onRename: (test: TestSummary) => void;
   onDelete: (test: TestSummary) => void;
+  onViewPrompt?: (test: TestSummary) => void;
 }) {
   const [showAttempts, setShowAttempts] = useState(false);
   const [attempts, setAttempts] = useState<AttemptSummary[]>([]);
+  const hasPrompt = !!localStorage.getItem(`nosey_test_params_${test.id}`);
 
   async function loadAttempts() {
     if (showAttempts) { setShowAttempts(false); return; }
@@ -482,6 +581,16 @@ function TestRow({
             <History size={17} />
           </button>
         ) : null}
+        {!isGenerating && !isFailed && hasPrompt && onViewPrompt ? (
+          <button
+            aria-label="View creation prompt"
+            onClick={() => onViewPrompt(test)}
+            title="View creation prompt"
+            type="button"
+          >
+            <ScrollText size={17} />
+          </button>
+        ) : null}
         {!isGenerating && (
           <button aria-label={`Rename ${test.title}`} onClick={() => onRename(test)} type="button">
             <Edit3 size={17} />
@@ -502,5 +611,96 @@ function TestRow({
         </div>
       ) : null}
     </Card>
+  );
+}
+
+const TEST_TYPE_LABELS: Record<string, string> = {
+  MCQ_only: "Multiple choice",
+  FRQ_only: "Free response",
+  mixed: "Mixed",
+  Extreme: "Extreme MCQ",
+};
+
+function PromptModal({
+  test,
+  params,
+  onClose,
+}: {
+  test: TestSummary;
+  params: TestCreationParams;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const mode = params.isCodingMode
+    ? `Coding (${params.codingLanguage})`
+    : params.isMathMode
+      ? "Math"
+      : "Standard";
+
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <div className="prompt-modal modal-card" role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="prompt-modal-header">
+          <div>
+            <h2>Creation prompt</h2>
+            <p className="muted small">{test.title}</p>
+          </div>
+          <button className="prompt-modal-close" onClick={onClose} type="button" aria-label="Close">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="prompt-modal-body">
+          <div className="prompt-modal-grid">
+            <div className="prompt-modal-field">
+              <span className="prompt-modal-label">Test type</span>
+              <span className="prompt-modal-value">{TEST_TYPE_LABELS[params.testType] ?? params.testType}</span>
+            </div>
+            <div className="prompt-modal-field">
+              <span className="prompt-modal-label">Mode</span>
+              <span className="prompt-modal-value">{mode}</span>
+            </div>
+            {params.advancedMode && (
+              <>
+                <div className="prompt-modal-field">
+                  <span className="prompt-modal-label">Difficulty</span>
+                  <span className="prompt-modal-value" style={{ textTransform: "capitalize" }}>{params.difficulty}</span>
+                </div>
+                <div className="prompt-modal-field">
+                  <span className="prompt-modal-label">Questions</span>
+                  <span className="prompt-modal-value">
+                    {params.testType !== "FRQ_only" ? `${params.countMcq} MCQ` : ""}
+                    {params.testType === "mixed" ? " · " : ""}
+                    {params.testType !== "MCQ_only" && params.testType !== "Extreme" ? `${params.countFrq} FRQ` : ""}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+          {params.topicFocus && (
+            <div className="prompt-modal-section">
+              <span className="prompt-modal-label">Topic focus</span>
+              <p className="prompt-modal-text">{params.topicFocus}</p>
+            </div>
+          )}
+          {params.customInstructions && (
+            <div className="prompt-modal-section">
+              <span className="prompt-modal-label">Custom instructions</span>
+              <p className="prompt-modal-text">{params.customInstructions}</p>
+            </div>
+          )}
+          {!params.topicFocus && !params.customInstructions && (
+            <p className="muted small" style={{ marginTop: 8 }}>No custom instructions or topic focus were set for this test.</p>
+          )}
+          <p className="muted small prompt-modal-date">Created {formatDate(params.savedAt)}</p>
+        </div>
+      </div>
+    </div>
   );
 }
