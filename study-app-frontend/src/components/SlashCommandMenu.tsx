@@ -10,11 +10,11 @@ export type CommandOption = {
 
 type Props = {
   commands: CommandOption[];
-  activeIndex: number;
+  activeIndex?: number;
   onSelect: (command: CommandOption) => void;
 };
 
-export function SlashCommandMenu({ commands, activeIndex, onSelect }: Props) {
+export function SlashCommandMenu({ commands, activeIndex = 0, onSelect }: Props) {
   if (commands.length === 0) return null;
 
   return (

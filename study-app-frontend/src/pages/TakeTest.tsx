@@ -192,6 +192,9 @@ export default function TakeTest() {
     try {
       const result = await submitAttempt(test.id, submittedAnswers);
       sessionStorage.setItem(`nosey_attempt_${result.attempt_id}`, JSON.stringify(result));
+      const completedKey = "nosey_completed_test_ids";
+      const existing = JSON.parse(localStorage.getItem(completedKey) ?? "[]") as number[];
+      localStorage.setItem(completedKey, JSON.stringify([...new Set([...existing, test.id])]));
       navigate(`/results/${result.attempt_id}`);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to submit this test.");
