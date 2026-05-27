@@ -52,7 +52,8 @@ import {
   fetchLeetCodeProblem,
   gradeLeetCodeSubmission,
 } from "../lib/api";
-import { runPythonLeetCode, type RunnerResult } from "../lib/pyodideRunner";
+import { runPythonLeetCode, traceLeetCodeExecution, type RunnerResult, type TraceResult } from "../lib/pyodideRunner";
+import { ExecutionVisualizer } from "../components/ExecutionVisualizer";
 import type { LeetCodeProblemData } from "../lib/types";
 import { useSettings } from "../lib/useSettings";
 
@@ -573,47 +574,6 @@ function isRunnable(problemData?: LeetCodeProblemData) {
   return snippet.includes("class Solution") && problemData?.examples.length;
 }
 
-function buildPythonTutorUrl(code: string, inputText: string, snippet: string): string {
-  if (!code.trim() || !snippet) return '';
-
-  const methodMatch = snippet.match(/def\s+(\w+)\s*\(self/);
-  const methodName = methodMatch?.[1];
-  if (!methodName) return '';
-
-  const sigMatch = snippet.match(/def\s+\w+\s*\(self(?:,\s*([^)]+))?\s*\)/);
-  const rawParams = sigMatch?.[1] ?? '';
-  const paramNames = rawParams
-    .split(',')
-    .map((p) => p.trim().split(':')[0].trim().split('=')[0].trim())
-    .filter(Boolean);
-
-  const preamble = [
-    'from typing import List, Optional, Dict, Tuple, Set',
-    '',
-    'class TreeNode:',
-    '    def __init__(self, val=0, left=None, right=None):',
-    '        self.val = val',
-    '        self.left = left',
-    '        self.right = right',
-    '',
-    'class ListNode:',
-    '    def __init__(self, val=0, next=None):',
-    '        self.val = val',
-    '        self.next = next',
-    '',
-  ].join('\n');
-
-  const fullCode = [
-    preamble + code.trimEnd(),
-    '',
-    '# --- test case ---',
-    inputText.trim(),
-    `result = Solution().${methodName}(${paramNames.join(', ')})`,
-    'print(result)',
-  ].join('\n');
-
-  return `https://pythontutor.com/render.html#code=${encodeURIComponent(fullCode)}&cumulative=false&curInstr=0&heapPrimitives=nestedPointerArrs&mode=display&origin=opt-frontend.js&py=3&rawInputLstJSON=%5B%5D&textReferences=false`;
-}
 
 export default function LeetCodeMode() {
   const { generationProvider } = useSettings();
@@ -635,6 +595,8 @@ export default function LeetCodeMode() {
   const [timeoutModalOpen, setTimeoutModalOpen] = useState(false);
   const [timeoutModalMessage, setTimeoutModalMessage] = useState<string | null>(null);
   const [solutionOpen, setSolutionOpen] = useState(false);
+  const [visualizerTrace, setVisualizerTrace] = useState<TraceResult | null>(null);
+  const [visualizerLoading, setVisualizerLoading] = useState<string | null>(null);
   const [kojoOpen, setKojoOpen] = useState(false);
   const [kojoInput, setKojoInput] = useState("");
   const [kojoResponse, setKojoResponse] = useState<string | null>(null);
@@ -1152,6 +1114,17 @@ export default function LeetCodeMode() {
     setCustomCases((prev) => ({ ...prev, [currentProblem.slug]: next }));
   }
 
+  async function handleVisualize(inputText: string) {
+    if (!currentProblem || !currentCode.trim() || visualizerLoading) return;
+    setVisualizerLoading(inputText);
+    try {
+      const trace = await traceLeetCodeExecution(currentCode, inputText);
+      setVisualizerTrace(trace);
+    } finally {
+      setVisualizerLoading(null);
+    }
+  }
+
   async function handleRunCode() {
     if (!currentProblem || !currentProblemData || !isRunnable(currentProblemData)) return;
     const problemAtRun = currentProblem;
@@ -1422,17 +1395,17 @@ export default function LeetCodeMode() {
                 <div key={example.index} className="lc-test-card">
                   <div className="lc-test-card-top">
                     <strong>Official {example.index}</strong>
-                    {currentCode.trim() && currentProblemData?.python_snippet ? (
-                      <a
-                        href={buildPythonTutorUrl(currentCode, example.input_text, currentProblemData.python_snippet)}
-                        target="_blank"
-                        rel="noreferrer"
+                    {currentCode.trim() && runnable ? (
+                      <button
+                        type="button"
                         className="lc-visualize-btn"
-                        title="Step through this test case in Python Tutor"
+                        onClick={() => handleVisualize(example.input_text)}
+                        disabled={visualizerLoading === example.input_text}
+                        title="Step through this test case"
                       >
-                        <Eye size={12} />
+                        {visualizerLoading === example.input_text ? <Loader2 size={12} className="spin" /> : <Eye size={12} />}
                         Visualize
-                      </a>
+                      </button>
                     ) : null}
                   </div>
                   <label>
@@ -1451,17 +1424,17 @@ export default function LeetCodeMode() {
                   <div className="lc-test-card-top">
                     <strong>Custom {index + 1}</strong>
                     <div className="lc-test-card-actions">
-                      {currentCode.trim() && currentProblemData?.python_snippet && testCase.inputText.trim() ? (
-                        <a
-                          href={buildPythonTutorUrl(currentCode, testCase.inputText, currentProblemData.python_snippet)}
-                          target="_blank"
-                          rel="noreferrer"
+                      {currentCode.trim() && runnable && testCase.inputText.trim() ? (
+                        <button
+                          type="button"
                           className="lc-visualize-btn"
-                          title="Step through this test case in Python Tutor"
+                          onClick={() => handleVisualize(testCase.inputText)}
+                          disabled={visualizerLoading === testCase.inputText}
+                          title="Step through this test case"
                         >
-                          <Eye size={12} />
+                          {visualizerLoading === testCase.inputText ? <Loader2 size={12} className="spin" /> : <Eye size={12} />}
                           Visualize
-                        </a>
+                        </button>
                       ) : null}
                       <button type="button" className="lc-inline-icon-btn" onClick={() => removeCustomCase(testCase.id)} aria-label="Remove custom test case">
                         <X size={14} />
@@ -1673,6 +1646,14 @@ export default function LeetCodeMode() {
             </div>
           </div>
         </>
+      ) : null}
+
+      {visualizerTrace ? (
+        <ExecutionVisualizer
+          code={currentCode}
+          trace={visualizerTrace}
+          onClose={() => setVisualizerTrace(null)}
+        />
       ) : null}
 
       {timerPickerOpen ? (
