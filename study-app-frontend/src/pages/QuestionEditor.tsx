@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ConfirmModal } from "../components/ConfirmModal";
 import {
   addQuestion,
   deleteQuestion,
@@ -39,6 +40,7 @@ function MCQCard({
   );
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function setOptionText(i: number, value: string) {
@@ -66,7 +68,6 @@ function MCQCard({
   }
 
   async function handleDelete() {
-    if (!confirm("Delete this question?")) return;
     setDeleting(true);
     try {
       await deleteQuestion(testId, question.id);
@@ -79,11 +80,21 @@ function MCQCard({
 
   return (
     <Card className="form-panel" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {confirmDelete ? (
+        <ConfirmModal
+          title="Delete Question"
+          message="Delete this question? This cannot be undone."
+          confirmLabel="Delete"
+          danger
+          onConfirm={() => { setConfirmDelete(false); void handleDelete(); }}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      ) : null}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span className="eyebrow">MCQ</span>
         <button
           type="button"
-          onClick={handleDelete}
+          onClick={() => setConfirmDelete(true)}
           disabled={deleting}
           style={{
             background: "none",
@@ -160,6 +171,7 @@ function FRQCard({
   const [answer, setAnswer] = useState(question.expected_answer ?? "");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSave() {
@@ -179,7 +191,6 @@ function FRQCard({
   }
 
   async function handleDelete() {
-    if (!confirm("Delete this question?")) return;
     setDeleting(true);
     try {
       await deleteQuestion(testId, question.id);
@@ -192,11 +203,21 @@ function FRQCard({
 
   return (
     <Card className="form-panel" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {confirmDelete ? (
+        <ConfirmModal
+          title="Delete Question"
+          message="Delete this question? This cannot be undone."
+          confirmLabel="Delete"
+          danger
+          onConfirm={() => { setConfirmDelete(false); void handleDelete(); }}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      ) : null}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span className="eyebrow">FRQ</span>
         <button
           type="button"
-          onClick={handleDelete}
+          onClick={() => setConfirmDelete(true)}
           disabled={deleting}
           style={{
             background: "none",

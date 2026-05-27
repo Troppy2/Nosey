@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -54,3 +54,23 @@ class LeetCodeGradeRequest(BaseModel):
 class LeetCodeGradeResponse(BaseModel):
     feedback: str
     flagged_uncertain: bool = False
+
+
+# ── LeetCode sync (progress / activity / workspace) ──────────────────────────
+
+class LCProgressResponse(BaseModel):
+    progress: dict[str, bool]
+    activity_dates: list[str]
+
+
+class LCProgressSyncRequest(BaseModel):
+    progress: dict[str, bool] = Field(default_factory=dict)
+    activity_dates: list[str] = Field(default_factory=list)
+
+
+class LCWorkspaceResponse(BaseModel):
+    workspace: Optional[Any] = None
+
+
+class LCWorkspaceSyncRequest(BaseModel):
+    workspace: Any = Field(...)

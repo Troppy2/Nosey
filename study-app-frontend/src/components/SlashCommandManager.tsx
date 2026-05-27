@@ -2,6 +2,7 @@ import { Check, Edit3, Pin, Plus, Search, Trash2, X } from "lucide-react";
 import type { FormEvent } from "react";
 import { useMemo, useState } from "react";
 import { Button } from "./Button";
+import { ConfirmModal } from "./ConfirmModal";
 import { TextArea, TextInput } from "./Field";
 import {
   createSlashCommand,
@@ -49,6 +50,7 @@ export default function SlashCommandManager({ commands, loading = false, onChang
   const [editingId, setEditingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<SlashCommand | null>(null);
 
   const visibleCommands = useMemo(() => {
     const needle = query.trim().toLowerCase().replace(/^\//, "");
@@ -229,7 +231,7 @@ export default function SlashCommandManager({ commands, loading = false, onChang
                 <button type="button" className="slash-action-btn action-edit" onClick={() => editCommand(command)} aria-label="Edit command" title="Edit">
                   <Edit3 size={16} />
                 </button>
-                <button type="button" className="slash-action-btn action-delete" onClick={() => removeCommand(command)} aria-label="Delete command" title="Delete">
+                <button type="button" className="slash-action-btn action-delete" onClick={() => setConfirmDelete(command)} aria-label="Delete command" title="Delete">
                   <Trash2 size={16} />
                 </button>
               </div>
@@ -237,6 +239,17 @@ export default function SlashCommandManager({ commands, loading = false, onChang
           ))
         )}
       </div>
+
+      {confirmDelete ? (
+        <ConfirmModal
+          title="Delete Command"
+          message={<>Delete <strong>{confirmDelete.label}</strong>? This cannot be undone.</>}
+          confirmLabel="Delete"
+          danger
+          onConfirm={() => { void removeCommand(confirmDelete); setConfirmDelete(null); }}
+          onCancel={() => setConfirmDelete(null)}
+        />
+      ) : null}
     </section>
   );
 }

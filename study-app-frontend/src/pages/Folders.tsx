@@ -3,6 +3,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
 import { TextInput } from "../components/Field";
 import { createFolder, deleteFolder, fetchFolders, updateFolder } from "../lib/api";
@@ -48,29 +49,35 @@ export default function Folders() {
     setFolderAction({ type: "delete", folder, draftName: folder.name });
   }
 
-  async function handleActionSubmit(event: FormEvent) {
+  async function handleRenameSubmit(event: FormEvent) {
     event.preventDefault();
     if (!folderAction) return;
-
+    const nextName = folderAction.draftName.trim();
+    if (!nextName) return;
     try {
-      if (folderAction.type === "rename") {
-        const nextName = folderAction.draftName.trim();
-        if (!nextName) return;
-
-        const updated = await updateFolder(folderAction.folder.id, {
-          name: nextName,
-          subject: folderAction.folder.subject ?? null,
-          description: folderAction.folder.description ?? null,
-        });
-        setFolders((current) => current.map((item) => (item.id === folderAction.folder.id ? updated : item)));
-      } else {
-        await deleteFolder(folderAction.folder.id);
-        setFolders((current) => current.filter((item) => item.id !== folderAction.folder.id));
-      }
+      const updated = await updateFolder(folderAction.folder.id, {
+        name: nextName,
+        subject: folderAction.folder.subject ?? null,
+        description: folderAction.folder.description ?? null,
+      });
+      setFolders((current) => current.map((item) => (item.id === folderAction.folder.id ? updated : item)));
       setError(null);
       setFolderAction(null);
     } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : "Unable to update that folder.");
+      setError(actionError instanceof Error ? actionError.message : "Unable to rename that folder.");
+    }
+  }
+
+  async function commitFolderDelete() {
+    if (!folderAction) return;
+    try {
+      await deleteFolder(folderAction.folder.id);
+      setFolders((current) => current.filter((item) => item.id !== folderAction.folder.id));
+      setError(null);
+      setFolderAction(null);
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "Unable to delete that folder.");
+      setFolderAction(null);
     }
   }
 
@@ -144,36 +151,37 @@ export default function Folders() {
         </div>
       ) : null}
 
-      {folderAction ? (
+      {folderAction?.type === "rename" ? (
         <div className="modal-backdrop" onMouseDown={() => setFolderAction(null)}>
-          <form className="modal-card" onMouseDown={(event) => event.stopPropagation()} onSubmit={handleActionSubmit}>
-            <h2>{folderAction.type === "rename" ? "Rename Folder" : "Delete Folder"}</h2>
-            {folderAction.type === "rename" ? (
-              <TextInput
-                label="Name"
-                value={folderAction.draftName}
-                onChange={(event) =>
-                  setFolderAction((current) =>
-                    current ? { ...current, draftName: event.target.value } : current,
-                  )
-                }
-                placeholder="Discrete Structures"
-              />
-            ) : (
-              <p className="muted">
-                Delete <strong>{folderAction.folder.name}</strong>? This cannot be undone.
-              </p>
-            )}
+          <form className="modal-card" onMouseDown={(event) => event.stopPropagation()} onSubmit={handleRenameSubmit}>
+            <h2>Rename Folder</h2>
+            <TextInput
+              label="Name"
+              value={folderAction.draftName}
+              onChange={(event) =>
+                setFolderAction((current) =>
+                  current ? { ...current, draftName: event.target.value } : current,
+                )
+              }
+              placeholder="Discrete Structures"
+            />
             <div className="button-row">
-              <Button variant="secondary" onClick={() => setFolderAction(null)}>
-                Cancel
-              </Button>
-              <Button type="submit" variant={folderAction.type === "delete" ? "danger" : "primary"} disabled={folderAction.type === "rename" && !folderAction.draftName.trim()}>
-                {folderAction.type === "rename" ? "Save" : "Delete"}
-              </Button>
+              <Button variant="secondary" onClick={() => setFolderAction(null)}>Cancel</Button>
+              <Button type="submit" disabled={!folderAction.draftName.trim()}>Save</Button>
             </div>
           </form>
         </div>
+      ) : null}
+
+      {folderAction?.type === "delete" ? (
+        <ConfirmModal
+          title="Delete Folder"
+          message={<>Delete <strong>{folderAction.folder.name}</strong>? This cannot be undone.</>}
+          confirmLabel="Delete"
+          danger
+          onConfirm={() => void commitFolderDelete()}
+          onCancel={() => setFolderAction(null)}
+        />
       ) : null}
     </div>
   );

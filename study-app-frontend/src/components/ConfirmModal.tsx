@@ -1,9 +1,9 @@
-import { X } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { Button } from "./Button";
 
 type ConfirmModalProps = {
   title: string;
-  message: string;
+  message: React.ReactNode;
   confirmLabel?: string;
   danger?: boolean;
   onConfirm: () => void;
@@ -27,28 +27,13 @@ export function ConfirmModal({
   }, [onCancel]);
 
   return (
-    <div className="modal-backdrop" onClick={onCancel}>
-      <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3>{title}</h3>
-          <button type="button" className="modal-close" onClick={onCancel} aria-label="Close">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="modal-body">
-          <p className="muted">{message}</p>
-        </div>
-        <div className="modal-footer">
-          <button type="button" className="modal-btn modal-btn--secondary" onClick={onCancel}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className={`modal-btn ${danger ? "modal-btn--danger" : "modal-btn--primary"}`}
-            onClick={onConfirm}
-          >
-            {confirmLabel}
-          </button>
+    <div className="modal-backdrop" onMouseDown={onCancel}>
+      <div className="modal-card" role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>
+        <h2>{title}</h2>
+        <p className="muted">{message}</p>
+        <div className="button-row">
+          <Button variant="secondary" onClick={onCancel}>Cancel</Button>
+          <Button variant={danger ? "danger" : "primary"} onClick={onConfirm}>{confirmLabel}</Button>
         </div>
       </div>
     </div>
@@ -85,31 +70,20 @@ export function RenameModal({ title, initialValue, onSave, onCancel }: RenameMod
   }
 
   return (
-    <div className="modal-backdrop" onClick={onCancel}>
-      <form className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
-        <div className="modal-header">
-          <h3>{title}</h3>
-          <button type="button" className="modal-close" onClick={onCancel} aria-label="Close">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="modal-body">
-          <input
-            ref={inputRef}
-            type="text"
-            className="modal-input"
-            defaultValue={initialValue}
-            placeholder="Enter a name"
-            maxLength={200}
-          />
-        </div>
-        <div className="modal-footer">
-          <button type="button" className="modal-btn modal-btn--secondary" onClick={onCancel}>
-            Cancel
-          </button>
-          <button type="submit" className="modal-btn modal-btn--primary">
-            Save
-          </button>
+    <div className="modal-backdrop" onMouseDown={onCancel}>
+      <form className="modal-card" role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
+        <h2>{title}</h2>
+        <input
+          ref={inputRef}
+          type="text"
+          className="modal-input"
+          defaultValue={initialValue}
+          placeholder="Enter a name"
+          maxLength={200}
+        />
+        <div className="button-row">
+          <Button variant="secondary" onClick={onCancel}>Cancel</Button>
+          <Button type="submit">Save</Button>
         </div>
       </form>
     </div>

@@ -681,3 +681,36 @@ export async function kojoTestBlueprint(
     body: JSON.stringify(body),
   });
 }
+
+// ── LeetCode sync ─────────────────────────────────────────────────────────────
+
+export type LCProgressData = {
+  progress: Record<string, boolean>;
+  activity_dates: string[];
+};
+
+export async function fetchLCProgress(): Promise<LCProgressData> {
+  return request<LCProgressData>("/leetcode/progress");
+}
+
+export async function syncLCProgress(data: LCProgressData): Promise<void> {
+  await request("/leetcode/progress", {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchLCWorkspace(problemSlug: string): Promise<{ workspace: unknown } | null> {
+  try {
+    return await request<{ workspace: unknown }>(`/leetcode/workspace/${problemSlug}`);
+  } catch {
+    return null;
+  }
+}
+
+export async function syncLCWorkspace(problemSlug: string, workspace: unknown): Promise<void> {
+  await request(`/leetcode/workspace/${problemSlug}`, {
+    method: "PUT",
+    body: JSON.stringify({ workspace }),
+  });
+}

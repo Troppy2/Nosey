@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from src.models.flashcard import Flashcard, FlashcardAttempt
     from src.models.folder import Folder
     from src.models.kojo_conversation import KojoConversation
+    from src.models.lc_sync import LCActivityDate, LCCodeWorkspace, LCProgress
     from src.models.slash_command import SlashCommand
     from src.models.user_attempt import UserAttempt
 
@@ -38,6 +39,15 @@ class User(Base, TimestampMixin):
     )
     slash_commands: Mapped[list[SlashCommand]] = relationship(
         "SlashCommand", back_populates="user", cascade="all, delete-orphan"
+    )
+    lc_progress: Mapped[list[LCProgress]] = relationship(
+        "LCProgress", back_populates="user", cascade="all, delete-orphan"
+    )
+    lc_activity_dates: Mapped[list[LCActivityDate]] = relationship(
+        "LCActivityDate", back_populates="user", cascade="all, delete-orphan"
+    )
+    lc_code_workspaces: Mapped[list[LCCodeWorkspace]] = relationship(
+        "LCCodeWorkspace", back_populates="user", cascade="all, delete-orphan"
     )
 
     @property

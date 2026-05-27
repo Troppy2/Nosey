@@ -1,6 +1,7 @@
 import { AlertCircle, FileText, Loader2, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type FolderFile, type SkippedFile, deleteFolderFile, fetchFolderFiles, uploadFolderFiles } from "../lib/api";
+import { ConfirmModal } from "./ConfirmModal";
 
 const MAX_FILE_SIZE_MB = 10;
 const MAX_TOTAL_SIZE_MB = 100;
@@ -35,6 +36,7 @@ export function FileManager({ folderId, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [skippedFiles, setSkippedFiles] = useState<SkippedFile[]>([]);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<FolderFile | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -239,7 +241,7 @@ export function FileManager({ folderId, onClose }: Props) {
                     className="row-action-btn"
                     aria-label={`Delete ${f.file_name}`}
                     disabled={deletingId === f.id}
-                    onClick={() => handleDelete(f.id)}
+                    onClick={() => setConfirmDelete(f)}
                     style={{ color: "var(--red, #e53e3e)", opacity: deletingId === f.id ? 0.4 : 1 }}
                   >
                     <Trash2 size={15} />
@@ -250,6 +252,17 @@ export function FileManager({ folderId, onClose }: Props) {
           )}
         </div>
       </div>
+
+      {confirmDelete ? (
+        <ConfirmModal
+          title="Delete File"
+          message={<>Delete <strong>{confirmDelete.file_name}</strong>? This cannot be undone.</>}
+          confirmLabel="Delete"
+          danger
+          onConfirm={() => { void handleDelete(confirmDelete.id); setConfirmDelete(null); }}
+          onCancel={() => setConfirmDelete(null)}
+        />
+      ) : null}
     </div>
   );
 }
