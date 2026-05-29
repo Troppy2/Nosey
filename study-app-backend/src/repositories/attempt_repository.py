@@ -54,7 +54,11 @@ class AttemptRepository(BaseRepository[UserAttempt]):
     async def list_for_test(self, user_id: int, test_id: int) -> list[UserAttempt]:
         rows = await self.session.scalars(
             select(UserAttempt)
-            .where(UserAttempt.user_id == user_id, UserAttempt.test_id == test_id)
+            .where(
+                UserAttempt.user_id == user_id,
+                UserAttempt.test_id == test_id,
+                UserAttempt.status == "submitted",
+            )
             .order_by(UserAttempt.attempt_number.desc())
         )
         return list(rows.all())

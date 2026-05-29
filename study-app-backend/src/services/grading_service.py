@@ -51,6 +51,11 @@ class GradingService:
                 raise ValidationException(f"Question {question_id} does not belong to this test")
 
         repo = AttemptRepository(session)
+        # Delete any in-progress draft so it doesn't inflate the attempt number
+        draft = await repo.get_draft(user_id, test_id)
+        if draft is not None:
+            await session.delete(draft)
+            await session.flush()
         attempt_number = await repo.next_attempt_number(user_id, test_id)
         attempt = await repo.create(user_id, test_id, attempt_number)
         notes = "\n\n".join(note.content for note in test.notes)
