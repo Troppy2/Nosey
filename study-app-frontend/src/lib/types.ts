@@ -14,6 +14,7 @@ export type Folder = {
   kojo_allow_artifacts?: boolean;
   kojo_auto_index?: boolean;
   kojo_persona?: string | null;
+  is_archived?: boolean;
 };
 
 export type TestSummary = {
@@ -282,6 +283,10 @@ export type KojoClearResponse = {
 export type KojoRestoreResponse = {
   folder_id: ID;
   restored: boolean;
+};
+
+export type ReviewSummaryResponse = {
+  summary: string;
 };
 
 export type KojoClearedConversation = {

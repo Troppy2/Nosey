@@ -1,5 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { AppShell } from "../components/AppShell";
+import { Sidebar } from "../components/Sidebar";
 import CreateTest from "../pages/CreateTest";
 import Dashboard from "../pages/Dashboard";
 import Flashcards from "../pages/Flashcards";
@@ -34,7 +34,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Landing />} />
-        <Route element={<AppShell />}>
+        <Route element={<Sidebar />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/folders" element={<Folders />} />
           <Route path="/folders/:folderId" element={<FolderDetail />} />

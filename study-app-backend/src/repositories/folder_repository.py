@@ -23,7 +23,7 @@ class FolderRepository(BaseRepository[Folder]):
             select(Folder).where(Folder.id == folder_id, Folder.user_id == user_id)
         )
 
-    async def list_with_counts(self, user_id: int) -> list[tuple[Folder, int, int]]:
+    async def list_with_counts(self, user_id: int, archived: bool = False) -> list[tuple[Folder, int, int]]:
         stmt: Select[tuple[Folder, int, int]] = (
             select(
                 Folder,
@@ -32,7 +32,7 @@ class FolderRepository(BaseRepository[Folder]):
             )
             .outerjoin(Test, Test.folder_id == Folder.id)
             .outerjoin(Flashcard, Flashcard.folder_id == Folder.id)
-            .where(Folder.user_id == user_id)
+            .where(Folder.user_id == user_id, Folder.is_archived == archived)
             .group_by(Folder.id)
             .order_by(Folder.created_at.desc())
         )

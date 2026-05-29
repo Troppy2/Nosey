@@ -95,3 +95,7 @@ class DraftAttemptResponse(BaseModel):
     attempt_number: int
     answers: list[DraftAttemptAnswer]
     exited_at: Optional[datetime] = None
+
+
+class ReviewSummaryResponse(BaseModel):
+    summary: str

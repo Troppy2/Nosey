@@ -7,7 +7,16 @@ from src.utils.exceptions import ResourceNotFoundException
 
 class FolderService:
     async def list_folders(self, user_id: int, session: AsyncSession) -> list[FolderResponse]:
-        rows = await FolderRepository(session).list_with_counts(user_id)
+        rows = await FolderRepository(session).list_with_counts(user_id, archived=False)
+        return [
+            FolderResponse.model_validate(folder).model_copy(
+                update={"test_count": test_count, "flashcard_count": flashcard_count}
+            )
+            for folder, test_count, flashcard_count in rows
+        ]
+
+    async def list_archived_folders(self, user_id: int, session: AsyncSession) -> list[FolderResponse]:
+        rows = await FolderRepository(session).list_with_counts(user_id, archived=True)
         return [
             FolderResponse.model_validate(folder).model_copy(
                 update={"test_count": test_count, "flashcard_count": flashcard_count}
@@ -59,6 +68,8 @@ class FolderService:
             folder.kojo_auto_index = data.kojo_auto_index
         if data.kojo_persona is not None:
             folder.kojo_persona = data.kojo_persona
+        if data.is_archived is not None:
+            folder.is_archived = data.is_archived
         await session.commit()
         await session.refresh(folder)
         return FolderResponse.model_validate(folder)

@@ -1,6 +1,6 @@
-import { BookOpen, Bot, Brain, ChevronDown, ChevronUp, Edit3, Files, FolderOpen, History, Info, Loader2, Plus, RotateCcw, ScrollText, Settings, Trash2, X } from "lucide-react";
+import { Archive, BookOpen, Bot, Brain, ChevronDown, ChevronUp, Edit3, Files, FolderOpen, History, Info, Loader2, Plus, RotateCcw, ScrollText, Settings, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmModal, RenameModal } from "../components/ConfirmModal";
@@ -21,6 +21,7 @@ const PERSONA_DESCRIPTIONS: Record<string, string> = {
 
 export default function FolderDetail() {
   const { folderId } = useParams();
+  const navigate = useNavigate();
   const [folder, setFolder] = useState<Folder | null>(null);
   const [tests, setTests] = useState<TestSummary[]>([]);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
@@ -36,6 +37,9 @@ export default function FolderDetail() {
   const [formDraft, setFormDraft] = useState<TestCreationParams | null>(null);
   const [viewingPromptTest, setViewingPromptTest] = useState<TestSummary | null>(null);
   const [viewingPromptParams, setViewingPromptParams] = useState<TestCreationParams | null>(null);
+  const [archiveConfirmValue, setArchiveConfirmValue] = useState("");
+  const [archiving, setArchiving] = useState(false);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
 
   const id = Number(folderId);
 
@@ -133,6 +137,19 @@ export default function FolderDetail() {
     }
   }
 
+  async function handleArchive() {
+    if (!folder || archiveConfirmValue.toLowerCase() !== "archive") return;
+    setArchiving(true);
+    setArchiveError(null);
+    try {
+      await updateFolder(id, { is_archived: true });
+      navigate("/dashboard");
+    } catch (err) {
+      setArchiveError(err instanceof Error ? err.message : "Unable to archive this folder.");
+      setArchiving(false);
+    }
+  }
+
   async function handleReindex() {
     setReindexing(true);
     setReindexMessage(null);
@@ -197,7 +214,7 @@ export default function FolderDetail() {
             icon={kojoSettingsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
             onClick={() => setKojoSettingsOpen((o) => !o)}
           >
-            Chat Settings
+            Folder Settings
           </Button>
           <Link to={`/flashcards/${id}`}>
             <Button variant="secondary" icon={<Brain size={18} />}>
@@ -320,6 +337,35 @@ export default function FolderDetail() {
                     {PERSONA_DESCRIPTIONS[folder.kojo_persona ?? "balanced"]}
                   </span>
                 </span>
+              </div>
+            </div>
+
+            <div className="folder-archive-row">
+              <div className="folder-kojo-toggle-info">
+                <span className="folder-kojo-toggle-label folder-archive-label">Archive this class</span>
+                <span className="folder-kojo-toggle-desc">
+                  Hides this folder from your dashboard. Restore it from Settings anytime.
+                </span>
+              </div>
+              <div className="folder-archive-action">
+                <input
+                  className="folder-archive-input"
+                  type="text"
+                  placeholder='Type "archive"'
+                  value={archiveConfirmValue}
+                  onChange={(e) => setArchiveConfirmValue(e.target.value)}
+                  disabled={archiving}
+                />
+                <Button
+                  type="button"
+                  variant="danger"
+                  icon={<Archive size={15} />}
+                  onClick={() => void handleArchive()}
+                  disabled={archiving || archiveConfirmValue.toLowerCase() !== "archive"}
+                >
+                  {archiving ? "Archiving…" : "Archive"}
+                </Button>
+                {archiveError ? <span className="folder-archive-error muted small">{archiveError}</span> : null}
               </div>
             </div>
           </div>

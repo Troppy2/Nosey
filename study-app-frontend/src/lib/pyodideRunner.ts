@@ -193,6 +193,10 @@ def serialize_value(value):
 def normalize_expected(text):
     text = text.strip()
     try:
+        return json.loads(text)
+    except Exception:
+        pass
+    try:
         return ast.literal_eval(text)
     except Exception:
         return text

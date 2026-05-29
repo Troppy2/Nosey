@@ -1563,6 +1563,38 @@ Rules:
 
         return await self.call_kojo(reduce_prompt, provider=provider)
 
+    async def generate_review_summary(
+        self,
+        missed_answers: list[dict],
+        provider: Optional[str] = None,
+    ) -> str:
+        items = []
+        for i, item in enumerate(missed_answers, 1):
+            q = item.get("question_text") or f"Question {i}"
+            ua = item.get("user_answer") or "(no answer)"
+            ca = item.get("correct_answer") or ""
+            fb = item.get("feedback") or ""
+            entry = f"**Question {i}:** {q}\n**Your answer:** {ua}"
+            if ca:
+                entry += f"\n**Correct answer:** {ca}"
+            if fb:
+                entry += f"\n**Feedback:** {fb}"
+            items.append(entry)
+
+        items_text = "\n\n".join(items)
+        prompt = (
+            "You are a study coach reviewing a student's missed test answers.\n"
+            "For each missed answer below, write a short study note explaining:\n"
+            "- What the correct answer is and why\n"
+            "- The key concept or fact to remember\n"
+            "- One quick tip for retaining it\n\n"
+            "Use plain markdown. Be concise — one tight paragraph per question. "
+            "Do NOT repeat the question text verbatim. Number each note to match the question.\n\n"
+            f"MISSED ANSWERS:\n{items_text}\n\n"
+            "Study notes:"
+        )
+        return await self.call_kojo(prompt, provider=provider)
+
     async def call_kojo(self, prompt: str, provider: Optional[str] = None) -> str:
         from src.utils.exceptions import LLMException
 
