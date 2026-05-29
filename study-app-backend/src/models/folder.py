@@ -30,6 +30,7 @@ class Folder(Base, TimestampMixin):
     kojo_allow_artifacts: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     kojo_auto_index: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     kojo_persona: Mapped[Optional[str]] = mapped_column(String(32))
+    is_archived: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
 
     user: Mapped[User] = relationship("User", back_populates="folders")
     tests: Mapped[list[Test]] = relationship(

@@ -65,6 +65,13 @@ export default function Flashcards() {
     setSelectedFolderId(folderId ? Number(folderId) : null);
   }, [folderId]);
 
+  // Persist card index so returning to a session resumes at the same card
+  useEffect(() => {
+    if (selectedFolderId != null && index > 0) {
+      localStorage.setItem(`nosey_flashcard_index_${selectedFolderId}`, String(index));
+    }
+  }, [index, selectedFolderId]);
+
   useEffect(() => {
     if (selectedFolderId == null) {
       setCards([]);
@@ -77,7 +84,9 @@ export default function Flashcards() {
 
     fetchFlashcards(selectedFolderId).then((data) => {
       setCards(data);
-      setIndex(0);
+      const saved = localStorage.getItem(`nosey_flashcard_index_${selectedFolderId}`);
+      const savedIndex = saved !== null ? Math.min(Number(saved), data.length - 1) : 0;
+      setIndex(Math.max(savedIndex, 0));
       setStudied(new Set());
       setFlipped(false);
       setStartedAt(Date.now());
@@ -106,6 +115,9 @@ export default function Flashcards() {
     setStudied(new Set());
     setFlipped(false);
     setStartedAt(Date.now());
+    if (selectedFolderId != null) {
+      localStorage.removeItem(`nosey_flashcard_index_${selectedFolderId}`);
+    }
   }
 
   async function handleDeleteAllFlashcards() {

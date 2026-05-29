@@ -31,6 +31,14 @@ async def create_folder(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@router.get("/archived", response_model=list[FolderResponse])
+async def list_archived_folders(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[FolderResponse]:
+    return await FolderService().list_archived_folders(user.id, session)
+
+
 @router.get("/{folder_id}", response_model=FolderResponse)
 async def get_folder(
     folder_id: int,

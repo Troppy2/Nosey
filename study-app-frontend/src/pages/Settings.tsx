@@ -5,6 +5,7 @@ import { Card } from "../components/Card";
 import { CollapsibleSection } from "../components/CollapsibleSection";
 import { SelectInput } from "../components/Field";
 import {
+  fetchArchivedFolders,
   fetchClearedKojoConversations,
   fetchFlashcards,
   fetchSlashCommands,
@@ -15,10 +16,11 @@ import {
   restoreKojoConversation,
   setGoogleSession,
   signOut,
+  unarchiveFolder,
 } from "../lib/api";
 import { useSettings } from "../lib/useSettings";
 import { useEffect, useRef, useState } from "react";
-import type { KojoClearedConversation, SlashCommand } from "../lib/types";
+import type { Folder, KojoClearedConversation, SlashCommand } from "../lib/types";
 import SlashCommandManager from "../components/SlashCommandManager";
 
 const GENERATION_PROVIDER_OPTIONS = [
@@ -42,6 +44,10 @@ export default function Settings() {
   const [loadingCleared, setLoadingCleared] = useState(true);
   const [restoreFolderId, setRestoreFolderId] = useState<number | null>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [archivedFolders, setArchivedFolders] = useState<Folder[]>([]);
+  const [loadingArchived, setLoadingArchived] = useState(true);
+  const [unarchivedFolderId, setUnarchivedFolderId] = useState<number | null>(null);
+  const [unarchiveError, setUnarchiveError] = useState<string | null>(null);
   const [resettingStats, setResettingStats] = useState(false);
   const [statsResetNotice, setStatsResetNotice] = useState<string | null>(null);
   const [slashCommands, setSlashCommands] = useState<SlashCommand[]>([]);
@@ -62,6 +68,26 @@ export default function Settings() {
     const conversations = await fetchClearedKojoConversations();
     setClearedConversations(conversations);
     setLoadingCleared(false);
+  }
+
+  async function loadArchivedFolders() {
+    setLoadingArchived(true);
+    const folders = await fetchArchivedFolders();
+    setArchivedFolders(folders);
+    setLoadingArchived(false);
+  }
+
+  async function handleUnarchive(folderId: number) {
+    setUnarchiveError(null);
+    setUnarchivedFolderId(folderId);
+    try {
+      await unarchiveFolder(folderId);
+      await loadArchivedFolders();
+    } catch (err) {
+      setUnarchiveError(err instanceof Error ? err.message : "Unable to restore this class.");
+    } finally {
+      setUnarchivedFolderId(null);
+    }
   }
 
   useEffect(() => {
@@ -104,6 +130,10 @@ export default function Settings() {
 
   useEffect(() => {
     void loadClearedConversations();
+  }, [user?.id]);
+
+  useEffect(() => {
+    void loadArchivedFolders();
   }, [user?.id]);
 
   useEffect(() => {
@@ -357,6 +387,43 @@ export default function Settings() {
                     disabled={restoreFolderId === conv.folder_id}
                   >
                     {restoreFolderId === conv.folder_id ? "Restoring…" : "Restore"}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CollapsibleSection>
+
+        <CollapsibleSection title="Restore archived classes">
+          <p className="muted small">
+            Classes you've archived are listed here. Restoring one brings it back to your dashboard.
+          </p>
+
+          {unarchiveError ? (
+            <div className="settings-feedback settings-feedback--error">
+              <XCircle size={16} />
+              <span>{unarchiveError}</span>
+            </div>
+          ) : null}
+
+          {loadingArchived ? (
+            <p className="muted small">Loading archived classes…</p>
+          ) : archivedFolders.length === 0 ? (
+            <p className="muted small">No archived classes.</p>
+          ) : (
+            <div className="settings-restore-list">
+              {archivedFolders.map((folder) => (
+                <div className="settings-restore-item" key={folder.id}>
+                  <div>
+                    <p className="settings-restore-folder">{folder.name}</p>
+                    {folder.subject ? <p className="muted small">{folder.subject}</p> : null}
+                  </div>
+                  <Button
+                    variant="secondary"
+                    onClick={() => void handleUnarchive(folder.id)}
+                    disabled={unarchivedFolderId === folder.id}
+                  >
+                    {unarchivedFolderId === folder.id ? "Restoring…" : "Restore"}
                   </Button>
                 </div>
               ))}

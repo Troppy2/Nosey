@@ -11,7 +11,9 @@ import type { Folder } from "../lib/types";
 
 export default function Folders() {
   const [folders, setFolders] = useState<Folder[]>([]);
-  const [view, setView] = useState<"grid" | "list">("grid");
+  const [view, setView] = useState<"grid" | "list">(
+    () => (localStorage.getItem("nosey_folder_view") as "grid" | "list") ?? "grid"
+  );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [folderAction, setFolderAction] = useState<{
     type: "rename" | "delete";
@@ -91,10 +93,10 @@ export default function Folders() {
         </div>
         <div className="toolbar">
           <div className="segmented" aria-label="View mode">
-            <button className={view === "grid" ? "active" : ""} onClick={() => setView("grid")} type="button">
+            <button className={view === "grid" ? "active" : ""} onClick={() => { setView("grid"); localStorage.setItem("nosey_folder_view", "grid"); }} type="button">
               <Grid3X3 size={18} />
             </button>
-            <button className={view === "list" ? "active" : ""} onClick={() => setView("list")} type="button">
+            <button className={view === "list" ? "active" : ""} onClick={() => { setView("list"); localStorage.setItem("nosey_folder_view", "list"); }} type="button">
               <List size={18} />
             </button>
           </div>

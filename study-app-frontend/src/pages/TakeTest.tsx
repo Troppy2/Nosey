@@ -40,6 +40,13 @@ export default function TakeTest() {
       .catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Unable to load this test."));
   }, [numericTestId]);
 
+  // Persist question index so resume lands on the right question
+  useEffect(() => {
+    if (index > 0) {
+      localStorage.setItem(`nosey_test_index_${numericTestId}`, String(index));
+    }
+  }, [index, numericTestId]);
+
   // Arrow keys to navigate test questions
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -142,11 +149,14 @@ export default function TakeTest() {
       setAnswers(JSON.parse(draftAnswers) as Record<number, string>);
       sessionStorage.removeItem(`_draft_answers_${numericTestId}`);
     }
+    const savedIndex = localStorage.getItem(`nosey_test_index_${numericTestId}`);
+    if (savedIndex !== null) setIndex(Number(savedIndex));
     setShowResumeDialog(false);
   }
 
   function handleStartFresh() {
     setAnswers({});
+    localStorage.removeItem(`nosey_test_index_${numericTestId}`);
     setShowResumeDialog(false);
   }
 
@@ -191,6 +201,7 @@ export default function TakeTest() {
     setIsSubmitting(true);
     try {
       const result = await submitAttempt(test.id, submittedAnswers);
+      localStorage.removeItem(`nosey_test_index_${numericTestId}`);
       sessionStorage.setItem(`nosey_attempt_${result.attempt_id}`, JSON.stringify(result));
       const completedKey = "nosey_completed_test_ids";
       const existing = JSON.parse(localStorage.getItem(completedKey) ?? "[]") as number[];

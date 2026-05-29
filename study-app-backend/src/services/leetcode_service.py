@@ -160,6 +160,8 @@ class LeetCodeService:
 
     def _parse_examples(self, content_html: str) -> list[LeetCodeExample]:
         examples: list[LeetCodeExample] = []
+
+        # Old format: <pre>Input: ...\nOutput: ...</pre>
         pre_blocks = re.findall(r"<pre>(.*?)</pre>", content_html, flags=re.DOTALL | re.IGNORECASE)
         for index, raw_block in enumerate(pre_blocks, start=1):
             block_text = self._html_to_text(raw_block)
@@ -176,6 +178,35 @@ class LeetCodeService:
                     explanation_text=explanation_match.group(1).strip() if explanation_match else None,
                 )
             )
+
+        if examples:
+            return examples
+
+        # New format: <div class="example-block"> with <span class="example-io">
+        div_blocks = re.findall(
+            r'<div[^>]+class="example-block"[^>]*>(.*?)</div>',
+            content_html,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+        for index, raw_block in enumerate(div_blocks, start=1):
+            io_spans = re.findall(r'<span[^>]+class="example-io"[^>]*>(.*?)</span>', raw_block, flags=re.DOTALL | re.IGNORECASE)
+            labels = re.findall(r'<strong[^>]*>\s*(Input|Output|Explanation)\s*:?\s*</strong>', raw_block, flags=re.IGNORECASE)
+            if len(io_spans) < 2 or len(labels) < 2:
+                continue
+            label_map: dict[str, str] = {}
+            for label, span in zip(labels, io_spans):
+                label_map[label.lower()] = self._html_to_text(span).strip()
+            if "input" not in label_map or "output" not in label_map:
+                continue
+            examples.append(
+                LeetCodeExample(
+                    index=index,
+                    input_text=label_map["input"],
+                    output_text=label_map["output"],
+                    explanation_text=label_map.get("explanation"),
+                )
+            )
+
         return examples
 
     def _html_to_text(self, html: str) -> str:

@@ -10,11 +10,13 @@ from src.schemas.attempt_schema import (
     AttemptSummary,
     DraftAttemptResponse,
     ResumableTestInfo,
+    ReviewSummaryResponse,
     SaveDraftAttemptRequest,
     SubmitAttemptRequest,
 )
 from src.services.grading_service import GradingService
-from src.utils.exceptions import ResourceNotFoundException, StudyAppException
+from src.services.llm_service import LLMService
+from src.utils.exceptions import LLMException, ResourceNotFoundException, StudyAppException
 
 router = APIRouter(tags=["attempts"])
 
@@ -108,3 +110,36 @@ async def get_attempt_detail(
         return await GradingService().get_attempt_detail(attempt_id, user.id, session)
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/attempts/{attempt_id}/review-summary", response_model=ReviewSummaryResponse)
+async def generate_review_summary(
+    attempt_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> ReviewSummaryResponse:
+    try:
+        detail = await GradingService().get_attempt_detail(attempt_id, user.id, session)
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    missed = [a for a in detail.answers if not a.is_correct]
+    if not missed:
+        return ReviewSummaryResponse(summary="All answers were correct — nothing to review!")
+
+    missed_dicts = [
+        {
+            "question_text": a.question_text,
+            "user_answer": a.user_answer,
+            "correct_answer": a.correct_answer,
+            "feedback": a.feedback,
+        }
+        for a in missed
+    ]
+
+    try:
+        summary = await LLMService().generate_review_summary(missed_dicts)
+    except LLMException as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return ReviewSummaryResponse(summary=summary)

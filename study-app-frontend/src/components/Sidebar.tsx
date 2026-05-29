@@ -13,7 +13,7 @@ const navItems = [
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
-export function AppShell() {
+export function Sidebar() {
   const location = useLocation();
   const [isNavHidden, setIsNavHidden] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);

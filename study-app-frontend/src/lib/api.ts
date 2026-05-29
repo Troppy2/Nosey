@@ -24,6 +24,7 @@ import type {
   QuestionEditable,
   QuestionUpdate,
   ResumableTestInfo,
+  ReviewSummaryResponse,
   SlashCommand,
   SlashCommandInput,
   SubmittedAnswer,
@@ -170,12 +171,24 @@ export async function createFolder(input: Pick<Folder, "name" | "subject" | "des
 
 export async function updateFolder(
   folderId: number,
-  input: Partial<Pick<Folder, "name" | "subject" | "description" | "kojo_sync_default" | "kojo_allow_artifacts" | "kojo_auto_index" | "kojo_persona">>,
+  input: Partial<Pick<Folder, "name" | "subject" | "description" | "kojo_sync_default" | "kojo_allow_artifacts" | "kojo_auto_index" | "kojo_persona" | "is_archived">>,
 ): Promise<Folder> {
   return request<Folder>(`/folders/${folderId}`, {
     method: "PATCH",
     body: JSON.stringify(input),
   });
+}
+
+export async function fetchArchivedFolders(): Promise<Folder[]> {
+  try {
+    return await request<Folder[]>("/folders/archived");
+  } catch {
+    return [];
+  }
+}
+
+export async function unarchiveFolder(folderId: number): Promise<Folder> {
+  return updateFolder(folderId, { is_archived: false });
 }
 
 export async function deleteFolder(folderId: number): Promise<void> {
@@ -510,6 +523,10 @@ export async function fetchClearedKojoConversations(): Promise<KojoClearedConver
 
 export async function fetchAttemptDetail(attemptId: number): Promise<AttemptDetail> {
   return request<AttemptDetail>(`/attempts/${attemptId}`);
+}
+
+export async function fetchReviewSummary(attemptId: number): Promise<ReviewSummaryResponse> {
+  return request<ReviewSummaryResponse>(`/attempts/${attemptId}/review-summary`, { method: "POST" });
 }
 
 export async function fetchLeetCodeProblem(titleSlug: string): Promise<LeetCodeProblemData> {
