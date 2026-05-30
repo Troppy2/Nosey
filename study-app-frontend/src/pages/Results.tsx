@@ -1,4 +1,4 @@
-import { AlertTriangle, Brain, Calculator, CheckCircle2, ChevronDown, RotateCcw, Target, XCircle } from "lucide-react";
+import { AlertTriangle, Brain, Calculator, CheckCircle2, ChevronDown, Loader2, RotateCcw, Sparkles, Target, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -7,7 +7,7 @@ import { EmptyState } from "../components/EmptyState";
 import { SelectInput, TextInput } from "../components/Field";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
-import { createTest, fetchAttemptDetail, fetchFolder } from "../lib/api";
+import { createTest, fetchAttemptDetail, fetchFolder, fetchReviewSummary } from "../lib/api";
 import { scoreTone } from "../lib/format";
 import type { AnswerResult, AttemptDetail } from "../lib/types";
 
@@ -36,6 +36,9 @@ export default function Results() {
   const [targetedDifficulty, setTargetedDifficulty] = useState("mixed");
   const [isCreatingTargeted, setIsCreatingTargeted] = useState(false);
   const [targetedError, setTargetedError] = useState<string | null>(null);
+  const [reviewSummary, setReviewSummary] = useState<string | null>(null);
+  const [loadingReview, setLoadingReview] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadAttempt() {
@@ -105,6 +108,20 @@ export default function Results() {
   const missed = attempt.answers.filter((answer) => !answer.is_correct);
   const hasMath = attempt.answers.some((a) => a.is_math);
 
+  async function handleGenerateReview() {
+    if (!attemptId) return;
+    setLoadingReview(true);
+    setReviewError(null);
+    try {
+      const result = await fetchReviewSummary(Number(attemptId));
+      setReviewSummary(result.summary);
+    } catch (err) {
+      setReviewError(err instanceof Error ? err.message : "Unable to generate study notes.");
+    } finally {
+      setLoadingReview(false);
+    }
+  }
+
   async function handleCreateTargetedTest() {
     if (!attempt?.folder_id) return;
     setIsCreatingTargeted(true);
@@ -168,11 +185,31 @@ export default function Results() {
 
       {missed.length > 0 ? (
         <Card tone="soft" className="focus-card">
-          <AlertTriangle size={22} />
-          <div>
-            <h2>Focus on these next</h2>
-            <p className="muted">Nosey found {missed.length} answer that deserves another pass.</p>
+          <div className="focus-card-header">
+            <AlertTriangle size={22} />
+            <div>
+              <h2>Focus on these next</h2>
+              <p className="muted">Nosey found {missed.length} answer{missed.length === 1 ? "" : "s"} that deserve another pass.</p>
+            </div>
+            {!reviewSummary && (
+              <Button
+                variant="secondary"
+                icon={loadingReview ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} />}
+                onClick={() => void handleGenerateReview()}
+                disabled={loadingReview}
+              >
+                {loadingReview ? "Generating…" : "Study notes"}
+              </Button>
+            )}
           </div>
+          {reviewError ? (
+            <p className="muted small" style={{ color: "var(--red, #e53e3e)", marginTop: 8 }}>{reviewError}</p>
+          ) : null}
+          {reviewSummary ? (
+            <div className="focus-card-summary">
+              <MarkdownContent content={reviewSummary} />
+            </div>
+          ) : null}
         </Card>
       ) : null}
 
