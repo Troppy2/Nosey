@@ -108,7 +108,7 @@ export default function FlashcardsManage() {
     const back = newBack.trim();
     const tempId = -Date.now();
     const now = new Date().toISOString();
-    const optimistic: Flashcard = { id: tempId, folder_id: id, front, back, source: null, difficulty: 0, created_at: now, updated_at: now };
+    const optimistic: Flashcard = { id: tempId, folder_id: id, front, back, source: null, difficulty: 0, created_at: now, updated_at: now, attempt_count: 0, correct_count: 0 };
     setCards((prev) => [optimistic, ...prev]);
     setNewFront("");
     setNewBack("");
