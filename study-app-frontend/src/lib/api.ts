@@ -68,7 +68,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   });
 
   if (!response.ok) {
-    if (response.status === 401 && localStorage.getItem(TOKEN_KEY)) {
+    if (response.status === 401 && token && token !== GUEST_TOKEN) {
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
       window.location.href = "/";
