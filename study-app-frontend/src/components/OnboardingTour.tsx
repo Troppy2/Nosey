@@ -90,17 +90,16 @@ export function OnboardingTour() {
               description:
                 "That covers the essentials. Head over to Create Test to get started , good luck studying!",
               align: "center",
-              customButtons: [
-                {
-                  text: "Replay tour",
-                  side: "left",
-                  className: "tour-replay-btn",
-                  onClick: () => {
-                    isReplayRef.current = true;
-                    driverObj.drive(0);
-                  },
-                },
-              ],
+              onPopoverRender: (popover) => {
+                const btn = document.createElement("button");
+                btn.textContent = "Replay tour";
+                btn.className = "tour-replay-btn";
+                btn.addEventListener("click", () => {
+                  isReplayRef.current = true;
+                  driverObj.drive(0);
+                });
+                popover.footerButtons.prepend(btn);
+              },
             },
           },
         ],
