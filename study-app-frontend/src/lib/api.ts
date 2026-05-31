@@ -148,6 +148,12 @@ export function signOut() {
   localStorage.removeItem(USER_KEY);
 }
 
+export async function deleteAccount(): Promise<void> {
+  await request<void>("/auth/account", { method: "DELETE" });
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+}
+
 export async function fetchFolders(): Promise<Folder[]> {
   try {
     return await request<Folder[]>("/folders");

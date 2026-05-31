@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { CollapsibleSection } from "../components/CollapsibleSection";
+import { ConfirmModal, TypeToConfirmModal } from "../components/ConfirmModal";
 import { SelectInput } from "../components/Field";
 import {
+  deleteAccount,
   fetchArchivedFolders,
   fetchClearedKojoConversations,
   fetchFlashcards,
@@ -52,6 +54,9 @@ export default function Settings() {
   const [statsResetNotice, setStatsResetNotice] = useState<string | null>(null);
   const [slashCommands, setSlashCommands] = useState<SlashCommand[]>([]);
   const [loadingSlashCommands, setLoadingSlashCommands] = useState(true);
+  const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const {
     questionFallbackEnabled,
     setQuestionFallbackEnabled,
@@ -163,6 +168,19 @@ export default function Settings() {
     navigate("/");
   }
 
+  async function handleDeleteAccount() {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteAccount();
+      setUser(null);
+      navigate("/");
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Account deletion failed. Please try again.");
+      setDeleting(false);
+    }
+  }
+
   async function handleResetStats() {
     setResettingStats(true);
     setStatsResetNotice(null);
@@ -261,6 +279,19 @@ export default function Settings() {
             Sign out
           </Button>
         </div>
+
+        {!guest && user ? (
+          <CollapsibleSection title="Delete Account">
+            <p className="muted small">
+              Permanently delete your account and all associated data — classes, tests, flashcards, and chat history. This cannot be undone.
+            </p>
+            <div className="settings-reset-row">
+              <Button type="button" variant="danger" onClick={() => setDeleteStep(1)}>
+                Delete account
+              </Button>
+            </div>
+          </CollapsibleSection>
+        ) : null}
 
         <div className="settings-note">
           <Sparkles size={18} />
@@ -455,6 +486,30 @@ export default function Settings() {
           )}
         </CollapsibleSection>
       </Card>
+
+      {deleteStep === 1 ? (
+        <ConfirmModal
+          title="Delete your account?"
+          message="This will permanently delete your account, all classes, tests, flashcards, and chat history. This action cannot be undone."
+          confirmLabel="Continue"
+          danger
+          onConfirm={() => { setDeleteStep(2); setDeleteError(null); }}
+          onCancel={() => setDeleteStep(0)}
+        />
+      ) : null}
+
+      {deleteStep === 2 ? (
+        <TypeToConfirmModal
+          title="Type to confirm deletion"
+          message='Enter "delete" below to permanently delete your account.'
+          confirmWord="delete"
+          confirmLabel="Delete my account"
+          loading={deleting}
+          error={deleteError}
+          onConfirm={handleDeleteAccount}
+          onCancel={() => { setDeleteStep(0); setDeleteError(null); }}
+        />
+      ) : null}
 
     </div>
   );

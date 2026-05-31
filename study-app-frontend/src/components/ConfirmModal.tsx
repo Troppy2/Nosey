@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "./Button";
 
 type ConfirmModalProps = {
@@ -46,6 +46,70 @@ type RenameModalProps = {
   onSave: (value: string) => void;
   onCancel: () => void;
 };
+
+type TypeToConfirmModalProps = {
+  title: string;
+  message: React.ReactNode;
+  confirmWord?: string;
+  confirmLabel?: string;
+  loading?: boolean;
+  error?: string | null;
+  onConfirm: () => void;
+  onCancel: () => void;
+};
+
+export function TypeToConfirmModal({
+  title,
+  message,
+  confirmWord = "delete",
+  confirmLabel = "Delete",
+  loading = false,
+  error,
+  onConfirm,
+  onCancel,
+}: TypeToConfirmModalProps) {
+  const [value, setValue] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onCancel();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
+  const canConfirm = value === confirmWord && !loading;
+
+  return (
+    <div className="modal-backdrop" onMouseDown={onCancel}>
+      <div className="modal-card" role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>
+        <h2>{title}</h2>
+        <p className="muted">{message}</p>
+        <input
+          ref={inputRef}
+          type="text"
+          className="modal-input"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={`Type "${confirmWord}" to confirm`}
+          autoComplete="off"
+        />
+        {error ? <p className="modal-type-confirm-error">{error}</p> : null}
+        <div className="button-row">
+          <Button variant="secondary" onClick={onCancel} disabled={loading}>Cancel</Button>
+          <Button variant="danger" onClick={onConfirm} disabled={!canConfirm}>
+            {loading ? "Deleting…" : confirmLabel}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function RenameModal({ title, initialValue, onSave, onCancel }: RenameModalProps) {
   const inputRef = useRef<HTMLInputElement>(null);
