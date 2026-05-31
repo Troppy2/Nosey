@@ -14,6 +14,9 @@ class UserRepository(BaseRepository[User]):
     async def get_by_google_id(self, google_id: str) -> Optional[User]:
         return await self.session.scalar(select(User).where(User.google_id == google_id))
 
+    async def delete_user(self, user: User) -> None:
+        await self.session.delete(user)
+
     async def create_or_update(
         self,
         google_id: str,
