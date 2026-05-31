@@ -125,7 +125,7 @@ function MCQCard({
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <span className="field-label">Options — select the correct answer</span>
+        <span className="field-label">Options , select the correct answer</span>
         {options.map((opt, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <input
@@ -342,7 +342,7 @@ function AddQuestionPanel({
 
       {type === "MCQ" ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <span className="field-label">Options — select the correct answer</span>
+          <span className="field-label">Options , select the correct answer</span>
           {options.map((opt, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <input

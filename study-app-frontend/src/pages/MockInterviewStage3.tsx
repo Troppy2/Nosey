@@ -69,7 +69,7 @@ export default function MockInterviewStage3() {
     } catch {
       const errMsg: InterviewChatMessage = {
         role: "interviewer",
-        content: "(Connection error — please try again.)",
+        content: "(Connection error. Please try again.)",
       };
       setMessages([...nextHistory, errMsg]);
     } finally {
@@ -120,7 +120,7 @@ export default function MockInterviewStage3() {
           <div className="mock-interviewer-avatar">BQ</div>
           <div>
             <div className="mock-interviewer-name">{companyLabel} Interviewer</div>
-            <div className="mock-stage-breadcrumb">Stage 3 — Behavioral Interview</div>
+            <div className="mock-stage-breadcrumb">Stage 3 , Behavioral Interview</div>
           </div>
         </div>
         {isDone && (
@@ -202,7 +202,7 @@ export default function MockInterviewStage3() {
           <span className="mock-star-chip mock-star-chip-t">Task</span>
           <span className="mock-star-chip mock-star-chip-a">Action</span>
           <span className="mock-star-chip mock-star-chip-r">Result</span>
-          <span className="mock-star-hint-label" style={{ marginLeft: 4 }}>— Speak it out loud first, then type.</span>
+          <span className="mock-star-hint-label" style={{ marginLeft: 4 }}>, Speak it out loud first, then type.</span>
         </div>
       )}
     </div>

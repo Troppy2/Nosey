@@ -7,7 +7,7 @@ export interface InterviewProblem {
 
 export type CompanyKey = "google" | "meta" | "amazon" | "apple" | "microsoft" | "netflix" | "random";
 
-// Source: github.com/liquidslr/interview-company-wise-problems — sorted by interview frequency
+// Source: github.com/liquidslr/interview-company-wise-problems , sorted by interview frequency
 // Top ~40 problems per company; database-only problems excluded
 
 const GOOGLE: InterviewProblem[] = [
@@ -238,7 +238,7 @@ const NETFLIX: InterviewProblem[] = [
   { slug: "lru-cache", title: "LRU Cache", difficulty: "Medium", topics: ["Hash Table", "Linked List", "Design"] },
 ];
 
-// All LeetCode problems in Nosey's study bank — used for the random pool.
+// All LeetCode problems in Nosey's study bank , used for the random pool.
 // Format per line: slug|title|difficulty|topic1,topic2,...
 const NOSEY_POOL_RAW = `
 two-sum|Two Sum|Easy|Array,Hash Table

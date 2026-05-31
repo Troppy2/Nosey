@@ -7,21 +7,21 @@ import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems"
 const STAGE_OPTIONS = [
   {
     key: "stage1",
-    label: "Stage 1 — Online Assessment",
+    label: "Stage 1 , Online Assessment",
     description: "2–3 LeetCode Medium/Hard problems under timed conditions. No hints.",
     icon: Code2,
     time: "60–90 min",
   },
   {
     key: "stage2",
-    label: "Stage 2 — Technical Interview",
+    label: "Stage 2 , Technical Interview",
     description: "AI interviewer reads a script. DS/Algo questions + 1 live coding challenge.",
     icon: Users,
     time: "45 min",
   },
   {
     key: "stage3",
-    label: "Stage 3 — Behavioral Interview",
+    label: "Stage 3 , Behavioral Interview",
     description: "Company-specific STAR questions. Type your answers; speak them out loud first.",
     icon: MessageSquare,
     time: "30–45 min",

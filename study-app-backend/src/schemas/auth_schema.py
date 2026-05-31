@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
 
 
 class GoogleAuthRequest(BaseModel):
@@ -16,6 +16,11 @@ class UserResponse(BaseModel):
     email: str
     full_name: Optional[str] = None
     profile_picture_url: Optional[str] = None
+
+    @computed_field
+    @property
+    def is_guest(self) -> bool:
+        return self.email.endswith("@nosey.guest")
 
 
 class AuthResponse(BaseModel):

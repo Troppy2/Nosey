@@ -217,6 +217,7 @@ export type AuthUser = {
   email: string;
   full_name?: string | null;
   profile_picture_url?: string | null;
+  is_guest?: boolean;
 };
 
 export type ConversationFile = {

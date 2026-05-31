@@ -285,7 +285,7 @@ export default function KojoMode() {
     fetchFolders()
       .then((items) => {
         setFolders(items);
-        // Start in General mode — user can click a folder to switch
+        // Start in General mode , user can click a folder to switch
       })
       .catch(() => {})
       .finally(() => setLoadingFolders(false));
@@ -500,14 +500,14 @@ export default function KojoMode() {
       setDeletingConvId(null);
 
       if (id === conversationId) {
-        // Deleted the active conversation — switch to next or create fresh
+        // Deleted the active conversation , switch to next or create fresh
         if (remaining.length > 0) {
           setConversationId(remaining[0].id);
           const c = await fetchKojoConversationById(remaining[0].id);
           if (c) setMessages(c.messages);
           fetchConversationFiles(remaining[0].id).then(setSessionFiles);
         } else {
-          // No conversations left — auto-create a fresh one
+          // No conversations left , auto-create a fresh one
           const fresh = isGeneralMode
             ? await createGeneralKojoConversation()
             : await createKojoConversation(folderId!);
@@ -710,7 +710,7 @@ export default function KojoMode() {
                 Kojo
               </span>
               <span className="chat-mode-subtitle">
-                {isGeneralMode ? "General chat" : (selectedFolder?.name ?? "—")}
+                {isGeneralMode ? "General chat" : (selectedFolder?.name ?? "-")}
               </span>
             </div>
           </div>
@@ -753,7 +753,7 @@ export default function KojoMode() {
                   <p className="kojo-empty-title">Hi, I'm Kojo</p>
                   <p className="kojo-empty-sub">
                     {isGeneralMode
-                      ? "Ask me anything — no folder needed. I'll answer from my own knowledge."
+                      ? "Ask me anything , no folder needed. I'll answer from my own knowledge."
                       : <>Ask me anything grounded in <strong>{selectedFolder?.name}</strong>. I can explain, quiz, compare ideas, or help you plan what to study next.</>}
                   </p>
                   <div className="kojo-suggestions">

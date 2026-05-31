@@ -186,7 +186,7 @@ export default function MockInterviewStage1() {
             <Code2 size={11} />
             {companyLabel}
           </div>
-          <span className="mock-stage1-stage-label">Stage 1 — OA</span>
+          <span className="mock-stage1-stage-label">Stage 1 , OA</span>
         </div>
 
         <div className="mock-stage1-question-tabs">
@@ -246,7 +246,7 @@ export default function MockInterviewStage1() {
             <div className="mock-stage1-panel-section" style={{ paddingBottom: 10 }}>
               <div className="mock-stage1-expired-banner">
                 <AlertCircle size={14} />
-                Time expired — submit what you have or move on.
+                Time expired , submit what you have or move on.
               </div>
             </div>
           )}

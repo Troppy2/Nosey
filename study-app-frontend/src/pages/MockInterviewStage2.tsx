@@ -103,7 +103,7 @@ export default function MockInterviewStage2() {
     } catch (e: unknown) {
       const errMsg: InterviewChatMessage = {
         role: "interviewer",
-        content: "(Connection error — please try again.)",
+        content: "(Connection error. Please try again.)",
       };
       setMessages([...nextHistory, errMsg]);
     } finally {
@@ -183,7 +183,7 @@ export default function MockInterviewStage2() {
           <div className="mock-interviewer-avatar">AI</div>
           <div>
             <div className="mock-interviewer-name">{companyLabel} Interviewer</div>
-            <div className="mock-stage-breadcrumb">Stage 2 — Technical Interview</div>
+            <div className="mock-stage-breadcrumb">Stage 2 , Technical Interview</div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -214,7 +214,7 @@ export default function MockInterviewStage2() {
           className="mock-stage2-room-left"
           style={!codingProblem ? { width: "100%", maxWidth: "none" } : undefined}
         >
-          {/* Problem card — visible once coding problem is revealed */}
+          {/* Problem card , visible once coding problem is revealed */}
           {codingProblem && (
             <div className="mock-stage2-problem-card">
               <div className="mock-stage2-problem-header">
@@ -291,7 +291,7 @@ export default function MockInterviewStage2() {
           )}
         </div>
 
-        {/* Right: editor — visible once coding problem is revealed */}
+        {/* Right: editor , visible once coding problem is revealed */}
         {codingProblem && (
           <div className="mock-stage2-room-right">
             <div className="mock-stage2-room-editor-wrap">

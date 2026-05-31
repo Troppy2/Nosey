@@ -7,7 +7,7 @@ import { EmptyState } from "../components/EmptyState";
 import { SelectInput, TextInput } from "../components/Field";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
-import { createTest, fetchAttemptDetail, fetchFolder, fetchReviewSummary } from "../lib/api";
+import { createTest, fetchAttemptDetail, fetchFolder, fetchReviewSummary, isGuestSession } from "../lib/api";
 import { scoreTone } from "../lib/format";
 import type { AnswerResult, AttemptDetail } from "../lib/types";
 
@@ -134,7 +134,7 @@ export default function Results() {
         .join("; ");
       await createTest({
         folderId: attempt.folder_id,
-        title: targetedTitle || `Targeted Practice — ${attempt.test_title}`,
+        title: targetedTitle || `Targeted Practice , ${attempt.test_title}`,
         testType: targetedTestType,
         files: [],
         countMcq: targetedTestType !== "FRQ_only" ? targetedCountMcq : 0,
@@ -179,7 +179,7 @@ export default function Results() {
       {hasMath && (
         <Card className="math-mode-notice">
           <Calculator size={18} />
-          <span>Math mode — tap any question to see the full worked solution and step-by-step breakdown.</span>
+          <span>Math mode , tap any question to see the full worked solution and step-by-step breakdown.</span>
         </Card>
       )}
 
@@ -232,7 +232,7 @@ export default function Results() {
               <Button
                 icon={<Target size={16} />}
                 onClick={() => {
-                  setTargetedTitle(`Targeted Practice — ${attempt.test_title}`);
+                  setTargetedTitle(`Targeted Practice , ${attempt.test_title}`);
                   setShowTargetedModal(true);
                 }}
               >
@@ -362,8 +362,10 @@ export default function Results() {
     </div>
   );
 
+  const guest = isGuestSession();
+
   return (
-    attempt.folder_id ? (
+    attempt.folder_id && !guest ? (
       <SelectionKojoAssistant folderId={attempt.folder_id} folderName={folderName}>
         {content}
       </SelectionKojoAssistant>

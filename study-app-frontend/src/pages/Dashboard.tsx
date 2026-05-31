@@ -5,6 +5,7 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmModal, RenameModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
+import { OnboardingTour } from "../components/OnboardingTour";
 import { deleteTest, fetchFlashcards, fetchFolders, fetchTests, getResumableTests, getStoredUser, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
 import type { Flashcard, Folder, ResumableTestInfo, TestSummary } from "../lib/types";
@@ -259,6 +260,7 @@ export default function Dashboard() {
 
   return (
     <>
+    <OnboardingTour />
     {renamingTest ? (
       <RenameModal
         title="Rename practice test"
@@ -284,7 +286,7 @@ export default function Dashboard() {
           <h1 aria-live="polite">{displayTitle || " "}</h1>
           <p className="muted">Recent tests, active folders, and weak concepts in one place.</p>
         </div>
-        <Link to="/create-test">
+        <Link id="tour-new-test" to="/create-test">
           <Button icon={<Plus size={18} />}>New Test</Button>
         </Link>
       </header>
@@ -297,7 +299,7 @@ export default function Dashboard() {
         </div>
       ) : (
         <>
-          <section className="grid grid-3 stat-grid">
+          <section id="tour-stat-grid" className="grid grid-3 stat-grid">
             {stats.map((stat) => {
               const Icon = stat.icon;
               return (
@@ -367,7 +369,7 @@ export default function Dashboard() {
                 </section>
               )}
 
-              <section>
+              <section id="tour-recent-tests">
                 <div className="section-title">
                   <h2>Recent Tests</h2>
                   <Link className="text-link" to="/create-test">
@@ -413,7 +415,7 @@ export default function Dashboard() {
               </section>
             </div>
 
-            <aside>
+            <aside id="tour-review-cards">
               <div className="section-title">
                 <h2>Review These</h2>
                 <Link className="text-link" to="/flashcards">
