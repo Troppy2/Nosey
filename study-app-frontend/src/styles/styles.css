@@ -9355,3 +9355,206 @@ h3 {
   border-color: rgba(255, 255, 255, 0.98) !important;
 }
 
+/* ═══════════════════════════════════════════════════
+   MOBILE RESPONSIVENESS ADDITIONS
+   Fills gaps in the existing breakpoints.
+   ═══════════════════════════════════════════════════ */
+
+@media (max-width: 760px) {
+  /* Kojo side-panel: expand to full viewport width so it doesn't overflow on phones */
+  .kojo-panel {
+    width: 100vw;
+    border-left: none;
+  }
+
+  /* Flip card: reduce fixed 400px height - too tall for most phone screens */
+  .flip-card {
+    height: 320px;
+  }
+
+  .flip-face {
+    padding: 28px 20px;
+  }
+
+  /* Question wrap: reduce top/side padding on phones */
+  .question-wrap {
+    padding: 24px 14px;
+  }
+
+  /* Review detail: 56px left indent is too wide on narrow screens - reduce to match body padding */
+  .review-detail {
+    padding: 0 16px 16px 16px;
+  }
+
+  /* Score hero: scale down the large percentage number */
+  .score-hero strong {
+    font-size: 3rem;
+  }
+
+  .score-hero {
+    padding: 32px 20px;
+  }
+
+  /* Test progress header: reduce horizontal padding on phones */
+  .test-progress header {
+    padding: 12px 16px;
+  }
+
+  /* Landing/sign-in: reduce card padding on phones */
+  .signin-card {
+    padding: 24px 20px;
+  }
+
+  /* Stat card number: slightly smaller on phones */
+  .stat-card strong {
+    font-size: 1.75rem;
+  }
+
+  /* Toolbar wraps cleanly when stacked */
+  .toolbar {
+    flex-wrap: wrap;
+  }
+
+  /* Option button: reduce min-height on phones for denser layout */
+  .option-button {
+    min-height: 54px;
+  }
+
+  /* Kojo model select: full width when header wraps */
+  .kojo-model-select {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  /* Flip card: even more compact on very small phones (320-375px wide) */
+  .flip-card {
+    height: 260px;
+  }
+
+  /* Flash wrap: tighter padding */
+  .flash-wrap {
+    padding: 24px 14px;
+  }
+
+  /* Score hero: cap the number at 2.5rem on tiny screens */
+  .score-hero strong {
+    font-size: 2.5rem;
+  }
+
+  /* Result stats number: smaller on very small phones */
+  .result-stats strong {
+    font-size: 1.6rem;
+  }
+
+  /* Confidence buttons: reduce min-height */
+  .confidence {
+    min-height: 44px;
+  }
+
+  /* Button: allow wrapping so text doesn't overflow */
+  .button {
+    white-space: normal;
+    text-align: center;
+  }
+
+  /* Question card: minimal padding on tiny screens */
+  .question-card {
+    padding: 16px;
+  }
+
+  /* Modal card: tighter padding */
+  .modal-card {
+    padding: 18px;
+    gap: 14px;
+  }
+
+  /* Kojo panel fullscreen fixes */
+  .kojo-panel--fullscreen .kojo-header {
+    padding: 10px 14px;
+  }
+
+  .kojo-panel--fullscreen .kojo-messages-inner {
+    padding: 16px 14px 12px;
+  }
+
+  .kojo-panel--fullscreen .kojo-input-area {
+    padding: 10px 14px 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Chat mode full-page (KojoMode): hide the icon-only sidebar on very small screens */
+  .chat-mode-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-mode-sidebar {
+    display: none;
+  }
+
+  /* Mock interview stage 1 topbar: wrap and make question tabs scrollable */
+  .mock-stage1-topbar {
+    height: auto;
+    min-height: 52px;
+    padding: 8px 12px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .mock-stage1-question-tabs {
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+    justify-content: flex-start;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mock-stage1-question-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Mock results: stack icon-and-text cards on narrow screens */
+  .mock-overall-card,
+  .mock-rec-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 18px 16px;
+  }
+
+  /* Mock setup hero: reduce title size */
+  .mock-setup-hero {
+    padding: 18px 16px 16px;
+  }
+
+  .mock-setup-hero-title {
+    font-size: 1.35rem;
+  }
+
+  .mock-setup-hero-top {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* Mock stage 2 header: stack on narrow screens */
+  .mock-stage2-header-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  /* LeetCode editor actions: stack into rows on narrow screens */
+  .lc-editor-actions {
+    flex-wrap: wrap;
+  }
+
+  /* LC timer controls: stack preset and input */
+  .lc-timer-controls {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
