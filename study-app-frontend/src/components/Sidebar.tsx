@@ -2,22 +2,24 @@ import { BookOpen, Brain, ChevronLeft, ChevronRight, Code2, FolderOpen, LayoutDa
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { useSettings } from "../lib/useSettings";
+import { isGuestSession } from "../lib/api";
 
 const sidebarStorageKey = "nosey_sidebar_collapsed";
 
 const BASE_NAV_ITEMS = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, beta: false },
-  { to: "/folders", label: "Folders", icon: FolderOpen, beta: false },
-  { to: "/flashcards", label: "Flashcards", icon: Brain, beta: false },
-  { to: "/leetcode", label: "LeetCode mode", icon: Code2, beta: true },
-  { to: "/kojo/chat", label: "Chat", icon: MessageCircle, beta: false },
-  { to: "/settings", label: "Settings", icon: Settings, beta: false },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, beta: false, guestHidden: false, tourId: undefined },
+  { to: "/folders", label: "Folders", icon: FolderOpen, beta: false, guestHidden: false, tourId: "tour-nav-folders" },
+  { to: "/flashcards", label: "Flashcards", icon: Brain, beta: false, guestHidden: false, tourId: undefined },
+  { to: "/leetcode", label: "LeetCode mode", icon: Code2, beta: true, guestHidden: false, tourId: undefined },
+  { to: "/kojo/chat", label: "Chat", icon: MessageCircle, beta: false, guestHidden: true, tourId: "tour-nav-kojo" },
+  { to: "/settings", label: "Settings", icon: Settings, beta: false, guestHidden: false, tourId: undefined },
 ];
 
 export function Sidebar() {
   const location = useLocation();
   const { betaMode } = useSettings();
-  const navItems = BASE_NAV_ITEMS.filter((item) => !item.beta || betaMode);
+  const guest = isGuestSession();
+  const navItems = BASE_NAV_ITEMS.filter((item) => (!item.beta || betaMode) && (!item.guestHidden || !guest));
   const [isNavHidden, setIsNavHidden] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -54,7 +56,7 @@ export function Sidebar() {
 
   useEffect(() => {
     const handleScroll = () => {
-      // On desktop the sidebar is a sticky left column — never hide it.
+      // On desktop the sidebar is a sticky left column , never hide it.
       // On mobile (<760px) the drawer handles visibility; skip scroll-hide there too.
       if (window.innerWidth > 1100 || window.innerWidth <= 760) {
         setIsNavHidden(false);
@@ -83,7 +85,7 @@ export function Sidebar() {
 
   return (
     <div className="shell" data-sidebar-collapsed={isSidebarCollapsed}>
-      {/* Mobile top bar — shown only on phones (<760px) */}
+      {/* Mobile top bar , shown only on phones (<760px) */}
       <div className="mobile-topbar">
         <Link className="brand-lockup brand-link" to="/dashboard" aria-label="Go to dashboard">
           <div className="brand-mark">
@@ -101,7 +103,7 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* Backdrop overlay — closes drawer on tap */}
+      {/* Backdrop overlay , closes drawer on tap */}
       <div
         className="sidebar-backdrop"
         data-visible={isDrawerOpen}
@@ -151,6 +153,7 @@ export function Sidebar() {
             return (
               <NavLink
                 key={item.to}
+                id={item.tourId}
                 className="nav-link"
                 to={item.to}
                 aria-label={item.label}

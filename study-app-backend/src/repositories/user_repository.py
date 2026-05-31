@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+
 from sqlalchemy import select
 
 from src.models.user import User
@@ -13,6 +15,18 @@ class UserRepository(BaseRepository[User]):
 
     async def get_by_google_id(self, google_id: str) -> Optional[User]:
         return await self.session.scalar(select(User).where(User.google_id == google_id))
+
+    async def create_guest_user(self) -> User:
+        guest_id = str(uuid.uuid4())
+        user = User(
+            google_id=f"guest_{guest_id}",
+            email=f"guest_{guest_id}@nosey.guest",
+            full_name="Guest",
+            profile_picture_url=None,
+        )
+        self.session.add(user)
+        await self.session.flush()
+        return user
 
     async def delete_user(self, user: User) -> None:
         await self.session.delete(user)

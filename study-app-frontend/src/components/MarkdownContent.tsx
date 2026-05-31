@@ -20,7 +20,7 @@ function rkx(src: string, display: boolean): string {
 
 interface MathEntry { display: boolean; src: string }
 
-// Use ASCII control chars as delimiters — can't appear in LLM text output.
+// Use ASCII control chars as delimiters , can't appear in LLM text output.
 const PH_RE = /\x00M:(\d+):\x00/g;
 const ph = (id: number) => `\x00M:${id}:\x00`;
 
@@ -35,7 +35,7 @@ function extractMath(raw: string): [string, MathEntry[]] {
   // Protect \$ so it isn't consumed by the $...$ pass
   let out = raw.replace(/\\\$/g, "\x01DS\x01");
 
-  // Block: \[...\]  and  $$...$$  (multi-line safe — [\s\S]*? is non-greedy)
+  // Block: \[...\]  and  $$...$$  (multi-line safe , [\s\S]*? is non-greedy)
   out = out.replace(/\\\[([\s\S]*?)\\\]/g, (_, s) => add(true, s));
   out = out.replace(/\$\$([\s\S]*?)\$\$/g, (_, s) => add(true, s));
 
@@ -52,7 +52,7 @@ function extractMath(raw: string): [string, MathEntry[]] {
 // ── Auto-wrap: undelimited math lines ─────────────────────────────────────────
 // Some LLMs output bare LaTeX without $$ delimiters. Detect lines that are
 // clearly math expressions. Critically: skip lines that look like English prose
-// with LaTeX mixed in — those caused the "Integrateusingthepowerrule" bug.
+// with LaTeX mixed in , those caused the "Integrateusingthepowerrule" bug.
 
 const LATEX_CMD_RE =
   /\\(?:frac|int|sum|prod|sqrt|left|right|partial|nabla|infty|cdot|times|div|pm|mp|alpha|beta|gamma|delta|epsilon|theta|lambda|mu|nu|pi|rho|sigma|tau|phi|omega|hbar|ell|lim|sin|cos|tan|log|ln|exp|det|max|min|sup|inf|leq|geq|neq|approx|equiv|rightarrow|leftarrow|Rightarrow|Leftarrow|cdots|ldots|vec|hat|bar|widehat|overline)\b/;

@@ -8,7 +8,7 @@ import { EmptyState } from "../components/EmptyState";
 import { FileManager } from "../components/FileManager";
 import { KojoChat } from "../components/KojoChat";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
-import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, reindexFolderFiles, updateFolder, updateTest } from "../lib/api";
+import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, isGuestSession, reindexFolderFiles, updateFolder, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
 import type { AttemptSummary, Flashcard, Folder, TestCreationParams, TestSummary } from "../lib/types";
 
@@ -22,6 +22,7 @@ const PERSONA_DESCRIPTIONS: Record<string, string> = {
 export default function FolderDetail() {
   const { folderId } = useParams();
   const navigate = useNavigate();
+  const guest = isGuestSession();
   const [folder, setFolder] = useState<Folder | null>(null);
   const [tests, setTests] = useState<TestSummary[]>([]);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
@@ -133,7 +134,7 @@ export default function FolderDetail() {
       const updated = await updateFolder(id, patch);
       setFolder(updated);
     } catch {
-      // non-critical — silently ignore
+      // non-critical , silently ignore
     }
   }
 
@@ -161,7 +162,7 @@ export default function FolderDetail() {
       } else if (result.reindexed > 0 && result.still_failed === 0) {
         msg = `${result.reindexed} file${result.reindexed === 1 ? "" : "s"} re-indexed successfully.`;
       } else if (result.reindexed > 0) {
-        msg = `${result.reindexed} re-indexed. ${result.still_failed} still failed — re-upload those files.`;
+        msg = `${result.reindexed} re-indexed. ${result.still_failed} still failed , re-upload those files.`;
       } else {
         msg = `${result.still_failed} file${result.still_failed === 1 ? "" : "s"} could not be re-indexed. Re-upload them to fix.`;
       }
@@ -202,13 +203,15 @@ export default function FolderDetail() {
           >
             Manage Files
           </Button>
-          <Button
-            variant="secondary"
-            icon={<Bot size={18} />}
-            onClick={() => setKojoOpen((o) => !o)}
-          >
-            {kojoOpen ? "Close Kojo" : "Ask Kojo"}
-          </Button>
+          {!guest ? (
+            <Button
+              variant="secondary"
+              icon={<Bot size={18} />}
+              onClick={() => setKojoOpen((o) => !o)}
+            >
+              {kojoOpen ? "Close Kojo" : "Ask Kojo"}
+            </Button>
+          ) : null}
           <Button
             variant="secondary"
             icon={kojoSettingsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
@@ -545,9 +548,11 @@ export default function FolderDetail() {
 
   return folder ? (
     <>
-      <SelectionKojoAssistant folderId={id} folderName={folder.name}>
-        {pageContent}
-      </SelectionKojoAssistant>
+      {guest ? pageContent : (
+        <SelectionKojoAssistant folderId={id} folderName={folder.name}>
+          {pageContent}
+        </SelectionKojoAssistant>
+      )}
       {modals}
     </>
   ) : (
@@ -600,7 +605,7 @@ function TestRow({
           <div>
             <h3>{test.title}</h3>
             <p className="muted small" style={{ color: "var(--red, #e53e3e)" }}>
-              Generation failed — delete and try again
+              Generation failed , delete and try again
             </p>
           </div>
         </div>

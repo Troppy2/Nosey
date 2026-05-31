@@ -498,7 +498,7 @@ export default function CreateTest() {
                 <div>
                   <span className="eyebrow" style={{ display: "block", marginBottom: 8 }}>Upload practice test</span>
                   <p className="muted" style={{ marginTop: 0, marginBottom: 10, fontSize: "0.875rem" }}>
-                    Upload an existing practice test — Nosey will extract and recreate the questions. If the folder already has saved files, Nosey can also use those for test generation.
+                    Upload an existing practice test , Nosey will extract and recreate the questions. If the folder already has saved files, Nosey can also use those for test generation.
                   </p>
                   {practiceTestFile ? (
                     <div className="selected-file" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -541,7 +541,7 @@ export default function CreateTest() {
                     style={{ width: 16, height: 16, accentColor: "var(--green-dark)", cursor: "pointer" }}
                   />
                   <span style={{ fontSize: "0.9rem" }}>
-                    <strong>Question editor mode</strong> — review and edit questions before taking the test
+                    <strong>Question editor mode</strong> , review and edit questions before taking the test
                   </span>
                 </label>
               </div>

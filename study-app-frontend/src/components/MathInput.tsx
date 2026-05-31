@@ -99,7 +99,7 @@ export function MathInput({ value, onChange, placeholder }: MathInputProps) {
             className="field-input math-scratchpad-area"
             value={scratchpad}
             onChange={(e) => setScratchpad(e.target.value)}
-            placeholder="Work out your problem here — this isn't submitted…"
+            placeholder="Work out your problem here , this isn't submitted…"
             rows={5}
           />
         )}

@@ -131,7 +131,7 @@ export function FileManager({ folderId, onClose }: Props) {
         </div>
 
         <p className="muted" style={{ marginTop: 0, marginBottom: 16, fontSize: "0.875rem" }}>
-          Upload notes files (PDF, DOCX, TXT, Markdown, PPTX) to this folder — {MAX_FILE_SIZE_MB} MB per file, {MAX_TOTAL_SIZE_MB} MB total.
+          Upload notes files (PDF, DOCX, TXT, Markdown, PPTX) to this folder , {MAX_FILE_SIZE_MB} MB per file, {MAX_TOTAL_SIZE_MB} MB total.
           These files are available when generating tests.
         </p>
 
@@ -195,7 +195,7 @@ export function FileManager({ folderId, onClose }: Props) {
             <ul style={{ margin: "6px 0 0 0", paddingLeft: 18 }}>
               {skippedFiles.map((s) => (
                 <li key={s.file_name}>
-                  <strong>{s.file_name}</strong> — {s.reason}
+                  <strong>{s.file_name}</strong> , {s.reason}
                 </li>
               ))}
             </ul>

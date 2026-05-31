@@ -35,6 +35,19 @@ async def google_auth(
         raise HTTPException(status_code=500, detail="Authentication failed") from exc
 
 
+@router.post("/guest", response_model=AuthResponse)
+async def guest_auth(
+    session: AsyncSession = Depends(get_session),
+) -> AuthResponse:
+    try:
+        user = await UserRepository(session).create_guest_user()
+        await session.commit()
+        return AuthService()._token_response(user)
+    except Exception as exc:
+        logger.exception("Unexpected error during guest auth")
+        raise HTTPException(status_code=500, detail="Guest authentication failed") from exc
+
+
 @router.delete("/account", status_code=204)
 async def delete_account(
     current_user: User = Depends(get_current_user),

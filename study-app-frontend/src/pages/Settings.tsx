@@ -283,7 +283,7 @@ export default function Settings() {
         {!guest && user ? (
           <CollapsibleSection title="Delete Account">
             <p className="muted small">
-              Permanently delete your account and all associated data — classes, tests, flashcards, and chat history. This cannot be undone.
+              Permanently delete your account and all associated data , classes, tests, flashcards, and chat history. This cannot be undone.
             </p>
             <div className="settings-reset-row">
               <Button type="button" variant="danger" onClick={() => setDeleteStep(1)}>
@@ -316,27 +316,47 @@ export default function Settings() {
           </div>
         </CollapsibleSection>
 
-        <CollapsibleSection title="Beta features">
+        <CollapsibleSection title="Onboarding Tour">
           <p className="muted small">
-            Enable experimental features: LeetCode mode and Mock Interview. These are works-in-progress and may have rough edges.
+            Replay the guided tour that highlights key features on the Dashboard.
           </p>
           <div className="settings-reset-row">
-            <button
+            <Button
               type="button"
-              role="switch"
-              className={`settings-toggle-switch${betaMode ? " settings-toggle-switch--on" : ""}`}
-              onClick={() => setBetaMode(!betaMode)}
-              aria-pressed={betaMode}
+              variant="secondary"
+              onClick={() => {
+                localStorage.removeItem("nosey_onboarding_done");
+                navigate("/dashboard");
+              }}
             >
-              <span className="settings-toggle-track">
-                <span className="settings-toggle-thumb" />
-              </span>
-              <span className="settings-toggle-label">
-                {betaMode ? "Beta features on" : "Beta features off"}
-              </span>
-            </button>
+              Replay Tour
+            </Button>
           </div>
         </CollapsibleSection>
+
+        {!guest ? (
+          <CollapsibleSection title="Beta features">
+            <p className="muted small">
+              Enable experimental features: LeetCode mode and Mock Interview. These are works-in-progress and may have rough edges.
+            </p>
+            <div className="settings-reset-row">
+              <button
+                type="button"
+                role="switch"
+                className={`settings-toggle-switch${betaMode ? " settings-toggle-switch--on" : ""}`}
+                onClick={() => setBetaMode(!betaMode)}
+                aria-pressed={betaMode}
+              >
+                <span className="settings-toggle-track">
+                  <span className="settings-toggle-thumb" />
+                </span>
+                <span className="settings-toggle-label">
+                  {betaMode ? "Beta features on" : "Beta features off"}
+                </span>
+              </button>
+            </div>
+          </CollapsibleSection>
+        ) : null}
 
         <CollapsibleSection title="Question Fallback">
           <p className="muted small">

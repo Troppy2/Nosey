@@ -106,7 +106,7 @@ export default function MockInterviewSummary() {
         <div>
           <span className="eyebrow">Interview Complete</span>
           <h1 style={{ marginTop: 6 }}>Loop Debrief</h1>
-          <p className="muted small" style={{ marginTop: 6 }}>{companyLabel} — Full Interview Loop</p>
+          <p className="muted small" style={{ marginTop: 6 }}>{companyLabel} , Full Interview Loop</p>
         </div>
         <Trophy size={26} style={{ color: "var(--green-dark)", flexShrink: 0, marginTop: 4 }} />
       </div>
@@ -123,13 +123,13 @@ export default function MockInterviewSummary() {
       {/* Per-stage verdicts */}
       <div className="mock-summary-stages">
         {result.stage1_verdict && (
-          <StageVerdictChip stage="Stage 1 — Online Assessment" verdict={result.stage1_verdict} />
+          <StageVerdictChip stage="Stage 1 , Online Assessment" verdict={result.stage1_verdict} />
         )}
         {result.stage2_verdict && (
-          <StageVerdictChip stage="Stage 2 — Technical Interview" verdict={result.stage2_verdict} />
+          <StageVerdictChip stage="Stage 2 , Technical Interview" verdict={result.stage2_verdict} />
         )}
         {result.stage3_verdict && (
-          <StageVerdictChip stage="Stage 3 — Behavioral" verdict={result.stage3_verdict} />
+          <StageVerdictChip stage="Stage 3 , Behavioral" verdict={result.stage3_verdict} />
         )}
       </div>
 

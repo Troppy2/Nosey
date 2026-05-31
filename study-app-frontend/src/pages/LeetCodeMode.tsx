@@ -506,7 +506,7 @@ function countStreak(dates: string[]) {
   const dateSet = new Set(dates);
   let count = 0;
   const cursor = new Date();
-  // If today isn't solved yet, count from yesterday — user has until midnight to maintain streak
+  // If today isn't solved yet, count from yesterday , user has until midnight to maintain streak
   if (!dateSet.has(cursor.toLocaleDateString("en-CA"))) {
     cursor.setDate(cursor.getDate() - 1);
   }
@@ -889,7 +889,7 @@ export default function LeetCodeMode() {
           );
           setGradeFeedback(grade.feedback);
         } catch {
-          // grading is best-effort — don't block the run result
+          // grading is best-effort , don't block the run result
         } finally {
           setGradeLoading(false);
         }
@@ -1181,7 +1181,7 @@ export default function LeetCodeMode() {
             className="lc-stat-tile lc-stat-tile--streak"
             data-tooltip={
               activityDates.includes(todayKey())
-                ? "Streak safe — solved today!"
+                ? "Streak safe , solved today!"
                 : `${streakExpiresIn()} left to keep your streak`
             }
           >
@@ -1535,7 +1535,7 @@ export default function LeetCodeMode() {
             {showNextButton && (nextProblemInCategory || suggestedNext) ? (
               <div className="lc-next-problem">
                 <span className="lc-next-problem-eyebrow">
-                  {nextProblemInCategory ? "Up next" : `Continue — ${suggestedNext!.category.label}`}
+                  {nextProblemInCategory ? "Up next" : `Continue , ${suggestedNext!.category.label}`}
                 </span>
                 <button
                   type="button"

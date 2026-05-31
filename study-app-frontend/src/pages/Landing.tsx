@@ -2,7 +2,7 @@ import { ArrowRight, BookOpen, Brain, FileText, LogIn, ShieldCheck } from "lucid
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
-import { setGoogleSession, setGuestSession, googleSignIn } from "../lib/api";
+import { setGoogleSession, guestSignIn, googleSignIn } from "../lib/api";
 import { useEffect, useRef, useState } from "react";
 
 const features = [
@@ -26,6 +26,7 @@ const features = [
 export default function Landing() {
   const navigate = useNavigate();
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const initialized = useRef(false);
 
@@ -103,12 +104,18 @@ export default function Landing() {
               fullWidth
               icon={<ArrowRight size={19} />}
               variant="secondary"
-              onClick={() => {
-                setGuestSession();
-                navigate("/dashboard");
+              disabled={guestLoading}
+              onClick={async () => {
+                setGuestLoading(true);
+                try {
+                  await guestSignIn();
+                  navigate("/dashboard");
+                } catch {
+                  setGuestLoading(false);
+                }
               }}
             >
-              Continue as guest
+              {guestLoading ? "Starting…" : "Continue as guest"}
             </Button>
           </div>
           <div className="trust-note">

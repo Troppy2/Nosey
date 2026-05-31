@@ -93,18 +93,14 @@ export function getStoredUser(): AuthUser | null {
 }
 
 export function isGuestSession() {
-  return localStorage.getItem(TOKEN_KEY) === GUEST_TOKEN;
+  return getStoredUser()?.is_guest === true;
 }
 
-export function setGuestSession(): AuthUser {
-  const user: AuthUser = {
-    id: 1,
-    email: "guest@nosey.local",
-    full_name: "Guest User",
-  };
-  localStorage.setItem(TOKEN_KEY, GUEST_TOKEN);
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
-  return user;
+export async function guestSignIn(): Promise<AuthUser> {
+  const data = await request<{ user_id: number; access_token: string; email: string; user: AuthUser }>("/auth/guest", { method: "POST" });
+  localStorage.setItem(TOKEN_KEY, data.access_token);
+  localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+  return data.user;
 }
 
 export function setGoogleSession() {
