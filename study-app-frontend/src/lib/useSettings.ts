@@ -27,7 +27,7 @@ function writeSetting(key: string, value: string) {
 
 export function useSettings() {
   const [questionFallbackEnabled, setQuestionFallbackEnabledState] = useState(() =>
-    readBooleanSetting(SETTINGS_KEYS.questionFallback, true),
+    readBooleanSetting(SETTINGS_KEYS.questionFallback, false),
   );
   const [generationProvider, setGenerationProviderState] = useState(() =>
     readStringSetting(SETTINGS_KEYS.generationProvider, "auto"),
