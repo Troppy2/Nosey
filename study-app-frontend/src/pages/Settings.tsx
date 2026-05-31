@@ -59,6 +59,8 @@ export default function Settings() {
     setGenerationProvider,
     kojoStrictness,
     setKojoStrictness,
+    betaMode,
+    setBetaMode,
   } = useSettings();
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const initialized = useRef(false);
@@ -280,6 +282,28 @@ export default function Settings() {
               {resettingStats ? "Resetting..." : "Reset Stats"}
             </Button>
             {statsResetNotice ? <span className="muted small">{statsResetNotice}</span> : null}
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection title="Beta features">
+          <p className="muted small">
+            Enable experimental features: LeetCode mode and Mock Interview. These are works-in-progress and may have rough edges.
+          </p>
+          <div className="settings-reset-row">
+            <button
+              type="button"
+              role="switch"
+              className={`settings-toggle-switch${betaMode ? " settings-toggle-switch--on" : ""}`}
+              onClick={() => setBetaMode(!betaMode)}
+              aria-pressed={betaMode}
+            >
+              <span className="settings-toggle-track">
+                <span className="settings-toggle-thumb" />
+              </span>
+              <span className="settings-toggle-label">
+                {betaMode ? "Beta features on" : "Beta features off"}
+              </span>
+            </button>
           </div>
         </CollapsibleSection>
 

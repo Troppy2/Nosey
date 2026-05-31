@@ -7,6 +7,7 @@ import type {
   AuthUser,
   DraftAttemptAnswer,
   DraftAttemptResponse,
+  InterviewChatMessage,
   KojoClearResponse,
   KojoClearedConversation,
   Flashcard,
@@ -19,6 +20,13 @@ import type {
   LeetCodeHintResponse,
   LeetCodeProblemData,
   KojoRestoreResponse,
+  MockInterviewSession,
+  MockInterviewFinishResponse,
+  Stage1GradeResponse,
+  Stage2MessageResponse,
+  Stage2ScriptResponse,
+  Stage3MessageResponse,
+  Stage3ScriptResponse,
   ProviderStatus,
   QuestionCreate,
   QuestionEditable,
@@ -729,5 +737,134 @@ export async function syncLCWorkspace(problemSlug: string, workspace: unknown): 
   await request(`/leetcode/workspace/${problemSlug}`, {
     method: "PUT",
     body: JSON.stringify({ workspace }),
+  });
+}
+
+// ── Mock Interview ────────────────────────────────────────────────────────────
+
+export async function createMockInterviewSession(
+  company: string,
+  stages: string[],
+): Promise<MockInterviewSession> {
+  return request<MockInterviewSession>("/mock-interview", {
+    method: "POST",
+    body: JSON.stringify({ company, stages }),
+  });
+}
+
+export async function getMockInterviewSession(sessionId: number): Promise<MockInterviewSession> {
+  return request<MockInterviewSession>(`/mock-interview/${sessionId}`);
+}
+
+export async function listMockInterviewSessions(): Promise<MockInterviewSession[]> {
+  return request<MockInterviewSession[]>("/mock-interview");
+}
+
+export type Stage1SubmissionItem = {
+  slug: string;
+  title: string;
+  difficulty: string;
+  code: string;
+  time_used_ms: number;
+  test_results: string;
+  all_passed: boolean;
+};
+
+export async function gradeStage1(
+  sessionId: number,
+  submissions: Stage1SubmissionItem[],
+  provider?: string,
+): Promise<Stage1GradeResponse> {
+  return request<Stage1GradeResponse>(`/mock-interview/${sessionId}/stage1/grade`, {
+    method: "POST",
+    body: JSON.stringify({ submissions, provider }),
+  });
+}
+
+export async function generateStage2Script(
+  sessionId: number,
+  provider?: string,
+): Promise<Stage2ScriptResponse> {
+  return request<Stage2ScriptResponse>(`/mock-interview/${sessionId}/stage2/script`, {
+    method: "POST",
+    body: JSON.stringify({ provider }),
+  });
+}
+
+export async function submitStage2(
+  sessionId: number,
+  code: string,
+  provider?: string,
+): Promise<{ feedback: string }> {
+  return request<{ feedback: string }>(`/mock-interview/${sessionId}/stage2/submit`, {
+    method: "POST",
+    body: JSON.stringify({ code, provider }),
+  });
+}
+
+export async function chatStage2(
+  sessionId: number,
+  message: string,
+  history: import("./types").Stage2ChatMessage[],
+  provider?: string,
+): Promise<import("./types").Stage2ChatResponse> {
+  return request(`/mock-interview/${sessionId}/stage2/chat`, {
+    method: "POST",
+    body: JSON.stringify({ message, history, provider }),
+  });
+}
+
+export async function generateStage3Script(
+  sessionId: number,
+  provider?: string,
+): Promise<Stage3ScriptResponse> {
+  return request<Stage3ScriptResponse>(`/mock-interview/${sessionId}/stage3/script`, {
+    method: "POST",
+    body: JSON.stringify({ provider }),
+  });
+}
+
+export async function submitStage3Answers(
+  sessionId: number,
+  answers: string[],
+  provider?: string,
+): Promise<{ feedback: string }> {
+  return request<{ feedback: string }>(`/mock-interview/${sessionId}/stage3/answers`, {
+    method: "POST",
+    body: JSON.stringify({ answers, provider }),
+  });
+}
+
+export async function sendStage2Message(
+  sessionId: number,
+  message: string | null,
+  history: InterviewChatMessage[],
+  provider?: string,
+): Promise<Stage2MessageResponse> {
+  return request<Stage2MessageResponse>(`/mock-interview/${sessionId}/stage2/message`, {
+    method: "POST",
+    body: JSON.stringify({ message, history, provider }),
+  });
+}
+
+export async function sendStage3Message(
+  sessionId: number,
+  message: string | null,
+  history: InterviewChatMessage[],
+  provider?: string,
+): Promise<Stage3MessageResponse> {
+  return request<Stage3MessageResponse>(`/mock-interview/${sessionId}/stage3/message`, {
+    method: "POST",
+    body: JSON.stringify({ message, history, provider }),
+  });
+}
+
+export async function finishMockInterview(
+  sessionId: number,
+  provider?: string,
+): Promise<MockInterviewFinishResponse> {
+  return request<MockInterviewFinishResponse>(`/mock-interview/${sessionId}/finish`, {
+    method: "POST",
+    body: JSON.stringify({ provider }),
   });
 }

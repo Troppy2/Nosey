@@ -360,3 +360,97 @@ export type SlashCommandInput = {
   is_pinned?: boolean;
   position?: number;
 };
+
+// ── Mock Interview ────────────────────────────────────────────────────────────
+
+export type MockInterviewSession = {
+  id: ID;
+  company: string;
+  stages_config: string;
+  status: string;
+  stage1_results?: string | null;
+  stage2_script?: string | null;
+  stage2_submission?: string | null;
+  stage3_script?: string | null;
+  stage3_answers?: string | null;
+  overall_feedback?: string | null;
+};
+
+export type Stage1QuestionResult = {
+  slug: string;
+  title: string;
+  difficulty: string;
+  code: string;
+  time_used_ms: number;
+  verdict: "strong" | "pass" | "borderline" | "needs_work";
+  feedback: string;
+};
+
+export type Stage1GradeResponse = {
+  results: Stage1QuestionResult[];
+};
+
+export type Stage2ScriptLine = {
+  speaker: "interviewer" | "prompt";
+  text: string;
+  is_coding_prompt: boolean;
+};
+
+export type Stage2ScriptResponse = {
+  script_lines: Stage2ScriptLine[];
+  coding_slug?: string | null;
+  coding_title?: string | null;
+  coding_difficulty?: string | null;
+};
+
+export type Stage2ChatMessage = {
+  role: "user" | "interviewer";
+  text: string;
+};
+
+export type Stage2ChatResponse = {
+  reply: string;
+};
+
+// Conversational interview types
+export type InterviewChatMessage = {
+  role: "user" | "interviewer";
+  content: string;
+};
+
+export type CodingProblemInfo = {
+  title: string;
+  slug: string;
+  difficulty: string;
+  prompt: string;
+};
+
+export type Stage2MessageResponse = {
+  reply: string;
+  coding_problem?: CodingProblemInfo | null;
+  is_done: boolean;
+};
+
+export type Stage3MessageResponse = {
+  reply: string;
+  is_done: boolean;
+};
+
+export type Stage3Question = {
+  index: number;
+  question: string;
+  follow_up?: string | null;
+};
+
+export type Stage3ScriptResponse = {
+  questions: Stage3Question[];
+  opening: string;
+};
+
+export type MockInterviewFinishResponse = {
+  overall_feedback: string;
+  stage1_verdict?: string | null;
+  stage2_verdict?: string | null;
+  stage3_verdict?: string | null;
+  hiring_recommendation: string;
+};

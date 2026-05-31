@@ -4,6 +4,7 @@ export const SETTINGS_KEYS = {
   questionFallback: "nosey_question_fallback",
   generationProvider: "nosey_generation_provider",
   kojoStrictness: "nosey_kojo_strictness",
+  betaMode: "nosey_beta_mode",
 } as const;
 
 function readBooleanSetting(key: string, defaultValue: boolean) {
@@ -34,6 +35,9 @@ export function useSettings() {
   const [kojoStrictness, setKojoStrictnessState] = useState(() =>
     readStringSetting(SETTINGS_KEYS.kojoStrictness, "medium"),
   );
+  const [betaMode, setBetaModeState] = useState(() =>
+    readBooleanSetting(SETTINGS_KEYS.betaMode, false),
+  );
 
   // Sync state when another instance of useSettings writes a setting.
   useEffect(() => {
@@ -46,6 +50,9 @@ export function useSettings() {
       }
       if (e.key === SETTINGS_KEYS.kojoStrictness && e.newValue !== null) {
         setKojoStrictnessState(e.newValue);
+      }
+      if (e.key === SETTINGS_KEYS.betaMode && e.newValue !== null) {
+        setBetaModeState(e.newValue !== "false");
       }
     }
     window.addEventListener("storage", handleStorage);
@@ -67,6 +74,11 @@ export function useSettings() {
     writeSetting(SETTINGS_KEYS.kojoStrictness, value);
   }
 
+  function setBetaMode(value: boolean) {
+    setBetaModeState(value);
+    writeSetting(SETTINGS_KEYS.betaMode, String(value));
+  }
+
   return {
     questionFallbackEnabled,
     setQuestionFallbackEnabled,
@@ -74,5 +86,7 @@ export function useSettings() {
     setGenerationProvider,
     kojoStrictness,
     setKojoStrictness,
+    betaMode,
+    setBetaMode,
   };
 }

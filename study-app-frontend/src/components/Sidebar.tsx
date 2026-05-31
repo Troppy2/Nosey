@@ -1,20 +1,23 @@
 import { BookOpen, Brain, ChevronLeft, ChevronRight, Code2, FolderOpen, LayoutDashboard, Menu, MessageCircle, Settings, X } from "lucide-react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
+import { useSettings } from "../lib/useSettings";
 
 const sidebarStorageKey = "nosey_sidebar_collapsed";
 
-const navItems = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/folders", label: "Folders", icon: FolderOpen },
-  { to: "/flashcards", label: "Flashcards", icon: Brain },
-  { to: "/leetcode", label: "LeetCode mode", icon: Code2 },
-  { to: "/kojo/chat", label: "Chat", icon: MessageCircle },
-  { to: "/settings", label: "Settings", icon: Settings },
+const BASE_NAV_ITEMS = [
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, beta: false },
+  { to: "/folders", label: "Folders", icon: FolderOpen, beta: false },
+  { to: "/flashcards", label: "Flashcards", icon: Brain, beta: false },
+  { to: "/leetcode", label: "LeetCode mode", icon: Code2, beta: true },
+  { to: "/kojo/chat", label: "Chat", icon: MessageCircle, beta: false },
+  { to: "/settings", label: "Settings", icon: Settings, beta: false },
 ];
 
 export function Sidebar() {
   const location = useLocation();
+  const { betaMode } = useSettings();
+  const navItems = BASE_NAV_ITEMS.filter((item) => !item.beta || betaMode);
   const [isNavHidden, setIsNavHidden] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
