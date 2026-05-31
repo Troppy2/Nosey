@@ -51,36 +51,39 @@ export default function Folders() {
     setFolderAction({ type: "delete", folder, draftName: folder.name });
   }
 
-  async function handleRenameSubmit(event: FormEvent) {
+  function handleRenameSubmit(event: FormEvent) {
     event.preventDefault();
     if (!folderAction) return;
     const nextName = folderAction.draftName.trim();
     if (!nextName) return;
-    try {
-      const updated = await updateFolder(folderAction.folder.id, {
-        name: nextName,
-        subject: folderAction.folder.subject ?? null,
-        description: folderAction.folder.description ?? null,
+    const folderId = folderAction.folder.id;
+    const prev = folders;
+    setFolders((current) => current.map((item) => (item.id === folderId ? { ...item, name: nextName } : item)));
+    setFolderAction(null);
+    updateFolder(folderId, {
+      name: nextName,
+      subject: folderAction.folder.subject ?? null,
+      description: folderAction.folder.description ?? null,
+    })
+      .then((updated) => {
+        setFolders((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      })
+      .catch((err) => {
+        setFolders(prev);
+        setError(err instanceof Error ? err.message : "Unable to rename that folder.");
       });
-      setFolders((current) => current.map((item) => (item.id === folderAction.folder.id ? updated : item)));
-      setError(null);
-      setFolderAction(null);
-    } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : "Unable to rename that folder.");
-    }
   }
 
-  async function commitFolderDelete() {
+  function commitFolderDelete() {
     if (!folderAction) return;
-    try {
-      await deleteFolder(folderAction.folder.id);
-      setFolders((current) => current.filter((item) => item.id !== folderAction.folder.id));
-      setError(null);
-      setFolderAction(null);
-    } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : "Unable to delete that folder.");
-      setFolderAction(null);
-    }
+    const folder = folderAction.folder;
+    const prev = folders;
+    setFolders((current) => current.filter((item) => item.id !== folder.id));
+    setFolderAction(null);
+    deleteFolder(folder.id).catch((err) => {
+      setFolders(prev);
+      setError(err instanceof Error ? err.message : "Unable to delete that folder.");
+    });
   }
 
   return (
@@ -100,7 +103,7 @@ export default function Folders() {
               <List size={18} />
             </button>
           </div>
-          <Button icon={<Plus size={18} />} onClick={() => setIsModalOpen(true)}>
+          <Button id="tour-folders-new" icon={<Plus size={18} />} onClick={() => setIsModalOpen(true)}>
             New Folder
           </Button>
         </div>
@@ -181,7 +184,7 @@ export default function Folders() {
           message={<>Delete <strong>{folderAction.folder.name}</strong>? This cannot be undone.</>}
           confirmLabel="Delete"
           danger
-          onConfirm={() => void commitFolderDelete()}
+          onConfirm={commitFolderDelete}
           onCancel={() => setFolderAction(null)}
         />
       ) : null}
@@ -207,18 +210,20 @@ function FolderGridCard({
           <h2>{folder.name}</h2>
           <p className="muted">{folder.description ?? folder.subject ?? "Study folder"}</p>
         </div>
+      </Link>
+      <div className="folder-card-bottom">
         <div className="folder-card-footer">
           <span>{folder.test_count} tests</span>
           <span>{folder.flashcard_count} cards</span>
         </div>
-      </Link>
-      <div className="row-actions folder-card-actions">
-        <button aria-label={`Rename ${folder.name}`} onClick={() => onRename(folder)} type="button">
-          <Edit3 size={17} />
-        </button>
-        <button aria-label={`Delete ${folder.name}`} onClick={() => onDelete(folder)} type="button">
-          <Trash2 size={17} />
-        </button>
+        <div className="row-actions folder-card-actions">
+          <button aria-label={`Rename ${folder.name}`} onClick={() => onRename(folder)} type="button">
+            <Edit3 size={17} />
+          </button>
+          <button aria-label={`Delete ${folder.name}`} onClick={() => onDelete(folder)} type="button">
+            <Trash2 size={17} />
+          </button>
+        </div>
       </div>
     </Card>
   );
@@ -241,11 +246,11 @@ function FolderListCard({
           <h3>{folder.name}</h3>
           <p className="muted small">{folder.subject ?? "General"}</p>
         </div>
-        <div className="mini-meta">
-          <span>{folder.test_count} tests</span>
-          <span>{folder.flashcard_count} cards</span>
-        </div>
       </Link>
+      <div className="mini-meta">
+        <span>{folder.test_count} tests</span>
+        <span>{folder.flashcard_count} cards</span>
+      </div>
       <div className="row-actions">
         <button type="button" aria-label={`Rename ${folder.name}`} onClick={() => onRename(folder)}>
           <Edit3 size={17} />

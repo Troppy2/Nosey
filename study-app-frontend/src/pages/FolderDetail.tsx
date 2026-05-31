@@ -98,34 +98,36 @@ export default function FolderDetail() {
     }
   }
 
-  async function commitRename(nextTitle: string) {
+  function commitRename(nextTitle: string) {
     if (!renamingTest) return;
     const test = renamingTest;
+    const prev = tests;
+    setTests((current) => current.map((item) => (item.id === test.id ? { ...item, title: nextTitle } : item)));
     setRenamingTest(null);
-    try {
-      const updated = await updateTest(test.id, { title: nextTitle, description: test.description });
-      setTests((current) =>
-        current.map((item) =>
-          item.id === test.id
-            ? { ...item, title: updated.title, description: updated.description ?? item.description }
-            : item,
-        ),
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to rename that test.");
-    }
+    updateTest(test.id, { title: nextTitle, description: test.description })
+      .then((updated) => {
+        setTests((current) =>
+          current.map((item) =>
+            item.id === test.id ? { ...item, title: updated.title, description: updated.description ?? item.description } : item,
+          ),
+        );
+      })
+      .catch((err) => {
+        setTests(prev);
+        setError(err instanceof Error ? err.message : "Unable to rename that test.");
+      });
   }
 
-  async function commitDelete() {
+  function commitDelete() {
     if (!deletingTest) return;
     const test = deletingTest;
+    const prev = tests;
+    setTests((current) => current.filter((item) => item.id !== test.id));
     setDeletingTest(null);
-    try {
-      await deleteTest(test.id);
-      setTests((current) => current.filter((item) => item.id !== test.id));
-    } catch (err) {
+    deleteTest(test.id).catch((err) => {
+      setTests(prev);
       setError(err instanceof Error ? err.message : "Unable to delete that test.");
-    }
+    });
   }
 
   async function updateKojoSetting(patch: Partial<Pick<Folder, "kojo_sync_default" | "kojo_allow_artifacts" | "kojo_auto_index" | "kojo_persona">>) {

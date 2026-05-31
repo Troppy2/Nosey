@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { useSettings } from "../lib/useSettings";
 import { isGuestSession } from "../lib/api";
+import { OnboardingTour } from "./OnboardingTour";
 
 const sidebarStorageKey = "nosey_sidebar_collapsed";
 
@@ -10,7 +11,7 @@ const BASE_NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, beta: false, guestHidden: false, tourId: undefined },
   { to: "/folders", label: "Folders", icon: FolderOpen, beta: false, guestHidden: false, tourId: "tour-nav-folders" },
   { to: "/flashcards", label: "Flashcards", icon: Brain, beta: false, guestHidden: false, tourId: undefined },
-  { to: "/leetcode", label: "LeetCode mode", icon: Code2, beta: true, guestHidden: false, tourId: undefined },
+  { to: "/leetcode", label: "LeetCode mode", icon: Code2, beta: true, guestHidden: true, tourId: undefined },
   { to: "/kojo/chat", label: "Chat", icon: MessageCircle, beta: false, guestHidden: true, tourId: "tour-nav-kojo" },
   { to: "/settings", label: "Settings", icon: Settings, beta: false, guestHidden: false, tourId: undefined },
 ];
@@ -168,6 +169,7 @@ export function Sidebar() {
       </aside>
 
       <main className="shell-main">
+        <OnboardingTour />
         <Outlet />
       </main>
     </div>

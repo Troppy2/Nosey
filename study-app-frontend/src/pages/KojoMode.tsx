@@ -845,7 +845,7 @@ export default function KojoMode() {
             )}
             {uploadError && <p className="chat-mode-upload-error">{uploadError}</p>}
 
-            <div className="chat-mode-input-wrap">
+            <div id="tour-kojo-chat" className="chat-mode-input-wrap">
               <input
                 ref={fileInputRef}
                 type="file"

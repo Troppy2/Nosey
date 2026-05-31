@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     google_client_secret: str = Field(default="replace-me", alias="GOOGLE_CLIENT_SECRET")
     jwt_secret: str = Field(default="replace-me", alias="JWT_SECRET")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
-    jwt_expiration_hours: int = Field(default=24, alias="JWT_EXPIRATION_HOURS")
+    jwt_expiration_hours: int = Field(default=720, alias="JWT_EXPIRATION_HOURS")
     ollama_base_url: str = Field(default="https://api.ollama.com", alias="OLLAMA_BASE_URL")
     ollama_model: str = Field(default="mistral:7b-instruct-q3_K_M", alias="OLLAMA_MODEL")
     ollama_api_key: Optional[str] = Field(default=None, alias="OLLAMA_API_KEY")

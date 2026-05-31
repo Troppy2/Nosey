@@ -30,7 +30,7 @@ export function useSettings() {
     readBooleanSetting(SETTINGS_KEYS.questionFallback, false),
   );
   const [generationProvider, setGenerationProviderState] = useState(() =>
-    readStringSetting(SETTINGS_KEYS.generationProvider, "auto"),
+    readStringSetting(SETTINGS_KEYS.generationProvider, "ollama"),
   );
   const [kojoStrictness, setKojoStrictnessState] = useState(() =>
     readStringSetting(SETTINGS_KEYS.kojoStrictness, "medium"),

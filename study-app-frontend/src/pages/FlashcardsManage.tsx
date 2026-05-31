@@ -34,7 +34,6 @@ export default function FlashcardsManage() {
   const [folderFileCount, setFolderFileCount] = useState(0);
   const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
-  const [deletingAll, setDeletingAll] = useState(false);
   const [confirmDeleteCard, setConfirmDeleteCard] = useState<Flashcard | null>(null);
   const { generationProvider, setGenerationProvider } = useSettings();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -76,51 +75,64 @@ export default function FlashcardsManage() {
     setEditBack(card.back);
   }
 
-  async function saveEdit(card: Flashcard) {
+  function saveEdit(card: Flashcard) {
     if (!editFront.trim() || !editBack.trim()) return;
-    try {
-      const updated = await updateFlashcard(id, card.id, { front: editFront.trim(), back: editBack.trim() });
-      setCards((prev) => prev.map((c) => (c.id === card.id ? updated : c)));
-      setEditingId(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save.");
-    }
+    const front = editFront.trim();
+    const back = editBack.trim();
+    const prev = cards;
+    setCards((c) => c.map((x) => (x.id === card.id ? { ...x, front, back } : x)));
+    setEditingId(null);
+    updateFlashcard(id, card.id, { front, back })
+      .then((serverCard) => {
+        setCards((c) => c.map((x) => (x.id === card.id ? serverCard : x)));
+      })
+      .catch((err) => {
+        setCards(prev);
+        setEditingId(card.id);
+        setError(err instanceof Error ? err.message : "Failed to save.");
+      });
   }
 
-  async function handleDelete(card: Flashcard) {
-    try {
-      await deleteFlashcard(id, card.id);
-      setCards((prev) => prev.filter((c) => c.id !== card.id));
-    } catch (err) {
+  function handleDelete(card: Flashcard) {
+    const prev = cards;
+    setCards((c) => c.filter((x) => x.id !== card.id));
+    deleteFlashcard(id, card.id).catch((err) => {
+      setCards(prev);
       setError(err instanceof Error ? err.message : "Failed to delete.");
-    }
+    });
   }
 
-  async function handleAdd() {
+  function handleAdd() {
     if (!newFront.trim() || !newBack.trim()) return;
-    try {
-      const card = await createFlashcard(id, { front: newFront.trim(), back: newBack.trim() });
-      setCards((prev) => [card, ...prev]);
-      setNewFront("");
-      setNewBack("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add card.");
-    }
+    const front = newFront.trim();
+    const back = newBack.trim();
+    const tempId = -Date.now();
+    const now = new Date().toISOString();
+    const optimistic: Flashcard = { id: tempId, folder_id: id, front, back, source: null, difficulty: 0, created_at: now, updated_at: now };
+    setCards((prev) => [optimistic, ...prev]);
+    setNewFront("");
+    setNewBack("");
+    createFlashcard(id, { front, back })
+      .then((card) => {
+        setCards((prev) => prev.map((c) => (c.id === tempId ? card : c)));
+      })
+      .catch((err) => {
+        setCards((prev) => prev.filter((c) => c.id !== tempId));
+        setNewFront(front);
+        setNewBack(back);
+        setError(err instanceof Error ? err.message : "Failed to add card.");
+      });
   }
 
-  async function handleDeleteAllFlashcards() {
-    if (cards.length === 0 || deletingAll) return;
-    setDeletingAll(true);
-    setError(null);
-    try {
-      await Promise.all(cards.map((card) => deleteFlashcard(id, card.id)));
-      setCards([]);
-      setShowDeleteAllModal(false);
-    } catch (err) {
+  function handleDeleteAllFlashcards() {
+    if (cards.length === 0) return;
+    const prev = cards;
+    setCards([]);
+    setShowDeleteAllModal(false);
+    Promise.all(prev.map((card) => deleteFlashcard(id, card.id))).catch((err) => {
+      setCards(prev);
       setError(err instanceof Error ? err.message : "Failed to delete all flashcards.");
-    } finally {
-      setDeletingAll(false);
-    }
+    });
   }
 
   async function handleGenerateFromFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -206,7 +218,7 @@ export default function FlashcardsManage() {
             icon={<Trash2 size={18} />}
             onClick={() => setShowDeleteAllModal(true)}
             variant="danger"
-            disabled={cards.length === 0 || deletingAll}
+            disabled={cards.length === 0}
           >
             Delete All Flashcards
           </Button>
@@ -323,7 +335,7 @@ export default function FlashcardsManage() {
           message={<>Delete this flashcard? This cannot be undone.</>}
           confirmLabel="Delete"
           danger
-          onConfirm={() => { void handleDelete(confirmDeleteCard); setConfirmDeleteCard(null); }}
+          onConfirm={() => { handleDelete(confirmDeleteCard); setConfirmDeleteCard(null); }}
           onCancel={() => setConfirmDeleteCard(null)}
         />
       ) : null}
@@ -332,9 +344,9 @@ export default function FlashcardsManage() {
         <ConfirmModal
           title="Delete All Flashcards"
           message="This permanently removes all flashcards in this folder. This cannot be undone."
-          confirmLabel={deletingAll ? "Deleting…" : "Delete All"}
+          confirmLabel="Delete All"
           danger
-          onConfirm={() => void handleDeleteAllFlashcards()}
+          onConfirm={handleDeleteAllFlashcards}
           onCancel={() => setShowDeleteAllModal(false)}
         />
       ) : null}
