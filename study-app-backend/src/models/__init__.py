@@ -9,6 +9,7 @@ from src.models.kojo_conversation import KojoConversation
 from src.models.kojo_message import KojoMessage
 from src.models.lc_sync import LCActivityDate, LCCodeWorkspace, LCProgress
 from src.models.mcq_option import MCQOption
+from src.models.mock_interview import MockInterviewSession
 from src.models.note import Note
 from src.models.question import Question
 from src.models.slash_command import SlashCommand
@@ -31,6 +32,7 @@ __all__ = [
     "LCCodeWorkspace",
     "LCProgress",
     "MCQOption",
+    "MockInterviewSession",
     "Note",
     "Question",
     "SlashCommand",

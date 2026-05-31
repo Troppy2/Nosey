@@ -31,6 +31,7 @@ import {
   Send,
   Sparkles,
   Trophy,
+  Users,
   WrapText,
   X,
   type LucideIcon,
@@ -54,6 +55,7 @@ import {
 } from "../lib/api";
 import { runPythonLeetCode, traceLeetCodeExecution, type RunnerResult, type TraceResult } from "../lib/pyodideRunner";
 import { ExecutionVisualizer } from "../components/ExecutionVisualizer";
+import { Link } from "react-router-dom";
 import type { LeetCodeProblemData } from "../lib/types";
 import { useSettings } from "../lib/useSettings";
 
@@ -504,11 +506,26 @@ function countStreak(dates: string[]) {
   const dateSet = new Set(dates);
   let count = 0;
   const cursor = new Date();
+  // If today isn't solved yet, count from yesterday — user has until midnight to maintain streak
+  if (!dateSet.has(cursor.toLocaleDateString("en-CA"))) {
+    cursor.setDate(cursor.getDate() - 1);
+  }
   while (dateSet.has(cursor.toLocaleDateString("en-CA"))) {
     count += 1;
     cursor.setDate(cursor.getDate() - 1);
   }
   return count;
+}
+
+function streakExpiresIn(): string {
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setHours(24, 0, 0, 0);
+  const msLeft = midnight.getTime() - now.getTime();
+  const hours = Math.floor(msLeft / 3600000);
+  const minutes = Math.floor((msLeft % 3600000) / 60000);
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
 }
 
 function countBestStreak(dates: string[]) {
@@ -1140,10 +1157,16 @@ export default function LeetCodeMode() {
             <h1>LeetCode roadmap</h1>
             <p className="muted">Official problems, a better practice surface, streaks, and Kojo as a coach instead of a code dump.</p>
           </div>
-          <a className="lc-official-link" href="https://leetcode.com/problemset/" target="_blank" rel="noreferrer">
-            <ExternalLink size={16} />
-            Open LeetCode
-          </a>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <Link to="/mock-interview" className="lc-official-link">
+              <Users size={16} />
+              Mock Interview
+            </Link>
+            <a className="lc-official-link" href="https://leetcode.com/problemset/" target="_blank" rel="noreferrer">
+              <ExternalLink size={16} />
+              Open LeetCode
+            </a>
+          </div>
         </header>
 
         <section className="lc-dashboard" aria-label="LeetCode progress dashboard">
@@ -1154,7 +1177,14 @@ export default function LeetCodeMode() {
               <span style={{ width: `${stats.percent}%` }} />
             </div>
           </div>
-          <div className="lc-stat-tile">
+          <div
+            className="lc-stat-tile lc-stat-tile--streak"
+            data-tooltip={
+              activityDates.includes(todayKey())
+                ? "Streak safe — solved today!"
+                : `${streakExpiresIn()} left to keep your streak`
+            }
+          >
             <Flame size={18} />
             <span>{stats.currentStreak}</span>
             <small>day streak</small>

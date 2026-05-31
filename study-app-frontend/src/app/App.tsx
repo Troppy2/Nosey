@@ -9,6 +9,12 @@ import Folders from "../pages/Folders";
 import Landing from "../pages/Landing";
 import KojoMode from "../pages/KojoMode";
 import LeetCodeMode from "../pages/LeetCodeMode";
+import MockInterviewSetup from "../pages/MockInterviewSetup";
+import MockInterviewStage1 from "../pages/MockInterviewStage1";
+import MockInterviewStage2 from "../pages/MockInterviewStage2";
+import MockInterviewStage3 from "../pages/MockInterviewStage3";
+import MockInterviewStage1Results from "../pages/MockInterviewStage1Results";
+import MockInterviewSummary from "../pages/MockInterviewSummary";
 import QuestionEditor from "../pages/QuestionEditor";
 import Results from "../pages/Results";
 import TakeTest from "../pages/TakeTest";
@@ -46,6 +52,12 @@ export default function App() {
           <Route path="/flashcards/:folderId" element={<Flashcards />} />
           <Route path="/folders/:folderId/flashcards/manage" element={<FlashcardsManage />} />
           <Route path="/leetcode" element={<LeetCodeMode />} />
+          <Route path="/mock-interview" element={<MockInterviewSetup />} />
+          <Route path="/mock-interview/:sessionId/stage1" element={<MockInterviewStage1 />} />
+          <Route path="/mock-interview/:sessionId/stage1-results" element={<MockInterviewStage1Results />} />
+          <Route path="/mock-interview/:sessionId/stage2" element={<MockInterviewStage2 />} />
+          <Route path="/mock-interview/:sessionId/stage3" element={<MockInterviewStage3 />} />
+          <Route path="/mock-interview/:sessionId/summary" element={<MockInterviewSummary />} />
           <Route path="/kojo/chat" element={<KojoMode />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
