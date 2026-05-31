@@ -1,4 +1,5 @@
 import { CheckCircle, LogIn, LogOut, RotateCcw, Sparkles, XCircle } from "lucide-react";
+import { ONBOARDING_DONE_KEY, TOUR_SEGMENT_KEY } from "../components/OnboardingTour";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -318,14 +319,15 @@ export default function Settings() {
 
         <CollapsibleSection title="Onboarding Tour">
           <p className="muted small">
-            Replay the guided tour that highlights key features on the Dashboard.
+            Replay the full guided tour across the app's key pages.
           </p>
           <div className="settings-reset-row">
             <Button
               type="button"
               variant="secondary"
               onClick={() => {
-                localStorage.removeItem("nosey_onboarding_done");
+                localStorage.removeItem(ONBOARDING_DONE_KEY);
+                localStorage.removeItem(TOUR_SEGMENT_KEY);
                 navigate("/dashboard");
               }}
             >
@@ -397,77 +399,81 @@ export default function Settings() {
           </SelectInput>
         </CollapsibleSection>
 
-        <CollapsibleSection title="Kojo constitution strictness">
-          <p className="muted small">
-            Controls how strictly Kojo sticks to your uploaded notes when answering questions.
-          </p>
-          <div className="settings-strictness-row">
-            {(["strict", "medium", "none"] as const).map((level) => (
-              <button
-                key={level}
-                type="button"
-                className={`settings-strictness-btn${kojoStrictness === level ? " settings-strictness-btn--active" : ""}`}
-                onClick={() => setKojoStrictness(level)}
-              >
-                <span className="settings-strictness-label">
-                  {level === "strict" ? "Strict" : level === "medium" ? "Medium" : "Not at all"}
-                </span>
-                <span className="settings-strictness-desc muted small">
-                  {level === "strict"
-                    ? "Only answers from your notes"
-                    : level === "medium"
-                      ? "Prefers notes, fills gaps with general knowledge"
-                      : "Answers freely, tells you to fact-check"}
-                </span>
-              </button>
-            ))}
-          </div>
-        </CollapsibleSection>
-
-        <CollapsibleSection title="Slash commands">
-          <SlashCommandManager
-            commands={slashCommands}
-            loading={loadingSlashCommands}
-            onChange={setSlashCommands}
-          />
-        </CollapsibleSection>
-
-        <CollapsibleSection title="Kojo chat history restore">
-          <p className="muted small">
-            Cleared Kojo chats are available here for up to 5 hours.
-          </p>
-
-          {restoreError ? (
-            <div className="settings-feedback settings-feedback--error">
-              <XCircle size={16} />
-              <span>{restoreError}</span>
-            </div>
-          ) : null}
-
-          {loadingCleared ? (
-            <p className="muted small">Loading cleared chats…</p>
-          ) : clearedConversations.length === 0 ? (
-            <p className="muted small">No recently cleared Kojo chats.</p>
-          ) : (
-            <div className="settings-restore-list">
-              {clearedConversations.map((conv) => (
-                <div className="settings-restore-item" key={conv.conversation_id}>
-                  <div>
-                    <p className="settings-restore-folder">{conv.folder_name}</p>
-                    <p className="muted small">{getRestoreTimeLabel(conv.restore_expires_at)}</p>
-                  </div>
-                  <Button
-                    variant="secondary"
-                    onClick={() => handleRestore(conv.folder_id)}
-                    disabled={restoreFolderId === conv.folder_id}
+        {!guest ? (
+          <>
+            <CollapsibleSection title="Kojo constitution strictness">
+              <p className="muted small">
+                Controls how strictly Kojo sticks to your uploaded notes when answering questions.
+              </p>
+              <div className="settings-strictness-row">
+                {(["strict", "medium", "none"] as const).map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    className={`settings-strictness-btn${kojoStrictness === level ? " settings-strictness-btn--active" : ""}`}
+                    onClick={() => setKojoStrictness(level)}
                   >
-                    {restoreFolderId === conv.folder_id ? "Restoring…" : "Restore"}
-                  </Button>
+                    <span className="settings-strictness-label">
+                      {level === "strict" ? "Strict" : level === "medium" ? "Medium" : "Not at all"}
+                    </span>
+                    <span className="settings-strictness-desc muted small">
+                      {level === "strict"
+                        ? "Only answers from your notes"
+                        : level === "medium"
+                          ? "Prefers notes, fills gaps with general knowledge"
+                          : "Answers freely, tells you to fact-check"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </CollapsibleSection>
+
+            <CollapsibleSection title="Slash commands">
+              <SlashCommandManager
+                commands={slashCommands}
+                loading={loadingSlashCommands}
+                onChange={setSlashCommands}
+              />
+            </CollapsibleSection>
+
+            <CollapsibleSection title="Kojo chat history restore">
+              <p className="muted small">
+                Cleared Kojo chats are available here for up to 5 hours.
+              </p>
+
+              {restoreError ? (
+                <div className="settings-feedback settings-feedback--error">
+                  <XCircle size={16} />
+                  <span>{restoreError}</span>
                 </div>
-              ))}
-            </div>
-          )}
-        </CollapsibleSection>
+              ) : null}
+
+              {loadingCleared ? (
+                <p className="muted small">Loading cleared chats…</p>
+              ) : clearedConversations.length === 0 ? (
+                <p className="muted small">No recently cleared Kojo chats.</p>
+              ) : (
+                <div className="settings-restore-list">
+                  {clearedConversations.map((conv) => (
+                    <div className="settings-restore-item" key={conv.conversation_id}>
+                      <div>
+                        <p className="settings-restore-folder">{conv.folder_name}</p>
+                        <p className="muted small">{getRestoreTimeLabel(conv.restore_expires_at)}</p>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        onClick={() => handleRestore(conv.folder_id)}
+                        disabled={restoreFolderId === conv.folder_id}
+                      >
+                        {restoreFolderId === conv.folder_id ? "Restoring…" : "Restore"}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CollapsibleSection>
+          </>
+        ) : null}
 
         <CollapsibleSection title="Restore archived classes">
           <p className="muted small">

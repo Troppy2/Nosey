@@ -313,7 +313,7 @@ export default function CreateTest() {
                 : "No saved files in this folder yet. You can still upload new documents here."}
             </p>
 
-            <div className="field">
+            <div id="tour-create-type" className="field">
               <span className="field-label">Test type</span>
               <div className="choice-grid">
                 {[
@@ -549,6 +549,7 @@ export default function CreateTest() {
           )}
 
           <Card
+            id="tour-create-upload"
             className={`upload-zone ${isDragging ? "dragging" : ""}`}
             onDragLeave={() => setIsDragging(false)}
             onDragOver={(event) => {

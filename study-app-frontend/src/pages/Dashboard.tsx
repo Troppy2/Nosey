@@ -1,11 +1,10 @@
-import { BookOpen, Brain, Edit3, FolderOpen, Plus, Trash2, TrendingUp, Undo2 } from "lucide-react";
+import { BookOpen, Brain, Edit3, FolderOpen, Plus, Trash2, TrendingUp, Undo2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmModal, RenameModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
-import { OnboardingTour } from "../components/OnboardingTour";
 import { deleteTest, fetchFlashcards, fetchFolders, fetchTests, getResumableTests, getStoredUser, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
 import type { Flashcard, Folder, ResumableTestInfo, TestSummary } from "../lib/types";
@@ -97,6 +96,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [renamingTest, setRenamingTest] = useState<TestSummary | null>(null);
   const [deletingTest, setDeletingTest] = useState<TestSummary | null>(null);
+  const [dismissedTestIds, setDismissedTestIds] = useState<Set<number>>(() => readCompletedTestIds());
   const [displayTitle, setDisplayTitle] = useState("Your study cockpit");
   const [statsResetVersion, setStatsResetVersion] = useState(0);
   const displayTitleRef = useRef(displayTitle);
@@ -223,8 +223,13 @@ export default function Dashboard() {
   }, [flashcards, tests, statsResetVersion]);
 
   const weakCards = [...flashcards].sort((a, b) => b.difficulty - a.difficulty).slice(0, 3);
-  const completedTestIds = readCompletedTestIds();
-  const pendingResumableTests = resumableTests.filter((t) => !completedTestIds.has(t.test_id));
+  const pendingResumableTests = resumableTests.filter((t) => !dismissedTestIds.has(t.test_id));
+
+  function dismissResumableTest(testId: number) {
+    const next = new Set([...dismissedTestIds, testId]);
+    setDismissedTestIds(next);
+    localStorage.setItem(COMPLETED_TEST_IDS_KEY, JSON.stringify([...next]));
+  }
 
   async function commitRename(nextTitle: string) {
     if (!renamingTest) return;
@@ -260,7 +265,6 @@ export default function Dashboard() {
 
   return (
     <>
-    <OnboardingTour />
     {renamingTest ? (
       <RenameModal
         title="Rename practice test"
@@ -363,6 +367,15 @@ export default function Dashboard() {
                             <span style={{ fontSize: "14px", fontWeight: "500" }}>Resume</span>
                           </div>
                         </Link>
+                        <div className="row-actions">
+                          <button
+                            aria-label={`Dismiss ${test.test_title}`}
+                            onClick={(e) => { e.preventDefault(); dismissResumableTest(test.test_id); }}
+                            type="button"
+                          >
+                            <X size={17} />
+                          </button>
+                        </div>
                       </Card>
                     ))}
                   </div>
@@ -398,8 +411,8 @@ export default function Dashboard() {
                               {test.question_count} questions · {formatDate(test.created_at)}
                             </p>
                           </div>
-                          <div className="score-badge">{formatPercent(test.best_score)}</div>
                         </Link>
+                        <div className="score-badge">{formatPercent(test.best_score)}</div>
                         <div className="row-actions">
                           <button aria-label={`Rename ${test.title}`} onClick={() => setRenamingTest(test)} type="button">
                             <Edit3 size={17} />

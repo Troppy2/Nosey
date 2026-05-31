@@ -1,4 +1,4 @@
-import { AlertTriangle, Brain, Calculator, CheckCircle2, ChevronDown, Loader2, RotateCcw, Sparkles, Target, XCircle } from "lucide-react";
+import { AlertTriangle, Brain, Calculator, CheckCircle2, ChevronDown, Loader2, RotateCcw, Sparkles, Target, X, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -265,78 +265,102 @@ export default function Results() {
                 aria-modal="true"
                 onMouseDown={(e) => e.stopPropagation()}
               >
-                <h2>Create Targeted Practice Test</h2>
-                <TextInput
-                  label="Test title"
-                  value={targetedTitle}
-                  onChange={(e) => setTargetedTitle(e.target.value)}
-                  placeholder="Targeted Practice Test"
-                />
-                <SelectInput
-                  label="Test type"
-                  value={targetedTestType}
-                  onChange={(e) => setTargetedTestType(e.target.value)}
-                >
-                  <option value="mixed">Mixed (MCQ + FRQ)</option>
-                  <option value="MCQ_only">Multiple Choice Only</option>
-                  <option value="FRQ_only">Free Response Only</option>
-                </SelectInput>
-                {targetedTestType !== "FRQ_only" && (
+                <div className="targeted-modal-header">
+                  <div>
+                    <h2>Targeted Practice</h2>
+                    <p className="muted small">Focused on your weak areas</p>
+                  </div>
+                  <button
+                    className="privacy-modal-close"
+                    onClick={() => setShowTargetedModal(false)}
+                    aria-label="Close"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="targeted-modal-fields">
                   <TextInput
-                    label="MCQ questions"
-                    type="number"
-                    min={1}
-                    max={20}
-                    value={targetedCountMcq}
-                    onChange={(e) =>
-                      setTargetedCountMcq(Math.max(1, Math.min(20, Number(e.target.value))))
-                    }
+                    label="Test title"
+                    value={targetedTitle}
+                    onChange={(e) => setTargetedTitle(e.target.value)}
+                    placeholder="Targeted Practice Test"
                   />
-                )}
-                {targetedTestType !== "MCQ_only" && (
-                  <TextInput
-                    label="FRQ questions"
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={targetedCountFrq}
-                    onChange={(e) =>
-                      setTargetedCountFrq(Math.max(1, Math.min(10, Number(e.target.value))))
-                    }
-                  />
-                )}
-                <SelectInput
-                  label="Difficulty"
-                  value={targetedDifficulty}
-                  onChange={(e) => setTargetedDifficulty(e.target.value)}
-                >
-                  <option value="mixed">Mixed</option>
-                  <option value="easy">Easy</option>
-                  <option value="medium">Medium</option>
-                  <option value="hard">Hard</option>
-                </SelectInput>
+                  <div className="targeted-row">
+                    <SelectInput
+                      label="Test type"
+                      value={targetedTestType}
+                      onChange={(e) => setTargetedTestType(e.target.value)}
+                    >
+                      <option value="mixed">Mixed (MCQ + FRQ)</option>
+                      <option value="MCQ_only">Multiple Choice Only</option>
+                      <option value="FRQ_only">Free Response Only</option>
+                    </SelectInput>
+                    <SelectInput
+                      label="Difficulty"
+                      value={targetedDifficulty}
+                      onChange={(e) => setTargetedDifficulty(e.target.value)}
+                    >
+                      <option value="mixed">Mixed</option>
+                      <option value="easy">Easy</option>
+                      <option value="medium">Medium</option>
+                      <option value="hard">Hard</option>
+                    </SelectInput>
+                  </div>
+                  <div className="targeted-row">
+                    {targetedTestType !== "FRQ_only" && (
+                      <TextInput
+                        label="MCQ questions"
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={targetedCountMcq}
+                        onChange={(e) =>
+                          setTargetedCountMcq(Math.max(1, Math.min(20, Number(e.target.value))))
+                        }
+                      />
+                    )}
+                    {targetedTestType !== "MCQ_only" && (
+                      <TextInput
+                        label="FRQ questions"
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={targetedCountFrq}
+                        onChange={(e) =>
+                          setTargetedCountFrq(Math.max(1, Math.min(10, Number(e.target.value))))
+                        }
+                      />
+                    )}
+                  </div>
+                </div>
+
                 <div className="targeted-topics-preview">
-                  <span className="field-label">
+                  <span className="targeted-topics-label">
+                    <Target size={13} />
                     Targeting {missed.length} weak area{missed.length !== 1 ? "s" : ""}
                   </span>
                   <div className="targeted-chips">
                     {missed.slice(0, 4).map((a) => (
-                      <span key={a.question_id} className="pill targeted-chip">
-                        {(a.question_text ?? "").slice(0, 48)}
-                        {(a.question_text?.length ?? 0) > 48 ? "…" : ""}
+                      <span key={a.question_id} className="targeted-chip">
+                        {(a.question_text ?? "").slice(0, 52)}
+                        {(a.question_text?.length ?? 0) > 52 ? "…" : ""}
                       </span>
                     ))}
                     {missed.length > 4 && (
-                      <span className="pill">+{missed.length - 4} more</span>
+                      <span className="targeted-chip targeted-chip-more">+{missed.length - 4} more</span>
                     )}
                   </div>
                 </div>
+
                 {targetedError && <p className="targeted-error">{targetedError}</p>}
-                <div className="button-row">
-                  <Button variant="secondary" onClick={() => setShowTargetedModal(false)}>
+
+                <div className="targeted-modal-actions">
+                  <Button variant="secondary" fullWidth onClick={() => setShowTargetedModal(false)}>
                     Cancel
                   </Button>
                   <Button
+                    fullWidth
                     onClick={handleCreateTargetedTest}
                     disabled={isCreatingTargeted || !targetedTitle.trim()}
                   >

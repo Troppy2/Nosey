@@ -1,3 +1,4 @@
+import React from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Sidebar } from "../components/Sidebar";
 import CreateTest from "../pages/CreateTest";
@@ -9,6 +10,7 @@ import Folders from "../pages/Folders";
 import Landing from "../pages/Landing";
 import KojoMode from "../pages/KojoMode";
 import LeetCodeMode from "../pages/LeetCodeMode";
+import { isGuestSession } from "../lib/api";
 import MockInterviewSetup from "../pages/MockInterviewSetup";
 import MockInterviewStage1 from "../pages/MockInterviewStage1";
 import MockInterviewStage2 from "../pages/MockInterviewStage2";
@@ -23,6 +25,11 @@ import Settings from "../pages/Settings";
 // Dependency imports for tracking the last visited path
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
+
+function SignedInRoute({ children }: { children: React.ReactNode }) {
+  if (isGuestSession()) return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
+}
 
 // Saves user last visted page
 function PathTracker() {
@@ -51,7 +58,7 @@ export default function App() {
           <Route path="/flashcards" element={<Flashcards />} />
           <Route path="/flashcards/:folderId" element={<Flashcards />} />
           <Route path="/folders/:folderId/flashcards/manage" element={<FlashcardsManage />} />
-          <Route path="/leetcode" element={<LeetCodeMode />} />
+          <Route path="/leetcode" element={<SignedInRoute><LeetCodeMode /></SignedInRoute>} />
           <Route path="/mock-interview" element={<MockInterviewSetup />} />
           <Route path="/mock-interview/:sessionId/stage1" element={<MockInterviewStage1 />} />
           <Route path="/mock-interview/:sessionId/stage1-results" element={<MockInterviewStage1Results />} />

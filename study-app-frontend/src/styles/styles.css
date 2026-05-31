@@ -871,14 +871,20 @@ h3 {
   flex: 1;
 }
 
+.folder-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
 .folder-card-actions {
   justify-content: flex-end;
-  margin-top: 14px;
 }
 
 .folder-list-main {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 18px;
   min-width: 0;
@@ -908,6 +914,11 @@ h3 {
   margin-top: 12px;
   color: #596949;
   font-size: 0.86rem;
+}
+
+.folder-list-row > .mini-meta {
+  margin-top: 0;
+  align-self: center;
 }
 
 .test-list,
@@ -1039,7 +1050,7 @@ h3 {
 
 .folder-list-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 18px;
   min-height: 82px;
@@ -1760,23 +1771,87 @@ h3 {
   gap: 14px;
 }
 
+.targeted-modal-card {
+  width: min(440px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  gap: 14px;
+}
+
+.targeted-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.targeted-modal-header h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 2px;
+}
+
+.targeted-modal-header .muted {
+  margin: 0;
+}
+
+.targeted-modal-fields {
+  display: grid;
+  gap: 12px;
+}
+
+.targeted-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
 .targeted-topics-preview {
   display: grid;
   gap: 8px;
+  padding: 10px 12px;
+  background: var(--green-lightest);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.targeted-topics-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--green-dark);
 }
 
 .targeted-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
 }
 
 .targeted-chip {
-  font-size: 0.75rem;
-  max-width: 220px;
+  font-size: 0.73rem;
+  padding: 3px 8px;
+  background: rgba(113, 131, 85, 0.12);
+  border: 1px solid var(--green-light-mid);
+  border-radius: 20px;
+  color: var(--ink);
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.targeted-chip-more {
+  color: var(--green-dark);
+  font-weight: 600;
+}
+
+.targeted-modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
 .targeted-error {
@@ -2087,7 +2162,7 @@ h3 {
 
 @media (max-width: 760px) {
   .page {
-    padding: 22px 14px 44px;
+    padding: 12px 14px 44px;
   }
 
   .page-header,
@@ -2256,21 +2331,27 @@ h3 {
     grid-template-columns: 1fr;
   }
 
-  .folder-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   h1 {
     font-size: clamp(1.55rem, 7vw, 1.95rem);
   }
 
   .folder-list-row {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 10px;
   }
 
-  .folder-list-row .mini-meta,
-  .folder-list-row .row-actions {
+  .folder-list-row > .folder-list-main {
     grid-column: 1 / -1;
+  }
+
+  .folder-list-row > .mini-meta {
+    grid-column: 1;
+    align-self: center;
+  }
+
+  .folder-list-row > .row-actions {
+    grid-column: 2;
+    align-self: center;
   }
 
   .test-row,
@@ -2282,13 +2363,19 @@ h3 {
 
   .test-row {
     align-items: flex-start;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
   }
 
   .test-row-main {
+    flex-basis: 100%;
     align-items: center;
     flex-wrap: wrap;
     gap: 10px;
+  }
+
+  .test-row .score-badge {
+    flex: 1;
   }
 
   .page-header .toolbar {
@@ -2310,6 +2397,37 @@ h3 {
     width: 100%;
   }
 
+  /* Fix: <Link> wrapping <Button> in button-row blocks flex stretching */
+  .button-row > a {
+    display: flex;
+  }
+
+  .button-row > a > .button {
+    flex: 1;
+  }
+
+  /* Tighten page header spacing on mobile */
+  .page-header {
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+
+  /* Stretch direct link+button children of page-header to full width */
+  .page-header > a {
+    display: flex;
+  }
+
+  .page-header > a > .button {
+    flex: 1;
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Reduce top padding on mobile pages */
+  .page {
+    padding-top: 18px;
+  }
+
   .row-actions {
     width: 100%;
     justify-content: flex-end;
@@ -2318,6 +2436,12 @@ h3 {
   .test-row .row-actions {
     border-left: none;
     padding-left: 0;
+    width: auto;
+  }
+
+  .folder-card .row-actions,
+  .folder-list-row .row-actions {
+    width: auto;
   }
 
   .question-card {
@@ -9367,6 +9491,80 @@ h3 {
     border-left: none;
   }
 
+  /* KojoMode full-page: subtract the mobile topbar (~61px) so the chat doesn't overflow */
+  .chat-mode-shell {
+    height: calc(100dvh - 61px);
+  }
+
+  /* Flash header: keep action buttons from stretching to full width */
+  .flash-header > .button {
+    align-self: flex-start;
+  }
+
+  /* Flashcard manage: row-actions must stay auto-width inside the flex row */
+  .flashcard-manage-item .row-actions {
+    width: auto;
+    flex-shrink: 0;
+  }
+
+  /* Folder grid: single column on phones */
+  .folder-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  /* Folder card: 300px min-height is far too tall on a phone screen — compact it */
+  .folder-card {
+    min-height: 165px;
+    padding: 16px 18px;
+  }
+
+  .folder-card h2 {
+    margin-top: 8px;
+    font-size: 1.1rem;
+  }
+
+  .folder-card p {
+    margin-top: 4px;
+  }
+
+  /* Page-header description: shrink font so it takes less vertical space */
+  .page-header > div > p.muted {
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+
+  /* Folder list: tighter gap on phones */
+  .folder-list {
+    gap: 8px;
+  }
+
+  /* Floating action button: move up slightly so it clears mobile keyboard */
+  .floating-action {
+    bottom: 20px;
+    right: 20px;
+  }
+
+  /* CreateTest upload zone: reduce padding on phones */
+  .upload-zone {
+    padding: 28px 16px;
+  }
+
+  /* math-mode-toggle: ensure text wraps cleanly on narrow screens */
+  .math-mode-toggle {
+    align-items: flex-start;
+  }
+
+  .math-mode-toggle-sub {
+    font-size: 0.78rem;
+  }
+
+  /* Segmented control: always auto-width, never stretches in stacked toolbar */
+  .page-header .toolbar .segmented {
+    align-self: flex-start;
+    width: fit-content;
+  }
+
   /* Flip card: reduce fixed 400px height - too tall for most phone screens */
   .flip-card {
     height: 320px;
@@ -9424,6 +9622,31 @@ h3 {
   .kojo-model-select {
     min-width: 0;
     width: 100%;
+  }
+
+  /* Results: focus-card-header - hide icon and wrap Study notes button to its own row */
+  .focus-card-header {
+    flex-wrap: wrap;
+  }
+  .focus-card-header > svg {
+    display: none;
+  }
+  .focus-card-header > button {
+    flex: 0 0 100%;
+  }
+
+  /* Results / shared: section-title stacks vertically so long action buttons don't crowd the heading */
+  .section-title {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  /* FlashcardsManage: prevent danger button from spanning full width in the 2-col toolbar grid */
+  .page-header .toolbar > .button-danger {
+    grid-column: auto;
+    align-self: start;
+    width: fit-content;
   }
 }
 
@@ -9556,5 +9779,124 @@ h3 {
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+/* ── Landing footer ── */
+
+.landing-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.landing-footer-version {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light-mid);
+  border-radius: 4px;
+  padding: 1px 6px;
+  letter-spacing: 0.03em;
+}
+
+.landing-footer-link {
+  font-size: 0.78rem;
+  color: var(--green-dark-mid);
+  text-decoration: none;
+}
+
+.landing-footer-link:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.landing-footer-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* ── Privacy modal ── */
+
+.privacy-modal {
+  width: min(540px, 100%);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.privacy-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.privacy-modal-header h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.privacy-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--green-dark-mid);
+}
+
+.privacy-modal-close:hover {
+  background: var(--green-lightest);
+  color: var(--ink);
+}
+
+.privacy-modal-body {
+  padding: 20px 24px 24px;
+  overflow-y: auto;
+  display: grid;
+  gap: 14px;
+}
+
+.privacy-modal-body h3 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 4px;
+}
+
+.privacy-modal-body p,
+.privacy-modal-body li {
+  font-size: 0.85rem;
+  color: var(--ink);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.privacy-modal-body ul {
+  padding-left: 18px;
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.privacy-modal-body a {
+  color: var(--green-dark);
+  text-decoration: underline;
 }
 
