@@ -173,6 +173,9 @@ def normalize_annotation(annotation):
         return ""
     if isinstance(annotation, str):
         return annotation
+    args = getattr(annotation, "__args__", None)
+    if args:
+        return " ".join(getattr(a, "__name__", str(a)) for a in args)
     return getattr(annotation, "__name__", str(annotation))
 
 def adapt_value(value, annotation_text):
@@ -327,7 +330,10 @@ def _bt(vals):
 
 def _norm_ann(ann):
     if ann is _inspect._empty: return ""
-    return ann if isinstance(ann, str) else getattr(ann, "__name__", str(ann))
+    if isinstance(ann, str): return ann
+    _args = getattr(ann, "__args__", None)
+    if _args: return " ".join(getattr(_a, "__name__", str(_a)) for _a in _args)
+    return getattr(ann, "__name__", str(ann))
 
 def _adapt(val, ann):
     a = ann.lower()
