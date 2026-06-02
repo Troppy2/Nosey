@@ -93,6 +93,8 @@ from typing import *
 import ast
 import inspect
 import json
+import sys as _sys
+import time as _time
 import traceback
 from collections import deque
 
@@ -204,6 +206,15 @@ def normalize_expected(text):
     except Exception:
         return text
 
+_EXEC_TIMEOUT = 5.0
+
+def _make_timeout_tracer(deadline):
+    def _t(frame, event, arg):
+        if _time.time() > deadline:
+            raise TimeoutError("Time limit exceeded (5s). Check for infinite loops.")
+        return _t
+    return _t
+
 RESULT = {"ok": False, "output": "", "cases": []}
 
 user_code = ${JSON.stringify(code)}
@@ -248,7 +259,11 @@ try:
         for (name, value), parameter in zip(raw_args, parameters):
             annotation_text = normalize_annotation(parameter.annotation)
             args.append(adapt_value(value, annotation_text))
-        actual = serialize_value(method(*args))
+        _sys.settrace(_make_timeout_tracer(_time.time() + _EXEC_TIMEOUT))
+        try:
+            actual = serialize_value(method(*args))
+        finally:
+            _sys.settrace(None)
         expected = normalize_expected(case["expectedOutput"])
         RESULT["cases"].append({
             "label": case["label"],
@@ -290,6 +305,7 @@ import sys as _sys
 import json as _json
 import inspect as _inspect
 import ast as _ast
+import time as _time
 import traceback as _tb
 from typing import *
 from collections import deque, defaultdict, Counter, OrderedDict
@@ -346,7 +362,9 @@ def _parse_args(text):
     return [(kw.arg or "", _ast.literal_eval(kw.value)) for kw in call.keywords]
 
 _MAX_STEPS = 500
+_TRACE_TIMEOUT = 5.0
 _STEPS = []
+_TRACE_START = _time.time()
 
 def _sz(v, d=0):
     if d > 3: return {"type": "other", "repr": "..."}
@@ -368,7 +386,10 @@ def _sz(v, d=0):
 def _tracer(frame, event, arg):
     if len(_STEPS) >= _MAX_STEPS:
         _sys.settrace(None)
-        return None
+        raise RuntimeError(f"Step limit of {_MAX_STEPS} reached. Check for infinite loops.")
+    if _time.time() - _TRACE_START > _TRACE_TIMEOUT:
+        _sys.settrace(None)
+        raise TimeoutError("Time limit exceeded (5s). Check for infinite loops.")
     if event == "call":
         return _tracer if frame.f_code.co_filename == "<user_solution>" else None
     if event == "line" and frame.f_code.co_filename == "<user_solution>":
