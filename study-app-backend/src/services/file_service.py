@@ -18,6 +18,7 @@ from fastapi import UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.models.folder import Folder
 from src.models.folder_file import FolderFile
 from src.utils.exceptions import ValidationException
 from src.utils.validators import (
@@ -253,10 +254,11 @@ class FileService:
 
         return "\n\n".join(sections), file_types
 
-    async def get_folder_files_content(self, folder_id: int, session: AsyncSession) -> str:
+    async def get_folder_files_content(self, folder_id: int, user_id: int, session: AsyncSession) -> str:
         rows = await session.scalars(
             select(FolderFile)
-            .where(FolderFile.folder_id == folder_id)
+            .join(Folder, Folder.id == FolderFile.folder_id)
+            .where(FolderFile.folder_id == folder_id, Folder.user_id == user_id)
             .order_by(FolderFile.uploaded_at.desc())
         )
         files = list(rows.all())

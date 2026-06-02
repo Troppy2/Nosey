@@ -249,7 +249,7 @@ async def create_test(
             mock_pt = _BytesUploadFile(pt_bytes[0], pt_bytes[1])
             practice_test_content, _ = await svc.extract_from_files([mock_pt])  # type: ignore[arg-type]
 
-        folder_files_content = await svc.get_folder_files_content(folder_id, session)
+        folder_files_content = await svc.get_folder_files_content(folder_id, user.id, session)
 
         use_folder_files = not notes_bytes
         combined_notes = "\n\n---\n\n".join(

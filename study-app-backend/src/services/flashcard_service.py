@@ -53,7 +53,7 @@ class FlashcardService:
         test = await TestRepository(session).get_owned_with_questions(test_id, user_id)
         if test is None or test.folder_id != folder_id:
             raise ResourceNotFoundException("Test")
-        folder_files_content = await self.file_service.get_folder_files_content(folder_id, session)
+        folder_files_content = await self.file_service.get_folder_files_content(folder_id, user_id, session)
         content = self._join_contexts(
             "\n\n".join(note.content for note in test.notes),
             folder_files_content,
@@ -87,7 +87,7 @@ class FlashcardService:
         folder = await FolderRepository(session).get_owned(folder_id, user_id)
         if folder is None:
             raise ResourceNotFoundException("Folder")
-        folder_files_content = await self.file_service.get_folder_files_content(folder_id, session)
+        folder_files_content = await self.file_service.get_folder_files_content(folder_id, user_id, session)
         existing_flashcards = await self._existing_flashcard_context(folder_id, user_id, session)
         generated = await self.llm_service.generate_flashcards(
             content=folder_files_content,
@@ -194,7 +194,7 @@ class FlashcardService:
         if folder is None:
             raise ResourceNotFoundException("Folder")
         content, _ = await self.file_service.extract_from_files(files)
-        folder_files_content = await self.file_service.get_folder_files_content(folder_id, session)
+        folder_files_content = await self.file_service.get_folder_files_content(folder_id, user_id, session)
         existing_flashcards = await self._existing_flashcard_context(folder_id, user_id, session)
         generated = await self.llm_service.generate_flashcards(
             content=self._join_contexts(content, folder_files_content),
