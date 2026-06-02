@@ -218,6 +218,45 @@ export type AuthUser = {
   full_name?: string | null;
   profile_picture_url?: string | null;
   is_guest?: boolean;
+  is_admin?: boolean;
+  email_verified?: boolean;
+};
+
+export type AdminUserRow = {
+  id: ID;
+  email: string;
+  full_name: string | null;
+  profile_picture_url: string | null;
+  is_admin: boolean;
+  email_verified: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FeatureTiming = {
+  feature: string;
+  avg_ms: number;
+  call_count: number;
+};
+
+export type TokenUsageRow = {
+  user_id: ID;
+  total_tokens: number;
+  call_count: number;
+};
+
+export type AdminStats = {
+  total_users: number;
+  total_usage_events: number;
+  total_tokens_used: number;
+  feature_timings: FeatureTiming[];
+  tokens_per_user: TokenUsageRow[];
+};
+
+export type AdminTokenResponse = {
+  admin_token: string;
+  expires_in_seconds: number;
+  session_id: string;
 };
 
 export type ConversationFile = {

@@ -14,7 +14,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.config import settings
-from src.routes import attempts, auth, flashcards, folder_files, folders, health, kojo, leetcode, mock_interview, slash_commands, tests
+from src.routes import admin, attempts, auth, flashcards, folder_files, folders, health, kojo, leetcode, mock_interview, slash_commands, tests
 
 app = FastAPI(title="Study App", version="0.1.0")
 
@@ -28,6 +28,7 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(auth.router)
+app.include_router(admin.router)
 app.include_router(folders.router)
 app.include_router(folder_files.router)
 app.include_router(tests.router)

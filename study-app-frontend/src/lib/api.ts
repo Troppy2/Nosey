@@ -1,4 +1,7 @@
 import type {
+  AdminStats,
+  AdminTokenResponse,
+  AdminUserRow,
   AttemptDetail,
   AttemptResult,
   AttemptSummary,
@@ -869,4 +872,67 @@ export async function finishMockInterview(
     method: "POST",
     body: JSON.stringify({ provider }),
   });
+}
+
+// Admin panel helpers
+const ADMIN_TOKEN_KEY = "nosey_admin_token";
+const ADMIN_TOKEN_EXPIRES_KEY = "nosey_admin_token_expires";
+
+export function getAdminToken(): string | null {
+  const token = localStorage.getItem(ADMIN_TOKEN_KEY);
+  const expiresStr = localStorage.getItem(ADMIN_TOKEN_EXPIRES_KEY);
+  if (!token || !expiresStr) return null;
+  if (Date.now() >= parseInt(expiresStr, 10)) {
+    localStorage.removeItem(ADMIN_TOKEN_KEY);
+    localStorage.removeItem(ADMIN_TOKEN_EXPIRES_KEY);
+    return null;
+  }
+  return token;
+}
+
+export function setAdminToken(token: string, expiresInSeconds: number): void {
+  localStorage.setItem(ADMIN_TOKEN_KEY, token);
+  localStorage.setItem(ADMIN_TOKEN_EXPIRES_KEY, String(Date.now() + expiresInSeconds * 1000));
+}
+
+export function clearAdminToken(): void {
+  localStorage.removeItem(ADMIN_TOKEN_KEY);
+  localStorage.removeItem(ADMIN_TOKEN_EXPIRES_KEY);
+}
+
+export function getAdminTokenExpiresAt(): number | null {
+  const expiresStr = localStorage.getItem(ADMIN_TOKEN_EXPIRES_KEY);
+  return expiresStr ? parseInt(expiresStr, 10) : null;
+}
+
+async function adminRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = getAdminToken();
+  if (!token) throw new Error("Admin session expired. Please re-authenticate.");
+  const headers = new Headers(options.headers);
+  headers.set("Content-Type", "application/json");
+  headers.set("Authorization", `Bearer ${token}`);
+  const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  if (!response.ok) {
+    let message = `Request failed: ${response.status}`;
+    try {
+      const body = await response.json();
+      if (body?.detail) message = String(body.detail);
+    } catch { /* ignore */ }
+    throw new Error(message);
+  }
+  return response.json() as Promise<T>;
+}
+
+export async function adminAuthenticate(): Promise<AdminTokenResponse> {
+  const data = await request<AdminTokenResponse>("/admin/authenticate", { method: "POST" });
+  setAdminToken(data.admin_token, data.expires_in_seconds);
+  return data;
+}
+
+export async function fetchAdminStats(): Promise<AdminStats> {
+  return adminRequest<AdminStats>("/admin/stats");
+}
+
+export async function fetchAdminUsers(): Promise<AdminUserRow[]> {
+  return adminRequest<AdminUserRow[]>("/admin/users");
 }

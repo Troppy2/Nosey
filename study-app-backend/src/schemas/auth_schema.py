@@ -16,6 +16,8 @@ class UserResponse(BaseModel):
     email: str
     full_name: Optional[str] = None
     profile_picture_url: Optional[str] = None
+    is_admin: bool = False
+    email_verified: bool = False
 
     @computed_field
     @property
@@ -28,3 +30,9 @@ class AuthResponse(BaseModel):
     access_token: str
     email: str
     user: UserResponse
+
+
+class AdminTokenResponse(BaseModel):
+    admin_token: str
+    expires_in_seconds: int
+    session_id: str

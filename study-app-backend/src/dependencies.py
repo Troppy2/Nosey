@@ -42,3 +42,33 @@ async def get_current_user(
     )
     await session.commit()
     return user
+
+
+async def get_admin_user(
+    authorization: Optional[str] = Header(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> User:
+    if authorization is None:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+    token = authorization.removeprefix("Bearer ").strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Invalid admin token")
+
+    auth_service = AuthService()
+    user_repo = UserRepository(session)
+    try:
+        user_id, session_id = auth_service.verify_admin_jwt(token)
+    except (jwt.InvalidTokenError, jwt.ExpiredSignatureError, ValidationException):
+        raise HTTPException(status_code=401, detail="Admin session expired or invalid. Please re-authenticate.")
+
+    user = await user_repo.get_by_id(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if user.email.lower() != settings.admin_email.lower():
+        raise HTTPException(status_code=403, detail="Access denied")
+    if user.admin_session_id != session_id:
+        raise HTTPException(status_code=401, detail="Admin session invalidated. Another session may have started.")
+
+    return user

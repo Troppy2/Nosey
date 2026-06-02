@@ -1,6 +1,6 @@
-import { CheckCircle, LogIn, LogOut, RotateCcw, Sparkles, XCircle } from "lucide-react";
+import { CheckCircle, LogIn, LogOut, RotateCcw, ShieldCheck, Sparkles, XCircle } from "lucide-react";
 import { ONBOARDING_DONE_KEY, TOUR_SEGMENT_KEY } from "../components/OnboardingTour";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { CollapsibleSection } from "../components/CollapsibleSection";
@@ -68,6 +68,8 @@ export default function Settings() {
     betaMode,
     setBetaMode,
   } = useSettings();
+  const ADMIN_EMAIL = "jamesinah34@gmail.com";
+  const isAdmin = !guest && user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const initialized = useRef(false);
 
@@ -473,6 +475,20 @@ export default function Settings() {
               )}
             </CollapsibleSection>
           </>
+        ) : null}
+
+        {isAdmin ? (
+          <CollapsibleSection title="Admin panel">
+            <p className="muted small">
+              Access platform metrics, user roster, and feature performance data.
+            </p>
+            <div className="settings-reset-row">
+              <Link to="/admin" className="button button--secondary">
+                <ShieldCheck size={16} />
+                Open admin panel
+              </Link>
+            </div>
+          </CollapsibleSection>
         ) : null}
 
         <CollapsibleSection title="Restore archived classes">
