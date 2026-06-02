@@ -229,8 +229,8 @@ try:
         name for name, value in solution_cls.__dict__.items()
         if callable(value) and not name.startswith("_")
     ]
-    if len(method_names) != 1:
-        raise ValueError("Automatic test running currently supports one public Solution method at a time.")
+    if len(method_names) == 0:
+        raise ValueError("Automatic test running requires at least one public method in class Solution.")
 
     solution = solution_cls()
     method = getattr(solution, method_names[0])
