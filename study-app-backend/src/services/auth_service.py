@@ -26,7 +26,7 @@ class AuthService:
             response.raise_for_status()
             payload = response.json()
         audience = payload.get("aud")
-        if settings.google_client_id != "replace-me" and audience != settings.google_client_id:
+        if audience != settings.google_client_id:
             raise ValidationException("Google token audience does not match this app")
         google_id = payload.get("sub")
         email = payload.get("email")

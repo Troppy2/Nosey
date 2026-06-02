@@ -110,7 +110,7 @@ class TestService:
 
         active_provider = provider
 
-        folder_files_content = await self.file_service.get_folder_files_content(folder_id, session)
+        folder_files_content = await self.file_service.get_folder_files_content(folder_id, user_id, session)
         if not notes_files and practice_test_file is None and not folder_files_content:
             raise ValidationException(
                 "At least one notes document, folder file, or a practice test file is required"

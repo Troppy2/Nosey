@@ -226,8 +226,8 @@ class KojoService:
         else:
             conversation = await repo.get_or_create_conversation(user_id, folder_id)
 
-        notes = await repo.get_folder_notes_content(folder_id)
-        folder_files = await FileService().get_folder_files_content(folder_id, session)
+        notes = await repo.get_folder_notes_content(folder_id, user_id)
+        folder_files = await FileService().get_folder_files_content(folder_id, user_id, session)
         session_files = await repo.get_conversation_files(conversation.id)
         session_files_content = "\n\n---\n\n".join(
             f"[Session upload: {f.file_name}]\n{f.content}" for f in session_files if f.content
@@ -585,8 +585,8 @@ class KojoService:
         if folder is None:
             raise ResourceNotFoundException("Folder")
 
-        notes = await KojoRepository(session).get_folder_notes_content(folder_id)
-        folder_files = await FileService().get_folder_files_content(folder_id, session)
+        notes = await KojoRepository(session).get_folder_notes_content(folder_id, user_id)
+        folder_files = await FileService().get_folder_files_content(folder_id, user_id, session)
         context_parts = [part for part in (notes, folder_files) if part]
         notes_context = "\n\n---\n\n".join(context_parts) if context_parts else ""
 

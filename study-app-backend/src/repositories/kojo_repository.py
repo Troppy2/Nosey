@@ -149,8 +149,13 @@ class KojoRepository(BaseRepository[KojoConversation]):
         messages = list(result.scalars().all())
         return list(reversed(messages))
 
-    async def get_folder_notes_content(self, folder_id: int) -> str:
-        stmt = select(Note).join(Test, Test.id == Note.test_id).where(Test.folder_id == folder_id)
+    async def get_folder_notes_content(self, folder_id: int, user_id: int) -> str:
+        stmt = (
+            select(Note)
+            .join(Test, Test.id == Note.test_id)
+            .join(Folder, Folder.id == Test.folder_id)
+            .where(Test.folder_id == folder_id, Folder.user_id == user_id)
+        )
         result = await self.session.execute(stmt)
         notes = result.scalars().all()
         if not notes:
