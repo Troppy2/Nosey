@@ -20,6 +20,7 @@ import MockInterviewSummary from "../pages/MockInterviewSummary";
 import QuestionEditor from "../pages/QuestionEditor";
 import Results from "../pages/Results";
 import TakeTest from "../pages/TakeTest";
+import AdminPanel from "../pages/AdminPanel";
 import Settings from "../pages/Settings";
 
 // Dependency imports for tracking the last visited path
@@ -67,6 +68,7 @@ export default function App() {
           <Route path="/mock-interview/:sessionId/summary" element={<MockInterviewSummary />} />
           <Route path="/kojo/chat" element={<KojoMode />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/admin" element={<AdminPanel />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -1,9 +1,11 @@
-import { BookOpen, Brain, ChevronLeft, ChevronRight, Code2, FolderOpen, LayoutDashboard, Menu, MessageCircle, Settings, X } from "lucide-react";
+import { BookOpen, Brain, ChevronLeft, ChevronRight, Code2, FolderOpen, LayoutDashboard, Menu, MessageCircle, Settings, ShieldCheck, X } from "lucide-react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { useSettings } from "../lib/useSettings";
-import { isGuestSession } from "../lib/api";
+import { getStoredUser, isGuestSession } from "../lib/api";
 import { OnboardingTour } from "./OnboardingTour";
+
+const ADMIN_EMAIL = "jamesinah34@gmail.com";
 
 const sidebarStorageKey = "nosey_sidebar_collapsed";
 
@@ -20,7 +22,13 @@ export function Sidebar() {
   const location = useLocation();
   const { betaMode } = useSettings();
   const guest = isGuestSession();
-  const navItems = BASE_NAV_ITEMS.filter((item) => (!item.beta || betaMode) && (!item.guestHidden || !guest));
+  const currentUser = getStoredUser();
+  const isAdmin = currentUser?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const adminItem = { to: "/admin", label: "Admin", icon: ShieldCheck, beta: false, guestHidden: true, tourId: undefined };
+  const navItems = [
+    ...BASE_NAV_ITEMS.filter((item) => (!item.beta || betaMode) && (!item.guestHidden || !guest)),
+    ...(isAdmin && !guest ? [adminItem] : []),
+  ];
   const [isNavHidden, setIsNavHidden] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {

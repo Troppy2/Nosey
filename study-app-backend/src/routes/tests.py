@@ -1,3 +1,4 @@
+import time
 from typing import Optional, Tuple
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
@@ -12,6 +13,7 @@ from src.models.folder_file import FolderFile
 from src.models.test import Test
 from src.models.user import User
 from src.repositories.test_repository import TestRepository
+from src.repositories.usage_event_repository import UsageEventRepository
 from src.schemas.test_schema import (
     CreateTestResponse,
     QuestionCreate,
@@ -51,6 +53,7 @@ class _BytesUploadFile:
 
 async def _generate_questions_background(
     test_id: int,
+    user_id: int,
     notes_content: str,
     practice_test_content: str,
     test_type: str,
@@ -67,6 +70,7 @@ async def _generate_questions_background(
 ) -> None:
     """Run LLM generation and save questions; called as a FastAPI background task."""
     async with async_session_maker() as session:
+        _t0 = time.monotonic()
         try:
             repo = TestRepository(session)
             llm = LLMService()
@@ -125,6 +129,11 @@ async def _generate_questions_background(
             test = await session.get(Test, test_id)
             if test is not None:
                 test.generation_status = "ready"
+            duration_ms = int((time.monotonic() - _t0) * 1000)
+            try:
+                await UsageEventRepository(session).log_event(user_id, "test_generation", duration_ms)
+            except Exception:
+                pass
             await session.commit()
             logger.info("Background test generation complete", extra={"test_id": test_id})
         except Exception as exc:
@@ -273,6 +282,7 @@ async def create_test(
         background_tasks.add_task(
             _generate_questions_background,
             test_id=test.id,
+            user_id=user.id,
             notes_content=combined_notes,
             practice_test_content=practice_test_content,
             test_type=test_type,

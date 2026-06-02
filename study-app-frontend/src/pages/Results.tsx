@@ -134,7 +134,7 @@ export default function Results() {
         .join("; ");
       await createTest({
         folderId: attempt.folder_id,
-        title: targetedTitle || `Targeted Practice——${attempt.test_title}`,
+        title: targetedTitle || `Targeted Practice—${attempt.test_title}`,
         testType: targetedTestType,
         files: [],
         countMcq: targetedTestType !== "FRQ_only" ? targetedCountMcq : 0,

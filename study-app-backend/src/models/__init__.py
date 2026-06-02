@@ -14,6 +14,7 @@ from src.models.note import Note
 from src.models.question import Question
 from src.models.slash_command import SlashCommand
 from src.models.test import Test
+from src.models.usage_event import UsageEvent
 from src.models.user import User
 from src.models.user_answer import UserAnswer
 from src.models.user_attempt import UserAttempt
@@ -37,6 +38,7 @@ __all__ = [
     "Question",
     "SlashCommand",
     "Test",
+    "UsageEvent",
     "User",
     "UserAnswer",
     "UserAttempt",

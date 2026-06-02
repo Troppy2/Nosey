@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import String, Text
+from sqlalchemy import Boolean, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import BIGINT_ID, Base, TimestampMixin
@@ -25,6 +25,9 @@ class User(Base, TimestampMixin):
     google_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     full_name: Mapped[Optional[str]] = mapped_column(String(255))
     profile_picture_url: Mapped[Optional[str]] = mapped_column(Text)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    admin_session_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
 
     folders: Mapped[list[Folder]] = relationship(
         "Folder", back_populates="user", cascade="all, delete-orphan"
