@@ -37,6 +37,7 @@ import {
   type LucideIcon,
   Code,
   Timer,
+  Notebook,
 } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -44,9 +45,11 @@ import { MarkdownContent } from "../components/MarkdownContent";
 import CodingTabs from "../components/Tab";
 import { SlashCommandMenu, type CommandOption as SlashCommand } from "../components/SlashCommandMenu";
 import {
+  fetchLCNotes,
   fetchLCProgress,
   fetchLCWorkspace,
   isGuestSession,
+  syncLCNotes,
   syncLCProgress,
   syncLCWorkspace,
   fetchLeetCodeHint,
@@ -118,6 +121,7 @@ const CODE_TAB_ID_KEY = "nosey_lc_tab_id";
 const CODE_WORKSPACE_KEY_PREFIX = "nosey_lc_code_tabs";
 const CODE_KEY_PREFIX = "nosey_lc_code";
 const TIMER_PRESETS = [15, 25, 45];
+const NOTES_KEY_PREFIX = "nosey_lc_notes";
 
 const CHAT_COMMANDS: SlashCommand[] = [
   { slash: "/hint", label: "Hint", description: "Get the next nudge without the full answer.", prompt: "Give me one focused hint. Do not give me the full solution." },
@@ -452,8 +456,8 @@ function normalizeCodeWorkspace(value: unknown): CodeWorkspace | null {
   const rawWorkspace = value as Partial<CodeWorkspace>;
   const tabs = Array.isArray(rawWorkspace.tabs)
     ? rawWorkspace.tabs
-        .filter((tab): tab is CodeTab => Boolean(tab) && typeof tab.id === "string" && typeof tab.name === "string" && typeof tab.code === "string")
-        .map((tab) => ({ id: tab.id, name: tab.name, code: tab.code }))
+      .filter((tab): tab is CodeTab => Boolean(tab) && typeof tab.id === "string" && typeof tab.name === "string" && typeof tab.code === "string")
+      .map((tab) => ({ id: tab.id, name: tab.name, code: tab.code }))
     : [];
 
   if (!tabs.length) return null;
@@ -625,6 +629,11 @@ export default function LeetCodeMode() {
   const currentCustomCasesRef = useRef<CustomCase[]>([]);
   const timerExpiryHandledRef = useRef(false);
   const workspaceSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesContent, setNotesContent] = useState("");
+  const [notesPos, setNotesPos] = useState<{ x: number; y: number } | null>(null);
+  const notesSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notesDragOffset = useRef<{ x: number; y: number } | null>(null);
 
   const currentProblem =
     view.type === "problem"
@@ -667,8 +676,8 @@ export default function LeetCodeMode() {
           return merged;
         });
       })
-      .catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+      .catch(() => { });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Seed starter snippet after async fetch completes (first open when cache is cold)
@@ -749,19 +758,19 @@ export default function LeetCodeMode() {
 
   function pushProgressToDb(nextProgress: Record<string, boolean>, nextDates: string[]) {
     if (isGuestSession()) return;
-    syncLCProgress({ progress: nextProgress, activity_dates: nextDates }).catch(() => {});
+    syncLCProgress({ progress: nextProgress, activity_dates: nextDates }).catch(() => { });
   }
 
   function pushWorkspaceToDb(problemSlug: string, workspace: CodeWorkspace) {
     if (isGuestSession()) return;
-    syncLCWorkspace(problemSlug, workspace).catch(() => {});
+    syncLCWorkspace(problemSlug, workspace).catch(() => { });
   }
 
   function schedulePushWorkspaceToDb(problemSlug: string, workspace: CodeWorkspace) {
     if (isGuestSession()) return;
     if (workspaceSyncTimerRef.current) clearTimeout(workspaceSyncTimerRef.current);
     workspaceSyncTimerRef.current = setTimeout(() => {
-      syncLCWorkspace(problemSlug, workspace).catch(() => {});
+      syncLCWorkspace(problemSlug, workspace).catch(() => { });
     }, 1500);
   }
 
@@ -825,6 +834,59 @@ export default function LeetCodeMode() {
 
     startTimer(parsed);
     setTimerMinutesInput(String(Math.round(parsed)));
+  }
+
+  function getNotesKey(problemSlug: string) {
+    return `${NOTES_KEY_PREFIX}:${problemSlug}`;
+  }
+
+  function openNotes(problemSlug: string) {
+    const local = localStorage.getItem(getNotesKey(problemSlug)) ?? "";
+    setNotesContent(local);
+    setNotesPos({ x: window.innerWidth - 520, y: Math.max(24, window.innerHeight - 580) });
+    setNotesOpen(true);
+    if (!local && !isGuestSession()) {
+      fetchLCNotes(problemSlug).then((remote) => {
+        if (!remote) return;
+        localStorage.setItem(getNotesKey(problemSlug), remote);
+        setNotesContent(remote);
+      }).catch(() => {});
+    }
+  }
+
+  function handleNotesDragStart(event: React.MouseEvent<HTMLDivElement>) {
+    if ((event.target as HTMLElement).closest("button")) return;
+    const modal = (event.currentTarget as HTMLElement).closest(".lc-notes-modal") as HTMLElement | null;
+    if (!modal) return;
+    const rect = modal.getBoundingClientRect();
+    notesDragOffset.current = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+
+    function onMove(moveEvent: MouseEvent) {
+      if (!notesDragOffset.current) return;
+      const x = Math.max(0, Math.min(window.innerWidth - rect.width, moveEvent.clientX - notesDragOffset.current.x));
+      const y = Math.max(0, Math.min(window.innerHeight - 60, moveEvent.clientY - notesDragOffset.current.y));
+      setNotesPos({ x, y });
+    }
+
+    function onUp() {
+      notesDragOffset.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    }
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
+  function handleNotesChange(problemSlug: string, value: string) {
+    setNotesContent(value);
+    localStorage.setItem(getNotesKey(problemSlug), value);
+    if (!isGuestSession()) {
+      if (notesSyncTimerRef.current) clearTimeout(notesSyncTimerRef.current);
+      notesSyncTimerRef.current = setTimeout(() => {
+        syncLCNotes(problemSlug, value).catch(() => {});
+      }, 1500);
+    }
   }
 
   function clearActiveTabWork() {
@@ -977,7 +1039,7 @@ export default function LeetCodeMode() {
             return { ...prev, [problemSlug]: parsed };
           });
         })
-        .catch(() => {});
+        .catch(() => { });
     }
 
     setView({ type: "problem", categoryId, problemSlug });
@@ -1302,8 +1364,8 @@ export default function LeetCodeMode() {
     : -1;
   const nextProblemInCategory =
     currentCategoryForNav &&
-    currentProblemIndexInCategory >= 0 &&
-    currentProblemIndexInCategory < currentCategoryForNav.problems.length - 1
+      currentProblemIndexInCategory >= 0 &&
+      currentProblemIndexInCategory < currentCategoryForNav.problems.length - 1
       ? currentCategoryForNav.problems[currentProblemIndexInCategory + 1]
       : null;
 
@@ -1347,27 +1409,31 @@ export default function LeetCodeMode() {
             NeetCode
           </a>
           <div className="lc-editor-actions">
-          <a className="lc-toolbar-btn" href={currentProblem.url} target="_blank" rel="noreferrer">
-            <ExternalLink size={16} />
-            Open
-          </a>
-          <button type="button" className="lc-toolbar-btn" onClick={handleFormat}>
-            <WrapText size={16} />
-            Format
-          </button>
-          <button type="button" className="lc-toolbar-btn" onClick={handleRunCode} disabled={!runnable || runnerLoading}>
-            {runnerLoading ? <Loader2 size={16} className="spin" /> : <Play size={16} />}
-            Run code
-          </button>
-          <button type="button" className="lc-toolbar-btn lc-toolbar-btn--kojo" onClick={() => openKojo(currentProblem)}>
-            <Sparkles size={16} />
-            Ask Kojo
-          </button>
-          <button type="button" className={progress[currentProblem.slug] ? "lc-toolbar-btn lc-toolbar-btn--done" : "lc-toolbar-btn"} onClick={() => toggleProgress(currentProblem)}>
-            {progress[currentProblem.slug] ? <CheckCircle2 size={16} /> : <Circle size={16} />}
-            {progress[currentProblem.slug] ? "Done" : "Mark done"}
-          </button>
-        </div>
+            <a className="lc-toolbar-btn" href={currentProblem.url} target="_blank" rel="noreferrer">
+              <ExternalLink size={16} />
+              Open
+            </a>
+            <button type="button" className="lc-toolbar-btn" onClick={handleFormat}>
+              <WrapText size={16} />
+              Format
+            </button>
+            <button type="button" className="lc-toolbar-btn" onClick={handleRunCode} disabled={!runnable || runnerLoading}>
+              {runnerLoading ? <Loader2 size={16} className="spin" /> : <Play size={16} />}
+              Run code
+            </button>
+            <button type="button" className="lc-toolbar-btn" onClick={() => openNotes(currentProblem.slug)}>
+              <Notebook size={16} />
+              Notes
+            </button>
+            <button type="button" className="lc-toolbar-btn lc-toolbar-btn--kojo" onClick={() => openKojo(currentProblem)}>
+              <Sparkles size={16} />
+              Ask Kojo
+            </button>
+            <button type="button" className={progress[currentProblem.slug] ? "lc-toolbar-btn lc-toolbar-btn--done" : "lc-toolbar-btn"} onClick={() => toggleProgress(currentProblem)}>
+              {progress[currentProblem.slug] ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+              {progress[currentProblem.slug] ? "Done" : "Mark done"}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1728,6 +1794,33 @@ export default function LeetCodeMode() {
               <button type="button" className="button button--primary lc-timeout-action" onClick={applyTimerFromInput}>
                 Start timer
               </button>
+            </div>
+          </div>
+        </>
+      ) : null}
+
+      {notesOpen ? (
+        <>
+          <div className="lc-kojo-backdrop" onClick={() => setNotesOpen(false)} />
+          <div
+            className="lc-kojo-modal lc-notes-modal"
+            style={notesPos ? { left: notesPos.x, top: notesPos.y, right: "unset", bottom: "unset" } : undefined}
+          >
+            <div className="lc-kojo-modal-header lc-notes-modal-header" onMouseDown={handleNotesDragStart}>
+              <div className="kojo-avatar"><Notebook size={16} /></div>
+              <span>Notes</span>
+              <button type="button" className="lc-kojo-close" onClick={() => setNotesOpen(false)} aria-label="Close notes">
+                <X size={17} />
+              </button>
+            </div>
+            <div className="lc-notes-body">
+              <textarea
+                className="lc-notes-textarea"
+                value={notesContent}
+                onChange={(event) => handleNotesChange(currentProblem.slug, event.target.value)}
+                placeholder="Jot down your approach, key observations, or edge cases..."
+                rows={14}
+              />
             </div>
           </div>
         </>

@@ -8,9 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_session
 from src.dependencies import get_current_user
-from src.models.lc_sync import LCActivityDate, LCCodeWorkspace, LCProgress
+from src.models.lc_sync import LCActivityDate, LCCodeWorkspace, LCProgress, LCProblemNote
 from src.models.user import User
 from src.schemas.leetcode_schema import (
+    LCNotesResponse,
+    LCNotesSyncRequest,
     LCProgressResponse,
     LCProgressSyncRequest,
     LCWorkspaceResponse,
@@ -177,5 +179,47 @@ async def sync_lc_workspace(
         row.workspace_json = workspace_json
     else:
         session.add(LCCodeWorkspace(user_id=user.id, problem_slug=problem_slug, workspace_json=workspace_json))
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ── Problem notes sync ────────────────────────────────────────────────────────
+
+@router.get("/notes/{problem_slug}", response_model=LCNotesResponse)
+async def get_lc_notes(
+    problem_slug: str,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LCNotesResponse:
+    row = (
+        await session.execute(
+            select(LCProblemNote).where(
+                LCProblemNote.user_id == user.id,
+                LCProblemNote.problem_slug == problem_slug,
+            )
+        )
+    ).scalar_one_or_none()
+    return LCNotesResponse(notes=row.notes if row else "")
+
+
+@router.put("/notes/{problem_slug}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def sync_lc_notes(
+    problem_slug: str,
+    body: LCNotesSyncRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> Response:
+    row = (
+        await session.execute(
+            select(LCProblemNote).where(
+                LCProblemNote.user_id == user.id,
+                LCProblemNote.problem_slug == problem_slug,
+            )
+        )
+    ).scalar_one_or_none()
+    if row:
+        row.notes = body.notes
+    else:
+        session.add(LCProblemNote(user_id=user.id, problem_slug=problem_slug, notes=body.notes))
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

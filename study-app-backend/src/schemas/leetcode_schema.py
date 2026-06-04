@@ -74,3 +74,10 @@ class LCWorkspaceResponse(BaseModel):
 
 class LCWorkspaceSyncRequest(BaseModel):
     workspace: Any = Field(...)
+
+class LCNotesSyncRequest(BaseModel):
+    notes: str = Field(default="", max_length=10000)
+
+
+class LCNotesResponse(BaseModel):
+    notes: str = ""

@@ -745,6 +745,22 @@ export async function syncLCWorkspace(problemSlug: string, workspace: unknown): 
   });
 }
 
+export async function fetchLCNotes(problemSlug: string): Promise<string> {
+  try {
+    const result = await request<{ notes: string }>(`/leetcode/notes/${problemSlug}`);
+    return result.notes ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export async function syncLCNotes(problemSlug: string, notes: string): Promise<void> {
+  await request(`/leetcode/notes/${problemSlug}`, {
+    method: "PUT",
+    body: JSON.stringify({ notes }),
+  });
+}
+
 // ── Mock Interview ────────────────────────────────────────────────────────────
 
 export async function createMockInterviewSession(

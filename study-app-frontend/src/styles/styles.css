@@ -10117,3 +10117,45 @@ h3 {
   background: #fff7ed;
   color: #c2410c;
 }
+
+/* LC Notes modal */
+.lc-notes-modal {
+  width: 480px;
+}
+
+.lc-notes-modal-header {
+  background: rgba(233, 245, 219, 0.58);
+  cursor: move;
+  user-select: none;
+}
+
+.lc-notes-body {
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lc-notes-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 240px;
+  padding: 10px 12px;
+  border: 1.5px solid #d1e8b0;
+  border-radius: 8px;
+  background: var(--green-lightest);
+  font-size: 0.88rem;
+  font-family: inherit;
+  line-height: 1.55;
+  color: var(--ink);
+  outline: none;
+}
+
+.lc-notes-textarea:focus {
+  border-color: var(--green-dark);
+}
+
+.lc-notes-textarea::placeholder {
+  color: #9ab87a;
+}
