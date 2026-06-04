@@ -83,7 +83,9 @@ async def kojo_chat(
         )
         duration_ms = int((time.monotonic() - _t0) * 1000)
         try:
-            await UsageEventRepository(session).log_event(user.id, "kojo_chat", duration_ms)
+            await UsageEventRepository(session).log_event(
+                user.id, "kojo_chat", duration_ms, provider=body.provider
+            )
             await session.commit()
         except Exception:
             pass
@@ -91,6 +93,15 @@ async def kojo_chat(
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except LLMException as exc:
+        duration_ms = int((time.monotonic() - _t0) * 1000)
+        try:
+            await UsageEventRepository(session).log_event(
+                user.id, "kojo_chat", duration_ms, provider=body.provider,
+                success=False, error_type="LLMException"
+            )
+            await session.commit()
+        except Exception:
+            pass
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 

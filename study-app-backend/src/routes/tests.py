@@ -131,19 +131,34 @@ async def _generate_questions_background(
                 test.generation_status = "ready"
             duration_ms = int((time.monotonic() - _t0) * 1000)
             try:
-                await UsageEventRepository(session).log_event(user_id, "test_generation", duration_ms)
+                await UsageEventRepository(session).log_event(
+                    user_id, "test_generation", duration_ms, provider=provider
+                )
             except Exception:
                 pass
             await session.commit()
             logger.info("Background test generation complete", extra={"test_id": test_id})
         except Exception as exc:
             logger.warning("Background test generation failed for test_id=%s: %s", test_id, exc)
+            duration_ms = int((time.monotonic() - _t0) * 1000)
+            error_label = type(exc).__name__
             async with async_session_maker() as err_session:
                 test = await err_session.get(Test, test_id)
                 if test is not None:
                     test.generation_status = "failed"
                     test.generation_error = str(exc)[:500]
-                    await err_session.commit()
+                try:
+                    await UsageEventRepository(err_session).log_event(
+                        user_id,
+                        "test_generation",
+                        duration_ms,
+                        provider=provider,
+                        success=False,
+                        error_type=error_label[:50],
+                    )
+                except Exception:
+                    pass
+                await err_session.commit()
 
 
 @router.post(

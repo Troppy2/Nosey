@@ -80,7 +80,9 @@ async def generate_flashcards(
             )
         duration_ms = int((time.monotonic() - _t0) * 1000)
         try:
-            await UsageEventRepository(session).log_event(user.id, "flashcard_generation", duration_ms)
+            await UsageEventRepository(session).log_event(
+                user.id, "flashcard_generation", duration_ms, provider=data.provider
+            )
             await session.commit()
         except Exception:
             pass

@@ -1,4 +1,15 @@
-import { AlertTriangle, RefreshCw, ShieldCheck, Users, Zap, Clock } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  RefreshCw,
+  ShieldCheck,
+  TrendingUp,
+  Users,
+  XCircle,
+  Zap,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -25,6 +36,26 @@ function formatFeatureName(feature: string): string {
   return feature.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function formatProviderName(provider: string): string {
+  const map: Record<string, string> = {
+    groq: "Groq",
+    openai: "OpenAI",
+    claude: "Claude (Anthropic)",
+    ollama: "Ollama (local)",
+    gemini: "Gemini",
+  };
+  return map[provider.toLowerCase()] ?? provider;
+}
+
+function formatDate(iso: string): string {
+  const d = new Date(iso + "T00:00:00Z");
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+function pct(rate: number): string {
+  return `${(rate * 100).toFixed(1)}%`;
+}
+
 function TimeRemaining({ expiresAt }: { expiresAt: number }) {
   const [secsLeft, setSecsLeft] = useState(() => Math.max(0, Math.floor((expiresAt - Date.now()) / 1000)));
 
@@ -48,6 +79,15 @@ function TimeRemaining({ expiresAt }: { expiresAt: number }) {
   );
 }
 
+function DailyActivityBar({ count, max }: { count: number; max: number }) {
+  const pctWidth = max > 0 ? Math.max(2, Math.round((count / max) * 100)) : 0;
+  return (
+    <div className="admin-activity-bar-wrap">
+      <div className="admin-activity-bar" style={{ width: `${pctWidth}%` }} />
+    </div>
+  );
+}
+
 export default function AdminPanel() {
   const navigate = useNavigate();
   const user = getStoredUser();
@@ -64,14 +104,12 @@ export default function AdminPanel() {
 
   const expiredCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Access guard: only admin email allowed
   useEffect(() => {
     if (!user || user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
       navigate("/settings", { replace: true });
     }
   }, [user, navigate]);
 
-  // Poll for session expiry and trigger re-auth prompt
   useEffect(() => {
     if (!authed) return;
     expiredCheckRef.current = setInterval(() => {
@@ -129,12 +167,10 @@ export default function AdminPanel() {
     navigate("/settings");
   }
 
-  // Not admin email
   if (!user || user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
     return null;
   }
 
-  // Auth / re-auth screen
   if (!authed || reauthing) {
     return (
       <div className="page page-narrow">
@@ -170,13 +206,15 @@ export default function AdminPanel() {
     );
   }
 
+  const maxDailyCount = stats ? Math.max(...stats.daily_counts.map((d) => d.count), 1) : 1;
+
   return (
     <div className="page">
       <header className="page-header">
         <div>
           <span className="eyebrow">Admin</span>
           <h1>Admin panel</h1>
-          <p className="muted">Platform overview, user roster, and feature performance metrics.</p>
+          <p className="muted">Platform overview, feature health, and LLM provider stats.</p>
         </div>
         <div className="toolbar">
           {expiresAt ? <TimeRemaining expiresAt={expiresAt} /> : null}
@@ -206,6 +244,7 @@ export default function AdminPanel() {
 
       {stats ? (
         <>
+          {/* Overview cards */}
           <section className="admin-stats-grid">
             <div className="admin-stat-card">
               <Users size={20} className="admin-stat-icon" />
@@ -213,35 +252,124 @@ export default function AdminPanel() {
               <p className="admin-stat-label">Total users</p>
             </div>
             <div className="admin-stat-card">
+              <Activity size={20} className="admin-stat-icon" />
+              <p className="admin-stat-value">{stats.active_users_7d.toLocaleString()}</p>
+              <p className="admin-stat-label">Active users (7d)</p>
+            </div>
+            <div className="admin-stat-card">
+              <TrendingUp size={20} className="admin-stat-icon" />
+              <p className="admin-stat-value">{stats.total_usage_events.toLocaleString()}</p>
+              <p className="admin-stat-label">Feature calls logged</p>
+            </div>
+            <div className="admin-stat-card">
               <Zap size={20} className="admin-stat-icon" />
               <p className="admin-stat-value">{stats.total_tokens_used.toLocaleString()}</p>
               <p className="admin-stat-label">Tokens used (est.)</p>
             </div>
-            <div className="admin-stat-card">
-              <Clock size={20} className="admin-stat-icon" />
-              <p className="admin-stat-value">{stats.total_usage_events.toLocaleString()}</p>
-              <p className="admin-stat-label">Feature calls logged</p>
-            </div>
           </section>
 
-          {stats.feature_timings.length > 0 ? (
+          {/* Feature usage ranked */}
+          {stats.feature_stats.length > 0 ? (
             <section className="admin-section">
-              <h2 className="admin-section-title">Average response time by feature</h2>
+              <h2 className="admin-section-title">Feature usage</h2>
               <div className="admin-table-wrap">
                 <table className="admin-table">
                   <thead>
                     <tr>
                       <th>Feature</th>
-                      <th>Avg response time</th>
                       <th>Calls</th>
+                      <th>Errors</th>
+                      <th>Error rate</th>
+                      <th>Avg response</th>
+                      <th>Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {stats.feature_timings.map((ft) => (
-                      <tr key={ft.feature}>
-                        <td>{formatFeatureName(ft.feature)}</td>
-                        <td>{formatMs(ft.avg_ms)}</td>
-                        <td>{ft.call_count.toLocaleString()}</td>
+                    {stats.feature_stats.map((fs) => {
+                      const healthy = fs.error_rate < 0.05;
+                      const degraded = fs.error_rate >= 0.05 && fs.error_rate < 0.2;
+                      return (
+                        <tr key={fs.feature}>
+                          <td>{formatFeatureName(fs.feature)}</td>
+                          <td>{fs.call_count.toLocaleString()}</td>
+                          <td>{fs.error_count.toLocaleString()}</td>
+                          <td>
+                            <span
+                              className={`admin-badge ${
+                                healthy
+                                  ? "admin-badge--green"
+                                  : degraded
+                                  ? "admin-badge--yellow"
+                                  : "admin-badge--red"
+                              }`}
+                            >
+                              {pct(fs.error_rate)}
+                            </span>
+                          </td>
+                          <td>{formatMs(fs.avg_ms)}</td>
+                          <td>
+                            {healthy ? (
+                              <span className="admin-health admin-health--ok">
+                                <CheckCircle size={13} /> OK
+                              </span>
+                            ) : degraded ? (
+                              <span className="admin-health admin-health--warn">
+                                <AlertTriangle size={13} /> Degraded
+                              </span>
+                            ) : (
+                              <span className="admin-health admin-health--error">
+                                <XCircle size={13} /> Failing
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
+
+          {/* LLM provider health */}
+          {stats.provider_stats.length > 0 ? (
+            <section className="admin-section">
+              <h2 className="admin-section-title">LLM provider health</h2>
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Provider</th>
+                      <th>Calls</th>
+                      <th>Successes</th>
+                      <th>Failures</th>
+                      <th>Success rate</th>
+                      <th>Avg response</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.provider_stats.map((ps) => (
+                      <tr key={ps.provider}>
+                        <td>
+                          <strong>{formatProviderName(ps.provider)}</strong>
+                        </td>
+                        <td>{ps.call_count.toLocaleString()}</td>
+                        <td className="admin-cell-green">{ps.success_count.toLocaleString()}</td>
+                        <td className="admin-cell-red">{ps.error_count.toLocaleString()}</td>
+                        <td>
+                          <span
+                            className={`admin-badge ${
+                              ps.success_rate >= 0.95
+                                ? "admin-badge--green"
+                                : ps.success_rate >= 0.8
+                                ? "admin-badge--yellow"
+                                : "admin-badge--red"
+                            }`}
+                          >
+                            {pct(ps.success_rate)}
+                          </span>
+                        </td>
+                        <td>{formatMs(ps.avg_ms)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -250,7 +378,66 @@ export default function AdminPanel() {
             </section>
           ) : null}
 
-          {stats.tokens_per_user.length > 0 ? (
+          {/* Daily activity */}
+          {stats.daily_counts.length > 0 ? (
+            <section className="admin-section">
+              <h2 className="admin-section-title">Daily activity (last 14 days)</h2>
+              <div className="admin-table-wrap">
+                <table className="admin-table admin-activity-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Events</th>
+                      <th style={{ width: "100%" }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.daily_counts.map((dc) => (
+                      <tr key={dc.date}>
+                        <td className="admin-cell-date">{formatDate(dc.date)}</td>
+                        <td className="admin-cell-count">{dc.count.toLocaleString()}</td>
+                        <td>
+                          <DailyActivityBar count={dc.count} max={maxDailyCount} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
+
+          {/* Error breakdown */}
+          {stats.error_breakdown.length > 0 ? (
+            <section className="admin-section">
+              <h2 className="admin-section-title">Error breakdown</h2>
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Error type</th>
+                      <th>Feature</th>
+                      <th>Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.error_breakdown.map((eb, i) => (
+                      <tr key={i}>
+                        <td>
+                          <span className="admin-badge admin-badge--red">{eb.error_type}</span>
+                        </td>
+                        <td>{formatFeatureName(eb.feature)}</td>
+                        <td>{eb.count.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
+
+          {/* Token usage by user */}
+          {stats.tokens_per_user.some((r) => r.total_tokens > 0) ? (
             <section className="admin-section">
               <h2 className="admin-section-title">Token usage by user</h2>
               <div className="admin-table-wrap">
@@ -280,6 +467,7 @@ export default function AdminPanel() {
         <p className="muted">Loading stats...</p>
       ) : null}
 
+      {/* User roster */}
       <section className="admin-section">
         <h2 className="admin-section-title">All users ({users.length})</h2>
         {users.length === 0 && !loading ? (

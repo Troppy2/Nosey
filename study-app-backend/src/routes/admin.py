@@ -59,12 +59,45 @@ class TokenUsageRow(BaseModel):
     call_count: int
 
 
+class FeatureStat(BaseModel):
+    feature: str
+    call_count: int
+    error_count: int
+    avg_ms: float
+    error_rate: float
+
+
+class ProviderStat(BaseModel):
+    provider: str
+    call_count: int
+    success_count: int
+    error_count: int
+    avg_ms: float
+    success_rate: float
+
+
+class DailyCount(BaseModel):
+    date: str
+    count: int
+
+
+class ErrorBreakdownRow(BaseModel):
+    error_type: str
+    feature: str
+    count: int
+
+
 class AdminStatsResponse(BaseModel):
     total_users: int
     total_usage_events: int
     total_tokens_used: int
+    active_users_7d: int
     feature_timings: list[FeatureTiming]
     tokens_per_user: list[TokenUsageRow]
+    feature_stats: list[FeatureStat]
+    provider_stats: list[ProviderStat]
+    daily_counts: list[DailyCount]
+    error_breakdown: list[ErrorBreakdownRow]
 
 
 @router.post("/authenticate", response_model=AdminTokenResponse)
@@ -96,16 +129,30 @@ async def get_admin_stats(
     user_repo = UserRepository(session)
     usage_repo = UsageEventRepository(session)
 
-    total_users, total_events, total_tokens, feature_timings, tokens_per_user = await _gather_stats(
-        user_repo, usage_repo
-    )
+    (
+        total_users,
+        total_events,
+        total_tokens,
+        feature_timings,
+        tokens_per_user,
+        feature_stats,
+        provider_stats,
+        daily_counts,
+        active_users_7d,
+        error_breakdown,
+    ) = await _gather_stats(user_repo, usage_repo)
 
     return AdminStatsResponse(
         total_users=total_users,
         total_usage_events=total_events,
         total_tokens_used=total_tokens,
+        active_users_7d=active_users_7d,
         feature_timings=[FeatureTiming(**ft) for ft in feature_timings],
         tokens_per_user=[TokenUsageRow(**tp) for tp in tokens_per_user],
+        feature_stats=[FeatureStat(**fs) for fs in feature_stats],
+        provider_stats=[ProviderStat(**ps) for ps in provider_stats],
+        daily_counts=[DailyCount(**dc) for dc in daily_counts],
+        error_breakdown=[ErrorBreakdownRow(**eb) for eb in error_breakdown],
     )
 
 
@@ -120,9 +167,40 @@ async def list_all_users(
 
 
 async def _gather_stats(user_repo: UserRepository, usage_repo: UsageEventRepository):
-    total_users = await user_repo.count_users()
-    total_events = await usage_repo.get_total_events()
-    total_tokens = await usage_repo.get_total_tokens()
-    feature_timings = await usage_repo.get_avg_duration_by_feature()
-    tokens_per_user = await usage_repo.get_tokens_per_user()
-    return total_users, total_events, total_tokens, feature_timings, tokens_per_user
+    import asyncio
+
+    (
+        total_users,
+        total_events,
+        total_tokens,
+        feature_timings,
+        tokens_per_user,
+        feature_stats,
+        provider_stats,
+        daily_counts,
+        active_users_7d,
+        error_breakdown,
+    ) = await asyncio.gather(
+        user_repo.count_users(),
+        usage_repo.get_total_events(),
+        usage_repo.get_total_tokens(),
+        usage_repo.get_avg_duration_by_feature(),
+        usage_repo.get_tokens_per_user(),
+        usage_repo.get_feature_stats(),
+        usage_repo.get_provider_stats(),
+        usage_repo.get_daily_counts(days=14),
+        usage_repo.get_active_users_count(days=7),
+        usage_repo.get_error_breakdown(),
+    )
+    return (
+        total_users,
+        total_events,
+        total_tokens,
+        feature_timings,
+        tokens_per_user,
+        feature_stats,
+        provider_stats,
+        daily_counts,
+        active_users_7d,
+        error_breakdown,
+    )
