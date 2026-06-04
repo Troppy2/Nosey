@@ -59,3 +59,20 @@ class LCCodeWorkspace(Base, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"LCCodeWorkspace(user_id={self.user_id!r}, slug={self.problem_slug!r})"
+
+
+class LCProblemNote(Base, TimestampMixin):
+    __tablename__ = "lc_problem_notes"
+    __table_args__ = (UniqueConstraint("user_id", "problem_slug", name="uq_lc_note_user_problem"),)
+
+    id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        BIGINT_ID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    problem_slug: Mapped[str] = mapped_column(String(200), nullable=False)
+    notes: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    user: Mapped[User] = relationship("User", back_populates="lc_problem_notes")
+
+    def __repr__(self) -> str:
+        return f"LCProblemNote(user_id={self.user_id!r}, slug={self.problem_slug!r})"
