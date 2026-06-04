@@ -34,6 +34,7 @@ jobs:
           GOOGLE_CLIENT_ID: ci-test-client-id
           GOOGLE_CLIENT_SECRET: ci-test-client-secret
           ENVIRONMENT: test
+          ADMIN_EMAIL: ci-admin@example.com
 
   frontend:
     name: Frontend — type check
