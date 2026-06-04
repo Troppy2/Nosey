@@ -10118,6 +10118,75 @@ h3 {
   color: #c2410c;
 }
 
+/* Admin badge extended colors */
+.admin-badge--yellow {
+  background: #fef9c3;
+  color: #a16207;
+}
+
+.admin-badge--red {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* Feature health indicators */
+.admin-health {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.admin-health--ok {
+  color: #16a34a;
+}
+
+.admin-health--warn {
+  color: #d97706;
+}
+
+.admin-health--error {
+  color: #dc2626;
+}
+
+/* Colored table cells */
+.admin-cell-green {
+  color: #16a34a;
+  font-weight: 500;
+}
+
+.admin-cell-red {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.admin-cell-count {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+/* Daily activity bar chart */
+.admin-activity-table {
+  min-width: 360px;
+}
+
+.admin-activity-bar-wrap {
+  height: 10px;
+  background: var(--green-lightest);
+  border-radius: 99px;
+  overflow: hidden;
+  min-width: 80px;
+}
+
+.admin-activity-bar {
+  height: 100%;
+  background: var(--green-dark);
+  border-radius: 99px;
+  transition: width 0.3s ease;
+}
+
 /* LC Notes modal */
 .lc-notes-modal {
   width: 480px;

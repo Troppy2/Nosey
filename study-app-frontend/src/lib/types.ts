@@ -245,12 +245,45 @@ export type TokenUsageRow = {
   call_count: number;
 };
 
+export type FeatureStat = {
+  feature: string;
+  call_count: number;
+  error_count: number;
+  avg_ms: number;
+  error_rate: number;
+};
+
+export type ProviderStat = {
+  provider: string;
+  call_count: number;
+  success_count: number;
+  error_count: number;
+  avg_ms: number;
+  success_rate: number;
+};
+
+export type DailyCount = {
+  date: string;
+  count: number;
+};
+
+export type ErrorBreakdownRow = {
+  error_type: string;
+  feature: string;
+  count: number;
+};
+
 export type AdminStats = {
   total_users: number;
   total_usage_events: number;
   total_tokens_used: number;
+  active_users_7d: number;
   feature_timings: FeatureTiming[];
   tokens_per_user: TokenUsageRow[];
+  feature_stats: FeatureStat[];
+  provider_stats: ProviderStat[];
+  daily_counts: DailyCount[];
+  error_breakdown: ErrorBreakdownRow[];
 };
 
 export type AdminTokenResponse = {

@@ -16,6 +16,7 @@ from src.dependencies import get_current_user
 from src.models.folder import Folder
 from src.models.folder_file import FolderFile
 from src.models.user import User
+from src.repositories.usage_event_repository import UsageEventRepository
 from src.services.file_service import FileService
 from src.utils.exceptions import ValidationException
 from src.utils.logger import get_logger
@@ -84,8 +85,11 @@ async def _extract_and_update(
     file_name: str,
     file_type: str,
     folder_id: int,
+    user_id: int,
 ) -> None:
     """Background task: extract text from bytes and update the folder_file record."""
+    import time as _time
+    _t0 = _time.monotonic()
     async with async_session_maker() as session:
         try:
             svc = FileService()
@@ -115,6 +119,16 @@ async def _extract_and_update(
                 record.size_bytes = len(content.encode("utf-8"))
                 record.upload_status = "ready"
 
+            duration_ms = int((_time.monotonic() - _t0) * 1000)
+            success = record.upload_status == "ready"
+            error_label = "duplicate_content" if not success else None
+            try:
+                await UsageEventRepository(session).log_event(
+                    user_id, "file_upload", duration_ms,
+                    success=success, error_type=error_label
+                )
+            except Exception:
+                pass
             await session.commit()
             logger.info(
                 "Background extraction complete",
@@ -122,12 +136,20 @@ async def _extract_and_update(
             )
         except Exception as exc:
             logger.warning("Background extraction failed for file_id=%s: %s", file_id, exc)
+            duration_ms = int((_time.monotonic() - _t0) * 1000)
             async with async_session_maker() as err_session:
                 record = await err_session.get(FolderFile, file_id)
                 if record is not None:
                     record.upload_status = "error"
                     record.upload_error = str(exc)[:500]
-                    await err_session.commit()
+                try:
+                    await UsageEventRepository(err_session).log_event(
+                        user_id, "file_upload", duration_ms,
+                        success=False, error_type=type(exc).__name__[:50]
+                    )
+                except Exception:
+                    pass
+                await err_session.commit()
 
 
 @router.get("/{folder_id}/files", response_model=list[FolderFileResponse])
@@ -214,7 +236,7 @@ async def upload_folder_files(
         await session.flush()
 
         # Schedule text extraction in the background — user can navigate away.
-        background_tasks.add_task(_extract_and_update, record.id, data, name, file_type, folder_id)
+        background_tasks.add_task(_extract_and_update, record.id, data, name, file_type, folder_id, user.id)
 
         created.append(FolderFileResponse.model_validate(record))
         logger.info(

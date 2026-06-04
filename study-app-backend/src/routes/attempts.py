@@ -1,9 +1,12 @@
+import time
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_session
 from src.dependencies import get_current_user
 from src.models.user import User
+from src.repositories.usage_event_repository import UsageEventRepository
 from src.schemas.attempt_schema import (
     AttemptDetail,
     AttemptResult,
@@ -28,8 +31,16 @@ async def submit_attempt(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> AttemptResult:
+    _t0 = time.monotonic()
     try:
-        return await GradingService().submit_and_grade(test_id, user.id, request.answers, session)
+        result = await GradingService().submit_and_grade(test_id, user.id, request.answers, session)
+        duration_ms = int((time.monotonic() - _t0) * 1000)
+        try:
+            await UsageEventRepository(session).log_event(user.id, "test_grading", duration_ms)
+            await session.commit()
+        except Exception:
+            pass
+        return result
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except StudyAppException as exc:

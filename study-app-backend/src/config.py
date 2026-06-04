@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     llm_timeout_seconds: int = Field(default=30, alias="LLM_TIMEOUT_SECONDS")
     llm_uncertainty_threshold: float = Field(default=0.6, alias="LLM_UNCERTAINTY_THRESHOLD")
     llm_provider: str = Field(default="auto", alias="LLM_PROVIDER")
-    admin_email: str = Field(default="jamesinah34@gmail.com", alias="ADMIN_EMAIL")
+    admin_email: str = Field(alias="ADMIN_EMAIL")
 
     @field_validator("cors_origins", mode="before")
     @classmethod
