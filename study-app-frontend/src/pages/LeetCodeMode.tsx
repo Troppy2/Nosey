@@ -48,6 +48,7 @@ import {
   fetchLCNotes,
   fetchLCProgress,
   fetchLCWorkspace,
+  getStoredUser,
   isGuestSession,
   syncLCNotes,
   syncLCProgress,
@@ -112,8 +113,18 @@ type CodeWorkspace = {
   activeTabId: string;
 };
 
-const PROGRESS_KEY = "nosey_lc_progress";
-const ACTIVITY_KEY = "nosey_lc_activity_dates";
+function getUserStoragePrefix(): string {
+  const user = getStoredUser();
+  return user ? `u${user.id}` : "guest";
+}
+
+function getProgressKey(): string {
+  return `${getUserStoragePrefix()}:nosey_lc_progress`;
+}
+
+function getActivityKey(): string {
+  return `${getUserStoragePrefix()}:nosey_lc_activity_dates`;
+}
 const LEETCODE_BASE_URL = "https://leetcode.com/problems";
 const CUSTOM_TEST_LIMIT = 2;
 const MAX_CODE_TABS = 5;
@@ -402,11 +413,11 @@ function loadJson<T>(key: string, fallback: T): T {
 }
 
 function saveProgress(progress: Record<string, boolean>) {
-  localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+  localStorage.setItem(getProgressKey(), JSON.stringify(progress));
 }
 
 function saveActivityDates(dates: string[]) {
-  localStorage.setItem(ACTIVITY_KEY, JSON.stringify(dates));
+  localStorage.setItem(getActivityKey(), JSON.stringify(dates));
 }
 
 function getTabStorageId() {
@@ -430,11 +441,11 @@ function makeTabId() {
 }
 
 function getCodeWorkspaceKey(problemSlug: string) {
-  return `${CODE_WORKSPACE_KEY_PREFIX}:${getTabStorageId()}:${problemSlug}`;
+  return `${CODE_WORKSPACE_KEY_PREFIX}:${getUserStoragePrefix()}:${getTabStorageId()}:${problemSlug}`;
 }
 
 function getLegacyCodeKey(problemSlug: string) {
-  return `${CODE_KEY_PREFIX}:${getTabStorageId()}:${problemSlug}`;
+  return `${CODE_KEY_PREFIX}:${getUserStoragePrefix()}:${getTabStorageId()}:${problemSlug}`;
 }
 
 function createDefaultWorkspace(initialCode = ""): CodeWorkspace {
@@ -491,12 +502,6 @@ function loadCodeWorkspace(problemSlug: string) {
   const legacyCurrentTabCode = localStorage.getItem(getLegacyCodeKey(problemSlug));
   if (legacyCurrentTabCode !== null) {
     return createDefaultWorkspace(legacyCurrentTabCode);
-  }
-
-  const legacyKey = `${CODE_KEY_PREFIX}_${problemSlug}`;
-  const legacyValue = localStorage.getItem(legacyKey);
-  if (legacyValue !== null) {
-    return createDefaultWorkspace(legacyValue);
   }
 
   return createDefaultWorkspace();
@@ -599,8 +604,8 @@ function isRunnable(problemData?: LeetCodeProblemData) {
 export default function LeetCodeMode() {
   const { generationProvider } = useSettings();
   const [view, setView] = useState<View>({ type: "tree" });
-  const [progress, setProgress] = useState<Record<string, boolean>>(() => loadJson(PROGRESS_KEY, {}));
-  const [activityDates, setActivityDates] = useState<string[]>(() => loadJson(ACTIVITY_KEY, []));
+  const [progress, setProgress] = useState<Record<string, boolean>>(() => loadJson(getProgressKey(), {}));
+  const [activityDates, setActivityDates] = useState<string[]>(() => loadJson(getActivityKey(), []));
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [codeWorkspaces, setCodeWorkspaces] = useState<Record<string, CodeWorkspace>>({});
@@ -837,7 +842,7 @@ export default function LeetCodeMode() {
   }
 
   function getNotesKey(problemSlug: string) {
-    return `${NOTES_KEY_PREFIX}:${problemSlug}`;
+    return `${NOTES_KEY_PREFIX}:${getUserStoragePrefix()}:${problemSlug}`;
   }
 
   function openNotes(problemSlug: string) {
@@ -1243,7 +1248,7 @@ export default function LeetCodeMode() {
             className="lc-stat-tile lc-stat-tile--streak"
             data-tooltip={
               activityDates.includes(todayKey())
-                ? "Streak safe , solved today!"
+                ? "Streak safe, solved today!"
                 : `${streakExpiresIn()} left to keep your streak`
             }
           >
