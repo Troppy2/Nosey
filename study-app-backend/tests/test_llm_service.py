@@ -20,6 +20,7 @@ from src.services.llm_service import (
     LLMService,
 )
 from src.utils.exceptions import LLMException
+from src.utils.serialization import safe_serialize_payload
 
 # ── shared fixtures ────────────────────────────────────────────────────────────
 
@@ -96,6 +97,17 @@ def fake_settings(groq_key: str | None = FAKE_KEY, timeout: int = 30, max_tokens
 
 
 # ── _strip_metadata ────────────────────────────────────────────────────────────
+
+class TestSafeSerializePayload:
+    def test_safe_serialize_long_payload_returns_string(self):
+        payload = {"items": ["x" * 1000 for _ in range(2000)]}
+
+        serialized = safe_serialize_payload(payload)
+
+        assert isinstance(serialized, str)
+        assert len(serialized) > 100_000
+        assert len(serialized) >= sum(len(item) for item in payload["items"])
+
 
 class TestStripMetadata:
     svc = LLMService()
@@ -389,6 +401,20 @@ class TestCompleteTextGroq:
             with patch("src.services.llm_service.settings", fake_settings()):
                 await self.svc._complete_text_groq("prompt")
         assert mock_client.post.call_args.args[0] == "https://api.groq.com/openai/v1/chat/completions"
+
+    async def test_provider_receives_serialized_string_for_long_payload(self):
+        payload = {"topics": [{"name": f"topic-{i}", "body": "x" * 1000} for i in range(150)]}
+
+        with mock_httpx_post(groq_text_body("ok")) as mock_client:
+            with patch("src.services.llm_service.settings", fake_settings()):
+                await self.svc._complete_text_groq(payload)  # type: ignore[arg-type]
+
+        body = mock_client.post.call_args.kwargs["json"]
+        outgoing = body["messages"][0]["content"]
+        assert isinstance(outgoing, str)
+        assert len(outgoing) > 100_000
+        assert outgoing != "[object Object]"
+        assert str(payload) != "[object Object]"
 
     async def test_propagates_http_error(self):
         mock_resp = MagicMock()

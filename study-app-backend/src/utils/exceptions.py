@@ -18,3 +18,7 @@ class ValidationException(StudyAppException):
 
 class LLMException(StudyAppException):
     pass
+
+
+class SerializationError(StudyAppException):
+    pass

@@ -16,6 +16,7 @@ from src.schemas.attempt_schema import FRQGrade
 from src.services.rag_service import HybridRAGService
 from src.utils.logger import get_logger
 from src.utils.latex_utils import normalize_latex
+from src.utils.serialization import safe_serialize_payload
 from typing import Any, Optional
 
 logger = get_logger(__name__)
@@ -1526,6 +1527,16 @@ Rules:
             return await self._complete_ollama(prompt)
         raise LLMException(f"Unsupported LLM provider: {provider}")
 
+    def _prepare_llm_payload(self, payload: object, provider: str) -> str:
+        serialized = safe_serialize_payload(payload)
+        logger.debug(
+            "Sending LLM payload provider=%s length=%d preview=%s",
+            provider,
+            len(serialized),
+            serialized[:2000],
+        )
+        return serialized
+
     def retrieve_context_for_query(
         self,
         notes: str,
@@ -1725,12 +1736,14 @@ Rules:
 
     async def _complete_text_gemini(self, prompt: str) -> str:
         async def _do() -> str:
+            prompt_body = self._prepare_llm_payload(prompt, "gemini")
             async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
                 response = await client.post(
                     "https://generativelanguage.googleapis.com/v1beta/models/deepseek-v4-flash:cloud:generateContent",
                     params={"key": settings.google_ai_api_key},
+                    headers={"Content-Type": "application/json; charset=utf-8"},
                     json={
-                        "contents": [{"parts": [{"text": prompt}]}],
+                        "contents": [{"parts": [{"text": prompt_body}]}],
                         "generationConfig": {
                             "maxOutputTokens": settings.llm_max_tokens,
                             "temperature": 0.7,
@@ -1774,7 +1787,8 @@ Rules:
     async def _complete_text_ollama(self, prompt: str) -> str:
         from src.utils.exceptions import LLMException
         try:
-            headers = {}
+            prompt_body = self._prepare_llm_payload(prompt, "ollama")
+            headers = {"Content-Type": "application/json; charset=utf-8"}
             if settings.ollama_api_key:
                 headers["Authorization"] = f"Bearer {settings.ollama_api_key}"
             async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
@@ -1783,7 +1797,7 @@ Rules:
                     headers=headers,
                     json={
                         "model": settings.ollama_model,
-                        "prompt": prompt,
+                        "prompt": prompt_body,
                         "stream": False,
                         "options": {"num_predict": settings.llm_max_tokens},
                     },
@@ -1809,13 +1823,17 @@ Rules:
 
     async def _complete_text_groq(self, prompt: str) -> str:
         async def _do() -> str:
+            prompt_body = self._prepare_llm_payload(prompt, "groq")
             async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
                 response = await client.post(
                     "https://api.groq.com/openai/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {settings.groq_api_key}"},
+                    headers={
+                        "Authorization": f"Bearer {settings.groq_api_key}",
+                        "Content-Type": "application/json; charset=utf-8",
+                    },
                     json={
                         "model": "llama-3.1-8b-instant",
-                        "messages": [{"role": "user", "content": prompt}],
+                        "messages": [{"role": "user", "content": prompt_body}],
                         "temperature": 0.7,
                         "max_tokens": settings.llm_max_tokens,
                     },
@@ -1826,18 +1844,19 @@ Rules:
 
     async def _complete_text_anthropic(self, prompt: str) -> str:
         async def _do() -> str:
+            prompt_body = self._prepare_llm_payload(prompt, "claude")
             async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
                 response = await client.post(
                     "https://api.anthropic.com/v1/messages",
                     headers={
                         "x-api-key": settings.anthropic_api_key or "",
                         "anthropic-version": "2023-06-01",
-                        "content-type": "application/json",
+                        "Content-Type": "application/json; charset=utf-8",
                     },
                     json={
                         "model": settings.anthropic_model,
                         "max_tokens": settings.llm_max_tokens,
-                        "messages": [{"role": "user", "content": prompt}],
+                        "messages": [{"role": "user", "content": prompt_body}],
                     },
                 )
                 response.raise_for_status()
@@ -1847,12 +1866,18 @@ Rules:
     async def _complete_anthropic(self, prompt: str) -> dict[str, object]:
         async def _do() -> dict[str, object]:
             # Haiku has limited context. If prompt is very large, truncate notes/examples.
-            actual_prompt = prompt
+            actual_prompt = safe_serialize_payload(prompt)
             if len(actual_prompt) > 12_000:
                 logger.warning("Prompt size %d exceeds Haiku optimum; may cause parsing failures. Consider breaking into smaller requests.", len(actual_prompt))
                 # Truncate trailing notes/context sections to ~10k
                 if len(actual_prompt) > 15_000:
                     actual_prompt = actual_prompt[:12_000] + "\n[... context truncated ...]"
+            logger.debug(
+                "Sending LLM payload provider=%s length=%d preview=%s",
+                "claude",
+                len(actual_prompt),
+                actual_prompt[:2000],
+            )
 
             async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
                 response = await client.post(
@@ -1860,7 +1885,7 @@ Rules:
                     headers={
                         "x-api-key": settings.anthropic_api_key or "",
                         "anthropic-version": "2023-06-01",
-                        "content-type": "application/json",
+                        "Content-Type": "application/json; charset=utf-8",
                     },
                     json={
                         "model": settings.anthropic_model,
@@ -1906,12 +1931,14 @@ Rules:
 
     async def _complete_gemini(self, prompt: str) -> dict[str, object]:
         async def _do() -> dict[str, object]:
+            prompt_body = self._prepare_llm_payload(prompt, "gemini")
             async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
                 response = await client.post(
                     "https://generativelanguage.googleapis.com/v1beta/models/deepseek-v4-flash:cloud:generateContent",
                     params={"key": settings.google_ai_api_key},
+                    headers={"Content-Type": "application/json; charset=utf-8"},
                     json={
-                        "contents": [{"parts": [{"text": prompt}]}],
+                        "contents": [{"parts": [{"text": prompt_body}]}],
                         "generationConfig": {
                             "maxOutputTokens": _JSON_MAX_TOKENS,
                             "temperature": 0.2,
@@ -1927,7 +1954,8 @@ Rules:
     async def _complete_ollama(self, prompt: str) -> dict[str, object]:
         from src.utils.exceptions import LLMException
         try:
-            headers = {}
+            prompt_body = self._prepare_llm_payload(prompt, "ollama")
+            headers = {"Content-Type": "application/json; charset=utf-8"}
             if settings.ollama_api_key:
                 headers["Authorization"] = f"Bearer {settings.ollama_api_key}"
             async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
@@ -1936,7 +1964,7 @@ Rules:
                     headers=headers,
                     json={
                         "model": settings.ollama_model,
-                        "prompt": prompt,
+                        "prompt": prompt_body,
                         "stream": False,
                         "format": "json",
                         "options": {"num_predict": _JSON_MAX_TOKENS},
@@ -2003,13 +2031,17 @@ Rules:
 
     async def _complete_groq(self, prompt: str) -> dict[str, object]:
         async def _do() -> dict[str, object]:
+            prompt_body = self._prepare_llm_payload(prompt, "groq")
             async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
                 response = await client.post(
                     "https://api.groq.com/openai/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {settings.groq_api_key}"},
+                    headers={
+                        "Authorization": f"Bearer {settings.groq_api_key}",
+                        "Content-Type": "application/json; charset=utf-8",
+                    },
                     json={
                         "model": "llama-3.3-70b-versatile",
-                        "messages": [{"role": "user", "content": prompt}],
+                        "messages": [{"role": "user", "content": prompt_body}],
                         "temperature": 0.2,
                         "max_tokens": _JSON_MAX_TOKENS,
                         "response_format": {"type": "json_object"},
