@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     llm_timeout_seconds: int = Field(default=30, alias="LLM_TIMEOUT_SECONDS")
     llm_uncertainty_threshold: float = Field(default=0.6, alias="LLM_UNCERTAINTY_THRESHOLD")
     llm_provider: str = Field(default="auto", alias="LLM_PROVIDER")
+    qdrant_url: Optional[str] = Field(default=None, alias="QDRANT_URL")
+    qdrant_api_key: Optional[str] = Field(default=None, alias="QDRANT_API_KEY")
+    qdrant_collection: str = Field(default="nosey_rag", alias="QDRANT_COLLECTION")
+    rag_embedding_model: str = Field(default="all-MiniLM-L6-v2", alias="RAG_EMBEDDING_MODEL")
+    rag_reranker_model: str = Field(default="cross-encoder/ms-marco-MiniLM-L-6-v2", alias="RAG_RERANKER_MODEL")
     admin_email: str = Field(alias="ADMIN_EMAIL")
 
     @field_validator("cors_origins", mode="before")

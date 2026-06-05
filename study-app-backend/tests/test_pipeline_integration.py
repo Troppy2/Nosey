@@ -100,6 +100,8 @@ A semaphore is a counter-based synchronization primitive.
     assert context, "RAG should retrieve some context"
     assert len(context) > 0, "Retrieved context should have content"
     assert meta.get('retrieval_selected_chunks', 0) > 0, "Should select at least one chunk"
+    assert "[Source: Threads_Study.md" in context, "Retrieved context should preserve the source file label"
+    assert "Threads_Study.md" in meta.get("retrieval_sources", []), "Retrieval metadata should include selected source names"
     
     # Step 6: Test that extracted content is suitable for extraction/study
     # This is what happens in test generation
