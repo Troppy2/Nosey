@@ -13,6 +13,7 @@ import httpx
 
 from src.config import settings
 from src.schemas.attempt_schema import FRQGrade
+from src.services.rag_service import HybridRAGService
 from src.utils.logger import get_logger
 from src.utils.latex_utils import normalize_latex
 from typing import Any, Optional
@@ -138,6 +139,7 @@ class LLMService:
             "retrieval_top_k": 0,
             "retrieval_query": "",
         }
+        self._rag = HybridRAGService()
 
     def get_last_generation_meta(self) -> dict[str, object]:
         return dict(self._last_generation_meta)
@@ -187,8 +189,6 @@ class LLMService:
         elif test_type == "FRQ_only":
             count_mcq = 0
 
-        # Strip file metadata (YAML frontmatter, doc markers) before any LLM pass.
-        cleaned = self._strip_metadata(notes)
         retrieval_query = self._build_retrieval_query(
             test_type=test_type,
             is_math_mode=is_math_mode,
@@ -201,7 +201,7 @@ class LLMService:
         # Run CPU-bound RAG retrieval in a thread pool to avoid blocking the event loop
         loop = asyncio.get_event_loop()
         generation_notes, retrieval_meta = await loop.run_in_executor(
-            None, self._retrieve_relevant_context, cleaned, retrieval_query, _RETRIEVAL_TOP_K
+            None, self._retrieve_relevant_context, notes, retrieval_query, _RETRIEVAL_TOP_K
         )
         diagnostics: dict[str, object] = {
             "fallback_used": False,
@@ -272,13 +272,13 @@ class LLMService:
                     "note_grounded": False,
                 })
                 self._set_last_generation_meta(diagnostics)
-                return self._fallback_math_questions(cleaned, count_mcq, count_frq)
+                return self._fallback_math_questions(self._strip_metadata(notes), count_mcq, count_frq)
 
         try:
             mcq, frq = await self._generate_test_attempts(
                 prompt=None,
                 provider_candidates=provider_candidates,
-                notes=cleaned,
+                notes=notes,
                 test_type=test_type,
                 count_mcq=count_mcq,
                 count_frq=count_frq,
@@ -307,7 +307,7 @@ class LLMService:
                 "note_grounded": False,
             })
             self._set_last_generation_meta(diagnostics)
-            fallback_mcq, fallback_frq = self._fallback_questions(cleaned, count_mcq, count_frq)
+            fallback_mcq, fallback_frq = self._fallback_questions(self._strip_metadata(notes), count_mcq, count_frq)
             mcq = (mcq + fallback_mcq)[:count_mcq]
             frq = (frq + fallback_frq)[:count_frq]
 
@@ -422,6 +422,61 @@ class LLMService:
             f"{custom_line}"
             f"{terms_block}"
             f"{concepts_block}"
+            f"{mcq_instructions}\n"
+            f"{frq_instructions}\n"
+            "CRITICAL: Return ONLY valid JSON. No markdown, no text before or after.\n"
+            "Response must be EXACTLY this format:\n"
+            '{"mcq": [{"question_text": "...", "options": ["a", "b", "c", "d"], "correct_index": 0}], "frq": [{"question_text": "...", "expected_answer": "..."}]}\n'
+        )
+
+    def _build_source_context_generation_prompt(
+        self,
+        source_context: str,
+        count_mcq: int,
+        count_frq: int,
+        test_type: str,
+        difficulty: str = "mixed",
+        topic_focus: Optional[str] = None,
+        custom_instructions: Optional[str] = None,
+    ) -> str:
+        difficulty_map = {
+            "easy": "straightforward recall questions: definitions, simple identification",
+            "medium": "application questions: use the concept, connect ideas",
+            "hard": "analysis and synthesis: compare, evaluate, multi-step reasoning",
+            "mixed": "a mix of easy recall, medium application, and hard analysis questions",
+        }
+        topic_line = f'TOPIC FOCUS: Only generate questions about "{topic_focus}".\n\n' if topic_focus else ""
+        custom_line = f"CUSTOM INSTRUCTIONS: {custom_instructions}\n\n" if custom_instructions else ""
+
+        mcq_instructions = ""
+        if count_mcq > 0:
+            mcq_instructions = (
+                f"Generate exactly {count_mcq} MCQ questions.\n"
+                "MCQ rules:\n"
+                "  - Ground each question in a specific labeled source chunk below.\n"
+                f"{self._mcq_distractor_guidance(test_type)}"
+                "  - Include the source file name in the question_text or explanation text when it helps disambiguate similar topics.\n"
+                "  - Do not invent facts outside the labeled source context.\n"
+            )
+
+        frq_instructions = ""
+        if count_frq > 0:
+            frq_instructions = (
+                f"Generate exactly {count_frq} FRQ questions.\n"
+                "FRQ rules:\n"
+                "  - Ask the student to explain, compare, or apply a concept from a specific labeled source chunk below.\n"
+                "  - Each expected_answer must cite the source file name when possible, for example '[source: FileName.md]'.\n"
+                "  - Each expected_answer must be complete and accurate (2-4 sentences).\n"
+                "  - Do not invent facts outside the labeled source context.\n"
+            )
+
+        return (
+            "You are building a study test. Use ONLY the labeled source context below.\n"
+            "The labels are part of the evidence: preserve file identity and do not merge facts from different files unless the question asks for comparison.\n\n"
+            f"DIFFICULTY: {difficulty_map.get(difficulty, difficulty_map['mixed'])}\n\n"
+            f"{topic_line}"
+            f"{custom_line}"
+            f"SOURCE CONTEXT:\n{source_context[:_GENERATE_CHAR_LIMIT]}\n\n"
             f"{mcq_instructions}\n"
             f"{frq_instructions}\n"
             "CRITICAL: Return ONLY valid JSON. No markdown, no text before or after.\n"
@@ -569,9 +624,20 @@ class LLMService:
         # Analyze the practice test style
         practice_style = await self._analyze_practice_test_style(practice_test_content, provider=provider)
         
-        # Extract study content
-        cleaned_notes = self._strip_metadata(notes)
-        study = await self._extract_study_content(cleaned_notes, provider=provider)
+        retrieval_query = self._build_retrieval_query(
+            test_type=test_type,
+            is_math_mode=is_math_mode,
+            is_coding_mode=is_coding_mode,
+            coding_language=coding_language,
+            difficulty=difficulty,
+            topic_focus=topic_focus,
+            custom_instructions=custom_instructions,
+        )
+        loop = asyncio.get_event_loop()
+        source_context, retrieval_meta = await loop.run_in_executor(
+            None, self._retrieve_relevant_context, notes, retrieval_query, _RETRIEVAL_TOP_K
+        )
+        study = await self._extract_study_content(source_context, provider=provider)
         
         # Build a prompt that uses the practice test style as a template
         context_header = f'SUBJECT: "{study.title}"\n\n' if study.title else ""
@@ -656,6 +722,7 @@ class LLMService:
             f"{topic_line}"
             f"{custom_line}"
             f"{pattern_guidance}"
+            f"SOURCE CONTEXT WITH FILE LABELS:\n{source_context[:_GENERATE_CHAR_LIMIT]}\n\n"
             f"{terms_block}"
             f"{concepts_block}"
             f"{mcq_instructions}\n"
@@ -669,10 +736,7 @@ class LLMService:
             "fallback_used": False,
             "fallback_reason": None,
             "note_grounded": True,
-            "retrieval_enabled": False,
-            "retrieval_total_chunks": 0,
-            "retrieval_selected_chunks": 0,
-            "retrieval_top_k": 0,
+            **retrieval_meta,
             "retrieval_query": "practice_test_template",
         }
         
@@ -687,7 +751,7 @@ class LLMService:
             return await self._generate_test_attempts(
                 prompt=prompt,
                 provider_candidates=provider_candidates,
-                notes=cleaned_notes,
+                notes=notes,
                 test_type=test_type,
                 count_mcq=count_mcq,
                 count_frq=count_frq,
@@ -703,7 +767,7 @@ class LLMService:
                 "note_grounded": False,
             })
             self._set_last_generation_meta(diagnostics)
-            return self._fallback_questions(cleaned_notes, count_mcq, count_frq)
+            return self._fallback_questions(self._strip_metadata(notes), count_mcq, count_frq)
 
     async def grade_frq_answer(
         self,
@@ -1178,16 +1242,27 @@ Rules:
         # Extract study content once before trying providers — avoids burning rate-limited
         # API calls on extraction for each provider when only generation needs to be retried.
         if prompt is None:
-            study = await self._extract_study_content(generation_notes or notes)
-            shared_prompt: str = self._build_generation_prompt(
-                study,
-                count_mcq,
-                count_frq,
-                test_type,
-                difficulty=difficulty,
-                topic_focus=topic_focus,
-                custom_instructions=custom_instructions,
-            )
+            if generation_notes and "[Source:" in generation_notes:
+                shared_prompt: str = self._build_source_context_generation_prompt(
+                    generation_notes,
+                    count_mcq,
+                    count_frq,
+                    test_type,
+                    difficulty=difficulty,
+                    topic_focus=topic_focus,
+                    custom_instructions=custom_instructions,
+                )
+            else:
+                study = await self._extract_study_content(generation_notes or notes)
+                shared_prompt = self._build_generation_prompt(
+                    study,
+                    count_mcq,
+                    count_frq,
+                    test_type,
+                    difficulty=difficulty,
+                    topic_focus=topic_focus,
+                    custom_instructions=custom_instructions,
+                )
         else:
             shared_prompt = prompt
 
@@ -1466,7 +1541,7 @@ Rules:
         history_block: str = "",
         provider: Optional[str] = None,
     ) -> str:
-        documents = self._extract_document_blocks(self._strip_metadata(notes))
+        documents = self._extract_document_blocks(notes)
         if not documents:
             logger.warning("map_reduce_long_answer: No documents found in notes")
             return await self.call_kojo(user_query, provider=provider)
@@ -1490,7 +1565,11 @@ Rules:
                     "doc_length": len(doc_text),
                 }
             )
-            retrieved, retrieval_meta = self._retrieve_relevant_context(doc_text, user_query, top_k=max(2, _RETRIEVAL_TOP_K // 2))
+            retrieved, retrieval_meta = self._retrieve_relevant_context(
+                f"[{source}]\n{doc_text}",
+                user_query,
+                top_k=max(2, _RETRIEVAL_TOP_K // 2),
+            )
             logger.info(
                 "map_reduce: Retrieved context for document",
                 extra={
@@ -2293,97 +2372,7 @@ Rules:
         query: str,
         top_k: int = _RETRIEVAL_TOP_K,
     ) -> tuple[str, dict[str, object]]:
-        query_variants = self._rewrite_query_for_retrieval(query)
-        filters_fingerprint = "|".join(sorted(query_variants))
-        cache_key = hashlib.sha256(
-            f"{hashlib.sha256(notes.encode('utf-8', errors='ignore')).hexdigest()}::{filters_fingerprint}::{top_k}".encode("utf-8")
-        ).hexdigest()
-        cached = self._retrieval_cache_get(cache_key)
-        if cached is not None:
-            cached_context, cached_meta = cached
-            cached_meta["retrieval_cache_hit"] = True
-            return cached_context, cached_meta
-
-        chunks = self._chunk_notes_for_retrieval(notes)
-        meta: dict[str, object] = {
-            "retrieval_enabled": True,
-            "retrieval_total_chunks": len(chunks),
-            "retrieval_selected_chunks": 0,
-            "retrieval_top_k": 0,
-            "retrieval_query_rewrites": len(query_variants),
-            "retrieval_hybrid": True,
-            "retrieval_compression": True,
-            "retrieval_cache_hit": False,
-        }
-        if not chunks:
-            result = (notes[:_GENERATE_CHAR_LIMIT], meta)
-            self._retrieval_cache_set(cache_key, result)
-            return result
-
-        combined_scores = [0.0 for _ in chunks]
-        chunk_query_overlap = [0.0 for _ in chunks]
-        query_token_set: set[str] = set()
-
-        for variant in query_variants:
-            query_tokens = [
-                token
-                for token in self._tokenize_for_retrieval(variant)
-                if token not in _RETRIEVAL_STOPWORDS
-            ]
-            if not query_tokens:
-                continue
-            query_token_set.update(query_tokens)
-
-            query_vec = self._embed_text_for_retrieval(variant)
-            dense = [self._cosine_similarity(query_vec, self._embed_text_for_retrieval(chunk.text)) for chunk in chunks]
-            dense_norm = self._normalize_scores(dense)
-
-            bm25 = self._bm25_scores(chunks, query_tokens)
-            bm25_norm = self._normalize_scores(bm25)
-
-            for idx, chunk in enumerate(chunks):
-                overlap = len(set(query_tokens).intersection(set(chunk.tokens))) / max(1.0, float(len(set(query_tokens))))
-                chunk_query_overlap[idx] = max(chunk_query_overlap[idx], overlap)
-                hybrid = 0.6 * dense_norm[idx] + 0.4 * bm25_norm[idx]
-                combined_scores[idx] = max(combined_scores[idx], hybrid)
-
-        scored: list[tuple[float, _RetrievalChunk]] = []
-        for idx, chunk in enumerate(chunks):
-            bonus = self._metadata_filter_bonus(query_token_set, chunk)
-            score = combined_scores[idx] + 0.1 * chunk_query_overlap[idx] + bonus
-            scored.append((score, chunk))
-
-        scored.sort(key=lambda item: item[0], reverse=True)
-        take = max(1, min(top_k * _RETRIEVAL_STAGE_MULTIPLIER, len(scored)))
-        selected_candidates = scored[:take]
-
-        compressed: list[tuple[int, str]] = []
-        for _, chunk in selected_candidates:
-            snippet = self._compress_chunk_for_query(chunk.text, query_variants)
-            if snippet:
-                compressed.append((chunk.index, f"[Source: {chunk.source} | Chunk {chunk.index + 1}]\n{snippet}"))
-
-        # Deduplicate repeated snippets while preserving order.
-        seen_snippets: set[str] = set()
-        deduped: list[tuple[int, str]] = []
-        for idx, text in compressed:
-            key = re.sub(r"\s+", " ", text).strip().lower()
-            if not key or key in seen_snippets:
-                continue
-            seen_snippets.add(key)
-            deduped.append((idx, text))
-
-        deduped = sorted(deduped[: max(1, min(top_k, len(deduped)))], key=lambda item: item[0])
-        meta["retrieval_selected_chunks"] = len(deduped)
-        meta["retrieval_top_k"] = min(top_k, len(deduped))
-
-        context_parts = [chunk_text for _, chunk_text in deduped]
-        context = "\n\n".join(context_parts).strip()
-        if not context:
-            context = notes
-        result = (context[:_GENERATE_CHAR_LIMIT], meta)
-        self._retrieval_cache_set(cache_key, result)
-        return result
+        return self._rag.retrieve_context(notes, query, top_k=top_k)
 
     def _chunk_notes_for_retrieval(
         self,
@@ -2391,66 +2380,10 @@ Rules:
         chunk_words: int = _RETRIEVAL_CHUNK_WORDS,
         overlap_words: int = _RETRIEVAL_CHUNK_OVERLAP_WORDS,
     ) -> list[_RetrievalChunk]:
-        cleaned = self._strip_metadata(notes)
-        documents = self._extract_document_blocks(cleaned)
-        if not documents:
-            return []
-
-        chunks: list[_RetrievalChunk] = []
-        global_index = 0
-        step = max(1, chunk_words - overlap_words)
-        for source, body in documents:
-            words = body.split()
-            if not words:
-                continue
-            if len(words) <= chunk_words:
-                text = body.strip()
-                if text:
-                    tokens = tuple(self._tokenize_for_retrieval(text))
-                    chunks.append(_RetrievalChunk(index=global_index, source=source, text=text, tokens=tokens))
-                    global_index += 1
-                continue
-
-            start = 0
-            while start < len(words):
-                text = " ".join(words[start:start + chunk_words]).strip()
-                if text:
-                    tokens = tuple(self._tokenize_for_retrieval(text))
-                    chunks.append(_RetrievalChunk(index=global_index, source=source, text=text, tokens=tokens))
-                    global_index += 1
-                start += step
-        return chunks
+        return self._rag.chunk_notes(notes)
 
     def _extract_document_blocks(self, notes: str) -> list[tuple[str, str]]:
-        lines = (notes or "").splitlines()
-        docs: list[tuple[str, str]] = []
-        current_source = "document"
-        current_lines: list[str] = []
-
-        def flush() -> None:
-            nonlocal current_lines, current_source
-            content = "\n".join(current_lines).strip()
-            if content:
-                docs.append((current_source, content))
-            current_lines = []
-
-        for line in lines:
-            marker_doc = re.match(r"^---\s*Document\s+\d+\s*:\s*(.+?)\s*---\s*$", line.strip(), re.IGNORECASE)
-            marker_file = re.match(r"^\[(.+?)\]\s*$", line.strip())
-            if marker_doc:
-                flush()
-                current_source = marker_doc.group(1).strip()
-                continue
-            if marker_file:
-                flush()
-                current_source = marker_file.group(1).strip()
-                continue
-            current_lines.append(line)
-
-        flush()
-        if not docs and notes.strip():
-            docs.append(("document", notes.strip()))
-        return docs
+        return self._rag.extract_document_blocks(notes)
 
     def _embed_text_for_retrieval(self, text: str, dimensions: int = _RETRIEVAL_EMBEDDING_DIM) -> list[float]:
         cache_key = hashlib.sha256(f"{dimensions}:{text}".encode("utf-8", errors="ignore")).hexdigest()

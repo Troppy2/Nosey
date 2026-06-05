@@ -22,6 +22,7 @@ from src.schemas.kojo_schema import (
 )
 from src.services.file_service import FileService
 from src.services.llm_service import LLMService
+from src.services.rag_service import HybridRAGService
 from src.utils.exceptions import LLMException, ResourceNotFoundException
 from src.utils.logger import get_logger
 from typing import Optional
@@ -634,6 +635,10 @@ _STOPWORDS = {
 
 def _extract_relevant_sections(notes: str, user_message: str, max_sections: int = 6) -> str:
     """Return the paragraphs from notes that best match the user's question keywords."""
+    context, meta = HybridRAGService().retrieve_context(notes, user_message, top_k=max_sections)
+    if context and meta.get("retrieval_selected_chunks", 0):
+        return context
+
     keywords = [
         w for w in re.findall(r"[a-zA-Z]{3,}", user_message.lower())
         if w not in _STOPWORDS

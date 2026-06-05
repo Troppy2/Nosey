@@ -140,6 +140,63 @@ Final section with content about topic C. This tests the continuation of the chu
         # Should handle gracefully by returning empty with proper metadata
         assert meta.get("retrieval_selected_chunks", 0) == 0, "Should select 0 chunks for empty notes"
 
+    def test_retrieval_preserves_file_identity_with_overlapping_vocabulary(self):
+        """Retrieval should keep the correct file visible when files share vocabulary."""
+        llm_svc = LLMService()
+        notes = """
+[basketball_strategy.md]
+# Training Model
+The coach builds a training model for evaluating player rotations.
+The model uses drills, film review, and evaluation notes about defensive spacing.
+No neural network or gradient descent is used in this sports plan.
+
+---
+
+[neural_networks.md]
+# Training Model
+The machine learning model trains a neural network with gradient descent.
+Backpropagation updates weights after evaluating prediction error.
+The topic is embeddings, optimization, and supervised learning.
+"""
+
+        context, meta = llm_svc._retrieve_relevant_context(
+            notes,
+            "How does gradient descent update neural network weights during model training?",
+            top_k=2,
+        )
+
+        assert "[Source: neural_networks.md" in context
+        assert "gradient descent" in context.lower()
+        assert "neural_networks.md" in meta.get("retrieval_sources", [])
+        assert context.find("neural_networks.md") <= context.find("basketball_strategy.md") or "basketball_strategy.md" not in context
+
+    def test_retrieval_prefers_correct_section_and_labels_it(self):
+        """Chunking should preserve headings so retrieval can choose the right section."""
+        llm_svc = LLMService()
+        notes = """
+[biology_notes.md]
+# Cell Biology
+
+## Photosynthesis
+Chloroplasts convert light energy into chemical energy.
+Light reactions produce ATP and NADPH for the Calvin cycle.
+
+## Cellular Respiration
+Mitochondria break down glucose to make ATP.
+The Krebs cycle and electron transport chain release usable energy from food.
+"""
+
+        context, meta = llm_svc._retrieve_relevant_context(
+            notes,
+            "Where does the Krebs cycle release energy from glucose?",
+            top_k=1,
+        )
+
+        assert "[Source: biology_notes.md" in context
+        assert "Cellular Respiration" in context
+        assert "Krebs cycle" in context
+        assert meta.get("retrieval_selected_chunks", 0) == 1
+
 
 class TestFileExtractionDiagnostics:
     """Test file extraction and storage."""
