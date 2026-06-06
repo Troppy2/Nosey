@@ -680,6 +680,11 @@ def _build_review_wrong_answers_prompt(notes: str, wrong_answers: str, user_mess
     has_notes = notes != _NO_NOTES
 
     if has_notes:
+        doc_sources = _list_document_sources(notes)
+        doc_inventory = (
+            f"UPLOADED DOCUMENTS ({len(doc_sources)}): {', '.join(doc_sources)}\n\n"
+            if len(doc_sources) > 1 else ""
+        )
         relevant = _extract_relevant_sections(notes, wrong_answers)
         relevant_block = (
             "RELEVANT SECTIONS FROM STUDENT'S NOTES (pre-matched to their answers):\n"
@@ -688,11 +693,11 @@ def _build_review_wrong_answers_prompt(notes: str, wrong_answers: str, user_mess
             "NOTE: No closely matching sections found in their notes for these answers.\n\n"
         )
         notes_block = (
+            f"{doc_inventory}"
             f"{relevant_block}"
             f"FULL STUDENT NOTES AND FOLDER FILES:\n{notes[:25000]}"
         )
     else:
-        relevant_block = ""
         notes_block = (
             "NOTE: The student has not uploaded any study materials yet. "
             "Provide the correct answers and explanations, and suggest they cross-reference with online resources or their textbook."
@@ -734,6 +739,21 @@ REVIEW GUIDELINES - FOLLOW THESE STRICTLY:
 Respond now:"""
 
 
+def _list_document_sources(notes_context: str) -> list[str]:
+    """Extract document names from the assembled notes context (reads [filename] markers)."""
+    sources: list[str] = []
+    seen: set[str] = set()
+    for line in notes_context.splitlines():
+        stripped = line.strip()
+        m = re.match(r"^\[(.+?)\]\s*$", stripped)
+        if m:
+            name = m.group(1).strip()
+            if name not in seen:
+                sources.append(name)
+                seen.add(name)
+    return sources
+
+
 def _build_prompt(notes: str, user_message: str, history: list, strictness: str = "medium") -> str:
     history_lines: list[str] = []
     for msg in history[:-1]:
@@ -744,6 +764,11 @@ def _build_prompt(notes: str, user_message: str, history: list, strictness: str 
     has_notes = notes != _NO_NOTES
 
     if has_notes:
+        doc_sources = _list_document_sources(notes)
+        doc_inventory = (
+            f"UPLOADED DOCUMENTS ({len(doc_sources)}): {', '.join(doc_sources)}\n\n"
+            if len(doc_sources) > 1 else ""
+        )
         relevant = _extract_relevant_sections(notes, user_message)
         relevant_block = (
             "RELEVANT SECTIONS FROM STUDENT'S NOTES (pre-matched to their question):\n"
@@ -752,11 +777,11 @@ def _build_prompt(notes: str, user_message: str, history: list, strictness: str 
             "RELEVANT SECTIONS: [No closely matching sections found — use the full notes below.]\n\n"
         )
         notes_block = (
+            f"{doc_inventory}"
             f"{relevant_block}"
             f"FULL STUDENT NOTES AND FOLDER FILES:\n{notes[:25000]}"
         )
     else:
-        relevant_block = ""
         notes_block = (
             "NOTE: The student has not uploaded any study materials yet. "
             "You can still answer general questions, but encourage them to upload notes for personalized help."

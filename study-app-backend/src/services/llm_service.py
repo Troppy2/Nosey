@@ -234,7 +234,7 @@ class LLMService:
             return await self._generate_test_attempts(
                 prompt=prompt,
                 provider_candidates=provider_candidates,
-                notes=cleaned,
+                notes=notes,
                 test_type=test_type,
                 count_mcq=count_mcq,
                 count_frq=count_frq,
@@ -256,7 +256,7 @@ class LLMService:
                 return await self._generate_test_attempts(
                     prompt=prompt,
                     provider_candidates=provider_candidates,
-                    notes=cleaned,
+                    notes=notes,
                     test_type=test_type,
                     count_mcq=count_mcq,
                     count_frq=count_frq,
