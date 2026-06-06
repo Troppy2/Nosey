@@ -72,7 +72,7 @@ function getGreetingName() {
     return emailName.charAt(0).toUpperCase() + emailName.slice(1);
   }
 
-  return "my goat";
+  return "Unknown User";
 }
 
 function getTimeOfDayMessage(now = new Date()) {
