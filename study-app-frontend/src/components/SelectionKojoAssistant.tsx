@@ -257,8 +257,8 @@ export function SelectionKojoAssistant({ folderId, folderName, children, onAskKo
             setTimeout(() => { suppressDismissRef.current = false; }, 300);
           }}
         >
-          <button className="sel-kojo-btn" type="button" onClick={handleAskKojo}>
-            <Bot size={13} />
+          <button className="sel-kojo-btn sel-kojo-btn--primary" type="button" onClick={handleAskKojo}>
+            <Sparkles size={12} />
             Ask Kojo
           </button>
           <div className="sel-kojo-toolbar-sep" />
@@ -269,14 +269,14 @@ export function SelectionKojoAssistant({ folderId, folderName, children, onAskKo
             disabled={flashcardDone}
           >
             <Layers size={13} />
-            {flashcardDone ? "Saved!" : "Make Flashcard"}
+            {flashcardDone ? "Saved!" : "Flashcard"}
           </button>
           {flashcardError && (
             <span className="sel-kojo-error">{flashcardError}</span>
           )}
           <div className="sel-kojo-toolbar-sep" />
           <button className="sel-kojo-btn sel-kojo-btn--close" type="button" onClick={close} aria-label="Close">
-            <X size={13} />
+            <X size={12} />
           </button>
         </div>
       </div>
@@ -349,22 +349,37 @@ export function SelectionKojoAssistant({ folderId, folderName, children, onAskKo
             )}
           </div>
 
-          <div className="selection-kojo-sep" />
-
           {/* Explanation section */}
           <div className="selection-kojo-explanation">
             {isLoading ? (
-              <div className="kojo-thinking">
-                <span /><span /><span />
+              <div className="sel-kojo-skeleton">
+                <div className="sel-kojo-skeleton-line" style={{ width: "88%" }} />
+                <div className="sel-kojo-skeleton-line" style={{ width: "76%" }} />
+                <div className="sel-kojo-skeleton-line" style={{ width: "92%" }} />
+                <div className="sel-kojo-skeleton-line" style={{ width: "60%" }} />
               </div>
             ) : error ? (
               <div className="kojo-error">{error}</div>
             ) : response ? (
               <MarkdownContent content={response} />
             ) : (
-              <p className="muted small">Kojo is thinking…</p>
+              <p className="muted small">Kojo is thinking...</p>
             )}
           </div>
+        </div>
+
+        {/* Panel footer */}
+        <div className="selection-kojo-footer">
+          <button
+            className={`sel-kojo-footer-btn${flashcardDone ? " sel-kojo-footer-btn--done" : ""}`}
+            type="button"
+            onClick={() => void handleMakeFlashcard()}
+            disabled={flashcardDone || isLoading}
+          >
+            <Layers size={13} />
+            {flashcardDone ? "Saved to flashcards" : "Save as flashcard"}
+          </button>
+          {flashcardError && <span className="sel-kojo-footer-error">{flashcardError}</span>}
         </div>
       </div>
     </div>
