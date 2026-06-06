@@ -141,6 +141,7 @@ class HybridRAGService:
             candidates = self._local_hybrid_candidates(chunks, query, top_k * _STAGE_MULTIPLIER)
 
         selected = self._rerank(query, candidates, top_k)
+        selected = self._ensure_source_diversity(selected, candidates)
         meta["retrieval_selected_chunks"] = len(selected)
         meta["retrieval_top_k"] = len(selected)
         meta["retrieval_sources"] = list(dict.fromkeys(chunk.source for chunk in selected))
@@ -356,6 +357,23 @@ class HybridRAGService:
             if isinstance(index, int) and index in by_index:
                 ordered.append(by_index[index])
         return ordered
+
+    def _ensure_source_diversity(self, selected: list[RagChunk], pool: list[RagChunk]) -> list[RagChunk]:
+        """Append one representative chunk for each source not already in selected.
+
+        Prevents a single high-scoring document from monopolizing all top-k slots when
+        the user has multiple files uploaded.
+        """
+        if not pool:
+            return selected
+        covered = {chunk.source for chunk in selected}
+        seen_extra: set[str] = set()
+        extra: list[RagChunk] = []
+        for chunk in pool:
+            if chunk.source not in covered and chunk.source not in seen_extra:
+                extra.append(chunk)
+                seen_extra.add(chunk.source)
+        return selected + extra
 
     def _rerank(self, query: str, candidates: list[RagChunk], top_k: int) -> list[RagChunk]:
         if not candidates:
