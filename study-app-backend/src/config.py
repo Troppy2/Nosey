@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     qdrant_collection: str = Field(default="nosey_rag", alias="QDRANT_COLLECTION")
     rag_embedding_model: str = Field(default="all-MiniLM-L6-v2", alias="RAG_EMBEDDING_MODEL")
     rag_reranker_model: str = Field(default="cross-encoder/ms-marco-MiniLM-L-6-v2", alias="RAG_RERANKER_MODEL")
-    admin_email: str = Field(alias="ADMIN_EMAIL")
+    admin_email: str = Field(default="", alias="ADMIN_EMAIL")
 
     @field_validator("cors_origins", mode="before")
     @classmethod

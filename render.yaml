@@ -1,0 +1,64 @@
+services:
+  - type: web
+    name: nosey-backend
+    runtime: docker
+    dockerfilePath: ./study-app-backend/Dockerfile
+    dockerContext: ./study-app-backend
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: JWT_EXPIRATION_HOURS
+        value: "720"
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GOOGLE_AI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-haiku-4-5-20251001
+      - key: OLLAMA_API_KEY
+        sync: false
+      - key: OLLAMA_BASE_URL
+        value: https://api.ollama.com
+      - key: OLLAMA_MODEL
+        value: gemma4:31b
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: CORS_ORIGINS
+        value: '["https://nosey-eosin.vercel.app"]'
+      - key: MAX_FILE_SIZE_BYTES
+        value: "52428800"
+      - key: ALLOWED_FILE_TYPES
+        value: '["pdf","txt","md"]'
+      - key: LLM_MAX_TOKENS
+        value: "4096"
+      - key: LLM_TIMEOUT_SECONDS
+        value: "300"
+      - key: LLM_UNCERTAINTY_THRESHOLD
+        value: "0.6"
+      - key: LLM_PROVIDER
+        value: auto
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: QDRANT_COLLECTION
+        value: nosey_documents
+      - key: RAG_EMBEDDING_MODEL
+        value: sentence-transformers/all-MiniLM-L6-v2
+      - key: RAG_RERANKER_MODEL
+        value: BAAI/bge-reranker-base
