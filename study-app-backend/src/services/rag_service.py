@@ -29,17 +29,33 @@ try:
 except ImportError:  # pragma: no cover - exercised only without optional deps
     BM25Okapi = None  # type: ignore[assignment]
 
-try:
-    from sentence_transformers import CrossEncoder, SentenceTransformer
-except ImportError:  # pragma: no cover - exercised only without optional deps
-    CrossEncoder = None  # type: ignore[assignment]
-    SentenceTransformer = None  # type: ignore[assignment]
+# sentence_transformers and flashrank both pull in onnxruntime/PyTorch, which
+# triggers a GPU device scan at import time and blocks startup for 30+ seconds
+# on CPU-only servers. Defer them until the first RAG call.
+SentenceTransformer: Any = None
+CrossEncoder: Any = None
+Ranker: Any = None
+RerankRequest: Any = None
+_ml_deps_loaded = False
 
-try:
-    from flashrank import Ranker, RerankRequest
-except ImportError:  # pragma: no cover - exercised only without optional deps
-    Ranker = None  # type: ignore[assignment]
-    RerankRequest = None  # type: ignore[assignment]
+
+def _load_heavy_ml_deps() -> None:
+    global SentenceTransformer, CrossEncoder, Ranker, RerankRequest, _ml_deps_loaded
+    if _ml_deps_loaded:
+        return
+    _ml_deps_loaded = True
+    try:
+        from sentence_transformers import CrossEncoder as _CE, SentenceTransformer as _ST
+        SentenceTransformer = _ST
+        CrossEncoder = _CE
+    except ImportError:
+        pass
+    try:
+        from flashrank import Ranker as _Ranker, RerankRequest as _RR
+        Ranker = _Ranker
+        RerankRequest = _RR
+    except ImportError:
+        pass
 
 try:
     from qdrant_client import QdrantClient
@@ -98,6 +114,7 @@ class HybridRAGService:
         top_k: int = _DEFAULT_TOP_K,
         source_filter: Optional[list[str]] = None,
     ) -> tuple[str, dict[str, object]]:
+        _load_heavy_ml_deps()
         query = (query or "").strip()
         cache_key = hashlib.sha256(
             (
