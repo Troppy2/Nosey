@@ -6,6 +6,10 @@ services:
     dockerContext: ./study-app-backend
     healthCheckPath: /health
     envVars:
+      - key: CUDA_VISIBLE_DEVICES
+        value: ""
+      - key: TOKENIZERS_PARALLELISM
+        value: "false"
       - key: DATABASE_URL
         sync: false
       - key: GOOGLE_CLIENT_ID
