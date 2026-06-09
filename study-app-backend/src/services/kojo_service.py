@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from datetime import datetime, timedelta
 
+from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.repositories.attempt_repository import AttemptRepository
@@ -25,7 +26,7 @@ from src.services.llm_service import LLMService
 from src.services.rag_service import HybridRAGService
 from src.utils.exceptions import LLMException, ResourceNotFoundException
 from src.utils.logger import get_logger
-from typing import Optional
+from typing import Optional, cast
 
 logger = get_logger(__name__)
 
@@ -451,7 +452,10 @@ class KojoService:
             data = await upload.read()
             async def _async_read(self, d=data):
                 return d
-            mock = type("_F", (), {"read": _async_read, "seek": lambda self, p: None, "filename": upload.filename or "file"})()
+            mock = cast(
+                UploadFile,
+                type("_F", (), {"read": _async_read, "seek": lambda self, p: None, "filename": upload.filename or "file"})(),
+            )
             content, _ = await svc.extract_from_files([mock])
             cf = await repo.add_conversation_file(
                 conversation_id=conversation_id,
@@ -612,7 +616,11 @@ class KojoService:
                 KojoClearedConversationDTO(
                     conversation_id=conv.id,
                     folder_id=conv.folder_id,
-                    folder_name=conv.folder.name if conv.folder is not None else f"Folder {conv.folder_id}",
+                    folder_name=(
+                        conv.folder.name if conv.folder is not None
+                        else "General chat" if conv.folder_id is None
+                        else f"Folder {conv.folder_id}"
+                    ),
                     cleared_at=conv.cleared_at,
                     restore_expires_at=conv.cleared_at + timedelta(hours=_CLEAR_WINDOW_HOURS),
                 )
