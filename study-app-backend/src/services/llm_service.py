@@ -447,17 +447,21 @@ class LLMService:
             "mixed": "a mix of easy recall, medium application, and hard analysis questions",
         }
         topic_line = f'TOPIC FOCUS: Only generate questions about "{topic_focus}".\n\n' if topic_focus else ""
-        custom_line = f"CUSTOM INSTRUCTIONS: {custom_instructions}\n\n" if custom_instructions else ""
+        custom_line = (
+            "CUSTOM INSTRUCTIONS (these take priority, follow them exactly):\n"
+            f"{custom_instructions}\n\n"
+            if custom_instructions else ""
+        )
 
         mcq_instructions = ""
         if count_mcq > 0:
             mcq_instructions = (
                 f"Generate exactly {count_mcq} MCQ questions.\n"
                 "MCQ rules:\n"
-                "  - Ground each question in a specific labeled source chunk below.\n"
+                "  - Base each question on the facts in the source context below.\n"
                 f"{self._mcq_distractor_guidance(test_type)}"
-                "  - Include the source file name in the question_text or explanation text when it helps disambiguate similar topics.\n"
-                "  - Do not invent facts outside the labeled source context.\n"
+                "  - Do not invent facts outside the source context.\n"
+                "  - Do NOT mention file names, source labels, chunk numbers, sections, or '[Source: ...]' markers anywhere in the question or options. Ask about the subject matter itself.\n"
             )
 
         frq_instructions = ""
@@ -465,18 +469,21 @@ class LLMService:
             frq_instructions = (
                 f"Generate exactly {count_frq} FRQ questions.\n"
                 "FRQ rules:\n"
-                "  - Ask the student to explain, compare, or apply a concept from a specific labeled source chunk below.\n"
-                "  - Each expected_answer must cite the source file name when possible, for example '[source: FileName.md]'.\n"
+                "  - Ask the student to explain, compare, or apply a concept from the source context below.\n"
                 "  - Each expected_answer must be complete and accurate (2-4 sentences).\n"
-                "  - Do not invent facts outside the labeled source context.\n"
+                "  - Do not invent facts outside the source context.\n"
+                "  - Do NOT mention file names, source labels, chunk numbers, sections, or '[Source: ...]' markers anywhere in the question or expected_answer. Ask about the subject matter itself.\n"
             )
 
         return (
-            "You are building a study test. Use ONLY the labeled source context below.\n"
-            "The labels are part of the evidence: preserve file identity and do not merge facts from different files unless the question asks for comparison.\n\n"
+            "You are building a study test. Use ONLY the source context below as your source of facts.\n"
+            "The [Source: ...] labels are INTERNAL grounding metadata for you only: they tell you which "
+            "file each fact came from so you do not merge unrelated facts. Never repeat these labels, file "
+            "names, chunk numbers, or section names to the student. Questions must read as if asked directly "
+            "about the subject, not about the documents.\n\n"
+            f"{custom_line}"
             f"DIFFICULTY: {difficulty_map.get(difficulty, difficulty_map['mixed'])}\n\n"
             f"{topic_line}"
-            f"{custom_line}"
             f"SOURCE CONTEXT:\n{source_context[:_GENERATE_CHAR_LIMIT]}\n\n"
             f"{mcq_instructions}\n"
             f"{frq_instructions}\n"
@@ -2175,6 +2182,36 @@ Rules:
         is_computation = bool(self._MATH_FRQ_COMPUTE_RE.search(question))
         return has_math or is_computation
 
+    # Safety net: even with prompt rules forbidding it, a provider may still leak the internal
+    # RAG grounding labels (file names, "[Source: ...]", "Chunk 69") into generated question text.
+    # These patterns strip those references so the student never sees them.
+    _SOURCE_REF_PATTERNS = (
+        re.compile(r"\[\s*source:[^\]]*\]", re.IGNORECASE),
+        re.compile(r"\(\s*chunk[:\s#]*\d+\s*\)", re.IGNORECASE),
+        re.compile(r"\bchunk[:\s#]*\d+\b", re.IGNORECASE),
+        re.compile(
+            r"^\s*(?:based on|according to|from|in|per|referencing)\b[^,.]*\."
+            r"(?:txt|md|markdown|pdf|docx?|pptx?|csv|rtf)\b[^,]*,\s*",
+            re.IGNORECASE,
+        ),
+        re.compile(r"\b[\w\-]+\.(?:txt|md|markdown|pdf|docx?|pptx?|csv|rtf)\b", re.IGNORECASE),
+    )
+
+    def _strip_source_references(self, text: str) -> str:
+        if not text:
+            return text
+        cleaned = text
+        for pattern in self._SOURCE_REF_PATTERNS:
+            cleaned = pattern.sub("", cleaned)
+        cleaned = re.sub(r"\s{2,}", " ", cleaned)
+        cleaned = re.sub(r"\s+([,.;:?!])", r"\1", cleaned)
+        cleaned = re.sub(r"^[\s,;:.\-]+", "", cleaned).strip()
+        if not cleaned:
+            return text.strip()
+        if cleaned[0].isalpha():
+            cleaned = cleaned[0].upper() + cleaned[1:]
+        return cleaned
+
     def _parse_generated_test(
         self,
         data: dict[str, object],
@@ -2199,7 +2236,7 @@ Rules:
                     options = [normalize_latex(o) for o in raw_options]
                     mcq.append(
                         GeneratedMCQ(
-                            question_text=normalize_latex(str(item.get("question_text", "Study question"))),  # type: ignore[union-attr]
+                            question_text=self._strip_source_references(normalize_latex(str(item.get("question_text", "Study question")))),  # type: ignore[union-attr]
                             options=options,
                             correct_index=max(0, min(3, int(item.get("correct_index", 0)))),  # type: ignore[union-attr]
                         )
@@ -2209,8 +2246,8 @@ Rules:
                 if frq_validator(item):
                     frq.append(
                         GeneratedFRQ(
-                            question_text=normalize_latex(str(item.get("question_text", "")).strip()),  # type: ignore[union-attr]
-                            expected_answer=normalize_latex(str(item.get("expected_answer", "")).strip()),  # type: ignore[union-attr]
+                            question_text=self._strip_source_references(normalize_latex(str(item.get("question_text", "")).strip())),  # type: ignore[union-attr]
+                            expected_answer=self._strip_source_references(normalize_latex(str(item.get("expected_answer", "")).strip())),  # type: ignore[union-attr]
                         )
                     )
         if len(mcq) < count_mcq or len(frq) < count_frq:
@@ -2663,7 +2700,7 @@ Rules:
         user_message: str,
         notes_context: str,
         provider: Optional[str] = None,
-    ) -> dict[str, object]:
+    ) -> dict[str, Any]:
         """Propose a test blueprint (title, type, counts, difficulty, topic) from the user's request."""
         notes_preview = notes_context[:3000] if notes_context else "[No notes uploaded yet]"
         prompt = f"""You are a test planning assistant inside a study tool called Nosey.

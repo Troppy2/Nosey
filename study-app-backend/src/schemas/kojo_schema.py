@@ -63,7 +63,7 @@ class KojoRestoreResponse(BaseModel):
 
 class KojoClearedConversationDTO(BaseModel):
     conversation_id: int
-    folder_id: int
+    folder_id: Optional[int] = None
     folder_name: str
     cleared_at: datetime
     restore_expires_at: datetime
