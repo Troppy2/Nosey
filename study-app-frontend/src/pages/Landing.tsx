@@ -2,7 +2,7 @@ import { ArrowRight, BookOpen, Brain, FileText, LogIn, ShieldCheck, X } from "lu
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
-import { setGoogleSession, guestSignIn, googleSignIn } from "../lib/api";
+import { setGoogleSession, guestSignIn, googleSignIn, submitDateOfBirth } from "../lib/api";
 import { useEffect, useRef, useState } from "react";
 
 const features = [
@@ -28,6 +28,10 @@ export default function Landing() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [guestLoading, setGuestLoading] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
+  const [showDobModal, setShowDobModal] = useState(false);
+  const [dob, setDob] = useState("");
+  const [dobError, setDobError] = useState<string | null>(null);
+  const [dobLoading, setDobLoading] = useState(false);
 
   useEffect(() => {
     if (!privacyOpen) return;
@@ -52,11 +56,15 @@ export default function Landing() {
             if (!resp?.credential) return;
             setGoogleLoading(true);
             try {
-              await googleSignIn(resp.credential);
-              navigate("/dashboard");
+              const user = await googleSignIn(resp.credential);
+              if (!user.date_of_birth) {
+                setShowDobModal(true);
+                setGoogleLoading(false);
+              } else {
+                navigate("/dashboard");
+              }
             } catch (err) {
               console.error(err);
-            } finally {
               setGoogleLoading(false);
             }
           },
@@ -162,6 +170,43 @@ export default function Landing() {
           </button>
         </footer>
       </section>
+
+      {showDobModal && (
+        <div className="modal-backdrop">
+          <div className="modal-card" role="dialog" aria-modal="true" aria-label="Date of birth" onMouseDown={(e) => e.stopPropagation()}>
+            <h2>One quick thing</h2>
+            <p className="muted">We use your date of birth to personalize your experience. This is kept private and never shared.</p>
+            <input
+              type="date"
+              className="modal-input"
+              value={dob}
+              onChange={(e) => { setDob(e.target.value); setDobError(null); }}
+              max={new Date().toISOString().split("T")[0]}
+              autoFocus
+            />
+            {dobError && <p style={{ color: "var(--red, #c0392b)", fontSize: "0.875rem" }}>{dobError}</p>}
+            <div className="button-row">
+              <Button
+                variant="primary"
+                disabled={!dob || dobLoading}
+                onClick={async () => {
+                  setDobLoading(true);
+                  setDobError(null);
+                  try {
+                    await submitDateOfBirth(dob);
+                    navigate("/dashboard");
+                  } catch {
+                    setDobError("Could not save your date of birth. Please try again.");
+                    setDobLoading(false);
+                  }
+                }}
+              >
+                {dobLoading ? "Saving..." : "Continue"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {privacyOpen && (
         <div className="modal-backdrop" onMouseDown={() => setPrivacyOpen(false)}>

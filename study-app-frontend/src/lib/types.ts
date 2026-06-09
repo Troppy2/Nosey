@@ -220,6 +220,9 @@ export type AuthUser = {
   is_guest?: boolean;
   is_admin?: boolean;
   email_verified?: boolean;
+  date_of_birth?: string | null;
+  age?: number | null;
+  kojo_enabled?: boolean;
 };
 
 export type AdminUserRow = {

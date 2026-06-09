@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 from typing import Optional
 
-from sqlalchemy import func, select
+from sqlalchemy import extract, func, select
 
 from src.models.user import User
 from src.repositories.base_repository import BaseRepository
+
+
+def _compute_age(dob: date) -> int:
+    today = date.today()
+    return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
 
 
 class UserRepository(BaseRepository[User]):
@@ -67,3 +73,41 @@ class UserRepository(BaseRepository[User]):
             user.is_admin = is_admin
         await self.session.flush()
         return user
+
+    async def update_date_of_birth(self, user: User, dob: date) -> User:
+        user.date_of_birth = dob
+        user.age = _compute_age(dob)
+        await self.session.flush()
+        return user
+
+    async def refresh_age_if_birthday(self, user: User) -> bool:
+        """Recalculate age if today is the user's birthday. Returns True if updated."""
+        if user.date_of_birth is None:
+            return False
+        new_age = _compute_age(user.date_of_birth)
+        if user.age != new_age:
+            user.age = new_age
+            await self.session.flush()
+            return True
+        return False
+
+    async def refresh_all_birthday_ages(self) -> int:
+        """Update age for every user whose birthday is today. Returns count updated."""
+        today = date.today()
+        result = await self.session.scalars(
+            select(User).where(
+                User.date_of_birth.is_not(None),
+                extract('month', User.date_of_birth) == today.month,
+                extract('day', User.date_of_birth) == today.day,
+            )
+        )
+        users = list(result.all())
+        count = 0
+        for u in users:
+            new_age = _compute_age(u.date_of_birth)  # type: ignore[arg-type]  # filtered by is_not(None) above
+            if u.age != new_age:
+                u.age = new_age
+                count += 1
+        if count:
+            await self.session.flush()
+        return count

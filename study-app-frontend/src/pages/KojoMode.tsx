@@ -31,6 +31,7 @@ import {
   fetchFolders,
   fetchKojoConversationById,
   fetchSlashCommands,
+  getStoredUser,
   kojoChat,
   kojoChatGeneral,
   kojoTestBlueprint,
@@ -225,6 +226,18 @@ function BlueprintCard({ message, folderId, provider, onGenerate, onCancel }: Bl
 
 export default function KojoMode() {
   const { generationProvider, kojoStrictness } = useSettings();
+
+  const storedUser = getStoredUser();
+  if (storedUser?.kojo_enabled === false) {
+    return (
+      <div className="page page-narrow">
+        <div className="page-header">
+          <h1>Chat Kojo</h1>
+        </div>
+        <p className="muted">Chat Kojo is available for users aged 15 and older.</p>
+      </div>
+    );
+  }
 
   const [folders, setFolders] = useState<Folder[]>([]);
   // null = General mode (no folder), number = specific folder

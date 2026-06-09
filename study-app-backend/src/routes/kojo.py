@@ -70,6 +70,8 @@ async def kojo_chat(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> KojoChatResponse:
+    if user.age is not None and user.age < 15:
+        raise HTTPException(status_code=403, detail="Kojo chat is not available for users under 15")
     _t0 = time.monotonic()
     try:
         result = await KojoService().chat(
