@@ -6,13 +6,13 @@ import { Card } from "../components/Card";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
 import { TextInput } from "../components/Field";
-import { createFolder, deleteFolder, fetchFolders, updateFolder } from "../lib/api";
+import { createFolder, deleteFolder, fetchFolders, scopeKey, updateFolder } from "../lib/api";
 import type { Folder } from "../lib/types";
 
 export default function Folders() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [view, setView] = useState<"grid" | "list">(
-    () => (localStorage.getItem("nosey_folder_view") as "grid" | "list") ?? "grid"
+    () => (localStorage.getItem(scopeKey("nosey_folder_view")) as "grid" | "list") ?? "grid"
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [folderAction, setFolderAction] = useState<{
@@ -96,10 +96,10 @@ export default function Folders() {
         </div>
         <div className="toolbar">
           <div className="segmented" aria-label="View mode">
-            <button className={view === "grid" ? "active" : ""} onClick={() => { setView("grid"); localStorage.setItem("nosey_folder_view", "grid"); }} type="button">
+            <button className={view === "grid" ? "active" : ""} onClick={() => { setView("grid"); localStorage.setItem(scopeKey("nosey_folder_view"), "grid"); }} type="button">
               <Grid3X3 size={18} />
             </button>
-            <button className={view === "list" ? "active" : ""} onClick={() => { setView("list"); localStorage.setItem("nosey_folder_view", "list"); }} type="button">
+            <button className={view === "list" ? "active" : ""} onClick={() => { setView("list"); localStorage.setItem(scopeKey("nosey_folder_view"), "list"); }} type="button">
               <List size={18} />
             </button>
           </div>

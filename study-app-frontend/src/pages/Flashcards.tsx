@@ -5,7 +5,7 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
-import { deleteFlashcard, fetchFlashcards, fetchFolders, recordFlashcardAttempt } from "../lib/api";
+import { deleteFlashcard, fetchFlashcards, fetchFolders, recordFlashcardAttempt, scopeKey } from "../lib/api";
 import type { Flashcard, Folder } from "../lib/types";
 
 export default function Flashcards() {
@@ -68,7 +68,7 @@ export default function Flashcards() {
   // Persist card index so returning to a session resumes at the same card
   useEffect(() => {
     if (selectedFolderId != null && index > 0) {
-      localStorage.setItem(`nosey_flashcard_index_${selectedFolderId}`, String(index));
+      localStorage.setItem(scopeKey(`nosey_flashcard_index_${selectedFolderId}`), String(index));
     }
   }, [index, selectedFolderId]);
 
@@ -84,7 +84,7 @@ export default function Flashcards() {
 
     fetchFlashcards(selectedFolderId).then((data) => {
       setCards(data);
-      const saved = localStorage.getItem(`nosey_flashcard_index_${selectedFolderId}`);
+      const saved = localStorage.getItem(scopeKey(`nosey_flashcard_index_${selectedFolderId}`));
       const savedIndex = saved !== null ? Math.min(Number(saved), data.length - 1) : 0;
       setIndex(Math.max(savedIndex, 0));
       setStudied(new Set());
@@ -116,7 +116,7 @@ export default function Flashcards() {
     setFlipped(false);
     setStartedAt(Date.now());
     if (selectedFolderId != null) {
-      localStorage.removeItem(`nosey_flashcard_index_${selectedFolderId}`);
+      localStorage.removeItem(scopeKey(`nosey_flashcard_index_${selectedFolderId}`));
     }
   }
 

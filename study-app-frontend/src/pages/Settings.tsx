@@ -17,6 +17,7 @@ import {
   googleSignIn,
   isGuestSession,
   restoreKojoConversation,
+  scopeKey,
   setGoogleSession,
   signOut,
   unarchiveFolder,
@@ -197,7 +198,7 @@ export default function Settings() {
         scoreCount: scored.length,
         resetAt: new Date().toISOString(),
       };
-      localStorage.setItem(STATS_RESET_BASELINE_KEY, JSON.stringify(baseline));
+      localStorage.setItem(scopeKey(STATS_RESET_BASELINE_KEY), JSON.stringify(baseline));
       window.dispatchEvent(new Event("nosey-stats-reset"));
       setStatsResetNotice("Stats reset. Dashboard totals now start from zero.");
     } catch (err) {
@@ -328,8 +329,8 @@ export default function Settings() {
               type="button"
               variant="secondary"
               onClick={() => {
-                localStorage.removeItem(ONBOARDING_DONE_KEY);
-                localStorage.removeItem(TOUR_SEGMENT_KEY);
+                localStorage.removeItem(scopeKey(ONBOARDING_DONE_KEY));
+                localStorage.removeItem(scopeKey(TOUR_SEGMENT_KEY));
                 navigate("/dashboard");
               }}
             >

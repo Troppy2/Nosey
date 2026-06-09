@@ -5,7 +5,7 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmModal, RenameModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
-import { deleteTest, fetchFlashcards, fetchFolders, fetchTests, getResumableTests, getStoredUser, updateTest } from "../lib/api";
+import { deleteTest, fetchFlashcards, fetchFolders, fetchTests, getResumableTests, getStoredUser, scopeKey, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
 import type { Flashcard, Folder, ResumableTestInfo, TestSummary } from "../lib/types";
 
@@ -17,7 +17,7 @@ const COMPLETED_TEST_IDS_KEY = "nosey_completed_test_ids";
 
 function readCompletedTestIds(): Set<number> {
   try {
-    const raw = localStorage.getItem(COMPLETED_TEST_IDS_KEY);
+    const raw = localStorage.getItem(scopeKey(COMPLETED_TEST_IDS_KEY));
     if (!raw) return new Set();
     return new Set(JSON.parse(raw) as number[]);
   } catch {
@@ -34,7 +34,7 @@ type StatsResetBaseline = {
 
 function readStatsResetBaseline(): StatsResetBaseline {
   try {
-    const raw = localStorage.getItem(STATS_RESET_BASELINE_KEY);
+    const raw = localStorage.getItem(scopeKey(STATS_RESET_BASELINE_KEY));
     if (!raw) {
       return { attempts: 0, cardsReviewed: 0, scoreSum: 0, scoreCount: 0 };
     }
@@ -258,7 +258,7 @@ export default function Dashboard() {
   function dismissResumableTest(testId: number) {
     const next = new Set([...dismissedTestIds, testId]);
     setDismissedTestIds(next);
-    localStorage.setItem(COMPLETED_TEST_IDS_KEY, JSON.stringify([...next]));
+    localStorage.setItem(scopeKey(COMPLETED_TEST_IDS_KEY), JSON.stringify([...next]));
   }
 
   async function commitRename(nextTitle: string) {

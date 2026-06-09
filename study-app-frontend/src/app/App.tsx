@@ -10,7 +10,7 @@ import Folders from "../pages/Folders";
 import Landing from "../pages/Landing";
 import KojoMode from "../pages/KojoMode";
 import LeetCodeMode from "../pages/LeetCodeMode";
-import { isGuestSession } from "../lib/api";
+import { isGuestSession, scopeKey } from "../lib/api";
 import MockInterviewSetup from "../pages/MockInterviewSetup";
 import MockInterviewStage1 from "../pages/MockInterviewStage1";
 import MockInterviewStage2 from "../pages/MockInterviewStage2";
@@ -37,7 +37,7 @@ function PathTracker() {
   const location = useLocation();
 
   useEffect(() => {
-    localStorage.setItem("lastVisitedPath", location.pathname);
+    localStorage.setItem(scopeKey("lastVisitedPath"), location.pathname);
   }, [location.pathname]);
 
   return null;
