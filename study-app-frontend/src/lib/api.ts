@@ -99,6 +99,15 @@ export function isGuestSession() {
   return getStoredUser()?.is_guest === true;
 }
 
+// Prefixes a localStorage key with the current user's ID so settings are
+// isolated per user on a shared browser. Falls back to the bare key when no
+// user is stored (e.g. during login or as a guest with no ID).
+export function scopeKey(key: string): string {
+  const user = getStoredUser();
+  if (!user?.id) return key;
+  return `${key}_u${user.id}`;
+}
+
 export async function guestSignIn(): Promise<AuthUser> {
   const data = await request<{ user_id: number; access_token: string; email: string; user: AuthUser }>("/auth/guest", { method: "POST" });
   localStorage.setItem(TOKEN_KEY, data.access_token);

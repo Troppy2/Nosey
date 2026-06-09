@@ -8,7 +8,7 @@ import { EmptyState } from "../components/EmptyState";
 import { FileManager } from "../components/FileManager";
 import { KojoChat } from "../components/KojoChat";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
-import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, getStoredUser, isGuestSession, reindexFolderFiles, updateFolder, updateTest } from "../lib/api";
+import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, getStoredUser, isGuestSession, reindexFolderFiles, scopeKey, updateFolder, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
 import type { AttemptSummary, Flashcard, Folder, TestCreationParams, TestSummary } from "../lib/types";
 
@@ -72,7 +72,7 @@ export default function FolderDetail() {
   useEffect(() => {
     if (!id) return;
     try {
-      const raw = localStorage.getItem(`nosey_create_test_form_${id}`);
+      const raw = localStorage.getItem(scopeKey(`nosey_create_test_form_${id}`));
       if (!raw) return;
       const draft = JSON.parse(raw) as TestCreationParams;
       if (draft.title?.trim() || draft.topicFocus?.trim() || draft.customInstructions?.trim()) {
@@ -84,13 +84,13 @@ export default function FolderDetail() {
   }, [id]);
 
   function clearFormDraft() {
-    localStorage.removeItem(`nosey_create_test_form_${id}`);
+    localStorage.removeItem(scopeKey(`nosey_create_test_form_${id}`));
     setFormDraft(null);
   }
 
   function openPromptViewer(test: TestSummary) {
     try {
-      const raw = localStorage.getItem(`nosey_test_params_${test.id}`);
+      const raw = localStorage.getItem(scopeKey(`nosey_test_params_${test.id}`));
       if (!raw) return;
       setViewingPromptParams(JSON.parse(raw) as TestCreationParams);
       setViewingPromptTest(test);
@@ -579,7 +579,7 @@ function TestRow({
 }) {
   const [showAttempts, setShowAttempts] = useState(false);
   const [attempts, setAttempts] = useState<AttemptSummary[]>([]);
-  const hasPrompt = !!localStorage.getItem(`nosey_test_params_${test.id}`);
+  const hasPrompt = !!localStorage.getItem(scopeKey(`nosey_test_params_${test.id}`));
 
   async function loadAttempts() {
     if (showAttempts) { setShowAttempts(false); return; }

@@ -13,6 +13,7 @@ import {
   fetchProviderStatus,
   generateFlashcards,
   generateFlashcardsFromFile,
+  scopeKey,
   updateFlashcard,
 } from "../lib/api";
 import { useSettings } from "../lib/useSettings";
@@ -141,7 +142,7 @@ export default function FlashcardsManage() {
     setGenerating(true);
     setError(null);
     try {
-      const generated = await generateFlashcardsFromFile(id, files, 10, generationProvider, localStorage.getItem("nosey_question_fallback") === "true");
+      const generated = await generateFlashcardsFromFile(id, files, 10, generationProvider, localStorage.getItem(scopeKey("nosey_question_fallback")) === "true");
       setCards((prev) => [...generated, ...prev]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate flashcards.");
@@ -160,7 +161,7 @@ export default function FlashcardsManage() {
         prompt:
           "Create fresh flashcards using the folder's saved files and the current flashcards as context. Do not repeat existing cards, and focus on new concepts, definitions, examples, or comparisons that are not already covered.",
         provider: generationProvider,
-        enableFallback: localStorage.getItem("nosey_question_fallback") === "true",
+        enableFallback: localStorage.getItem(scopeKey("nosey_question_fallback")) === "true",
       });
       setCards((prev) => {
         const seen = new Set(prev.map((card) => `${card.front.trim().toLowerCase()}::${card.back.trim().toLowerCase()}`));

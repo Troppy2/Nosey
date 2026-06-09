@@ -2,7 +2,7 @@ import { BookOpen, Brain, ChevronLeft, ChevronRight, Code2, FolderOpen, LayoutDa
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { useSettings } from "../lib/useSettings";
-import { getStoredUser, isGuestSession } from "../lib/api";
+import { getStoredUser, isGuestSession, scopeKey } from "../lib/api";
 import { OnboardingTour } from "./OnboardingTour";
 
 const ADMIN_EMAIL = "jamesinah34@gmail.com";
@@ -38,7 +38,7 @@ export function Sidebar() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     if (typeof window === "undefined") return false;
-    return localStorage.getItem(sidebarStorageKey) === "true";
+    return localStorage.getItem(scopeKey(sidebarStorageKey)) === "true";
   });
   const lastScrollY = useRef(0);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -50,7 +50,7 @@ export function Sidebar() {
 
 
   useEffect(() => {
-    localStorage.setItem(sidebarStorageKey, String(isSidebarCollapsed));
+    localStorage.setItem(scopeKey(sidebarStorageKey), String(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
   // Close drawer on Escape key

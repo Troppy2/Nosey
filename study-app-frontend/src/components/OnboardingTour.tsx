@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { driver } from "driver.js";
-import { isGuestSession } from "../lib/api";
+import { isGuestSession, scopeKey } from "../lib/api";
 
 export const ONBOARDING_DONE_KEY = "nosey_onboarding_done";
 export const TOUR_SEGMENT_KEY = "nosey_tour_segment";
@@ -22,8 +22,8 @@ export function OnboardingTour() {
   const driverRef = useRef<ReturnType<typeof driver> | null>(null);
 
   useEffect(() => {
-    const isDone = !!localStorage.getItem(ONBOARDING_DONE_KEY);
-    const resumeSegment = localStorage.getItem(TOUR_SEGMENT_KEY);
+    const isDone = !!localStorage.getItem(scopeKey(ONBOARDING_DONE_KEY));
+    const resumeSegment = localStorage.getItem(scopeKey(TOUR_SEGMENT_KEY));
 
     if (isDone && !resumeSegment) return;
 
@@ -47,8 +47,8 @@ export function OnboardingTour() {
           smoothScroll: true,
           popoverOffset: 12,
           onDestroyed: () => {
-            if (!localStorage.getItem(TOUR_SEGMENT_KEY)) {
-              localStorage.setItem(ONBOARDING_DONE_KEY, "true");
+            if (!localStorage.getItem(scopeKey(TOUR_SEGMENT_KEY))) {
+              localStorage.setItem(scopeKey(ONBOARDING_DONE_KEY), "true");
             }
           },
           steps: [
@@ -94,7 +94,7 @@ export function OnboardingTour() {
                 side: isMobile ? "bottom" : "left",
                 align: isMobile ? "center" : "start",
                 onNextClick: () => {
-                  localStorage.setItem(TOUR_SEGMENT_KEY, "create-test");
+                  localStorage.setItem(scopeKey(TOUR_SEGMENT_KEY), "create-test");
                   d.destroy();
                   navigate("/create-test");
                 },
@@ -104,7 +104,7 @@ export function OnboardingTour() {
         });
 
       } else if (segment === "create-test") {
-        localStorage.removeItem(TOUR_SEGMENT_KEY);
+        localStorage.removeItem(scopeKey(TOUR_SEGMENT_KEY));
         d = driver({
           showProgress: true,
           progressText: "{{current}} of {{total}}",
@@ -113,8 +113,8 @@ export function OnboardingTour() {
           smoothScroll: true,
           popoverOffset: 12,
           onDestroyed: () => {
-            if (!localStorage.getItem(TOUR_SEGMENT_KEY)) {
-              localStorage.setItem(ONBOARDING_DONE_KEY, "true");
+            if (!localStorage.getItem(scopeKey(TOUR_SEGMENT_KEY))) {
+              localStorage.setItem(scopeKey(ONBOARDING_DONE_KEY), "true");
             }
           },
           steps: [
@@ -142,7 +142,7 @@ export function OnboardingTour() {
                 description: "Give your test a title, pick a folder, upload notes, and hit Generate. Next: how folders keep everything organized.",
                 align: "center",
                 onNextClick: () => {
-                  localStorage.setItem(TOUR_SEGMENT_KEY, "folders");
+                  localStorage.setItem(scopeKey(TOUR_SEGMENT_KEY), "folders");
                   d.destroy();
                   navigate("/folders");
                 },
@@ -152,7 +152,7 @@ export function OnboardingTour() {
         });
 
       } else if (segment === "folders") {
-        localStorage.removeItem(TOUR_SEGMENT_KEY);
+        localStorage.removeItem(scopeKey(TOUR_SEGMENT_KEY));
         d = driver({
           showProgress: true,
           progressText: "{{current}} of {{total}}",
@@ -161,8 +161,8 @@ export function OnboardingTour() {
           smoothScroll: true,
           popoverOffset: 12,
           onDestroyed: () => {
-            if (!localStorage.getItem(TOUR_SEGMENT_KEY)) {
-              localStorage.setItem(ONBOARDING_DONE_KEY, "true");
+            if (!localStorage.getItem(scopeKey(TOUR_SEGMENT_KEY))) {
+              localStorage.setItem(scopeKey(ONBOARDING_DONE_KEY), "true");
             }
           },
           steps: [
@@ -183,7 +183,7 @@ export function OnboardingTour() {
                 side: "bottom",
                 align: isMobile ? "center" : "end",
                 onNextClick: guest ? undefined : () => {
-                  localStorage.setItem(TOUR_SEGMENT_KEY, "kojo");
+                  localStorage.setItem(scopeKey(TOUR_SEGMENT_KEY), "kojo");
                   d.destroy();
                   navigate("/kojo/chat");
                 },
@@ -194,7 +194,7 @@ export function OnboardingTour() {
 
       } else {
         // segment === "kojo"
-        localStorage.removeItem(TOUR_SEGMENT_KEY);
+        localStorage.removeItem(scopeKey(TOUR_SEGMENT_KEY));
         d = driver({
           showProgress: true,
           progressText: "{{current}} of {{total}}",
@@ -203,7 +203,7 @@ export function OnboardingTour() {
           smoothScroll: true,
           popoverOffset: 12,
           onDestroyed: () => {
-            localStorage.setItem(ONBOARDING_DONE_KEY, "true");
+            localStorage.setItem(scopeKey(ONBOARDING_DONE_KEY), "true");
           },
           steps: [
             {

@@ -5,7 +5,7 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { SelectInput, TextInput } from "../components/Field";
-import { createTest, fetchFolderFiles, fetchFolders, fetchProviderStatus } from "../lib/api";
+import { createTest, fetchFolderFiles, fetchFolders, fetchProviderStatus, scopeKey } from "../lib/api";
 import { useSettings } from "../lib/useSettings";
 import type { Folder, ProviderStatus, TestCreationParams } from "../lib/types";
 
@@ -62,7 +62,7 @@ export default function CreateTest() {
           : null;
       if (storageKey) {
         try {
-          const raw = localStorage.getItem(storageKey);
+          const raw = localStorage.getItem(scopeKey(storageKey));
           if (raw) {
             const p = JSON.parse(raw) as Partial<TestCreationParams>;
             if (p.title !== undefined) setTitle(p.title);
@@ -109,7 +109,7 @@ export default function CreateTest() {
       topicFocus, customInstructions, advancedMode,
       savedAt: new Date().toISOString(),
     };
-    localStorage.setItem(`nosey_create_test_form_${folderId}`, JSON.stringify(draft));
+    localStorage.setItem(scopeKey(`nosey_create_test_form_${folderId}`), JSON.stringify(draft));
   }, [title, folderId, testType, countMcq, countFrq, isMathMode, isCodingMode, codingLanguage, difficulty, topicFocus, customInstructions, advancedMode]);
 
   useEffect(() => {
@@ -144,7 +144,7 @@ export default function CreateTest() {
         topicFocus: advancedMode && topicFocus.trim() ? topicFocus.trim() : undefined,
         customInstructions: advancedMode && customInstructions.trim() ? customInstructions.trim() : undefined,
         generationProvider: generationProvider,
-        enableFallback: localStorage.getItem("nosey_question_fallback") === "true",
+        enableFallback: localStorage.getItem(scopeKey("nosey_question_fallback")) === "true",
       });
       sessionStorage.setItem(
         `nosey_generation_meta_${result.test_id}`,
@@ -166,8 +166,8 @@ export default function CreateTest() {
           topicFocus, customInstructions, advancedMode,
           savedAt: new Date().toISOString(),
         };
-        localStorage.setItem(`nosey_test_params_${result.test_id}`, JSON.stringify(params));
-        localStorage.removeItem(`nosey_create_test_form_${folderId}`);
+        localStorage.setItem(scopeKey(`nosey_test_params_${result.test_id}`), JSON.stringify(params));
+        localStorage.removeItem(scopeKey(`nosey_create_test_form_${folderId}`));
       }
       // Navigate to folder so the user can see the test generating in the list.
       // When generation_status is already 'ready' (e.g. fast run), go straight to the test.

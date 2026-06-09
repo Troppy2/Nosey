@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { scopeKey } from "./api";
 
 export const SETTINGS_KEYS = {
   questionFallback: "nosey_question_fallback",
@@ -27,31 +28,31 @@ function writeSetting(key: string, value: string) {
 
 export function useSettings() {
   const [questionFallbackEnabled, setQuestionFallbackEnabledState] = useState(() =>
-    readBooleanSetting(SETTINGS_KEYS.questionFallback, false),
+    readBooleanSetting(scopeKey(SETTINGS_KEYS.questionFallback), false),
   );
   const [generationProvider, setGenerationProviderState] = useState(() =>
-    readStringSetting(SETTINGS_KEYS.generationProvider, "ollama"),
+    readStringSetting(scopeKey(SETTINGS_KEYS.generationProvider), "ollama"),
   );
   const [kojoStrictness, setKojoStrictnessState] = useState(() =>
-    readStringSetting(SETTINGS_KEYS.kojoStrictness, "medium"),
+    readStringSetting(scopeKey(SETTINGS_KEYS.kojoStrictness), "medium"),
   );
   const [betaMode, setBetaModeState] = useState(() =>
-    readBooleanSetting(SETTINGS_KEYS.betaMode, false),
+    readBooleanSetting(scopeKey(SETTINGS_KEYS.betaMode), false),
   );
 
   // Sync state when another instance of useSettings writes a setting.
   useEffect(() => {
     function handleStorage(e: StorageEvent) {
-      if (e.key === SETTINGS_KEYS.questionFallback && e.newValue !== null) {
+      if (e.key === scopeKey(SETTINGS_KEYS.questionFallback) && e.newValue !== null) {
         setQuestionFallbackEnabledState(e.newValue !== "false");
       }
-      if (e.key === SETTINGS_KEYS.generationProvider && e.newValue !== null) {
+      if (e.key === scopeKey(SETTINGS_KEYS.generationProvider) && e.newValue !== null) {
         setGenerationProviderState(e.newValue);
       }
-      if (e.key === SETTINGS_KEYS.kojoStrictness && e.newValue !== null) {
+      if (e.key === scopeKey(SETTINGS_KEYS.kojoStrictness) && e.newValue !== null) {
         setKojoStrictnessState(e.newValue);
       }
-      if (e.key === SETTINGS_KEYS.betaMode && e.newValue !== null) {
+      if (e.key === scopeKey(SETTINGS_KEYS.betaMode) && e.newValue !== null) {
         setBetaModeState(e.newValue !== "false");
       }
     }
@@ -61,22 +62,22 @@ export function useSettings() {
 
   function setQuestionFallbackEnabled(value: boolean) {
     setQuestionFallbackEnabledState(value);
-    writeSetting(SETTINGS_KEYS.questionFallback, String(value));
+    writeSetting(scopeKey(SETTINGS_KEYS.questionFallback), String(value));
   }
 
   function setGenerationProvider(value: string) {
     setGenerationProviderState(value);
-    writeSetting(SETTINGS_KEYS.generationProvider, value);
+    writeSetting(scopeKey(SETTINGS_KEYS.generationProvider), value);
   }
 
   function setKojoStrictness(value: string) {
     setKojoStrictnessState(value);
-    writeSetting(SETTINGS_KEYS.kojoStrictness, value);
+    writeSetting(scopeKey(SETTINGS_KEYS.kojoStrictness), value);
   }
 
   function setBetaMode(value: boolean) {
     setBetaModeState(value);
-    writeSetting(SETTINGS_KEYS.betaMode, String(value));
+    writeSetting(scopeKey(SETTINGS_KEYS.betaMode), String(value));
   }
 
   return {

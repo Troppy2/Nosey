@@ -8,7 +8,7 @@ import { EmptyState } from "../components/EmptyState";
 import { TextArea } from "../components/Field";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { MathInput } from "../components/MathInput";
-import { API_BASE_URL, fetchTest, getDraftAttempt, saveDraftAttempt, submitAttempt } from "../lib/api";
+import { API_BASE_URL, fetchTest, getDraftAttempt, saveDraftAttempt, scopeKey, submitAttempt } from "../lib/api";
 import type { DraftAttemptAnswer, Question, SubmittedAnswer, TestTake } from "../lib/types";
 
 type GenerationMeta = {
@@ -43,7 +43,7 @@ export default function TakeTest() {
   // Persist question index so resume lands on the right question
   useEffect(() => {
     if (index > 0) {
-      localStorage.setItem(`nosey_test_index_${numericTestId}`, String(index));
+      localStorage.setItem(scopeKey(`nosey_test_index_${numericTestId}`), String(index));
     }
   }, [index, numericTestId]);
 
@@ -149,14 +149,14 @@ export default function TakeTest() {
       setAnswers(JSON.parse(draftAnswers) as Record<number, string>);
       sessionStorage.removeItem(`_draft_answers_${numericTestId}`);
     }
-    const savedIndex = localStorage.getItem(`nosey_test_index_${numericTestId}`);
+    const savedIndex = localStorage.getItem(scopeKey(`nosey_test_index_${numericTestId}`));
     if (savedIndex !== null) setIndex(Number(savedIndex));
     setShowResumeDialog(false);
   }
 
   function handleStartFresh() {
     setAnswers({});
-    localStorage.removeItem(`nosey_test_index_${numericTestId}`);
+    localStorage.removeItem(scopeKey(`nosey_test_index_${numericTestId}`));
     setShowResumeDialog(false);
   }
 
@@ -201,9 +201,9 @@ export default function TakeTest() {
     setIsSubmitting(true);
     try {
       const result = await submitAttempt(test.id, submittedAnswers);
-      localStorage.removeItem(`nosey_test_index_${numericTestId}`);
+      localStorage.removeItem(scopeKey(`nosey_test_index_${numericTestId}`));
       sessionStorage.setItem(`nosey_attempt_${result.attempt_id}`, JSON.stringify(result));
-      const completedKey = "nosey_completed_test_ids";
+      const completedKey = scopeKey("nosey_completed_test_ids");
       const existing = JSON.parse(localStorage.getItem(completedKey) ?? "[]") as number[];
       localStorage.setItem(completedKey, JSON.stringify([...new Set([...existing, test.id])]));
       navigate(`/results/${result.attempt_id}`);
