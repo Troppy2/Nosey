@@ -85,6 +85,8 @@ class TestUpdate(BaseModel):
 
 class TestTakeResponse(BaseModel):
     id: int
+    folder_id: int
+    folder_name: str
     title: str
     description: Optional[str] = None
     test_type: str

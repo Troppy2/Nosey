@@ -69,6 +69,7 @@ class TestRepository(BaseRepository[Test]):
             .options(
                 selectinload(Test.questions).options(*_QUESTION_WITH_ANSWERS),
                 selectinload(Test.notes),
+                selectinload(Test.folder),
             )
         )
         return await self.session.scalar(stmt)
