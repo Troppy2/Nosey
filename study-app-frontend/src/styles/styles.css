@@ -10346,3 +10346,80 @@ h3 {
 .lc-notes-textarea::placeholder {
   color: #9ab87a;
 }
+
+/* ── Learning Mode (beta test mode) ───────────────────────────────────────── */
+.learning-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--green-light);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.learning-mode-toggle:hover {
+  border-color: var(--green-dark-mid, var(--green-dark));
+}
+
+.learning-mode-toggle--on {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+  color: #fff;
+}
+
+.learning-mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px dashed var(--green-light);
+  background: var(--green-lightest);
+}
+
+.learning-mode-bar-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--green-dark);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.learning-mode-ask-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: none;
+  background: var(--green-dark);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.learning-mode-ask-btn:hover {
+  filter: brightness(1.08);
+}
+
+@media (max-width: 760px) {
+  .learning-mode-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .learning-mode-ask-btn {
+    justify-content: center;
+  }
+}

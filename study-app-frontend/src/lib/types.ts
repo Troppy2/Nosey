@@ -103,6 +103,8 @@ export type QuestionUpdate = {
 
 export type TestTake = {
   id: ID;
+  folder_id?: ID;
+  folder_name?: string;
   title: string;
   description?: string | null;
   test_type: string;

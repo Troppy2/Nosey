@@ -426,6 +426,8 @@ class TestService:
         questions = [self._serialize_question_public(q) for q in test.questions]
         return TestTakeResponse(
             id=test.id,
+            folder_id=test.folder_id,
+            folder_name=test.folder.name,
             title=test.title,
             description=test.description,
             test_type=test.test_type,
