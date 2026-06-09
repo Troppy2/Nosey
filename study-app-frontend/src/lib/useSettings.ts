@@ -8,16 +8,35 @@ export const SETTINGS_KEYS = {
   betaMode: "nosey_beta_mode",
 } as const;
 
-function readBooleanSetting(key: string, defaultValue: boolean) {
+// Resolves a setting value from the user-scoped key, falling back to the legacy
+// unscoped key written before scopeKey existed. When a legacy value is found it
+// is migrated forward to the scoped key so this only happens once. Without this,
+// settings saved before key scoping (e.g. beta mode) silently read as default.
+function resolveSettingValue(bareKey: string): string | null {
+  const scoped = scopeKey(bareKey);
+  const scopedVal = localStorage.getItem(scoped);
+  if (scopedVal !== null) return scopedVal;
+  // No scoped value yet. Migrate the legacy unscoped value if one exists.
+  if (scoped !== bareKey) {
+    const legacy = localStorage.getItem(bareKey);
+    if (legacy !== null) {
+      localStorage.setItem(scoped, legacy);
+      return legacy;
+    }
+  }
+  return null;
+}
+
+function readBooleanSetting(bareKey: string, defaultValue: boolean) {
   if (typeof window === "undefined") return defaultValue;
-  const val = localStorage.getItem(key);
+  const val = resolveSettingValue(bareKey);
   if (val === null) return defaultValue;
   return val !== "false";
 }
 
-function readStringSetting(key: string, defaultValue: string) {
+function readStringSetting(bareKey: string, defaultValue: string) {
   if (typeof window === "undefined") return defaultValue;
-  return localStorage.getItem(key) ?? defaultValue;
+  return resolveSettingValue(bareKey) ?? defaultValue;
 }
 
 // Writes to localStorage and notifies all useSettings instances in the same tab.
@@ -28,16 +47,16 @@ function writeSetting(key: string, value: string) {
 
 export function useSettings() {
   const [questionFallbackEnabled, setQuestionFallbackEnabledState] = useState(() =>
-    readBooleanSetting(scopeKey(SETTINGS_KEYS.questionFallback), false),
+    readBooleanSetting(SETTINGS_KEYS.questionFallback, false),
   );
   const [generationProvider, setGenerationProviderState] = useState(() =>
-    readStringSetting(scopeKey(SETTINGS_KEYS.generationProvider), "ollama"),
+    readStringSetting(SETTINGS_KEYS.generationProvider, "ollama"),
   );
   const [kojoStrictness, setKojoStrictnessState] = useState(() =>
-    readStringSetting(scopeKey(SETTINGS_KEYS.kojoStrictness), "medium"),
+    readStringSetting(SETTINGS_KEYS.kojoStrictness, "medium"),
   );
   const [betaMode, setBetaModeState] = useState(() =>
-    readBooleanSetting(scopeKey(SETTINGS_KEYS.betaMode), false),
+    readBooleanSetting(SETTINGS_KEYS.betaMode, false),
   );
 
   // Sync state when another instance of useSettings writes a setting.
