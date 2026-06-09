@@ -1,4 +1,5 @@
 import logging
+from datetime import date
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -8,7 +9,7 @@ from src.database import get_session
 from src.dependencies import get_current_user
 from src.models.user import User
 from src.repositories.user_repository import UserRepository
-from src.schemas.auth_schema import AuthResponse, GoogleAuthRequest
+from src.schemas.auth_schema import AuthResponse, DateOfBirthRequest, GoogleAuthRequest, UserResponse
 from src.services.auth_service import AuthService
 from src.utils.exceptions import StudyAppException
 
@@ -46,6 +47,26 @@ async def guest_auth(
     except Exception as exc:
         logger.exception("Unexpected error during guest auth")
         raise HTTPException(status_code=500, detail="Guest authentication failed") from exc
+
+
+@router.post("/date-of-birth", response_model=UserResponse)
+async def set_date_of_birth(
+    request: DateOfBirthRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserResponse:
+    today = date.today()
+    min_dob = date(today.year - 120, today.month, today.day)
+    max_dob = date(today.year - 5, today.month, today.day)
+    if request.date_of_birth < min_dob or request.date_of_birth > max_dob:
+        raise HTTPException(status_code=400, detail="Date of birth is not valid")
+    try:
+        user = await UserRepository(session).update_date_of_birth(current_user, request.date_of_birth)
+        await session.commit()
+        return UserResponse.model_validate(user)
+    except Exception as exc:
+        logger.exception("Unexpected error setting date of birth")
+        raise HTTPException(status_code=500, detail="Failed to save date of birth") from exc
 
 
 @router.delete("/account", status_code=204)

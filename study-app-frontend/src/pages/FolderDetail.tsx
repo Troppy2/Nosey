@@ -8,7 +8,7 @@ import { EmptyState } from "../components/EmptyState";
 import { FileManager } from "../components/FileManager";
 import { KojoChat } from "../components/KojoChat";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
-import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, isGuestSession, reindexFolderFiles, updateFolder, updateTest } from "../lib/api";
+import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, getStoredUser, isGuestSession, reindexFolderFiles, updateFolder, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
 import type { AttemptSummary, Flashcard, Folder, TestCreationParams, TestSummary } from "../lib/types";
 
@@ -23,6 +23,7 @@ export default function FolderDetail() {
   const { folderId } = useParams();
   const navigate = useNavigate();
   const guest = isGuestSession();
+  const kojoEnabled = getStoredUser()?.kojo_enabled !== false;
   const [folder, setFolder] = useState<Folder | null>(null);
   const [tests, setTests] = useState<TestSummary[]>([]);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
@@ -205,7 +206,7 @@ export default function FolderDetail() {
           >
             Manage Files
           </Button>
-          {!guest ? (
+          {!guest && kojoEnabled ? (
             <Button
               variant="secondary"
               icon={<Bot size={18} />}

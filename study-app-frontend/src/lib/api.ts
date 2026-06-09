@@ -147,6 +147,15 @@ export function signOut() {
   localStorage.removeItem(USER_KEY);
 }
 
+export async function submitDateOfBirth(dob: string): Promise<AuthUser> {
+  const user = await request<AuthUser>("/auth/date-of-birth", {
+    method: "POST",
+    body: JSON.stringify({ date_of_birth: dob }),
+  });
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  return user;
+}
+
 export async function deleteAccount(): Promise<void> {
   await request<void>("/auth/account", { method: "DELETE" });
   localStorage.removeItem(TOKEN_KEY);

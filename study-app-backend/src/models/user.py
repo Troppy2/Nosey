@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import Boolean, String, Text
+from sqlalchemy import Boolean, Date, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import BIGINT_ID, Base, TimestampMixin
@@ -28,6 +29,8 @@ class User(Base, TimestampMixin):
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     admin_session_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    date_of_birth: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    age: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     folders: Mapped[list[Folder]] = relationship(
         "Folder", back_populates="user", cascade="all, delete-orphan"

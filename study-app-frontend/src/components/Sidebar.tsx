@@ -25,8 +25,13 @@ export function Sidebar() {
   const currentUser = getStoredUser();
   const isAdmin = currentUser?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const adminItem = { to: "/admin", label: "Admin", icon: ShieldCheck, beta: false, guestHidden: true, tourId: undefined };
+  const kojoEnabled = currentUser?.kojo_enabled !== false;
   const navItems = [
-    ...BASE_NAV_ITEMS.filter((item) => (!item.beta || betaMode) && (!item.guestHidden || !guest)),
+    ...BASE_NAV_ITEMS.filter((item) =>
+      (!item.beta || betaMode) &&
+      (!item.guestHidden || !guest) &&
+      (item.to !== "/kojo/chat" || kojoEnabled)
+    ),
     ...(isAdmin && !guest ? [adminItem] : []),
   ];
   const [isNavHidden, setIsNavHidden] = useState(false);
