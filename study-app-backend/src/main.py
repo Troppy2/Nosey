@@ -1,3 +1,9 @@
+import asyncio
+import sys
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 import socket as _socket
 
 _orig_getaddrinfo = _socket.getaddrinfo
