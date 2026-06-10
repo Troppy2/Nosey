@@ -56,6 +56,8 @@ Set-Location study-app-backend
 ..\.venv\Scripts\Activate.ps1
 ```
 
+**Note for Windows:** Use `run.py` to start the backend. Running `python -m uvicorn src.main:app` directly will fail with a psycopg ProactorEventLoop error because uvicorn creates its event loop before the app module is imported. `run.py` sets `WindowsSelectorEventLoopPolicy` first.
+
 Then (first time) install dependencies and apply migrations.
 
 Check and install Python dependencies (recommended):
@@ -113,7 +115,7 @@ Set-Location study-app-backend
 ..\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
-..\.venv\Scripts\python.exe -m uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+..\.venv\Scripts\python.exe run.py
 ```
 
 API base: `http://localhost:8000` (docs at `/docs`).
