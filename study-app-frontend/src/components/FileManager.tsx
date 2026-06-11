@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { type FolderFile, type SkippedFile, deleteFolderFile, fetchFolderFiles, uploadFolderFiles } from "../lib/api";
 import { ConfirmModal } from "./ConfirmModal";
 
-const MAX_FILE_SIZE_MB = 10;
-const MAX_TOTAL_SIZE_MB = 100;
+const MAX_FILE_SIZE_MB = 100;
+const MAX_TOTAL_SIZE_MB = 300;
 const ALLOWED_TYPES = [
   "application/pdf",
   "text/plain",

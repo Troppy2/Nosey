@@ -9,8 +9,8 @@ import { createTest, fetchFolderFiles, fetchFolders, fetchProviderStatus, scopeK
 import { useSettings } from "../lib/useSettings";
 import type { Folder, ProviderStatus, TestCreationParams } from "../lib/types";
 
-const MAX_UPLOAD_FILE_SIZE_MB = 10;
-const MAX_UPLOAD_TOTAL_SIZE_MB = 100;
+const MAX_UPLOAD_FILE_SIZE_MB = 100;
+const MAX_UPLOAD_TOTAL_SIZE_MB = 300;
 
 export default function CreateTest() {
   const navigate = useNavigate();
@@ -232,7 +232,7 @@ export default function CreateTest() {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       ].includes(file.type) || /\.(pdf|docx|txt|md)$/i.test(file.name);
     if (!allowed || file.size > MAX_UPLOAD_FILE_SIZE_MB * 1024 * 1024) {
-      setError("Practice test must be a PDF, DOCX, TXT, or Markdown file under 10 MB.");
+      setError(`Practice test must be a PDF, DOCX, TXT, or Markdown file under ${MAX_UPLOAD_FILE_SIZE_MB} MB.`);
       return;
     }
     setError(null);
@@ -257,7 +257,7 @@ export default function CreateTest() {
           <span className="eyebrow">Generate</span>
           <h1>Create a practice test</h1>
           <p className="muted">
-            Upload PDF, DOCX, TXT, or Markdown documents (10 MB each, {MAX_UPLOAD_TOTAL_SIZE_MB} MB total), or use files already saved in the folder, and choose the question style Nosey should generate.
+            Upload PDF, DOCX, TXT, or Markdown documents ({MAX_UPLOAD_FILE_SIZE_MB} MB each, {MAX_UPLOAD_TOTAL_SIZE_MB} MB total), or use files already saved in the folder, and choose the question style Nosey should generate.
           </p>
         </div>
         <button
