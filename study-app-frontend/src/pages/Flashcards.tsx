@@ -1,4 +1,4 @@
-import { AlertCircle, ArrowLeft, CheckCircle2, FolderOpen, RotateCcw, XCircle } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, FolderOpen, RotateCcw, Trash2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -47,6 +47,7 @@ export default function Flashcards() {
         event.preventDefault();
         setIndex((currentIndex) => Math.max(currentIndex - 1, 0));
         setFlipped(false);
+        setStartedAt(Date.now());
         return;
       }
 
@@ -54,6 +55,7 @@ export default function Flashcards() {
         event.preventDefault();
         setIndex((currentIndex) => Math.min(currentIndex + 1, cards.length - 1));
         setFlipped(false);
+        setStartedAt(Date.now());
       }
     }
 
@@ -108,6 +110,12 @@ export default function Flashcards() {
     setStartedAt(Date.now());
     setFlipped(false);
     if (index < cards.length - 1) setIndex(index + 1);
+  }
+
+  function goTo(nextIndex: number) {
+    setIndex(Math.min(Math.max(nextIndex, 0), cards.length - 1));
+    setFlipped(false);
+    setStartedAt(Date.now());
   }
 
   function reset() {
@@ -222,35 +230,51 @@ export default function Flashcards() {
   return (
     <div className="flash-screen">
       <header className="flash-header">
-        <Link className="back-link" to="/flashcards">
-          <ArrowLeft size={16} />
-          Class folders
-        </Link>
-        <div>
-          <h1>{selectedFolder?.name ?? "Flashcards"}</h1>
-          <p className="muted">{remaining} cards remaining</p>
+        <div className="flash-header-row">
+          <Link className="flash-back-btn" to="/flashcards" aria-label="Back to class folders" title="Back to class folders">
+            <ArrowLeft size={18} />
+          </Link>
+          <div className="flash-header-title">
+            <h1>{selectedFolder?.name ?? "Flashcards"}</h1>
+            <p className="flash-header-sub">
+              {remaining} card{remaining === 1 ? "" : "s"} remaining
+            </p>
+          </div>
+          <div className="flash-header-actions">
+            <button
+              className="flash-icon-btn"
+              onClick={reset}
+              type="button"
+              aria-label="Restart session"
+              title="Restart session"
+            >
+              <RotateCcw size={17} />
+            </button>
+            <button
+              className="flash-icon-btn flash-icon-btn--danger"
+              onClick={() => setShowDeleteAllModal(true)}
+              disabled={cards.length === 0 || deletingAll}
+              type="button"
+              aria-label="Delete all flashcards"
+              title="Delete all flashcards"
+            >
+              <Trash2 size={17} />
+            </button>
+          </div>
         </div>
-        <Button
-          variant="danger"
-          onClick={() => setShowDeleteAllModal(true)}
-          disabled={cards.length === 0 || deletingAll}
-        >
-          Delete All Flashcards
-        </Button>
-        <Button variant="secondary" icon={<RotateCcw size={18} />} onClick={reset}>
-          Reset
-        </Button>
+        <div className="progress-track flash-progress">
+          <div className="progress-fill" style={{ width: `${progress}%` }} />
+        </div>
       </header>
 
-      {actionError ? <div className="form-error">{actionError}</div> : null}
-
-      <div className="progress-track">
-        <div className="progress-fill" style={{ width: `${progress}%` }} />
-      </div>
+      {actionError ? <div className="form-error flash-error">{actionError}</div> : null}
 
       <main className="flash-wrap">
         <div className="flash-meta">
-          Card {index + 1} of {cards.length} · Difficulty {current.difficulty}
+          <span className="pill">
+            Card {index + 1} of {cards.length}
+          </span>
+          <span className="pill">Difficulty {current.difficulty}</span>
         </div>
         <button className={`flip-card ${flipped ? "flipped" : ""}`} onClick={() => setFlipped(!flipped)} type="button">
           <div className="flip-inner">
@@ -264,24 +288,49 @@ export default function Flashcards() {
             </Card>
           </div>
         </button>
-        <p className="muted small">Click the card to flip it.</p>
 
-        {flipped ? (
-          <div className="confidence-row">
-            <button className="confidence hard" onClick={() => mark(false)} type="button">
-              <XCircle size={21} />
-              Hard
-            </button>
-            <button className="confidence medium" onClick={() => mark(false)} type="button">
-              <AlertCircle size={21} />
-              Medium
-            </button>
-            <button className="confidence easy" onClick={() => mark(true)} type="button">
-              <CheckCircle2 size={21} />
-              Easy
-            </button>
-          </div>
-        ) : null}
+        <div className="flash-controls">
+          <button
+            className="flash-nav-btn"
+            onClick={() => goTo(index - 1)}
+            disabled={index === 0}
+            type="button"
+            aria-label="Previous card"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <p className="flash-hint">{flipped ? "How well did you know it?" : "Tap the card to flip it"}</p>
+          <button
+            className="flash-nav-btn"
+            onClick={() => goTo(index + 1)}
+            disabled={index >= cards.length - 1}
+            type="button"
+            aria-label="Next card"
+          >
+            <ChevronRight size={20} />
+          </button>
+        </div>
+
+        <div className="flash-confidence-zone">
+          {flipped ? (
+            <div className="confidence-row">
+              <button className="confidence hard" onClick={() => mark(false)} type="button">
+                <XCircle size={21} />
+                Hard
+              </button>
+              <button className="confidence medium" onClick={() => mark(false)} type="button">
+                <AlertCircle size={21} />
+                Medium
+              </button>
+              <button className="confidence easy" onClick={() => mark(true)} type="button">
+                <CheckCircle2 size={21} />
+                Easy
+              </button>
+            </div>
+          ) : null}
+        </div>
+
+        <p className="flash-kbd-hint">Space flips the card. Arrow keys move between cards.</p>
       </main>
 
       {showDeleteAllModal ? (

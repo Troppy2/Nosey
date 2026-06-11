@@ -192,6 +192,29 @@ export default function FlashcardsManage() {
           <p className="muted">{cards.length} card{cards.length === 1 ? "" : "s"}</p>
         </div>
         <div className="toolbar">
+          <Button
+            icon={<Trash2 size={18} />}
+            onClick={() => setShowDeleteAllModal(true)}
+            variant="danger"
+            disabled={cards.length === 0}
+          >
+            Delete All Flashcards
+          </Button>
+        </div>
+      </header>
+
+      {error ? <div className="form-error">{error}</div> : null}
+
+      <Card tone="soft" className="flashcard-gen-panel">
+        <div className="flashcard-gen-head">
+          <h3>Generate with AI</h3>
+          <p className="muted small">
+            {folderFileCount > 0
+              ? `${folderFileCount} saved file${folderFileCount === 1 ? "" : "s"} will be used as source context.`
+              : "No saved files in this folder yet. Nosey will generate from the existing flashcards and any uploaded file you choose."}
+          </p>
+        </div>
+        <div className="flashcard-gen-controls">
           <input
             accept=".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml"
             multiple
@@ -204,6 +227,7 @@ export default function FlashcardsManage() {
             icon={<Upload size={18} />}
             onClick={() => fileRef.current?.click()}
             variant="secondary"
+            disabled={generating}
           >
             {generating ? "Generating..." : "Generate from file"}
           </Button>
@@ -215,41 +239,20 @@ export default function FlashcardsManage() {
           >
             {generatingMore ? "Generating..." : "Generate more"}
           </Button>
-          <Button
-            icon={<Trash2 size={18} />}
-            onClick={() => setShowDeleteAllModal(true)}
-            variant="danger"
-            disabled={cards.length === 0}
-          >
-            Delete All Flashcards
-          </Button>
+          <label className="flashcard-gen-count">
+            Cards to add
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={generateCount}
+              onChange={(e) => setGenerateCount(Math.max(1, Math.min(50, Number(e.target.value))))}
+              className="input"
+            />
+          </label>
         </div>
-      </header>
-
-      <div className="toolbar" style={{ justifyContent: "flex-end", marginTop: -8, marginBottom: 12 }}>
-        <label className="muted small" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          Cards to add
-          <input
-            type="number"
-            min={1}
-            max={50}
-            value={generateCount}
-            onChange={(e) => setGenerateCount(Math.max(1, Math.min(50, Number(e.target.value))))}
-            className="input"
-            style={{ width: 92, padding: "8px 10px" }}
-          />
-        </label>
-        <span className="muted small" style={{ alignSelf: "center" }}>
-          AI model is set in Settings.
-        </span>
-        <span className="muted small" style={{ alignSelf: "center" }}>
-          {folderFileCount > 0
-            ? `${folderFileCount} saved file${folderFileCount === 1 ? "" : "s"} will be used as source context.`
-            : "No saved files in this folder yet. Nosey will generate from the existing flashcards and any uploaded file you choose."}
-        </span>
-      </div>
-
-      {error ? <div className="form-error">{error}</div> : null}
+        <p className="muted small">AI model is set in Settings.</p>
+      </Card>
 
       <Card tone="soft" className="add-card-form">
         <h3>Add a card</h3>

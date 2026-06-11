@@ -496,8 +496,7 @@ h3 {
 }
 
 .button:hover:not(:disabled) {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-1px) scale(1.02);
+  transform: translateY(-2px);
 }
 
 .button:active:not(:disabled) {
@@ -520,12 +519,19 @@ h3 {
 
 .button-primary:hover:not(:disabled) {
   background: var(--green-dark-mid);
+  box-shadow: 0 4px 14px rgba(113, 131, 85, 0.35);
 }
 
 .button-secondary {
   color: var(--green-dark);
-  background: rgba(255, 255, 255, 0.58);
-  border: 1px solid var(--green-light-mid);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1.5px solid var(--green-mid);
+}
+
+.button-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: var(--green-dark);
+  box-shadow: 0 2px 8px rgba(113, 131, 85, 0.2);
 }
 
 .button-ghost {
@@ -533,9 +539,18 @@ h3 {
   background: transparent;
 }
 
+.button-ghost:hover:not(:disabled) {
+  background: rgba(113, 131, 85, 0.1);
+}
+
 .button-danger {
   color: #fff;
   background: var(--error);
+}
+
+.button-danger:hover:not(:disabled) {
+  background: #b91c1c;
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.3);
 }
 
 .card {
@@ -1941,26 +1956,104 @@ h3 {
   position: sticky;
   top: 0;
   z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 20px 32px;
-  background: rgba(233, 245, 219, 0.86);
+  background: rgba(233, 245, 219, 0.9);
   border-bottom: 1px solid var(--green-light-mid);
   backdrop-filter: blur(12px);
 }
 
-.flash-header .back-link {
-  margin: 0;
+.flash-header-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px clamp(14px, 3vw, 32px);
 }
 
-.flash-screen>.progress-track {
-  position: sticky;
-  top: 89px;
-  z-index: 9;
+.flash-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  color: var(--green-dark);
+  background: rgba(255, 255, 255, 0.6);
+  border: 1.5px solid var(--green-light-mid);
+  border-radius: 10px;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.flash-back-btn:hover {
+  background: var(--white);
+  border-color: var(--green-mid);
+}
+
+.flash-header-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.flash-header-title h1 {
+  font-size: clamp(1.05rem, 2.4vw, 1.35rem);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.flash-header-sub {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.flash-header-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.flash-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  color: var(--green-dark);
+  background: rgba(255, 255, 255, 0.6);
+  border: 1.5px solid var(--green-light-mid);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.flash-icon-btn:hover:not(:disabled) {
+  background: var(--white);
+  border-color: var(--green-mid);
+}
+
+.flash-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.flash-icon-btn--danger {
+  color: var(--error);
+  border-color: rgba(220, 38, 38, 0.3);
+}
+
+.flash-icon-btn--danger:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: var(--error);
+}
+
+.flash-progress {
   height: 4px;
   border-radius: 0;
+}
+
+.flash-error {
+  width: min(720px, calc(100% - 28px));
+  margin: 14px auto 0;
 }
 
 .flash-wrap {
@@ -1968,19 +2061,20 @@ h3 {
   justify-items: center;
   width: min(720px, 100%);
   margin: 0 auto;
-  padding: 42px 24px;
+  padding: clamp(22px, 4.5vw, 42px) clamp(14px, 3vw, 24px) clamp(32px, 5vw, 56px);
 }
 
 .flash-meta {
-  margin-bottom: 16px;
-  color: #596949;
-  font-size: 0.9rem;
-  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
 }
 
 .flip-card {
   width: min(620px, 100%);
   height: 400px;
+  height: clamp(280px, 46dvh, 420px);
   padding: 0;
   background: transparent;
   cursor: pointer;
@@ -2002,12 +2096,21 @@ h3 {
 .flip-face {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
-  gap: 18px;
-  padding: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  justify-content: safe center;
+  gap: 16px;
+  padding: clamp(22px, 4vw, 44px);
   text-align: center;
   backface-visibility: hidden;
+  overflow-y: auto;
+}
+
+.flip-front h2 {
+  font-size: clamp(1.1rem, 1.2vw + 0.9rem, 1.5rem);
+  line-height: 1.45;
 }
 
 .flip-front {
@@ -2033,9 +2136,21 @@ h3 {
 .confidence-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  width: min(520px, 100%);
+  width: 100%;
   gap: 12px;
-  margin-top: 28px;
+  animation: confidence-in 220ms ease;
+}
+
+@keyframes confidence-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .confidence {
@@ -2168,8 +2283,7 @@ h3 {
   .page-header,
   .toolbar,
   .button-row,
-  .test-progress header,
-  .flash-header {
+  .test-progress header {
     align-items: stretch;
     flex-direction: column;
   }
@@ -2326,8 +2440,7 @@ h3 {
 
   .grid-2,
   .grid-3,
-  .choice-grid,
-  .confidence-row {
+  .choice-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2454,10 +2567,6 @@ h3 {
 
   .option-button svg {
     display: none;
-  }
-
-  .flash-screen>.progress-track {
-    top: 183px;
   }
 }
 
@@ -3290,8 +3399,8 @@ h3 {
 .kojo-input-area {
   flex-shrink: 0;
   padding: 14px 20px 12px;
-  border-top: 1px solid var(--green-light-mid);
-  background: #f9faf7;
+  border-top: 2px solid var(--green-light-mid);
+  background: #eef5e5;
 }
 
 .kojo-panel--fullscreen .kojo-input-area {
@@ -3303,10 +3412,10 @@ h3 {
   align-items: flex-end;
   gap: 10px;
   background: var(--white);
-  border: 1.5px solid var(--green-light-mid);
+  border: 2px solid var(--green-dark-mid);
   border-radius: 14px;
   padding: 10px 10px 10px 14px;
-  box-shadow: 0 2px 8px rgba(38, 48, 31, 0.07);
+  box-shadow: 0 2px 10px rgba(38, 48, 31, 0.12);
   transition: border-color 0.15s, box-shadow 0.15s;
   margin: 0 auto;
 }
@@ -3317,7 +3426,7 @@ h3 {
 
 .kojo-input-wrap:focus-within {
   border-color: var(--green-dark);
-  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.12);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.22), 0 2px 10px rgba(38, 48, 31, 0.12);
 }
 
 .kojo-input {
@@ -3342,7 +3451,7 @@ h3 {
 }
 
 .kojo-input::placeholder {
-  color: var(--green-mid);
+  color: #627350;
 }
 
 .kojo-input:disabled {
@@ -3443,6 +3552,15 @@ h3 {
   font-size: 0.7rem;
   color: var(--green-mid);
   white-space: nowrap;
+}
+
+.kojo-input-label {
+  margin: 0 0 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--green-dark-mid);
 }
 
 /* ── Model picker (replaces select) ── */
@@ -5597,15 +5715,25 @@ h3 {
   width: 100%;
   min-height: 138px;
   padding: 12px 14px;
-  border: 0;
-  border-bottom: 1px solid rgba(113, 131, 85, 0.22);
-  background: var(--white);
+  border: 2px solid var(--green-dark-mid);
+  border-radius: 8px;
+  background: #f8fbf4;
   color: var(--ink);
   font-family: inherit;
   font-size: 0.86rem;
   line-height: 1.5;
   outline: none;
   resize: vertical;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.lc-kojo-input:focus {
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.18);
+}
+
+.lc-kojo-input::placeholder {
+  color: #627350;
 }
 
 .lc-kojo-response {
@@ -6289,6 +6417,17 @@ h3 {
 
 .lc-kojo-input-wrap {
   position: relative;
+  padding: 10px 14px 14px;
+}
+
+.lc-kojo-input-label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--green-dark-mid);
 }
 
 /* LeetCode grade feedback */
@@ -9614,11 +9753,6 @@ h3 {
     height: calc(100dvh - 61px);
   }
 
-  /* Flash header: keep action buttons from stretching to full width */
-  .flash-header > .button {
-    align-self: flex-start;
-  }
-
   /* Flashcard manage: row-actions must stay auto-width inside the flex row */
   .flashcard-manage-item .row-actions {
     width: auto;
@@ -9681,15 +9815,6 @@ h3 {
   .page-header .toolbar .segmented {
     align-self: flex-start;
     width: fit-content;
-  }
-
-  /* Flip card: reduce fixed 400px height - too tall for most phone screens */
-  .flip-card {
-    height: 320px;
-  }
-
-  .flip-face {
-    padding: 28px 20px;
   }
 
   /* Question wrap: reduce top/side padding on phones */
@@ -9769,16 +9894,6 @@ h3 {
 }
 
 @media (max-width: 560px) {
-  /* Flip card: even more compact on very small phones (320-375px wide) */
-  .flip-card {
-    height: 260px;
-  }
-
-  /* Flash wrap: tighter padding */
-  .flash-wrap {
-    padding: 24px 14px;
-  }
-
   /* Score hero: cap the number at 2.5rem on tiny screens */
   .score-hero strong {
     font-size: 2.5rem;
@@ -10421,5 +10536,139 @@ h3 {
   }
   .learning-mode-ask-btn {
     justify-content: center;
+  }
+}
+
+
+/* ============================================================
+   FLASHCARD UI REVAMP (study + manage pages)
+   ============================================================ */
+
+/* ── Study screen: nav controls below the flip card ── */
+.flash-controls {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 12px;
+  width: min(620px, 100%);
+  margin-top: 18px;
+}
+
+.flash-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--green-dark);
+  background: rgba(255, 255, 255, 0.7);
+  border: 1.5px solid var(--green-light-mid);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.flash-nav-btn:hover:not(:disabled) {
+  background: var(--white);
+  border-color: var(--green-mid);
+  transform: translateY(-1px);
+}
+
+.flash-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.flash-hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Reserved space so showing the confidence row does not shift the layout */
+.flash-confidence-zone {
+  display: grid;
+  width: min(520px, 100%);
+  min-height: 60px;
+  margin-top: 14px;
+}
+
+.flash-kbd-hint {
+  margin-top: 18px;
+  color: var(--gray-500);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  /* Keyboard hint is meaningless on touch devices */
+  .flash-kbd-hint {
+    display: none;
+  }
+
+  .flash-confidence-zone {
+    min-height: 52px;
+  }
+}
+
+/* ── Manage page: AI generation panel ── */
+.flashcard-gen-panel {
+  display: grid;
+  gap: 14px;
+  padding: 20px 24px;
+  margin-bottom: 18px;
+}
+
+.flashcard-gen-head {
+  display: grid;
+  gap: 4px;
+}
+
+.flashcard-gen-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.flashcard-gen-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.flashcard-gen-count .input {
+  width: 86px;
+  min-height: 42px;
+  padding: 8px 10px;
+}
+
+@media (max-width: 760px) {
+  .flashcard-gen-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .flashcard-gen-controls .button {
+    width: 100%;
+  }
+
+  .flashcard-gen-count {
+    justify-content: space-between;
+  }
+
+  /* Manage list: stack front/back with a divider, keep actions top-aligned */
+  .flashcard-manage-item {
+    align-items: flex-start;
+  }
+
+  .flashcard-manage-content > div + div {
+    padding-top: 10px;
+    border-top: 1px dashed var(--green-light-mid);
   }
 }
