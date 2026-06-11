@@ -2962,22 +2962,22 @@ h3 {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-shrink: 0;
   justify-content: flex-end;
 }
 
 .kojo-header-btn {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  min-height: 36px;
-  padding: 7px 10px;
-  border-radius: 9px;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  flex-shrink: 0;
+  border-radius: 10px;
   border: 1px solid #cdddba;
   background: #ffffff;
   color: #2f4222;
-  font-size: 0.78rem;
-  font-weight: 700;
   cursor: pointer;
   transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
 }
@@ -2994,15 +2994,6 @@ h3 {
 .kojo-header-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
-}
-
-.kojo-panel--fullscreen .kojo-header-btn {
-  width: 36px;
-  height: 36px;
-  min-height: unset;
-  padding: 0;
-  justify-content: center;
-  border-radius: 10px;
 }
 
 .kojo-clear-inline {
@@ -3823,17 +3814,6 @@ h3 {
 }
 
 @media (max-width: 980px) {
-  .kojo-header-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
-
-  .kojo-header-btn {
-    min-height: 34px;
-    font-size: 0.74rem;
-    padding: 6px 9px;
-  }
-
   .kojo-model-select {
     min-width: 162px;
   }
@@ -10670,5 +10650,376 @@ h3 {
   .flashcard-manage-content > div + div {
     padding-top: 10px;
     border-top: 1px dashed var(--green-light-mid);
+  }
+}
+
+/* ─── Take Test tools (beta) ─────────────────────────────────────────────────
+   Question navigator, cross-out, highlighter, scratch notes, stuck bookmark.
+   Gated behind beta mode. Consistent layout across desktop and mobile. */
+
+::highlight(nosey-test-highlight) {
+  background-color: #fff1a8;
+  color: inherit;
+}
+
+.test-tools-wrap {
+  position: relative;
+  padding: 0 32px 12px;
+}
+
+.test-tools-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.test-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1.5px solid var(--green-mid);
+  border-radius: 999px;
+  color: var(--green-dark);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.test-tool-btn:hover {
+  background: #fff;
+  border-color: var(--green-dark);
+}
+
+.test-tool-btn--active {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+  color: var(--green-lightest);
+}
+
+/* ── Question navigator dropdown ── */
+.test-nav-pop {
+  position: absolute;
+  top: calc(100% - 6px);
+  left: 32px;
+  z-index: 40;
+  width: min(420px, calc(100vw - 48px));
+  padding: 14px;
+  background: #fff;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+}
+
+.test-nav-pop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--green-dark);
+}
+
+.test-nav-pop-close {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.test-nav-pop-close:hover {
+  background: rgba(113, 131, 85, 0.14);
+}
+
+.test-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: 8px;
+}
+
+.test-nav-chip {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  padding: 4px;
+  background: #fff;
+  border: 1.5px solid var(--green-light-mid);
+  border-radius: 10px;
+  color: var(--ink);
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.test-nav-chip:hover {
+  border-color: var(--green-mid);
+}
+
+.test-nav-chip--answered {
+  background: rgba(113, 131, 85, 0.14);
+  border-color: var(--green-mid);
+}
+
+.test-nav-chip--current {
+  border-color: var(--green-dark);
+  box-shadow: inset 0 0 0 2px var(--green-dark);
+}
+
+.test-nav-chip--marked {
+  border-color: var(--warning);
+}
+
+.test-nav-chip-flag {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  color: var(--warning);
+}
+
+.test-nav-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: 0.75rem;
+  color: var(--muted, #6b7a59);
+}
+
+.test-nav-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.test-nav-dot {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+}
+
+.test-nav-dot--answered {
+  background: rgba(113, 131, 85, 0.5);
+  border: 1.5px solid var(--green-mid);
+}
+
+/* ── Stuck badge on the question card ── */
+.question-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.question-stuck-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: rgba(214, 158, 46, 0.16);
+  border-radius: 999px;
+  color: #9a6b12;
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ── Highlighter hint ── */
+.test-highlight-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  background: rgba(255, 241, 168, 0.4);
+  border: 1px dashed #d9b94a;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #6b5a12;
+}
+
+.test-highlight-hint > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.test-highlight-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  background: #fff;
+  border: 1px solid #d9b94a;
+  border-radius: 999px;
+  color: #6b5a12;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.test-highlight-clear:hover {
+  background: #fff8dc;
+}
+
+/* ── Cross-out on MCQ options ── */
+.option-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.option-row > .option-button {
+  flex: 1;
+  min-width: 0;
+}
+
+.option-cross-btn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.7);
+  border: 2px solid var(--green-light-mid);
+  border-radius: 12px;
+  color: var(--green-mid);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.option-cross-btn:hover {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.option-cross-btn--on {
+  background: rgba(197, 48, 48, 0.1);
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.option-row--crossed > .option-button {
+  opacity: 0.5;
+}
+
+.option-row--crossed > .option-button .test-option-markdown {
+  text-decoration: line-through;
+  text-decoration-color: var(--error);
+}
+
+/* ── Scratch notes panel ── */
+.test-notes-panel {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  width: min(360px, calc(100vw - 32px));
+  height: min(420px, calc(100vh - 120px));
+  background: #fff;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.test-notes-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #eef5e5;
+  border-bottom: 1px solid var(--green-light-mid);
+  font-weight: 800;
+  color: var(--green-dark);
+}
+
+.test-notes-head > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.test-notes-close {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.test-notes-close:hover {
+  background: rgba(113, 131, 85, 0.14);
+}
+
+.test-notes-textarea {
+  flex: 1;
+  width: 100%;
+  padding: 14px 16px;
+  background: #fcfdf9;
+  border: none;
+  resize: none;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.test-notes-textarea:focus {
+  outline: none;
+}
+
+.test-notes-hint {
+  margin: 0;
+  padding: 8px 16px;
+  background: #f4f8ec;
+  border-top: 1px solid var(--green-light-mid);
+  font-size: 0.72rem;
+  color: var(--muted, #6b7a59);
+}
+
+@media (max-width: 760px) {
+  .test-tools-wrap {
+    padding: 0 16px 10px;
+  }
+
+  .test-tool-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .test-nav-pop {
+    left: 16px;
+    right: 16px;
+    width: auto;
+  }
+
+  /* Notes panel becomes a bottom sheet on phones */
+  .test-notes-panel {
+    right: 0;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: min(60vh, 440px);
+    border-radius: 16px 16px 0 0;
   }
 }

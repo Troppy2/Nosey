@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSettings } from "../lib/useSettings";
 import { getStoredUser, isGuestSession, scopeKey } from "../lib/api";
 import { OnboardingTour } from "./OnboardingTour";
+import { AgeGateModal } from "./AgeGateModal";
 
 const ADMIN_EMAIL = "jamesinah34@gmail.com";
 
@@ -182,6 +183,7 @@ export function Sidebar() {
       </aside>
 
       <main className="shell-main">
+        <AgeGateModal />
         <OnboardingTour />
         <Outlet />
       </main>
