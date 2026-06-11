@@ -313,6 +313,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
 
         {/* ── Input ── */}
         <div className="kojo-input-area">
+          <p className="kojo-input-label">Message Kojo</p>
           <div className={isFullscreen ? "kojo-input-row" : undefined}>
             {isFullscreen && modelPicker}
             <div className="kojo-input-wrap">

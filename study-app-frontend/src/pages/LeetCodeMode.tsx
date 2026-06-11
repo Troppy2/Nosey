@@ -1719,7 +1719,9 @@ export default function LeetCodeMode() {
             </div>
 
             <div className="lc-kojo-input-wrap">
+              <label className="lc-kojo-input-label" htmlFor="lc-kojo-textarea">Your question</label>
               <textarea
+                id="lc-kojo-textarea"
                 className="lc-kojo-input"
                 rows={5}
                 value={kojoInput}
