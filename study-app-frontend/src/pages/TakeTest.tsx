@@ -1,6 +1,6 @@
 import Editor from "@monaco-editor/react";
-import { AlertCircle, ArrowLeft, ArrowRight, Bot, Calculator, Check, Code2, GraduationCap, Send, Sparkles, Undo2, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { AlertCircle, ArrowLeft, ArrowRight, Bookmark, Bot, Calculator, Check, Code2, Eraser, Flag, GraduationCap, Highlighter, LayoutGrid, NotebookPen, Send, Sparkles, Strikethrough, Undo2, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -10,8 +10,26 @@ import { MarkdownContent } from "../components/MarkdownContent";
 import { MathInput } from "../components/MathInput";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
 import { API_BASE_URL, fetchTest, getDraftAttempt, kojoChat, saveDraftAttempt, scopeKey, submitAttempt } from "../lib/api";
+import { applyTextHighlights, clearTextHighlights, getContainedSelectionText, HIGHLIGHT_SUPPORTED } from "../lib/highlightRanges";
 import { useSettings } from "../lib/useSettings";
 import type { DraftAttemptAnswer, Question, SubmittedAnswer, TestTake } from "../lib/types";
+
+// ── Test tools (beta) localStorage helpers ──────────────────────────────────
+function loadToolJson<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(scopeKey(key));
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+const toolKeys = {
+  bookmarks: (testId: number) => `nosey_test_bookmarks_${testId}`,
+  crossouts: (testId: number) => `nosey_test_crossouts_${testId}`,
+  notes: (testId: number) => `nosey_test_notes_${testId}`,
+  highlights: (testId: number) => `nosey_test_highlights_${testId}`,
+};
 
 type GenerationMeta = {
   fallback_used: boolean;
@@ -49,6 +67,50 @@ export default function TakeTest() {
 
   // Learning mode is only usable while beta mode is on and the test belongs to a folder.
   const learningActive = betaMode && learningMode && Boolean(test?.folder_id);
+
+  // ── Test tools (beta only) ─────────────────────────────────────────────────
+  // All tools are gated behind beta mode and persist per test in localStorage.
+  const toolsEnabled = betaMode;
+  const [navOpen, setNavOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [highlightMode, setHighlightMode] = useState(false);
+  const [bookmarks, setBookmarks] = useState<Set<number>>(
+    () => new Set(loadToolJson<number[]>(toolKeys.bookmarks(numericTestId), [])),
+  );
+  const [crossouts, setCrossouts] = useState<Record<number, string[]>>(
+    () => loadToolJson<Record<number, string[]>>(toolKeys.crossouts(numericTestId), {}),
+  );
+  const [highlights, setHighlights] = useState<Record<number, string[]>>(
+    () => loadToolJson<Record<number, string[]>>(toolKeys.highlights(numericTestId), {}),
+  );
+  const [notes, setNotes] = useState<string>(() => {
+    try {
+      return localStorage.getItem(scopeKey(toolKeys.notes(numericTestId))) ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const questionTextRef = useRef<HTMLDivElement>(null);
+
+  // Persist tool state
+  useEffect(() => {
+    localStorage.setItem(scopeKey(toolKeys.bookmarks(numericTestId)), JSON.stringify([...bookmarks]));
+  }, [bookmarks, numericTestId]);
+  useEffect(() => {
+    localStorage.setItem(scopeKey(toolKeys.crossouts(numericTestId)), JSON.stringify(crossouts));
+  }, [crossouts, numericTestId]);
+  useEffect(() => {
+    localStorage.setItem(scopeKey(toolKeys.highlights(numericTestId)), JSON.stringify(highlights));
+  }, [highlights, numericTestId]);
+  useEffect(() => {
+    localStorage.setItem(scopeKey(toolKeys.notes(numericTestId)), notes);
+  }, [notes, numericTestId]);
+
+  function clearToolStorage() {
+    [toolKeys.bookmarks, toolKeys.crossouts, toolKeys.highlights, toolKeys.notes].forEach((fn) =>
+      localStorage.removeItem(scopeKey(fn(numericTestId))),
+    );
+  }
 
   function toggleLearningMode() {
     setLearningMode((prev) => {
@@ -223,6 +285,62 @@ export default function TakeTest() {
   }
 
   const question = test?.questions[index];
+  const questionId = question?.id;
+
+  // Re-paint persisted highlights for the current question after each render.
+  useEffect(() => {
+    if (!toolsEnabled || questionId == null) return;
+    const container = questionTextRef.current;
+    if (!container) return;
+    applyTextHighlights(container, highlights[questionId] ?? []);
+    return () => clearTextHighlights();
+  }, [toolsEnabled, questionId, highlights, index]);
+
+  function toggleBookmark() {
+    if (questionId == null) return;
+    setBookmarks((prev) => {
+      const next = new Set(prev);
+      if (next.has(questionId)) next.delete(questionId);
+      else next.add(questionId);
+      return next;
+    });
+  }
+
+  function toggleCrossout(optionId: string) {
+    if (questionId == null) return;
+    setCrossouts((prev) => {
+      const current = prev[questionId] ?? [];
+      const next = current.includes(optionId)
+        ? current.filter((id) => id !== optionId)
+        : [...current, optionId];
+      return { ...prev, [questionId]: next };
+    });
+  }
+
+  function captureHighlight() {
+    if (!highlightMode || questionId == null) return;
+    const container = questionTextRef.current;
+    if (!container) return;
+    const text = getContainedSelectionText(container);
+    if (!text) return;
+    setHighlights((prev) => {
+      const existing = prev[questionId] ?? [];
+      if (existing.includes(text)) return prev;
+      return { ...prev, [questionId]: [...existing, text] };
+    });
+    window.getSelection()?.removeAllRanges();
+  }
+
+  function clearCurrentHighlights() {
+    if (questionId == null) return;
+    setHighlights((prev) => {
+      if (!prev[questionId]?.length) return prev;
+      const next = { ...prev };
+      delete next[questionId];
+      return next;
+    });
+  }
+
   const answeredCount = test ? test.questions.filter((item) => isQuestionAnswered(item, answers[item.id])).length : 0;
   const progress = test ? ((index + 1) / test.questions.length) * 100 : 0;
   const canSubmit = test ? test.questions.every((item) => isQuestionAnswered(item, answers[item.id])) : false;
@@ -264,6 +382,7 @@ export default function TakeTest() {
     try {
       const result = await submitAttempt(test.id, submittedAnswers);
       localStorage.removeItem(scopeKey(`nosey_test_index_${numericTestId}`));
+      clearToolStorage();
       sessionStorage.setItem(`nosey_attempt_${result.attempt_id}`, JSON.stringify(result));
       const completedKey = scopeKey("nosey_completed_test_ids");
       const existing = JSON.parse(localStorage.getItem(completedKey) ?? "[]") as number[];
@@ -382,6 +501,85 @@ export default function TakeTest() {
             </button>
           )}
         </header>
+        {toolsEnabled && question && (
+          <div className="test-tools-wrap">
+            <div className="test-tools-bar">
+              <button
+                type="button"
+                className={`test-tool-btn${navOpen ? " test-tool-btn--active" : ""}`}
+                onClick={() => setNavOpen((open) => !open)}
+                aria-expanded={navOpen}
+              >
+                <LayoutGrid size={15} />
+                Questions
+              </button>
+              <button
+                type="button"
+                className={`test-tool-btn${bookmarks.has(question.id) ? " test-tool-btn--active" : ""}`}
+                onClick={toggleBookmark}
+                title="Bookmark this question to come back to it"
+              >
+                <Bookmark size={15} />
+                {bookmarks.has(question.id) ? "Stuck" : "Mark stuck"}
+              </button>
+              {HIGHLIGHT_SUPPORTED && (
+                <button
+                  type="button"
+                  className={`test-tool-btn${highlightMode ? " test-tool-btn--active" : ""}`}
+                  onClick={() => setHighlightMode((on) => !on)}
+                  aria-pressed={highlightMode}
+                  title="Highlight text in the question"
+                >
+                  <Highlighter size={15} />
+                  Highlight
+                </button>
+              )}
+              <button
+                type="button"
+                className={`test-tool-btn${notesOpen ? " test-tool-btn--active" : ""}`}
+                onClick={() => setNotesOpen((open) => !open)}
+                aria-pressed={notesOpen}
+              >
+                <NotebookPen size={15} />
+                Notes
+              </button>
+            </div>
+            {navOpen && (
+              <div className="test-nav-pop" role="menu">
+                <div className="test-nav-pop-head">
+                  <span>Jump to question</span>
+                  <button type="button" className="test-nav-pop-close" onClick={() => setNavOpen(false)} aria-label="Close">
+                    <X size={15} />
+                  </button>
+                </div>
+                <div className="test-nav-grid">
+                  {test.questions.map((item, itemIndex) => {
+                    const answered = isQuestionAnswered(item, answers[item.id]);
+                    const marked = bookmarks.has(item.id);
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`test-nav-chip${itemIndex === index ? " test-nav-chip--current" : ""}${answered ? " test-nav-chip--answered" : ""}${marked ? " test-nav-chip--marked" : ""}`}
+                        onClick={() => {
+                          setIndex(itemIndex);
+                          setNavOpen(false);
+                        }}
+                      >
+                        <span>{itemIndex + 1}</span>
+                        {marked ? <Flag size={11} className="test-nav-chip-flag" /> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="test-nav-legend">
+                  <span><i className="test-nav-dot test-nav-dot--answered" /> Answered</span>
+                  <span><Flag size={11} /> Stuck</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <main className="question-wrap">
@@ -412,12 +610,39 @@ export default function TakeTest() {
         {(() => {
           const questionCard = (
             <Card className="question-card">
-          <span className="pill">{questionTypeLabel(question)}</span>
-          <div className="test-question-markdown">
+          <div className="question-card-top">
+            <span className="pill">{questionTypeLabel(question)}</span>
+            {toolsEnabled && bookmarks.has(question.id) ? (
+              <span className="question-stuck-badge"><Flag size={12} /> Stuck</span>
+            ) : null}
+          </div>
+          {toolsEnabled && highlightMode ? (
+            <div className="test-highlight-hint">
+              <span><Highlighter size={14} /> Select text in the question to highlight it.</span>
+              {(highlights[question.id]?.length ?? 0) > 0 ? (
+                <button type="button" className="test-highlight-clear" onClick={clearCurrentHighlights}>
+                  <Eraser size={13} /> Clear
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+          <div
+            className="test-question-markdown"
+            ref={questionTextRef}
+            onMouseUp={toolsEnabled ? captureHighlight : undefined}
+            onTouchEnd={toolsEnabled ? captureHighlight : undefined}
+          >
             <MarkdownContent content={question.question_text} />
           </div>
           {question.type === "MCQ" ? (
-            <MCQQuestion question={question} answer={answers[question.id]} onAnswer={(answer) => setAnswers({ ...answers, [question.id]: answer })} />
+            <MCQQuestion
+              question={question}
+              answer={answers[question.id]}
+              onAnswer={(answer) => setAnswers({ ...answers, [question.id]: answer })}
+              toolsEnabled={toolsEnabled}
+              crossed={crossouts[question.id] ?? []}
+              onToggleCross={toggleCrossout}
+            />
           ) : isCodingMode ? (
             <div className="code-editor-wrap">
               <label className="field-label">Your code</label>
@@ -486,6 +711,24 @@ export default function TakeTest() {
         </div>
       </main>
 
+      {toolsEnabled && notesOpen && (
+        <div className="test-notes-panel">
+          <div className="test-notes-head">
+            <span><NotebookPen size={15} /> Scratch notes</span>
+            <button type="button" className="test-notes-close" onClick={() => setNotesOpen(false)} aria-label="Close notes">
+              <X size={16} />
+            </button>
+          </div>
+          <textarea
+            className="test-notes-textarea"
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            placeholder="Jot down your working, formulas, or things to revisit..."
+          />
+          <p className="test-notes-hint">Saved on this device for this test.</p>
+        </div>
+      )}
+
       {kojoOpen && (
         <>
           <div className="lc-kojo-backdrop" onClick={() => { setKojoOpen(false); setKojoResponse(null); }} />
@@ -537,23 +780,48 @@ function MCQQuestion({
   question,
   answer,
   onAnswer,
+  toolsEnabled = false,
+  crossed = [],
+  onToggleCross,
 }: {
   question: Question;
   answer?: string;
   onAnswer: (answer: string) => void;
+  toolsEnabled?: boolean;
+  crossed?: string[];
+  onToggleCross?: (optionId: string) => void;
 }) {
   return (
     <div className="option-grid">
       {question.options.map((option, optionIndex) => {
         const selected = answer === option.text;
+        const optionId = String(option.id);
+        const isCrossed = crossed.includes(optionId);
         return (
-          <button className={`option-button ${selected ? "selected" : ""}`} key={option.id} onClick={() => onAnswer(option.text)} type="button">
-            <span className="option-label">{String.fromCharCode(65 + optionIndex)}</span>
-            <div className="test-option-markdown">
-              <MarkdownContent content={option.text} />
-            </div>
-            {selected ? <Check size={18} /> : null}
-          </button>
+          <div className={`option-row${isCrossed ? " option-row--crossed" : ""}`} key={option.id}>
+            <button
+              className={`option-button ${selected ? "selected" : ""}`}
+              onClick={() => onAnswer(option.text)}
+              type="button"
+            >
+              <span className="option-label">{String.fromCharCode(65 + optionIndex)}</span>
+              <div className="test-option-markdown">
+                <MarkdownContent content={option.text} />
+              </div>
+              {selected ? <Check size={18} /> : null}
+            </button>
+            {toolsEnabled && onToggleCross ? (
+              <button
+                type="button"
+                className={`option-cross-btn${isCrossed ? " option-cross-btn--on" : ""}`}
+                onClick={() => onToggleCross(optionId)}
+                aria-pressed={isCrossed}
+                title={isCrossed ? "Restore this option" : "Cross out this option"}
+              >
+                <Strikethrough size={15} />
+              </button>
+            ) : null}
+          </div>
         );
       })}
     </div>

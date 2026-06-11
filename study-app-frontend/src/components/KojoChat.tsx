@@ -181,7 +181,6 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
               disabled={isLoading}
             >
               <Trash2 size={18} />
-              {!isFullscreen && <span>Clear chat</span>}
             </button>
             <button
               className="kojo-header-btn"
@@ -191,7 +190,6 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
               title={isFullscreen ? "Exit full screen" : "Full screen"}
             >
               {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-              {!isFullscreen && <span>Full screen</span>}
             </button>
             <button
               className="kojo-header-btn"
@@ -201,7 +199,6 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
               title="Close"
             >
               <X size={18} />
-              {!isFullscreen && <span>Close</span>}
             </button>
           </div>
         </div>

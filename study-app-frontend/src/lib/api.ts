@@ -156,6 +156,15 @@ export function signOut() {
   localStorage.removeItem(USER_KEY);
 }
 
+// Fetches the current user fresh from the backend and refreshes the stored
+// copy. Used to detect users whose age is null in the database (e.g. accounts
+// created before the date-of-birth prompt existed) so they can be asked once.
+export async function getMe(): Promise<AuthUser> {
+  const user = await request<AuthUser>("/auth/me");
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  return user;
+}
+
 export async function submitDateOfBirth(dob: string): Promise<AuthUser> {
   const user = await request<AuthUser>("/auth/date-of-birth", {
     method: "POST",
