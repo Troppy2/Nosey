@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import random
+
 from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -71,10 +73,19 @@ class TestService:
 
     def _serialize_question_public(self, q) -> QuestionPublic:
         qtype = q.question_type
-        if qtype == "MCQ":
+        # Choice-based types all expose their options (correctness hidden by MCQOptionPublic).
+        if qtype in ("MCQ", "TF", "MS"):
             return QuestionPublic(
-                id=q.id, type="MCQ", question_text=q.question_text,
+                id=q.id, type=qtype, question_text=q.question_text,
                 options=[MCQOptionPublic(id=opt.id, text=opt.option_text) for opt in q.mcq_options],
+            )
+        # Ranking: shuffle so the stored correct order (display_order) is never revealed.
+        if qtype == "RANK":
+            shuffled = list(q.mcq_options)
+            random.shuffle(shuffled)
+            return QuestionPublic(
+                id=q.id, type="RANK", question_text=q.question_text,
+                options=[MCQOptionPublic(id=opt.id, text=opt.option_text) for opt in shuffled],
             )
         return QuestionPublic(id=q.id, type=qtype or "FRQ", question_text=q.question_text)
 

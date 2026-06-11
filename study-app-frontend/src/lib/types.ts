@@ -204,6 +204,9 @@ export type TestCreationParams = {
   testType: string;
   countMcq: number;
   countFrq: number;
+  countTf?: number;
+  countMs?: number;
+  countRank?: number;
   isMathMode: boolean;
   isCodingMode: boolean;
   codingLanguage: string;

@@ -399,6 +399,22 @@ export default function Results() {
   );
 }
 
+// Multiple-select and ranking answers are stored as JSON arrays of option texts.
+// Render them as a readable list instead of raw JSON.
+function formatAnswerForDisplay(raw: string): string {
+  if (!raw) return raw;
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed.map((item) => String(item)).join(", ");
+    } catch {
+      // not a JSON array, render as-is
+    }
+  }
+  return raw;
+}
+
 function ReviewItem({ answer, number }: { answer: AnswerResult; number: number }) {
   const [open, setOpen] = useState(false);
   const Icon = answer.is_correct ? CheckCircle2 : XCircle;
@@ -420,7 +436,7 @@ function ReviewItem({ answer, number }: { answer: AnswerResult; number: number }
           <div>
             <span>Your answer</span>
             <div className="math-answer-text review-answer-markdown">
-              <MarkdownContent content={answer.user_answer} />
+              <MarkdownContent content={formatAnswerForDisplay(answer.user_answer)} />
             </div>
           </div>
           <div className="math-explanation">

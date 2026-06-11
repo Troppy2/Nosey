@@ -255,6 +255,9 @@ export async function createTest(input: {
   files: File[];
   countMcq?: number;
   countFrq?: number;
+  countTf?: number;
+  countMs?: number;
+  countRank?: number;
   practiceTestFile?: File | null;
   isMathMode?: boolean;
   difficulty?: string;
@@ -281,6 +284,9 @@ export async function createTest(input: {
   formData.append("test_type", input.testType);
   if (input.countMcq !== undefined) formData.append("count_mcq", String(input.countMcq));
   if (input.countFrq !== undefined) formData.append("count_frq", String(input.countFrq));
+  if (input.countTf) formData.append("count_tf", String(input.countTf));
+  if (input.countMs) formData.append("count_ms", String(input.countMs));
+  if (input.countRank) formData.append("count_rank", String(input.countRank));
   if (input.isMathMode) formData.append("is_math_mode", "true");
   if (input.difficulty) formData.append("difficulty", input.difficulty);
   if (input.topicFocus) formData.append("topic_focus", input.topicFocus);

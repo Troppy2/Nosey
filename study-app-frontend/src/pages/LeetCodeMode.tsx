@@ -604,6 +604,7 @@ function isRunnable(problemData?: LeetCodeProblemData) {
 export default function LeetCodeMode() {
   const { generationProvider } = useSettings();
   const [view, setView] = useState<View>({ type: "tree" });
+  const [mobilePane, setMobilePane] = useState<"problem" | "code">("problem");
   const [progress, setProgress] = useState<Record<string, boolean>>(() => loadJson(getProgressKey(), {}));
   const [activityDates, setActivityDates] = useState<string[]>(() => loadJson(getActivityKey(), []));
   const [filter, setFilter] = useState<Filter>("all");
@@ -1048,6 +1049,7 @@ export default function LeetCodeMode() {
     }
 
     setView({ type: "problem", categoryId, problemSlug });
+    setMobilePane("problem");
     setKojoOpen(false);
     setSolutionOpen(false);
     setRunnerResult(null);
@@ -1396,53 +1398,72 @@ export default function LeetCodeMode() {
   return (
     <div className="lc-editor-shell">
       <div className="lc-editor-topbar">
-        <button type="button" className="lc-back-btn" onClick={() => setView({ type: "category", categoryId: currentProblem.categoryId })}>
+        <button type="button" className="lc-back-btn" onClick={() => setView({ type: "category", categoryId: currentProblem.categoryId })} aria-label={`Back to ${currentProblem.categoryLabel}`}>
           <ChevronLeft size={16} />
-          {currentProblem.categoryLabel}
+          <span className="lc-tb-label">{currentProblem.categoryLabel}</span>
         </button>
         <div className="lc-editor-title">
           <span>{currentProblem.title}</span>
           <span className={`lc-difficulty lc-difficulty--${difficultyClass(currentProblem.difficulty)}`}>{currentProblem.difficulty}</span>
         </div>
-        <div className="lc-editor-actions lc-editor-actions--timer">
-          <button type="button" className="lc-toolbar-btn lc-toolbar-btn--timer" onClick={openTimerPicker}>
+        <div className="lc-editor-actions">
+          <button type="button" className="lc-toolbar-btn lc-toolbar-btn--timer" onClick={openTimerPicker} aria-label="Set timer">
             <Timer size={16} />
-            {timerButtonLabel}
+            <span className="lc-tb-label lc-tb-label--timer">{timerButtonLabel}</span>
           </button>
-          <a className="lc-toolbar-btn" href={`https://www.youtube.com/results?search_query=neetcode+${encodeURIComponent(currentProblem.title)}`} target="_blank" rel="noreferrer">
+          <a className="lc-toolbar-btn" href={`https://www.youtube.com/results?search_query=neetcode+${encodeURIComponent(currentProblem.title)}`} target="_blank" rel="noreferrer" aria-label="Search NeetCode on YouTube">
             <Youtube size={16} />
-            NeetCode
+            <span className="lc-tb-label">NeetCode</span>
           </a>
-          <div className="lc-editor-actions">
-            <a className="lc-toolbar-btn" href={currentProblem.url} target="_blank" rel="noreferrer">
-              <ExternalLink size={16} />
-              Open
-            </a>
-            <button type="button" className="lc-toolbar-btn" onClick={handleFormat}>
-              <WrapText size={16} />
-              Format
-            </button>
-            <button type="button" className="lc-toolbar-btn" onClick={handleRunCode} disabled={!runnable || runnerLoading}>
-              {runnerLoading ? <Loader2 size={16} className="spin" /> : <Play size={16} />}
-              Run code
-            </button>
-            <button type="button" className="lc-toolbar-btn" onClick={() => openNotes(currentProblem.slug)}>
-              <Notebook size={16} />
-              Notes
-            </button>
-            <button type="button" className="lc-toolbar-btn lc-toolbar-btn--kojo" onClick={() => openKojo(currentProblem)}>
-              <Sparkles size={16} />
-              Ask Kojo
-            </button>
-            <button type="button" className={progress[currentProblem.slug] ? "lc-toolbar-btn lc-toolbar-btn--done" : "lc-toolbar-btn"} onClick={() => toggleProgress(currentProblem)}>
-              {progress[currentProblem.slug] ? <CheckCircle2 size={16} /> : <Circle size={16} />}
-              {progress[currentProblem.slug] ? "Done" : "Mark done"}
-            </button>
-          </div>
+          <a className="lc-toolbar-btn" href={currentProblem.url} target="_blank" rel="noreferrer" aria-label="Open on LeetCode">
+            <ExternalLink size={16} />
+            <span className="lc-tb-label">Open</span>
+          </a>
+          <button type="button" className="lc-toolbar-btn" onClick={handleFormat} aria-label="Format code">
+            <WrapText size={16} />
+            <span className="lc-tb-label">Format</span>
+          </button>
+          <button type="button" className="lc-toolbar-btn" onClick={handleRunCode} disabled={!runnable || runnerLoading} aria-label="Run code">
+            {runnerLoading ? <Loader2 size={16} className="spin" /> : <Play size={16} />}
+            <span className="lc-tb-label">Run code</span>
+          </button>
+          <button type="button" className="lc-toolbar-btn" onClick={() => openNotes(currentProblem.slug)} aria-label="Open notes">
+            <Notebook size={16} />
+            <span className="lc-tb-label">Notes</span>
+          </button>
+          <button type="button" className="lc-toolbar-btn lc-toolbar-btn--kojo" onClick={() => openKojo(currentProblem)} aria-label="Ask Kojo for a hint">
+            <Sparkles size={16} />
+            <span className="lc-tb-label">Ask Kojo</span>
+          </button>
+          <button type="button" className={progress[currentProblem.slug] ? "lc-toolbar-btn lc-toolbar-btn--done" : "lc-toolbar-btn"} onClick={() => toggleProgress(currentProblem)} aria-label={progress[currentProblem.slug] ? "Mark incomplete" : "Mark done"}>
+            {progress[currentProblem.slug] ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+            <span className="lc-tb-label">{progress[currentProblem.slug] ? "Done" : "Mark done"}</span>
+          </button>
         </div>
       </div>
 
-      <div className="lc-editor-body">
+      <div className="lc-mobile-pane-toggle" role="group" aria-label="Switch between problem and code">
+        <button
+          type="button"
+          className={mobilePane === "problem" ? "lc-mobile-pane-btn lc-mobile-pane-btn--active" : "lc-mobile-pane-btn"}
+          onClick={() => setMobilePane("problem")}
+          aria-pressed={mobilePane === "problem"}
+        >
+          <BookOpen size={15} />
+          Problem
+        </button>
+        <button
+          type="button"
+          className={mobilePane === "code" ? "lc-mobile-pane-btn lc-mobile-pane-btn--active" : "lc-mobile-pane-btn"}
+          onClick={() => setMobilePane("code")}
+          aria-pressed={mobilePane === "code"}
+        >
+          <Code2 size={15} />
+          Code
+        </button>
+      </div>
+
+      <div className="lc-editor-body" data-mobile-pane={mobilePane}>
         <aside className="lc-problem-pane">
           <div className="lc-problem-source">
             <span>{currentProblem.isOfficial ? "Official LeetCode statement" : "Reference-only topic"}</span>

@@ -4769,8 +4769,34 @@ h3 {
   color: #7f1d1d;
 }
 
-.lc-editor-actions--timer {
-  flex-wrap: wrap;
+.lc-tb-label {
+  display: inline;
+}
+
+/* Problem | Code switcher: desktop shows both panes, so the toggle is hidden. */
+.lc-mobile-pane-toggle {
+  display: none;
+}
+
+.lc-mobile-pane-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex: 1;
+  min-height: 40px;
+  border: 0;
+  background: transparent;
+  color: #596949;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.lc-mobile-pane-btn--active {
+  background: var(--white);
+  color: var(--green-dark);
+  box-shadow: var(--shadow-sm);
 }
 
 .lc-timer-controls {
@@ -5261,7 +5287,7 @@ h3 {
 .lc-editor-shell {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background: #f7faf2;
 }
@@ -5744,6 +5770,18 @@ h3 {
   }
 }
 
+/* At <=1100px the app sidebar becomes a horizontal topbar that sits above the
+   content, so a hard 100dvh editor shell overflows below the fold. Let it flow
+   and derive the editor height from the remaining space instead. The single-pane
+   Problem | Code toggle only kicks in lower down (<=900px). */
+@media (max-width: 1100px) {
+  .lc-editor-shell {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+}
+
 @media (max-width: 900px) {
   .lc-roadmap {
     grid-template-columns: 1fr;
@@ -5772,20 +5810,80 @@ h3 {
     width: 18px;
   }
 
+  /* Editor view goes single-pane: the Problem | Code toggle picks which one shows,
+     so the shell flows in the document instead of being pinned to 100dvh under the
+     mobile topbar (which previously pushed the bottom of the editor off-screen). */
+  .lc-editor-shell {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .lc-mobile-pane-toggle {
+    display: flex;
+    gap: 4px;
+    padding: 6px;
+    margin: 10px 14px 0;
+    border: 1px solid var(--lc-border);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.68);
+  }
+
   .lc-editor-body {
     flex-direction: column;
+    flex: 1;
+  }
+
+  .lc-editor-body[data-mobile-pane="problem"] .lc-editor-pane {
+    display: none;
+  }
+
+  .lc-editor-body[data-mobile-pane="code"] .lc-problem-pane {
+    display: none;
   }
 
   .lc-problem-pane {
     width: 100%;
     min-width: 0;
-    max-height: 42vh;
+    max-height: none;
     border-right: 0;
-    border-bottom: 1px solid rgba(113, 131, 85, 0.22);
   }
 
   .lc-editor-pane {
-    min-height: 58vh;
+    flex: 1;
+    min-height: 60dvh;
+  }
+
+  /* Toolbar: one horizontally scrollable row of icon-only buttons (timer keeps its
+     countdown label since that conveys information, not just a name). */
+  .lc-editor-topbar {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .lc-editor-title {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .lc-editor-actions {
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .lc-editor-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .lc-toolbar-btn {
+    flex: 0 0 auto;
+    padding: 8px 9px;
+  }
+
+  .lc-tb-label:not(.lc-tb-label--timer) {
+    display: none;
   }
 }
 
@@ -5808,19 +5906,6 @@ h3 {
   .lc-extra-pill,
   .lc-row-link {
     display: none;
-  }
-
-  .lc-editor-topbar {
-    align-items: stretch;
-  }
-
-  .lc-editor-title,
-  .lc-editor-actions {
-    width: 100%;
-  }
-
-  .lc-toolbar-btn {
-    flex: 1 1 auto;
   }
 }
 
@@ -9982,11 +10067,6 @@ h3 {
     gap: 10px;
   }
 
-  /* LeetCode editor actions: stack into rows on narrow screens */
-  .lc-editor-actions {
-    flex-wrap: wrap;
-  }
-
   /* LC timer controls: stack preset and input */
   .lc-timer-controls {
     flex-direction: column;
@@ -11022,4 +11102,176 @@ h3 {
     height: min(60vh, 440px);
     border-radius: 16px 16px 0 0;
   }
+}
+
+/* ─── Extra question types (beta): True/False, Multiple Select, Ranking ─────── */
+
+.pill--beta {
+  margin-left: 6px;
+  background: rgba(113, 131, 85, 0.16);
+  color: var(--green-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.66rem;
+}
+
+.extra-types-section {
+  padding: 16px 18px;
+  background: rgba(207, 225, 185, 0.18);
+  border: 1px dashed var(--green-light-mid);
+  border-radius: 12px;
+}
+
+.extra-types-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 560px) {
+  .extra-types-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── True/False ── */
+.tf-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.tf-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 72px;
+  padding: 16px;
+  background: #fff;
+  border: 2px solid var(--green-light-mid);
+  border-radius: 14px;
+  color: var(--ink);
+  font-size: 1.1rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.tf-button:hover {
+  transform: translateY(-2px);
+  border-color: var(--green-mid);
+}
+
+.tf-button.tf-true.selected {
+  background: rgba(56, 142, 60, 0.12);
+  border-color: var(--success);
+  color: #2f6f33;
+}
+
+.tf-button.tf-false.selected {
+  background: rgba(197, 48, 48, 0.1);
+  border-color: var(--error);
+  color: #9a2a2a;
+}
+
+@media (max-width: 480px) {
+  .tf-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Multiple Select ── */
+.ms-hint {
+  margin: 0 0 4px;
+  color: #596949;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.ms-option {
+  cursor: pointer;
+}
+
+.ms-check {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  background: #fff;
+  border: 2px solid var(--green-light-mid);
+  border-radius: 7px;
+  color: #fff;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.ms-check.on {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+}
+
+.option-button.ms-option.selected .ms-check {
+  border-color: var(--green-dark);
+}
+
+/* ── Ranking ── */
+.rank-list {
+  display: grid;
+  gap: 10px;
+}
+
+.rank-item {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 2px solid var(--green-light-mid);
+  border-radius: 12px;
+}
+
+.rank-num {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  background: var(--green-dark);
+  border-radius: 999px;
+  color: var(--green-lightest);
+  font-weight: 800;
+}
+
+.rank-item-text {
+  min-width: 0;
+}
+
+.rank-item-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rank-item-actions button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 26px;
+  padding: 0;
+  background: rgba(207, 225, 185, 0.4);
+  border: 1px solid var(--green-light-mid);
+  border-radius: 7px;
+  color: var(--green-dark);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.rank-item-actions button:hover:not(:disabled) {
+  background: var(--green-light-mid);
+}
+
+.rank-item-actions button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
