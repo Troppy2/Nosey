@@ -28,6 +28,10 @@ export default function CreateTest() {
   const [advancedMode, setAdvancedMode] = useState(false);
   const [countMcq, setCountMcq] = useState(10);
   const [countFrq, setCountFrq] = useState(5);
+  // Extra (beta) question types
+  const [countTf, setCountTf] = useState(0);
+  const [countMs, setCountMs] = useState(0);
+  const [countRank, setCountRank] = useState(0);
   const [reviewBeforeTaking, setReviewBeforeTaking] = useState(false);
   const [practiceTestFile, setPracticeTestFile] = useState<File | null>(null);
   const practiceTestInputRef = useRef<HTMLInputElement>(null);
@@ -37,7 +41,7 @@ export default function CreateTest() {
   const [isCodingMode, setIsCodingMode] = useState(false);
   const [codingLanguage, setCodingLanguage] = useState("Python");
   const [customInstructions, setCustomInstructions] = useState("");
-  const { generationProvider, setGenerationProvider } = useSettings();
+  const { generationProvider, setGenerationProvider, betaMode } = useSettings();
 
   function countWords(text: string) {
     return text.trim().split(/\s+/).filter(Boolean).length;
@@ -69,6 +73,9 @@ export default function CreateTest() {
             if (p.testType) setTestType(p.testType);
             if (p.countMcq !== undefined) setCountMcq(p.countMcq);
             if (p.countFrq !== undefined) setCountFrq(p.countFrq);
+            if (p.countTf !== undefined) setCountTf(p.countTf);
+            if (p.countMs !== undefined) setCountMs(p.countMs);
+            if (p.countRank !== undefined) setCountRank(p.countRank);
             if (p.isMathMode !== undefined) setIsMathMode(p.isMathMode);
             if (p.isCodingMode !== undefined) setIsCodingMode(p.isCodingMode);
             if (p.codingLanguage) setCodingLanguage(p.codingLanguage);
@@ -105,12 +112,13 @@ export default function CreateTest() {
     if (!title.trim() && !topicFocus.trim() && !customInstructions.trim()) return;
     const draft: TestCreationParams = {
       title, folderId, testType, countMcq, countFrq,
+      countTf, countMs, countRank,
       isMathMode, isCodingMode, codingLanguage, difficulty,
       topicFocus, customInstructions, advancedMode,
       savedAt: new Date().toISOString(),
     };
     localStorage.setItem(scopeKey(`nosey_create_test_form_${folderId}`), JSON.stringify(draft));
-  }, [title, folderId, testType, countMcq, countFrq, isMathMode, isCodingMode, codingLanguage, difficulty, topicFocus, customInstructions, advancedMode]);
+  }, [title, folderId, testType, countMcq, countFrq, countTf, countMs, countRank, isMathMode, isCodingMode, codingLanguage, difficulty, topicFocus, customInstructions, advancedMode]);
 
   useEffect(() => {
     if (!providerStatus) return;
@@ -136,6 +144,9 @@ export default function CreateTest() {
         files,
         countMcq: advancedMode ? countMcq : undefined,
         countFrq: advancedMode ? (testType === "Extreme" ? 0 : countFrq) : undefined,
+        countTf: advancedMode && betaMode ? countTf : undefined,
+        countMs: advancedMode && betaMode ? countMs : undefined,
+        countRank: advancedMode && betaMode ? countRank : undefined,
         practiceTestFile: advancedMode ? practiceTestFile : null,
         isMathMode: isMathMode && !isCodingMode,
         isCodingMode,
@@ -162,6 +173,7 @@ export default function CreateTest() {
       if (folderId) {
         const params: TestCreationParams = {
           title: title.trim(), folderId, testType, countMcq, countFrq,
+          countTf, countMs, countRank,
           isMathMode, isCodingMode, codingLanguage, difficulty,
           topicFocus, customInstructions, advancedMode,
           savedAt: new Date().toISOString(),
@@ -493,6 +505,56 @@ export default function CreateTest() {
                     </div>
                   </div>
                 </div>
+
+                {/* Extra question types (beta) */}
+                {betaMode && (
+                  <div className="extra-types-section">
+                    <span className="eyebrow" style={{ display: "block", marginBottom: 6 }}>
+                      Extra question types <span className="pill pill--beta">Beta</span>
+                    </span>
+                    <p className="muted" style={{ marginTop: 0, marginBottom: 10, fontSize: "0.8rem" }}>
+                      Added on top of your MCQ and FRQ counts. Generated separately, so they never block the rest of the test. Up to 10 each.
+                    </p>
+                    <div className="extra-types-grid">
+                      <div className="field">
+                        <label className="field-label" htmlFor="count-tf">True / False</label>
+                        <input
+                          id="count-tf"
+                          type="number"
+                          min={0}
+                          max={10}
+                          value={countTf}
+                          onChange={(e) => setCountTf(Math.max(0, Math.min(10, Number(e.target.value))))}
+                          className="input"
+                        />
+                      </div>
+                      <div className="field">
+                        <label className="field-label" htmlFor="count-ms">Multiple select</label>
+                        <input
+                          id="count-ms"
+                          type="number"
+                          min={0}
+                          max={10}
+                          value={countMs}
+                          onChange={(e) => setCountMs(Math.max(0, Math.min(10, Number(e.target.value))))}
+                          className="input"
+                        />
+                      </div>
+                      <div className="field">
+                        <label className="field-label" htmlFor="count-rank">Ranking</label>
+                        <input
+                          id="count-rank"
+                          type="number"
+                          min={0}
+                          max={10}
+                          value={countRank}
+                          onChange={(e) => setCountRank(Math.max(0, Math.min(10, Number(e.target.value))))}
+                          className="input"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Practice test upload */}
                 <div>

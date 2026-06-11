@@ -67,6 +67,9 @@ async def _generate_questions_background(
     custom_instructions: Optional[str],
     provider: Optional[str],
     enable_fallback: bool,
+    count_tf: int = 0,
+    count_ms: int = 0,
+    count_rank: int = 0,
 ) -> None:
     """Run LLM generation and save questions; called as a FastAPI background task."""
     async with async_session_maker() as session:
@@ -125,6 +128,44 @@ async def _generate_questions_background(
             for item in frq_questions:
                 await repo.add_frq_question(test_id, item.question_text, display_order, item.expected_answer)
                 display_order += 1
+
+            # Extra (beta) question types. Isolated and best-effort: a failure here
+            # must never break the MCQ/FRQ test that was already generated above.
+            if count_tf or count_ms or count_rank:
+                try:
+                    extra_source = notes_content or practice_test_content
+                    tf_questions, ms_questions, rank_questions = await llm.generate_extra_question_types(
+                        notes=extra_source,
+                        count_tf=count_tf,
+                        count_ms=count_ms,
+                        count_rank=count_rank,
+                        difficulty=difficulty,
+                        topic_focus=topic_focus,
+                        custom_instructions=custom_instructions,
+                        provider=provider,
+                    )
+                    for tf_item in tf_questions:
+                        await repo.add_tf_question(test_id, tf_item.question_text, display_order, tf_item.correct_answer)
+                        display_order += 1
+                    for ms_item in ms_questions:
+                        ms_options = [
+                            (option_text, index in ms_item.correct_indices)
+                            for index, option_text in enumerate(ms_item.options)
+                        ]
+                        await repo.add_ms_question(test_id, ms_item.question_text, display_order, ms_options)
+                        display_order += 1
+                    for rank_item in rank_questions:
+                        await repo.add_rank_question(test_id, rank_item.question_text, display_order, rank_item.items_in_correct_order)
+                        display_order += 1
+                    logger.info(
+                        "Extra question types saved for test_id=%s: tf=%d ms=%d rank=%d",
+                        test_id, len(tf_questions), len(ms_questions), len(rank_questions),
+                    )
+                except Exception as extra_exc:
+                    logger.warning(
+                        "Extra question types failed for test_id=%s (test still valid): %s",
+                        test_id, extra_exc,
+                    )
 
             test = await session.get(Test, test_id)
             if test is not None:
@@ -193,6 +234,17 @@ async def create_test(
             count_frq = 5
         if test_type == "Extreme":
             count_frq = 0
+
+        # Extra (beta) question types. Capped at 10 each to stay within the token
+        # budget; absent/invalid values default to 0 so non-beta requests are unaffected.
+        def _extra_count(field_name: str) -> int:
+            try:
+                return max(0, min(10, int(str(form.get(field_name, "0")))))
+            except (ValueError, TypeError):
+                return 0
+        count_tf = _extra_count("count_tf")
+        count_ms = _extra_count("count_ms")
+        count_rank = _extra_count("count_rank")
         is_math_mode = str(form.get("is_math_mode", "false")).lower() in ("true", "1", "yes")
         difficulty_raw = str(form.get("difficulty", "mixed")).strip().lower()
         difficulty = difficulty_raw if difficulty_raw in ("easy", "medium", "hard", "mixed") else "mixed"
@@ -311,6 +363,9 @@ async def create_test(
             custom_instructions=custom_instructions,
             provider=provider,
             enable_fallback=enable_fallback,
+            count_tf=count_tf,
+            count_ms=count_ms,
+            count_rank=count_rank,
         )
 
         return CreateTestResponse(

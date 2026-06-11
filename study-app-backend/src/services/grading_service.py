@@ -132,22 +132,17 @@ class GradingService:
         coding_language: str = "Python",
     ) -> FRQGrade:
         qtype = question.question_type
-        
-        if qtype == "MCQ":
+
+        # MCQ and True/False both resolve to a single correct option, compared by text.
+        if qtype == "MCQ" or qtype == "TF":
             return self._grade_mcq(question, user_answer)
-        
-        if qtype == "select_all":
-            return self._grade_select_all(question, user_answer)
-        
-        if qtype == "matching":
-            return self._grade_matching(question, user_answer)
-        
-        if qtype == "ordering":
-            return self._grade_ordering(question, user_answer)
-        
-        if qtype == "fill_blank":
-            return self._grade_fill_blank(question, user_answer)
-        
+
+        if qtype == "MS":
+            return self._grade_ms(question, user_answer)
+
+        if qtype == "RANK":
+            return self._grade_rank(question, user_answer)
+
         # FRQ grading (existing logic)
         if question.frq_answer is None:
             return FRQGrade(
@@ -200,207 +195,84 @@ class GradingService:
             confidence=1.0,
         )
 
-    def _grade_matching(self, question: Question, user_answer: str) -> FRQGrade:
-        """Grade matching question: all pairs must be correct for full credit."""
-        if question.matching_answer is None:
+    def _grade_ms(self, question: Question, user_answer: str) -> FRQGrade:
+        """Multiple Select (all-or-nothing): selected set must exactly equal correct set.
+
+        user_answer is a JSON array of the selected option texts. Correct options are
+        the MCQOption rows with is_correct=True. Comparison is case/whitespace-insensitive.
+        """
+        correct = {o.option_text.strip().lower() for o in question.mcq_options if o.is_correct}
+        if not correct:
             return FRQGrade(
                 is_correct=False,
-                feedback="This matching question has no answer key configured.",
+                feedback="This question has no correct selections configured.",
                 flagged_uncertain=True,
                 confidence=0.0,
             )
         try:
-            correct_pairs = json.loads(question.matching_answer.pairs_json)
-            user_pairs = json.loads(user_answer)
-        except (json.JSONDecodeError, ValueError):
+            parsed = json.loads(user_answer)
+            selected = {str(item).strip().lower() for item in parsed} if isinstance(parsed, list) else set()
+        except (json.JSONDecodeError, ValueError, TypeError):
+            selected = {user_answer.strip().lower()} if user_answer.strip() else set()
+
+        is_correct = selected == correct
+        feedback = None
+        if not is_correct:
+            correct_labels = " | ".join(o.option_text for o in question.mcq_options if o.is_correct)
+            feedback = f"The correct selections were: {correct_labels}"
+        return FRQGrade(is_correct=is_correct, feedback=feedback, flagged_uncertain=False, confidence=1.0)
+
+    def _grade_rank(self, question: Question, user_answer: str) -> FRQGrade:
+        """Ranking (all-or-nothing): submitted order must exactly match the correct order.
+
+        The correct order is the MCQOption rows sorted by display_order (the relationship
+        is already ordered that way). user_answer is a JSON array of the option texts in
+        the student's chosen order.
+        """
+        correct_order = [o.option_text.strip().lower() for o in question.mcq_options]
+        if not correct_order:
             return FRQGrade(
                 is_correct=False,
-                feedback="Could not parse your answer. Please ensure all pairs are properly formatted.",
+                feedback="This question has no ordering configured.",
+                flagged_uncertain=True,
+                confidence=0.0,
+            )
+        try:
+            parsed = json.loads(user_answer)
+            user_order = [str(item).strip().lower() for item in parsed] if isinstance(parsed, list) else []
+        except (json.JSONDecodeError, ValueError, TypeError):
+            return FRQGrade(
+                is_correct=False,
+                feedback="Could not read your ordering.",
                 flagged_uncertain=False,
                 confidence=0.5,
             )
-        
-        # Convert to sets of (left, right) tuples for comparison (order-independent)
-        correct_set = {(pair["left"].strip().lower(), pair["right"].strip().lower()) for pair in correct_pairs}
-        user_set = {(pair["left"].strip().lower(), pair["right"].strip().lower()) for pair in user_pairs}
-        
-        is_correct = correct_set == user_set
-        if is_correct:
-            feedback = None
-        else:
-            incorrect_pairs = user_set - correct_set
-            missing_pairs = correct_set - user_set
-            details = []
-            if incorrect_pairs:
-                details.append(f"Incorrect matches: {len(incorrect_pairs)}")
-            if missing_pairs:
-                details.append(f"Missing matches: {len(missing_pairs)}")
-            feedback = "Some pairs were incorrect. " + ", ".join(details)
-        
-        return FRQGrade(
-            is_correct=is_correct,
-            feedback=feedback,
-            flagged_uncertain=False,
-            confidence=1.0,
-        )
 
-    def _grade_ordering(self, question: Question, user_answer: str) -> FRQGrade:
-        """Grade ordering question: exact sequence must match. Partial credit for prefix matches."""
-        if question.ordering_answer is None:
-            return FRQGrade(
-                is_correct=False,
-                feedback="This ordering question has no answer key configured.",
-                flagged_uncertain=True,
-                confidence=0.0,
-            )
-        try:
-            correct_order = json.loads(question.ordering_answer.correct_order_json)
-            user_order = json.loads(user_answer)
-        except (json.JSONDecodeError, ValueError):
-            return FRQGrade(
-                is_correct=False,
-                feedback="Could not parse your answer. Please ensure the order is properly formatted.",
-                flagged_uncertain=False,
-                confidence=0.5,
-            )
-        
-        # Normalize for comparison (case-insensitive, whitespace-trimmed)
-        correct_normalized = [item.strip().lower() for item in correct_order]
-        user_normalized = [item.strip().lower() for item in user_order]
-        
-        is_correct = correct_normalized == user_normalized
-        if is_correct:
-            feedback = None
-        else:
-            # Calculate longest common prefix for partial credit insight
-            prefix_len = 0
-            for i in range(min(len(correct_normalized), len(user_normalized))):
-                if correct_normalized[i] == user_normalized[i]:
-                    prefix_len += 1
-                else:
-                    break
-            feedback = f"Incorrect order. First {prefix_len} items are correct."
-        
-        return FRQGrade(
-            is_correct=is_correct,
-            feedback=feedback,
-            flagged_uncertain=False,
-            confidence=1.0,
-        )
-
-    def _grade_fill_blank(self, question: Question, user_answer: str) -> FRQGrade:
-        """Grade fill-in-the-blank question: case-insensitive exact or synonym match."""
-        if question.fill_blank_answer is None:
-            return FRQGrade(
-                is_correct=False,
-                feedback="This fill-in-the-blank question has no answer key configured.",
-                flagged_uncertain=True,
-                confidence=0.0,
-            )
-        try:
-            acceptable = json.loads(question.fill_blank_answer.acceptable_answers_json)
-        except (json.JSONDecodeError, ValueError):
-            return FRQGrade(
-                is_correct=False,
-                feedback="Answer key could not be read.",
-                flagged_uncertain=True,
-                confidence=0.0,
-            )
-        
-        user_normalized = user_answer.strip().lower()
-        acceptable_normalized = [ans.strip().lower() for ans in acceptable]
-        
-        is_correct = user_normalized in acceptable_normalized
-        if is_correct:
-            feedback = None
-        else:
-            feedback = f"Incorrect. The correct answer was: {acceptable[0]}"
-        
-        return FRQGrade(
-            is_correct=is_correct,
-            feedback=feedback,
-            flagged_uncertain=False,
-            confidence=1.0,
-        )
-
-    def _grade_select_all(self, question: Question, user_answer: str) -> FRQGrade:
-        """Grade select-all question: user must select all correct and no incorrect options."""
-        if question.select_all_answer is None:
-            return FRQGrade(
-                is_correct=False,
-                feedback="This select-all question has no answer key configured.",
-                flagged_uncertain=True,
-                confidence=0.0,
-            )
-        try:
-            correct_indices = json.loads(question.select_all_answer.correct_indices_json)
-            user_indices = json.loads(user_answer)
-        except (json.JSONDecodeError, ValueError):
-            return FRQGrade(
-                is_correct=False,
-                feedback="Could not parse your selection. Please ensure indices are properly formatted.",
-                flagged_uncertain=False,
-                confidence=0.5,
-            )
-        
-        # Convert to sets for comparison
-        correct_set = set(correct_indices)
-        user_set = set(user_indices)
-        
-        is_correct = correct_set == user_set
-        if is_correct:
-            feedback = None
-        else:
-            missed = correct_set - user_set
-            incorrect = user_set - correct_set
-            details = []
-            if missed:
-                details.append(f"Missed {len(missed)} correct option(s)")
-            if incorrect:
-                details.append(f"Selected {len(incorrect)} incorrect option(s)")
-            feedback = "Incomplete. " + "; ".join(details)
-        
-        return FRQGrade(
-            is_correct=is_correct,
-            feedback=feedback,
-            flagged_uncertain=False,
-            confidence=1.0,
-        )
+        is_correct = user_order == correct_order
+        feedback = None
+        if not is_correct:
+            feedback = "Correct order: " + " → ".join(o.option_text for o in question.mcq_options)
+        return FRQGrade(is_correct=is_correct, feedback=feedback, flagged_uncertain=False, confidence=1.0)
 
     def _correct_answer_text(self, question: Question) -> Optional[str]:
         qtype = question.question_type
-        
-        if qtype == "MCQ" or qtype == "select_all":
-            # For MCQ and select_all, show correct options
+
+        # MCQ / True-False / Multiple-Select: show the correct option(s).
+        if qtype in ("MCQ", "TF", "MS"):
             correct = [o for o in question.mcq_options if o.is_correct]
             if correct:
                 return " | ".join(o.option_text for o in correct)
             return None
-        
-        if qtype == "matching" and question.matching_answer:
-            try:
-                pairs = json.loads(question.matching_answer.pairs_json)
-                return str(pairs)
-            except (json.JSONDecodeError, ValueError):
-                return None
-        
-        if qtype == "ordering" and question.ordering_answer:
-            try:
-                order = json.loads(question.ordering_answer.correct_order_json)
-                return " → ".join(order)
-            except (json.JSONDecodeError, ValueError):
-                return None
-        
-        if qtype == "fill_blank" and question.fill_blank_answer:
-            try:
-                answers = json.loads(question.fill_blank_answer.acceptable_answers_json)
-                return answers[0] if answers else None
-            except (json.JSONDecodeError, ValueError):
-                return None
-        
+
+        # Ranking: show the correct sequence (options are stored in display_order order).
+        if qtype == "RANK":
+            if question.mcq_options:
+                return " → ".join(o.option_text for o in question.mcq_options)
+            return None
+
         if question.frq_answer is not None:
             return question.frq_answer.expected_answer
-        
+
         return None
 
     async def list_attempts(

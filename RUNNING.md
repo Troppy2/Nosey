@@ -107,6 +107,7 @@ Start the server (use 8001 if 8000 is already in use). Run this from the project
 
 ```bash
 source .venv/bin/activate
+- uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 uvicorn --app-dir study-app-backend src.main:app --reload --host 0.0.0.0 --port 8000
 ```
 

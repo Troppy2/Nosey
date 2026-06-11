@@ -144,6 +144,62 @@ class TestRepository(BaseRepository[Test]):
             )
         return question
 
+    async def add_tf_question(
+        self, test_id: int, text: str, display_order: int, correct_answer: bool
+    ) -> Question:
+        """True/False: stored as two MCQOptions ("True"/"False"), one marked correct."""
+        question = Question(
+            test_id=test_id,
+            question_text=text,
+            question_type="TF",
+            display_order=display_order,
+        )
+        self.session.add(question)
+        await self.session.flush()
+        self.session.add(MCQOption(question_id=question.id, option_text="True", is_correct=correct_answer, display_order=1))
+        self.session.add(MCQOption(question_id=question.id, option_text="False", is_correct=not correct_answer, display_order=2))
+        return question
+
+    async def add_ms_question(
+        self, test_id: int, text: str, display_order: int, options: list[tuple[str, bool]]
+    ) -> Question:
+        """Multiple Select: MCQOptions with one OR MORE marked correct."""
+        question = Question(
+            test_id=test_id,
+            question_text=text,
+            question_type="MS",
+            display_order=display_order,
+        )
+        self.session.add(question)
+        await self.session.flush()
+        for index, (option_text, is_correct) in enumerate(options, start=1):
+            self.session.add(
+                MCQOption(question_id=question.id, option_text=option_text, is_correct=is_correct, display_order=index)
+            )
+        return question
+
+    async def add_rank_question(
+        self, test_id: int, text: str, display_order: int, items_in_correct_order: list[str]
+    ) -> Question:
+        """Ranking: MCQOptions whose display_order ENCODES the correct sequence.
+
+        The student-facing serializer shuffles these before sending them out, so the
+        correct order (display_order ascending) is never revealed to the student.
+        """
+        question = Question(
+            test_id=test_id,
+            question_text=text,
+            question_type="RANK",
+            display_order=display_order,
+        )
+        self.session.add(question)
+        await self.session.flush()
+        for index, item_text in enumerate(items_in_correct_order, start=1):
+            self.session.add(
+                MCQOption(question_id=question.id, option_text=item_text, is_correct=False, display_order=index)
+            )
+        return question
+
     async def add_frq_question(
         self, test_id: int, text: str, display_order: int, expected_answer: str
     ) -> Question:

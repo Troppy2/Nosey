@@ -1,5 +1,5 @@
 import Editor from "@monaco-editor/react";
-import { AlertCircle, ArrowLeft, ArrowRight, Bookmark, Bot, Calculator, Check, Code2, Eraser, Flag, GraduationCap, Highlighter, LayoutGrid, NotebookPen, Send, Sparkles, Strikethrough, Undo2, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, Bookmark, Bot, Calculator, Check, ChevronDown, ChevronUp, Code2, Eraser, Flag, GraduationCap, Highlighter, LayoutGrid, NotebookPen, Send, Sparkles, Strikethrough, Undo2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -643,6 +643,24 @@ export default function TakeTest() {
               crossed={crossouts[question.id] ?? []}
               onToggleCross={toggleCrossout}
             />
+          ) : question.type === "TF" ? (
+            <TFQuestion
+              question={question}
+              answer={answers[question.id]}
+              onAnswer={(answer) => setAnswers({ ...answers, [question.id]: answer })}
+            />
+          ) : question.type === "MS" ? (
+            <MSQuestion
+              question={question}
+              answer={answers[question.id]}
+              onAnswer={(answer) => setAnswers({ ...answers, [question.id]: answer })}
+            />
+          ) : question.type === "RANK" ? (
+            <RankQuestion
+              question={question}
+              answer={answers[question.id]}
+              onAnswer={(answer) => setAnswers({ ...answers, [question.id]: answer })}
+            />
           ) : isCodingMode ? (
             <div className="code-editor-wrap">
               <label className="field-label">Your code</label>
@@ -828,10 +846,169 @@ function MCQQuestion({
   );
 }
 
-function questionTypeLabel(question: Question): string {
-  return question.type === "MCQ" ? "Multiple choice" : "Free response";
+// True/False renders the two stored options ("True"/"False") as distinct buttons.
+function TFQuestion({
+  question,
+  answer,
+  onAnswer,
+}: {
+  question: Question;
+  answer?: string;
+  onAnswer: (answer: string) => void;
+}) {
+  return (
+    <div className="tf-grid">
+      {question.options.map((option) => {
+        const selected = answer === option.text;
+        const isTrue = option.text.trim().toLowerCase() === "true";
+        return (
+          <button
+            key={option.id}
+            type="button"
+            className={`tf-button${isTrue ? " tf-true" : " tf-false"}${selected ? " selected" : ""}`}
+            onClick={() => onAnswer(option.text)}
+          >
+            {isTrue ? <Check size={22} /> : <X size={22} />}
+            <span>{option.text}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
-function isQuestionAnswered(_question: Question, answer?: string): boolean {
-  return Boolean(answer && answer.trim().length > 0);
+// Multiple Select: answer is a JSON array of the selected option texts.
+function MSQuestion({
+  question,
+  answer,
+  onAnswer,
+}: {
+  question: Question;
+  answer?: string;
+  onAnswer: (answer: string) => void;
+}) {
+  const selected = useMemo<string[]>(() => {
+    if (!answer) return [];
+    try {
+      const parsed = JSON.parse(answer);
+      return Array.isArray(parsed) ? parsed.map(String) : [];
+    } catch {
+      return [];
+    }
+  }, [answer]);
+
+  function toggle(text: string) {
+    const next = selected.includes(text) ? selected.filter((t) => t !== text) : [...selected, text];
+    onAnswer(JSON.stringify(next));
+  }
+
+  return (
+    <div className="option-grid">
+      <p className="ms-hint">Select all that apply.</p>
+      {question.options.map((option) => {
+        const isSelected = selected.includes(option.text);
+        return (
+          <button
+            key={option.id}
+            type="button"
+            className={`option-button ms-option ${isSelected ? "selected" : ""}`}
+            onClick={() => toggle(option.text)}
+          >
+            <span className={`ms-check${isSelected ? " on" : ""}`}>{isSelected ? <Check size={15} /> : null}</span>
+            <div className="test-option-markdown">
+              <MarkdownContent content={option.text} />
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// Ranking: answer is a JSON array of option texts in the student's chosen order.
+function RankQuestion({
+  question,
+  answer,
+  onAnswer,
+}: {
+  question: Question;
+  answer?: string;
+  onAnswer: (answer: string) => void;
+}) {
+  const order = useMemo<string[]>(() => {
+    if (answer) {
+      try {
+        const parsed = JSON.parse(answer);
+        if (Array.isArray(parsed) && parsed.length === question.options.length) return parsed.map(String);
+      } catch {
+        // fall through to the option order
+      }
+    }
+    return question.options.map((option) => option.text);
+  }, [answer, question.options]);
+
+  // Persist the initial order once so the question counts as answered even if the
+  // student never reorders it (they just risk getting it wrong, all-or-nothing).
+  useEffect(() => {
+    if (!answer) onAnswer(JSON.stringify(question.options.map((option) => option.text)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [question.id]);
+
+  function move(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= order.length) return;
+    const next = [...order];
+    [next[index], next[target]] = [next[target], next[index]];
+    onAnswer(JSON.stringify(next));
+  }
+
+  return (
+    <div className="rank-list">
+      <p className="ms-hint">Put these in the correct order. Top is first.</p>
+      {order.map((text, position) => (
+        <div key={text} className="rank-item">
+          <span className="rank-num">{position + 1}</span>
+          <div className="rank-item-text test-option-markdown">
+            <MarkdownContent content={text} />
+          </div>
+          <div className="rank-item-actions">
+            <button type="button" onClick={() => move(position, -1)} disabled={position === 0} aria-label="Move up">
+              <ChevronUp size={16} />
+            </button>
+            <button type="button" onClick={() => move(position, 1)} disabled={position === order.length - 1} aria-label="Move down">
+              <ChevronDown size={16} />
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function questionTypeLabel(question: Question): string {
+  switch (question.type) {
+    case "MCQ":
+      return "Multiple choice";
+    case "TF":
+      return "True or false";
+    case "MS":
+      return "Multiple select";
+    case "RANK":
+      return "Ranking";
+    default:
+      return "Free response";
+  }
+}
+
+function isQuestionAnswered(question: Question, answer?: string): boolean {
+  if (!answer || !answer.trim()) return false;
+  if (question.type === "MS") {
+    try {
+      const parsed = JSON.parse(answer);
+      return Array.isArray(parsed) && parsed.length > 0;
+    } catch {
+      return false;
+    }
+  }
+  return answer.trim().length > 0;
 }
