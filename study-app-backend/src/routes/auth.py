@@ -49,6 +49,13 @@ async def guest_auth(
         raise HTTPException(status_code=500, detail="Guest authentication failed") from exc
 
 
+@router.get("/me", response_model=UserResponse)
+async def get_me(
+    current_user: User = Depends(get_current_user),
+) -> UserResponse:
+    return UserResponse.model_validate(current_user)
+
+
 @router.post("/date-of-birth", response_model=UserResponse)
 async def set_date_of_birth(
     request: DateOfBirthRequest,
