@@ -173,7 +173,7 @@ Async SQLAlchemy engine + `AsyncSession` factory. Exposes `get_session` as a Fas
 | DELETE | `/folders/{folder_id}` | Delete folder and cascade contents |
 
 #### `routes/folder_files.py` — prefix `/folders`
-Persists uploaded study files as `FolderFile` records (stores extracted text content). Max 30 files per folder, 10 MB per file.
+Persists uploaded study files as `FolderFile` records (stores extracted text content). Max 30 files per folder, 100 MB per file.
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -242,7 +242,7 @@ Test creation form fields: `title`, `test_type`, `notes_files[]`, `practice_test
 Verifies Google ID token via `google-auth` library. Upserts user record in DB. Generates and validates JWTs with `PyJWT` (24-hour expiry, HS256).
 
 #### `file_service.py`
-Extracts text from uploaded files. PDF uses a dual-engine approach: PyMuPDF primary, pdfplumber fallback. DOCX via python-docx. TXT/MD read directly. Parallel processing up to 4 workers for multi-page PDFs. Validates file type and enforces max size (10 MB).
+Extracts text from uploaded files. PDF uses a dual-engine approach: PyMuPDF primary, pdfplumber fallback. DOCX via python-docx. TXT/MD read directly. Parallel processing up to 4 workers for multi-page PDFs. Validates file type and enforces max size (100 MB).
 
 #### `folder_service.py`
 CRUD operations for folders. Enforces guest limits (1 folder max). Cascade-deletes all related tests, flashcards, and files.
@@ -314,7 +314,7 @@ Responsibilities:
 Custom exception hierarchy: `StudyAppException` (base) → `ResourceNotFoundException`, `ValidationException`, `LLMException`. Routes catch these and map them to HTTP status codes.
 
 #### `utils/validators.py`
-Constants: `MAX_UPLOAD_FILE_SIZE_BYTES` (10 MB), `MAX_UPLOAD_DOCUMENTS` (30). Allowed MIME types and extensions for file upload. `normalize_filename()` helper.
+Constants: `MAX_UPLOAD_FILE_SIZE_BYTES` (100 MB), `MAX_UPLOAD_DOCUMENTS` (30). Allowed MIME types and extensions for file upload. `normalize_filename()` helper.
 
 #### `utils/logger.py`
 Standard Python logging setup with consistent format across services.
