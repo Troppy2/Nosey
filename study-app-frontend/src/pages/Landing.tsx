@@ -2,7 +2,7 @@ import { ArrowRight, BookOpen, Brain, FileText, LogIn, ShieldCheck, X } from "lu
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
-import { setGoogleSession, guestSignIn, googleSignIn, submitDateOfBirth } from "../lib/api";
+import { setGoogleSession, guestSignIn, googleSignIn, submitDateOfBirth, hasValidSession } from "../lib/api";
 import { useEffect, useRef, useState } from "react";
 
 const features = [
@@ -26,6 +26,10 @@ const features = [
 export default function Landing() {
   const navigate = useNavigate();
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  useEffect(() => {
+    if (hasValidSession()) navigate("/dashboard", { replace: true });
+  }, [navigate]);
   const [guestLoading, setGuestLoading] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [showDobModal, setShowDobModal] = useState(false);
