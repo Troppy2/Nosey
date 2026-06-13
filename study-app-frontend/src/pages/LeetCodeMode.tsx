@@ -58,6 +58,7 @@ import {
   gradeLeetCodeSubmission,
 } from "../lib/api";
 import { runPythonLeetCode, traceLeetCodeExecution, type RunnerResult, type TraceResult } from "../lib/pyodideRunner";
+import { sanitizeLeetCodeHtml } from "../lib/leetcodeHtml";
 import { ExecutionVisualizer } from "../components/ExecutionVisualizer";
 import { Link } from "react-router-dom";
 import type { LeetCodeProblemData } from "../lib/types";
@@ -568,31 +569,6 @@ function filterProblems(problems: Problem[], progress: Record<string, boolean>, 
     const matchesQuery = !normalizedQuery || problem.title.toLowerCase().includes(normalizedQuery);
     return matchesFilter && matchesQuery;
   });
-}
-
-function sanitizeLeetCodeHtml(html: string) {
-  if (typeof window === "undefined") return html;
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, "text/html");
-  const allowed = new Set(["p", "pre", "code", "strong", "em", "ul", "ol", "li", "sup", "sub"]);
-
-  const clean = (node: Node) => {
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      const element = node as HTMLElement;
-      const tag = element.tagName.toLowerCase();
-      if (!allowed.has(tag)) {
-        const fragment = document.createDocumentFragment();
-        while (element.firstChild) fragment.appendChild(element.firstChild);
-        element.replaceWith(fragment);
-        return;
-      }
-      Array.from(element.attributes).forEach((attribute) => element.removeAttribute(attribute.name));
-    }
-    Array.from(node.childNodes).forEach(clean);
-  };
-
-  Array.from(doc.body.childNodes).forEach(clean);
-  return doc.body.innerHTML;
 }
 
 function isRunnable(problemData?: LeetCodeProblemData) {

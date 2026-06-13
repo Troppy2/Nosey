@@ -1,54 +1,114 @@
-import { Briefcase, ChevronRight, Clock, Code2, Loader2, MessageSquare, Shuffle, Users } from "lucide-react";
+import {
+  Briefcase,
+  ChevronRight,
+  Clock,
+  Code2,
+  FileText,
+  Loader2,
+  MessageSquare,
+  Play,
+  Shuffle,
+  Users,
+  X,
+} from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createMockInterviewSession } from "../lib/api";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
+import {
+  clearActiveMockSession,
+  clearMockProgress,
+  getActiveMockSession,
+  loadMockProgress,
+  resumeRouteFor,
+  saveMockProgress,
+} from "../lib/mockInterview";
 
 const STAGE_OPTIONS = [
   {
+    key: "resume",
+    label: "Resume Screen",
+    description: "ATS check on your resume: would it clear the screen and earn an OA? Never blocks you.",
+    icon: FileText,
+    time: "2 min",
+  },
+  {
     key: "stage1",
-    label: "Stage 1 , Online Assessment",
-    description: "2–3 LeetCode Medium/Hard problems under timed conditions. No hints.",
+    label: "Stage 1: Online Assessment",
+    description: "2 to 3 LeetCode problems in a real in-app editor, run against sample cases. No hints.",
     icon: Code2,
-    time: "60–90 min",
+    time: "60 to 90 min",
   },
   {
     key: "stage2",
-    label: "Stage 2 , Technical Interview",
-    description: "AI interviewer reads a script. DS/Algo questions + 1 live coding challenge.",
+    label: "Stage 2: Technical Interview",
+    description: "Conversational AI interviewer. Background, CS questions, then 1 live coding challenge.",
     icon: Users,
     time: "45 min",
   },
   {
     key: "stage3",
-    label: "Stage 3 , Behavioral Interview",
+    label: "Stage 3: Behavioral Interview",
     description: "Company-specific STAR questions. Type your answers; speak them out loud first.",
     icon: MessageSquare,
-    time: "30–45 min",
+    time: "30 to 45 min",
   },
 ];
 
 const COMPANY_BRAND: Record<CompanyKey, { color: string; initial: string }> = {
-  google:    { color: "#4285F4", initial: "G" },
-  meta:      { color: "#7B68EE", initial: "M" },
-  amazon:    { color: "#FF9900", initial: "A" },
-  apple:     { color: "#1d1d1f", initial: "" },
+  google: { color: "#4285F4", initial: "G" },
+  meta: { color: "#7B68EE", initial: "M" },
+  amazon: { color: "#FF9900", initial: "A" },
+  apple: { color: "#1d1d1f", initial: "" },
   microsoft: { color: "#0078D4", initial: "M" },
-  netflix:   { color: "#E50914", initial: "N" },
-  random:    { color: "#276749", initial: "" },
+  netflix: { color: "#E50914", initial: "N" },
+  random: { color: "#276749", initial: "" },
 };
 
 export default function MockInterviewSetup() {
   const navigate = useNavigate();
   const [selectedCompany, setSelectedCompany] = useState<CompanyKey>("google");
-  const [selectedStages, setSelectedStages] = useState<string[]>(["stage1", "stage2", "stage3"]);
+  const [selectedStages, setSelectedStages] = useState<string[]>([
+    "resume",
+    "stage1",
+    "stage2",
+    "stage3",
+  ]);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Offer to resume an interview that was left in progress.
+  const [active, setActive] = useState(() => getActiveMockSession());
+  const activeCompanyLabel = active
+    ? COMPANY_OPTIONS.find((c) => c.key === active.company)?.label ?? active.company
+    : "";
+
   function toggleStage(key: string) {
     setSelectedStages((prev) =>
-      prev.includes(key) ? prev.filter((s) => s !== key) : [...prev, key]
+      prev.includes(key) ? prev.filter((s) => s !== key) : [...prev, key],
     );
+  }
+
+  function handleResume() {
+    if (!active) return;
+    const progress = loadMockProgress(active.sessionId);
+    if (!progress) {
+      clearActiveMockSession();
+      setActive(null);
+      return;
+    }
+    navigate(resumeRouteFor(progress), {
+      state: {
+        session: { id: progress.sessionId, company: progress.company },
+        selectedStages: progress.selectedStages,
+      },
+    });
+  }
+
+  function handleDiscard() {
+    if (active) clearMockProgress(active.sessionId);
+    clearActiveMockSession();
+    setActive(null);
   }
 
   async function handleStart() {
@@ -60,11 +120,20 @@ export default function MockInterviewSetup() {
     setStarting(true);
     try {
       const session = await createMockInterviewSession(selectedCompany, selectedStages);
-      const firstStage = selectedStages.includes("stage1")
+      const firstStage = selectedStages.includes("resume")
+        ? "resume"
+        : selectedStages.includes("stage1")
         ? "stage1"
         : selectedStages.includes("stage2")
         ? "stage2"
         : "stage3";
+      // Seed an initial snapshot so a refresh immediately after starting still resumes.
+      saveMockProgress({
+        sessionId: session.id,
+        company: selectedCompany,
+        selectedStages,
+        updatedAt: Date.now(),
+      });
       navigate(`/mock-interview/${session.id}/${firstStage}`, {
         state: { session, selectedStages },
       });
@@ -75,41 +144,80 @@ export default function MockInterviewSetup() {
   }
 
   const totalTime = selectedStages.reduce((sum, key) => {
-    const mins = key === "stage1" ? 90 : key === "stage2" ? 45 : 45;
+    const mins = key === "resume" ? 2 : key === "stage1" ? 90 : 45;
     return sum + mins;
   }, 0);
 
   return (
     <div className="page page-narrow">
-      {/* Hero */}
       <div className="mock-setup-hero">
         <div className="mock-setup-hero-top">
           <div>
             <span className="eyebrow">Mock Interview Mode</span>
-            <h1 className="mock-setup-hero-title" style={{ marginTop: 6 }}>Interview Loop Simulator</h1>
+            <h1 className="mock-setup-hero-title" style={{ marginTop: 6 }}>
+              Interview Loop Simulator
+            </h1>
             <p className="muted small" style={{ marginTop: 6 }}>
-              Simulate a real SWE interview loop end-to-end. No hand-holding.
+              Simulate a real SWE interview loop end to end. No hand-holding.
             </p>
           </div>
           <Briefcase size={28} style={{ color: "var(--green-dark)", flexShrink: 0, marginTop: 4 }} />
         </div>
         <div className="mock-setup-loop-bar">
           <div className="mock-loop-step">
-            <div className="mock-loop-step-icon"><Code2 size={12} /></div>
+            <div className="mock-loop-step-icon">
+              <FileText size={12} />
+            </div>
+            Resume Screen
+          </div>
+          <span className="mock-loop-arrow">{"→"}</span>
+          <div className="mock-loop-step">
+            <div className="mock-loop-step-icon">
+              <Code2 size={12} />
+            </div>
             Online Assessment
           </div>
-          <span className="mock-loop-arrow">→</span>
+          <span className="mock-loop-arrow">{"→"}</span>
           <div className="mock-loop-step">
-            <div className="mock-loop-step-icon"><Users size={12} /></div>
+            <div className="mock-loop-step-icon">
+              <Users size={12} />
+            </div>
             Technical Interview
           </div>
-          <span className="mock-loop-arrow">→</span>
+          <span className="mock-loop-arrow">{"→"}</span>
           <div className="mock-loop-step">
-            <div className="mock-loop-step-icon"><MessageSquare size={12} /></div>
+            <div className="mock-loop-step-icon">
+              <MessageSquare size={12} />
+            </div>
             Behavioral Interview
           </div>
         </div>
       </div>
+
+      {/* Resume banner */}
+      {active && (
+        <div className="card mock-resume-banner">
+          <div className="mock-resume-banner-info">
+            <Play size={16} style={{ color: "var(--green-dark)", flexShrink: 0 }} />
+            <div>
+              <div className="mock-resume-banner-title">Resume your {activeCompanyLabel} interview</div>
+              <div className="muted small">You have an interview in progress. Pick up where you left off.</div>
+            </div>
+          </div>
+          <div className="mock-resume-banner-actions">
+            <button className="button button-primary" onClick={handleResume}>
+              Resume <ChevronRight size={14} />
+            </button>
+            <button
+              className="button button-ghost mock-resume-discard"
+              onClick={handleDiscard}
+              title="Discard saved progress"
+            >
+              <X size={14} /> Discard
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Company selector */}
       <section className="card mock-setup-section">
@@ -130,7 +238,7 @@ export default function MockInterviewSetup() {
                     <Shuffle size={18} color="#fff" />
                   ) : isApple ? (
                     <svg width="18" height="22" viewBox="0 0 814 1000" fill="#fff">
-                      <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-57.8-155.5-127.4C46 790.1 0 665.8 0 546.5c0-211.9 138.5-323.9 275.1-323.9 70.6 0 129.5 46.4 173.5 46.4 42.2 0 108.5-49.5 188.5-49.5 30.6 0 108.2 2.6 168.7 80.5zM552.5 85.3c29.2-35.1 50.2-83.4 50.2-131.7 0-6.5-.6-13-1.9-19.5-47.6 1.9-104 32.5-138.2 73.8-26.6 30.8-50.7 79.1-50.7 128.7 0 7.1 1.3 14.2 1.9 16.5 3.2.6 8.4 1.3 13.7 1.3 42.8 0 96.9-29.1 125-69.1z"/>
+                      <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-57.8-155.5-127.4C46 790.1 0 665.8 0 546.5c0-211.9 138.5-323.9 275.1-323.9 70.6 0 129.5 46.4 173.5 46.4 42.2 0 108.5-49.5 188.5-49.5 30.6 0 108.2 2.6 168.7 80.5zM552.5 85.3c29.2-35.1 50.2-83.4 50.2-131.7 0-6.5-.6-13-1.9-19.5-47.6 1.9-104 32.5-138.2 73.8-26.6 30.8-50.7 79.1-50.7 128.7 0 7.1 1.3 14.2 1.9 16.5 3.2.6 8.4 1.3 13.7 1.3 42.8 0 96.9-29.1 125-69.1z" />
                     </svg>
                   ) : (
                     <span className="mock-company-initial">{brand.initial}</span>
@@ -149,15 +257,15 @@ export default function MockInterviewSetup() {
         <div className="mock-stage-list">
           {STAGE_OPTIONS.map((stage) => {
             const Icon = stage.icon;
-            const active = selectedStages.includes(stage.key);
+            const activeStage = selectedStages.includes(stage.key);
             return (
               <button
                 key={stage.key}
-                className={`mock-stage-row${active ? " selected" : ""}`}
+                className={`mock-stage-row${activeStage ? " selected" : ""}`}
                 onClick={() => toggleStage(stage.key)}
               >
                 <div className="mock-stage-check">
-                  <div className={`mock-stage-checkbox${active ? " checked" : ""}`} />
+                  <div className={`mock-stage-checkbox${activeStage ? " checked" : ""}`} />
                 </div>
                 <div className="mock-stage-icon-wrap">
                   <Icon size={17} />
@@ -181,11 +289,17 @@ export default function MockInterviewSetup() {
         <div className="mock-setup-footer-meta">
           {selectedStages.length > 0 ? (
             <p className="muted small" style={{ margin: 0 }}>
-              <Clock size={12} style={{ display: "inline", marginRight: 4, verticalAlign: "middle" }} />
-              {selectedStages.length} stage{selectedStages.length > 1 ? "s" : ""} selected · ~{totalTime} min estimated
+              <Clock
+                size={12}
+                style={{ display: "inline", marginRight: 4, verticalAlign: "middle" }}
+              />
+              {selectedStages.length} stage{selectedStages.length > 1 ? "s" : ""} selected, about{" "}
+              {totalTime} min estimated
             </p>
           ) : (
-            <p className="muted small" style={{ margin: 0 }}>No stages selected</p>
+            <p className="muted small" style={{ margin: 0 }}>
+              No stages selected
+            </p>
           )}
           {error && <p className="mock-setup-error">{error}</p>}
         </div>
@@ -195,9 +309,13 @@ export default function MockInterviewSetup() {
           disabled={starting || selectedStages.length === 0}
         >
           {starting ? (
-            <><Loader2 size={15} className="spin" /> Starting…</>
+            <>
+              <Loader2 size={15} className="spin" /> Starting…
+            </>
           ) : (
-            <>Start Interview <ChevronRight size={16} /></>
+            <>
+              Start Interview <ChevronRight size={16} />
+            </>
           )}
         </button>
       </div>

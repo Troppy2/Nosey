@@ -1,18 +1,29 @@
 import Editor from "@monaco-editor/react";
-import { AlertCircle, ChevronRight, ExternalLink, Flag, Loader2, Send, Users, Volume2, VolumeX } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+  AlertCircle,
+  ChevronRight,
+  ExternalLink,
+  Flag,
+  Loader2,
+  LogOut,
+  Send,
+  Users,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { sendStage2Message, submitStage2 } from "../lib/api";
 import type { CodingProblemInfo, InterviewChatMessage, MockInterviewSession } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
+import { loadMockProgress, saveMockProgress, type MockProgress } from "../lib/mockInterview";
 
-function speak(text: string, onEnd?: () => void) {
+function speak(text: string) {
   if (!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
   const utt = new SpeechSynthesisUtterance(text);
   utt.rate = 0.95;
   utt.pitch = 1;
-  if (onEnd) utt.onend = onEnd;
   window.speechSynthesis.speak(utt);
 }
 
@@ -24,28 +35,34 @@ const ttsSupported = typeof window !== "undefined" && "speechSynthesis" in windo
 
 export default function MockInterviewStage2() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const numericSessionId = Number(sessionId);
   const navigate = useNavigate();
   const location = useLocation();
-  const state = location.state as { session: MockInterviewSession; selectedStages: string[] } | null;
+  const state = location.state as { session?: MockInterviewSession; selectedStages?: string[] } | null;
 
-  const session = state?.session;
-  const selectedStages = state?.selectedStages ?? ["stage2", "stage3"];
-  const company = (session?.company ?? "random") as CompanyKey;
+  const stored = useMemo<MockProgress | null>(
+    () => (Number.isFinite(numericSessionId) ? loadMockProgress(numericSessionId) : null),
+    [numericSessionId],
+  );
+
+  const company = (state?.session?.company ?? stored?.company ?? "random") as CompanyKey;
   const companyLabel = COMPANY_OPTIONS.find((c) => c.key === company)?.label ?? company;
+  const selectedStages = state?.selectedStages ?? stored?.selectedStages ?? ["stage2", "stage3"];
 
-  const [messages, setMessages] = useState<InterviewChatMessage[]>([]);
+  const [messages, setMessages] = useState<InterviewChatMessage[]>(() => stored?.stage2?.messages ?? []);
   const [input, setInput] = useState("");
-  const [initializing, setInitializing] = useState(true);
+  const [initializing, setInitializing] = useState(() => (stored?.stage2?.messages?.length ?? 0) === 0);
   const [sending, setSending] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
 
-  const [codingProblem, setCodingProblem] = useState<CodingProblemInfo | null>(null);
-  const [code, setCode] = useState("# Write your solution here\n\n");
+  const [codingProblem, setCodingProblem] = useState<CodingProblemInfo | null>(
+    () => stored?.stage2?.codingProblem ?? null,
+  );
+  const [code, setCode] = useState(() => stored?.stage2?.code ?? "# Write your solution here\n\n");
   const [codeSubmitting, setCodeSubmitting] = useState(false);
-  const [codeFeedback, setCodeFeedback] = useState<string | null>(null);
+  const [codeFeedback, setCodeFeedback] = useState<string | null>(() => stored?.stage2?.codeFeedback ?? null);
   const [codeError, setCodeError] = useState<string | null>(null);
-
-  const [isDone, setIsDone] = useState(false);
+  const [submitted, setSubmitted] = useState(() => stored?.stage2?.submitted ?? false);
   const [ttsEnabled, setTtsEnabled] = useState(false);
 
   const threadRef = useRef<HTMLDivElement>(null);
@@ -57,30 +74,54 @@ export default function MockInterviewStage2() {
     }, 50);
   }
 
-  // Start interview
+  // Persist Stage 2 progress on every meaningful change.
   useEffect(() => {
-    async function init() {
+    if (!Number.isFinite(numericSessionId)) return;
+    const prev = loadMockProgress(numericSessionId);
+    const progress: MockProgress = {
+      ...(prev ?? { sessionId: numericSessionId, company, selectedStages, updatedAt: Date.now() }),
+      sessionId: numericSessionId,
+      company,
+      selectedStages,
+      updatedAt: Date.now(),
+      stage2: { messages, codingProblem, code, codeFeedback, submitted },
+    };
+    saveMockProgress(progress);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, codingProblem, code, codeFeedback, submitted]);
+
+  // Start the interview only if there is no saved conversation.
+  useEffect(() => {
+    if (!initializing) {
+      scrollToBottom();
+      return;
+    }
+    let cancelled = false;
+    (async () => {
       try {
-        const res = await sendStage2Message(Number(sessionId), null, []);
-        const first: InterviewChatMessage = { role: "interviewer", content: res.reply };
-        setMessages([first]);
+        const res = await sendStage2Message(numericSessionId, null, []);
+        if (cancelled) return;
+        setMessages([{ role: "interviewer", content: res.reply }]);
         if (ttsEnabled) speak(res.reply);
         if (res.coding_problem) setCodingProblem(res.coding_problem);
-        if (res.is_done) setIsDone(true);
       } catch (e: unknown) {
-        setInitError(e instanceof Error ? e.message : "Failed to start interview.");
+        if (!cancelled) setInitError(e instanceof Error ? e.message : "Failed to start interview.");
       } finally {
-        setInitializing(false);
-        scrollToBottom();
+        if (!cancelled) {
+          setInitializing(false);
+          scrollToBottom();
+        }
       }
-    }
-    init();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [numericSessionId]);
 
   async function handleSend() {
     const text = input.trim();
-    if (!text || sending || isDone) return;
+    if (!text || sending || submitted) return;
     stopSpeaking();
 
     const userMsg: InterviewChatMessage = { role: "user", content: text };
@@ -91,7 +132,7 @@ export default function MockInterviewStage2() {
     scrollToBottom();
 
     try {
-      const res = await sendStage2Message(Number(sessionId), text, messages);
+      const res = await sendStage2Message(numericSessionId, text, messages);
       const aiMsg: InterviewChatMessage = { role: "interviewer", content: res.reply };
       setMessages([...nextHistory, aiMsg]);
       if (ttsEnabled) speak(res.reply);
@@ -99,13 +140,11 @@ export default function MockInterviewStage2() {
         setCodingProblem(res.coding_problem);
         setCode(`# ${res.coding_problem.title}\n# Write your solution here\n\n`);
       }
-      if (res.is_done) setIsDone(true);
-    } catch (e: unknown) {
-      const errMsg: InterviewChatMessage = {
-        role: "interviewer",
-        content: "(Connection error. Please try again.)",
-      };
-      setMessages([...nextHistory, errMsg]);
+    } catch {
+      setMessages([
+        ...nextHistory,
+        { role: "interviewer", content: "(Connection error. Please try again.)" },
+      ]);
     } finally {
       setSending(false);
       scrollToBottom();
@@ -118,9 +157,8 @@ export default function MockInterviewStage2() {
     setCodeError(null);
     setCodeSubmitting(true);
     try {
-      const res = await submitStage2(Number(sessionId), code);
+      const res = await submitStage2(numericSessionId, code, codingProblem.title, codingProblem.slug);
       setCodeFeedback(res.feedback);
-      // Add code submission + feedback to chat
       const codeMsg: InterviewChatMessage = {
         role: "user",
         content: `MY SOLUTION:\n\`\`\`python\n${code.slice(0, 400)}${code.length > 400 ? "\n..." : ""}\n\`\`\``,
@@ -128,7 +166,7 @@ export default function MockInterviewStage2() {
       const fbMsg: InterviewChatMessage = { role: "interviewer", content: res.feedback };
       setMessages((prev) => [...prev, codeMsg, fbMsg]);
       if (ttsEnabled) speak(res.feedback);
-      setIsDone(true);
+      setSubmitted(true);
       scrollToBottom();
     } catch (e: unknown) {
       setCodeError(e instanceof Error ? e.message : "Submission failed. Try again.");
@@ -152,7 +190,10 @@ export default function MockInterviewStage2() {
   if (initializing) {
     return (
       <div className="mock-loading" style={{ height: "100vh" }}>
-        <div className="mock-interviewer-avatar" style={{ width: 52, height: 52, fontSize: "0.9rem" }}>
+        <div
+          className="mock-interviewer-avatar"
+          style={{ width: 52, height: 52, fontSize: "0.9rem" }}
+        >
           <Users size={20} />
         </div>
         <p className="muted">Preparing your interviewer…</p>
@@ -167,9 +208,20 @@ export default function MockInterviewStage2() {
         <div className="card mock-error-card">
           <AlertCircle size={20} style={{ color: "var(--error)" }} />
           <p>{initError}</p>
-          <button className="button button-ghost" onClick={() => navigate("/mock-interview")}>
-            Back to Setup
-          </button>
+          <div className="button-row" style={{ marginTop: 8 }}>
+            <button className="button button-ghost" onClick={() => navigate("/mock-interview")}>
+              Back to Setup
+            </button>
+            <button
+              className="button button-primary"
+              onClick={() => {
+                setInitError(null);
+                setInitializing(true);
+              }}
+            >
+              Retry
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -177,29 +229,38 @@ export default function MockInterviewStage2() {
 
   return (
     <div className="mock-stage2-room">
-      {/* Top bar */}
       <div className="mock-stage2-room-topbar">
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div className="mock-interviewer-avatar">AI</div>
           <div>
             <div className="mock-interviewer-name">{companyLabel} Interviewer</div>
-            <div className="mock-stage-breadcrumb">Stage 2 , Technical Interview</div>
+            <div className="mock-stage-breadcrumb">Stage 2: Technical Interview</div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {ttsSupported && (
             <button
               className={`button button-ghost mock-stage2-tts-btn${ttsEnabled ? " active" : ""}`}
-              onClick={() => { stopSpeaking(); setTtsEnabled((v) => !v); }}
+              onClick={() => {
+                stopSpeaking();
+                setTtsEnabled((v) => !v);
+              }}
             >
               {ttsEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
               {ttsEnabled ? "Audio On" : "Audio Off"}
             </button>
           )}
-          {isDone && (
+          <button
+            className="button button-ghost"
+            onClick={() => navigate("/mock-interview")}
+            title="Quit (your progress is saved)"
+          >
+            <LogOut size={14} /> Quit
+          </button>
+          {submitted && (
             <button
               className="button button-primary"
-              onClick={() => navigate(nextRoute(), { state: { session, selectedStages } })}
+              onClick={() => navigate(nextRoute(), { state: { session: state?.session, selectedStages } })}
             >
               Continue <ChevronRight size={14} />
             </button>
@@ -207,14 +268,11 @@ export default function MockInterviewStage2() {
         </div>
       </div>
 
-      {/* Body */}
       <div className="mock-stage2-room-body">
-        {/* Left: problem (optional) + chat */}
         <div
           className="mock-stage2-room-left"
           style={!codingProblem ? { width: "100%", maxWidth: "none" } : undefined}
         >
-          {/* Problem card , visible once coding problem is revealed */}
           {codingProblem && (
             <div className="mock-stage2-problem-card">
               <div className="mock-stage2-problem-header">
@@ -227,7 +285,13 @@ export default function MockInterviewStage2() {
                     href={`https://leetcode.com/problems/${codingProblem.slug}/`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: "0.75rem", color: "var(--green-dark)" }}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 3,
+                      fontSize: "0.75rem",
+                      color: "var(--green-dark)",
+                    }}
                   >
                     LeetCode <ExternalLink size={10} />
                   </a>
@@ -237,16 +301,21 @@ export default function MockInterviewStage2() {
             </div>
           )}
 
-          {/* Chat thread */}
           <div
             className="mock-stage2-chat-thread"
             ref={threadRef}
-            style={!codingProblem ? { maxWidth: 720, width: "100%", margin: "0 auto", alignSelf: "stretch" } : undefined}
+            style={
+              !codingProblem
+                ? { maxWidth: 720, width: "100%", margin: "0 auto", alignSelf: "stretch" }
+                : undefined
+            }
           >
             {messages.map((msg, i) => (
               <div
                 key={i}
-                className={`mock-chat-msg ${msg.role === "interviewer" ? "mock-chat-msg--interviewer" : "mock-chat-msg--user"}`}
+                className={`mock-chat-msg ${
+                  msg.role === "interviewer" ? "mock-chat-msg--interviewer" : "mock-chat-msg--user"
+                }`}
               >
                 <span className="mock-chat-msg-role">
                   {msg.role === "interviewer" ? companyLabel + " Interviewer" : "You"}
@@ -265,13 +334,12 @@ export default function MockInterviewStage2() {
             )}
           </div>
 
-          {/* Chat input */}
-          {!isDone && (
+          {!submitted && (
             <div className="mock-stage2-chat-input-row">
               <textarea
                 ref={inputRef}
                 className="kojo-input"
-                placeholder="Type your response… (Enter to send, Shift+Enter for newline)"
+                placeholder="Type your response (Enter to send, Shift+Enter for newline)"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
@@ -291,7 +359,6 @@ export default function MockInterviewStage2() {
           )}
         </div>
 
-        {/* Right: editor , visible once coding problem is revealed */}
         {codingProblem && (
           <div className="mock-stage2-room-right">
             <div className="mock-stage2-room-editor-wrap">
@@ -319,12 +386,22 @@ export default function MockInterviewStage2() {
               {codeFeedback ? (
                 <div className="mock-stage2-feedback">
                   <span className="eyebrow">Code Feedback</span>
-                  <p className="muted" style={{ lineHeight: 1.65 }}>{codeFeedback}</p>
+                  <p className="muted" style={{ lineHeight: 1.65 }}>
+                    {codeFeedback}
+                  </p>
                 </div>
               ) : (
                 <div className="mock-stage2-submit-bar">
                   {codeError && (
-                    <span style={{ color: "var(--error)", fontSize: "0.82rem", display: "flex", alignItems: "center", gap: 4 }}>
+                    <span
+                      style={{
+                        color: "var(--error)",
+                        fontSize: "0.82rem",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                      }}
+                    >
                       <AlertCircle size={13} /> {codeError}
                     </span>
                   )}
@@ -335,9 +412,13 @@ export default function MockInterviewStage2() {
                     disabled={codeSubmitting || !code.trim()}
                   >
                     {codeSubmitting ? (
-                      <><Loader2 size={14} className="spin" /> Submitting…</>
+                      <>
+                        <Loader2 size={14} className="spin" /> Submitting…
+                      </>
                     ) : (
-                      <><Flag size={13} /> Submit Solution</>
+                      <>
+                        <Flag size={13} /> Submit Solution
+                      </>
                     )}
                   </button>
                 </div>

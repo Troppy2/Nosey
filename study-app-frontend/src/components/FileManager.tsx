@@ -1,6 +1,7 @@
-import { AlertCircle, FileText, Loader2, Trash2, Upload, X } from "lucide-react";
+import { AlertCircle, FileText, Loader2, StickyNote, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { type FolderFile, type SkippedFile, deleteFolderFile, fetchFolderFiles, uploadFolderFiles } from "../lib/api";
+import { type FolderFile, type SkippedFile, addFolderTextNote, deleteFolderFile, fetchFolderFiles, uploadFolderFiles } from "../lib/api";
+import { Button } from "./Button";
 import { ConfirmModal } from "./ConfirmModal";
 
 const MAX_FILE_SIZE_MB = 100;
@@ -37,6 +38,10 @@ export function FileManager({ folderId, onClose }: Props) {
   const [skippedFiles, setSkippedFiles] = useState<SkippedFile[]>([]);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<FolderFile | null>(null);
+  const [mode, setMode] = useState<"upload" | "paste">("upload");
+  const [noteTitle, setNoteTitle] = useState("");
+  const [noteContent, setNoteContent] = useState("");
+  const [isSavingNote, setIsSavingNote] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -98,6 +103,25 @@ export function FileManager({ folderId, onClose }: Props) {
     }
   }
 
+  async function handleSaveNote() {
+    const content = noteContent.trim();
+    if (!content) { setError("Note text cannot be empty."); return; }
+    setError(null);
+    setSkippedFiles([]);
+    setIsSavingNote(true);
+    try {
+      const created = await addFolderTextNote(folderId, noteTitle.trim(), content);
+      setFiles((prev) => [created, ...(prev ?? [])]);
+      setNoteTitle("");
+      setNoteContent("");
+      setMode("upload");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save note.");
+    } finally {
+      setIsSavingNote(false);
+    }
+  }
+
   async function handleDelete(fileId: number) {
     setDeletingId(fileId);
     try {
@@ -109,6 +133,8 @@ export function FileManager({ folderId, onClose }: Props) {
       setDeletingId(null);
     }
   }
+
+  const usedBytes = (files ?? []).reduce((sum, file) => sum + file.size_bytes, 0);
 
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
@@ -130,35 +156,38 @@ export function FileManager({ folderId, onClose }: Props) {
           </button>
         </div>
 
-        <p className="muted" style={{ marginTop: 0, marginBottom: 16, fontSize: "0.875rem" }}>
-          Upload notes files (PDF, DOCX, TXT, Markdown, PPTX) to this folder , {MAX_FILE_SIZE_MB} MB per file, {MAX_TOTAL_SIZE_MB} MB total.
-          These files are available when generating tests.
-        </p>
+        {/* Mode tabs */}
+        <div className="file-manager-tabs">
+          <button
+            type="button"
+            className={`file-manager-tab${mode === "upload" ? " file-manager-tab--active" : ""}`}
+            onClick={() => { setMode("upload"); setError(null); }}
+          >
+            <Upload size={15} />
+            Upload Files
+          </button>
+          <button
+            type="button"
+            className={`file-manager-tab${mode === "paste" ? " file-manager-tab--active" : ""}`}
+            onClick={() => { setMode("paste"); setError(null); setSkippedFiles([]); }}
+          >
+            <StickyNote size={15} />
+            Paste Text
+          </button>
+        </div>
 
         {/* Upload area */}
+        {mode === "upload" ? (
         <label
           className="file-manager-upload-zone"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            padding: "12px 16px",
-            border: "1.5px dashed var(--green-light-mid)",
-            borderRadius: 8,
-            cursor: isUploading ? "not-allowed" : "pointer",
-            background: "var(--green-lightest)",
-            marginBottom: 16,
-            opacity: isUploading ? 0.6 : 1,
-          }}
+          style={{ cursor: isUploading ? "not-allowed" : "pointer", opacity: isUploading ? 0.6 : 1 }}
         >
           <Upload size={16} style={{ color: "var(--green-dark)", flexShrink: 0 }} />
-          <span style={{ fontSize: "0.875rem", color: "var(--green-dark)", fontWeight: 600 }}>
+          <span className="file-manager-upload-label">
             {isUploading ? "Uploading…" : "Choose files to upload"}
           </span>
-          <span className="muted" style={{ fontSize: "0.8rem", marginLeft: "auto" }}>
-            {(files ?? []).reduce((sum, file) => sum + file.size_bytes, 0) / (1024 * 1024) > 0
-              ? `${((files ?? []).reduce((sum, file) => sum + file.size_bytes, 0) / (1024 * 1024)).toFixed(1)} MB used`
-              : "0 MB used"}
+          <span className="muted file-manager-upload-meta">
+            {`${(usedBytes / (1024 * 1024)).toFixed(1)} / ${MAX_TOTAL_SIZE_MB} MB`}
           </span>
           <input
             ref={inputRef}
@@ -170,6 +199,44 @@ export function FileManager({ folderId, onClose }: Props) {
             onChange={(e) => handleUpload(e.target.files)}
           />
         </label>
+        ) : (
+          <div className="file-manager-paste">
+            <input
+              type="text"
+              className="file-manager-note-title"
+              placeholder="Note title (optional)"
+              value={noteTitle}
+              maxLength={255}
+              disabled={isSavingNote}
+              onChange={(e) => setNoteTitle(e.target.value)}
+            />
+            <textarea
+              className="file-manager-note-body"
+              placeholder="Type or paste your notes here…"
+              value={noteContent}
+              disabled={isSavingNote}
+              rows={6}
+              onChange={(e) => setNoteContent(e.target.value)}
+            />
+            <div className="file-manager-paste-actions">
+              <span className="muted small">
+                {noteContent.trim().length.toLocaleString()} characters
+              </span>
+              <Button
+                className="file-manager-save-note"
+                disabled={isSavingNote || !noteContent.trim()}
+                onClick={() => void handleSaveNote()}
+              >
+                {isSavingNote ? "Saving…" : "Save note"}
+              </Button>
+            </div>
+          </div>
+        )}
+        <p className="muted small file-manager-hint">
+          {mode === "upload"
+            ? `PDF, DOCX, TXT, MD, PPTX and code files · ${MAX_FILE_SIZE_MB} MB per file`
+            : "Saved as a text note, usable in tests and Kojo just like a file."}
+        </p>
 
         {error && (
           <div className="form-error" style={{ marginBottom: 12 }}>
