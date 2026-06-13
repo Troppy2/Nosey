@@ -1,9 +1,10 @@
 import { AlertCircle, CheckCircle2, Loader2, Minus, RefreshCw, Trophy, XCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { finishMockInterview } from "../lib/api";
 import type { MockInterviewFinishResponse, MockInterviewSession } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
+import { clearActiveMockSession, loadMockProgress } from "../lib/mockInterview";
 
 const RECOMMENDATION_META: Record<
   string,
@@ -36,42 +37,52 @@ const RECOMMENDATION_META: Record<
 };
 
 const VERDICT_LABELS: Record<string, { label: string; className: string }> = {
-  strong:     { label: "Strong Pass", className: "verdict-strong" },
-  pass:       { label: "Pass",        className: "verdict-pass" },
-  borderline: { label: "Borderline",  className: "verdict-borderline" },
-  needs_work: { label: "Needs Work",  className: "verdict-needs-work" },
+  strong: { label: "Strong Pass", className: "verdict-strong" },
+  pass: { label: "Pass", className: "verdict-pass" },
+  borderline: { label: "Borderline", className: "verdict-borderline" },
+  needs_work: { label: "Needs Work", className: "verdict-needs-work" },
 };
 
 export default function MockInterviewSummary() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const numericSessionId = Number(sessionId);
   const navigate = useNavigate();
   const location = useLocation();
-  const state = location.state as {
-    session: MockInterviewSession;
-    selectedStages: string[];
-  } | null;
+  const state = location.state as { session?: MockInterviewSession; selectedStages?: string[] } | null;
 
-  const session = state?.session;
-  const company = (session?.company ?? "random") as CompanyKey;
+  const stored = useMemo(
+    () => (Number.isFinite(numericSessionId) ? loadMockProgress(numericSessionId) : null),
+    [numericSessionId],
+  );
+  const company = (state?.session?.company ?? stored?.company ?? "random") as CompanyKey;
   const companyLabel = COMPANY_OPTIONS.find((c) => c.key === company)?.label ?? company;
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [result, setResult] = useState<MockInterviewFinishResponse | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    async function load() {
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    (async () => {
       try {
-        const data = await finishMockInterview(Number(sessionId));
+        const data = await finishMockInterview(numericSessionId);
+        if (cancelled) return;
         setResult(data);
+        // Loop is finished: drop the resume pointer so setup no longer offers it.
+        clearActiveMockSession();
       } catch (e: unknown) {
-        setLoadError(e instanceof Error ? e.message : "Failed to generate summary.");
+        if (!cancelled) setLoadError(e instanceof Error ? e.message : "Failed to generate summary.");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
-    }
-    load();
-  }, [sessionId]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [numericSessionId, attempt]);
 
   if (loading) {
     return (
@@ -89,9 +100,14 @@ export default function MockInterviewSummary() {
         <div className="card mock-error-card">
           <AlertCircle size={20} style={{ color: "var(--error)" }} />
           <p>{loadError ?? "Could not generate summary."}</p>
-          <button className="button button-ghost" onClick={() => navigate("/mock-interview")}>
-            Back to Setup
-          </button>
+          <div className="button-row" style={{ marginTop: 8 }}>
+            <button className="button button-ghost" onClick={() => navigate("/mock-interview")}>
+              Back to Setup
+            </button>
+            <button className="button button-primary" onClick={() => setAttempt((a) => a + 1)}>
+              <RefreshCw size={14} /> Retry
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -106,48 +122,48 @@ export default function MockInterviewSummary() {
         <div>
           <span className="eyebrow">Interview Complete</span>
           <h1 style={{ marginTop: 6 }}>Loop Debrief</h1>
-          <p className="muted small" style={{ marginTop: 6 }}>{companyLabel} , Full Interview Loop</p>
+          <p className="muted small" style={{ marginTop: 6 }}>
+            {companyLabel}: Full Interview Loop
+          </p>
         </div>
         <Trophy size={26} style={{ color: "var(--green-dark)", flexShrink: 0, marginTop: 4 }} />
       </div>
 
-      {/* Hiring recommendation hero */}
       <div className={`card mock-rec-card ${recMeta.className}`}>
         <RecIcon size={44} className="mock-rec-icon" />
         <div style={{ flex: 1 }}>
           <div className="mock-rec-label">{recMeta.label}</div>
-          <div className="muted small" style={{ marginTop: 4 }}>{recMeta.description}</div>
+          <div className="muted small" style={{ marginTop: 4 }}>
+            {recMeta.description}
+          </div>
         </div>
       </div>
 
-      {/* Per-stage verdicts */}
       <div className="mock-summary-stages">
+        {result.resume_verdict && (
+          <StageVerdictChip stage="Resume Screen" verdict={result.resume_verdict} />
+        )}
         {result.stage1_verdict && (
-          <StageVerdictChip stage="Stage 1 , Online Assessment" verdict={result.stage1_verdict} />
+          <StageVerdictChip stage="Stage 1: Online Assessment" verdict={result.stage1_verdict} />
         )}
         {result.stage2_verdict && (
-          <StageVerdictChip stage="Stage 2 , Technical Interview" verdict={result.stage2_verdict} />
+          <StageVerdictChip stage="Stage 2: Technical Interview" verdict={result.stage2_verdict} />
         )}
         {result.stage3_verdict && (
-          <StageVerdictChip stage="Stage 3 , Behavioral" verdict={result.stage3_verdict} />
+          <StageVerdictChip stage="Stage 3: Behavioral" verdict={result.stage3_verdict} />
         )}
       </div>
 
-      {/* Overall feedback */}
       <div className="card mock-summary-feedback">
         <span className="eyebrow">Recruiter Debrief</span>
         <p className="muted">{result.overall_feedback}</p>
       </div>
 
-      {/* Actions */}
       <div className="button-row" style={{ marginTop: 28 }}>
         <button className="button button-ghost" onClick={() => navigate("/dashboard")}>
           Dashboard
         </button>
-        <button
-          className="button button-primary"
-          onClick={() => navigate("/mock-interview")}
-        >
+        <button className="button button-primary" onClick={() => navigate("/mock-interview")}>
           <RefreshCw size={14} /> Try Again
         </button>
       </div>

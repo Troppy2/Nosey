@@ -248,6 +248,93 @@ async def upload_folder_files(
     return UploadResult(uploaded=created, skipped=skipped)
 
 
+class TextNoteRequest(BaseModel):
+    title: Optional[str] = None
+    content: str
+
+
+@router.post(
+    "/{folder_id}/files/text",
+    response_model=FolderFileResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_folder_text_note(
+    folder_id: int,
+    payload: TextNoteRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> FolderFileResponse:
+    folder = await _get_owned_folder(folder_id, user, session)
+
+    content = (payload.content or "").strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="Note text cannot be empty.")
+
+    content_bytes = len(content.encode("utf-8"))
+    if content_bytes > MAX_UPLOAD_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Note exceeds the {MAX_UPLOAD_FILE_SIZE_BYTES // (1024 * 1024)} MB per-file limit.",
+        )
+
+    from sqlalchemy import func as sqlfunc
+    current_total_result = await session.scalar(
+        select(sqlfunc.coalesce(sqlfunc.sum(FolderFile.size_bytes), 0)).where(FolderFile.folder_id == folder_id)
+    )
+    current_total_bytes = int(current_total_result or 0)
+    if current_total_bytes + content_bytes > MAX_UPLOAD_TOTAL_SIZE_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Adding this note would exceed the {MAX_UPLOAD_TOTAL_SIZE_BYTES // (1024 * 1024)} MB folder limit.",
+        )
+
+    content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    duplicate = await session.scalar(
+        select(FolderFile).where(
+            FolderFile.folder_id == folder_id,
+            FolderFile.content_hash == content_hash,
+        )
+    )
+    if duplicate is not None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Identical content already exists as '{duplicate.file_name}'.",
+        )
+
+    title = (payload.title or "").strip()
+    if not title:
+        first_line = next((line.strip() for line in content.splitlines() if line.strip()), "")
+        if first_line:
+            title = first_line[:60]
+        else:
+            title = f"Note - {datetime.now().strftime('%b %d, %Y')}"
+    title = title[:255]
+
+    record = FolderFile(
+        folder_id=folder.id,
+        file_name=title,
+        file_type="txt",
+        size_bytes=content_bytes,
+        content=content,
+        content_hash=content_hash,
+        upload_status="ready",
+    )
+    session.add(record)
+    await session.flush()
+
+    try:
+        await UsageEventRepository(session).log_event(user.id, "file_upload", 0, success=True)
+    except Exception:
+        pass
+
+    await session.commit()
+    logger.info(
+        "Text note added to folder",
+        extra={"file_name": title, "folder_id": folder_id, "size_bytes": content_bytes},
+    )
+    return FolderFileResponse.model_validate(record)
+
+
 class ReindexResult(BaseModel):
     reindexed: int
     still_failed: int

@@ -22,17 +22,24 @@ class MockInterviewSession(Base, TimestampMixin):
     company: Mapped[str] = mapped_column(String(64), nullable=False)
     # JSON array of stage keys, e.g. ["stage1", "stage2", "stage3"]
     stages_config: Mapped[str] = mapped_column(Text, nullable=False, default='["stage1","stage2","stage3"]')
-    # pending | stage1 | stage2 | stage3 | complete
+    # Lifecycle (forward-only): pending, stage1_complete, stage2, stage2_complete,
+    # stage3, stage3_complete, complete. See routes/mock_interview.py STATUS_* constants.
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
 
-    # Stage 1 — OA results JSON: [{slug, title, difficulty, code, verdict, feedback}]
+    # Resume Screen (optional first stage): ATS evaluation result JSON.
+    resume_screen: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Stage 1 OA results JSON: [{slug, title, difficulty, code, verdict, feedback}]
     stage1_results: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    # Stage 2 — generated interviewer script JSON + user's code submission
+    # Stage 2 code submission JSON ({code, feedback}).
+    # stage2_script is legacy (the old pre-generated script flow) and is no longer
+    # written; the column is retained to avoid a destructive migration.
     stage2_script: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     stage2_submission: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    # Stage 3 — behavioral questions JSON + user's typed answers JSON
+    # Stage 3 conversational behavioral feedback JSON ({feedback}).
+    # stage3_script is legacy and no longer written (retained to avoid a migration).
     stage3_script: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     stage3_answers: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 

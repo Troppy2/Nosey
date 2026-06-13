@@ -25,11 +25,10 @@ import type {
   KojoRestoreResponse,
   MockInterviewSession,
   MockInterviewFinishResponse,
+  ResumeScreenResult,
   Stage1GradeResponse,
   Stage2MessageResponse,
-  Stage2ScriptResponse,
   Stage3MessageResponse,
-  Stage3ScriptResponse,
   ProviderStatus,
   QuestionCreate,
   QuestionEditable,
@@ -674,6 +673,17 @@ export async function uploadFolderFiles(folderId: number, files: File[]): Promis
   });
 }
 
+export async function addFolderTextNote(
+  folderId: number,
+  title: string,
+  content: string,
+): Promise<FolderFile> {
+  return request<FolderFile>(`/folders/${folderId}/files/text`, {
+    method: "POST",
+    body: JSON.stringify({ title: title || null, content }),
+  });
+}
+
 export async function deleteFolderFile(folderId: number, fileId: number): Promise<void> {
   await request(`/folders/${folderId}/files/${fileId}`, { method: "DELETE" });
 }
@@ -814,6 +824,21 @@ export async function listMockInterviewSessions(): Promise<MockInterviewSession[
   return request<MockInterviewSession[]>("/mock-interview");
 }
 
+export async function screenResume(
+  sessionId: number,
+  input: { file?: File | null; text?: string | null },
+  provider?: string,
+): Promise<ResumeScreenResult> {
+  const formData = new FormData();
+  if (input.file) formData.append("resume_file", input.file);
+  if (input.text && input.text.trim()) formData.append("resume_text", input.text);
+  if (provider) formData.append("provider", provider);
+  return request<ResumeScreenResult>(`/mock-interview/${sessionId}/resume/screen`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
 export type Stage1SubmissionItem = {
   slug: string;
   title: string;
@@ -822,6 +847,8 @@ export type Stage1SubmissionItem = {
   time_used_ms: number;
   test_results: string;
   all_passed: boolean;
+  tests_passed: number;
+  tests_total: number;
 };
 
 export async function gradeStage1(
@@ -835,57 +862,21 @@ export async function gradeStage1(
   });
 }
 
-export async function generateStage2Script(
-  sessionId: number,
-  provider?: string,
-): Promise<Stage2ScriptResponse> {
-  return request<Stage2ScriptResponse>(`/mock-interview/${sessionId}/stage2/script`, {
-    method: "POST",
-    body: JSON.stringify({ provider }),
-  });
-}
-
 export async function submitStage2(
   sessionId: number,
   code: string,
+  problemTitle: string,
+  problemSlug: string,
   provider?: string,
 ): Promise<{ feedback: string }> {
   return request<{ feedback: string }>(`/mock-interview/${sessionId}/stage2/submit`, {
     method: "POST",
-    body: JSON.stringify({ code, provider }),
-  });
-}
-
-export async function chatStage2(
-  sessionId: number,
-  message: string,
-  history: import("./types").Stage2ChatMessage[],
-  provider?: string,
-): Promise<import("./types").Stage2ChatResponse> {
-  return request(`/mock-interview/${sessionId}/stage2/chat`, {
-    method: "POST",
-    body: JSON.stringify({ message, history, provider }),
-  });
-}
-
-export async function generateStage3Script(
-  sessionId: number,
-  provider?: string,
-): Promise<Stage3ScriptResponse> {
-  return request<Stage3ScriptResponse>(`/mock-interview/${sessionId}/stage3/script`, {
-    method: "POST",
-    body: JSON.stringify({ provider }),
-  });
-}
-
-export async function submitStage3Answers(
-  sessionId: number,
-  answers: string[],
-  provider?: string,
-): Promise<{ feedback: string }> {
-  return request<{ feedback: string }>(`/mock-interview/${sessionId}/stage3/answers`, {
-    method: "POST",
-    body: JSON.stringify({ answers, provider }),
+    body: JSON.stringify({
+      code,
+      problem_title: problemTitle,
+      problem_slug: problemSlug,
+      provider,
+    }),
   });
 }
 

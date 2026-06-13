@@ -1,10 +1,37 @@
 import Editor from "@monaco-editor/react";
-import { AlertCircle, ChevronLeft, ChevronRight, Clock, Code2, ExternalLink, Flag, Loader2, PenLine } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Code2,
+  ExternalLink,
+  Flag,
+  Loader2,
+  LogOut,
+  PenLine,
+  Play,
+  XCircle,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { gradeStage1, type Stage1SubmissionItem } from "../lib/api";
-import { COMPANY_OPTIONS, pickProblems, type CompanyKey, type InterviewProblem } from "../data/mockInterviewProblems";
-import type { MockInterviewSession } from "../lib/types";
+import { fetchLeetCodeProblem, gradeStage1, type Stage1SubmissionItem } from "../lib/api";
+import { runPythonLeetCode, type RunnerResult } from "../lib/pyodideRunner";
+import { isLeetCodeRunnable, sanitizeLeetCodeHtml } from "../lib/leetcodeHtml";
+import {
+  loadMockProgress,
+  saveMockProgress,
+  type MockProgress,
+  type Stage1QuestionProgress,
+} from "../lib/mockInterview";
+import {
+  COMPANY_OPTIONS,
+  pickProblems,
+  type CompanyKey,
+  type InterviewProblem,
+} from "../data/mockInterviewProblems";
+import type { LeetCodeProblemData, MockInterviewSession } from "../lib/types";
 
 function questionTimeLimitMs(difficulty: string): number {
   if (difficulty === "Hard") return 40 * 60 * 1000;
@@ -26,95 +53,203 @@ function formatMsCompact(ms: number): string {
 }
 
 function benchmarkLabel(difficulty: string): string {
-  if (difficulty === "Hard") return "35–40 min";
-  if (difficulty === "Easy") return "10–15 min";
-  return "20–25 min";
+  if (difficulty === "Hard") return "35 to 40 min";
+  if (difficulty === "Easy") return "10 to 15 min";
+  return "20 to 25 min";
 }
 
-type QuestionState = {
-  problem: InterviewProblem;
-  code: string;
-  notes: string;
-  startedAt: number;
-  timeUsedMs: number;
-  isExpired: boolean;
-  skipped: boolean;
-};
+function freshQuestion(p: InterviewProblem): Stage1QuestionProgress {
+  return {
+    slug: p.slug,
+    title: p.title,
+    difficulty: p.difficulty,
+    topics: p.topics,
+    code: "",
+    notes: "",
+    timeUsedMs: 0,
+    startedAt: 0,
+    isExpired: false,
+    ranOnce: false,
+    lastTestsPassed: 0,
+    lastTestsTotal: 0,
+    lastAllPassed: false,
+  };
+}
 
 export default function MockInterviewStage1() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const numericSessionId = Number(sessionId);
   const navigate = useNavigate();
   const location = useLocation();
   const locationState = location.state as {
-    session: MockInterviewSession;
-    selectedStages: string[];
+    session?: MockInterviewSession;
+    selectedStages?: string[];
   } | null;
 
-  const session = locationState?.session;
-  const selectedStages = locationState?.selectedStages ?? ["stage1", "stage2", "stage3"];
-  const company = (session?.company ?? "random") as CompanyKey;
-  const companyLabel = COMPANY_OPTIONS.find((c) => c.key === company)?.label ?? company;
-
-  const [problems] = useState<InterviewProblem[]>(() => pickProblems(company, 3));
-  const [currentIdx, setCurrentIdx] = useState(0);
-  const [questionStates, setQuestionStates] = useState<QuestionState[]>(() =>
-    problems.map((p) => ({
-      problem: p,
-      code: `# ${p.title}\n# Write your solution here\n\n`,
-      notes: "",
-      startedAt: 0,
-      timeUsedMs: 0,
-      isExpired: false,
-      skipped: false,
-    }))
+  // Resolve identity from navigation state first, then from any saved progress.
+  const stored = useMemo<MockProgress | null>(
+    () => (Number.isFinite(numericSessionId) ? loadMockProgress(numericSessionId) : null),
+    [numericSessionId],
   );
+
+  const company = (locationState?.session?.company ?? stored?.company ?? "random") as CompanyKey;
+  const companyLabel = COMPANY_OPTIONS.find((c) => c.key === company)?.label ?? company;
+  const selectedStages = locationState?.selectedStages ?? stored?.selectedStages ?? [
+    "stage1",
+    "stage2",
+    "stage3",
+  ];
+
+  const missingContext = !locationState?.session && !stored;
+
+  // Problems are chosen once and then frozen in localStorage so a refresh never
+  // re-rolls the assessment.
+  const [problems] = useState<InterviewProblem[]>(
+    () => stored?.stage1?.problems ?? pickProblems(company, 3),
+  );
+
+  const [questions, setQuestions] = useState<Stage1QuestionProgress[]>(() => {
+    if (stored?.stage1?.questions?.length === problems.length) {
+      return stored.stage1.questions;
+    }
+    const initial = problems.map(freshQuestion);
+    if (initial[0]) initial[0].startedAt = Date.now();
+    return initial;
+  });
+  const [currentIdx, setCurrentIdx] = useState(() => stored?.stage1?.currentIdx ?? 0);
+
+  // Fetched LeetCode problem statements + runner results, keyed by slug.
+  const [problemData, setProblemData] = useState<Record<string, LeetCodeProblemData>>({});
+  const [problemLoading, setProblemLoading] = useState(false);
+  const [problemError, setProblemError] = useState<string | null>(null);
+  const [runnerResults, setRunnerResults] = useState<Record<string, RunnerResult>>({});
+  const [running, setRunning] = useState(false);
 
   const [now, setNow] = useState(Date.now());
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [finished, setFinished] = useState(false);
 
+  // If we landed here without any context, send the user back to setup.
   useEffect(() => {
-    tickRef.current = setInterval(() => setNow(Date.now()), 1000);
-    return () => { if (tickRef.current) clearInterval(tickRef.current); };
-  }, []);
+    if (missingContext) navigate("/mock-interview", { replace: true });
+  }, [missingContext, navigate]);
 
+  // Make sure the active question's clock is running after a resume.
   useEffect(() => {
-    setQuestionStates((prev) => {
+    setQuestions((prev) => {
+      const cur = prev[currentIdx];
+      if (!cur || cur.startedAt > 0 || cur.isExpired) return prev;
       const next = [...prev];
-      next[0] = { ...next[0], startedAt: Date.now() };
+      next[currentIdx] = { ...cur, startedAt: Date.now() };
       return next;
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const current = questionStates[currentIdx];
-  const limitMs = questionTimeLimitMs(current.problem.difficulty);
-  const elapsedMs = current.startedAt > 0
-    ? current.timeUsedMs + (now - current.startedAt)
-    : current.timeUsedMs;
+  useEffect(() => {
+    tickRef.current = setInterval(() => setNow(Date.now()), 1000);
+    return () => {
+      if (tickRef.current) clearInterval(tickRef.current);
+    };
+  }, []);
+
+  // Debounced persistence of the whole Stage 1 snapshot.
+  useEffect(() => {
+    if (missingContext) return;
+    if (persistTimer.current) clearTimeout(persistTimer.current);
+    persistTimer.current = setTimeout(() => {
+      const prev = loadMockProgress(numericSessionId);
+      const progress: MockProgress = {
+        ...(prev ?? {}),
+        sessionId: numericSessionId,
+        company,
+        selectedStages,
+        updatedAt: Date.now(),
+        stage1: {
+          problems,
+          questions,
+          currentIdx,
+          submitted: prev?.stage1?.submitted ?? false,
+          results: prev?.stage1?.results,
+        },
+      };
+      saveMockProgress(progress);
+    }, 500);
+    return () => {
+      if (persistTimer.current) clearTimeout(persistTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questions, currentIdx]);
+
+  // Load the current problem statement on demand.
+  const currentSlug = questions[currentIdx]?.slug;
+  useEffect(() => {
+    if (!currentSlug || problemData[currentSlug]) return;
+    let cancelled = false;
+    setProblemLoading(true);
+    setProblemError(null);
+    fetchLeetCodeProblem(currentSlug)
+      .then((data) => {
+        if (cancelled) return;
+        setProblemData((prev) => ({ ...prev, [currentSlug]: data }));
+        // Seed the editor with the official stub only if untouched.
+        setQuestions((prev) => {
+          const idx = prev.findIndex((q) => q.slug === currentSlug);
+          if (idx < 0) return prev;
+          if (prev[idx].code.trim() !== "") return prev;
+          const snippet = (data.python_snippet ?? "").trimEnd();
+          if (!snippet) return prev;
+          const next = [...prev];
+          next[idx] = { ...next[idx], code: `${snippet}\n` };
+          return next;
+        });
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        setProblemError(e instanceof Error ? e.message : "Could not load this problem.");
+      })
+      .finally(() => {
+        if (!cancelled) setProblemLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSlug]);
+
+  const current = questions[currentIdx];
+  const curData = current ? problemData[current.slug] : undefined;
+  const curRunnable = isLeetCodeRunnable(curData);
+  const limitMs = current ? questionTimeLimitMs(current.difficulty) : 0;
+  const elapsedMs = current
+    ? current.startedAt > 0
+      ? current.timeUsedMs + (now - current.startedAt)
+      : current.timeUsedMs
+    : 0;
   const remainingMs = Math.max(0, limitMs - elapsedMs);
-  const timePct = Math.max(0, Math.min(100, (remainingMs / limitMs) * 100));
+  const timePct = limitMs > 0 ? Math.max(0, Math.min(100, (remainingMs / limitMs) * 100)) : 0;
   const isWarning = remainingMs < 5 * 60 * 1000 && remainingMs > 0;
   const isExpiredNow = remainingMs === 0;
-
   const barColor = timePct > 40 ? "var(--green-dark)" : timePct > 20 ? "#f59e0b" : "#ef4444";
 
   useEffect(() => {
-    if (isExpiredNow && !current.isExpired) {
-      setQuestionStates((prev) => {
+    if (isExpiredNow && current && !current.isExpired) {
+      setQuestions((prev) => {
         const next = [...prev];
-        next[currentIdx] = { ...next[currentIdx], isExpired: true };
+        next[currentIdx] = { ...next[currentIdx], isExpired: true, startedAt: 0, timeUsedMs: limitMs };
         return next;
       });
     }
-  }, [isExpiredNow, current.isExpired, currentIdx]);
+  }, [isExpiredNow, current, currentIdx, limitMs]);
 
-  function saveCurrentCodeAndTime() {
-    setQuestionStates((prev) => {
+  function saveCurrentTime() {
+    setQuestions((prev) => {
       const next = [...prev];
       const q = next[currentIdx];
+      if (!q) return prev;
       const addedMs = q.startedAt > 0 ? Date.now() - q.startedAt : 0;
       next[currentIdx] = { ...q, timeUsedMs: q.timeUsedMs + addedMs, startedAt: 0 };
       return next;
@@ -122,18 +257,19 @@ export default function MockInterviewStage1() {
   }
 
   function goToQuestion(idx: number) {
-    if (idx === currentIdx) return;
-    saveCurrentCodeAndTime();
+    if (idx === currentIdx || idx < 0 || idx >= questions.length) return;
+    saveCurrentTime();
     setCurrentIdx(idx);
-    setQuestionStates((prev) => {
+    setQuestions((prev) => {
       const next = [...prev];
-      next[idx] = { ...next[idx], startedAt: Date.now() };
+      const q = next[idx];
+      if (q && !q.isExpired && q.startedAt === 0) next[idx] = { ...q, startedAt: Date.now() };
       return next;
     });
   }
 
   function handleCodeChange(val: string | undefined) {
-    setQuestionStates((prev) => {
+    setQuestions((prev) => {
       const next = [...prev];
       next[currentIdx] = { ...next[currentIdx], code: val ?? "" };
       return next;
@@ -141,31 +277,102 @@ export default function MockInterviewStage1() {
   }
 
   function handleNotesChange(val: string) {
-    setQuestionStates((prev) => {
+    setQuestions((prev) => {
       const next = [...prev];
       next[currentIdx] = { ...next[currentIdx], notes: val };
       return next;
     });
   }
 
+  async function handleRun() {
+    if (!current || !curData || !curRunnable || running) return;
+    const cases = curData.examples.map((ex) => ({
+      label: `Example ${ex.index}`,
+      inputText: ex.input_text,
+      expectedOutput: ex.output_text,
+    }));
+    setRunning(true);
+    try {
+      const result = await runPythonLeetCode(current.code, cases);
+      setRunnerResults((prev) => ({ ...prev, [current.slug]: result }));
+      const passed = result.cases?.filter((c) => c.passed).length ?? 0;
+      const total = result.cases?.length ?? 0;
+      setQuestions((prev) => {
+        const next = [...prev];
+        next[currentIdx] = {
+          ...next[currentIdx],
+          ranOnce: true,
+          lastTestsPassed: passed,
+          lastTestsTotal: total,
+          lastAllPassed: result.ok && total > 0,
+        };
+        return next;
+      });
+    } catch (e: unknown) {
+      setRunnerResults((prev) => ({
+        ...prev,
+        [current.slug]: {
+          ok: false,
+          output: "",
+          error: e instanceof Error ? e.message : "Run failed.",
+        },
+      }));
+    } finally {
+      setRunning(false);
+    }
+  }
+
   async function handleSubmitAll() {
-    saveCurrentCodeAndTime();
+    saveCurrentTime();
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const subs: Stage1SubmissionItem[] = questionStates.map((qs) => ({
-        slug: qs.problem.slug,
-        title: qs.problem.title,
-        difficulty: qs.problem.difficulty,
-        code: qs.code,
-        time_used_ms: qs.timeUsedMs + (qs.startedAt > 0 ? Date.now() - qs.startedAt : 0),
-        test_results: "[]",
-        all_passed: false,
-      }));
-      const response = await gradeStage1(Number(sessionId), subs);
+      const subs: Stage1SubmissionItem[] = questions.map((qs) => {
+        const result = runnerResults[qs.slug];
+        const testResults = result?.cases?.length
+          ? JSON.stringify(
+              result.cases.map((c) => ({
+                label: c.label,
+                passed: c.passed,
+                actual: c.actual,
+                expected: c.expected,
+              })),
+            )
+          : "[]";
+        return {
+          slug: qs.slug,
+          title: qs.title,
+          difficulty: qs.difficulty,
+          code: qs.code,
+          time_used_ms: qs.timeUsedMs + (qs.startedAt > 0 ? Date.now() - qs.startedAt : 0),
+          test_results: testResults,
+          all_passed: qs.lastAllPassed,
+          tests_passed: qs.lastTestsPassed,
+          tests_total: qs.lastTestsTotal,
+        };
+      });
+      const response = await gradeStage1(numericSessionId, subs);
+
+      // Persist the graded results so the results page survives a refresh.
+      const prev = loadMockProgress(numericSessionId);
+      saveMockProgress({
+        ...(prev ?? { sessionId: numericSessionId, company, selectedStages, updatedAt: Date.now() }),
+        sessionId: numericSessionId,
+        company,
+        selectedStages,
+        updatedAt: Date.now(),
+        stage1: {
+          problems,
+          questions,
+          currentIdx,
+          submitted: true,
+          results: response.results,
+        },
+      });
+
       setFinished(true);
       navigate(`/mock-interview/${sessionId}/stage1-results`, {
-        state: { gradeResponse: response, session, selectedStages, problems },
+        state: { gradeResponse: response, session: locationState?.session, selectedStages, problems },
       });
     } catch (e: unknown) {
       setSubmitError(e instanceof Error ? e.message : "Grading failed. Try again.");
@@ -173,110 +380,132 @@ export default function MockInterviewStage1() {
     }
   }
 
-  const attemptedCount = questionStates.filter(
-    (qs) => qs.code.trim().length > 50 || qs.skipped || qs.isExpired
+  const attemptedCount = questions.filter(
+    (qs) => qs.ranOnce || qs.code.trim().length > 60 || qs.isExpired,
   ).length;
+
+  if (missingContext || !current) {
+    return (
+      <div className="mock-loading" style={{ height: "100vh" }}>
+        <Loader2 size={20} className="spin" style={{ color: "var(--green-dark)" }} />
+        <p className="muted">Loading your assessment…</p>
+      </div>
+    );
+  }
+
+  const curResult = runnerResults[current.slug];
+  const curPassed = curResult?.cases?.filter((c) => c.passed).length ?? 0;
+  const curTotal = curResult?.cases?.length ?? 0;
 
   return (
     <div className="mock-stage1-layout">
-      {/* ── Topbar ── */}
+      {/* Topbar */}
       <div className="mock-stage1-topbar">
         <div className="mock-stage1-topbar-left">
           <div className="mock-stage1-company-badge">
             <Code2 size={11} />
             {companyLabel}
           </div>
-          <span className="mock-stage1-stage-label">Stage 1 , OA</span>
+          <span className="mock-stage1-stage-label">Stage 1: Online Assessment</span>
         </div>
 
         <div className="mock-stage1-question-tabs">
-          {questionStates.map((qs, i) => {
-            const attempted = qs.code.trim().length > 50 || qs.skipped;
+          {questions.map((qs, i) => {
+            const attempted = qs.ranOnce || qs.code.trim().length > 60;
             return (
               <button
-                key={i}
+                key={qs.slug}
                 className={[
                   "mock-q-tab",
                   i === currentIdx ? "active" : "",
                   qs.isExpired ? "expired" : "",
                   attempted ? "attempted" : "",
-                ].filter(Boolean).join(" ")}
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
                 onClick={() => goToQuestion(i)}
-                title={qs.problem.title}
+                title={qs.title}
               >
                 <span className="mock-q-tab-dot" />
                 Q{i + 1}
-                <span className={`pill mock-diff-${qs.problem.difficulty.toLowerCase()}`} style={{ fontSize: "0.68rem", padding: "1px 5px" }}>
-                  {qs.problem.difficulty[0]}
+                <span
+                  className={`pill mock-diff-${qs.difficulty.toLowerCase()}`}
+                  style={{ fontSize: "0.68rem", padding: "1px 5px" }}
+                >
+                  {qs.difficulty[0]}
                 </span>
               </button>
             );
           })}
         </div>
 
-        <div className={`mock-stage1-timer${isWarning ? " warning" : ""}${isExpiredNow ? " expired" : ""}`}>
+        <div
+          className={`mock-stage1-timer${isWarning ? " warning" : ""}${isExpiredNow ? " expired" : ""}`}
+        >
           <Clock size={13} />
           {isExpiredNow ? "Time's up" : formatMs(remainingMs)}
         </div>
       </div>
 
-      {/* ── Main split ── */}
+      {/* Main split */}
       <div className="mock-stage1-body">
         {/* Left: problem panel */}
         <div className="mock-stage1-problem-panel">
-
-          {/* Header: problem number + title + chips */}
           <div className="mock-stage1-problem-header">
             <span className="mock-stage1-prob-num">
-              Problem {currentIdx + 1} of {questionStates.length}
+              Problem {currentIdx + 1} of {questions.length}
             </span>
-            <h2 className="mock-stage1-problem-title">{current.problem.title}</h2>
+            <h2 className="mock-stage1-problem-title">{current.title}</h2>
             <div className="mock-stage1-problem-meta">
-              <span className={`pill mock-diff-${current.problem.difficulty.toLowerCase()}`}>
-                {current.problem.difficulty}
+              <span className={`pill mock-diff-${current.difficulty.toLowerCase()}`}>
+                {current.difficulty}
               </span>
-              {current.problem.topics.map((t) => (
-                <span key={t} className="pill">{t}</span>
+              {current.topics.map((t) => (
+                <span key={t} className="pill">
+                  {t}
+                </span>
               ))}
             </div>
           </div>
 
-          {/* Expired banner */}
           {current.isExpired && (
             <div className="mock-stage1-panel-section" style={{ paddingBottom: 10 }}>
               <div className="mock-stage1-expired-banner">
                 <AlertCircle size={14} />
-                Time expired , submit what you have or move on.
+                Time expired. Submit what you have or move on.
               </div>
             </div>
           )}
 
-          {/* Description section */}
+          {/* Problem statement, rendered in-app */}
           <div className="mock-stage1-panel-section">
-            <span className="mock-stage1-section-label">Description</span>
-            <div className="mock-stage1-lc-card">
-              <span className="mock-stage1-lc-card-text">
-                Read the full problem on LeetCode, then solve it here.
-              </span>
+            <div className="mock-stage1-section-label-row">
+              <span className="mock-stage1-section-label">Problem</span>
               <a
-                href={`https://leetcode.com/problems/${current.problem.slug}/`}
+                href={`https://leetcode.com/problems/${current.slug}/`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mock-stage1-lc-link"
               >
-                Open <ExternalLink size={10} />
+                LeetCode <ExternalLink size={10} />
               </a>
             </div>
-          </div>
-
-          {/* Topics */}
-          <div className="mock-stage1-panel-section">
-            <span className="mock-stage1-section-label">Topics</span>
-            <div className="mock-stage1-topics-chips">
-              {current.problem.topics.map((t) => (
-                <span key={t} className="pill">{t}</span>
-              ))}
-            </div>
+            {problemLoading && (
+              <div className="mock-stage1-statement-loading">
+                <Loader2 size={15} className="spin" /> Loading problem…
+              </div>
+            )}
+            {problemError && (
+              <div className="mock-stage1-statement-error">
+                <AlertCircle size={14} /> {problemError}
+              </div>
+            )}
+            {curData && (
+              <div
+                className="mock-stage1-statement"
+                dangerouslySetInnerHTML={{ __html: sanitizeLeetCodeHtml(curData.content_html) }}
+              />
+            )}
           </div>
 
           {/* Time budget */}
@@ -287,13 +516,13 @@ export default function MockInterviewStage1() {
             <div className="mock-stage1-time-budget">
               <div className="mock-stage1-time-budget-row">
                 <span
-                  className={`mock-stage1-time-budget-remaining${isWarning ? " warning" : ""}${isExpiredNow ? " expired" : ""}`}
+                  className={`mock-stage1-time-budget-remaining${isWarning ? " warning" : ""}${
+                    isExpiredNow ? " expired" : ""
+                  }`}
                 >
                   {isExpiredNow ? "Expired" : formatMs(remainingMs)}
                 </span>
-                <span className="mock-stage1-time-budget-limit">
-                  of {formatMsCompact(limitMs)}
-                </span>
+                <span className="mock-stage1-time-budget-limit">of {formatMsCompact(limitMs)}</span>
               </div>
               <div className="mock-stage1-time-bar-track">
                 <div
@@ -303,7 +532,7 @@ export default function MockInterviewStage1() {
               </div>
               <div className="mock-stage1-benchmark-row">
                 <Clock size={10} />
-                Target: {benchmarkLabel(current.problem.difficulty)}
+                Target: {benchmarkLabel(current.difficulty)}
               </div>
             </div>
           </div>
@@ -323,14 +552,22 @@ export default function MockInterviewStage1() {
           </div>
         </div>
 
-        {/* Right: Monaco editor */}
+        {/* Right: editor + run console */}
         <div className="mock-stage1-editor-panel">
           <div className="mock-stage1-editor-header">
             <span className="mock-stage1-editor-lang">
               <span className="mock-stage1-editor-lang-dot" />
               Python 3
             </span>
-            <span className="mock-stage1-editor-hint">Shift+Enter for new line</span>
+            <button
+              className="mock-stage1-run-btn"
+              onClick={handleRun}
+              disabled={running || !curRunnable || !current.code.trim()}
+              title={curRunnable ? "Run against the sample cases" : "This problem cannot be run in-app"}
+            >
+              {running ? <Loader2 size={13} className="spin" /> : <Play size={13} />}
+              {running ? "Running…" : "Run"}
+            </button>
           </div>
           <div className="mock-stage1-editor-wrap">
             <Editor
@@ -353,44 +590,95 @@ export default function MockInterviewStage1() {
               }}
             />
           </div>
+
+          {/* Run console */}
+          {!curRunnable && curData && (
+            <div className="mock-stage1-console mock-stage1-console--note">
+              This problem has no auto-runnable harness. Write your solution and submit; it will be
+              reviewed without sample execution.
+            </div>
+          )}
+          {curResult && (
+            <div className="mock-stage1-console">
+              {curResult.error ? (
+                <div className="mock-stage1-console-error">
+                  <AlertCircle size={13} /> {curResult.error}
+                </div>
+              ) : (
+                <>
+                  <div className="mock-stage1-console-summary">
+                    {curResult.ok ? (
+                      <span className="mock-stage1-console-pass">
+                        <CheckCircle2 size={14} /> Passed {curPassed}/{curTotal} sample cases
+                      </span>
+                    ) : (
+                      <span className="mock-stage1-console-fail">
+                        <XCircle size={14} /> Passed {curPassed}/{curTotal} sample cases
+                      </span>
+                    )}
+                  </div>
+                  {curResult.cases?.some((c) => !c.passed) && (
+                    <details className="mock-stage1-console-details">
+                      <summary>View failing cases</summary>
+                      {curResult.cases
+                        .filter((c) => !c.passed)
+                        .map((c, i) => (
+                          <div key={i} className="mock-stage1-console-case">
+                            <span className="mock-stage1-console-case-label">{c.label}</span>
+                            <div>
+                              <span className="muted small">Expected:</span> <code>{c.expected}</code>
+                            </div>
+                            <div>
+                              <span className="muted small">Got:</span> <code>{c.actual}</code>
+                            </div>
+                          </div>
+                        ))}
+                    </details>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ── Bottom bar ── */}
+      {/* Bottom bar */}
       <div className="mock-stage1-bottombar">
-        {/* Prev / Next */}
         <button
           className="button button-ghost"
           style={{ padding: "6px 10px" }}
-          onClick={() => goToQuestion(Math.max(0, currentIdx - 1))}
+          onClick={() => goToQuestion(currentIdx - 1)}
           disabled={currentIdx === 0}
+          title="Previous problem"
         >
           <ChevronLeft size={15} />
         </button>
         <button
           className="button button-ghost"
           style={{ padding: "6px 10px" }}
-          onClick={() => goToQuestion(Math.min(questionStates.length - 1, currentIdx + 1))}
-          disabled={currentIdx === questionStates.length - 1}
+          onClick={() => goToQuestion(currentIdx + 1)}
+          disabled={currentIdx === questions.length - 1}
+          title="Next problem"
         >
           <ChevronRight size={15} />
         </button>
 
-        {/* Question chips */}
         <div className="mock-stage1-q-status-row">
-          {questionStates.map((qs, i) => {
-            const attempted = qs.code.trim().length > 50 || qs.skipped;
+          {questions.map((qs, i) => {
+            const attempted = qs.ranOnce || qs.code.trim().length > 60;
             return (
               <button
-                key={i}
+                key={qs.slug}
                 className={[
                   "mock-stage1-q-chip",
                   i === currentIdx ? "active" : "",
                   qs.isExpired ? "expired" : "",
                   attempted && !qs.isExpired ? "attempted" : "",
-                ].filter(Boolean).join(" ")}
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
                 onClick={() => goToQuestion(i)}
-                title={qs.problem.title}
+                title={qs.title}
               >
                 <span className="mock-stage1-q-chip-dot" />
                 Q{i + 1}
@@ -400,7 +688,7 @@ export default function MockInterviewStage1() {
         </div>
 
         <span className="mock-stage1-q-progress">
-          {attemptedCount}/{questionStates.length} attempted
+          {attemptedCount}/{questions.length} attempted
         </span>
 
         <div style={{ flex: 1 }} />
@@ -412,15 +700,28 @@ export default function MockInterviewStage1() {
         )}
 
         <button
+          className="button button-ghost"
+          style={{ padding: "8px 14px" }}
+          onClick={() => navigate("/mock-interview")}
+          disabled={submitting}
+          title="Quit (your progress is saved)"
+        >
+          <LogOut size={13} /> Quit
+        </button>
+        <button
           className="button button-primary"
           style={{ padding: "8px 20px" }}
           onClick={handleSubmitAll}
           disabled={submitting || finished}
         >
           {submitting ? (
-            <><Loader2 size={14} className="spin" /> Grading…</>
+            <>
+              <Loader2 size={14} className="spin" /> Grading…
+            </>
           ) : (
-            <><Flag size={13} /> Submit All</>
+            <>
+              <Flag size={13} /> Submit All
+            </>
           )}
         </button>
       </div>

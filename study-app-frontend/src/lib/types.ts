@@ -449,12 +449,25 @@ export type MockInterviewSession = {
   company: string;
   stages_config: string;
   status: string;
+  resume_screen?: string | null;
   stage1_results?: string | null;
   stage2_script?: string | null;
   stage2_submission?: string | null;
   stage3_script?: string | null;
   stage3_answers?: string | null;
   overall_feedback?: string | null;
+};
+
+export type ResumeScreenResult = {
+  ats_score: number;
+  passes_oa: boolean;
+  verdict: string;
+  matched_keywords: string[];
+  missing_keywords: string[];
+  strengths: string[];
+  gaps: string[];
+  fixes: string[];
+  summary: string;
 };
 
 export type Stage1QuestionResult = {
@@ -469,28 +482,6 @@ export type Stage1QuestionResult = {
 
 export type Stage1GradeResponse = {
   results: Stage1QuestionResult[];
-};
-
-export type Stage2ScriptLine = {
-  speaker: "interviewer" | "prompt";
-  text: string;
-  is_coding_prompt: boolean;
-};
-
-export type Stage2ScriptResponse = {
-  script_lines: Stage2ScriptLine[];
-  coding_slug?: string | null;
-  coding_title?: string | null;
-  coding_difficulty?: string | null;
-};
-
-export type Stage2ChatMessage = {
-  role: "user" | "interviewer";
-  text: string;
-};
-
-export type Stage2ChatResponse = {
-  reply: string;
 };
 
 // Conversational interview types
@@ -517,19 +508,9 @@ export type Stage3MessageResponse = {
   is_done: boolean;
 };
 
-export type Stage3Question = {
-  index: number;
-  question: string;
-  follow_up?: string | null;
-};
-
-export type Stage3ScriptResponse = {
-  questions: Stage3Question[];
-  opening: string;
-};
-
 export type MockInterviewFinishResponse = {
   overall_feedback: string;
+  resume_verdict?: string | null;
   stage1_verdict?: string | null;
   stage2_verdict?: string | null;
   stage3_verdict?: string | null;

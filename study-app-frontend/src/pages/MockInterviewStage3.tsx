@@ -1,27 +1,33 @@
-import { AlertCircle, ChevronRight, Loader2, MessageSquare, Send } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { AlertCircle, ChevronRight, Loader2, LogOut, MessageSquare, Send } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { sendStage3Message } from "../lib/api";
 import type { InterviewChatMessage, MockInterviewSession } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
+import { loadMockProgress, saveMockProgress, type MockProgress } from "../lib/mockInterview";
 
 export default function MockInterviewStage3() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const numericSessionId = Number(sessionId);
   const navigate = useNavigate();
   const location = useLocation();
-  const state = location.state as { session: MockInterviewSession; selectedStages: string[] } | null;
+  const state = location.state as { session?: MockInterviewSession; selectedStages?: string[] } | null;
 
-  const session = state?.session;
-  const selectedStages = state?.selectedStages ?? ["stage3"];
-  const company = (session?.company ?? "random") as CompanyKey;
+  const stored = useMemo<MockProgress | null>(
+    () => (Number.isFinite(numericSessionId) ? loadMockProgress(numericSessionId) : null),
+    [numericSessionId],
+  );
+
+  const company = (state?.session?.company ?? stored?.company ?? "random") as CompanyKey;
   const companyLabel = COMPANY_OPTIONS.find((c) => c.key === company)?.label ?? company;
+  const selectedStages = state?.selectedStages ?? stored?.selectedStages ?? ["stage3"];
 
-  const [messages, setMessages] = useState<InterviewChatMessage[]>([]);
+  const [messages, setMessages] = useState<InterviewChatMessage[]>(() => stored?.stage3?.messages ?? []);
   const [input, setInput] = useState("");
-  const [initializing, setInitializing] = useState(true);
+  const [initializing, setInitializing] = useState(() => (stored?.stage3?.messages?.length ?? 0) === 0);
   const [sending, setSending] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
-  const [isDone, setIsDone] = useState(false);
+  const [isDone, setIsDone] = useState(() => stored?.stage3?.isDone ?? false);
 
   const threadRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -32,23 +38,47 @@ export default function MockInterviewStage3() {
     }, 50);
   }
 
-  // Start interview
   useEffect(() => {
-    async function init() {
+    if (!Number.isFinite(numericSessionId)) return;
+    const prev = loadMockProgress(numericSessionId);
+    const progress: MockProgress = {
+      ...(prev ?? { sessionId: numericSessionId, company, selectedStages, updatedAt: Date.now() }),
+      sessionId: numericSessionId,
+      company,
+      selectedStages,
+      updatedAt: Date.now(),
+      stage3: { messages, isDone },
+    };
+    saveMockProgress(progress);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, isDone]);
+
+  useEffect(() => {
+    if (!initializing) {
+      scrollToBottom();
+      return;
+    }
+    let cancelled = false;
+    (async () => {
       try {
-        const res = await sendStage3Message(Number(sessionId), null, []);
+        const res = await sendStage3Message(numericSessionId, null, []);
+        if (cancelled) return;
         setMessages([{ role: "interviewer", content: res.reply }]);
         if (res.is_done) setIsDone(true);
       } catch (e: unknown) {
-        setInitError(e instanceof Error ? e.message : "Failed to start interview.");
+        if (!cancelled) setInitError(e instanceof Error ? e.message : "Failed to start interview.");
       } finally {
-        setInitializing(false);
-        scrollToBottom();
+        if (!cancelled) {
+          setInitializing(false);
+          scrollToBottom();
+        }
       }
-    }
-    init();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [numericSessionId]);
 
   async function handleSend() {
     const text = input.trim();
@@ -62,16 +92,14 @@ export default function MockInterviewStage3() {
     scrollToBottom();
 
     try {
-      const res = await sendStage3Message(Number(sessionId), text, messages);
-      const aiMsg: InterviewChatMessage = { role: "interviewer", content: res.reply };
-      setMessages([...nextHistory, aiMsg]);
+      const res = await sendStage3Message(numericSessionId, text, messages);
+      setMessages([...nextHistory, { role: "interviewer", content: res.reply }]);
       if (res.is_done) setIsDone(true);
     } catch {
-      const errMsg: InterviewChatMessage = {
-        role: "interviewer",
-        content: "(Connection error. Please try again.)",
-      };
-      setMessages([...nextHistory, errMsg]);
+      setMessages([
+        ...nextHistory,
+        { role: "interviewer", content: "(Connection error. Please try again.)" },
+      ]);
     } finally {
       setSending(false);
       scrollToBottom();
@@ -89,7 +117,10 @@ export default function MockInterviewStage3() {
   if (initializing) {
     return (
       <div className="mock-loading" style={{ height: "100vh" }}>
-        <div className="mock-interviewer-avatar" style={{ width: 52, height: 52, fontSize: "0.9rem" }}>
+        <div
+          className="mock-interviewer-avatar"
+          style={{ width: 52, height: 52, fontSize: "0.9rem" }}
+        >
           <MessageSquare size={18} />
         </div>
         <p className="muted">Preparing your behavioral interview…</p>
@@ -104,9 +135,20 @@ export default function MockInterviewStage3() {
         <div className="card mock-error-card">
           <AlertCircle size={20} style={{ color: "var(--error)" }} />
           <p>{initError}</p>
-          <button className="button button-ghost" onClick={() => navigate("/mock-interview")}>
-            Back to Setup
-          </button>
+          <div className="button-row" style={{ marginTop: 8 }}>
+            <button className="button button-ghost" onClick={() => navigate("/mock-interview")}>
+              Back to Setup
+            </button>
+            <button
+              className="button button-primary"
+              onClick={() => {
+                setInitError(null);
+                setInitializing(true);
+              }}
+            >
+              Retry
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -114,34 +156,45 @@ export default function MockInterviewStage3() {
 
   return (
     <div className="page page-narrow">
-      {/* Header */}
       <div className="page-header" style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div className="mock-interviewer-avatar">BQ</div>
           <div>
             <div className="mock-interviewer-name">{companyLabel} Interviewer</div>
-            <div className="mock-stage-breadcrumb">Stage 3 , Behavioral Interview</div>
+            <div className="mock-stage-breadcrumb">Stage 3: Behavioral Interview</div>
           </div>
         </div>
-        {isDone && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button
-            className="button button-primary"
-            onClick={() =>
-              navigate(`/mock-interview/${sessionId}/summary`, { state: { session, selectedStages } })
-            }
+            className="button button-ghost"
+            onClick={() => navigate("/mock-interview")}
+            title="Quit (your progress is saved)"
           >
-            View Summary <ChevronRight size={14} />
+            <LogOut size={14} /> Quit
           </button>
-        )}
+          {isDone && (
+            <button
+              className="button button-primary"
+              onClick={() =>
+                navigate(`/mock-interview/${sessionId}/summary`, {
+                  state: { session: state?.session, selectedStages },
+                })
+              }
+            >
+              View Summary <ChevronRight size={14} />
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Chat window */}
       <div className="mock-stage3-chat-wrap">
         <div className="mock-stage3-chat-thread" ref={threadRef}>
           {messages.map((msg, i) => (
             <div
               key={i}
-              className={`mock-chat-msg ${msg.role === "interviewer" ? "mock-chat-msg--interviewer" : "mock-chat-msg--user"}`}
+              className={`mock-chat-msg ${
+                msg.role === "interviewer" ? "mock-chat-msg--interviewer" : "mock-chat-msg--user"
+              }`}
             >
               <span className="mock-chat-msg-role">
                 {msg.role === "interviewer" ? `${companyLabel} Interviewer` : "You"}
@@ -174,7 +227,7 @@ export default function MockInterviewStage3() {
             <textarea
               ref={inputRef}
               className="kojo-input"
-              placeholder="Type your answer… (Enter to send, Shift+Enter for newline)"
+              placeholder="Type your answer (Enter to send, Shift+Enter for newline)"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -194,15 +247,18 @@ export default function MockInterviewStage3() {
         )}
       </div>
 
-      {/* STAR hint */}
       {!isDone && (
-        <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <div
+          style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
+        >
           <span className="mock-star-hint-label">STAR:</span>
           <span className="mock-star-chip mock-star-chip-s">Situation</span>
           <span className="mock-star-chip mock-star-chip-t">Task</span>
           <span className="mock-star-chip mock-star-chip-a">Action</span>
           <span className="mock-star-chip mock-star-chip-r">Result</span>
-          <span className="mock-star-hint-label" style={{ marginLeft: 4 }}>, Speak it out loud first, then type.</span>
+          <span className="mock-star-hint-label" style={{ marginLeft: 4 }}>
+            Speak it out loud first, then type.
+          </span>
         </div>
       )}
     </div>

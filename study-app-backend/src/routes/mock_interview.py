@@ -4,7 +4,7 @@ import asyncio
 import json
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,31 +19,35 @@ from src.schemas.mock_interview_schema import (
     InterviewChatMessage,
     MockInterviewCreateRequest,
     MockInterviewSessionResponse,
+    ResumeScreenResult,
     Stage1GradeRequest,
     Stage1GradeResponse,
     Stage1QuestionResult,
-    Stage2ChatRequest,
-    Stage2ChatResponse,
     Stage2MessageRequest,
     Stage2MessageResponse,
-    Stage2ScriptLine,
-    Stage2ScriptRequest,
-    Stage2ScriptResponse,
     Stage2SubmitRequest,
     Stage2SubmitResponse,
-    Stage3AnswersRequest,
-    Stage3AnswersResponse,
     Stage3MessageRequest,
     Stage3MessageResponse,
-    Stage3Question,
-    Stage3ScriptRequest,
-    Stage3ScriptResponse,
 )
+from src.services.file_service import FileService
 from src.services.leetcode_service import LeetCodeService
 from src.services.llm_service import LLMService
-from src.utils.exceptions import LLMException, ResourceNotFoundException
+from src.utils.exceptions import LLMException, ValidationException
 
 router = APIRouter(prefix="/mock-interview", tags=["mock-interview"])
+
+# Canonical session lifecycle. A session moves forward only; the frontend
+# resumes from its own localStorage snapshot, while these values let the
+# summary endpoint know which stages produced gradable artifacts.
+STATUS_PENDING = "pending"
+STATUS_RESUME_COMPLETE = "resume_complete"
+STATUS_STAGE1_COMPLETE = "stage1_complete"
+STATUS_STAGE2 = "stage2"
+STATUS_STAGE2_COMPLETE = "stage2_complete"
+STATUS_STAGE3 = "stage3"
+STATUS_STAGE3_COMPLETE = "stage3_complete"
+STATUS_COMPLETE = "complete"
 
 _COMPANY_LABELS = {
     "google": "Google",
@@ -92,15 +96,15 @@ async def create_session(
     db: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> MockInterviewSessionResponse:
-    stages = [s for s in body.stages if s in ("stage1", "stage2", "stage3")]
+    stages = [s for s in body.stages if s in ("resume", "stage1", "stage2", "stage3")]
     if not stages:
-        stages = ["stage1", "stage2", "stage3"]
+        stages = ["resume", "stage1", "stage2", "stage3"]
 
     session = MockInterviewSession(
         user_id=user.id,
         company=body.company.lower(),
         stages_config=json.dumps(stages),
-        status="pending",
+        status=STATUS_PENDING,
     )
     db.add(session)
     await db.commit()
@@ -120,6 +124,133 @@ async def get_session_route(
     return _to_response(row)
 
 
+# ── Resume Screen: simulated ATS evaluation ───────────────────────────────────
+
+_COMPANY_ROLE_FOCUS = {
+    "google": "algorithmic depth, systems thinking, scalable distributed systems, and strong CS fundamentals",
+    "meta": "fast execution, product impact, large-scale systems, and ownership",
+    "amazon": "scalability, operational excellence, ownership, and customer-facing impact (Leadership Principles)",
+    "apple": "craftsmanship, low-level/performance work, attention to detail, and cross-functional polish",
+    "microsoft": "collaboration, breadth across the stack, customer empathy, and growth mindset",
+    "netflix": "senior-level autonomy, high-impact systems, and strong judgment",
+}
+
+
+def _resume_verdict_label(score: int, passes: bool) -> str:
+    if passes and score >= 80:
+        return "Strong resume, very likely to pass the screen"
+    if passes:
+        return "Solid resume, likely to land an OA"
+    if score >= 50:
+        return "Borderline, may be filtered by ATS"
+    return "Below the bar, unlikely to pass the screen as-is"
+
+
+@router.post("/{session_id}/resume/screen", response_model=ResumeScreenResult)
+async def screen_resume(
+    session_id: int,
+    resume_file: Optional[UploadFile] = File(default=None),
+    resume_text: Optional[str] = Form(default=None),
+    provider: Optional[str] = Form(default=None),
+    db: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> ResumeScreenResult:
+    row = await _load_session(session_id, user, db)
+    company_label = _COMPANY_LABELS.get(row.company, row.company.title())
+    role_focus = _COMPANY_ROLE_FOCUS.get(row.company, "strong CS fundamentals and engineering impact")
+
+    # Resume text comes either from an uploaded file (PDF/DOCX/...) or pasted
+    # text/LaTeX. Files take priority when both are present.
+    text = ""
+    if resume_file is not None and resume_file.filename:
+        try:
+            text, _ = await FileService().extract_from_file(resume_file)
+        except ValidationException as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Could not read the resume file: {exc}") from exc
+    elif resume_text:
+        text = resume_text
+
+    text = (text or "").strip()
+    if len(text) < 40:
+        raise HTTPException(
+            status_code=400,
+            detail="Please provide a resume: upload a PDF/DOCX or paste your resume text or LaTeX.",
+        )
+
+    # Keep the prompt bounded; resumes are short, but guard against huge pastes.
+    text = text[:12000]
+
+    prompt = (
+        "You are an Applicant Tracking System (ATS) combined with a technical recruiter doing the "
+        f"first resume screen for a software engineering role at {company_label}. "
+        f"This company weighs: {role_focus}.\n\n"
+        "Evaluate the resume below the way an ATS plus a recruiter would: keyword and skills match for "
+        "the role, parse-ability and formatting, relevance and depth of experience, signal of impact "
+        "(metrics, scope), and overall whether this candidate would clear the screen and be sent an "
+        "Online Assessment (OA).\n\n"
+        "RESPOND WITH ONLY RAW JSON, no markdown fences, no extra text, in exactly this shape:\n"
+        "{\n"
+        '  "ats_score": 0-100 integer,\n'
+        '  "passes_oa": true or false,\n'
+        '  "verdict": "one short sentence",\n'
+        '  "matched_keywords": ["..."],\n'
+        '  "missing_keywords": ["..."],\n'
+        '  "strengths": ["2 to 3 short bullet strings"],\n'
+        '  "gaps": ["2 to 3 short bullet strings"],\n'
+        '  "fixes": ["2 to 3 concrete, specific improvements"],\n'
+        '  "summary": "2 to 3 sentence overall read"\n'
+        "}\n\n"
+        "Be honest and specific. passes_oa should be true only when the resume genuinely clears a "
+        f"{company_label} screen. Do not invent experience that is not in the resume.\n\n"
+        f"RESUME:\n{text}\n\nYour JSON response:"
+    )
+
+    try:
+        llm = LLMService()
+        raw = await llm.call_kojo(prompt, provider=provider)
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+        parsed = json.loads(raw)
+    except (json.JSONDecodeError, LLMException) as exc:
+        raise HTTPException(status_code=503, detail=f"Failed to screen the resume: {exc}") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Failed to screen the resume: {exc}") from exc
+
+    def _str_list(value) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        return [str(v).strip() for v in value if str(v).strip()][:8]
+
+    try:
+        score = int(parsed.get("ats_score", 0))
+    except (TypeError, ValueError):
+        score = 0
+    score = max(0, min(100, score))
+    passes = bool(parsed.get("passes_oa", False))
+
+    result = ResumeScreenResult(
+        ats_score=score,
+        passes_oa=passes,
+        verdict=str(parsed.get("verdict") or _resume_verdict_label(score, passes))[:200],
+        matched_keywords=_str_list(parsed.get("matched_keywords")),
+        missing_keywords=_str_list(parsed.get("missing_keywords")),
+        strengths=_str_list(parsed.get("strengths")),
+        gaps=_str_list(parsed.get("gaps")),
+        fixes=_str_list(parsed.get("fixes")),
+        summary=str(parsed.get("summary") or "")[:1200],
+    )
+
+    row.resume_screen = json.dumps(result.model_dump())
+    if row.status == STATUS_PENDING:
+        row.status = STATUS_RESUME_COMPLETE
+    await db.commit()
+
+    return result
+
+
 # ── Stage 1: grade submissions ────────────────────────────────────────────────
 
 @router.post("/{session_id}/stage1/grade", response_model=Stage1GradeResponse)
@@ -134,6 +265,15 @@ async def grade_stage1(
     svc = LeetCodeService()
 
     async def _grade_one(sub) -> Stage1QuestionResult:
+        # Verdict comes first from the real in-app execution counts so it is
+        # deterministic; the LLM only writes prose feedback and can never flip
+        # a passing run to a fail (or vice versa).
+        verdict = _derive_verdict(
+            all_passed=sub.all_passed,
+            tests_passed=sub.tests_passed,
+            tests_total=sub.tests_total,
+            code=sub.code,
+        )
         try:
             result = await svc.grade(
                 title_slug=sub.slug,
@@ -144,10 +284,9 @@ async def grade_stage1(
                 provider=body.provider,
             )
             feedback = result.feedback
-        except Exception as exc:
-            feedback = f"Grading unavailable: {exc}"
+        except Exception:
+            feedback = _fallback_feedback(verdict, sub.tests_passed, sub.tests_total)
 
-        verdict = _derive_verdict(sub.all_passed, feedback, sub.code)
         return Stage1QuestionResult(
             slug=sub.slug,
             title=sub.title,
@@ -161,87 +300,46 @@ async def grade_stage1(
     results = await asyncio.gather(*[_grade_one(s) for s in body.submissions])
 
     row.stage1_results = json.dumps([r.model_dump() for r in results])
-    row.status = "stage1_complete"
+    row.status = STATUS_STAGE1_COMPLETE
     await db.commit()
 
     return Stage1GradeResponse(results=list(results))
 
 
-def _derive_verdict(all_passed: bool, feedback: str, code: str) -> str:
-    fb_lower = feedback.lower()
-    if all_passed and any(w in fb_lower for w in ("correct", "excellent", "great", "optimal", "efficient", "well done")):
-        return "strong"
+def _derive_verdict(all_passed: bool, tests_passed: int, tests_total: int, code: str) -> str:
+    """Map real execution results to a verdict.
+
+    When tests actually ran (tests_total > 0) the verdict is purely a function
+    of the pass ratio. When the problem could not be executed (tests_total == 0)
+    we fall back to whether any code was written.
+    """
+    has_code = bool(code.strip())
+    if tests_total > 0:
+        if all_passed or tests_passed >= tests_total:
+            return "strong"
+        if tests_passed > 0:
+            return "borderline"
+        return "needs_work" if not has_code else "borderline"
+    # No execution signal available.
     if all_passed:
         return "pass"
-    if any(w in fb_lower for w in ("partial", "almost", "close", "minor", "small issue")):
-        return "borderline"
-    if not code.strip():
+    if not has_code:
         return "needs_work"
     return "borderline" if len(code.strip()) > 50 else "needs_work"
 
 
-# ── Stage 2: generate interviewer script ─────────────────────────────────────
-
-@router.post("/{session_id}/stage2/script", response_model=Stage2ScriptResponse)
-async def generate_stage2_script(
-    session_id: int,
-    body: Stage2ScriptRequest,
-    db: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
-) -> Stage2ScriptResponse:
-    row = await _load_session(session_id, user, db)
-    company_label = _COMPANY_LABELS.get(row.company, row.company.title())
-    candidate = _candidate_name(user)
-
-    prompt = (
-        f"You are simulating a technical phone-screen interview at {company_label}. "
-        f"The candidate's name is {candidate}. "
-        "Generate a realistic interviewer script for a 45-minute software engineering interview. "
-        "The script must be structured as a JSON object with this exact shape:\n"
-        "{\n"
-        '  "script_lines": [\n'
-        '    {"speaker": "interviewer", "text": "...", "is_coding_prompt": false},\n'
-        '    ...\n'
-        "  ],\n"
-        '  "coding_slug": "two-sum",\n'
-        '  "coding_title": "Two Sum",\n'
-        '  "coding_difficulty": "Medium"\n'
-        "}\n\n"
-        "The script should include:\n"
-        f"1. A warm intro (interviewer introduces themselves, greets {candidate} by name)\n"
-        "2. 2-3 conceptual CS questions about data structures / algorithms / complexity\n"
-        "3. ONE coding challenge — pick a real LeetCode Medium problem appropriate for "
-        f"{company_label}. Set is_coding_prompt: true for the line where you present the problem, "
-        "and put the full problem statement in that line's text field.\n"
-        "4. A wrap-up / 'do you have questions for me?' closing\n\n"
-        f"Use {candidate}'s name naturally throughout (not on every line). "
-        "Use natural, conversational language. Keep each line under 3 sentences. "
-        "Return ONLY the raw JSON — no markdown fences, no explanation."
-    )
-
-    try:
-        llm = LLMService()
-        raw = await llm.call_kojo(prompt, provider=body.provider)
-        raw = raw.strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0]
-        parsed = json.loads(raw)
-    except (json.JSONDecodeError, LLMException) as exc:
-        raise HTTPException(status_code=503, detail=f"Failed to generate interview script: {exc}") from exc
-
-    script_lines = [Stage2ScriptLine(**line) for line in parsed.get("script_lines", [])]
-    response = Stage2ScriptResponse(
-        script_lines=script_lines,
-        coding_slug=parsed.get("coding_slug"),
-        coding_title=parsed.get("coding_title"),
-        coding_difficulty=parsed.get("coding_difficulty"),
-    )
-
-    row.stage2_script = json.dumps(response.model_dump())
-    row.status = "stage2"
-    await db.commit()
-
-    return response
+def _fallback_feedback(verdict: str, tests_passed: int, tests_total: int) -> str:
+    if tests_total > 0:
+        ran = f"You passed {tests_passed} of {tests_total} sample test cases. "
+    else:
+        ran = ""
+    tail = {
+        "strong": "Clean, working solution. Tighten the explanation of your time and space complexity next time.",
+        "pass": "Solid attempt that meets the bar. Double-check edge cases under interview pressure.",
+        "borderline": "Partially working. Revisit the failing cases and the core data structure choice.",
+        "needs_work": "This needs more work. Start from the brute-force approach, then optimize.",
+    }.get(verdict, "Keep practicing this pattern.")
+    return ran + tail
 
 
 # ── Stage 2: submit coding answer ─────────────────────────────────────────────
@@ -255,9 +353,8 @@ async def submit_stage2(
 ) -> Stage2SubmitResponse:
     row = await _load_session(session_id, user, db)
 
-    script_data = json.loads(row.stage2_script) if row.stage2_script else {}
-    coding_slug = script_data.get("coding_slug", "unknown")
-    coding_title = script_data.get("coding_title", "the coding problem")
+    coding_slug = body.problem_slug or "unknown"
+    coding_title = body.problem_title or "the coding problem"
     company_label = _COMPANY_LABELS.get(row.company, row.company.title())
     candidate = _candidate_name(user)
 
@@ -277,57 +374,10 @@ async def submit_stage2(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     row.stage2_submission = json.dumps({"code": body.code, "feedback": feedback})
-    row.status = "stage2_complete"
+    row.status = STATUS_STAGE2_COMPLETE
     await db.commit()
 
     return Stage2SubmitResponse(feedback=feedback)
-
-
-# ── Stage 2: live chat during coding ─────────────────────────────────────────
-
-@router.post("/{session_id}/stage2/chat", response_model=Stage2ChatResponse)
-async def stage2_chat(
-    session_id: int,
-    body: Stage2ChatRequest,
-    db: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
-) -> Stage2ChatResponse:
-    row = await _load_session(session_id, user, db)
-    company_label = _COMPANY_LABELS.get(row.company, row.company.title())
-    candidate = _candidate_name(user)
-
-    script_data = json.loads(row.stage2_script) if row.stage2_script else {}
-    coding_title = script_data.get("coding_title", "the coding problem")
-    problem_text = next(
-        (line["text"] for line in script_data.get("script_lines", []) if line.get("is_coding_prompt")),
-        "",
-    )
-
-    history_text = "\n".join(
-        f"{candidate if m.role == 'user' else 'Interviewer'}: {m.text}"
-        for m in body.history
-    )
-
-    prompt = (
-        f"You are a senior software engineer at {company_label} conducting a live technical interview "
-        f"with {candidate}.\n"
-        f"You presented this coding problem:\n\n"
-        f"Problem: {coding_title}\n{problem_text}\n\n"
-        f"Conversation so far:\n{history_text}\n"
-        f"{candidate}: {body.message}\n\n"
-        f"Respond as the interviewer in 1-3 sentences. Use {candidate}'s name occasionally to keep it "
-        "personal. Answer clarifying questions helpfully without giving away the solution. "
-        "If they explain an approach, give brief feedback or ask a probing follow-up. "
-        "Keep it natural and conversational."
-    )
-
-    try:
-        llm = LLMService()
-        reply = await llm.call_kojo(prompt, provider=body.provider)
-    except LLMException as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-    return Stage2ChatResponse(reply=reply.strip())
 
 
 # ── Stage 2: conversational interview ────────────────────────────────────────
@@ -354,20 +404,20 @@ async def stage2_message(
 
     system_prompt = (
         f"You are a senior software engineer at {company_label} conducting a 45-minute technical phone screen with {candidate}.\n\n"
-        "RESPOND WITH ONLY RAW JSON — no markdown fences, no extra text:\n"
+        "RESPOND WITH ONLY RAW JSON, no markdown fences, no extra text:\n"
         '{"reply": "...", "coding_problem": null, "is_done": false}\n\n'
         f"CURRENT USER TURN: {turn_count + 1}\n\n"
         "INTERVIEW PHASES (follow strictly based on turn count):\n"
-        f"• Turns 1–3: Warm greeting, ask about {candidate}'s background (current role, relevant experience, why {company_label})\n"
-        "• Turns 4–5: Ask 2 technical conceptual questions (time complexity, data structure tradeoffs, algorithm design)\n"
-        f"• Turn 6: Present ONE {coding_difficulty} LeetCode problem — fill coding_problem field:\n"
+        f"- Turns 1 to 3: Warm greeting, ask about {candidate}'s background (current role, relevant experience, why {company_label})\n"
+        "- Turns 4 to 5: Ask 2 technical conceptual questions (time complexity, data structure tradeoffs, algorithm design)\n"
+        f"- Turn 6: Present ONE {coding_difficulty} LeetCode problem by filling the coding_problem field:\n"
         '  {"title":"Two Sum","slug":"two-sum","difficulty":"Medium","prompt":"Given an array..."}\n'
-        "• Turns 7+: Discuss the problem, answer clarifying questions. coding_problem MUST be null.\n"
-        "• After a user message starting with 'MY SOLUTION:': Give 2–3 sentence code review feedback. Set is_done: true.\n\n"
+        "- Turns 7+: Discuss the problem and answer clarifying questions without giving away the full solution. coding_problem MUST be null.\n\n"
         "RULES:\n"
-        "- reply: 2–4 sentences max. Be direct and conversational.\n"
+        "- reply: 2 to 4 sentences max. Be direct and conversational.\n"
         f"- Use {candidate}'s name occasionally (not every message).\n"
-        "- coding_problem must only appear ONCE — null in all other turns.\n"
+        "- coding_problem must appear ONCE only (null in all other turns).\n"
+        "- The candidate submits their code with a separate button, so always keep is_done false.\n"
         "- Return ONLY raw JSON.\n"
     )
 
@@ -401,128 +451,25 @@ async def stage2_message(
             prompt=cp.get("prompt", ""),
         )
 
-    row.status = "stage2"
+    row.status = STATUS_STAGE2
     await db.commit()
 
     return Stage2MessageResponse(
         reply=parsed.get("reply", ""),
         coding_problem=coding_problem,
-        is_done=bool(parsed.get("is_done", False)),
+        is_done=False,
     )
-
-
-# ── Stage 3: generate behavioral questions ────────────────────────────────────
-
-@router.post("/{session_id}/stage3/script", response_model=Stage3ScriptResponse)
-async def generate_stage3_script(
-    session_id: int,
-    body: Stage3ScriptRequest,
-    db: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
-) -> Stage3ScriptResponse:
-    row = await _load_session(session_id, user, db)
-    company_label = _COMPANY_LABELS.get(row.company, row.company.title())
-
-    company_culture_hints = {
-        "google": "Googleyness & Leadership principles — focus on ambiguity, collaboration, impact at scale",
-        "meta": "Move Fast culture — bias for action, ownership, building at scale, data-driven decisions",
-        "amazon": "Amazon Leadership Principles (Customer Obsession, Ownership, Invent & Simplify, Deliver Results)",
-        "apple": "craftsmanship, attention to detail, cross-functional teamwork, simplicity",
-        "microsoft": "growth mindset, customer empathy, collaboration, inclusive leadership",
-        "netflix": "Freedom & Responsibility culture — judgment, courage, transparency, impact",
-    }
-    culture_hint = company_culture_hints.get(row.company, "standard behavioral interview values")
-
-    prompt = (
-        f"You are a hiring manager at {company_label} conducting a behavioral interview. "
-        f"The company culture focuses on: {culture_hint}.\n\n"
-        "Generate a behavioral interview script as a JSON object:\n"
-        "{\n"
-        '  "opening": "Hi [Candidate], thanks for joining us today...",\n'
-        '  "questions": [\n'
-        '    {"index": 1, "question": "...", "follow_up": "..."},\n'
-        "    ...\n"
-        "  ]\n"
-        "}\n\n"
-        f"Include 5 behavioral questions tailored to {company_label}'s values. "
-        "Each question should be a specific STAR-format prompt (Situation/Task/Action/Result). "
-        "Include an optional follow-up question for each. "
-        "Return ONLY the raw JSON — no markdown fences, no explanation."
-    )
-
-    try:
-        llm = LLMService()
-        raw = await llm.call_kojo(prompt, provider=body.provider)
-        raw = raw.strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0]
-        parsed = json.loads(raw)
-    except (json.JSONDecodeError, LLMException) as exc:
-        raise HTTPException(status_code=503, detail=f"Failed to generate behavioral questions: {exc}") from exc
-
-    questions = [Stage3Question(**q) for q in parsed.get("questions", [])]
-    response = Stage3ScriptResponse(
-        questions=questions,
-        opening=parsed.get("opening", f"Welcome to your {company_label} behavioral interview."),
-    )
-
-    row.stage3_script = json.dumps(response.model_dump())
-    row.status = "stage3"
-    await db.commit()
-
-    return response
-
-
-# ── Stage 3: submit answers ───────────────────────────────────────────────────
-
-@router.post("/{session_id}/stage3/answers", response_model=Stage3AnswersResponse)
-async def submit_stage3_answers(
-    session_id: int,
-    body: Stage3AnswersRequest,
-    db: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
-) -> Stage3AnswersResponse:
-    row = await _load_session(session_id, user, db)
-    company_label = _COMPANY_LABELS.get(row.company, row.company.title())
-
-    script_data = json.loads(row.stage3_script) if row.stage3_script else {}
-    questions = script_data.get("questions", [])
-
-    qa_pairs = []
-    for i, q in enumerate(questions):
-        answer = body.answers[i] if i < len(body.answers) else "(no answer provided)"
-        qa_pairs.append(f"Q{i+1}: {q.get('question', '')}\nA: {answer}")
-
-    qa_text = "\n\n".join(qa_pairs)
-    prompt = (
-        f"You are a {company_label} hiring manager reviewing a candidate's behavioral interview answers.\n\n"
-        f"{qa_text}\n\n"
-        "Provide 2-3 sentences of overall behavioral feedback: what was strong, what could be improved, "
-        "and whether the answers align with the company's culture. Be direct and professional."
-    )
-
-    try:
-        llm = LLMService()
-        feedback = await llm.call_kojo(prompt, provider=body.provider)
-    except LLMException as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-    row.stage3_answers = json.dumps({"answers": body.answers, "feedback": feedback})
-    row.status = "stage3_complete"
-    await db.commit()
-
-    return Stage3AnswersResponse(feedback=feedback)
 
 
 # ── Stage 3: conversational behavioral interview ──────────────────────────────
 
 _COMPANY_CULTURE = {
-    "google": "Googleyness & Leadership — ambiguity tolerance, collaboration, impact at scale",
-    "meta": "Move Fast — bias for action, ownership, data-driven decisions, building at scale",
-    "amazon": "Leadership Principles — Customer Obsession, Ownership, Invent & Simplify, Deliver Results",
+    "google": "Googleyness and Leadership: ambiguity tolerance, collaboration, impact at scale",
+    "meta": "Move Fast: bias for action, ownership, data-driven decisions, building at scale",
+    "amazon": "Leadership Principles: Customer Obsession, Ownership, Invent and Simplify, Deliver Results",
     "apple": "craftsmanship, attention to detail, simplicity, cross-functional teamwork",
     "microsoft": "growth mindset, customer empathy, collaboration, inclusive leadership",
-    "netflix": "Freedom & Responsibility — judgment, courage, transparency, impact over process",
+    "netflix": "Freedom and Responsibility: judgment, courage, transparency, impact over process",
 }
 
 
@@ -548,16 +495,16 @@ async def stage3_message(
     system_prompt = (
         f"You are a hiring manager at {company_label} conducting a 30-minute behavioral interview with {candidate}.\n"
         f"Company culture: {culture_hint}\n\n"
-        "RESPOND WITH ONLY RAW JSON — no markdown, no extra text:\n"
+        "RESPOND WITH ONLY RAW JSON, no markdown, no extra text:\n"
         '{"reply": "...", "is_done": false}\n\n'
         f"USER TURNS SO FAR: {turn_count}\n\n"
         "INTERVIEW FLOW:\n"
-        f"• If turn_count == 0: Warm greeting + ask the FIRST behavioral STAR question tailored to {company_label}\n"
-        "• After each answer: 1 sentence acknowledgment, then ask the NEXT question (one at a time)\n"
-        f"• Cover 5 behavioral questions total focused on {company_label}'s culture above\n"
-        "• After 5 user answers are given and acknowledged: wrap up warmly, set is_done: true\n\n"
+        f"- If turn_count == 0: Warm greeting plus ask the FIRST behavioral STAR question tailored to {company_label}\n"
+        "- After each answer: 1 sentence acknowledgment, then ask the NEXT question (one at a time)\n"
+        f"- Cover 5 behavioral questions total focused on {company_label}'s culture above\n"
+        "- After 5 user answers are given and acknowledged: wrap up warmly, set is_done: true\n\n"
         "RULES:\n"
-        "- reply: 2–3 sentences max\n"
+        "- reply: 2 to 3 sentences max\n"
         "- Ask ONE question per turn\n"
         f"- Use {candidate}'s name occasionally\n"
         "- Be warm but professional\n"
@@ -597,7 +544,7 @@ async def stage3_message(
             provider=body.provider,
         )
     else:
-        row.status = "stage3"
+        row.status = STATUS_STAGE3
         await db.commit()
 
     return Stage3MessageResponse(
@@ -621,7 +568,7 @@ async def _save_stage3_conversation_feedback(
     eval_prompt = (
         f"You are a {company_label} hiring manager reviewing a behavioral interview transcript.\n\n"
         f"{qa_text}\n\n"
-        f"In 2–3 sentences, evaluate {candidate}'s overall behavioral responses: "
+        f"In 2 to 3 sentences, evaluate {candidate}'s overall behavioral responses: "
         "what was strong, what needs improvement, and whether they align with the company's culture. "
         "Be direct and professional."
     )
@@ -632,7 +579,7 @@ async def _save_stage3_conversation_feedback(
         feedback = "Behavioral evaluation unavailable."
 
     row.stage3_answers = json.dumps({"feedback": feedback.strip()})
-    row.status = "stage3_complete"
+    row.status = STATUS_STAGE3_COMPLETE
     await db.commit()
 
 
@@ -648,22 +595,38 @@ async def finish_interview(
     row = await _load_session(session_id, user, db)
     company_label = _COMPANY_LABELS.get(row.company, row.company.title())
 
+    stage1_verdict = _stage1_overall_verdict(row.stage1_results)
+    stage2_verdict = _stage2_overall_verdict(row.stage2_submission)
+    stage3_verdict = _stage3_overall_verdict(row.stage3_answers)
+    resume_verdict = _resume_overall_verdict(row.resume_screen)
+
+    # The summary page calls this on every mount. Once a debrief exists, return
+    # the cached copy instead of paying for another LLM generation.
+    if row.status == STATUS_COMPLETE and row.overall_feedback:
+        return FinishResponse(
+            overall_feedback=row.overall_feedback,
+            resume_verdict=resume_verdict,
+            stage1_verdict=stage1_verdict,
+            stage2_verdict=stage2_verdict,
+            stage3_verdict=stage3_verdict,
+            hiring_recommendation=_extract_recommendation(row.overall_feedback),
+        )
+
+    resume_summary = _summarize_resume(row.resume_screen)
     stage1_summary = _summarize_stage1(row.stage1_results)
     stage2_summary = _summarize_stage2(row.stage2_submission)
     stage3_summary = _summarize_stage3(row.stage3_answers)
 
-    stage1_verdict = _stage1_overall_verdict(row.stage1_results)
-    stage2_verdict = _stage2_overall_verdict(row.stage2_submission)
-    stage3_verdict = _stage3_overall_verdict(row.stage3_answers)
-
     prompt = (
         f"You are a senior recruiter at {company_label} writing a debrief after a full mock interview loop.\n\n"
+        f"Resume Screen (ATS):\n{resume_summary}\n\n"
         f"Stage 1 (Online Assessment):\n{stage1_summary}\n\n"
         f"Stage 2 (Technical Interview):\n{stage2_summary}\n\n"
         f"Stage 3 (Behavioral):\n{stage3_summary}\n\n"
         "Write a concise debrief (3-4 sentences): overall strengths, areas to improve, "
         "and end with a hiring recommendation from: STRONG HIRE / HIRE / BORDERLINE / NO HIRE. "
-        "Be direct and professional."
+        "Base the recommendation on the interview performance (Stages 1 to 3); mention the resume "
+        "screen only as context. Be direct and professional."
     )
 
     try:
@@ -675,11 +638,12 @@ async def finish_interview(
     hiring_recommendation = _extract_recommendation(overall_feedback)
 
     row.overall_feedback = overall_feedback
-    row.status = "complete"
+    row.status = STATUS_COMPLETE
     await db.commit()
 
     return FinishResponse(
         overall_feedback=overall_feedback,
+        resume_verdict=resume_verdict,
         stage1_verdict=stage1_verdict,
         stage2_verdict=stage2_verdict,
         stage3_verdict=stage3_verdict,
@@ -712,6 +676,7 @@ def _to_response(row: MockInterviewSession) -> MockInterviewSessionResponse:
         company=row.company,
         stages_config=row.stages_config,
         status=row.status,
+        resume_screen=row.resume_screen,
         stage1_results=row.stage1_results,
         stage2_script=row.stage2_script,
         stage2_submission=row.stage2_submission,
@@ -721,6 +686,35 @@ def _to_response(row: MockInterviewSession) -> MockInterviewSessionResponse:
     )
 
 
+def _summarize_resume(resume_screen_json: Optional[str]) -> str:
+    if not resume_screen_json:
+        return "Resume Screen was skipped or not completed."
+    try:
+        data = json.loads(resume_screen_json)
+        score = data.get("ats_score", 0)
+        passes = "would pass" if data.get("passes_oa") else "would NOT pass"
+        return f"ATS score {score}/100, {passes} the screen. {data.get('summary', '')[:200]}"
+    except Exception:
+        return "Resume Screen result unavailable."
+
+
+def _resume_overall_verdict(resume_screen_json: Optional[str]) -> Optional[str]:
+    if not resume_screen_json:
+        return None
+    try:
+        data = json.loads(resume_screen_json)
+        score = int(data.get("ats_score", 0))
+        if score >= 80:
+            return "strong"
+        if score >= 65 or data.get("passes_oa"):
+            return "pass"
+        if score >= 50:
+            return "borderline"
+        return "needs_work"
+    except Exception:
+        return None
+
+
 def _summarize_stage1(stage1_results_json: Optional[str]) -> str:
     if not stage1_results_json:
         return "Stage 1 was skipped or not completed."
@@ -728,7 +722,7 @@ def _summarize_stage1(stage1_results_json: Optional[str]) -> str:
         results = json.loads(stage1_results_json)
         lines = []
         for r in results:
-            lines.append(f"- {r['title']} ({r['difficulty']}): {r['verdict'].upper()} — {r['feedback'][:120]}")
+            lines.append(f"- {r['title']} ({r['difficulty']}): {r['verdict'].upper()}: {r['feedback'][:120]}")
         return "\n".join(lines) or "No results."
     except Exception:
         return "Stage 1 results unavailable."

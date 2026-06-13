@@ -12,6 +12,7 @@ import KojoMode from "../pages/KojoMode";
 import LeetCodeMode from "../pages/LeetCodeMode";
 import { isGuestSession, scopeKey } from "../lib/api";
 import MockInterviewSetup from "../pages/MockInterviewSetup";
+import MockInterviewResume from "../pages/MockInterviewResume";
 import MockInterviewStage1 from "../pages/MockInterviewStage1";
 import MockInterviewStage2 from "../pages/MockInterviewStage2";
 import MockInterviewStage3 from "../pages/MockInterviewStage3";
@@ -61,6 +62,7 @@ export default function App() {
           <Route path="/folders/:folderId/flashcards/manage" element={<FlashcardsManage />} />
           <Route path="/leetcode" element={<SignedInRoute><LeetCodeMode /></SignedInRoute>} />
           <Route path="/mock-interview" element={<MockInterviewSetup />} />
+          <Route path="/mock-interview/:sessionId/resume" element={<MockInterviewResume />} />
           <Route path="/mock-interview/:sessionId/stage1" element={<MockInterviewStage1 />} />
           <Route path="/mock-interview/:sessionId/stage1-results" element={<MockInterviewStage1Results />} />
           <Route path="/mock-interview/:sessionId/stage2" element={<MockInterviewStage2 />} />
