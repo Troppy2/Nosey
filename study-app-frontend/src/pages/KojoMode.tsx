@@ -1,19 +1,18 @@
 import {
-  AlertCircle,
-  ArrowUp,
-  Bot,
-  Check,
-  CheckCircle2,
-  ClipboardList,
-  ExternalLink,
-  FolderOpen,
-  MessageSquarePlus,
-  Paperclip,
-  Plus,
-  Sparkles,
-  Trash2,
-  X,
-} from "lucide-react";
+  BsArrowUp,
+  BsBoxArrowUpRight,
+  BsCheckLg,
+  BsCheckCircleFill,
+  BsClipboard2Check,
+  BsChatDotsFill,
+  BsFolder2Open,
+  BsPaperclip,
+  BsPlusLg,
+  BsStars,
+  BsTrash3,
+  BsX,
+  BsExclamationCircle,
+} from "react-bootstrap-icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -144,10 +143,10 @@ function BlueprintCard({ message, folderId, provider, onGenerate, onCancel }: Bl
     return (
       <div className="kojo-blueprint-card kojo-blueprint-card--done">
         <div className="kojo-blueprint-done">
-          <Check size={16} className="kojo-blueprint-done-icon" />
+          <BsCheckLg size={16} className="kojo-blueprint-done-icon" />
           <span>Test created!</span>
           <Link to={`/folders/${folderId}`} className="kojo-blueprint-test-link">
-            <ExternalLink size={13} />
+            <BsBoxArrowUpRight size={13} />
             Open in folder
           </Link>
         </div>
@@ -160,7 +159,7 @@ function BlueprintCard({ message, folderId, provider, onGenerate, onCancel }: Bl
   return (
     <div className="kojo-blueprint-card">
       <div className="kojo-blueprint-intro">
-        <ClipboardList size={15} className="kojo-blueprint-intro-icon" />
+        <BsClipboard2Check size={15} className="kojo-blueprint-intro-icon" />
         <span>{bp.intro}</span>
       </div>
       <div className="kojo-blueprint-fields">
@@ -211,11 +210,11 @@ function BlueprintCard({ message, folderId, provider, onGenerate, onCancel }: Bl
       )}
       <div className="kojo-blueprint-actions">
         <button type="button" className="kojo-blueprint-btn kojo-blueprint-btn--primary" onClick={handleGenerate} disabled={generating}>
-          {generating ? <span className="loader loader--sm" /> : <ClipboardList size={14} />}
+          {generating ? <span className="loader loader--sm" /> : <BsClipboard2Check size={14} />}
           {generating ? "Generating…" : "Generate Test"}
         </button>
         <button type="button" className="kojo-blueprint-btn kojo-blueprint-btn--ghost" onClick={() => onCancel(message.id)} disabled={generating}>
-          <X size={13} />Cancel
+          <BsX size={13} />Cancel
         </button>
       </div>
     </div>
@@ -600,7 +599,7 @@ export default function KojoMode() {
       {/* ── Sidebar ── */}
       <aside className="chat-mode-sidebar">
         <div className="chat-mode-sidebar-header">
-          <Sparkles size={15} />
+          <BsStars size={15} />
           <span>Chat mode</span>
         </div>
 
@@ -614,7 +613,7 @@ export default function KojoMode() {
             className={`chat-mode-folder-btn${folderId === null ? " chat-mode-folder-btn--active" : ""}`}
             onClick={() => setFolderId(null)}
           >
-            <MessageSquarePlus size={15} />
+            <BsChatDotsFill size={14} />
             <span>No folder</span>
           </button>
         </nav>
@@ -634,7 +633,7 @@ export default function KojoMode() {
                   className={`chat-mode-folder-btn${folder.id === folderId ? " chat-mode-folder-btn--active" : ""}`}
                   onClick={() => setFolderId(folder.id)}
                 >
-                  <FolderOpen size={15} />
+                  <BsFolder2Open size={14} />
                   <span>{folder.name}</span>
                 </button>
               ))}
@@ -646,7 +645,7 @@ export default function KojoMode() {
         {conversations.length > 0 && (
           <div className="kojo-chat-history">
             <div className="kojo-chat-history-label">
-              <MessageSquarePlus size={12} />
+              <BsChatDotsFill size={11} />
               <span>Chats</span>
             </div>
             <div className="kojo-chat-list">
@@ -678,7 +677,7 @@ export default function KojoMode() {
                         className="kojo-clear-inline-btn"
                         onClick={() => setDeletingConvId(null)}
                       >
-                        ✕
+                        <BsX size={14} />
                       </button>
                     </div>
                   ) : (
@@ -688,7 +687,7 @@ export default function KojoMode() {
                       onClick={() => setDeletingConvId(conv.id)}
                       title="Delete chat"
                     >
-                      <Trash2 size={11} />
+                      <BsTrash3 size={11} />
                     </button>
                   )}
                 </div>
@@ -705,7 +704,7 @@ export default function KojoMode() {
             onClick={() => void handleNewChat()}
             disabled={isLoading}
           >
-            <Plus size={14} />
+            <BsPlusLg size={13} />
             New Chat
           </button>
         </div>
@@ -716,10 +715,9 @@ export default function KojoMode() {
         {/* Header */}
         <div className="chat-mode-header">
           <div className="chat-mode-header-left">
-            <div className="kojo-avatar"><Bot size={18} /></div>
+            <div className="kojo-avatar"><BsStars size={17} /></div>
             <div>
               <span className="chat-mode-title">
-                <Sparkles size={13} className="kojo-title-icon" />
                 Kojo
               </span>
               <span className="chat-mode-subtitle">
@@ -739,7 +737,7 @@ export default function KojoMode() {
               disabled={isLoading}
               title="Clear chat"
             >
-              <Trash2 size={17} />
+              <BsTrash3 size={16} />
               <span>Clear</span>
             </button>
           )}
@@ -762,7 +760,7 @@ export default function KojoMode() {
             <div className="chat-mode-messages-inner">
               {messages.length === 0 && !isLoading && (
                 <div className="kojo-empty">
-                  <div className="kojo-empty-icon"><Sparkles size={28} /></div>
+                  <div className="kojo-empty-icon"><BsStars size={28} /></div>
                   <p className="kojo-empty-title">Hi, I'm Kojo</p>
                   <p className="kojo-empty-sub">
                     {isGeneralMode
@@ -781,7 +779,7 @@ export default function KojoMode() {
                 if (msg.role === "assistant" && (msg.message_type === "blueprint" || msg.message_type === "blueprint_done" || msg.message_type === "blueprint_cancelled")) {
                   return (
                     <div key={msg.id} className="kojo-message kojo-message--assistant">
-                      <div className="kojo-msg-avatar"><Bot size={14} /></div>
+                      <div className="kojo-msg-avatar"><BsStars size={13} /></div>
                       <div className="kojo-message-body">
                         <div className="kojo-message-meta">
                           <span className="kojo-message-label">Kojo</span>
@@ -800,7 +798,7 @@ export default function KojoMode() {
                 if (msg.role === "assistant") {
                   return (
                     <div key={msg.id} className="kojo-message kojo-message--assistant">
-                      <div className="kojo-msg-avatar"><Bot size={14} /></div>
+                      <div className="kojo-msg-avatar"><BsStars size={13} /></div>
                       <div className="kojo-message-body">
                         <div className="kojo-message-meta">
                           <span className="kojo-message-label">Kojo</span>
@@ -816,7 +814,7 @@ export default function KojoMode() {
                   <div key={msg.id} className="kojo-message kojo-message--user">
                     <div className="kojo-user-bubble">
                       {msg.display ? (
-                        <span className="kojo-command-pill"><Sparkles size={11} />{msg.display}</span>
+                        <span className="kojo-command-pill"><BsStars size={11} />{msg.display}</span>
                       ) : (
                         <p>{msg.content}</p>
                       )}
@@ -829,7 +827,7 @@ export default function KojoMode() {
               {isLoading && (
                 <div className="kojo-thinking-centered"><div className="kojo-thinking"><span /><span /><span /></div></div>
               )}
-              {error && <div className="kojo-error"><AlertCircle size={14} /><span>{error}</span></div>}
+              {error && <div className="kojo-error"><BsExclamationCircle size={14} /><span>{error}</span></div>}
               {clearNotice && <p className="kojo-notice">{clearNotice}</p>}
               <div ref={bottomRef} />
             </div>
@@ -892,7 +890,7 @@ export default function KojoMode() {
                     disabled={isLoading || conversationId === null}
                     aria-label="Attach files"
                   >
-                    {isUploading ? <span className="loader loader--sm" /> : <Paperclip size={15} />}
+                    {isUploading ? <span className="loader loader--sm" /> : <BsPaperclip size={15} />}
                   </button>
                   {showAttachMenu && (
                     <div className="kojo-attach-menu">
@@ -901,12 +899,12 @@ export default function KojoMode() {
                         className="kojo-attach-menu-item"
                         onClick={() => fileInputRef.current?.click()}
                       >
-                        <Paperclip size={13} />
+                        <BsPaperclip size={13} />
                         <span>Upload notes / files</span>
                       </button>
                       {!isGeneralMode && (
                         <div className="kojo-attach-menu-item kojo-attach-menu-item--info">
-                          <CheckCircle2 size={13} className="kojo-attach-menu-check" />
+                          <BsCheckCircleFill size={13} className="kojo-attach-menu-check" />
                           <span>Folder notes included</span>
                         </div>
                       )}
@@ -921,7 +919,7 @@ export default function KojoMode() {
                   type="button"
                   aria-label="Send"
                 >
-                  <ArrowUp size={16} />
+                  <BsArrowUp size={16} />
                 </button>
               </div>
             </div>
