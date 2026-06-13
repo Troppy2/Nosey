@@ -48,6 +48,20 @@ const TOKEN_KEY = "nosey_access_token";
 const USER_KEY = "nosey_user";
 const GUEST_TOKEN = "nosey_guest_token";
 
+// Returns true if there is a non-guest JWT in localStorage whose `exp` claim
+// has not yet passed. Guest tokens are excluded because they use a sentinel
+// string value rather than a real JWT.
+export function hasValidSession(): boolean {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token || token === GUEST_TOKEN) return false;
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return typeof payload.exp === "number" && Date.now() / 1000 < payload.exp;
+  } catch {
+    return false;
+  }
+}
+
 type RequestOptions = RequestInit & {
   allowMock?: boolean;
 };
