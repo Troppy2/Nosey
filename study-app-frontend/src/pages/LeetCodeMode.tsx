@@ -2305,6 +2305,11 @@ export default function LeetCodeMode() {
               onMount={handleMonacoMount}
               theme="vs-dark"
               options={{
+                // The code pane starts hidden (display:none) behind the mobile
+                // problem/code toggle, so Monaco first measures a 0-size container.
+                // automaticLayout makes it re-measure when it becomes visible,
+                // otherwise it paints a collapsed black box you cannot type into.
+                automaticLayout: true,
                 fontSize: 14,
                 fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
                 minimap: { enabled: false },

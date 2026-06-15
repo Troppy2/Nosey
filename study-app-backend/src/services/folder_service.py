@@ -37,16 +37,13 @@ class FolderService:
         return FolderResponse.model_validate(folder)
 
     async def get_folder(self, folder_id: int, user_id: int, session: AsyncSession) -> FolderResponse:
-        folder = await FolderRepository(session).get_owned(folder_id, user_id)
-        if folder is None:
+        row = await FolderRepository(session).get_with_counts(folder_id, user_id)
+        if row is None:
             raise ResourceNotFoundException("Folder")
-        rows = await FolderRepository(session).list_with_counts(user_id)
-        for row_folder, test_count, flashcard_count in rows:
-            if row_folder.id == folder_id:
-                return FolderResponse.model_validate(row_folder).model_copy(
-                    update={"test_count": test_count, "flashcard_count": flashcard_count}
-                )
-        return FolderResponse.model_validate(folder)
+        folder, test_count, flashcard_count = row
+        return FolderResponse.model_validate(folder).model_copy(
+            update={"test_count": test_count, "flashcard_count": flashcard_count}
+        )
 
     async def update_folder(
         self, folder_id: int, user_id: int, data: FolderUpdate, session: AsyncSession
