@@ -131,7 +131,7 @@ export default function FolderDetail() {
     });
   }
 
-  async function updateKojoSetting(patch: Partial<Pick<Folder, "kojo_sync_default" | "kojo_allow_artifacts" | "kojo_auto_index" | "kojo_persona">>) {
+  async function updateKojoSetting(patch: Partial<Pick<Folder, "kojo_sync_default" | "kojo_allow_artifacts" | "kojo_auto_index" | "kojo_persona" | "avoid_repeat_questions">>) {
     if (!folder) return;
     try {
       const updated = await updateFolder(id, patch);
@@ -345,6 +345,22 @@ export default function FolderDetail() {
                 </span>
               </div>
             </div>
+
+            <label className="folder-kojo-toggle-row">
+              <div className="folder-kojo-toggle-info">
+                <span className="folder-kojo-toggle-label">Fresh questions on re-test</span>
+                <span className="folder-kojo-toggle-desc">When you build another test from the same notes, avoid repeating questions you have already seen and ask them in new ways that test deeper understanding.</span>
+              </div>
+              <button
+                type="button"
+                className={`folder-kojo-toggle${folder.avoid_repeat_questions !== false ? " folder-kojo-toggle--on" : ""}`}
+                onClick={() => void updateKojoSetting({ avoid_repeat_questions: !(folder.avoid_repeat_questions !== false) })}
+                aria-checked={folder.avoid_repeat_questions !== false}
+                role="switch"
+              >
+                <span className="folder-kojo-toggle-thumb" />
+              </button>
+            </label>
 
             <div className="folder-archive-row">
               <div className="folder-kojo-toggle-info">

@@ -186,10 +186,15 @@ class LLMService:
     def _mcq_distractor_guidance(self, test_type: str) -> str:
         if self._is_extreme_mode(test_type):
             return (
-                "  - Wrong answer options should be near-miss distractors: plausible, topic-adjacent, and separated by one key detail\n"
-                "  - The correct option should only be obviously correct after careful reading of the notes\n"
-                "  - Avoid copying note sentences verbatim; paraphrase the concept and make the distractors feel close\n"
-                "  - Make the choices look similar enough that the student must know the material, not just recognize a keyword\n"
+                "  - EXTREME DIFFICULTY: every question must be the hardest reasonable version. Do NOT write recall or definition questions.\n"
+                "  - The QUESTION STEM must demand real reasoning: multi-step inference, synthesis of two or more concepts, or applying the material to a NEW scenario not stated in the notes.\n"
+                "  - Favor 'predict the outcome', 'which conclusion follows', 'what breaks if X changes', 'compare two close cases' over 'what is X'.\n"
+                "  - A student who only memorized keywords must get it WRONG; only true understanding should yield the answer.\n"
+                "  - Wrong answer options must be near-miss distractors: each one plausible, topic-adjacent, and separated from the correct answer by a single decisive detail.\n"
+                "  - Build distractors from common misconceptions and partially-correct reasoning, so each looks right to a weak student.\n"
+                "  - All four options must be similar in length, specificity, and phrasing: never let the correct one stand out by being longest or most detailed.\n"
+                "  - Do NOT use 'all of the above' or 'none of the above'. Avoid absolute giveaways like 'always'/'never' that flag a distractor.\n"
+                "  - Paraphrase concepts; never copy note sentences verbatim into the stem or the correct option.\n"
             )
 
         return (
@@ -211,11 +216,19 @@ class LLMService:
         custom_instructions: Optional[str] = None,
         provider: Optional[str] = None,
         enable_fallback: bool = True,
+        prior_questions: Optional[list[str]] = None,
     ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
         if self._is_mcq_only_mode(test_type):
             count_frq = 0
         elif test_type == "FRQ_only":
             count_mcq = 0
+
+        # Extreme mode is defined as the hardest possible test: force max difficulty so
+        # the DIFFICULTY line never asks the model for easy/recall questions, regardless
+        # of the difficulty knob. The extreme stem/distractor rules live in
+        # _mcq_distractor_guidance and ride along on top of this.
+        if self._is_extreme_mode(test_type):
+            difficulty = "hard"
 
         retrieval_query = self._build_retrieval_query(
             test_type=test_type,
@@ -267,6 +280,7 @@ class LLMService:
                 count_frq=count_frq,
                 diagnostics=diagnostics,
                 enable_fallback=enable_fallback,
+                prior_questions=prior_questions,
             )
 
         if is_math_mode:
@@ -290,6 +304,7 @@ class LLMService:
                     diagnostics=diagnostics,
                     math_mode=True,
                     enable_fallback=enable_fallback,
+                    prior_questions=prior_questions,
                 )
             except Exception:
                 if not enable_fallback:
@@ -316,6 +331,7 @@ class LLMService:
                 topic_focus=topic_focus,
                 custom_instructions=custom_instructions,
                 enable_fallback=enable_fallback,
+                prior_questions=prior_questions,
             )
         except Exception:
             if not enable_fallback:
@@ -845,6 +861,7 @@ class LLMService:
         custom_instructions: Optional[str] = None,
         provider: Optional[str] = None,
         enable_fallback: bool = True,
+        prior_questions: Optional[list[str]] = None,
     ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
         """Generate questions from study notes using practice test as a style template.
         
@@ -877,8 +894,11 @@ class LLMService:
         # Build a prompt that uses the practice test style as a template
         context_header = f'SUBJECT: "{study.title}"\n\n' if study.title else ""
         
-        # Use practice test difficulty if available, otherwise use requested difficulty
-        if practice_style.difficulty_indicators and "easy" in practice_style.difficulty_indicators.lower():
+        # Use practice test difficulty if available, otherwise use requested difficulty.
+        # Extreme mode always overrides to the hardest setting regardless of the template.
+        if self._is_extreme_mode(test_type):
+            use_difficulty = "hard"
+        elif practice_style.difficulty_indicators and "easy" in practice_style.difficulty_indicators.lower():
             use_difficulty = "easy"
         elif practice_style.difficulty_indicators and "hard" in practice_style.difficulty_indicators.lower():
             use_difficulty = "hard"
@@ -992,6 +1012,7 @@ class LLMService:
                 count_frq=count_frq,
                 diagnostics=diagnostics,
                 enable_fallback=enable_fallback,
+                prior_questions=prior_questions,
             )
         except Exception:
             if not enable_fallback:
@@ -1471,6 +1492,7 @@ Rules:
         topic_focus: Optional[str] = None,
         custom_instructions: Optional[str] = None,
         enable_fallback: bool = True,
+        prior_questions: Optional[list[str]] = None,
     ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
         from src.utils.exceptions import LLMException
 
@@ -1500,6 +1522,14 @@ Rules:
                 )
         else:
             shared_prompt = prompt
+
+        # "Fresh questions": when the student already saw questions from these same
+        # notes, append the avoid-list and vary-form instructions ONCE here. This single
+        # insertion point covers the normal, math, and coding paths, and propagates into
+        # any same-provider top-up prompts (which are built from shared_prompt).
+        novelty_block = self._build_novelty_block(prior_questions)
+        if novelty_block:
+            shared_prompt = f"{shared_prompt}\n\n{novelty_block}"
 
         last_error: Optional[Exception] = None
         # Best partial output seen across all providers — used for cross-provider topup.
@@ -1681,6 +1711,33 @@ Rules:
             "Practice test could not be generated. The selected AI provider may be rate-limited or temporarily unavailable. "
             "Try a different provider or try again in a moment."
         ) from last_error
+
+    def _build_novelty_block(self, prior_questions: Optional[list[str]]) -> str:
+        """Build the "fresh questions" instruction block.
+
+        Tells the model which questions the student has already seen (from earlier
+        tests on the same notes) and to produce genuinely different ones: not just
+        new numbers but a different question FORM that probes deeper understanding
+        (e.g. solve for a different unknown, add a reasoning step, reverse the setup).
+        Best-effort only: if the model still cannot produce novel questions, generation
+        proceeds normally rather than failing or returning a short test.
+        """
+        cleaned = [q.strip() for q in (prior_questions or []) if q and q.strip()]
+        if not cleaned:
+            return ""
+        seen_lines = "\n".join(f"- {q}" for q in cleaned[:80])
+        return (
+            "FRESH QUESTIONS REQUIREMENT (the student has already been tested on this "
+            "material, follow strictly):\n"
+            "- Do NOT repeat or merely rephrase any of the questions listed below.\n"
+            "- Do NOT just change the numbers or surface wording of a previous question.\n"
+            "- Change the FORM of the question to test deeper understanding: solve for a "
+            "different unknown, add an extra reasoning step, reverse the setup, apply the "
+            "concept to a new scenario, or ask 'why/how' instead of 'what'.\n"
+            "- Cover concepts or angles the earlier questions did not.\n\n"
+            "QUESTIONS THE STUDENT HAS ALREADY SEEN (DO NOT REPEAT):\n"
+            f"{seen_lines}\n"
+        )
 
     def _build_provider_topup_prompt(
         self,

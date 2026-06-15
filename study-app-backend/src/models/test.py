@@ -29,6 +29,9 @@ class Test(Base, TimestampMixin):
     coding_language: Mapped[Optional[str]] = mapped_column(String(50))
     generation_status: Mapped[str] = mapped_column(String(20), nullable=False, default="ready", server_default="ready")
     generation_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # SHA-256 of the source notes used to generate this test. Lets a later test built
+    # from the SAME notes find and avoid repeating these questions ("fresh questions").
+    notes_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
 
     folder: Mapped[Folder] = relationship("Folder", back_populates="tests")
     questions: Mapped[list[Question]] = relationship(

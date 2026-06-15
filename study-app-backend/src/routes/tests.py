@@ -1,3 +1,4 @@
+import hashlib
 import time
 from typing import Optional, Tuple
 
@@ -70,6 +71,7 @@ async def _generate_questions_background(
     count_tf: int = 0,
     count_ms: int = 0,
     count_rank: int = 0,
+    prior_questions: Optional[list[str]] = None,
 ) -> None:
     """Run LLM generation and save questions; called as a FastAPI background task."""
     async with async_session_maker() as session:
@@ -93,6 +95,7 @@ async def _generate_questions_background(
                     custom_instructions=custom_instructions,
                     provider=provider,
                     enable_fallback=enable_fallback,
+                    prior_questions=prior_questions,
                 )
             elif practice_test_content:
                 mcq_questions, frq_questions = await llm.parse_practice_test(
@@ -115,6 +118,7 @@ async def _generate_questions_background(
                     custom_instructions=custom_instructions,
                     provider=provider,
                     enable_fallback=enable_fallback,
+                    prior_questions=prior_questions,
                 )
 
             display_order = 1
@@ -323,6 +327,15 @@ async def create_test(
             p for p in [notes_content, folder_files_content if use_folder_files else ""] if p
         )
 
+        # Fingerprint the source material so a later test built from the SAME notes
+        # can find and avoid repeating questions the student has already seen.
+        source_for_hash = combined_notes or practice_test_content
+        notes_hash = (
+            hashlib.sha256(source_for_hash.encode("utf-8")).hexdigest()
+            if source_for_hash
+            else None
+        )
+
         # ── Create test record immediately ────────────────────────────────────
         repo = TestRepository(session)
         test = await repo.create(
@@ -333,6 +346,7 @@ async def create_test(
             is_math_mode=is_math_mode,
             is_coding_mode=is_coding_mode,
             coding_language=coding_language,
+            notes_hash=notes_hash,
         )
         test.generation_status = "generating"
 
@@ -342,6 +356,14 @@ async def create_test(
         if practice_test_content:
             pt_label = pt_bytes[1] if pt_bytes else "practice_test"
             await repo.add_note(test.id, pt_label[:255], "pdf", practice_test_content)
+
+        # "Fresh questions": when enabled for this folder, collect questions from
+        # earlier tests built from the same notes so the LLM can avoid repeating them.
+        prior_questions: list[str] = []
+        if notes_hash and getattr(folder, "avoid_repeat_questions", True):
+            prior_questions = await repo.get_prior_question_texts(
+                folder_id, notes_hash, exclude_test_id=test.id
+            )
 
         await session.commit()
 
@@ -366,6 +388,7 @@ async def create_test(
             count_tf=count_tf,
             count_ms=count_ms,
             count_rank=count_rank,
+            prior_questions=prior_questions,
         )
 
         return CreateTestResponse(
