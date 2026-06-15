@@ -1431,6 +1431,48 @@ Rules:
         logger.warning("LLM flashcard generation failed; using fallback")
         return self._fallback_flashcards(content, count, prompt)
 
+    async def generate_custom_problem(
+        self,
+        code: str,
+        hint: str = "",
+        provider: Optional[str] = None,
+    ) -> dict[str, object]:
+        """Given user-pasted code (a bare function or a class) and an optional hint of
+        intent, produce a full LeetCode-style problem package as JSON: title, topic,
+        difficulty, a written walkthrough (with worked examples), clean runnable
+        starter_code, and named-argument test cases. Single JSON call with provider
+        fallback handled inside _complete_json (no per-provider loop here)."""
+        prompt = self._build_custom_problem_prompt(code, hint)
+        return await self._complete_json(prompt, provider=provider)
+
+    def _build_custom_problem_prompt(self, code: str, hint: str) -> str:
+        code_block = (code or "").strip()[:12000] or "# (no code provided)"
+        hint_line = (hint or "").strip()[:2000] or "(none given)"
+        return f"""You are building a LeetCode-style practice problem from a student's own code.
+
+STUDENT CODE (the source of truth for the function signature and behavior):
+```python
+{code_block}
+```
+
+STUDENT HINT ABOUT WHAT IT DOES: {hint_line}
+
+Infer what the code is supposed to do, then return a JSON object ONLY (no prose, no code fences) with EXACTLY these keys:
+- "title": a short, descriptive problem title (string).
+- "topic": one broad category such as "Arrays", "Strings", "Dynamic Programming", "Graph". If you genuinely cannot tell, use "unknown".
+- "difficulty": exactly one of "Easy", "Medium", "Hard". If you genuinely cannot tell, use "unknown".
+- "description": a Markdown problem statement written like LeetCode: a clear introduction of the task, the constraints you can reasonably infer, followed by 2 to 3 worked examples each with an Input, an Output, and a short Explanation that walks through the reasoning.
+- "starter_code": clean, runnable Python based on the student's code. Keep the SAME function name and parameter names the student used. It may be a top-level function (e.g. `def two_sum(nums, target): ...`) or a `class Solution` method. Do NOT change the signature.
+- "test_cases": an array of 3 to 5 objects, each with "input_text", "output_text", and "explanation_text".
+
+CRITICAL rules for "test_cases" so they can actually run:
+- "input_text" MUST be Python named arguments matching the starter_code signature exactly, comma separated, e.g. `nums = [2, 7, 11, 15], target = 9`. Use the real parameter names. Do not wrap it in a function call.
+- "output_text" MUST be a single Python literal that equals the expected return value, e.g. `[0, 1]` or `True` or `"abc"`.
+- Cover normal cases plus at least one edge case (empty input, single element, or a no-solution case) when applicable.
+- Every test case must be correct for the given starter_code.
+
+Return only the JSON object."""
+
     async def _with_retry(self, fn, label: str):
         """Retry a cloud LLM call on 429 with exponential backoff (max 3 attempts)."""
         delay = 1.0

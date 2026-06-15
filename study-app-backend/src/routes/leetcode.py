@@ -8,9 +8,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_session
 from src.dependencies import get_current_user
-from src.models.lc_sync import LCActivityDate, LCCodeWorkspace, LCProgress, LCProblemNote
+from src.models.lc_sync import LCActivityDate, LCCodeWorkspace, LCCustomProblem, LCProgress, LCProblemNote
 from src.models.user import User
 from src.schemas.leetcode_schema import (
+    LCCustomProblemListResponse,
+    LCCustomProblemResponse,
+    LCCustomProblemSyncRequest,
+    LCCustomTestCase,
+    LCGenerateCustomProblemRequest,
+    LCGeneratedCustomProblem,
     LCNotesResponse,
     LCNotesSyncRequest,
     LCProgressResponse,
@@ -56,6 +62,7 @@ async def kojo_leetcode_hint(
             user_message=body.message,
             user_code=body.user_code,
             provider=body.provider,
+            statement=body.statement,
         )
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -76,6 +83,7 @@ async def grade_leetcode_submission(
             test_results=body.test_results,
             all_passed=body.all_passed,
             provider=body.provider,
+            statement=body.statement,
         )
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -223,3 +231,132 @@ async def sync_lc_notes(
         session.add(LCProblemNote(user_id=user.id, problem_slug=problem_slug, notes=body.notes))
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ── Custom (user-authored) problems ───────────────────────────────────────────
+
+def _serialize_custom_problem(row: LCCustomProblem) -> LCCustomProblemResponse:
+    try:
+        raw_cases = json.loads(row.test_cases_json or "[]")
+    except Exception:
+        raw_cases = []
+    test_cases = [
+        LCCustomTestCase(
+            input_text=str(item.get("input_text", "") or ""),
+            output_text=str(item.get("output_text", "") or ""),
+            explanation_text=(str(item["explanation_text"]) if item.get("explanation_text") else None),
+        )
+        for item in raw_cases
+        if isinstance(item, dict)
+    ]
+    return LCCustomProblemResponse(
+        slug=row.slug,
+        title=row.title,
+        topic=row.topic,
+        difficulty=row.difficulty,
+        description=row.description,
+        url=row.url,
+        starter_code=row.starter_code,
+        test_cases=test_cases,
+    )
+
+
+def _validate_custom_slug(slug: str) -> None:
+    if not slug.startswith("custom-") or len(slug) > 200 or len(slug) < 8:
+        raise HTTPException(status_code=400, detail="Invalid custom problem id.")
+
+
+@router.get("/custom-problems", response_model=LCCustomProblemListResponse)
+async def list_custom_problems(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LCCustomProblemListResponse:
+    rows = (
+        await session.execute(
+            select(LCCustomProblem)
+            .where(LCCustomProblem.user_id == user.id)
+            .order_by(LCCustomProblem.created_at.asc())
+        )
+    ).scalars().all()
+    return LCCustomProblemListResponse(problems=[_serialize_custom_problem(row) for row in rows])
+
+
+@router.put("/custom-problems/{slug}", response_model=LCCustomProblemResponse)
+async def upsert_custom_problem(
+    slug: str,
+    body: LCCustomProblemSyncRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LCCustomProblemResponse:
+    _validate_custom_slug(slug)
+    test_cases_json = json.dumps([case.model_dump() for case in body.test_cases])
+    row = (
+        await session.execute(
+            select(LCCustomProblem).where(
+                LCCustomProblem.user_id == user.id,
+                LCCustomProblem.slug == slug,
+            )
+        )
+    ).scalar_one_or_none()
+    if row:
+        row.title = body.title
+        row.topic = body.topic or "unknown"
+        row.difficulty = body.normalized_difficulty()
+        row.description = body.description
+        row.url = body.url
+        row.starter_code = body.starter_code
+        row.test_cases_json = test_cases_json
+    else:
+        row = LCCustomProblem(
+            user_id=user.id,
+            slug=slug,
+            title=body.title,
+            topic=body.topic or "unknown",
+            difficulty=body.normalized_difficulty(),
+            description=body.description,
+            url=body.url,
+            starter_code=body.starter_code,
+            test_cases_json=test_cases_json,
+        )
+        session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return _serialize_custom_problem(row)
+
+
+@router.delete("/custom-problems/{slug}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def delete_custom_problem(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> Response:
+    _validate_custom_slug(slug)
+    row = (
+        await session.execute(
+            select(LCCustomProblem).where(
+                LCCustomProblem.user_id == user.id,
+                LCCustomProblem.slug == slug,
+            )
+        )
+    ).scalar_one_or_none()
+    if row:
+        await session.delete(row)
+        await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/custom-problems/generate", response_model=LCGeneratedCustomProblem)
+async def generate_custom_problem(
+    body: LCGenerateCustomProblemRequest,
+    user: User = Depends(get_current_user),
+) -> LCGeneratedCustomProblem:
+    if not body.code.strip() and not body.hint.strip():
+        raise HTTPException(status_code=400, detail="Paste some code or describe the problem first.")
+    try:
+        return await LeetCodeService().generate_custom_problem(
+            code=body.code,
+            hint=body.hint,
+            provider=body.provider,
+        )
+    except LLMException as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc

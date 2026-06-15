@@ -19,6 +19,8 @@ import type {
   KojoChatResponse,
   KojoConversation,
   KojoConversationSummary,
+  LCCustomProblem,
+  LCGeneratedCustomProblem,
   LeetCodeGradeResponse,
   LeetCodeHintResponse,
   LeetCodeProblemData,
@@ -537,6 +539,7 @@ export async function gradeLeetCodeSubmission(
   testResults: string,
   allPassed: boolean,
   provider?: string,
+  statement?: string,
 ): Promise<LeetCodeGradeResponse> {
   const body: Record<string, unknown> = {
     title_slug: titleSlug,
@@ -546,6 +549,7 @@ export async function gradeLeetCodeSubmission(
     all_passed: allPassed,
   };
   if (provider) body.provider = provider;
+  if (statement) body.statement = statement;
   return request<LeetCodeGradeResponse>("/leetcode/grade", {
     method: "POST",
     body: JSON.stringify(body),
@@ -598,6 +602,7 @@ export async function fetchLeetCodeHint(
   message: string,
   userCode: string,
   provider?: string,
+  statement?: string,
 ): Promise<LeetCodeHintResponse> {
   const body: Record<string, unknown> = {
     title_slug: titleSlug,
@@ -606,6 +611,7 @@ export async function fetchLeetCodeHint(
     user_code: userCode,
   };
   if (provider) body.provider = provider;
+  if (statement) body.statement = statement;
   return request<LeetCodeHintResponse>("/leetcode/hint", {
     method: "POST",
     body: JSON.stringify(body),
@@ -815,6 +821,42 @@ export async function syncLCNotes(problemSlug: string, notes: string): Promise<v
   await request(`/leetcode/notes/${problemSlug}`, {
     method: "PUT",
     body: JSON.stringify({ notes }),
+  });
+}
+
+// ── Custom (user-authored) LeetCode problems ──────────────────────────────────
+
+export async function fetchLCCustomProblems(): Promise<LCCustomProblem[]> {
+  try {
+    const result = await request<{ problems: LCCustomProblem[] }>("/leetcode/custom-problems");
+    return result.problems ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function syncLCCustomProblem(
+  slug: string,
+  problem: Omit<LCCustomProblem, "slug">,
+): Promise<LCCustomProblem> {
+  return request<LCCustomProblem>(`/leetcode/custom-problems/${slug}`, {
+    method: "PUT",
+    body: JSON.stringify(problem),
+  });
+}
+
+export async function deleteLCCustomProblem(slug: string): Promise<void> {
+  await request(`/leetcode/custom-problems/${slug}`, { method: "DELETE" });
+}
+
+export async function generateLCCustomProblem(
+  code: string,
+  hint: string,
+  provider?: string,
+): Promise<LCGeneratedCustomProblem> {
+  return request<LCGeneratedCustomProblem>("/leetcode/custom-problems/generate", {
+    method: "POST",
+    body: JSON.stringify({ code, hint, provider }),
   });
 }
 

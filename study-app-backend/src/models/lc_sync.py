@@ -76,3 +76,31 @@ class LCProblemNote(Base, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"LCProblemNote(user_id={self.user_id!r}, slug={self.problem_slug!r})"
+
+
+class LCCustomProblem(Base, TimestampMixin):
+    """A user-authored LeetCode-style problem. Slug is client-generated (custom-<uuid>)
+    so it never collides with official slugs and the existing slug-keyed progress,
+    workspace, and notes sync all work for it without any extra wiring."""
+
+    __tablename__ = "lc_custom_problems"
+    __table_args__ = (UniqueConstraint("user_id", "slug", name="uq_lc_custom_user_slug"),)
+
+    id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        BIGINT_ID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    slug: Mapped[str] = mapped_column(String(200), nullable=False)
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    topic: Mapped[str] = mapped_column(String(120), nullable=False, default="unknown")
+    difficulty: Mapped[str] = mapped_column(String(20), nullable=False, default="unknown")
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    url: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    starter_code: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # JSON array of {input_text, output_text, explanation_text} objects.
+    test_cases_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+
+    user: Mapped[User] = relationship("User", back_populates="lc_custom_problems")
+
+    def __repr__(self) -> str:
+        return f"LCCustomProblem(user_id={self.user_id!r}, slug={self.slug!r})"
