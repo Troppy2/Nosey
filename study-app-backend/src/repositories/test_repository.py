@@ -29,6 +29,7 @@ class TestRepository(BaseRepository[Test]):
         is_math_mode: bool = False,
         is_coding_mode: bool = False,
         coding_language: Optional[str] = None,
+        notes_hash: Optional[str] = None,
     ) -> Test:
         test = Test(
             folder_id=folder_id,
@@ -38,10 +39,38 @@ class TestRepository(BaseRepository[Test]):
             is_math_mode=is_math_mode,
             is_coding_mode=is_coding_mode,
             coding_language=coding_language,
+            notes_hash=notes_hash,
         )
         self.session.add(test)
         await self.session.flush()
         return test
+
+    async def get_prior_question_texts(
+        self,
+        folder_id: int,
+        notes_hash: str,
+        exclude_test_id: int,
+        limit: int = 80,
+    ) -> list[str]:
+        """Return question texts from earlier READY tests in this folder that were
+        built from the SAME source notes (matched by notes_hash). Used to tell the
+        LLM which questions the student has already seen so it can avoid repeating
+        them. Capped at `limit` (most recent tests first) to protect the token budget.
+        """
+        stmt = (
+            select(Question.question_text)
+            .join(Test, Test.id == Question.test_id)
+            .where(
+                Test.folder_id == folder_id,
+                Test.notes_hash == notes_hash,
+                Test.id != exclude_test_id,
+                Test.generation_status == "ready",
+            )
+            .order_by(Test.created_at.desc(), Question.display_order)
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        return [text for text in result.scalars().all() if text and text.strip()]
 
     async def get_owned(self, test_id: int, user_id: int) -> Optional[Test]:
         stmt = select(Test).join(Folder, Folder.id == Test.folder_id).where(

@@ -21,6 +21,7 @@ class FolderUpdate(BaseModel):
     kojo_auto_index: Optional[bool] = None
     kojo_persona: Optional[str] = Field(default=None, max_length=32)
     is_archived: Optional[bool] = None
+    avoid_repeat_questions: Optional[bool] = None
 
 
 class FolderResponse(BaseModel):
@@ -35,6 +36,7 @@ class FolderResponse(BaseModel):
     kojo_auto_index: bool = True
     kojo_persona: Optional[str] = None
     is_archived: bool = False
+    avoid_repeat_questions: bool = True
     created_at: datetime
     updated_at: datetime
     test_count: int = 0

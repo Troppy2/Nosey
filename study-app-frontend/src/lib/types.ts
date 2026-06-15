@@ -15,6 +15,7 @@ export type Folder = {
   kojo_auto_index?: boolean;
   kojo_persona?: string | null;
   is_archived?: boolean;
+  avoid_repeat_questions?: boolean;
 };
 
 export type TestSummary = {

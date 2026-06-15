@@ -70,6 +70,8 @@ class FolderService:
             folder.kojo_persona = data.kojo_persona
         if data.is_archived is not None:
             folder.is_archived = data.is_archived
+        if data.avoid_repeat_questions is not None:
+            folder.avoid_repeat_questions = data.avoid_repeat_questions
         await session.commit()
         await session.refresh(folder)
         return FolderResponse.model_validate(folder)
