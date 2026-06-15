@@ -5923,6 +5923,14 @@ h3 {
     min-height: 100dvh;
     overflow: visible;
   }
+
+  /* The shell drops its fixed 100dvh height here, so Monaco's height:100% no
+     longer has a definite ancestor to resolve against and collapses to a 0-height
+     black box. Give the editor pane an explicit floor so the surface stays sized.
+     The single-pane toggle below 900px reuses the same idea at 60dvh. */
+  .lc-editor-pane {
+    min-height: 70dvh;
+  }
 }
 
 @media (max-width: 900px) {
