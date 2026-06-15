@@ -38,10 +38,14 @@ import {
   Code,
   Timer,
   Notebook,
+  Pencil,
+  Trash2,
+  Wand2,
 } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MarkdownContent } from "../components/MarkdownContent";
+import { ConfirmModal } from "../components/ConfirmModal";
 import CodingTabs from "../components/Tab";
 import { SlashCommandMenu, type CommandOption as SlashCommand } from "../components/SlashCommandMenu";
 import {
@@ -56,15 +60,19 @@ import {
   fetchLeetCodeHint,
   fetchLeetCodeProblem,
   gradeLeetCodeSubmission,
+  fetchLCCustomProblems,
+  syncLCCustomProblem,
+  deleteLCCustomProblem,
+  generateLCCustomProblem,
 } from "../lib/api";
 import { runPythonLeetCode, traceLeetCodeExecution, type RunnerResult, type TraceResult } from "../lib/pyodideRunner";
 import { sanitizeLeetCodeHtml } from "../lib/leetcodeHtml";
 import { ExecutionVisualizer } from "../components/ExecutionVisualizer";
 import { Link } from "react-router-dom";
-import type { LeetCodeProblemData } from "../lib/types";
+import type { LeetCodeProblemData, LCCustomProblem, LCCustomTestCase, LCGeneratedCustomProblem } from "../lib/types";
 import { useSettings } from "../lib/useSettings";
 
-type Difficulty = "Easy" | "Medium" | "Hard" | "Reference";
+type Difficulty = "Easy" | "Medium" | "Hard" | "Reference" | "Unknown";
 type Filter = "all" | "todo" | "done";
 
 type Problem = {
@@ -127,6 +135,9 @@ function getActivityKey(): string {
   return `${getUserStoragePrefix()}:nosey_lc_activity_dates`;
 }
 const LEETCODE_BASE_URL = "https://leetcode.com/problems";
+const CUSTOM_CATEGORY_ID = "custom";
+const CUSTOM_CATEGORY_LABEL = "Custom Questions";
+const CUSTOM_PROBLEMS_KEY_PREFIX = "nosey_lc_custom_problems";
 const CUSTOM_TEST_LIMIT = 2;
 const MAX_CODE_TABS = 5;
 const CODE_TAB_ID_KEY = "nosey_lc_tab_id";
@@ -421,6 +432,85 @@ function saveActivityDates(dates: string[]) {
   localStorage.setItem(getActivityKey(), JSON.stringify(dates));
 }
 
+function getCustomProblemsKey(): string {
+  return `${CUSTOM_PROBLEMS_KEY_PREFIX}:${getUserStoragePrefix()}`;
+}
+
+function loadCustomProblems(): LCCustomProblem[] {
+  const raw = loadJson<LCCustomProblem[]>(getCustomProblemsKey(), []);
+  return Array.isArray(raw) ? raw.filter((item) => item && typeof item.slug === "string") : [];
+}
+
+function saveCustomProblems(problems: LCCustomProblem[]) {
+  localStorage.setItem(getCustomProblemsKey(), JSON.stringify(problems));
+}
+
+function makeCustomSlug(): string {
+  const id = typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `custom-${id}`;
+}
+
+function customDifficulty(value: string): Difficulty {
+  return value === "Easy" || value === "Medium" || value === "Hard" ? value : "Unknown";
+}
+
+// Turn a stored custom problem into the local Problem shape the views already render.
+function customToProblem(cp: LCCustomProblem): Problem {
+  return {
+    categoryId: CUSTOM_CATEGORY_ID,
+    categoryLabel: CUSTOM_CATEGORY_LABEL,
+    title: cp.title,
+    difficulty: customDifficulty(cp.difficulty),
+    slug: cp.slug,
+    url: cp.url || "https://leetcode.com/problemset/",
+    isExtra: false,
+    isOfficial: false,
+  };
+}
+
+// Synthesize the LeetCodeProblemData the problem view expects (examples from the
+// user's test cases, starter code as the runnable snippet) so custom problems run
+// through the exact same Run/Grade/Visualize path as official ones.
+function customToProblemData(cp: LCCustomProblem): LeetCodeProblemData {
+  return {
+    title: cp.title,
+    title_slug: cp.slug,
+    difficulty: cp.difficulty === "unknown" ? "" : cp.difficulty,
+    content_html: "",
+    examples: cp.test_cases.map((tc, index) => ({
+      index: index + 1,
+      input_text: tc.input_text,
+      output_text: tc.output_text,
+      explanation_text: tc.explanation_text ?? null,
+    })),
+    example_testcases: [],
+    python_snippet: cp.starter_code,
+    topic_tags: cp.topic && cp.topic !== "unknown" ? [{ name: cp.topic, slug: cp.topic }] : [],
+  };
+}
+
+type CustomFormState = {
+  title: string;
+  topic: string;
+  difficulty: LCCustomProblem["difficulty"];
+  description: string;
+  url: string;
+  starterCode: string;
+  testCases: LCCustomTestCase[];
+};
+
+const EMPTY_CUSTOM_FORM: CustomFormState = {
+  title: "",
+  topic: "unknown",
+  difficulty: "unknown",
+  description: "",
+  url: "",
+  starterCode: "",
+  testCases: [],
+};
+
 function getTabStorageId() {
   if (typeof window === "undefined") return "server";
 
@@ -573,13 +663,27 @@ function filterProblems(problems: Problem[], progress: Record<string, boolean>, 
 
 function isRunnable(problemData?: LeetCodeProblemData) {
   const snippet = problemData?.python_snippet ?? "";
-  return snippet.includes("class Solution") && problemData?.examples.length;
+  // A runnable problem just needs some code and at least one example/test case. The
+  // runner accepts either a `class Solution` or a bare top-level function, so custom
+  // problems built from a pasted function run too.
+  return Boolean(snippet.trim()) && Boolean(problemData?.examples.length);
 }
 
 
 export default function LeetCodeMode() {
   const { generationProvider } = useSettings();
   const [view, setView] = useState<View>({ type: "tree" });
+  const [customProblems, setCustomProblems] = useState<LCCustomProblem[]>(() => loadCustomProblems());
+  const [customModalOpen, setCustomModalOpen] = useState(false);
+  const [editingSlug, setEditingSlug] = useState<string | null>(null);
+  const [customForm, setCustomForm] = useState<CustomFormState>(EMPTY_CUSTOM_FORM);
+  const [customSaving, setCustomSaving] = useState(false);
+  const [customError, setCustomError] = useState<string | null>(null);
+  const [pendingDeleteSlug, setPendingDeleteSlug] = useState<string | null>(null);
+  const [aiCode, setAiCode] = useState("");
+  const [aiHint, setAiHint] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const [mobilePane, setMobilePane] = useState<"problem" | "code">("problem");
   const [progress, setProgress] = useState<Record<string, boolean>>(() => loadJson(getProgressKey(), {}));
   const [activityDates, setActivityDates] = useState<string[]>(() => loadJson(getActivityKey(), []));
@@ -617,13 +721,21 @@ export default function LeetCodeMode() {
   const notesSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notesDragOffset = useRef<{ x: number; y: number } | null>(null);
 
+  const customProblemList = useMemo(() => customProblems.map(customToProblem), [customProblems]);
+
   const currentProblem =
     view.type === "problem"
-      ? CATEGORIES.find((category) => category.id === view.categoryId)?.problems.find((problem) => problem.slug === view.problemSlug) ?? null
+      ? (view.categoryId === CUSTOM_CATEGORY_ID
+          ? customProblemList.find((problem) => problem.slug === view.problemSlug) ?? null
+          : CATEGORIES.find((category) => category.id === view.categoryId)?.problems.find((problem) => problem.slug === view.problemSlug) ?? null)
       : null;
 
+  const currentCustomProblem = currentProblem
+    ? customProblems.find((cp) => cp.slug === currentProblem.slug) ?? null
+    : null;
+  const isCustomProblem = Boolean(currentCustomProblem);
   const currentProblemState = currentProblem ? problemStates[currentProblem.slug] : undefined;
-  const currentProblemData = currentProblemState?.data;
+  const currentProblemData = currentCustomProblem ? customToProblemData(currentCustomProblem) : currentProblemState?.data;
   const currentCustomCases = currentProblem ? customCases[currentProblem.slug] ?? [] : [];
   const currentCodeWorkspace = currentProblem ? codeWorkspaces[currentProblem.slug] ?? null : null;
   const currentCodeTab = currentCodeWorkspace?.tabs.find((tab) => tab.id === currentCodeWorkspace.activeTabId) ?? currentCodeWorkspace?.tabs[0] ?? null;
@@ -659,6 +771,33 @@ export default function LeetCodeMode() {
         });
       })
       .catch(() => { });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // On mount: pull custom problems from DB and reconcile with localStorage. DB wins on
+  // overlap; any local-only entries (created while a prior sync failed) get pushed up.
+  useEffect(() => {
+    if (isGuestSession()) return;
+    fetchLCCustomProblems()
+      .then((dbProblems) => {
+        setCustomProblems((local) => {
+          const bySlug = new Map<string, LCCustomProblem>();
+          for (const item of local) bySlug.set(item.slug, item);
+          const localOnly: LCCustomProblem[] = [];
+          for (const item of local) {
+            if (!dbProblems.some((db) => db.slug === item.slug)) localOnly.push(item);
+          }
+          for (const db of dbProblems) bySlug.set(db.slug, db);
+          for (const item of localOnly) {
+            const { slug, ...rest } = item;
+            syncLCCustomProblem(slug, rest).catch(() => {});
+          }
+          const merged = Array.from(bySlug.values());
+          saveCustomProblems(merged);
+          return merged;
+        });
+      })
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -779,6 +918,158 @@ export default function LeetCodeMode() {
     saveProgress(next);
     const nextDates = recordSolvedToday();
     pushProgressToDb(next, nextDates);
+  }
+
+  // ── Custom problem handlers ─────────────────────────────────────────────────
+
+  function openCustomModal(existing?: LCCustomProblem) {
+    setCustomError(null);
+    setAiError(null);
+    setAiHint("");
+    if (existing) {
+      setEditingSlug(existing.slug);
+      setCustomForm({
+        title: existing.title,
+        topic: existing.topic || "unknown",
+        difficulty: existing.difficulty || "unknown",
+        description: existing.description,
+        url: existing.url,
+        starterCode: existing.starter_code,
+        testCases: existing.test_cases.map((tc) => ({ ...tc })),
+      });
+      setAiCode(existing.starter_code);
+    } else {
+      setEditingSlug(null);
+      setCustomForm(EMPTY_CUSTOM_FORM);
+      setAiCode("");
+    }
+    setCustomModalOpen(true);
+  }
+
+  function closeCustomModal() {
+    setCustomModalOpen(false);
+    setEditingSlug(null);
+    setCustomForm(EMPTY_CUSTOM_FORM);
+    setAiCode("");
+    setAiHint("");
+    setAiError(null);
+    setCustomError(null);
+    setCustomSaving(false);
+    setAiLoading(false);
+  }
+
+  function persistCustomProblems(next: LCCustomProblem[]) {
+    setCustomProblems(next);
+    saveCustomProblems(next);
+  }
+
+  async function runCustomAiGenerate() {
+    if (aiLoading) return;
+    if (!aiCode.trim() && !aiHint.trim()) {
+      setAiError("Paste your function (or describe the problem) first.");
+      return;
+    }
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const generated: LCGeneratedCustomProblem = await generateLCCustomProblem(aiCode, aiHint, generationProvider);
+      setCustomForm((prev) => ({
+        title: generated.title || prev.title,
+        topic: generated.topic || prev.topic || "unknown",
+        difficulty: generated.difficulty || prev.difficulty || "unknown",
+        description: generated.description || prev.description,
+        url: prev.url,
+        starterCode: generated.starter_code || aiCode || prev.starterCode,
+        testCases: generated.test_cases.length ? generated.test_cases.map((tc) => ({ ...tc })) : prev.testCases,
+      }));
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : "Generation failed. Try again.");
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  function updateCustomForm<K extends keyof CustomFormState>(field: K, value: CustomFormState[K]) {
+    setCustomForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function addFormTestCase() {
+    setCustomForm((prev) => ({
+      ...prev,
+      testCases: [...prev.testCases, { input_text: "", output_text: "", explanation_text: "" }],
+    }));
+  }
+
+  function updateFormTestCase(index: number, field: keyof LCCustomTestCase, value: string) {
+    setCustomForm((prev) => ({
+      ...prev,
+      testCases: prev.testCases.map((tc, i) => (i === index ? { ...tc, [field]: value } : tc)),
+    }));
+  }
+
+  function removeFormTestCase(index: number) {
+    setCustomForm((prev) => ({ ...prev, testCases: prev.testCases.filter((_, i) => i !== index) }));
+  }
+
+  async function saveCustomProblem() {
+    if (customSaving) return;
+    const title = customForm.title.trim();
+    if (!title) {
+      setCustomError("Give the problem a title.");
+      return;
+    }
+    setCustomSaving(true);
+    setCustomError(null);
+
+    const slug = editingSlug ?? makeCustomSlug();
+    const payload: Omit<LCCustomProblem, "slug"> = {
+      title,
+      topic: customForm.topic.trim() || "unknown",
+      difficulty: customForm.difficulty || "unknown",
+      description: customForm.description,
+      url: customForm.url.trim(),
+      starter_code: customForm.starterCode,
+      test_cases: customForm.testCases
+        .filter((tc) => tc.input_text.trim() || tc.output_text.trim())
+        .map((tc) => ({
+          input_text: tc.input_text,
+          output_text: tc.output_text,
+          explanation_text: tc.explanation_text || null,
+        })),
+    };
+
+    const saved: LCCustomProblem = { slug, ...payload };
+    const next = editingSlug
+      ? customProblems.map((cp) => (cp.slug === slug ? saved : cp))
+      : [...customProblems, saved];
+    persistCustomProblems(next);
+
+    if (!isGuestSession()) {
+      try {
+        await syncLCCustomProblem(slug, payload);
+      } catch {
+        // Best-effort like the rest of LC sync; localStorage already holds it.
+      }
+    }
+    setCustomSaving(false);
+    closeCustomModal();
+  }
+
+  function handleDeleteCustomProblem(slug: string) {
+    setPendingDeleteSlug(slug);
+  }
+
+  function confirmDeleteCustomProblem() {
+    const slug = pendingDeleteSlug;
+    if (!slug) return;
+    persistCustomProblems(customProblems.filter((cp) => cp.slug !== slug));
+    if (!isGuestSession()) {
+      deleteLCCustomProblem(slug).catch(() => {});
+    }
+    setPendingDeleteSlug(null);
+    if (view.type === "problem" && view.problemSlug === slug) {
+      setView({ type: "category", categoryId: CUSTOM_CATEGORY_ID });
+    }
   }
 
   function closeTimerPicker() {
@@ -923,6 +1214,7 @@ export default function LeetCodeMode() {
           })),
         );
         try {
+          const customForGrade = customProblems.find((cp) => cp.slug === problemAtRun.slug);
           const grade = await gradeLeetCodeSubmission(
             problemAtRun.slug,
             problemAtRun.title,
@@ -930,6 +1222,7 @@ export default function LeetCodeMode() {
             testResultsSummary,
             result.ok,
             generationProvider,
+            customForGrade?.description || undefined,
           );
           setGradeFeedback(grade.feedback);
         } catch {
@@ -1147,6 +1440,7 @@ export default function LeetCodeMode() {
         message,
         currentCode,
         generationProvider,
+        currentCustomProblem?.description || undefined,
       );
       setKojoResponse(result.response);
     } catch (error) {
@@ -1192,6 +1486,205 @@ export default function LeetCodeMode() {
     const problemAtRun = currentProblem;
     await runAndGradeCurrentCode(problemAtRun, currentCode, currentProblemData, currentCustomCases);
   }
+
+  const pendingDeleteProblem = pendingDeleteSlug
+    ? customProblems.find((cp) => cp.slug === pendingDeleteSlug) ?? null
+    : null;
+  const confirmDeleteNode = pendingDeleteSlug ? (
+    <ConfirmModal
+      title="Delete custom question?"
+      message={
+        pendingDeleteProblem
+          ? `"${pendingDeleteProblem.title}" and your saved work on it will be removed. This cannot be undone.`
+          : "This custom question will be removed. This cannot be undone."
+      }
+      confirmLabel="Delete"
+      danger
+      onConfirm={confirmDeleteCustomProblem}
+      onCancel={() => setPendingDeleteSlug(null)}
+    />
+  ) : null;
+
+  // Rendered in every view (tree, custom category, problem) so "Add question" works everywhere.
+  const customModalNode = customModalOpen ? (
+    <>
+      <div className="lc-kojo-backdrop" onClick={closeCustomModal} />
+      <div className="lc-kojo-modal lc-custom-modal" role="dialog" aria-label="Custom question editor">
+        <div className="lc-kojo-modal-header lc-custom-modal-header">
+          <div className="kojo-avatar lc-custom-avatar"><Code size={16} /></div>
+          <span>{editingSlug ? "Edit custom question" : "Add custom question"}</span>
+          <button type="button" className="lc-kojo-close" onClick={closeCustomModal} aria-label="Close">
+            <X size={17} />
+          </button>
+        </div>
+
+        <div className="lc-custom-modal-body">
+          <div className="lc-custom-ai">
+            <div className="lc-custom-ai-head">
+              <Wand2 size={15} />
+              <span>Generate from your code</span>
+            </div>
+            <p className="muted small">Paste a function (or any code). Kojo writes the title, a walkthrough, and runnable test cases. You can edit everything below.</p>
+            <textarea
+              className="lc-custom-ai-code"
+              value={aiCode}
+              onChange={(event) => setAiCode(event.target.value)}
+              rows={6}
+              placeholder={"def two_sum(nums, target):\n    # your code"}
+              spellCheck={false}
+            />
+            <input
+              className="lc-custom-input"
+              value={aiHint}
+              onChange={(event) => setAiHint(event.target.value)}
+              placeholder="Optional: one line on what it should do"
+            />
+            {aiError ? <div className="kojo-error"><AlertCircle size={14} /><span>{aiError}</span></div> : null}
+            <button type="button" className="button lc-custom-ai-btn" onClick={() => void runCustomAiGenerate()} disabled={aiLoading}>
+              {aiLoading ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />}
+              {aiLoading ? "Generating…" : "Generate with AI"}
+            </button>
+          </div>
+
+          <div className="lc-custom-divider"><span>then review</span></div>
+
+          <label className="lc-custom-field">
+            <span>Title</span>
+            <input
+              className="lc-custom-input"
+              value={customForm.title}
+              onChange={(event) => updateCustomForm("title", event.target.value)}
+              placeholder="Two Sum"
+            />
+          </label>
+
+          <div className="lc-custom-field-row">
+            <label className="lc-custom-field">
+              <span>Topic</span>
+              <input
+                className="lc-custom-input"
+                value={customForm.topic}
+                onChange={(event) => updateCustomForm("topic", event.target.value)}
+                placeholder="unknown"
+              />
+            </label>
+            <label className="lc-custom-field">
+              <span>Difficulty</span>
+              <select
+                className="lc-custom-input"
+                value={customForm.difficulty}
+                onChange={(event) => updateCustomForm("difficulty", event.target.value as CustomFormState["difficulty"])}
+              >
+                <option value="unknown">Unknown</option>
+                <option value="Easy">Easy</option>
+                <option value="Medium">Medium</option>
+                <option value="Hard">Hard</option>
+              </select>
+            </label>
+          </div>
+
+          <label className="lc-custom-field">
+            <span>LeetCode URL <small className="muted">(optional)</small></span>
+            <input
+              className="lc-custom-input"
+              value={customForm.url}
+              onChange={(event) => updateCustomForm("url", event.target.value)}
+              placeholder="https://leetcode.com/problems/..."
+            />
+          </label>
+
+          <label className="lc-custom-field">
+            <span>Problem statement <small className="muted">(Markdown)</small></span>
+            <textarea
+              className="lc-custom-textarea"
+              value={customForm.description}
+              onChange={(event) => updateCustomForm("description", event.target.value)}
+              rows={6}
+              placeholder="Describe the task, constraints, and a couple of worked examples."
+            />
+          </label>
+
+          <label className="lc-custom-field">
+            <span>Starter code</span>
+            <textarea
+              className="lc-custom-ai-code"
+              value={customForm.starterCode}
+              onChange={(event) => updateCustomForm("starterCode", event.target.value)}
+              rows={6}
+              placeholder={"def two_sum(nums, target):\n    ..."}
+              spellCheck={false}
+            />
+          </label>
+
+          <div className="lc-custom-cases">
+            <div className="lc-custom-cases-head">
+              <span>Test cases</span>
+              <button type="button" className="lc-add-test-btn" onClick={addFormTestCase}>
+                <Plus size={14} />
+                Add case
+              </button>
+            </div>
+            <p className="muted small">Input uses named arguments, e.g. <code>nums = [2,7,11,15], target = 9</code>. Expected is a Python value, e.g. <code>[0, 1]</code>.</p>
+            {customForm.testCases.length === 0 ? (
+              <p className="muted small">No test cases yet. Add some so this problem can run.</p>
+            ) : (
+              customForm.testCases.map((tc, index) => (
+                <div key={index} className="lc-custom-case">
+                  <div className="lc-custom-case-top">
+                    <strong>Case {index + 1}</strong>
+                    <button type="button" className="lc-inline-icon-btn" onClick={() => removeFormTestCase(index)} aria-label="Remove test case">
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <label>
+                    <span>Input</span>
+                    <textarea
+                      value={tc.input_text}
+                      onChange={(event) => updateFormTestCase(index, "input_text", event.target.value)}
+                      rows={2}
+                      placeholder="nums = [2,7,11,15], target = 9"
+                      spellCheck={false}
+                    />
+                  </label>
+                  <label>
+                    <span>Expected</span>
+                    <textarea
+                      value={tc.output_text}
+                      onChange={(event) => updateFormTestCase(index, "output_text", event.target.value)}
+                      rows={1}
+                      placeholder="[0, 1]"
+                      spellCheck={false}
+                    />
+                  </label>
+                  <label>
+                    <span>Explanation <small className="muted">(optional)</small></span>
+                    <textarea
+                      value={tc.explanation_text ?? ""}
+                      onChange={(event) => updateFormTestCase(index, "explanation_text", event.target.value)}
+                      rows={1}
+                      placeholder="Why this output"
+                    />
+                  </label>
+                </div>
+              ))
+            )}
+          </div>
+
+          {customError ? <div className="kojo-error"><AlertCircle size={14} /><span>{customError}</span></div> : null}
+        </div>
+
+        <div className="lc-custom-modal-footer">
+          <button type="button" className="button lc-timeout-action lc-timeout-action--ghost" onClick={closeCustomModal}>
+            Cancel
+          </button>
+          <button type="button" className="lc-custom-add-btn lc-custom-modal-save" onClick={() => void saveCustomProblem()} disabled={customSaving}>
+            {customSaving ? <Loader2 size={15} className="spin" /> : null}
+            {editingSlug ? "Save changes" : "Add question"}
+          </button>
+        </div>
+      </div>
+    </>
+  ) : null;
 
   if (view.type === "tree") {
     return (
@@ -1270,6 +1763,108 @@ export default function LeetCodeMode() {
             );
           })}
         </section>
+
+        <section className="lc-custom-section" aria-label="Custom questions">
+          {(() => {
+            const customDone = customProblemList.filter((problem) => progress[problem.slug]).length;
+            const customPct = customProblemList.length ? Math.round((customDone / customProblemList.length) * 100) : 0;
+            return (
+              <div className="lc-custom-node" style={{ "--lc-accent": "#b45309" } as CSSProperties}>
+                <button
+                  type="button"
+                  className="lc-custom-node-main"
+                  onClick={() => setView({ type: "category", categoryId: CUSTOM_CATEGORY_ID })}
+                >
+                  <span className="lc-node-icon"><Code size={22} /></span>
+                  <span className="lc-node-copy">
+                    <strong>{CUSTOM_CATEGORY_LABEL}</strong>
+                    <small>
+                      {customProblemList.length
+                        ? `${customDone}/${customProblemList.length} complete`
+                        : "Add your own problems"}
+                    </small>
+                  </span>
+                  <span className="lc-node-progress"><span style={{ width: `${customPct}%` }} /></span>
+                </button>
+                <button type="button" className="lc-custom-add-btn" onClick={() => openCustomModal()}>
+                  <Plus size={16} />
+                  Add question
+                </button>
+              </div>
+            );
+          })()}
+        </section>
+        {customModalNode}
+        {confirmDeleteNode}
+      </div>
+    );
+  }
+
+  if (view.type === "category" && view.categoryId === CUSTOM_CATEGORY_ID) {
+    const visibleProblems = filterProblems(customProblemList, progress, filter, query);
+    const done = customProblemList.filter((problem) => progress[problem.slug]).length;
+    return (
+      <div className="page page-narrow lc-page">
+        <header className="lc-category-header">
+          <button type="button" className="lc-back-btn" onClick={() => setView({ type: "tree" })}>
+            <ChevronLeft size={16} />
+            Roadmap
+          </button>
+          <div className="lc-category-title-row" style={{ "--lc-accent": "#b45309" } as CSSProperties}>
+            <span className="lc-node-icon"><Code size={22} /></span>
+            <div>
+              <h1>{CUSTOM_CATEGORY_LABEL}</h1>
+              <p className="muted">{done}/{customProblemList.length} complete</p>
+            </div>
+          </div>
+          <div className="lc-category-tools">
+            <div className="lc-search">
+              <Search size={16} />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search problems" />
+            </div>
+            <button type="button" className="lc-custom-add-btn" onClick={() => openCustomModal()}>
+              <Plus size={16} />
+              Add question
+            </button>
+          </div>
+        </header>
+
+        {customProblemList.length === 0 ? (
+          <div className="lc-custom-empty">
+            <p>No custom questions yet. Paste a function and let Kojo turn it into a full problem with a walkthrough and test cases, or write one by hand.</p>
+            <button type="button" className="lc-custom-add-btn" onClick={() => openCustomModal()}>
+              <Plus size={16} />
+              Add your first question
+            </button>
+          </div>
+        ) : (
+          <div className="lc-problem-list">
+            {visibleProblems.map((problem) => {
+              const solved = Boolean(progress[problem.slug]);
+              const cp = customProblems.find((item) => item.slug === problem.slug);
+              return (
+                <div key={problem.slug} className={solved ? "lc-problem-row lc-problem-row--done" : "lc-problem-row"}>
+                  <button type="button" className="lc-problem-check" onClick={() => toggleProgress(problem)} title={solved ? "Mark incomplete" : "Mark complete"}>
+                    {solved ? <CheckCircle2 size={20} className="lc-check-done" /> : <Circle size={20} className="lc-check-empty" />}
+                  </button>
+                  <button type="button" className="lc-problem-title-btn" onClick={() => openProblem(CUSTOM_CATEGORY_ID, problem.slug)}>
+                    <span>{problem.title}</span>
+                    <small>{cp && cp.topic !== "unknown" ? cp.topic : "Custom problem"}</small>
+                  </button>
+                  <span className={`lc-difficulty lc-difficulty--${difficultyClass(problem.difficulty)}`}>{problem.difficulty}</span>
+                  <button type="button" className="lc-inline-icon-btn" onClick={() => cp && openCustomModal(cp)} aria-label="Edit custom question">
+                    <Pencil size={16} />
+                  </button>
+                  <button type="button" className="lc-inline-icon-btn" onClick={() => handleDeleteCustomProblem(problem.slug)} aria-label="Delete custom question">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {customModalNode}
+        {confirmDeleteNode}
       </div>
     );
   }
@@ -1442,8 +2037,15 @@ export default function LeetCodeMode() {
       <div className="lc-editor-body" data-mobile-pane={mobilePane}>
         <aside className="lc-problem-pane">
           <div className="lc-problem-source">
-            <span>{currentProblem.isOfficial ? "Official LeetCode statement" : "Reference-only topic"}</span>
-            <a href={currentProblem.url} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Source</a>
+            <span>{isCustomProblem ? "Custom problem" : currentProblem.isOfficial ? "Official LeetCode statement" : "Reference-only topic"}</span>
+            {!isCustomProblem || currentCustomProblem?.url ? (
+              <a href={currentProblem.url} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Source</a>
+            ) : null}
+            {isCustomProblem && currentCustomProblem ? (
+              <button type="button" className="lc-inline-icon-btn" onClick={() => openCustomModal(currentCustomProblem)} aria-label="Edit custom question">
+                <Pencil size={15} />
+              </button>
+            ) : null}
           </div>
 
           <h2 className="lc-problem-heading">{currentProblem.title}</h2>
@@ -1461,13 +2063,25 @@ export default function LeetCodeMode() {
             <div className="lc-statement-state lc-statement-state--error"><AlertCircle size={18} /><span>{problemError}</span></div>
           ) : null}
 
-          {!currentProblem.isOfficial ? (
+          {!currentProblem.isOfficial && !isCustomProblem ? (
             <div className="lc-source-note">
               <p>This item is kept as a reference drill because it is not an official LeetCode problem title. The editor and Kojo coach still work here, but there is no official statement to render.</p>
             </div>
           ) : null}
 
-          {currentProblemData ? (
+          {isCustomProblem && currentCustomProblem ? (
+            currentCustomProblem.description.trim() ? (
+              <div className="lc-custom-statement">
+                <MarkdownContent content={currentCustomProblem.description} />
+              </div>
+            ) : (
+              <div className="lc-source-note">
+                <p>No write-up yet. Edit this problem and use Generate with AI to add a walkthrough and test cases, or just start coding.</p>
+              </div>
+            )
+          ) : null}
+
+          {currentProblemData && !isCustomProblem ? (
             <>
               <div className="lc-topic-tags">
                 {currentProblemData.topic_tags.slice(0, 4).map((tag) => (
@@ -1486,13 +2100,17 @@ export default function LeetCodeMode() {
                 Add custom
               </button>
             </div>
-            <p className="muted small">You can add up to 2 custom cases on top of the official LeetCode examples.</p>
+            <p className="muted small">
+              {isCustomProblem
+                ? "These cases come from this problem. You can add up to 2 ad-hoc cases for a quick run."
+                : "You can add up to 2 custom cases on top of the official LeetCode examples."}
+            </p>
 
             <div className="lc-test-list">
               {officialExamples.map((example) => (
                 <div key={example.index} className="lc-test-card">
                   <div className="lc-test-card-top">
-                    <strong>Official {example.index}</strong>
+                    <strong>{isCustomProblem ? "Test" : "Official"} {example.index}</strong>
                     {currentCode.trim() && runnable ? (
                       <button
                         type="button"
@@ -1565,6 +2183,10 @@ export default function LeetCodeMode() {
               <p className="lc-runner-note">Automatic running currently supports Python `class Solution` problems with official example inputs. Design-style problems still open with the official statement and editor, but they do not auto-run yet.</p>
             ) : null}
 
+            {!runnable && isCustomProblem ? (
+              <p className="lc-runner-note">Add starter code and at least one test case to run this problem. Editing it and using Generate with AI fills both in automatically.</p>
+            ) : null}
+
             {runnerResult ? (
               <div className={runnerResult.ok ? "lc-runner-result lc-runner-result--ok" : "lc-runner-result lc-runner-result--error"}>
                 <strong>{runnerResult.output}</strong>
@@ -1632,34 +2254,36 @@ export default function LeetCodeMode() {
             ) : null}
           </div>
 
-          <div className="lc-solution-panel">
-            <button
-              type="button"
-              className="lc-solution-toggle"
-              onClick={() => hasAttempted && setSolutionOpen((prev) => !prev)}
-              disabled={!hasAttempted}
-              title={hasAttempted ? "Toggle NeetCode solution" : "Attempt the problem to unlock"}
-            >
-              <Youtube size={15} />
-              <span>NeetCode solution</span>
-              {!hasAttempted ? (
-                <small className="lc-solution-locked">Attempt first to unlock</small>
-              ) : (
-                <ChevronDown size={14} className={solutionOpen ? "lc-solution-chevron lc-solution-chevron--open" : "lc-solution-chevron"} />
-              )}
-            </button>
-            {solutionOpen && hasAttempted ? (
-              <div className="lc-solution-frame-wrap">
-                <iframe
-                  src={`https://neetcode.io/solutions/${currentProblem.slug}`}
-                  title={`NeetCode solution for ${currentProblem.title}`}
-                  className="lc-solution-iframe"
-                  allow="autoplay; encrypted-media"
-                  allowFullScreen
-                />
-              </div>
-            ) : null}
-          </div>
+          {!isCustomProblem ? (
+            <div className="lc-solution-panel">
+              <button
+                type="button"
+                className="lc-solution-toggle"
+                onClick={() => hasAttempted && setSolutionOpen((prev) => !prev)}
+                disabled={!hasAttempted}
+                title={hasAttempted ? "Toggle NeetCode solution" : "Attempt the problem to unlock"}
+              >
+                <Youtube size={15} />
+                <span>NeetCode solution</span>
+                {!hasAttempted ? (
+                  <small className="lc-solution-locked">Attempt first to unlock</small>
+                ) : (
+                  <ChevronDown size={14} className={solutionOpen ? "lc-solution-chevron lc-solution-chevron--open" : "lc-solution-chevron"} />
+                )}
+              </button>
+              {solutionOpen && hasAttempted ? (
+                <div className="lc-solution-frame-wrap">
+                  <iframe
+                    src={`https://neetcode.io/solutions/${currentProblem.slug}`}
+                    title={`NeetCode solution for ${currentProblem.title}`}
+                    className="lc-solution-iframe"
+                    allow="autoplay; encrypted-media"
+                    allowFullScreen
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </aside>
 
         <div className="lc-editor-pane">
@@ -1874,6 +2498,9 @@ export default function LeetCodeMode() {
           </div>
         </>
       ) : null}
+
+      {customModalNode}
+      {confirmDeleteNode}
     </div>
   );
 }

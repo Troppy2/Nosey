@@ -229,25 +229,48 @@ import functools
 import itertools
 """
 
+def select_callable(namespace, new_keys, first_case):
+    """Prefer a class Solution method; otherwise fall back to a bare top-level
+    function the user pasted. When several functions exist, pick the one whose
+    parameter count matches the first test case so 'just paste a function' works."""
+    import types as _types
+    solution_cls = namespace.get("Solution")
+    if isinstance(solution_cls, type):
+        method_names = [
+            name for name, value in solution_cls.__dict__.items()
+            if callable(value) and not name.startswith("_")
+        ]
+        if not method_names:
+            raise ValueError("class Solution needs at least one public method to run.")
+        return getattr(solution_cls(), method_names[0])
+
+    func_candidates = [
+        namespace[k] for k in new_keys
+        if isinstance(namespace.get(k), _types.FunctionType)
+    ]
+    if not func_candidates:
+        raise ValueError("To run, your code needs a top-level function or a class Solution.")
+    if len(func_candidates) == 1 or first_case is None:
+        return func_candidates[-1]
+    try:
+        wanted = len(parse_named_args(first_case["inputText"]))
+        for fn in func_candidates:
+            if len(inspect.signature(fn).parameters) == wanted:
+                return fn
+    except Exception:
+        pass
+    return func_candidates[-1]
+
 try:
     namespace = {}
     exec(_PRELUDE, namespace)
     namespace["ListNode"] = ListNode
     namespace["TreeNode"] = TreeNode
+    _before_keys = set(namespace.keys())
     exec(user_code, namespace)
-    solution_cls = namespace.get("Solution")
-    if solution_cls is None:
-        raise ValueError("Automatic test running currently supports LeetCode Python snippets that define class Solution.")
+    _new_keys = [k for k in namespace.keys() if k not in _before_keys]
 
-    method_names = [
-        name for name, value in solution_cls.__dict__.items()
-        if callable(value) and not name.startswith("_")
-    ]
-    if len(method_names) == 0:
-        raise ValueError("Automatic test running requires at least one public method in class Solution.")
-
-    solution = solution_cls()
-    method = getattr(solution, method_names[0])
+    method = select_callable(namespace, _new_keys, test_cases[0] if test_cases else None)
     signature = inspect.signature(method)
     parameters = list(signature.parameters.values())
 
@@ -408,11 +431,19 @@ _input_text = ${JSON.stringify(inputText)}
 _TRACE_RESULT = {"steps": [], "result": None, "error": None}
 
 try:
+    import types as _types
+    _before = set(_ns.keys())
     exec(compile(_user_code, "<user_solution>", "exec"), _ns)
-    _cls = _ns["Solution"]
-    _mn = [n for n, v in _cls.__dict__.items() if callable(v) and not n.startswith("_")][0]
-    _inst = _cls()
-    _meth = getattr(_inst, _mn)
+    _new = [k for k in _ns.keys() if k not in _before]
+    _cls = _ns.get("Solution")
+    if isinstance(_cls, type):
+        _mn = [n for n, v in _cls.__dict__.items() if callable(v) and not n.startswith("_")][0]
+        _meth = getattr(_cls(), _mn)
+    else:
+        _funcs = [_ns[k] for k in _new if isinstance(_ns.get(k), _types.FunctionType)]
+        if not _funcs:
+            raise ValueError("Need a top-level function or class Solution to visualize.")
+        _meth = _funcs[-1]
     _sig = _inspect.signature(_meth)
     _params = list(_sig.parameters.values())
     _raw = _parse_args(_input_text)

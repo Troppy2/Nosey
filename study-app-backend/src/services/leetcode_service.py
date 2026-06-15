@@ -9,6 +9,8 @@ from typing import Optional
 import httpx
 
 from src.schemas.leetcode_schema import (
+    LCCustomTestCase,
+    LCGeneratedCustomProblem,
     LeetCodeExample,
     LeetCodeGradeResponse,
     LeetCodeHintResponse,
@@ -55,15 +57,25 @@ class LeetCodeService:
         user_message: str,
         user_code: str,
         provider: Optional[str] = None,
+        statement: str = "",
     ) -> LeetCodeHintResponse:
-        problem = await self._fetch_problem(title_slug)
-        prompt = self._build_hint_prompt(
-            title=title or problem.title,
-            statement_html=problem.content_html,
-            examples=problem.examples,
-            user_message=user_message,
-            user_code=user_code,
-        )
+        if statement.strip():
+            prompt = self._build_hint_prompt(
+                title=title or "this problem",
+                statement_html=statement,
+                examples=[],
+                user_message=user_message,
+                user_code=user_code,
+            )
+        else:
+            problem = await self._fetch_problem(title_slug)
+            prompt = self._build_hint_prompt(
+                title=title or problem.title,
+                statement_html=problem.content_html,
+                examples=problem.examples,
+                user_message=user_message,
+                user_code=user_code,
+            )
         try:
             response = await LLMService().call_kojo(prompt, provider=provider)
         except Exception as exc:  # pragma: no cover - mirrors Kojo path
@@ -83,21 +95,76 @@ class LeetCodeService:
         test_results: str,
         all_passed: bool,
         provider: Optional[str] = None,
+        statement: str = "",
     ) -> LeetCodeGradeResponse:
-        problem = await self._fetch_problem(title_slug)
-        prompt = self._build_grade_prompt(
-            title=title or problem.title,
-            statement_html=problem.content_html,
-            user_code=user_code,
-            test_results=test_results,
-            all_passed=all_passed,
-        )
+        if statement.strip():
+            prompt = self._build_grade_prompt(
+                title=title or "this problem",
+                statement_html=statement,
+                user_code=user_code,
+                test_results=test_results,
+                all_passed=all_passed,
+            )
+        else:
+            problem = await self._fetch_problem(title_slug)
+            prompt = self._build_grade_prompt(
+                title=title or problem.title,
+                statement_html=problem.content_html,
+                user_code=user_code,
+                test_results=test_results,
+                all_passed=all_passed,
+            )
         try:
             response = await LLMService().call_kojo(prompt, provider=provider)
         except Exception as exc:
             raise LLMException("Kojo failed to grade the submission. Try again.") from exc
 
         return LeetCodeGradeResponse(feedback=response, flagged_uncertain=False)
+
+    async def generate_custom_problem(
+        self,
+        code: str,
+        hint: str = "",
+        provider: Optional[str] = None,
+    ) -> LCGeneratedCustomProblem:
+        """Turn user-pasted code into a full LeetCode-style problem (title, walkthrough,
+        worked examples, runnable starter code, named-argument test cases)."""
+        try:
+            data = await LLMService().generate_custom_problem(code=code, hint=hint, provider=provider)
+        except Exception as exc:
+            raise LLMException("Kojo couldn't generate a problem from that code. Try again.") from exc
+
+        difficulty = str(data.get("difficulty", "unknown") or "unknown").strip().capitalize()
+        if difficulty not in ("Easy", "Medium", "Hard"):
+            difficulty = "unknown"
+
+        raw_cases = data.get("test_cases")
+        test_cases: list[LCCustomTestCase] = []
+        if isinstance(raw_cases, list):
+            for item in raw_cases:
+                if not isinstance(item, dict):
+                    continue
+                input_text = str(item.get("input_text", "") or "").strip()
+                output_text = str(item.get("output_text", "") or "").strip()
+                if not input_text or not output_text:
+                    continue
+                explanation = item.get("explanation_text")
+                test_cases.append(
+                    LCCustomTestCase(
+                        input_text=input_text[:4000],
+                        output_text=output_text[:4000],
+                        explanation_text=(str(explanation)[:4000] if explanation else None),
+                    )
+                )
+
+        return LCGeneratedCustomProblem(
+            title=str(data.get("title", "") or "").strip()[:300],
+            topic=str(data.get("topic", "unknown") or "unknown").strip()[:120] or "unknown",
+            difficulty=difficulty,
+            description=str(data.get("description", "") or "").strip()[:20000],
+            starter_code=str(data.get("starter_code", "") or code or "").strip()[:20000],
+            test_cases=test_cases,
+        )
 
     async def _fetch_problem(self, title_slug: str) -> _FetchedProblem:
         payload = {

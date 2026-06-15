@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from src.models.flashcard import Flashcard, FlashcardAttempt
     from src.models.folder import Folder
     from src.models.kojo_conversation import KojoConversation
-    from src.models.lc_sync import LCActivityDate, LCCodeWorkspace, LCProgress, LCProblemNote
+    from src.models.lc_sync import LCActivityDate, LCCodeWorkspace, LCCustomProblem, LCProgress, LCProblemNote
     from src.models.mock_interview import MockInterviewSession
     from src.models.slash_command import SlashCommand
     from src.models.user_attempt import UserAttempt
@@ -58,6 +58,9 @@ class User(Base, TimestampMixin):
     )
     lc_problem_notes: Mapped[list[LCProblemNote]] = relationship(
         "LCProblemNote", back_populates="user", cascade="all, delete-orphan"
+    )
+    lc_custom_problems: Mapped[list[LCCustomProblem]] = relationship(
+        "LCCustomProblem", back_populates="user", cascade="all, delete-orphan"
     )
     mock_interview_sessions: Mapped[list[MockInterviewSession]] = relationship(
         "MockInterviewSession", back_populates="user", cascade="all, delete-orphan"

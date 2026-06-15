@@ -407,6 +407,37 @@ export type LeetCodeHintResponse = {
   flagged_uncertain: boolean;
 };
 
+// ── Custom (user-authored) LeetCode problems ────────────────────────────────────
+
+export type LCCustomDifficulty = "Easy" | "Medium" | "Hard" | "unknown";
+
+export type LCCustomTestCase = {
+  input_text: string;
+  output_text: string;
+  explanation_text?: string | null;
+};
+
+export type LCCustomProblem = {
+  slug: string;
+  title: string;
+  topic: string;
+  difficulty: LCCustomDifficulty;
+  description: string;
+  url: string;
+  starter_code: string;
+  test_cases: LCCustomTestCase[];
+};
+
+// What the AI returns from /custom-problems/generate (no slug or url yet).
+export type LCGeneratedCustomProblem = {
+  title: string;
+  topic: string;
+  difficulty: LCCustomDifficulty;
+  description: string;
+  starter_code: string;
+  test_cases: LCCustomTestCase[];
+};
+
 export type LeetCodeGradeResponse = {
   feedback: string;
   flagged_uncertain: boolean;
