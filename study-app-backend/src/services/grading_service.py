@@ -133,15 +133,18 @@ class GradingService:
     ) -> FRQGrade:
         qtype = question.question_type
 
-        # MCQ and True/False both resolve to a single correct option, compared by text.
-        if qtype == "MCQ" or qtype == "TF":
-            return self._grade_mcq(question, user_answer)
-
-        if qtype == "MS":
-            return self._grade_ms(question, user_answer)
-
-        if qtype == "RANK":
-            return self._grade_rank(question, user_answer)
+        # Objective types are graded deterministically, then enriched with an LLM
+        # "how to solve / why it's correct" guide (for both correct and incorrect
+        # answers). The deterministic feedback stays as the fallback if the LLM call
+        # fails or there is no configured answer.
+        if qtype in ("MCQ", "TF", "MS", "RANK"):
+            if qtype == "MS":
+                grade = self._grade_ms(question, user_answer)
+            elif qtype == "RANK":
+                grade = self._grade_rank(question, user_answer)
+            else:
+                grade = self._grade_mcq(question, user_answer)
+            return await self._enrich_objective_feedback(question, user_answer, grade)
 
         # FRQ grading (existing logic)
         if question.frq_answer is None:
@@ -169,6 +172,38 @@ class GradingService:
             question=question.question_text,
             expected_answer=question.frq_answer.expected_answer,
             user_answer=user_answer,
+        )
+
+    async def _enrich_objective_feedback(
+        self,
+        question: Question,
+        user_answer: str,
+        grade: FRQGrade,
+    ) -> FRQGrade:
+        """Replace the plain deterministic feedback with an LLM-written guide.
+
+        Skips the LLM call when there is no configured correct answer (the grade
+        already carries a config-error message). On LLM failure, keeps the original
+        deterministic feedback.
+        """
+        correct_answer = self._correct_answer_text(question)
+        if not correct_answer:
+            return grade
+
+        explanation = await self.llm_service.explain_objective_answer(
+            question=question.question_text,
+            correct_answer=correct_answer,
+            user_answer=user_answer,
+            is_correct=grade.is_correct,
+        )
+        if not explanation:
+            return grade
+
+        return FRQGrade(
+            is_correct=grade.is_correct,
+            feedback=explanation,
+            flagged_uncertain=grade.flagged_uncertain,
+            confidence=grade.confidence,
         )
 
     def _grade_mcq(self, question: Question, user_answer: str) -> FRQGrade:

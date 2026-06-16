@@ -1374,6 +1374,59 @@ Rules:
             logger.warning("LLM math grading failed; using fallback: %s", exc)
             return self._fallback_grade(expected_answer, user_answer)
 
+    async def explain_objective_answer(
+        self,
+        question: str,
+        correct_answer: str,
+        user_answer: str,
+        is_correct: bool,
+    ) -> str:
+        """Write a short Markdown guide for an objective question (MCQ/TF/MS/Ranking).
+
+        Correctness is decided deterministically by the grading service; this only
+        produces the "how to solve and why it's correct" explanation. Returns an empty
+        string on failure so the caller can fall back to its plain feedback.
+        """
+        status = (
+            "The student answered CORRECTLY."
+            if is_correct
+            else "The student answered INCORRECTLY."
+        )
+        closing = (
+            "- Briefly affirm why the student's choice is the right one."
+            if is_correct
+            else "- Point out why the student's answer is wrong and the likely misconception."
+        )
+        prompt = f"""You are a tutor writing a short explanation for a test question the student just answered.
+
+QUESTION:
+{question}
+
+CORRECT ANSWER:
+{correct_answer}
+
+STUDENT'S ANSWER:
+{user_answer}
+
+{status}
+
+Write a concise explanation in Markdown that:
+- States the correct answer and explains WHY it is correct.
+- Gives a brief how-to-solve walkthrough (the reasoning or steps to reach it).
+{closing}
+
+Keep it tight (2 to 5 sentences or a few short steps). Use Markdown. If math is involved, write expressions in LaTeX using $...$ or $$...$$.
+
+Return JSON only:
+{{"feedback": "the markdown explanation"}}
+"""
+        try:
+            data = await self._complete_json(prompt)
+            return str(data.get("feedback", "")).strip()[:2000]
+        except Exception as exc:
+            logger.warning("LLM objective explanation failed: %s", exc)
+            return ""
+
     async def generate_flashcards(
         self,
         content: str,
