@@ -479,11 +479,17 @@ export default function Dashboard() {
                     />
                   ) : (
                     weakCards.map((card) => (
-                      <Card key={card.id} tone="dark" interactive className="weak-card">
-                        <span className="pill dark-pill">Difficulty {card.difficulty}</span>
-                        <h3>{card.front}</h3>
-                        <p>{Math.round((card.success_rate ?? 0) * 100)}% recall rate</p>
-                      </Card>
+                      <Link
+                        key={card.id}
+                        to={`/flashcards/${card.folder_id}?card=${card.id}`}
+                        className="weak-card-link"
+                      >
+                        <Card tone="dark" interactive className="weak-card">
+                          <span className="pill dark-pill">Difficulty {card.difficulty}</span>
+                          <h3>{card.front}</h3>
+                          <p>{Math.round((card.success_rate ?? 0) * 100)}% recall rate</p>
+                        </Card>
+                      </Link>
                     ))
                   )}
                 </div>
