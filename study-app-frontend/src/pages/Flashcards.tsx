@@ -1,6 +1,6 @@
 import { AlertCircle, ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, FolderOpen, RotateCcw, Trash2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmModal } from "../components/ConfirmModal";
@@ -10,6 +10,8 @@ import type { Flashcard, Folder } from "../lib/types";
 
 export default function Flashcards() {
   const { folderId } = useParams();
+  const [searchParams] = useSearchParams();
+  const cardParam = searchParams.get("card");
   const initialFolderId = folderId ? Number(folderId) : null;
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -94,6 +96,21 @@ export default function Flashcards() {
       setStartedAt(Date.now());
     });
   }, [selectedFolderId]);
+
+  // Deep link from the dashboard "Review These" cards: jump straight to that card
+  // once the folder's cards have loaded (overrides the resumed/saved index).
+  useEffect(() => {
+    if (!cardParam || cards.length === 0) return;
+    const targetId = Number(cardParam);
+    const targetIndex = [...cards]
+      .sort((a, b) => b.difficulty - a.difficulty)
+      .findIndex((card) => card.id === targetId);
+    if (targetIndex >= 0) {
+      setIndex(targetIndex);
+      setFlipped(false);
+      setStartedAt(Date.now());
+    }
+  }, [cardParam, cards]);
 
   const sortedCards = [...cards].sort((a, b) => b.difficulty - a.difficulty);
   const selectedFolder = folders.find((folder) => folder.id === selectedFolderId) ?? null;
@@ -314,17 +331,20 @@ export default function Flashcards() {
         <div className="flash-confidence-zone">
           {flipped ? (
             <div className="confidence-row">
-              <button className="confidence hard" onClick={() => mark(false)} type="button">
-                <XCircle size={21} />
-                Hard
+              <button className="confidence confidence--hard" onClick={() => mark(false)} type="button">
+                <span className="confidence-icon"><XCircle size={20} /></span>
+                <span className="confidence-label">Hard</span>
+                <span className="confidence-sub">Study again</span>
               </button>
-              <button className="confidence medium" onClick={() => mark(false)} type="button">
-                <AlertCircle size={21} />
-                Medium
+              <button className="confidence confidence--medium" onClick={() => mark(false)} type="button">
+                <span className="confidence-icon"><AlertCircle size={20} /></span>
+                <span className="confidence-label">Medium</span>
+                <span className="confidence-sub">Almost</span>
               </button>
-              <button className="confidence easy" onClick={() => mark(true)} type="button">
-                <CheckCircle2 size={21} />
-                Easy
+              <button className="confidence confidence--easy" onClick={() => mark(true)} type="button">
+                <span className="confidence-icon"><CheckCircle2 size={20} /></span>
+                <span className="confidence-label">Easy</span>
+                <span className="confidence-sub">Got it</span>
               </button>
             </div>
           ) : null}

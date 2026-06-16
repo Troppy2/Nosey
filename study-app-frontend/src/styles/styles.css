@@ -954,6 +954,19 @@ h3 {
   text-align: center;
 }
 
+/* Each weak card links straight to that flashcard in review */
+.weak-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 12px;
+}
+
+.weak-card-link:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
 .weak-card {
   display: grid;
   gap: 14px;
@@ -2153,47 +2166,102 @@ h3 {
   }
 }
 
+/* Spaced-recall rating buttons: tinted card per rating, color-mixed from the
+   shared --c accent so all three stay in sync. Solid lift on hover/press. */
 .confidence {
+  --c: var(--green-dark);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 86px;
+  padding: 14px 10px;
+  background: color-mix(in srgb, var(--c) 8%, #fff);
+  border: 1px solid color-mix(in srgb, var(--c) 32%, transparent);
+  border-radius: 14px;
+  color: var(--c);
+  cursor: pointer;
+  font-weight: 800;
+  overflow: hidden;
+  transition: background var(--transition-fast), border-color var(--transition-fast),
+    color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+/* Accent rail along the top edge */
+.confidence::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--c);
+}
+
+.confidence-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 52px;
-  background: transparent;
-  border: 2px solid currentColor;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 800;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--c) 16%, #fff);
+  color: var(--c);
   transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
 
+.confidence-label {
+  font-size: 0.98rem;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.confidence-sub {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.62;
+}
+
 .confidence:hover {
+  background: var(--c);
+  border-color: var(--c);
   color: #fff;
+  transform: translateY(-3px);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--c) 34%, transparent);
+}
+
+.confidence:hover .confidence-icon {
+  background: rgba(255, 255, 255, 0.24);
+  color: #fff;
+  transform: scale(1.08);
+}
+
+.confidence:hover .confidence-sub {
+  opacity: 0.92;
+}
+
+.confidence:active {
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--c) 28%, transparent);
 }
 
-.confidence.hard {
-  color: var(--error);
+.confidence:focus-visible {
+  outline: 2px solid var(--c);
+  outline-offset: 2px;
 }
 
-.confidence.hard:hover {
-  background: var(--error);
+.confidence--hard {
+  --c: var(--error);
 }
 
-.confidence.medium {
-  color: var(--warning);
+.confidence--medium {
+  --c: var(--warning);
 }
 
-.confidence.medium:hover {
-  background: var(--warning);
-}
-
-.confidence.easy {
-  color: var(--success);
-}
-
-.confidence.easy:hover {
-  background: var(--success);
+.confidence--easy {
+  --c: var(--success);
 }
 
 .complete-card {
@@ -10120,9 +10188,24 @@ h3 {
     font-size: 1.6rem;
   }
 
-  /* Confidence buttons: reduce min-height */
+  /* Confidence buttons: tighter stacked layout on small phones */
   .confidence {
-    min-height: 44px;
+    min-height: 74px;
+    padding: 11px 6px;
+    gap: 4px;
+  }
+
+  .confidence-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .confidence-label {
+    font-size: 0.9rem;
+  }
+
+  .confidence-sub {
+    font-size: 0.62rem;
   }
 
   /* Button: allow wrapping so text doesn't overflow */
