@@ -77,6 +77,10 @@ class LCWorkspaceResponse(BaseModel):
     workspace: Optional[Any] = None
 
 
+class LCWorkspacesResponse(BaseModel):
+    workspaces: dict[str, Any] = Field(default_factory=dict)
+
+
 class LCWorkspaceSyncRequest(BaseModel):
     workspace: Any = Field(...)
 

@@ -52,6 +52,7 @@ import {
   fetchLCNotes,
   fetchLCProgress,
   fetchLCWorkspace,
+  fetchLCWorkspaces,
   getStoredUser,
   isGuestSession,
   syncLCNotes,
@@ -532,11 +533,7 @@ function makeTabId() {
 }
 
 function getCodeWorkspaceKey(problemSlug: string) {
-  return `${CODE_WORKSPACE_KEY_PREFIX}:${getUserStoragePrefix()}:${getTabStorageId()}:${problemSlug}`;
-}
-
-function getLegacyCodeKey(problemSlug: string) {
-  return `${CODE_KEY_PREFIX}:${getUserStoragePrefix()}:${getTabStorageId()}:${problemSlug}`;
+  return `${CODE_WORKSPACE_KEY_PREFIX}:${getUserStoragePrefix()}:${problemSlug}`;
 }
 
 function createDefaultWorkspace(initialCode = ""): CodeWorkspace {
@@ -573,27 +570,56 @@ function normalizeCodeWorkspace(value: unknown): CodeWorkspace | null {
 
 function saveCodeWorkspace(problemSlug: string, workspace: CodeWorkspace) {
   localStorage.setItem(getCodeWorkspaceKey(problemSlug), JSON.stringify(workspace));
-  const activeTab = workspace.tabs.find((tab) => tab.id === workspace.activeTabId) ?? workspace.tabs[0];
-  if (activeTab) {
-    localStorage.setItem(getLegacyCodeKey(problemSlug), activeTab.code);
-  }
 }
 
-function loadCodeWorkspace(problemSlug: string) {
-  const scopedWorkspace = localStorage.getItem(getCodeWorkspaceKey(problemSlug));
-  if (scopedWorkspace) {
+function loadCodeWorkspace(problemSlug: string): CodeWorkspace {
+  const userPrefix = getUserStoragePrefix();
+  const stableKey = `${CODE_WORKSPACE_KEY_PREFIX}:${userPrefix}:${problemSlug}`;
+
+  // 1. New stable key (no tabId)
+  const stableRaw = localStorage.getItem(stableKey);
+  if (stableRaw) {
     try {
-      const parsed = normalizeCodeWorkspace(JSON.parse(scopedWorkspace));
+      const parsed = normalizeCodeWorkspace(JSON.parse(stableRaw));
       if (parsed) return parsed;
-    } catch {
-      // fall through to legacy formats
-    }
+    } catch { /* fall through */ }
   }
 
-  const legacyCurrentTabCode = localStorage.getItem(getLegacyCodeKey(problemSlug));
-  if (legacyCurrentTabCode !== null) {
-    return createDefaultWorkspace(legacyCurrentTabCode);
+  // 2. Legacy tabId-scoped workspace keys (scan for longest code)
+  const wsPrefix = `${CODE_WORKSPACE_KEY_PREFIX}:${userPrefix}:`;
+  const slugSuffix = `:${problemSlug}`;
+  let bestWorkspace: CodeWorkspace | null = null;
+  let bestCodeLen = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key || key === stableKey) continue;
+    if (key.startsWith(wsPrefix) && key.endsWith(slugSuffix)) {
+      try {
+        const parsed = normalizeCodeWorkspace(JSON.parse(localStorage.getItem(key) ?? ""));
+        if (parsed) {
+          const totalCode = parsed.tabs.reduce((sum, tab) => sum + tab.code.length, 0);
+          if (totalCode > bestCodeLen) {
+            bestCodeLen = totalCode;
+            bestWorkspace = parsed;
+          }
+        }
+      } catch { /* skip */ }
+    }
   }
+  if (bestWorkspace) return bestWorkspace;
+
+  // 3. Legacy single-code keys (pre-workspace format, any tabId variant)
+  const codePrefix = `${CODE_KEY_PREFIX}:${userPrefix}:`;
+  let bestCode = "";
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key || !key.startsWith(codePrefix)) continue;
+    if (key.endsWith(`:${problemSlug}`) || key === `${codePrefix}${problemSlug}`) {
+      const val = localStorage.getItem(key) ?? "";
+      if (val.length > bestCode.length) bestCode = val;
+    }
+  }
+  if (bestCode) return createDefaultWorkspace(bestCode);
 
   return createDefaultWorkspace();
 }
@@ -715,6 +741,7 @@ export default function LeetCodeMode() {
   const currentCustomCasesRef = useRef<CustomCase[]>([]);
   const timerExpiryHandledRef = useRef(false);
   const workspaceSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingWorkspaceSyncRef = useRef<{ slug: string; workspace: CodeWorkspace } | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesContent, setNotesContent] = useState("");
   const [notesPos, setNotesPos] = useState<{ x: number; y: number } | null>(null);
@@ -750,6 +777,89 @@ export default function LeetCodeMode() {
   useEffect(() => {
     currentProblemDataRef.current = currentProblemData;
   }, [currentProblemData]);
+
+  // Flush any pending debounced workspace sync on unmount, page hide, or tab close
+  useEffect(() => {
+    function flushPending() {
+      if (!pendingWorkspaceSyncRef.current || isGuestSession()) return;
+      const { slug, workspace } = pendingWorkspaceSyncRef.current;
+      syncLCWorkspace(slug, workspace).catch(() => {});
+      pendingWorkspaceSyncRef.current = null;
+      if (workspaceSyncTimerRef.current) {
+        clearTimeout(workspaceSyncTimerRef.current);
+        workspaceSyncTimerRef.current = null;
+      }
+    }
+    const handleBeforeUnload = () => flushPending();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") flushPending();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      flushPending();
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
+
+  // On mount: bulk-fetch all DB workspaces and reconcile with localStorage.
+  // This pre-populates the stable per-slug localStorage keys so that code
+  // survives closing a browser tab (which previously cleared sessionStorage,
+  // orphaning the tabId-scoped key and losing the save).
+  useEffect(() => {
+    if (isGuestSession()) return;
+    fetchLCWorkspaces()
+      .then((dbMap) => {
+        const userPrefix = getUserStoragePrefix();
+        const wsKeyPrefix = `${CODE_WORKSPACE_KEY_PREFIX}:${userPrefix}:`;
+
+        // Build best-per-slug workspace from all localStorage keys for this user
+        const localBestBySlug = new Map<string, CodeWorkspace>();
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (!key || !key.startsWith(wsKeyPrefix)) continue;
+          const after = key.slice(wsKeyPrefix.length);
+          // slug is the last colon-separated segment (legacy keys have tabId before slug)
+          const lastColon = after.lastIndexOf(":");
+          const slug = lastColon >= 0 ? after.slice(lastColon + 1) : after;
+          if (!slug) continue;
+          try {
+            const parsed = normalizeCodeWorkspace(JSON.parse(localStorage.getItem(key) ?? ""));
+            if (!parsed) continue;
+            const newLen = parsed.tabs.reduce((s, t) => s + t.code.length, 0);
+            const existingBest = localBestBySlug.get(slug);
+            const existingLen = existingBest ? existingBest.tabs.reduce((s, t) => s + t.code.length, 0) : 0;
+            if (newLen > existingLen) localBestBySlug.set(slug, parsed);
+          } catch { /* skip */ }
+        }
+
+        const allSlugs = new Set([...Object.keys(dbMap), ...localBestBySlug.keys()]);
+        for (const slug of allSlugs) {
+          const stableKey = `${wsKeyPrefix}${slug}`;
+          const localBest = localBestBySlug.get(slug);
+          const dbWorkspace = dbMap[slug] ? normalizeCodeWorkspace(dbMap[slug]) : null;
+          const localLen = localBest ? localBest.tabs.reduce((s, t) => s + t.code.length, 0) : 0;
+          const dbLen = dbWorkspace ? dbWorkspace.tabs.reduce((s, t) => s + t.code.length, 0) : 0;
+
+          if (dbLen > 0 && localLen === 0) {
+            // DB has code, local empty: write DB to stable localStorage key
+            localStorage.setItem(stableKey, JSON.stringify(dbWorkspace));
+          } else if (localLen > 0 && localBest) {
+            // Local has code: ensure stable key is populated
+            if (!localStorage.getItem(stableKey)) {
+              localStorage.setItem(stableKey, JSON.stringify(localBest));
+            }
+            // Push to DB if local has more code than DB (covers orphaned tabId-scoped code)
+            if (localLen > dbLen) {
+              syncLCWorkspace(slug, localBest).catch(() => {});
+            }
+          }
+        }
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // On mount: fetch DB progress/dates, merge with localStorage, push merged result back
   useEffect(() => {
@@ -889,9 +999,11 @@ export default function LeetCodeMode() {
 
   function schedulePushWorkspaceToDb(problemSlug: string, workspace: CodeWorkspace) {
     if (isGuestSession()) return;
+    pendingWorkspaceSyncRef.current = { slug: problemSlug, workspace };
     if (workspaceSyncTimerRef.current) clearTimeout(workspaceSyncTimerRef.current);
     workspaceSyncTimerRef.current = setTimeout(() => {
       syncLCWorkspace(problemSlug, workspace).catch(() => { });
+      pendingWorkspaceSyncRef.current = null;
     }, 1500);
   }
 
@@ -1300,7 +1412,10 @@ export default function LeetCodeMode() {
       setCodeWorkspaces((prev) => ({ ...prev, [problemSlug]: workspace }));
     }
 
-    // DB fallback: if localStorage has no user code, fetch from DB (cross-device restore)
+    // DB fallback: if localStorage has no user code, fetch from DB (cross-device restore).
+    // When hasLocalCode is false, any code in the editor at callback time is app-seeded
+    // (starter code or empty), not user-typed. DB wins unconditionally to prevent the
+    // seeding effect from shadowing a saved solution.
     if (!hasLocalCode && !initialCode.trim() && !isGuestSession()) {
       fetchLCWorkspace(problemSlug)
         .then((result) => {
@@ -1308,8 +1423,6 @@ export default function LeetCodeMode() {
           const parsed = normalizeCodeWorkspace(result.workspace);
           if (!parsed || !parsed.tabs.some((tab) => tab.code.trim())) return;
           setCodeWorkspaces((prev) => {
-            const current = prev[problemSlug];
-            if (current?.tabs.some((tab) => tab.code.trim())) return prev;
             saveCodeWorkspace(problemSlug, parsed);
             return { ...prev, [problemSlug]: parsed };
           });
