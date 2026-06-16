@@ -22,6 +22,7 @@ from src.schemas.leetcode_schema import (
     LCProgressResponse,
     LCProgressSyncRequest,
     LCWorkspaceResponse,
+    LCWorkspacesResponse,
     LCWorkspaceSyncRequest,
     LeetCodeGradeRequest,
     LeetCodeGradeResponse,
@@ -165,6 +166,23 @@ async def get_lc_workspace(
     except Exception:
         workspace = None
     return LCWorkspaceResponse(workspace=workspace)
+
+
+@router.get("/workspaces", response_model=LCWorkspacesResponse)
+async def get_lc_workspaces(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LCWorkspacesResponse:
+    rows = (
+        await session.execute(select(LCCodeWorkspace).where(LCCodeWorkspace.user_id == user.id))
+    ).scalars().all()
+    workspaces: dict = {}
+    for row in rows:
+        try:
+            workspaces[row.problem_slug] = json.loads(row.workspace_json)
+        except Exception:
+            pass
+    return LCWorkspacesResponse(workspaces=workspaces)
 
 
 @router.put("/workspace/{problem_slug}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)

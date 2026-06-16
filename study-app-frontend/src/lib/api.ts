@@ -801,6 +801,15 @@ export async function fetchLCWorkspace(problemSlug: string): Promise<{ workspace
   }
 }
 
+export async function fetchLCWorkspaces(): Promise<Record<string, unknown>> {
+  try {
+    const result = await request<{ workspaces: Record<string, unknown> }>("/leetcode/workspaces");
+    return result.workspaces ?? {};
+  } catch {
+    return {};
+  }
+}
+
 export async function syncLCWorkspace(problemSlug: string, workspace: unknown): Promise<void> {
   await request(`/leetcode/workspace/${problemSlug}`, {
     method: "PUT",
