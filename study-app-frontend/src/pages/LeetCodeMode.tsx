@@ -2001,15 +2001,17 @@ export default function LeetCodeMode() {
                     <small>{cp && cp.topic !== "unknown" ? cp.topic : "Custom problem"}</small>
                   </button>
                   <span className={`lc-difficulty lc-difficulty--${difficultyClass(problem.difficulty)}`}>{problem.difficulty}</span>
-                  <button type="button" className="lc-inline-icon-btn" onClick={() => cp && openCustomModal(cp)} aria-label="Edit custom question">
-                    <Pencil size={16} />
-                  </button>
-                  <button type="button" className="lc-inline-icon-btn" onClick={() => setCustomProblemArchived(problem.slug, true)} aria-label="Archive custom question" title="Archive">
-                    <Archive size={16} />
-                  </button>
-                  <button type="button" className="lc-inline-icon-btn" onClick={() => handleDeleteCustomProblem(problem.slug)} aria-label="Delete custom question" title="Delete permanently">
-                    <Trash2 size={16} />
-                  </button>
+                  <div className="lc-row-actions">
+                    <button type="button" className="lc-inline-icon-btn" onClick={() => cp && openCustomModal(cp)} aria-label="Edit custom question" title="Edit">
+                      <Pencil size={16} />
+                    </button>
+                    <button type="button" className="lc-inline-icon-btn" onClick={() => setCustomProblemArchived(problem.slug, true)} aria-label="Archive custom question" title="Archive">
+                      <Archive size={16} />
+                    </button>
+                    <button type="button" className="lc-inline-icon-btn lc-inline-icon-btn--danger" onClick={() => handleDeleteCustomProblem(problem.slug)} aria-label="Delete custom question" title="Delete permanently">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -2041,12 +2043,14 @@ export default function LeetCodeMode() {
                           <small>{cp && cp.topic !== "unknown" ? cp.topic : "Archived"}</small>
                         </button>
                         <span className={`lc-difficulty lc-difficulty--${difficultyClass(problem.difficulty)}`}>{problem.difficulty}</span>
-                        <button type="button" className="lc-inline-icon-btn" onClick={() => setCustomProblemArchived(problem.slug, false)} aria-label="Restore custom question" title="Restore">
-                          <ArchiveRestore size={16} />
-                        </button>
-                        <button type="button" className="lc-inline-icon-btn" onClick={() => handleDeleteCustomProblem(problem.slug)} aria-label="Delete custom question" title="Delete permanently">
-                          <Trash2 size={16} />
-                        </button>
+                        <div className="lc-row-actions">
+                          <button type="button" className="lc-inline-icon-btn" onClick={() => setCustomProblemArchived(problem.slug, false)} aria-label="Restore custom question" title="Restore">
+                            <ArchiveRestore size={16} />
+                          </button>
+                          <button type="button" className="lc-inline-icon-btn lc-inline-icon-btn--danger" onClick={() => handleDeleteCustomProblem(problem.slug)} aria-label="Delete custom question" title="Delete permanently">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
@@ -2230,25 +2234,27 @@ export default function LeetCodeMode() {
         <aside className="lc-problem-pane">
           <div className="lc-problem-source">
             <span>{isCustomProblem ? "Custom problem" : currentProblem.isOfficial ? "Official LeetCode statement" : "Reference-only topic"}</span>
-            {!isCustomProblem || currentCustomProblem?.url ? (
-              <a href={currentProblem.url} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Source</a>
-            ) : null}
-            {isCustomProblem && currentCustomProblem ? (
-              <>
-                <button type="button" className="lc-inline-icon-btn" onClick={() => openCustomModal(currentCustomProblem)} aria-label="Edit custom question">
-                  <Pencil size={15} />
-                </button>
-                {currentCustomProblem.is_archived ? (
-                  <button type="button" className="lc-inline-icon-btn" onClick={() => setCustomProblemArchived(currentCustomProblem.slug, false)} aria-label="Restore custom question" title="Restore">
-                    <ArchiveRestore size={15} />
+            <div className="lc-row-actions">
+              {!isCustomProblem || currentCustomProblem?.url ? (
+                <a href={currentProblem.url} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Source</a>
+              ) : null}
+              {isCustomProblem && currentCustomProblem ? (
+                <>
+                  <button type="button" className="lc-inline-icon-btn" onClick={() => openCustomModal(currentCustomProblem)} aria-label="Edit custom question" title="Edit">
+                    <Pencil size={15} />
                   </button>
-                ) : (
-                  <button type="button" className="lc-inline-icon-btn" onClick={() => setCustomProblemArchived(currentCustomProblem.slug, true)} aria-label="Archive custom question" title="Archive">
-                    <Archive size={15} />
-                  </button>
-                )}
-              </>
-            ) : null}
+                  {currentCustomProblem.is_archived ? (
+                    <button type="button" className="lc-inline-icon-btn" onClick={() => setCustomProblemArchived(currentCustomProblem.slug, false)} aria-label="Restore custom question" title="Restore">
+                      <ArchiveRestore size={15} />
+                    </button>
+                  ) : (
+                    <button type="button" className="lc-inline-icon-btn" onClick={() => setCustomProblemArchived(currentCustomProblem.slug, true)} aria-label="Archive custom question" title="Archive">
+                      <Archive size={15} />
+                    </button>
+                  )}
+                </>
+              ) : null}
+            </div>
           </div>
 
           <h2 className="lc-problem-heading">{currentProblem.title}</h2>

@@ -5390,12 +5390,24 @@ h3 {
 
 .lc-problem-row {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) auto auto 34px;
+  grid-template-columns: 30px minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-height: 58px;
   padding: 10px 14px;
   border-bottom: 1px solid rgba(181, 201, 154, 0.38);
+}
+
+/* Archived rows drop the completion checkbox, so the grid loses its first column. */
+.lc-problem-row--archived {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+/* Keep Edit / Archive / Delete (and Restore / Delete) together as one tight cluster. */
+.lc-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .lc-problem-row:last-child {
@@ -6562,9 +6574,24 @@ h3 {
 }
 
 .lc-inline-icon-btn {
-  width: 30px;
-  min-width: 30px;
+  width: 32px;
+  min-width: 32px;
   padding: 0;
+  color: #596949;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+}
+
+.lc-inline-icon-btn:hover {
+  transform: translateY(-1px);
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+}
+
+.lc-inline-icon-btn--danger:hover {
+  border-color: rgba(220, 38, 38, 0.45);
+  background: #fef2f2;
+  color: #b91c1c;
 }
 
 .lc-add-test-btn:disabled {
