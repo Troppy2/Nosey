@@ -12219,7 +12219,7 @@ h3 {
 
 /* ── Roadmap node + add button ─────────────────────────────────────────────── */
 .lc-custom-section {
-  margin-top: 6px;
+  margin-top: 30px;
   padding-top: 22px;
   border-top: 1px dashed color-mix(in srgb, var(--lc-custom-accent) 38%, white);
 }
