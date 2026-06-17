@@ -99,6 +99,9 @@ class LCCustomProblem(Base, TimestampMixin):
     starter_code: Mapped[str] = mapped_column(Text, nullable=False, default="")
     # JSON array of {input_text, output_text, explanation_text} objects.
     test_cases_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    # Soft-archive: hidden from the active list but kept (with its progress and
+    # workspace) so the user can restore it later instead of losing it to a delete.
+    is_archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     user: Mapped[User] = relationship("User", back_populates="lc_custom_problems")
 

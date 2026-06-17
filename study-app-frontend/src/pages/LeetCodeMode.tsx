@@ -41,6 +41,8 @@ import {
   Pencil,
   Trash2,
   Wand2,
+  Archive,
+  ArchiveRestore,
 } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -706,6 +708,7 @@ export default function LeetCodeMode() {
   const [customSaving, setCustomSaving] = useState(false);
   const [customError, setCustomError] = useState<string | null>(null);
   const [pendingDeleteSlug, setPendingDeleteSlug] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const [aiCode, setAiCode] = useState("");
   const [aiHint, setAiHint] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
@@ -748,12 +751,18 @@ export default function LeetCodeMode() {
   const notesSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notesDragOffset = useRef<{ x: number; y: number } | null>(null);
 
-  const customProblemList = useMemo(() => customProblems.map(customToProblem), [customProblems]);
+  // Full list (active + archived) backs deep-link lookups so an archived problem can
+  // still be opened directly. The active/archived splits below back the list views.
+  const allCustomProblemList = useMemo(() => customProblems.map(customToProblem), [customProblems]);
+  const activeCustomProblems = useMemo(() => customProblems.filter((cp) => !cp.is_archived), [customProblems]);
+  const archivedCustomProblems = useMemo(() => customProblems.filter((cp) => cp.is_archived), [customProblems]);
+  const customProblemList = useMemo(() => activeCustomProblems.map(customToProblem), [activeCustomProblems]);
+  const archivedProblemList = useMemo(() => archivedCustomProblems.map(customToProblem), [archivedCustomProblems]);
 
   const currentProblem =
     view.type === "problem"
       ? (view.categoryId === CUSTOM_CATEGORY_ID
-          ? customProblemList.find((problem) => problem.slug === view.problemSlug) ?? null
+          ? allCustomProblemList.find((problem) => problem.slug === view.problemSlug) ?? null
           : CATEGORIES.find((category) => category.id === view.categoryId)?.problems.find((problem) => problem.slug === view.problemSlug) ?? null)
       : null;
 
@@ -1134,6 +1143,10 @@ export default function LeetCodeMode() {
     setCustomError(null);
 
     const slug = editingSlug ?? makeCustomSlug();
+    // Editing must not silently un-archive: preserve the existing flag.
+    const existingArchived = editingSlug
+      ? customProblems.find((cp) => cp.slug === slug)?.is_archived ?? false
+      : false;
     const payload: Omit<LCCustomProblem, "slug"> = {
       title,
       topic: customForm.topic.trim() || "unknown",
@@ -1148,6 +1161,7 @@ export default function LeetCodeMode() {
           output_text: tc.output_text,
           explanation_text: tc.explanation_text || null,
         })),
+      is_archived: existingArchived,
     };
 
     const saved: LCCustomProblem = { slug, ...payload };
@@ -1180,6 +1194,23 @@ export default function LeetCodeMode() {
     }
     setPendingDeleteSlug(null);
     if (view.type === "problem" && view.problemSlug === slug) {
+      setView({ type: "category", categoryId: CUSTOM_CATEGORY_ID });
+    }
+  }
+
+  // Soft-archive: keep the problem (and its progress/workspace) but hide it from the
+  // active list. Reuses the existing full-object sync so no new endpoint is needed.
+  function setCustomProblemArchived(slug: string, archived: boolean) {
+    const target = customProblems.find((cp) => cp.slug === slug);
+    if (!target) return;
+    const updated: LCCustomProblem = { ...target, is_archived: archived };
+    persistCustomProblems(customProblems.map((cp) => (cp.slug === slug ? updated : cp)));
+    if (!isGuestSession()) {
+      const { slug: _slug, ...rest } = updated;
+      syncLCCustomProblem(slug, rest).catch(() => {});
+    }
+    // If the archived problem is open, drop back to the custom list.
+    if (archived && view.type === "problem" && view.problemSlug === slug) {
       setView({ type: "category", categoryId: CUSTOM_CATEGORY_ID });
     }
   }
@@ -1916,6 +1947,7 @@ export default function LeetCodeMode() {
   if (view.type === "category" && view.categoryId === CUSTOM_CATEGORY_ID) {
     const visibleProblems = filterProblems(customProblemList, progress, filter, query);
     const done = customProblemList.filter((problem) => progress[problem.slug]).length;
+    const visibleArchived = filterProblems(archivedProblemList, progress, filter, query);
     return (
       <div className="page page-narrow lc-page">
         <header className="lc-category-header">
@@ -1944,10 +1976,14 @@ export default function LeetCodeMode() {
 
         {customProblemList.length === 0 ? (
           <div className="lc-custom-empty">
-            <p>No custom questions yet. Paste a function and let Kojo turn it into a full problem with a walkthrough and test cases, or write one by hand.</p>
+            <p>
+              {archivedProblemList.length > 0
+                ? "No active custom questions. Add a new one, or restore an archived question below."
+                : "No custom questions yet. Paste a function and let Kojo turn it into a full problem with a walkthrough and test cases, or write one by hand."}
+            </p>
             <button type="button" className="lc-custom-add-btn" onClick={() => openCustomModal()}>
               <Plus size={16} />
-              Add your first question
+              {archivedProblemList.length > 0 ? "Add a question" : "Add your first question"}
             </button>
           </div>
         ) : (
@@ -1968,7 +2004,10 @@ export default function LeetCodeMode() {
                   <button type="button" className="lc-inline-icon-btn" onClick={() => cp && openCustomModal(cp)} aria-label="Edit custom question">
                     <Pencil size={16} />
                   </button>
-                  <button type="button" className="lc-inline-icon-btn" onClick={() => handleDeleteCustomProblem(problem.slug)} aria-label="Delete custom question">
+                  <button type="button" className="lc-inline-icon-btn" onClick={() => setCustomProblemArchived(problem.slug, true)} aria-label="Archive custom question" title="Archive">
+                    <Archive size={16} />
+                  </button>
+                  <button type="button" className="lc-inline-icon-btn" onClick={() => handleDeleteCustomProblem(problem.slug)} aria-label="Delete custom question" title="Delete permanently">
                     <Trash2 size={16} />
                   </button>
                 </div>
@@ -1976,6 +2015,46 @@ export default function LeetCodeMode() {
             })}
           </div>
         )}
+
+        {archivedProblemList.length > 0 ? (
+          <div className="lc-archived-section">
+            <button
+              type="button"
+              className="lc-archived-toggle"
+              onClick={() => setShowArchived((prev) => !prev)}
+              aria-expanded={showArchived}
+            >
+              <Archive size={15} />
+              {showArchived ? "Hide" : "Show"} archived ({archivedProblemList.length})
+            </button>
+            {showArchived ? (
+              visibleArchived.length === 0 ? (
+                <p className="muted small lc-archived-empty">No archived questions match your search.</p>
+              ) : (
+                <div className="lc-problem-list lc-problem-list--archived">
+                  {visibleArchived.map((problem) => {
+                    const cp = archivedCustomProblems.find((item) => item.slug === problem.slug);
+                    return (
+                      <div key={problem.slug} className="lc-problem-row lc-problem-row--archived">
+                        <button type="button" className="lc-problem-title-btn" onClick={() => openProblem(CUSTOM_CATEGORY_ID, problem.slug)}>
+                          <span>{problem.title}</span>
+                          <small>{cp && cp.topic !== "unknown" ? cp.topic : "Archived"}</small>
+                        </button>
+                        <span className={`lc-difficulty lc-difficulty--${difficultyClass(problem.difficulty)}`}>{problem.difficulty}</span>
+                        <button type="button" className="lc-inline-icon-btn" onClick={() => setCustomProblemArchived(problem.slug, false)} aria-label="Restore custom question" title="Restore">
+                          <ArchiveRestore size={16} />
+                        </button>
+                        <button type="button" className="lc-inline-icon-btn" onClick={() => handleDeleteCustomProblem(problem.slug)} aria-label="Delete custom question" title="Delete permanently">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            ) : null}
+          </div>
+        ) : null}
         {customModalNode}
         {confirmDeleteNode}
       </div>
@@ -2155,9 +2234,20 @@ export default function LeetCodeMode() {
               <a href={currentProblem.url} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Source</a>
             ) : null}
             {isCustomProblem && currentCustomProblem ? (
-              <button type="button" className="lc-inline-icon-btn" onClick={() => openCustomModal(currentCustomProblem)} aria-label="Edit custom question">
-                <Pencil size={15} />
-              </button>
+              <>
+                <button type="button" className="lc-inline-icon-btn" onClick={() => openCustomModal(currentCustomProblem)} aria-label="Edit custom question">
+                  <Pencil size={15} />
+                </button>
+                {currentCustomProblem.is_archived ? (
+                  <button type="button" className="lc-inline-icon-btn" onClick={() => setCustomProblemArchived(currentCustomProblem.slug, false)} aria-label="Restore custom question" title="Restore">
+                    <ArchiveRestore size={15} />
+                  </button>
+                ) : (
+                  <button type="button" className="lc-inline-icon-btn" onClick={() => setCustomProblemArchived(currentCustomProblem.slug, true)} aria-label="Archive custom question" title="Archive">
+                    <Archive size={15} />
+                  </button>
+                )}
+              </>
             ) : null}
           </div>
 
