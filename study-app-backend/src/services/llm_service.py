@@ -1512,7 +1512,7 @@ STUDENT HINT ABOUT WHAT IT DOES: {hint_line}
 
 Infer what the code is supposed to do, then return a JSON object ONLY (no prose, no code fences) with EXACTLY these keys:
 - "title": a short, descriptive problem title (string).
-- "topic": one broad category such as "Arrays", "Strings", "Dynamic Programming", "Graph". If you genuinely cannot tell, use "unknown".
+- "topic": the primary algorithmic pattern or data structure the problem exercises. Prefer the specific technique over a broad bucket (e.g. "Two Pointers" rather than "Arrays", "Stack" rather than "Strings"). Pick the single best fit, ideally one of: "Arrays", "Strings", "Hash Map", "Two Pointers", "Sliding Window", "Prefix Sum", "Stack", "Queue", "Linked List", "Binary Search", "Sorting", "Recursion", "Backtracking", "Trees", "Binary Search Tree", "Trie", "Heap", "Graphs", "Dynamic Programming", "Greedy", "Intervals", "Matrix", "Bit Manipulation", "Math". If none of these clearly fit, use the closest specific pattern name. Only use "unknown" if you genuinely cannot tell.
 - "difficulty": exactly one of "Easy", "Medium", "Hard". If you genuinely cannot tell, use "unknown".
 - "description": a Markdown problem statement written like LeetCode: a clear introduction of the task, the constraints you can reasonably infer, followed by 2 to 3 worked examples each with an Input, an Output, and a short Explanation that walks through the reasoning.
 - "starter_code": clean, runnable Python based on the student's code. Keep the SAME function name and parameter names the student used. It may be a top-level function (e.g. `def two_sum(nums, target): ...`) or a `class Solution` method. Do NOT change the signature.
