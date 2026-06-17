@@ -276,6 +276,7 @@ def _serialize_custom_problem(row: LCCustomProblem) -> LCCustomProblemResponse:
         url=row.url,
         starter_code=row.starter_code,
         test_cases=test_cases,
+        is_archived=row.is_archived,
     )
 
 
@@ -324,6 +325,7 @@ async def upsert_custom_problem(
         row.url = body.url
         row.starter_code = body.starter_code
         row.test_cases_json = test_cases_json
+        row.is_archived = body.is_archived
     else:
         row = LCCustomProblem(
             user_id=user.id,
@@ -335,6 +337,7 @@ async def upsert_custom_problem(
             url=body.url,
             starter_code=body.starter_code,
             test_cases_json=test_cases_json,
+            is_archived=body.is_archived,
         )
         session.add(row)
     await session.commit()

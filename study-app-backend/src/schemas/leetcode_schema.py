@@ -111,6 +111,7 @@ class LCCustomProblemBase(BaseModel):
     url: str = Field(default="", max_length=2000)
     starter_code: str = Field(default="", max_length=20000)
     test_cases: list[LCCustomTestCase] = Field(default_factory=list)
+    is_archived: bool = Field(default=False)
 
     def normalized_difficulty(self) -> str:
         return self.difficulty if self.difficulty in _ALLOWED_DIFFICULTIES else "unknown"

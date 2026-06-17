@@ -426,6 +426,7 @@ export type LCCustomProblem = {
   url: string;
   starter_code: string;
   test_cases: LCCustomTestCase[];
+  is_archived?: boolean;
 };
 
 // What the AI returns from /custom-problems/generate (no slug or url yet).

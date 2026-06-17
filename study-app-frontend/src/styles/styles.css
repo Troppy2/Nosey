@@ -12653,3 +12653,46 @@ select.lc-custom-input {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ── Archived custom questions ─────────────────────────────────────────────── */
+.lc-archived-section {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--green-lightest, #e6e3da);
+}
+
+.lc-archived-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--lc-custom-accent) 28%, white);
+  border-radius: 999px;
+  background: var(--lc-custom-tint);
+  color: var(--lc-custom-ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.lc-archived-toggle:hover {
+  background: color-mix(in srgb, var(--lc-custom-accent) 14%, white);
+}
+
+.lc-problem-list--archived {
+  margin-top: 12px;
+}
+
+.lc-problem-row--archived {
+  opacity: 0.78;
+}
+
+.lc-problem-row--archived .lc-problem-title-btn span {
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--lc-custom-ink) 45%, transparent);
+}
+
+.lc-archived-empty {
+  margin-top: 12px;
+}
