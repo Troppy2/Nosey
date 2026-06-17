@@ -2132,19 +2132,21 @@ export default function LeetCodeMode() {
 
   if (!currentProblem) return null;
 
-  const currentCategoryForNav = CATEGORIES.find((c) => c.id === currentProblem.categoryId);
-  const currentProblemIndexInCategory = currentCategoryForNav
-    ? currentCategoryForNav.problems.findIndex((p) => p.slug === currentProblem.slug)
-    : -1;
+  // Custom questions are their own "category" (not in CATEGORIES), so navigation has to
+  // walk the active custom list. Without this, the fallback below scanned the official
+  // CATEGORIES and sent the user to an unrelated verified LeetCode problem.
+  const isCustomNav = currentProblem.categoryId === CUSTOM_CATEGORY_ID;
+  const navProblems: Problem[] = isCustomNav
+    ? customProblemList
+    : CATEGORIES.find((c) => c.id === currentProblem.categoryId)?.problems ?? [];
+  const currentProblemIndexInCategory = navProblems.findIndex((p) => p.slug === currentProblem.slug);
   const nextProblemInCategory =
-    currentCategoryForNav &&
-      currentProblemIndexInCategory >= 0 &&
-      currentProblemIndexInCategory < currentCategoryForNav.problems.length - 1
-      ? currentCategoryForNav.problems[currentProblemIndexInCategory + 1]
+    currentProblemIndexInCategory >= 0 && currentProblemIndexInCategory < navProblems.length - 1
+      ? navProblems[currentProblemIndexInCategory + 1]
       : null;
 
   let suggestedNext: { problem: Problem; category: Category } | null = null;
-  if (!nextProblemInCategory) {
+  if (!nextProblemInCategory && !isCustomNav) {
     const catIdx = CATEGORIES.findIndex((c) => c.id === currentProblem.categoryId);
     for (let i = catIdx + 1; i < CATEGORIES.length; i++) {
       const undone = CATEGORIES[i].problems.find((p) => !progress[p.slug]);
