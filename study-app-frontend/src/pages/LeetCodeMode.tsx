@@ -459,6 +459,22 @@ function customDifficulty(value: string): Difficulty {
   return value === "Easy" || value === "Medium" || value === "Hard" ? value : "Unknown";
 }
 
+// A custom problem's topic is a comma-separated list of patterns (e.g. "Sliding Window,
+// Hash Map"). Split it into trimmed, de-duped, non-"unknown" labels for chip display.
+function splitTopics(topic: string | undefined): string[] {
+  if (!topic) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of topic.split(",")) {
+    const name = part.trim();
+    const key = name.toLowerCase();
+    if (!name || key === "unknown" || seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  return out;
+}
+
 // Turn a stored custom problem into the local Problem shape the views already render.
 function customToProblem(cp: LCCustomProblem): Problem {
   return {
@@ -490,7 +506,7 @@ function customToProblemData(cp: LCCustomProblem): LeetCodeProblemData {
     })),
     example_testcases: [],
     python_snippet: cp.starter_code,
-    topic_tags: cp.topic && cp.topic !== "unknown" ? [{ name: cp.topic, slug: cp.topic }] : [],
+    topic_tags: splitTopics(cp.topic).map((name) => ({ name, slug: name })),
   };
 }
 
