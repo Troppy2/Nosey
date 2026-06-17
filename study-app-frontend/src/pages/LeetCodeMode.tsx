@@ -1967,6 +1967,18 @@ export default function LeetCodeMode() {
               <Search size={16} />
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search problems" />
             </div>
+            <div className="lc-filter-tabs" role="group" aria-label="Problem filter">
+              {(["all", "todo", "done"] as Filter[]).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  className={filter === item ? "lc-filter-tab lc-filter-tab--active" : "lc-filter-tab"}
+                  onClick={() => setFilter(item)}
+                >
+                  {item === "all" ? "All" : item === "todo" ? "To do" : "Done"}
+                </button>
+              ))}
+            </div>
             <button type="button" className="lc-custom-add-btn" onClick={() => openCustomModal()}>
               <Plus size={16} />
               Add question
