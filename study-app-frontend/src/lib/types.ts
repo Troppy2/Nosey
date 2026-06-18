@@ -127,6 +127,7 @@ export type AnswerResult = {
   correct_answer?: string | null;
   is_correct: boolean;
   feedback?: string | null;
+  reasoning?: string | null;
   confidence?: number | null;
   flagged_uncertain: boolean;
   is_math?: boolean;

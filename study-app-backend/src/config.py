@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     ollama_model: str = Field(default="mistral:7b-instruct-q3_K_M", alias="OLLAMA_MODEL")
     ollama_api_key: Optional[str] = Field(default=None, alias="OLLAMA_API_KEY")
     ollama_is_cloud: bool = Field(default=False, alias="OLLAMA_IS_CLOUD")
+    # Input context window for Ollama. Ollama silently truncates the prompt when it
+    # exceeds num_ctx, which drops the trailing JSON-schema instructions and makes the
+    # model emit empty or off-schema output. Set this high enough to hold a full
+    # generation prompt (terms + concepts + rules + format spec).
+    ollama_num_ctx: int = Field(default=8192, alias="OLLAMA_NUM_CTX")
     groq_api_key: Optional[str] = Field(default=None, alias="GROQ_API_KEY")
     google_ai_api_key: Optional[str] = Field(default=None, alias="GOOGLE_AI_API_KEY")
     anthropic_api_key: Optional[str] = Field(default=None, alias="ANTHROPIC_API_KEY")
@@ -44,7 +49,10 @@ class Settings(BaseSettings):
     max_file_size_bytes: int = Field(default=52_428_800, alias="MAX_FILE_SIZE_BYTES")
     allowed_file_types: Any = Field(default_factory=lambda: ["pdf", "txt", "md"], alias="ALLOWED_FILE_TYPES")
     llm_max_tokens: int = Field(default=4096, alias="LLM_MAX_TOKENS")
-    llm_timeout_seconds: int = Field(default=30, alias="LLM_TIMEOUT_SECONDS")
+    # Chat/interactive calls (Kojo) — keep short so a hung provider doesn't block the user.
+    llm_timeout_seconds: int = Field(default=60, alias="LLM_TIMEOUT_SECONDS")
+    # Background JSON generation (test/flashcard) — longer ceiling for slow 31B cloud models.
+    llm_generation_timeout_seconds: int = Field(default=180, alias="LLM_GENERATION_TIMEOUT_SECONDS")
     llm_uncertainty_threshold: float = Field(default=0.6, alias="LLM_UNCERTAINTY_THRESHOLD")
     llm_provider: str = Field(default="auto", alias="LLM_PROVIDER")
     qdrant_url: Optional[str] = Field(default=None, alias="QDRANT_URL")

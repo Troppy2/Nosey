@@ -89,6 +89,7 @@ class GradingService:
                 grade.feedback,
                 grade.confidence,
                 grade.flagged_uncertain,
+                reasoning=grade.reasoning,
             )
             correct_answer = self._correct_answer_text(question)
             results.append(
@@ -99,6 +100,7 @@ class GradingService:
                     correct_answer=correct_answer,
                     is_correct=grade.is_correct,
                     feedback=grade.feedback,
+                    reasoning=grade.reasoning,
                     confidence=grade.confidence,
                     flagged_uncertain=grade.flagged_uncertain,
                     is_math=is_math_mode and question.question_type == "FRQ",
@@ -190,7 +192,7 @@ class GradingService:
         if not correct_answer:
             return grade
 
-        explanation = await self.llm_service.explain_objective_answer(
+        explanation, reasoning = await self.llm_service.explain_objective_answer(
             question=question.question_text,
             correct_answer=correct_answer,
             user_answer=user_answer,
@@ -202,6 +204,7 @@ class GradingService:
         return FRQGrade(
             is_correct=grade.is_correct,
             feedback=explanation,
+            reasoning=reasoning,
             flagged_uncertain=grade.flagged_uncertain,
             confidence=grade.confidence,
         )
@@ -353,6 +356,7 @@ class GradingService:
                     correct_answer=self._correct_answer_text(answer.question) if answer.question else None,
                     is_correct=bool(answer.is_correct),
                     feedback=answer.ai_feedback,
+                    reasoning=answer.ai_reasoning,
                     confidence=float(answer.confidence_score)
                     if answer.confidence_score is not None
                     else None,
