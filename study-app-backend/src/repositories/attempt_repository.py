@@ -37,6 +37,7 @@ class AttemptRepository(BaseRepository[UserAttempt]):
         feedback: Optional[str],
         confidence: Optional[float],
         flagged_uncertain: bool,
+        reasoning: Optional[str] = None,
     ) -> UserAnswer:
         answer = UserAnswer(
             attempt_id=attempt_id,
@@ -44,6 +45,7 @@ class AttemptRepository(BaseRepository[UserAttempt]):
             user_answer=user_answer,
             is_correct=is_correct,
             ai_feedback=feedback,
+            ai_reasoning=reasoning,
             confidence_score=confidence,
             flagged_uncertain=flagged_uncertain,
         )

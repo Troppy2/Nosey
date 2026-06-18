@@ -417,7 +417,9 @@ function formatAnswerForDisplay(raw: string): string {
 
 function ReviewItem({ answer, number }: { answer: AnswerResult; number: number }) {
   const [open, setOpen] = useState(false);
+  const [reasoningOpen, setReasoningOpen] = useState(false);
   const Icon = answer.is_correct ? CheckCircle2 : XCircle;
+  const reasoning = answer.reasoning?.trim();
 
   return (
     <Card className={`review-item ${answer.is_correct ? "correct" : "incorrect"}`}>
@@ -443,6 +445,24 @@ function ReviewItem({ answer, number }: { answer: AnswerResult; number: number }
             <span>Feedback</span>
             <MarkdownContent content={answer.feedback ?? "No feedback returned for this answer."} />
           </div>
+          {reasoning ? (
+            <div className="answer-reasoning">
+              <button
+                className="answer-reasoning-trigger"
+                onClick={() => setReasoningOpen(!reasoningOpen)}
+                type="button"
+              >
+                <Brain size={15} />
+                <span>Reasoning</span>
+                <ChevronDown className={reasoningOpen ? "rotated" : ""} size={15} />
+              </button>
+              {reasoningOpen ? (
+                <div className="answer-reasoning-body">
+                  <MarkdownContent content={reasoning} />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {answer.confidence !== null && answer.confidence !== undefined ? (
             <span className="pill">{Math.round(answer.confidence * 100)}% confidence</span>
           ) : null}

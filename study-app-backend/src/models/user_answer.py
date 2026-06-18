@@ -27,6 +27,7 @@ class UserAnswer(Base):
     user_answer: Mapped[str] = mapped_column(Text, nullable=False)
     is_correct: Mapped[Optional[bool]] = mapped_column(Boolean)
     ai_feedback: Mapped[Optional[str]] = mapped_column(Text)
+    ai_reasoning: Mapped[Optional[str]] = mapped_column(Text)
     confidence_score: Mapped[Optional[Decimal]] = mapped_column(Numeric(3, 2))
     flagged_uncertain: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 

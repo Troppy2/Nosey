@@ -30,6 +30,7 @@ class AnswerResult(BaseModel):
     correct_answer: Optional[str] = None
     is_correct: bool
     feedback: Optional[str] = None
+    reasoning: Optional[str] = None
     confidence: Optional[float] = None
     flagged_uncertain: bool = False
     is_math: bool = False
@@ -63,6 +64,7 @@ class AttemptDetail(AttemptSummary):
 class FRQGrade(BaseModel):
     is_correct: bool
     feedback: Optional[str] = None
+    reasoning: Optional[str] = None
     flagged_uncertain: bool = False
     confidence: float = 0.0
 

@@ -1047,8 +1047,13 @@ EXPECTED ANSWER:
 USER ANSWER:
 {user_answer}
 
+Do your thinking and any self-correction in the "reasoning" field only. The "feedback"
+field must be the final, clean explanation the student reads: state the verdict and why,
+with NO trial-and-error, second-guessing, or phrases like "wait", "let me reconsider",
+"actually", or "oh".
+
 Return JSON only:
-{{"is_correct": true/false, "feedback": "brief explanation", "flagged_uncertain": true/false, "confidence": 0.0-1.0}}
+{{"is_correct": true/false, "reasoning": "your private step-by-step working (may be messy)", "feedback": "clean final explanation for the student", "flagged_uncertain": true/false, "confidence": 0.0-1.0}}
 If the notes do not support grading, set flagged_uncertain true and confidence 0.0.
 """
         try:
@@ -1056,6 +1061,7 @@ If the notes do not support grading, set flagged_uncertain true and confidence 0
             return FRQGrade(
                 is_correct=bool(data.get("is_correct", False)),
                 feedback=str(data.get("feedback", ""))[:2000],
+                reasoning=(str(data.get("reasoning", "")).strip() or None),
                 flagged_uncertain=bool(data.get("flagged_uncertain", False)),
                 confidence=max(0.0, min(1.0, float(data.get("confidence", 0.0)))),
             )
@@ -1146,9 +1152,13 @@ Evaluate the student's code for:
 2. Logic — is the approach sound even if syntax is slightly off?
 3. Edge cases — does it handle the given examples?
 
+Put your private trace-through and any self-correction in "reasoning". The other fields
+must be clean and final: no "wait", "let me reconsider", "actually", or "oh".
+
 Return JSON only with these exact keys:
 {{
   "is_correct": true or false,
+  "reasoning": "your private step-by-step evaluation of the code (may be messy)",
   "what_went_right": "what the student did well (empty string if nothing)",
   "what_went_wrong": "specific bugs or issues (empty string if correct)",
   "improvements": ["suggestion 1", "suggestion 2"],
@@ -1163,6 +1173,7 @@ Be lenient on minor syntax errors if the logic is correct. Accept equivalent sol
         try:
             data = await self._complete_json(prompt)
             is_correct = bool(data.get("is_correct", False))
+            reasoning = str(data.get("reasoning", "")).strip() or None
             what_right = str(data.get("what_went_right", "")).strip()
             what_wrong = str(data.get("what_went_wrong", "")).strip()
             improvements = data.get("improvements", [])
@@ -1188,6 +1199,7 @@ Be lenient on minor syntax errors if the logic is correct. Accept equivalent sol
             return FRQGrade(
                 is_correct=is_correct,
                 feedback=feedback[:4000],
+                reasoning=reasoning,
                 flagged_uncertain=flagged,
                 confidence=confidence,
             )
@@ -1325,7 +1337,11 @@ Then return JSON only with these exact keys:
 
 Rules:
 - Accept equivalent forms (e.g. x=4 and 4 are equivalent for "solve for x: ... = 4")
-- steps must walk through the complete solution from start to finish
+- steps must walk through the complete solution from start to finish. This is the detailed
+  working, shown to the student only if they expand a "Reasoning" dropdown.
+- "what_went_right" and "what_went_wrong" are the clean, default-visible summary: state them
+  plainly with NO trial-and-error, second-guessing, or phrases like "wait", "let me reconsider",
+  "actually", or "oh". Do any messy thinking inside "steps" only.
 - Write ALL math expressions in LaTeX notation: \\frac{{dy}}{{dx}} = 3t^{{2}} + 1
 - Be specific in what_went_right and what_went_wrong
 """
@@ -1339,15 +1355,20 @@ Rules:
             confidence = max(0.0, min(1.0, float(data.get("confidence", 0.5))))
             flagged = bool(data.get("flagged_uncertain", False))
 
-            # Build structured markdown+LaTeX feedback (rendered by MarkdownContent)
+            # Default-visible feedback: the clean verdict and the correct final answer.
+            # The step-by-step working goes into reasoning, hidden behind a dropdown.
             sections: list[str] = []
             if what_right:
                 sections.append(f"**What you got right:** {what_right}")
             if what_wrong:
                 sections.append(f"**What to fix:** {what_wrong}")
+            if final_answer:
+                sections.append(f"\n**Final answer:** $${final_answer}$$")
+            feedback = "\n\n".join(sections)
 
+            # Build the step-by-step working as the collapsible reasoning.
+            reasoning_lines: list[str] = []
             if isinstance(steps_raw, list) and steps_raw:
-                sections.append("\n**Step-by-step solution:**")
                 for item in steps_raw:
                     if not isinstance(item, dict):
                         continue
@@ -1358,15 +1379,13 @@ Rules:
                         line = f"**Step {num}:** {desc}"
                         if expr:
                             line += f"  $${expr}$$"
-                        sections.append(line)
+                        reasoning_lines.append(line)
+            reasoning = "\n\n".join(reasoning_lines) or None
 
-            if final_answer:
-                sections.append(f"\n**Final answer:** $${final_answer}$$")
-
-            feedback = "\n\n".join(sections)
             return FRQGrade(
                 is_correct=is_correct,
                 feedback=feedback[:4000],
+                reasoning=(reasoning[:4000] if reasoning else None),
                 flagged_uncertain=flagged,
                 confidence=confidence,
             )
@@ -1380,12 +1399,14 @@ Rules:
         correct_answer: str,
         user_answer: str,
         is_correct: bool,
-    ) -> str:
+    ) -> tuple[str, Optional[str]]:
         """Write a short Markdown guide for an objective question (MCQ/TF/MS/Ranking).
 
         Correctness is decided deterministically by the grading service; this only
-        produces the "how to solve and why it's correct" explanation. Returns an empty
-        string on failure so the caller can fall back to its plain feedback.
+        produces the "how to solve and why it's correct" explanation. Returns a
+        (feedback, reasoning) pair: feedback is the clean default-visible explanation,
+        reasoning is the optional collapsible working. Returns ("", None) on failure so
+        the caller can fall back to its plain feedback.
         """
         status = (
             "The student answered CORRECTLY."
@@ -1417,15 +1438,20 @@ Write a concise explanation in Markdown that:
 
 Keep it tight (2 to 5 sentences or a few short steps). Use Markdown. If math is involved, write expressions in LaTeX using $...$ or $$...$$.
 
+Do any messy thinking or self-correction in "reasoning" only. "feedback" must be the clean
+final explanation, with NO "wait", "let me reconsider", "actually", or "oh".
+
 Return JSON only:
-{{"feedback": "the markdown explanation"}}
+{{"reasoning": "your private working (may be messy, can be empty)", "feedback": "the clean markdown explanation"}}
 """
         try:
             data = await self._complete_json(prompt)
-            return str(data.get("feedback", "")).strip()[:2000]
+            feedback = str(data.get("feedback", "")).strip()[:2000]
+            reasoning = str(data.get("reasoning", "")).strip()[:2000] or None
+            return feedback, reasoning
         except Exception as exc:
             logger.warning("LLM objective explanation failed: %s", exc)
-            return ""
+            return "", None
 
     async def generate_flashcards(
         self,
@@ -1774,20 +1800,26 @@ Return only the JSON object."""
                 else:
                     fallback_reason = "provider_partial_output_filled"
             else:
+                # Each placeholder text must be unique. _merge_generated_questions dedups by
+                # normalized question text, so identical placeholders would collapse to a
+                # single slot, leaving the test short and tripping the "not enough questions"
+                # error even though this branch is meant to fill every slot.
+                existing_mcq = len(fill_mcq)
+                existing_frq = len(fill_frq)
                 gap_mcq = [
                     GeneratedMCQ(
-                        question_text="[Question could not be generated]",
+                        question_text=f"[Question {existing_mcq + i + 1} could not be generated]",
                         options=["[Not available]", "[Not available]", "[Not available]", "[Not available]"],
                         correct_index=0,
                     )
-                    for _ in range(remaining_mcq)
+                    for i in range(remaining_mcq)
                 ]
                 gap_frq = [
                     GeneratedFRQ(
-                        question_text="[Question could not be generated]",
+                        question_text=f"[Question {existing_frq + i + 1} could not be generated]",
                         expected_answer="[Not available]",
                     )
-                    for _ in range(remaining_frq)
+                    for i in range(remaining_frq)
                 ]
                 fallback_reason = "blank_placeholder_fill"
 
@@ -2185,7 +2217,10 @@ Return only the JSON object."""
                         "model": settings.ollama_model,
                         "prompt": prompt_body,
                         "stream": False,
-                        "options": {"num_predict": settings.llm_max_tokens},
+                        "options": {
+                            "num_predict": settings.llm_max_tokens,
+                            "num_ctx": settings.ollama_num_ctx,
+                        },
                     },
                 )
                 response.raise_for_status()
@@ -2265,7 +2300,7 @@ Return only the JSON object."""
                 actual_prompt[:2000],
             )
 
-            async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
+            async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
                 response = await client.post(
                     "https://api.anthropic.com/v1/messages",
                     headers={
@@ -2318,7 +2353,7 @@ Return only the JSON object."""
     async def _complete_gemini(self, prompt: str) -> dict[str, object]:
         async def _do() -> dict[str, object]:
             prompt_body = self._prepare_llm_payload(prompt, "gemini")
-            async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
+            async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
                 response = await client.post(
                     "https://generativelanguage.googleapis.com/v1beta/models/deepseek-v4-flash:cloud:generateContent",
                     params={"key": settings.google_ai_api_key},
@@ -2344,7 +2379,7 @@ Return only the JSON object."""
             headers = {"Content-Type": "application/json; charset=utf-8"}
             if settings.ollama_api_key:
                 headers["Authorization"] = f"Bearer {settings.ollama_api_key}"
-            async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
+            async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
                 response = await client.post(
                     f"{settings.ollama_base_url.rstrip('/')}/api/generate",
                     headers=headers,
@@ -2353,7 +2388,10 @@ Return only the JSON object."""
                         "prompt": prompt_body,
                         "stream": False,
                         "format": "json",
-                        "options": {"num_predict": _JSON_MAX_TOKENS},
+                        "options": {
+                            "num_predict": _JSON_MAX_TOKENS,
+                            "num_ctx": settings.ollama_num_ctx,
+                        },
                     },
                 )
                 response.raise_for_status()
@@ -2361,6 +2399,19 @@ Return only the JSON object."""
 
             # Ollama responses vary in shape. "response" may be a string, a dict, or nested.
             raw_resp = payload.get("response")
+
+            # Diagnostics: log what Ollama actually returned. Without this we cannot tell a
+            # model that returned nothing from one whose output failed downstream validation.
+            done_reason = payload.get("done_reason")
+            raw_preview = str(raw_resp)[:500] if raw_resp is not None else ""
+            logger.info(
+                "Ollama JSON response: model=%s shape=%s len=%d done_reason=%s preview=%s",
+                settings.ollama_model,
+                type(raw_resp).__name__,
+                len(str(raw_resp)) if raw_resp is not None else 0,
+                done_reason,
+                raw_preview,
+            )
 
             # If Ollama already returned structured JSON, return it directly.
             if isinstance(raw_resp, dict):
@@ -2418,7 +2469,7 @@ Return only the JSON object."""
     async def _complete_groq(self, prompt: str) -> dict[str, object]:
         async def _do() -> dict[str, object]:
             prompt_body = self._prepare_llm_payload(prompt, "groq")
-            async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
+            async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
                 response = await client.post(
                     "https://api.groq.com/openai/v1/chat/completions",
                     headers={
@@ -2497,8 +2548,42 @@ Return only the JSON object."""
                     item["correct_index"] = item[alt]
                     break
         options = item.get("options")
+        # Some models emit options under an alternate key.
+        if options is None:
+            for alt in ("choices", "answers", "option_list"):
+                if alt in item:
+                    options = item[alt]
+                    item["options"] = options
+                    break
         if isinstance(options, dict):
-            item["options"] = list(options.values())
+            options = list(options.values())
+            item["options"] = options
+        # A model that returns only 3 options would otherwise be dropped entirely.
+        # Pad to the required 4 with a neutral distractor; the correct answer is never
+        # the padded option, so this only ever degrades quality, never correctness.
+        if isinstance(options, list) and len(options) == 3:
+            item["options"] = list(options) + ["None of the above"]
+        return item
+
+    def _normalize_frq_item(self, item: object) -> object:
+        """Coerce common FRQ key deviations so _is_valid_frq has the best chance of accepting it.
+
+        Mirrors _normalize_mcq_item. Without this, an FRQ that uses 'answer' instead of
+        'expected_answer' is silently dropped, which can zero out the entire FRQ count.
+        """
+        if not isinstance(item, dict):
+            return item
+        item = dict(item)
+        if "question_text" not in item:
+            for alt in ("question", "text", "prompt"):
+                if alt in item:
+                    item["question_text"] = item[alt]
+                    break
+        if "expected_answer" not in item:
+            for alt in ("answer", "expected", "solution", "sample_answer", "model_answer"):
+                if alt in item:
+                    item["expected_answer"] = item[alt]
+                    break
         return item
 
     def _is_valid_mcq(self, item: object) -> bool:
@@ -2622,6 +2707,7 @@ Return only the JSON object."""
                     )
         if isinstance(frq_raw, list):
             for item in frq_raw:
+                item = self._normalize_frq_item(item)
                 if frq_validator(item):
                     frq.append(
                         GeneratedFRQ(
@@ -2629,6 +2715,20 @@ Return only the JSON object."""
                             expected_answer=self._strip_source_references(normalize_latex(str(item.get("expected_answer", "")).strip())),  # type: ignore[union-attr]
                         )
                     )
+
+        # Diagnostics: distinguish "model returned nothing" from "everything failed validation".
+        raw_mcq_count = len(mcq_raw) if isinstance(mcq_raw, list) else 0
+        raw_frq_count = len(frq_raw) if isinstance(frq_raw, list) else 0
+        logger.info(
+            "Parsed generated test (math_mode=%s): mcq raw=%d valid=%d, frq raw=%d valid=%d",
+            math_mode, raw_mcq_count, len(mcq), raw_frq_count, len(frq),
+        )
+        if not mcq and not frq:
+            logger.warning(
+                "Generated test parsed to 0 valid questions; response top-level keys=%s",
+                list(data.keys()),
+            )
+
         if len(mcq) < count_mcq or len(frq) < count_frq:
             if not allow_fallback:
                 return mcq[:count_mcq], frq[:count_frq]

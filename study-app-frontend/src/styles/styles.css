@@ -12837,3 +12837,43 @@ select.lc-custom-input {
   margin-top: 2px;
   color: #dc2626;
 }
+
+/* Collapsible "Reasoning" dropdown on graded answers (Results page) */
+.answer-reasoning {
+  display: grid;
+  gap: 8px;
+}
+
+.answer-reasoning-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 6px 12px;
+  border: 1px solid var(--green-light, #cfe1b9);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--green-dark);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.answer-reasoning-trigger:hover {
+  background: rgba(207, 225, 185, 0.35);
+}
+
+.answer-reasoning-trigger .rotated {
+  transform: rotate(180deg);
+}
+
+.answer-reasoning-body {
+  padding: 12px 14px;
+  background: rgba(207, 225, 185, 0.28);
+  border-left: 3px solid var(--green-light, #cfe1b9);
+  border-radius: 8px;
+}
+
+.answer-reasoning-body .kojo-markdown {
+  font-size: 0.88rem;
+}
