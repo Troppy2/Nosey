@@ -12723,3 +12723,117 @@ select.lc-custom-input {
 .lc-archived-empty {
   margin-top: 12px;
 }
+
+/* ── Save My Streak challenge (beta-only, tree-view bottom) ──────────────── */
+.lc-streak-section {
+  margin-top: 30px;
+  padding-top: 22px;
+  border-top: 1px dashed color-mix(in srgb, #dc2626 28%, white);
+}
+
+.lc-streak-node {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 16px 18px;
+  border: 1.5px solid color-mix(in srgb, #dc2626 30%, white);
+  border-radius: 14px;
+  background: color-mix(in srgb, #dc2626 5%, white);
+  cursor: pointer;
+  text-align: left;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.lc-streak-node:hover {
+  transform: translateY(-2px);
+  border-color: #dc2626;
+  box-shadow: 0 4px 18px color-mix(in srgb, #dc2626 18%, transparent);
+}
+
+.lc-streak-node-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: color-mix(in srgb, #dc2626 12%, white);
+  color: #dc2626;
+  flex-shrink: 0;
+}
+
+.lc-streak-node-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lc-streak-node-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lc-streak-node-title strong {
+  font-size: 1rem;
+  color: var(--ink);
+}
+
+.lc-streak-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #dc2626 15%, white);
+  color: #dc2626;
+  border: 1px solid color-mix(in srgb, #dc2626 30%, white);
+}
+
+.lc-streak-node-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lc-streak-node-desc {
+  font-size: 0.82rem;
+  color: #596949;
+  font-weight: 550;
+}
+
+.lc-streak-node-expires {
+  font-size: 0.78rem;
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.lc-streak-node-flame {
+  color: #dc2626;
+  opacity: 0.8;
+  flex-shrink: 0;
+}
+
+/* Banner shown inside the problem pane for streak challenge problems */
+.lc-streak-challenge-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border-radius: 10px;
+  background: color-mix(in srgb, #dc2626 7%, white);
+  border: 1px solid color-mix(in srgb, #dc2626 25%, white);
+  color: #991b1b;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.lc-streak-challenge-banner svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #dc2626;
+}

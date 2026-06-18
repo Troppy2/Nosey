@@ -29,6 +29,7 @@ import {
   Route,
   Search,
   Send,
+  ShieldAlert,
   Sparkles,
   Trophy,
   Users,
@@ -67,12 +68,15 @@ import {
   syncLCCustomProblem,
   deleteLCCustomProblem,
   generateLCCustomProblem,
+  fetchLCStreakChallenge,
+  createLCStreakChallenge,
+  completeLCStreakChallenge,
 } from "../lib/api";
 import { runPythonLeetCode, traceLeetCodeExecution, type RunnerResult, type TraceResult } from "../lib/pyodideRunner";
 import { sanitizeLeetCodeHtml } from "../lib/leetcodeHtml";
 import { ExecutionVisualizer } from "../components/ExecutionVisualizer";
 import { Link } from "react-router-dom";
-import type { LeetCodeProblemData, LCCustomProblem, LCCustomTestCase, LCGeneratedCustomProblem } from "../lib/types";
+import type { LeetCodeProblemData, LCCustomProblem, LCCustomTestCase, LCGeneratedCustomProblem, LCStreakChallenge } from "../lib/types";
 import { useSettings } from "../lib/useSettings";
 
 type Difficulty = "Easy" | "Medium" | "Hard" | "Reference" | "Unknown";
@@ -714,8 +718,27 @@ function isRunnable(problemData?: LeetCodeProblemData) {
 }
 
 
+const STREAK_CHALLENGE_SLUG = "trapping-rain-water";
+
+function fillStreakGap(currentDates: string[]): string[] {
+  if (currentDates.length === 0) return [todayKey()];
+  const sorted = [...currentDates].sort();
+  const lastDateStr = sorted[sorted.length - 1];
+  const lastDate = new Date(`${lastDateStr}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dateSet = new Set(currentDates);
+  const cursor = new Date(lastDate);
+  cursor.setDate(cursor.getDate() + 1);
+  while (cursor <= today) {
+    dateSet.add(cursor.toLocaleDateString("en-CA"));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return [...dateSet];
+}
+
 export default function LeetCodeMode() {
-  const { generationProvider } = useSettings();
+  const { generationProvider, betaMode } = useSettings();
   const [view, setView] = useState<View>({ type: "tree" });
   const [customProblems, setCustomProblems] = useState<LCCustomProblem[]>(() => loadCustomProblems());
   const [customModalOpen, setCustomModalOpen] = useState(false);
@@ -766,6 +789,7 @@ export default function LeetCodeMode() {
   const [notesPos, setNotesPos] = useState<{ x: number; y: number } | null>(null);
   const notesSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notesDragOffset = useRef<{ x: number; y: number } | null>(null);
+  const [streakChallenge, setStreakChallenge] = useState<LCStreakChallenge | null>(null);
 
   // Full list (active + archived) backs deep-link lookups so an archived problem can
   // still be opened directly. The active/archived splits below back the list views.
@@ -786,6 +810,11 @@ export default function LeetCodeMode() {
     ? customProblems.find((cp) => cp.slug === currentProblem.slug) ?? null
     : null;
   const isCustomProblem = Boolean(currentCustomProblem);
+  const isStreakChallengeProblem =
+    betaMode &&
+    streakChallenge !== null &&
+    streakChallenge.completed_at === null &&
+    currentProblem?.slug === streakChallenge.problem_slug;
   const currentProblemState = currentProblem ? problemStates[currentProblem.slug] : undefined;
   const currentProblemData = currentCustomProblem ? customToProblemData(currentCustomProblem) : currentProblemState?.data;
   const currentCustomCases = currentProblem ? customCases[currentProblem.slug] ?? [] : [];
@@ -909,6 +938,17 @@ export default function LeetCodeMode() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // On mount: fetch streak challenge for beta users.
+  useEffect(() => {
+    if (isGuestSession() || !betaMode) return;
+    fetchLCStreakChallenge()
+      .then((existing) => {
+        setStreakChallenge(existing);
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [betaMode]);
+
   // On mount: pull custom problems from DB and reconcile with localStorage. DB wins on
   // overlap; any local-only entries (created while a prior sync failed) get pushed up.
   useEffect(() => {
@@ -1012,6 +1052,34 @@ export default function LeetCodeMode() {
     };
   }, [activityDates, progress]);
 
+  // Show the streak rescue challenge at the bottom of the roadmap when:
+  // - beta mode is on
+  // - the current streak is 0 (streak has ended)
+  // - the user had a streak before (so there is something to save)
+  // - a challenge exists and has not been completed yet
+  const showStreakChallenge =
+    betaMode &&
+    stats.currentStreak === 0 &&
+    stats.bestStreak > 0 &&
+    streakChallenge !== null &&
+    streakChallenge.completed_at === null;
+
+  async function ensureStreakChallengeExists() {
+    if (isGuestSession() || !betaMode) return;
+    if (streakChallenge && streakChallenge.completed_at === null) return;
+    const created = await createLCStreakChallenge();
+    if (created) setStreakChallenge(created);
+  }
+
+  // When streak drops to 0 and the user has a prior streak, auto-create the challenge.
+  useEffect(() => {
+    if (!betaMode || isGuestSession()) return;
+    if (stats.currentStreak === 0 && stats.bestStreak > 0) {
+      void ensureStreakChallengeExists();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stats.currentStreak, stats.bestStreak, betaMode]);
+
   function pushProgressToDb(nextProgress: Record<string, boolean>, nextDates: string[]) {
     if (isGuestSession()) return;
     syncLCProgress({ progress: nextProgress, activity_dates: nextDates }).catch(() => { });
@@ -1053,8 +1121,21 @@ export default function LeetCodeMode() {
     const next = { ...progress, [problem.slug]: true };
     setProgress(next);
     saveProgress(next);
-    const nextDates = recordSolvedToday();
-    pushProgressToDb(next, nextDates);
+
+    // If this is the streak challenge problem, bridge the activity gap so the streak
+    // is restored to continuity before adding today.
+    if (isStreakChallengeProblem) {
+      const bridgedDates = fillStreakGap(activityDates);
+      setActivityDates(bridgedDates);
+      saveActivityDates(bridgedDates);
+      pushProgressToDb(next, bridgedDates);
+      completeLCStreakChallenge()
+        .then(() => setStreakChallenge((prev) => prev ? { ...prev, completed_at: new Date().toISOString() } : prev))
+        .catch(() => {});
+    } else {
+      const nextDates = recordSolvedToday();
+      pushProgressToDb(next, nextDates);
+    }
   }
 
   // ── Custom problem handlers ─────────────────────────────────────────────────
@@ -1954,6 +2035,39 @@ export default function LeetCodeMode() {
             );
           })()}
         </section>
+
+        {showStreakChallenge ? (
+          <section className="lc-streak-section" aria-label="Save My Streak challenge">
+            <button
+              type="button"
+              className="lc-streak-node"
+              onClick={() => setView({ type: "problem", categoryId: "arrays", problemSlug: STREAK_CHALLENGE_SLUG })}
+            >
+              <span className="lc-streak-node-icon">
+                <ShieldAlert size={22} />
+              </span>
+              <span className="lc-streak-node-copy">
+                <span className="lc-streak-node-title">
+                  <strong>Save My Streak</strong>
+                  <span className="lc-streak-badge">Beta</span>
+                </span>
+                <span className="lc-streak-node-meta">
+                  <span className="lc-difficulty lc-difficulty--hard">Hard</span>
+                  <span className="lc-streak-node-desc">Trapping Rain Water - no Kojo, no NeetCode</span>
+                </span>
+                {streakChallenge?.expires_at ? (
+                  <small className="lc-streak-node-expires">
+                    Expires {new Date(streakChallenge.expires_at).toLocaleString()}
+                  </small>
+                ) : (
+                  <small className="lc-streak-node-expires">No expiry - solve to restore your streak</small>
+                )}
+              </span>
+              <span className="lc-streak-node-flame"><Flame size={20} /></span>
+            </button>
+          </section>
+        ) : null}
+
         {customModalNode}
         {confirmDeleteNode}
       </div>
@@ -2208,10 +2322,12 @@ export default function LeetCodeMode() {
             <Timer size={16} />
             <span className="lc-tb-label lc-tb-label--timer">{timerButtonLabel}</span>
           </button>
-          <a className="lc-toolbar-btn" href={`https://www.youtube.com/results?search_query=neetcode+${encodeURIComponent(currentProblem.title)}`} target="_blank" rel="noreferrer" aria-label="Search NeetCode on YouTube">
-            <Youtube size={16} />
-            <span className="lc-tb-label">NeetCode</span>
-          </a>
+          {!isStreakChallengeProblem ? (
+            <a className="lc-toolbar-btn" href={`https://www.youtube.com/results?search_query=neetcode+${encodeURIComponent(currentProblem.title)}`} target="_blank" rel="noreferrer" aria-label="Search NeetCode on YouTube">
+              <Youtube size={16} />
+              <span className="lc-tb-label">NeetCode</span>
+            </a>
+          ) : null}
           <a className="lc-toolbar-btn" href={currentProblem.url} target="_blank" rel="noreferrer" aria-label="Open on LeetCode">
             <ExternalLink size={16} />
             <span className="lc-tb-label">Open</span>
@@ -2228,10 +2344,12 @@ export default function LeetCodeMode() {
             <Notebook size={16} />
             <span className="lc-tb-label">Notes</span>
           </button>
-          <button type="button" className="lc-toolbar-btn lc-toolbar-btn--kojo" onClick={() => openKojo(currentProblem)} aria-label="Ask Kojo for a hint">
-            <Sparkles size={16} />
-            <span className="lc-tb-label">Ask Kojo</span>
-          </button>
+          {!isStreakChallengeProblem ? (
+            <button type="button" className="lc-toolbar-btn lc-toolbar-btn--kojo" onClick={() => openKojo(currentProblem)} aria-label="Ask Kojo for a hint">
+              <Sparkles size={16} />
+              <span className="lc-tb-label">Ask Kojo</span>
+            </button>
+          ) : null}
           <button type="button" className={progress[currentProblem.slug] ? "lc-toolbar-btn lc-toolbar-btn--done" : "lc-toolbar-btn"} onClick={() => toggleProgress(currentProblem)} aria-label={progress[currentProblem.slug] ? "Mark incomplete" : "Mark done"}>
             {progress[currentProblem.slug] ? <CheckCircle2 size={16} /> : <Circle size={16} />}
             <span className="lc-tb-label">{progress[currentProblem.slug] ? "Done" : "Mark done"}</span>
@@ -2293,6 +2411,13 @@ export default function LeetCodeMode() {
             <span>{currentProblem.categoryLabel}</span>
             {currentProblem.isExtra ? <span>Extra</span> : null}
           </div>
+
+          {isStreakChallengeProblem ? (
+            <div className="lc-streak-challenge-banner">
+              <ShieldAlert size={15} />
+              <span><strong>Save My Streak challenge.</strong> Kojo and NeetCode are disabled. Solve this on your own to restore your streak.</span>
+            </div>
+          ) : null}
 
           {problemLoading ? (
             <div className="lc-statement-state"><Loader2 size={18} className="spin" /><span>Loading official statement…</span></div>
@@ -2493,7 +2618,7 @@ export default function LeetCodeMode() {
             ) : null}
           </div>
 
-          {!isCustomProblem ? (
+          {!isCustomProblem && !isStreakChallengeProblem ? (
             <div className="lc-solution-panel">
               <button
                 type="button"
