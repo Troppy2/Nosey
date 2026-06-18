@@ -466,6 +466,16 @@ export type SlashCommand = {
   updated_at: string;
 };
 
+// ── Streak challenge (Save My Streak, beta-only) ────────────────────────────
+
+export type LCStreakChallenge = {
+  id: ID;
+  problem_slug: string;
+  expires_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+};
+
 export type SlashCommandInput = {
   slash: string;
   label: string;

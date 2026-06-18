@@ -146,3 +146,13 @@ class LCGeneratedCustomProblem(BaseModel):
     description: str = ""
     starter_code: str = ""
     test_cases: list[LCCustomTestCase] = Field(default_factory=list)
+
+
+# ── Streak challenge (Save My Streak, beta-only) ──────────────────────────────
+
+class LCStreakChallengeResponse(BaseModel):
+    id: int
+    problem_slug: str
+    expires_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    created_at: str

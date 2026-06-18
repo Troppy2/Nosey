@@ -7,7 +7,7 @@ from src.models.folder_file import FolderFile
 from src.models.frq_answer import FRQAnswer
 from src.models.kojo_conversation import KojoConversation
 from src.models.kojo_message import KojoMessage
-from src.models.lc_sync import LCActivityDate, LCCodeWorkspace, LCProgress
+from src.models.lc_sync import LCActivityDate, LCCodeWorkspace, LCProgress, LCStreakChallenge
 from src.models.mcq_option import MCQOption
 from src.models.mock_interview import MockInterviewSession
 from src.models.note import Note
@@ -32,6 +32,7 @@ __all__ = [
     "LCActivityDate",
     "LCCodeWorkspace",
     "LCProgress",
+    "LCStreakChallenge",
     "MCQOption",
     "MockInterviewSession",
     "Note",

@@ -869,6 +869,28 @@ export async function generateLCCustomProblem(
   });
 }
 
+// ── Streak challenge (Save My Streak, beta-only) ─────────────────────────────
+
+export async function fetchLCStreakChallenge(): Promise<import("./types").LCStreakChallenge | null> {
+  try {
+    return await request<import("./types").LCStreakChallenge | null>("/leetcode/streak-challenge");
+  } catch {
+    return null;
+  }
+}
+
+export async function createLCStreakChallenge(): Promise<import("./types").LCStreakChallenge | null> {
+  try {
+    return await request<import("./types").LCStreakChallenge>("/leetcode/streak-challenge", { method: "POST" });
+  } catch {
+    return null;
+  }
+}
+
+export async function completeLCStreakChallenge(): Promise<void> {
+  await request("/leetcode/streak-challenge/complete", { method: "POST" });
+}
+
 // ── Mock Interview ────────────────────────────────────────────────────────────
 
 export async function createMockInterviewSession(

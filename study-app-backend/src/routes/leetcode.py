@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
@@ -8,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_session
 from src.dependencies import get_current_user
-from src.models.lc_sync import LCActivityDate, LCCodeWorkspace, LCCustomProblem, LCProgress, LCProblemNote
+from src.models.lc_sync import LCActivityDate, LCCodeWorkspace, LCCustomProblem, LCProgress, LCProblemNote, LCStreakChallenge
 from src.models.user import User
 from src.schemas.leetcode_schema import (
     LCCustomProblemListResponse,
@@ -21,6 +23,7 @@ from src.schemas.leetcode_schema import (
     LCNotesSyncRequest,
     LCProgressResponse,
     LCProgressSyncRequest,
+    LCStreakChallengeResponse,
     LCWorkspaceResponse,
     LCWorkspacesResponse,
     LCWorkspaceSyncRequest,
@@ -32,6 +35,8 @@ from src.schemas.leetcode_schema import (
 )
 from src.services.leetcode_service import LeetCodeService
 from src.utils.exceptions import LLMException, ResourceNotFoundException
+
+STREAK_CHALLENGE_SLUG = "trapping-rain-water"
 
 router = APIRouter(prefix="/leetcode", tags=["leetcode"])
 
@@ -381,3 +386,85 @@ async def generate_custom_problem(
         )
     except LLMException as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+# ── Streak challenge (Save My Streak, beta-only) ──────────────────────────────
+
+def _serialize_streak_challenge(row: LCStreakChallenge) -> LCStreakChallengeResponse:
+    return LCStreakChallengeResponse(
+        id=row.id,
+        problem_slug=row.problem_slug,
+        expires_at=row.expires_at.isoformat() if row.expires_at else None,
+        completed_at=row.completed_at.isoformat() if row.completed_at else None,
+        created_at=row.created_at.isoformat(),
+    )
+
+
+@router.get("/streak-challenge", response_model=Optional[LCStreakChallengeResponse])
+async def get_streak_challenge(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> Optional[LCStreakChallengeResponse]:
+    row = (
+        await session.execute(
+            select(LCStreakChallenge)
+            .where(LCStreakChallenge.user_id == user.id)
+            .order_by(LCStreakChallenge.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if not row:
+        return None
+    return _serialize_streak_challenge(row)
+
+
+@router.post("/streak-challenge", response_model=LCStreakChallengeResponse, status_code=status.HTTP_201_CREATED)
+async def create_streak_challenge(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LCStreakChallengeResponse:
+    # Only one active (uncompleted) challenge at a time.
+    existing = (
+        await session.execute(
+            select(LCStreakChallenge)
+            .where(
+                LCStreakChallenge.user_id == user.id,
+                LCStreakChallenge.completed_at.is_(None),
+            )
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if existing:
+        return _serialize_streak_challenge(existing)
+    row = LCStreakChallenge(
+        user_id=user.id,
+        problem_slug=STREAK_CHALLENGE_SLUG,
+        expires_at=None,
+    )
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return _serialize_streak_challenge(row)
+
+
+@router.post("/streak-challenge/complete", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def complete_streak_challenge(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> Response:
+    row = (
+        await session.execute(
+            select(LCStreakChallenge)
+            .where(
+                LCStreakChallenge.user_id == user.id,
+                LCStreakChallenge.completed_at.is_(None),
+            )
+            .order_by(LCStreakChallenge.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="No active streak challenge found.")
+    row.completed_at = datetime.now(timezone.utc)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

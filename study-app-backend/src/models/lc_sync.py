@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
+from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import BIGINT_ID, Base, TimestampMixin
@@ -107,3 +108,24 @@ class LCCustomProblem(Base, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"LCCustomProblem(user_id={self.user_id!r}, slug={self.slug!r})"
+
+
+class LCStreakChallenge(Base, TimestampMixin):
+    """One active streak-rescue challenge per user. Created when the user's streak
+    reaches zero (and they have a prior streak). Completing it before expiry
+    bridges the gap in their activity dates so the streak is preserved."""
+
+    __tablename__ = "lc_streak_challenges"
+
+    id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        BIGINT_ID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    problem_slug: Mapped[str] = mapped_column(String(200), nullable=False)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user: Mapped[User] = relationship("User", back_populates="lc_streak_challenges")
+
+    def __repr__(self) -> str:
+        return f"LCStreakChallenge(user_id={self.user_id!r}, slug={self.problem_slug!r})"
