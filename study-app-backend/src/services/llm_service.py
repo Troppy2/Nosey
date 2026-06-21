@@ -1788,28 +1788,55 @@ Return only the JSON object."""
                 self._set_last_generation_meta(diagnostics)
                 return best_mcq[:count_mcq], best_frq[:count_frq]
 
-        # No more disguising failure. If real generation could not fill every slot, we
-        # FAIL the run instead of padding it with note-based filler or blank
-        # "[Question N could not be generated]" placeholders. A failed test surfaces an
-        # error and a Retry button (see routes/tests.py), which is honest and actionable.
-        # Padding produced "ready" tests that were actually blank: the original bug.
+        # Phase 3: handle the remaining slots. The original bug was that this phase ALWAYS
+        # produced a "ready" test, either with generic filler or, worse, blank
+        # "[Question N could not be generated]" placeholders. The blank-placeholder branch
+        # is gone for good. Behavior now splits on the user's fallback preference:
+        #
+        #  - enable_fallback OFF (the default for real users): RAISE. The background task
+        #    marks the test "failed" and surfaces an error + Retry button. No junk test.
+        #  - enable_fallback ON (explicit Settings opt-in): fill the gap with answerable
+        #    note-based questions, KEEPING any real questions we did get. Never blanks.
+        fill_mcq = best_mcq[:]
+        fill_frq = best_frq[:]
+        remaining_mcq = max(0, count_mcq - len(fill_mcq))
+        remaining_frq = max(0, count_frq - len(fill_frq))
+
+        if not enable_fallback:
+            diagnostics.update({
+                "fallback_used": False,
+                "fallback_reason": "generation_failed_insufficient_questions",
+                "note_grounded": False,
+                "generated_mcq": len(best_mcq),
+                "generated_frq": len(best_frq),
+            })
+            self._set_last_generation_meta(diagnostics)
+            logger.warning(
+                "Test generation failed: only %d/%d MCQ and %d/%d FRQ were valid after all providers and top-ups",
+                len(best_mcq), count_mcq, len(best_frq), count_frq,
+            )
+            raise LLMException(
+                "Practice test could not be generated. The AI provider may be rate-limited or "
+                "temporarily unavailable, or it returned no usable questions for these notes. "
+                "Retry in a moment, or try a different provider."
+            ) from last_error
+
+        fallback_builder = self._fallback_math_questions if math_mode else self._fallback_questions
+        gap_mcq, gap_frq = fallback_builder(notes, remaining_mcq, remaining_frq)
+        if not best_mcq and not best_frq and last_error is not None:
+            fallback_reason = "llm_exception_math" if math_mode else "llm_exception"
+        else:
+            fallback_reason = "provider_partial_output_filled"
+        fill_mcq, fill_frq = self._merge_generated_questions(
+            fill_mcq, fill_frq, gap_mcq, gap_frq, count_mcq, count_frq
+        )
         diagnostics.update({
             "fallback_used": True,
-            "fallback_reason": "generation_failed_insufficient_questions",
+            "fallback_reason": fallback_reason,
             "note_grounded": False,
-            "generated_mcq": len(best_mcq),
-            "generated_frq": len(best_frq),
         })
         self._set_last_generation_meta(diagnostics)
-        logger.warning(
-            "Test generation failed: only %d/%d MCQ and %d/%d FRQ were valid after all providers and top-ups",
-            len(best_mcq), count_mcq, len(best_frq), count_frq,
-        )
-        raise LLMException(
-            "Practice test could not be generated. The AI provider may be rate-limited or "
-            "temporarily unavailable, or it returned no usable questions for these notes. "
-            "Retry in a moment, or try a different provider."
-        ) from last_error
+        return fill_mcq[:count_mcq], fill_frq[:count_frq]
 
     def _build_novelty_block(self, prior_questions: Optional[list[str]]) -> str:
         """Build the "fresh questions" instruction block.
