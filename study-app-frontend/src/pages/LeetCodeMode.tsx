@@ -103,6 +103,7 @@ type Category = {
 
 type View =
   | { type: "tree" }
+  | { type: "browse" }
   | { type: "category"; categoryId: string }
   | { type: "problem"; categoryId: string; problemSlug: string };
 
@@ -699,13 +700,25 @@ function difficultyClass(difficulty: Difficulty) {
   return difficulty.toLowerCase();
 }
 
-function filterProblems(problems: Problem[], progress: Record<string, boolean>, filter: Filter, query: string) {
+// Filters combine (AND): status + search + difficulty + topic all apply together.
+// Empty `difficulties`/`topics` sets mean "no constraint on that dimension" so the
+// per-category bar (which never passes topics) behaves exactly as before.
+function filterProblems(
+  problems: Problem[],
+  progress: Record<string, boolean>,
+  filter: Filter,
+  query: string,
+  difficulties?: Set<Difficulty>,
+  topics?: Set<string>,
+) {
   const normalizedQuery = query.trim().toLowerCase();
   return problems.filter((problem) => {
     const done = Boolean(progress[problem.slug]);
     const matchesFilter = filter === "all" || (filter === "done" ? done : !done);
     const matchesQuery = !normalizedQuery || problem.title.toLowerCase().includes(normalizedQuery);
-    return matchesFilter && matchesQuery;
+    const matchesDifficulty = !difficulties || difficulties.size === 0 || difficulties.has(problem.difficulty);
+    const matchesTopic = !topics || topics.size === 0 || topics.has(problem.categoryId);
+    return matchesFilter && matchesQuery && matchesDifficulty && matchesTopic;
   });
 }
 
@@ -756,6 +769,8 @@ export default function LeetCodeMode() {
   const [progress, setProgress] = useState<Record<string, boolean>>(() => loadJson(getProgressKey(), {}));
   const [activityDates, setActivityDates] = useState<string[]>(() => loadJson(getActivityKey(), []));
   const [filter, setFilter] = useState<Filter>("all");
+  const [difficultyFilter, setDifficultyFilter] = useState<Set<Difficulty>>(new Set());
+  const [topicFilter, setTopicFilter] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
   const [codeWorkspaces, setCodeWorkspaces] = useState<Record<string, CodeWorkspace>>({});
   const [problemStates, setProblemStates] = useState<Record<string, CachedProblemState>>({});
@@ -798,6 +813,22 @@ export default function LeetCodeMode() {
   const archivedCustomProblems = useMemo(() => customProblems.filter((cp) => cp.is_archived), [customProblems]);
   const customProblemList = useMemo(() => activeCustomProblems.map(customToProblem), [activeCustomProblems]);
   const archivedProblemList = useMemo(() => archivedCustomProblems.map(customToProblem), [archivedCustomProblems]);
+
+  // "Browse all" pools every official problem (deduped by slug, so a problem listed in
+  // two categories appears once) plus active custom problems, for cross-topic filtering.
+  const browseProblems = useMemo(
+    () => [...UNIQUE_PROBLEMS, ...customProblemList],
+    [customProblemList],
+  );
+  // Topic chips for the browse view: every official category, plus a Custom chip when the
+  // user has custom problems. The id matches Problem.categoryId so the topic filter works.
+  const topicOptions = useMemo(() => {
+    const options = CATEGORIES.map((category) => ({ id: category.id, label: category.label }));
+    if (customProblemList.length > 0) {
+      options.push({ id: CUSTOM_CATEGORY_ID, label: CUSTOM_CATEGORY_LABEL });
+    }
+    return options;
+  }, [customProblemList.length]);
 
   const currentProblem =
     view.type === "problem"
@@ -1927,6 +1958,96 @@ export default function LeetCodeMode() {
     </>
   ) : null;
 
+  function toggleDifficulty(value: Difficulty) {
+    setDifficultyFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(value)) next.delete(value);
+      else next.add(value);
+      return next;
+    });
+  }
+
+  function toggleTopic(id: string) {
+    setTopicFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function clearFilters(includeTopic: boolean) {
+    setFilter("all");
+    setDifficultyFilter(new Set());
+    if (includeTopic) setTopicFilter(new Set());
+  }
+
+  // Shared combinable filter bar. `showTopic` adds the cross-category topic chips (browse
+  // view only); category views pass false since they are already scoped to one topic.
+  function renderFilterBar(showTopic: boolean) {
+    const anyActive =
+      filter !== "all" || difficultyFilter.size > 0 || (showTopic && topicFilter.size > 0);
+    return (
+      <div className="lc-filter-bar">
+        <div className="lc-filter-group">
+          <span className="lc-filter-label">Difficulty</span>
+          <div className="lc-filter-chips">
+            {(["Easy", "Medium", "Hard"] as Difficulty[]).map((value) => (
+              <button
+                key={value}
+                type="button"
+                className={`lc-filter-chip${difficultyFilter.has(value) ? ` lc-filter-chip--active lc-filter-chip--${value.toLowerCase()}` : ""}`}
+                aria-pressed={difficultyFilter.has(value)}
+                onClick={() => toggleDifficulty(value)}
+              >
+                {value}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="lc-filter-group">
+          <span className="lc-filter-label">Status</span>
+          <div className="lc-filter-tabs" role="group" aria-label="Status filter">
+            {(["all", "todo", "done"] as Filter[]).map((item) => (
+              <button
+                key={item}
+                type="button"
+                className={filter === item ? "lc-filter-tab lc-filter-tab--active" : "lc-filter-tab"}
+                onClick={() => setFilter(item)}
+              >
+                {item === "all" ? "All" : item === "todo" ? "To do" : "Done"}
+              </button>
+            ))}
+          </div>
+        </div>
+        {showTopic ? (
+          <div className="lc-filter-group lc-filter-group--topic">
+            <span className="lc-filter-label">Topic</span>
+            <div className="lc-filter-chips">
+              {topicOptions.map((topic) => (
+                <button
+                  key={topic.id}
+                  type="button"
+                  className={`lc-filter-chip${topicFilter.has(topic.id) ? " lc-filter-chip--active" : ""}`}
+                  aria-pressed={topicFilter.has(topic.id)}
+                  onClick={() => toggleTopic(topic.id)}
+                >
+                  {topic.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {anyActive ? (
+          <button type="button" className="lc-filter-clear" onClick={() => clearFilters(showTopic)}>
+            <X size={14} />
+            Clear
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+
   if (view.type === "tree") {
     return (
       <div className="page lc-page">
@@ -1979,6 +2100,15 @@ export default function LeetCodeMode() {
             <small>Hard</small><span>{stats.hard}</span>
           </div>
         </section>
+
+        <button type="button" className="lc-browse-all" onClick={() => setView({ type: "browse" })}>
+          <span className="lc-browse-all-icon"><Search size={18} /></span>
+          <span className="lc-browse-all-copy">
+            <strong>Browse all problems</strong>
+            <small>Filter across every topic by difficulty, status, and type</small>
+          </span>
+          <ArrowRight size={18} />
+        </button>
 
         <section className="lc-roadmap" aria-label="Skill tree">
           {CATEGORIES.map((category, index) => {
@@ -2074,10 +2204,69 @@ export default function LeetCodeMode() {
     );
   }
 
+  if (view.type === "browse") {
+    const visibleProblems = filterProblems(browseProblems, progress, filter, query, difficultyFilter, topicFilter);
+    const solvedCount = browseProblems.filter((problem) => progress[problem.slug]).length;
+    return (
+      <div className="page page-narrow lc-page">
+        <header className="lc-category-header">
+          <button type="button" className="lc-back-btn" onClick={() => setView({ type: "tree" })}>
+            <ChevronLeft size={16} />
+            Roadmap
+          </button>
+          <div className="lc-category-title-row" style={{ "--lc-accent": "#16a34a" } as CSSProperties}>
+            <span className="lc-node-icon"><Search size={22} /></span>
+            <div>
+              <h1>Browse all problems</h1>
+              <p className="muted">{visibleProblems.length} shown · {solvedCount}/{browseProblems.length} complete</p>
+            </div>
+          </div>
+          <div className="lc-category-tools">
+            <div className="lc-search">
+              <Search size={16} />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search problems" />
+            </div>
+          </div>
+          {renderFilterBar(true)}
+        </header>
+
+        {visibleProblems.length === 0 ? (
+          <div className="lc-custom-empty">
+            <p>No problems match these filters. Try removing a difficulty, topic, or status filter.</p>
+          </div>
+        ) : (
+          <div className="lc-problem-list">
+            {visibleProblems.map((problem) => {
+              const solved = Boolean(progress[problem.slug]);
+              const topicLabel =
+                problem.categoryId === CUSTOM_CATEGORY_ID
+                  ? CUSTOM_CATEGORY_LABEL
+                  : CATEGORY_META[problem.categoryId]?.label ?? problem.categoryLabel;
+              return (
+                <div key={`${problem.categoryId}-${problem.slug}`} className={solved ? "lc-problem-row lc-problem-row--done" : "lc-problem-row"}>
+                  <button type="button" className="lc-problem-check" onClick={() => toggleProgress(problem)} title={solved ? "Mark incomplete" : "Mark complete"}>
+                    {solved ? <CheckCircle2 size={20} className="lc-check-done" /> : <Circle size={20} className="lc-check-empty" />}
+                  </button>
+                  <button type="button" className="lc-problem-title-btn" onClick={() => openProblem(problem.categoryId, problem.slug)}>
+                    <span>{problem.title}</span>
+                    <small>{topicLabel}</small>
+                  </button>
+                  <span className={`lc-difficulty lc-difficulty--${difficultyClass(problem.difficulty)}`}>{problem.difficulty}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {customModalNode}
+        {confirmDeleteNode}
+      </div>
+    );
+  }
+
   if (view.type === "category" && view.categoryId === CUSTOM_CATEGORY_ID) {
-    const visibleProblems = filterProblems(customProblemList, progress, filter, query);
+    const visibleProblems = filterProblems(customProblemList, progress, filter, query, difficultyFilter);
     const done = customProblemList.filter((problem) => progress[problem.slug]).length;
-    const visibleArchived = filterProblems(archivedProblemList, progress, filter, query);
+    const visibleArchived = filterProblems(archivedProblemList, progress, filter, query, difficultyFilter);
     return (
       <div className="page page-narrow lc-page">
         <header className="lc-category-header">
@@ -2097,23 +2286,12 @@ export default function LeetCodeMode() {
               <Search size={16} />
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search problems" />
             </div>
-            <div className="lc-filter-tabs" role="group" aria-label="Problem filter">
-              {(["all", "todo", "done"] as Filter[]).map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  className={filter === item ? "lc-filter-tab lc-filter-tab--active" : "lc-filter-tab"}
-                  onClick={() => setFilter(item)}
-                >
-                  {item === "all" ? "All" : item === "todo" ? "To do" : "Done"}
-                </button>
-              ))}
-            </div>
             <button type="button" className="lc-custom-add-btn" onClick={() => openCustomModal()}>
               <Plus size={16} />
               Add question
             </button>
           </div>
+          {renderFilterBar(false)}
         </header>
 
         {customProblemList.length === 0 ? (
@@ -2209,7 +2387,7 @@ export default function LeetCodeMode() {
 
   if (view.type === "category") {
     const category = CATEGORIES.find((item) => item.id === view.categoryId) ?? CATEGORIES[0];
-    const visibleProblems = filterProblems(category.problems, progress, filter, query);
+    const visibleProblems = filterProblems(category.problems, progress, filter, query, difficultyFilter);
     const done = category.problems.filter((problem) => progress[problem.slug]).length;
     const Icon = category.icon;
 
@@ -2232,19 +2410,8 @@ export default function LeetCodeMode() {
               <Search size={16} />
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search problems" />
             </div>
-            <div className="lc-filter-tabs" role="group" aria-label="Problem filter">
-              {(["all", "todo", "done"] as Filter[]).map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  className={filter === item ? "lc-filter-tab lc-filter-tab--active" : "lc-filter-tab"}
-                  onClick={() => setFilter(item)}
-                >
-                  {item === "all" ? "All" : item === "todo" ? "To do" : "Done"}
-                </button>
-              ))}
-            </div>
           </div>
+          {renderFilterBar(false)}
         </header>
 
         <div className="lc-problem-list">
