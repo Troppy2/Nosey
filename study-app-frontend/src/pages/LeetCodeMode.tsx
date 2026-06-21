@@ -1982,8 +1982,17 @@ export default function LeetCodeMode() {
     if (includeTopic) setTopicFilter(new Set());
   }
 
+  // Status options share the chip idiom with difficulty/topic (single-select), each with
+  // an icon so the control reads clearly instead of as a plain segmented toggle.
+  const STATUS_OPTIONS: { value: Filter; label: string; Icon: LucideIcon }[] = [
+    { value: "all", label: "All", Icon: ListChecks },
+    { value: "todo", label: "To do", Icon: Circle },
+    { value: "done", label: "Done", Icon: CheckCircle2 },
+  ];
+
   // Shared combinable filter bar. `showTopic` adds the cross-category topic chips (browse
   // view only); category views pass false since they are already scoped to one topic.
+  // Every dimension uses one unified chip system so the bar reads as a single control set.
   function renderFilterBar(showTopic: boolean) {
     const anyActive =
       filter !== "all" || difficultyFilter.size > 0 || (showTopic && topicFilter.size > 0);
@@ -1992,32 +2001,42 @@ export default function LeetCodeMode() {
         <div className="lc-filter-group">
           <span className="lc-filter-label">Difficulty</span>
           <div className="lc-filter-chips">
-            {(["Easy", "Medium", "Hard"] as Difficulty[]).map((value) => (
-              <button
-                key={value}
-                type="button"
-                className={`lc-filter-chip${difficultyFilter.has(value) ? ` lc-filter-chip--active lc-filter-chip--${value.toLowerCase()}` : ""}`}
-                aria-pressed={difficultyFilter.has(value)}
-                onClick={() => toggleDifficulty(value)}
-              >
-                {value}
-              </button>
-            ))}
+            {(["Easy", "Medium", "Hard"] as Difficulty[]).map((value) => {
+              const active = difficultyFilter.has(value);
+              const tone = value.toLowerCase();
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  className={`lc-filter-chip${active ? ` lc-filter-chip--active lc-filter-chip--${tone}` : ""}`}
+                  aria-pressed={active}
+                  onClick={() => toggleDifficulty(value)}
+                >
+                  <span className={`lc-diff-dot lc-diff-dot--${tone}`} />
+                  {value}
+                </button>
+              );
+            })}
           </div>
         </div>
         <div className="lc-filter-group">
           <span className="lc-filter-label">Status</span>
-          <div className="lc-filter-tabs" role="group" aria-label="Status filter">
-            {(["all", "todo", "done"] as Filter[]).map((item) => (
-              <button
-                key={item}
-                type="button"
-                className={filter === item ? "lc-filter-tab lc-filter-tab--active" : "lc-filter-tab"}
-                onClick={() => setFilter(item)}
-              >
-                {item === "all" ? "All" : item === "todo" ? "To do" : "Done"}
-              </button>
-            ))}
+          <div className="lc-filter-chips" role="group" aria-label="Status filter">
+            {STATUS_OPTIONS.map(({ value, label, Icon }) => {
+              const active = filter === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  className={`lc-filter-chip lc-filter-chip--status${active ? " lc-filter-chip--active" : ""}`}
+                  aria-pressed={active}
+                  onClick={() => setFilter(value)}
+                >
+                  <Icon size={14} />
+                  {label}
+                </button>
+              );
+            })}
           </div>
         </div>
         {showTopic ? (
@@ -2039,11 +2058,29 @@ export default function LeetCodeMode() {
           </div>
         ) : null}
         {anyActive ? (
-          <button type="button" className="lc-filter-clear" onClick={() => clearFilters(showTopic)}>
-            <X size={14} />
-            Clear
-          </button>
+          <div className="lc-filter-actions">
+            <button type="button" className="lc-filter-clear" onClick={() => clearFilters(showTopic)}>
+              <X size={13} />
+              Clear filters
+            </button>
+          </div>
         ) : null}
+      </div>
+    );
+  }
+
+  // Friendly empty state shown whenever a filtered list has no matches, instead of an
+  // empty bordered list box. `onReset` clears filters so the user can recover in one tap.
+  function renderFilterEmpty(onReset: () => void) {
+    return (
+      <div className="lc-empty">
+        <span className="lc-empty-icon"><Search size={26} /></span>
+        <p className="lc-empty-title">Whoops, looks like there's nothing here...</p>
+        <small className="lc-empty-sub">No problems match these filters.</small>
+        <button type="button" className="lc-empty-reset" onClick={onReset}>
+          <X size={14} />
+          Clear filters
+        </button>
       </div>
     );
   }
@@ -2231,9 +2268,7 @@ export default function LeetCodeMode() {
         </header>
 
         {visibleProblems.length === 0 ? (
-          <div className="lc-custom-empty">
-            <p>No problems match these filters. Try removing a difficulty, topic, or status filter.</p>
-          </div>
+          renderFilterEmpty(() => clearFilters(true))
         ) : (
           <div className="lc-problem-list">
             {visibleProblems.map((problem) => {
@@ -2306,6 +2341,8 @@ export default function LeetCodeMode() {
               {archivedProblemList.length > 0 ? "Add a question" : "Add your first question"}
             </button>
           </div>
+        ) : visibleProblems.length === 0 ? (
+          renderFilterEmpty(() => clearFilters(false))
         ) : (
           <div className="lc-problem-list">
             {visibleProblems.map((problem) => {
@@ -2414,27 +2451,31 @@ export default function LeetCodeMode() {
           {renderFilterBar(false)}
         </header>
 
-        <div className="lc-problem-list">
-          {visibleProblems.map((problem) => {
-            const solved = Boolean(progress[problem.slug]);
-            return (
-              <div key={`${problem.categoryId}-${problem.slug}`} className={solved ? "lc-problem-row lc-problem-row--done" : "lc-problem-row"}>
-                <button type="button" className="lc-problem-check" onClick={() => toggleProgress(problem)} title={solved ? "Mark incomplete" : "Mark complete"}>
-                  {solved ? <CheckCircle2 size={20} className="lc-check-done" /> : <Circle size={20} className="lc-check-empty" />}
-                </button>
-                <button type="button" className="lc-problem-title-btn" onClick={() => openProblem(category.id, problem.slug)}>
-                  <span>{problem.title}</span>
-                  {!problem.isOfficial ? <small>Reference drill</small> : null}
-                </button>
-                {problem.isExtra ? <span className="lc-extra-pill">Extra</span> : null}
-                <span className={`lc-difficulty lc-difficulty--${difficultyClass(problem.difficulty)}`}>{problem.difficulty}</span>
-                <a className="lc-row-link" href={problem.url} target="_blank" rel="noreferrer" title="Open official problem">
-                  <ExternalLink size={16} />
-                </a>
-              </div>
-            );
-          })}
-        </div>
+        {visibleProblems.length === 0 ? (
+          renderFilterEmpty(() => clearFilters(false))
+        ) : (
+          <div className="lc-problem-list">
+            {visibleProblems.map((problem) => {
+              const solved = Boolean(progress[problem.slug]);
+              return (
+                <div key={`${problem.categoryId}-${problem.slug}`} className={solved ? "lc-problem-row lc-problem-row--done" : "lc-problem-row"}>
+                  <button type="button" className="lc-problem-check" onClick={() => toggleProgress(problem)} title={solved ? "Mark incomplete" : "Mark complete"}>
+                    {solved ? <CheckCircle2 size={20} className="lc-check-done" /> : <Circle size={20} className="lc-check-empty" />}
+                  </button>
+                  <button type="button" className="lc-problem-title-btn" onClick={() => openProblem(category.id, problem.slug)}>
+                    <span>{problem.title}</span>
+                    {!problem.isOfficial ? <small>Reference drill</small> : null}
+                  </button>
+                  {problem.isExtra ? <span className="lc-extra-pill">Extra</span> : null}
+                  <span className={`lc-difficulty lc-difficulty--${difficultyClass(problem.difficulty)}`}>{problem.difficulty}</span>
+                  <a className="lc-row-link" href={problem.url} target="_blank" rel="noreferrer" title="Open official problem">
+                    <ExternalLink size={16} />
+                  </a>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   }
