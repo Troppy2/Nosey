@@ -12916,3 +12916,162 @@ select.lc-custom-input {
   font-size: 0.9rem;
   line-height: 1.5;
 }
+
+/* ── LeetCode: Browse all problems entry + combinable filter bar ──────────────
+   "Browse all" pools every topic into one filterable list; the filter bar (also
+   reused by category views) lets difficulty + status + topic chips aggregate. */
+.lc-browse-all {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin: 0 auto 18px;
+  max-width: 760px;
+  padding: 14px 18px;
+  border: 1px solid var(--lc-border);
+  border-radius: 12px;
+  background: var(--white);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.lc-browse-all:hover {
+  border-color: var(--green-dark);
+  box-shadow: var(--shadow-md, 0 6px 18px rgba(67, 84, 45, 0.12));
+  transform: translateY(-1px);
+}
+
+.lc-browse-all-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  flex-shrink: 0;
+}
+
+.lc-browse-all-copy {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.lc-browse-all-copy strong {
+  font-size: 0.98rem;
+  font-weight: 800;
+}
+
+.lc-browse-all-copy small {
+  color: #596949;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.lc-browse-all > svg {
+  color: var(--green-dark);
+  flex-shrink: 0;
+}
+
+.lc-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 18px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.lc-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lc-filter-group--topic {
+  flex: 1 1 100%;
+}
+
+.lc-filter-label {
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #7c8a68;
+}
+
+.lc-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lc-filter-chip {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--lc-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.68);
+  color: #596949;
+  font-size: 0.8rem;
+  font-weight: 750;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.lc-filter-chip:hover {
+  border-color: var(--green-dark);
+}
+
+/* Default active (topic chips) uses the app's green; difficulty chips override
+   below so an active Easy/Medium/Hard chip reads in its familiar color. */
+.lc-filter-chip--active {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+  color: var(--white);
+}
+
+.lc-filter-chip--easy {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.lc-filter-chip--medium {
+  background: #fef3c7;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+
+.lc-filter-chip--hard {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.lc-filter-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 12px;
+  margin-left: auto;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #8a5a5a;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.lc-filter-clear:hover {
+  color: #991b1b;
+  text-decoration: underline;
+}
