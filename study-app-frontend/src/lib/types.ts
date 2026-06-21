@@ -29,6 +29,7 @@ export type TestSummary = {
   attempt_count: number;
   created_at: string;
   generation_status?: string;
+  generation_error?: string | null;
 };
 
 export type TestUpdate = {

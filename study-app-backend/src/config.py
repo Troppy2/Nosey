@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     ollama_num_ctx: int = Field(default=8192, alias="OLLAMA_NUM_CTX")
     groq_api_key: Optional[str] = Field(default=None, alias="GROQ_API_KEY")
     google_ai_api_key: Optional[str] = Field(default=None, alias="GOOGLE_AI_API_KEY")
+    # Real Google Generative Language model. The UI may label this provider "DeepSeek",
+    # but the endpoint must point at a valid Gemini model. A previous refactor corrupted
+    # this to a non-existent "deepseek-v4-flash:cloud" model, which 404'd on every call.
+    google_ai_model: str = Field(default="gemini-2.0-flash", alias="GOOGLE_AI_MODEL")
     anthropic_api_key: Optional[str] = Field(default=None, alias="ANTHROPIC_API_KEY")
     anthropic_model: str = Field(default="claude-haiku-4-5-20251001", alias="ANTHROPIC_MODEL")
     environment: str = Field(default="production", alias="ENVIRONMENT")

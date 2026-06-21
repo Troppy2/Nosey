@@ -8,7 +8,7 @@ import { EmptyState } from "../components/EmptyState";
 import { FileManager } from "../components/FileManager";
 import { KojoChat } from "../components/KojoChat";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
-import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, getStoredUser, isGuestSession, reindexFolderFiles, scopeKey, updateFolder, updateTest } from "../lib/api";
+import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, getStoredUser, isGuestSession, regenerateTest, reindexFolderFiles, scopeKey, updateFolder, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
 import type { AttemptSummary, Flashcard, Folder, TestCreationParams, TestSummary } from "../lib/types";
 
@@ -34,6 +34,8 @@ export default function FolderDetail() {
   const [kojoSettingsOpen, setKojoSettingsOpen] = useState(false);
   const [renamingTest, setRenamingTest] = useState<TestSummary | null>(null);
   const [deletingTest, setDeletingTest] = useState<TestSummary | null>(null);
+  const [retryingTestId, setRetryingTestId] = useState<number | null>(null);
+  const [retryError, setRetryError] = useState<{ testId: number; message: string } | null>(null);
   const [reindexing, setReindexing] = useState(false);
   const [reindexMessage, setReindexMessage] = useState<string | null>(null);
   const [formDraft, setFormDraft] = useState<TestCreationParams | null>(null);
@@ -86,6 +88,44 @@ export default function FolderDetail() {
   function clearFormDraft() {
     localStorage.removeItem(scopeKey(`nosey_create_test_form_${id}`));
     setFormDraft(null);
+  }
+
+  async function handleRetryTest(test: TestSummary) {
+    setRetryError(null);
+    setRetryingTestId(test.id);
+    // Reuse the original generation params from localStorage when present so the retry
+    // reproduces the user's request. The backend reuses the stored notes either way.
+    let params: Parameters<typeof regenerateTest>[1];
+    try {
+      const raw = localStorage.getItem(scopeKey(`nosey_test_params_${test.id}`));
+      if (raw) {
+        const p = JSON.parse(raw) as Partial<TestCreationParams>;
+        params = {
+          countMcq: p.countMcq,
+          countFrq: p.countFrq,
+          countTf: p.countTf,
+          countMs: p.countMs,
+          countRank: p.countRank,
+          difficulty: p.difficulty,
+          topicFocus: p.topicFocus,
+          customInstructions: p.customInstructions,
+        };
+      }
+    } catch {
+      // ignore malformed params; backend defaults apply
+    }
+    try {
+      await regenerateTest(test.id, params);
+      const refreshed = await fetchTests(id);
+      setTests(refreshed);
+    } catch (err) {
+      setRetryError({
+        testId: test.id,
+        message: err instanceof Error ? err.message : "Could not start regeneration.",
+      });
+    } finally {
+      setRetryingTestId(null);
+    }
   }
 
   function openPromptViewer(test: TestSummary) {
@@ -489,12 +529,24 @@ export default function FolderDetail() {
                     <div key={test.id} className="draft-card card">
                       <div className="draft-card-info">
                         <span className="draft-card-title">{test.title}</span>
-                        <span className="muted small draft-card-status">Generation failed</span>
+                        <span className="muted small draft-card-status">
+                          {test.generation_error
+                            ? `Generation failed: ${test.generation_error}`
+                            : "Generation failed"}
+                        </span>
+                        {retryError?.testId === test.id ? (
+                          <span className="small" style={{ color: "var(--red, #e53e3e)" }}>{retryError.message}</span>
+                        ) : null}
                       </div>
                       <div className="draft-card-actions">
-                        <Link to={`/create-test?folderId=${id}&regenerateTestId=${test.id}`}>
-                          <Button variant="secondary" icon={<RotateCcw size={14} />}>Regenerate</Button>
-                        </Link>
+                        <Button
+                          variant="secondary"
+                          icon={<RotateCcw size={14} />}
+                          onClick={() => handleRetryTest(test)}
+                          disabled={retryingTestId === test.id}
+                        >
+                          {retryingTestId === test.id ? "Retrying…" : "Retry"}
+                        </Button>
                         <button aria-label={`Delete ${test.title}`} onClick={() => setDeletingTest(test)} type="button">
                           <Trash2 size={16} />
                         </button>

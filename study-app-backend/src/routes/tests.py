@@ -18,6 +18,7 @@ from src.repositories.usage_event_repository import UsageEventRepository
 from src.schemas.test_schema import (
     CreateTestResponse,
     QuestionCreate,
+    RegenerateTestRequest,
     QuestionEditable,
     QuestionUpdate,
     TestResponse,
@@ -399,6 +400,110 @@ async def create_test(
             generation_status="generating",
         )
 
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except LLMException as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except StudyAppException as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/tests/{test_id}/regenerate", response_model=CreateTestResponse)
+async def regenerate_test(
+    test_id: int,
+    data: RegenerateTestRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> CreateTestResponse:
+    """Re-run question generation for an existing test, reusing its stored notes.
+
+    This is the one-click "Retry" path for a test that failed or generated nothing.
+    It reuses the notes persisted on the test (no re-upload), clears any stale
+    questions, resets the test to "generating", and schedules a fresh background run.
+    """
+    try:
+        repo = TestRepository(session)
+        test = await repo.get_owned_with_questions(test_id, user.id)
+        if test is None:
+            raise ResourceNotFoundException("Test")
+
+        # Reconstruct the source material from the persisted Note rows. create_test
+        # stores combined notes under file_type "combined" and a practice test under "pdf".
+        notes_content = "\n\n---\n\n".join(
+            n.content for n in test.notes if n.file_type != "pdf" and n.content
+        )
+        practice_test_content = "\n\n---\n\n".join(
+            n.content for n in test.notes if n.file_type == "pdf" and n.content
+        )
+        if not notes_content and not practice_test_content:
+            raise StudyAppException(
+                "This test has no saved notes to regenerate from. Create a new test and re-upload your notes."
+            )
+
+        provider = data.provider
+        provider_aliases = {"google": "gemini", "anthropic": "claude"}
+        if provider:
+            provider = provider.strip().lower()
+            provider = provider_aliases.get(provider, provider)
+            if provider not in ("auto", "groq", "gemini", "claude", "ollama"):
+                raise StudyAppException(
+                    "provider must be auto, groq, google, anthropic, gemini, claude, or ollama"
+                )
+
+        difficulty = data.difficulty.strip().lower()
+        if difficulty not in ("easy", "medium", "hard", "mixed"):
+            difficulty = "mixed"
+
+        count_frq = data.count_frq if test.test_type != "Extreme" else 0
+
+        # Clear stale questions (blank placeholders or a partial prior run) before regenerating.
+        for question in list(test.questions):
+            await repo.delete_question(question)
+
+        test.generation_status = "generating"
+        test.generation_error = None
+
+        prior_questions: list[str] = []
+        if test.notes_hash:
+            folder = test.folder
+            if folder is not None and getattr(folder, "avoid_repeat_questions", True):
+                prior_questions = await repo.get_prior_question_texts(
+                    test.folder_id, test.notes_hash, exclude_test_id=test.id
+                )
+
+        await session.commit()
+
+        background_tasks.add_task(
+            _generate_questions_background,
+            test_id=test.id,
+            user_id=user.id,
+            notes_content=notes_content,
+            practice_test_content=practice_test_content,
+            test_type=test.test_type,
+            count_mcq=data.count_mcq,
+            count_frq=count_frq,
+            is_math_mode=test.is_math_mode,
+            difficulty=difficulty,
+            topic_focus=(data.topic_focus.strip()[:200] if data.topic_focus else None),
+            is_coding_mode=test.is_coding_mode,
+            coding_language=test.coding_language or "Python",
+            custom_instructions=(data.custom_instructions.strip()[:500] if data.custom_instructions else None),
+            provider=provider,
+            enable_fallback=data.enable_fallback,
+            count_tf=data.count_tf,
+            count_ms=data.count_ms,
+            count_rank=data.count_rank,
+            prior_questions=prior_questions,
+        )
+
+        return CreateTestResponse(
+            test_id=test.id,
+            title=test.title,
+            questions_generated=0,
+            message="Regenerating your test. Check back in a moment.",
+            generation_status="generating",
+        )
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except LLMException as exc:

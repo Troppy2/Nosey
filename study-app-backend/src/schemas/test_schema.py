@@ -76,6 +76,27 @@ class TestSummary(BaseModel):
     attempt_count: int = 0
     created_at: datetime
     generation_status: str = "ready"
+    generation_error: Optional[str] = None
+
+
+class RegenerateTestRequest(BaseModel):
+    """Parameters to re-run generation for an existing test, reusing its stored notes.
+
+    The notes themselves are NOT re-uploaded: they are read from the test's persisted
+    Note rows. These fields mirror the create-test generation knobs (which live in the
+    frontend's localStorage), so a retry reproduces the original request.
+    """
+
+    count_mcq: int = Field(default=10, ge=0, le=50)
+    count_frq: int = Field(default=5, ge=0, le=50)
+    count_tf: int = Field(default=0, ge=0, le=10)
+    count_ms: int = Field(default=0, ge=0, le=10)
+    count_rank: int = Field(default=0, ge=0, le=10)
+    difficulty: str = "mixed"
+    topic_focus: Optional[str] = None
+    custom_instructions: Optional[str] = None
+    provider: Optional[str] = None
+    enable_fallback: bool = True
 
 
 class TestUpdate(BaseModel):
