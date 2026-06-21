@@ -5,6 +5,7 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
+import { MarkdownContent } from "../components/MarkdownContent";
 import { deleteFlashcard, fetchFlashcards, fetchFolders, recordFlashcardAttempt, scopeKey } from "../lib/api";
 import type { Flashcard, Folder } from "../lib/types";
 
@@ -297,11 +298,15 @@ export default function Flashcards() {
           <div className="flip-inner">
             <Card className="flip-face flip-front">
               <span className="eyebrow">Question</span>
-              <h2>{current.front}</h2>
+              <div className="flashcard-face-md">
+                <MarkdownContent content={current.front} />
+              </div>
             </Card>
             <Card className="flip-face flip-back">
               <span className="eyebrow">Answer</span>
-              <p>{current.back}</p>
+              <div className="flashcard-face-md">
+                <MarkdownContent content={current.back} />
+              </div>
             </Card>
           </div>
         </button>

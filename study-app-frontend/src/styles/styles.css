@@ -12877,3 +12877,42 @@ select.lc-custom-input {
 .answer-reasoning-body .kojo-markdown {
   font-size: 0.88rem;
 }
+
+/* ── Flashcard markdown + KaTeX ──────────────────────────────────────────────
+   Flashcard front/back now render through MarkdownContent so math equations
+   ($...$, $$...$$) get KaTeX formatting like the test screen does, regardless
+   of math mode. These rules restore the original front/back text sizing and
+   keep the dark flip-back face readable. */
+.flashcard-face-md {
+  width: 100%;
+}
+
+.flip-front .flashcard-face-md .kojo-markdown {
+  font-size: clamp(1.1rem, 1.2vw + 0.9rem, 1.5rem);
+  line-height: 1.45;
+}
+
+.flip-back .flashcard-face-md .kojo-markdown {
+  font-size: 1.12rem;
+  line-height: 1.65;
+  color: inherit;
+}
+
+.flip-back .flashcard-face-md .kojo-markdown .kojo-md-p,
+.flip-back .flashcard-face-md .kojo-markdown .kojo-md-heading,
+.flip-back .flashcard-face-md .kojo-markdown .kojo-md-list li {
+  color: inherit;
+}
+
+/* Display math renders on a light block background, so force dark text inside it
+   even on the dark flip-back face (where surrounding text is light). */
+.flashcard-face-md .math-block {
+  color: var(--ink);
+  text-align: left;
+}
+
+.flashcard-manage-content .kojo-markdown {
+  margin-top: 4px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
