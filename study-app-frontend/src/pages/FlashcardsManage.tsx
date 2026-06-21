@@ -5,6 +5,7 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { TextInput } from "../components/Field";
+import { MarkdownContent } from "../components/MarkdownContent";
 import {
   createFlashcard,
   deleteFlashcard,
@@ -311,11 +312,11 @@ export default function FlashcardsManage() {
                   <div className="flashcard-manage-content">
                     <div>
                       <span className="eyebrow">Front</span>
-                      <p>{card.front}</p>
+                      <MarkdownContent content={card.front} />
                     </div>
                     <div>
                       <span className="eyebrow">Back</span>
-                      <p>{card.back}</p>
+                      <MarkdownContent content={card.back} />
                     </div>
                   </div>
                   <div className="row-actions">
