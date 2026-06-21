@@ -151,6 +151,29 @@ _MATH_CONTENT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# LaTeX commands that begin with a JSON string-escape letter (b f n r t u). When a model
+# emits these with a SINGLE backslash inside a JSON string value (e.g. "$\text{...}$"
+# instead of "$\\text{...}$"), json.loads does NOT error: it silently consumes the escape,
+# corrupting \text -> TAB+"ext", \frac -> FF+"rac", \theta -> TAB+"heta", \neq -> LF+"eq",
+# \rho -> CR+"ho", \beta -> BS+"eta". (\u... instead errors and the generic repair below
+# leaves it alone because it exempts \u for unicode escapes.) These produce the garbled
+# "extExactlyonesolution" KaTeX render in math mode. Commands starting with OTHER letters
+# raise a clean JSONDecodeError and are already fixed by the generic backslash-doubling
+# fallback in _loads_json, so only the b/f/n/r/t/u-prefixed set needs pre-repair here.
+# The (?<!\\) guard means already-correct double-escaped output (e.g. Claude's \\frac) is
+# left untouched; the trailing (?![a-zA-Z]) ensures we only match a full command name, so a
+# real newline followed by a word (\n + "ext...") is not misread as a command.
+_LATEX_BACKSLASH_FIX_RE = re.compile(
+    r"(?<!\\)\\("
+    r"frac|forall"
+    r"|tfrac|textbf|textit|text|theta|Theta|times|tanh|tan|tau|tilde|triangle|top|to|therefore"
+    r"|nabla|neq|nleftarrow|nrightarrow|notin|nexists|nu|ne|ni"
+    r"|rightarrow|Rightarrow|rho|rangle|rfloor|rceil|right|Re"
+    r"|binom|bmatrix|beta|boxed|bullet|bigcup|bigcap|bigoplus|bigotimes|bigg|big|bar"
+    r"|upsilon|underline|underbrace|uparrow|updownarrow"
+    r")(?![a-zA-Z])"
+)
+
 
 class LLMService:
     _embed_cache: OrderedDict[str, list[float]] = OrderedDict()
@@ -2494,6 +2517,12 @@ Return only the JSON object."""
         # Strip markdown code fences that LLMs sometimes wrap around JSON
         raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.IGNORECASE)
         raw = re.sub(r"\s*```$", "", raw.strip())
+        # Repair single-backslash LaTeX commands that would be SILENTLY corrupted by
+        # json.loads (\text, \frac, \theta, ...). This must run BEFORE the first parse:
+        # unlike invalid escapes such as \sqrt, these commands parse "successfully" into
+        # mangled control characters, so the post-error fallback never sees them. Run
+        # unconditionally; the regex's (?<!\\) guard leaves correctly escaped output alone.
+        raw = _LATEX_BACKSLASH_FIX_RE.sub(lambda m: "\\\\" + m.group(1), raw)
         non_object_detected = False
 
         # Try direct parse first
