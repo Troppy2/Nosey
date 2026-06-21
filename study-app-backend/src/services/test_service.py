@@ -407,6 +407,7 @@ class TestService:
                 attempt_count=attempt_count,
                 created_at=test.created_at,
                 generation_status=test.generation_status,
+                generation_error=test.generation_error,
             )
             for test, question_count, best_score, attempt_count in rows
         ]
@@ -424,6 +425,7 @@ class TestService:
                 attempt_count=attempt_count,
                 created_at=test.created_at,
                 generation_status=test.generation_status,
+                generation_error=test.generation_error,
             )
             for test, question_count, best_score, attempt_count in rows
         ]

@@ -263,6 +263,38 @@ export async function fetchTests(folderId?: number): Promise<TestSummary[]> {
   }
 }
 
+export async function regenerateTest(
+  testId: number,
+  params?: {
+    countMcq?: number;
+    countFrq?: number;
+    countTf?: number;
+    countMs?: number;
+    countRank?: number;
+    difficulty?: string;
+    topicFocus?: string;
+    customInstructions?: string;
+    provider?: string;
+    enableFallback?: boolean;
+  },
+): Promise<CreateTestResult> {
+  const body: Record<string, unknown> = {};
+  if (params?.countMcq !== undefined) body.count_mcq = params.countMcq;
+  if (params?.countFrq !== undefined) body.count_frq = params.countFrq;
+  if (params?.countTf !== undefined) body.count_tf = params.countTf;
+  if (params?.countMs !== undefined) body.count_ms = params.countMs;
+  if (params?.countRank !== undefined) body.count_rank = params.countRank;
+  if (params?.difficulty) body.difficulty = params.difficulty;
+  if (params?.topicFocus) body.topic_focus = params.topicFocus;
+  if (params?.customInstructions) body.custom_instructions = params.customInstructions;
+  if (params?.provider) body.provider = params.provider;
+  if (params?.enableFallback !== undefined) body.enable_fallback = params.enableFallback;
+  return request(`/tests/${testId}/regenerate`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 export async function createTest(input: {
   folderId: number;
   title: string;

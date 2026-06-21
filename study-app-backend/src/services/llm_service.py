@@ -1582,8 +1582,6 @@ Return only the JSON object."""
 
     async def _candidate_providers(self, provider: Optional[str] = None) -> list[str]:
         normalized = self._normalize_generation_provider(provider)
-        if normalized != "auto":
-            return [normalized]
 
         providers: list[str] = []
         if settings.groq_api_key:
@@ -1596,6 +1594,15 @@ Return only the JSON object."""
         status = await self.check_providers_status()
         if status.get("ollama"):
             providers.append("ollama")
+
+        if normalized != "auto":
+            # Honor the user's explicit pick by trying it first, but DON'T hard-fail if it
+            # is down. A specific choice that returns no candidates (or a permanently dead
+            # provider) used to produce a blank test with no fallback. Fall back to the
+            # remaining available providers after the chosen one.
+            ordered = [normalized] + [p for p in providers if p != normalized]
+            return ordered
+
         return providers
 
     async def _generate_test_attempts(
@@ -1781,62 +1788,27 @@ Return only the JSON object."""
                 self._set_last_generation_meta(diagnostics)
                 return best_mcq[:count_mcq], best_frq[:count_frq]
 
-        # Phase 3: fill any remaining slots.
-        # With enable_fallback, use note-based placeholder questions.
-        # Without enable_fallback, use blank placeholders rather than failing outright —
-        # a test with a few blank slots is better than no test at all.
-        fill_mcq = best_mcq[:]
-        fill_frq = best_frq[:]
-        remaining_mcq = max(0, count_mcq - len(fill_mcq))
-        remaining_frq = max(0, count_frq - len(fill_frq))
-
-        if remaining_mcq > 0 or remaining_frq > 0:
-            fallback_reason = None
-            if enable_fallback:
-                fallback_builder = self._fallback_math_questions if math_mode else self._fallback_questions
-                gap_mcq, gap_frq = fallback_builder(notes, remaining_mcq, remaining_frq)
-                if not best_mcq and not best_frq and last_error is not None:
-                    fallback_reason = "llm_exception_math" if math_mode else "llm_exception"
-                else:
-                    fallback_reason = "provider_partial_output_filled"
-            else:
-                # Each placeholder text must be unique. _merge_generated_questions dedups by
-                # normalized question text, so identical placeholders would collapse to a
-                # single slot, leaving the test short and tripping the "not enough questions"
-                # error even though this branch is meant to fill every slot.
-                existing_mcq = len(fill_mcq)
-                existing_frq = len(fill_frq)
-                gap_mcq = [
-                    GeneratedMCQ(
-                        question_text=f"[Question {existing_mcq + i + 1} could not be generated]",
-                        options=["[Not available]", "[Not available]", "[Not available]", "[Not available]"],
-                        correct_index=0,
-                    )
-                    for i in range(remaining_mcq)
-                ]
-                gap_frq = [
-                    GeneratedFRQ(
-                        question_text=f"[Question {existing_frq + i + 1} could not be generated]",
-                        expected_answer="[Not available]",
-                    )
-                    for i in range(remaining_frq)
-                ]
-                fallback_reason = "blank_placeholder_fill"
-
-            fill_mcq, fill_frq = self._merge_generated_questions(
-                fill_mcq, fill_frq, gap_mcq, gap_frq, count_mcq, count_frq
-            )
-            diagnostics.update({
-                "fallback_used": True,
-                "fallback_reason": fallback_reason,
-                "note_grounded": False,
-            })
-            self._set_last_generation_meta(diagnostics)
-            return fill_mcq[:count_mcq], fill_frq[:count_frq]
-
+        # No more disguising failure. If real generation could not fill every slot, we
+        # FAIL the run instead of padding it with note-based filler or blank
+        # "[Question N could not be generated]" placeholders. A failed test surfaces an
+        # error and a Retry button (see routes/tests.py), which is honest and actionable.
+        # Padding produced "ready" tests that were actually blank: the original bug.
+        diagnostics.update({
+            "fallback_used": True,
+            "fallback_reason": "generation_failed_insufficient_questions",
+            "note_grounded": False,
+            "generated_mcq": len(best_mcq),
+            "generated_frq": len(best_frq),
+        })
+        self._set_last_generation_meta(diagnostics)
+        logger.warning(
+            "Test generation failed: only %d/%d MCQ and %d/%d FRQ were valid after all providers and top-ups",
+            len(best_mcq), count_mcq, len(best_frq), count_frq,
+        )
         raise LLMException(
-            "Practice test could not be generated. The selected AI provider may be rate-limited or temporarily unavailable. "
-            "Try a different provider or try again in a moment."
+            "Practice test could not be generated. The AI provider may be rate-limited or "
+            "temporarily unavailable, or it returned no usable questions for these notes. "
+            "Retry in a moment, or try a different provider."
         ) from last_error
 
     def _build_novelty_block(self, prior_questions: Optional[list[str]]) -> str:
@@ -2157,7 +2129,7 @@ Return only the JSON object."""
             prompt_body = self._prepare_llm_payload(prompt, "gemini")
             async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
                 response = await client.post(
-                    "https://generativelanguage.googleapis.com/v1beta/models/deepseek-v4-flash:cloud:generateContent",
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{settings.google_ai_model}:generateContent",
                     params={"key": settings.google_ai_api_key},
                     headers={"Content-Type": "application/json; charset=utf-8"},
                     json={
@@ -2355,7 +2327,7 @@ Return only the JSON object."""
             prompt_body = self._prepare_llm_payload(prompt, "gemini")
             async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
                 response = await client.post(
-                    "https://generativelanguage.googleapis.com/v1beta/models/deepseek-v4-flash:cloud:generateContent",
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{settings.google_ai_model}:generateContent",
                     params={"key": settings.google_ai_api_key},
                     headers={"Content-Type": "application/json; charset=utf-8"},
                     json={
@@ -2620,9 +2592,14 @@ Return only the JSON object."""
             return False
         question = str(item.get("question_text", ""))  # type: ignore[union-attr]
         options = [str(o) for o in item.get("options", [])]  # type: ignore[union-attr]
-        if not _MATH_CONTENT_RE.search(question):
-            return False
-        return bool(options[:4]) and all(_MATH_CONTENT_RE.search(option) for option in options[:4])
+        # Require math content in the question OR in at least one option. The previous rule
+        # demanded math in EVERY option, which silently rejected perfectly valid math
+        # questions whose answer choices are conceptual (e.g. "Power rule", "Chain rule")
+        # or short labels. That over-strict gate was a prime cause of "0 valid questions"
+        # runs on clean math notes (see TEST_GENERATION_FAILURE_INVESTIGATION.md).
+        if _MATH_CONTENT_RE.search(question):
+            return True
+        return any(_MATH_CONTENT_RE.search(option) for option in options[:4] if option)
 
     _MATH_FRQ_CONCEPTUAL_RE = re.compile(
         r"^(explain|describe|what\s+is|what\s+are|define|how\s+do\s+you|why\s+(is|does|do|are|would)|state\s+the|"
