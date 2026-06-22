@@ -244,7 +244,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="page page-narrow">
+    <div className="page page-narrow settings-page">
       <header className="page-header">
         <div>
           <span className="eyebrow">Account</span>
