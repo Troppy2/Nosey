@@ -59,13 +59,14 @@ def _load_heavy_ml_deps() -> None:
 
 try:
     from qdrant_client import QdrantClient
-    from qdrant_client.models import Distance, FieldCondition, Filter, MatchValue, PointStruct, VectorParams
+    from qdrant_client.models import Distance, FieldCondition, Filter, MatchValue, PayloadSchemaType, PointStruct, VectorParams
 except ImportError:  # pragma: no cover - exercised only without optional deps
     QdrantClient = None  # type: ignore[assignment]
     Distance = None  # type: ignore[assignment]
     FieldCondition = None  # type: ignore[assignment]
     Filter = None  # type: ignore[assignment]
     MatchValue = None  # type: ignore[assignment]
+    PayloadSchemaType = None  # type: ignore[assignment]
     PointStruct = None  # type: ignore[assignment]
     VectorParams = None  # type: ignore[assignment]
 
@@ -106,6 +107,9 @@ class HybridRAGService:
     _cross_encoder: Any = None
     _flashrank_ranker: Any = None
     _qdrant_client: Any = None
+    # Collections we've already ensured a "namespace" payload index on, so we don't
+    # re-issue create_payload_index on every retrieval. Cleared when the process restarts.
+    _qdrant_indexed_collections: set[str] = set()
 
     def retrieve_context(
         self,
@@ -342,6 +346,20 @@ class HybridRAGService:
                     collection_name=collection_name,
                     vectors_config=VectorParams(size=len(vectors[0]), distance=Distance.COSINE),
                 )
+            # Qdrant rejects a filtered query (400) unless the filtered payload field has an
+            # index. We filter on "namespace", so ensure a keyword index exists. Idempotent and
+            # cached per process so it only runs once per collection per restart.
+            if collection_name not in self.__class__._qdrant_indexed_collections:
+                try:
+                    client.create_payload_index(
+                        collection_name=collection_name,
+                        field_name="namespace",
+                        field_schema=PayloadSchemaType.KEYWORD,
+                    )
+                except Exception as index_exc:
+                    # Already-exists errors are fine; anything else still lets the query try.
+                    logger.debug("Qdrant namespace index ensure: %s", index_exc)
+                self.__class__._qdrant_indexed_collections.add(collection_name)
             namespace = hashlib.sha256("||".join(f"{c.source}:{c.index}:{c.text[:120]}" for c in chunks).encode("utf-8")).hexdigest()
             points = [
                 PointStruct(
