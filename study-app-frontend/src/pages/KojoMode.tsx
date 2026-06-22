@@ -7,6 +7,7 @@ import {
   ClipboardList,
   ExternalLink,
   FolderOpen,
+  Menu,
   MessageSquarePlus,
   Paperclip,
   Plus,
@@ -255,6 +256,8 @@ export default function KojoMode() {
   const [slashActiveIndex, setSlashActiveIndex] = useState(0);
   // ID of the conversation showing the delete confirmation inline
   const [deletingConvId, setDeletingConvId] = useState<number | null>(null);
+  // Mobile: whether the off-canvas sidebar drawer is open
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [sessionFiles, setSessionFiles] = useState<ConversationFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -293,6 +296,21 @@ export default function KojoMode() {
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, [showAttachMenu]);
+
+  // Lock body scroll + close drawer on Escape while the mobile drawer is open
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setSidebarOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [sidebarOpen]);
 
   useEffect(() => {
     fetchFolders()
@@ -474,6 +492,7 @@ export default function KojoMode() {
 
   async function handleNewChat() {
     if (isLoading) return;
+    setSidebarOpen(false);
     try {
       const fresh = isGeneralMode
         ? await createGeneralKojoConversation()
@@ -493,6 +512,7 @@ export default function KojoMode() {
   }
 
   async function handleSwitchConversation(conv: KojoConversationSummary) {
+    setSidebarOpen(false);
     if (conv.id === conversationId) return;
     setConversationId(conv.id);
     setMessages([]);
@@ -597,11 +617,24 @@ export default function KojoMode() {
 
   return (
     <div className="chat-mode-shell">
+      {/* Mobile drawer backdrop */}
+      {sidebarOpen && (
+        <div className="chat-mode-sidebar-backdrop" onClick={() => setSidebarOpen(false)} aria-hidden="true" />
+      )}
+
       {/* ── Sidebar ── */}
-      <aside className="chat-mode-sidebar">
+      <aside className={`chat-mode-sidebar${sidebarOpen ? " chat-mode-sidebar--open" : ""}`}>
         <div className="chat-mode-sidebar-header">
           <Sparkles size={15} />
           <span>Chat mode</span>
+          <button
+            type="button"
+            className="chat-mode-sidebar-close"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Close menu"
+          >
+            <X size={18} />
+          </button>
         </div>
 
         {/* General section */}
@@ -612,7 +645,7 @@ export default function KojoMode() {
           <button
             type="button"
             className={`chat-mode-folder-btn${folderId === null ? " chat-mode-folder-btn--active" : ""}`}
-            onClick={() => setFolderId(null)}
+            onClick={() => { setFolderId(null); setSidebarOpen(false); }}
           >
             <MessageSquarePlus size={15} />
             <span>No folder</span>
@@ -632,7 +665,7 @@ export default function KojoMode() {
                   key={folder.id}
                   type="button"
                   className={`chat-mode-folder-btn${folder.id === folderId ? " chat-mode-folder-btn--active" : ""}`}
-                  onClick={() => setFolderId(folder.id)}
+                  onClick={() => { setFolderId(folder.id); setSidebarOpen(false); }}
                 >
                   <FolderOpen size={15} />
                   <span>{folder.name}</span>
@@ -716,6 +749,14 @@ export default function KojoMode() {
         {/* Header */}
         <div className="chat-mode-header">
           <div className="chat-mode-header-left">
+            <button
+              type="button"
+              className="chat-mode-menu-btn"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open chats and folders"
+            >
+              <Menu size={20} />
+            </button>
             <div className="kojo-avatar"><Bot size={18} /></div>
             <div>
               <span className="chat-mode-title">
