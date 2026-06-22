@@ -284,84 +284,28 @@ export default function Settings() {
           </Button>
         </div>
 
-        {!guest && user ? (
-          <CollapsibleSection title="Delete Account">
-            <p className="muted small">
-              Permanently delete your account and all associated data , classes, tests, flashcards, and chat history. This cannot be undone.
-            </p>
-            <div className="settings-reset-row">
-              <Button type="button" variant="danger" onClick={() => setDeleteStep(1)}>
-                Delete account
-              </Button>
-            </div>
-          </CollapsibleSection>
-        ) : null}
-
         <div className="settings-note">
           <Sparkles size={18} />
           <span>Use the guest session to try the full flow before connecting a real account.</span>
         </div>
 
-        <CollapsibleSection title="Reset Study Stats">
-          <p className="muted small">
-            Reset dashboard counters for Tests Taken, Cards Reviewed, and Average Score.
-          </p>
-          <div className="settings-reset-row">
-            <Button
-              type="button"
-              variant="secondary"
-              icon={<RotateCcw size={16} />}
-              onClick={handleResetStats}
-              disabled={resettingStats}
-            >
-              {resettingStats ? "Resetting..." : "Reset Stats"}
-            </Button>
-            {statsResetNotice ? <span className="muted small">{statsResetNotice}</span> : null}
-          </div>
-        </CollapsibleSection>
+        <h2 className="settings-group-title">AI &amp; models</h2>
 
-        <CollapsibleSection title="Onboarding Tour">
+        <CollapsibleSection title="LLM model override">
           <p className="muted small">
-            Replay the full guided tour across the app's key pages.
+            Choose the default provider Nosey should use for all LLM-powered features.
           </p>
-          <div className="settings-reset-row">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                localStorage.removeItem(scopeKey(ONBOARDING_DONE_KEY));
-                localStorage.removeItem(scopeKey(TOUR_SEGMENT_KEY));
-                navigate("/dashboard");
-              }}
-            >
-              Replay Tour
-            </Button>
-          </div>
+          <SelectInput
+            label="Default provider"
+            value={generationProvider}
+            onChange={(event) => handleChangeGenerationProvider(event.target.value)}
+            hint="This setting feeds Create Test, Flashcards, Kojo, and other AI workflows."
+          >
+            {GENERATION_PROVIDER_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </SelectInput>
         </CollapsibleSection>
-
-        {!guest ? (
-          <CollapsibleSection title="Beta features">
-            <p className="muted small">
-              Enable experimental features: LeetCode mode and Mock Interview. These are works-in-progress and may have rough edges.
-            </p>
-            <div className="settings-reset-row">
-              <button
-                type="button"
-                role="switch"
-                className={`settings-toggle-switch${betaMode ? " settings-toggle-switch--on" : ""}`}
-                onClick={() => setBetaMode(!betaMode)}
-                aria-pressed={betaMode}
-              >
-                <span className="settings-toggle-track">
-                  <span className="settings-toggle-thumb" />
-                </span>
-                <span className="settings-toggle-label">
-                  {betaMode ? "Beta features on" : "Beta features off"}
-                </span>
-              </button>
-            </div>
-          </CollapsibleSection>
-        ) : null}
 
         <CollapsibleSection title="Question Fallback">
           <p className="muted small">
@@ -384,22 +328,6 @@ export default function Settings() {
               </span>
             </button>
           </div>
-        </CollapsibleSection>
-
-        <CollapsibleSection title="LLM model override">
-          <p className="muted small">
-            Choose the default provider Nosey should use for all LLM-powered features.
-          </p>
-          <SelectInput
-            label="Default provider"
-            value={generationProvider}
-            onChange={(event) => handleChangeGenerationProvider(event.target.value)}
-            hint="This setting feeds Create Test, Flashcards, Kojo, and other AI workflows."
-          >
-            {GENERATION_PROVIDER_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </SelectInput>
         </CollapsibleSection>
 
         {!guest ? (
@@ -438,57 +366,110 @@ export default function Settings() {
                 onChange={setSlashCommands}
               />
             </CollapsibleSection>
-
-            <CollapsibleSection title="Kojo chat history restore">
-              <p className="muted small">
-                Cleared Kojo chats are available here for up to 5 hours.
-              </p>
-
-              {restoreError ? (
-                <div className="settings-feedback settings-feedback--error">
-                  <XCircle size={16} />
-                  <span>{restoreError}</span>
-                </div>
-              ) : null}
-
-              {loadingCleared ? (
-                <p className="muted small">Loading cleared chats…</p>
-              ) : clearedConversations.length === 0 ? (
-                <p className="muted small">No recently cleared Kojo chats.</p>
-              ) : (
-                <div className="settings-restore-list">
-                  {clearedConversations.map((conv) => (
-                    <div className="settings-restore-item" key={conv.conversation_id}>
-                      <div>
-                        <p className="settings-restore-folder">{conv.folder_name}</p>
-                        <p className="muted small">{getRestoreTimeLabel(conv.restore_expires_at)}</p>
-                      </div>
-                      <Button
-                        variant="secondary"
-                        onClick={() => handleRestore(conv.folder_id)}
-                        disabled={restoreFolderId === conv.folder_id}
-                      >
-                        {restoreFolderId === conv.folder_id ? "Restoring…" : "Restore"}
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CollapsibleSection>
           </>
         ) : null}
 
-        {isAdmin ? (
-          <CollapsibleSection title="Admin panel">
+        <h2 className="settings-group-title">App preferences</h2>
+
+        {!guest ? (
+          <CollapsibleSection title="Beta features">
             <p className="muted small">
-              Access platform metrics, user roster, and feature performance data.
+              Enable experimental features: LeetCode mode and Mock Interview. These are works-in-progress and may have rough edges.
             </p>
             <div className="settings-reset-row">
-              <Link to="/admin" className="button button--secondary">
-                <ShieldCheck size={16} />
-                Open admin panel
-              </Link>
+              <button
+                type="button"
+                role="switch"
+                className={`settings-toggle-switch${betaMode ? " settings-toggle-switch--on" : ""}`}
+                onClick={() => setBetaMode(!betaMode)}
+                aria-pressed={betaMode}
+              >
+                <span className="settings-toggle-track">
+                  <span className="settings-toggle-thumb" />
+                </span>
+                <span className="settings-toggle-label">
+                  {betaMode ? "Beta features on" : "Beta features off"}
+                </span>
+              </button>
             </div>
+          </CollapsibleSection>
+        ) : null}
+
+        <CollapsibleSection title="Onboarding Tour">
+          <p className="muted small">
+            Replay the full guided tour across the app's key pages.
+          </p>
+          <div className="settings-reset-row">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                localStorage.removeItem(scopeKey(ONBOARDING_DONE_KEY));
+                localStorage.removeItem(scopeKey(TOUR_SEGMENT_KEY));
+                navigate("/dashboard");
+              }}
+            >
+              Replay Tour
+            </Button>
+          </div>
+        </CollapsibleSection>
+
+        <h2 className="settings-group-title">Data &amp; history</h2>
+
+        <CollapsibleSection title="Reset Study Stats">
+          <p className="muted small">
+            Reset dashboard counters for Tests Taken, Cards Reviewed, and Average Score.
+          </p>
+          <div className="settings-reset-row">
+            <Button
+              type="button"
+              variant="secondary"
+              icon={<RotateCcw size={16} />}
+              onClick={handleResetStats}
+              disabled={resettingStats}
+            >
+              {resettingStats ? "Resetting..." : "Reset Stats"}
+            </Button>
+            {statsResetNotice ? <span className="muted small">{statsResetNotice}</span> : null}
+          </div>
+        </CollapsibleSection>
+
+        {!guest ? (
+          <CollapsibleSection title="Kojo chat history restore">
+            <p className="muted small">
+              Cleared Kojo chats are available here for up to 5 hours.
+            </p>
+
+            {restoreError ? (
+              <div className="settings-feedback settings-feedback--error">
+                <XCircle size={16} />
+                <span>{restoreError}</span>
+              </div>
+            ) : null}
+
+            {loadingCleared ? (
+              <p className="muted small">Loading cleared chats…</p>
+            ) : clearedConversations.length === 0 ? (
+              <p className="muted small">No recently cleared Kojo chats.</p>
+            ) : (
+              <div className="settings-restore-list">
+                {clearedConversations.map((conv) => (
+                  <div className="settings-restore-item" key={conv.conversation_id}>
+                    <div>
+                      <p className="settings-restore-folder">{conv.folder_name}</p>
+                      <p className="muted small">{getRestoreTimeLabel(conv.restore_expires_at)}</p>
+                    </div>
+                    <Button
+                      variant="secondary"
+                      onClick={() => handleRestore(conv.folder_id)}
+                      disabled={restoreFolderId === conv.folder_id}
+                    >
+                      {restoreFolderId === conv.folder_id ? "Restoring…" : "Restore"}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </CollapsibleSection>
         ) : null}
 
@@ -528,6 +509,39 @@ export default function Settings() {
             </div>
           )}
         </CollapsibleSection>
+
+        {isAdmin ? (
+          <>
+            <h2 className="settings-group-title">Admin</h2>
+            <CollapsibleSection title="Admin panel">
+              <p className="muted small">
+                Access platform metrics, user roster, and feature performance data.
+              </p>
+              <div className="settings-reset-row">
+                <Link to="/admin" className="button button--secondary">
+                  <ShieldCheck size={16} />
+                  Open admin panel
+                </Link>
+              </div>
+            </CollapsibleSection>
+          </>
+        ) : null}
+
+        {!guest && user ? (
+          <>
+            <h2 className="settings-group-title settings-group-title--danger">Danger zone</h2>
+            <CollapsibleSection title="Delete Account">
+              <p className="muted small">
+                Permanently delete your account and all associated data , classes, tests, flashcards, and chat history. This cannot be undone.
+              </p>
+              <div className="settings-reset-row">
+                <Button type="button" variant="danger" onClick={() => setDeleteStep(1)}>
+                  Delete account
+                </Button>
+              </div>
+            </CollapsibleSection>
+          </>
+        ) : null}
       </Card>
 
       {deleteStep === 1 ? (

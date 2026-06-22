@@ -1194,6 +1194,27 @@ h3 {
   line-height: 1.5;
 }
 
+.settings-group-title {
+  margin: 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--green-light-mid);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--green-dark);
+}
+
+.settings-card > .settings-group-title:first-of-type {
+  padding-top: 0;
+  border-top: none;
+}
+
+.settings-group-title--danger {
+  color: #b3261e;
+  border-top-color: rgba(179, 38, 30, 0.28);
+}
+
 .settings-restore-list {
   display: grid;
   gap: 10px;
