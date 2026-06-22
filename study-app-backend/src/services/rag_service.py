@@ -361,7 +361,15 @@ class HybridRAGService:
             client.upsert(collection_name=collection_name, points=points, wait=True)
             query_vector = self._embed_many([query])[0]
             qfilter = Filter(must=[FieldCondition(key="namespace", match=MatchValue(value=namespace))])
-            results = client.search(collection_name=collection_name, query_vector=query_vector, limit=limit, query_filter=qfilter)
+            # query_points is the current Qdrant client API; the old .search method was
+            # removed in recent qdrant-client versions ('QdrantClient' object has no attribute
+            # 'search'), which made every retrieval silently fall back to local hybrid RAG.
+            results = client.query_points(
+                collection_name=collection_name,
+                query=query_vector,
+                limit=limit,
+                query_filter=qfilter,
+            ).points
         except Exception as exc:
             logger.warning("Qdrant retrieval unavailable; falling back to local hybrid RAG: %s", exc)
             return []
