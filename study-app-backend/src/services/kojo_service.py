@@ -278,6 +278,7 @@ class KojoService:
 
         try:
             llm = LLMService()
+            kojo_strictness = _normalize_strictness(strictness)
             use_map_reduce = (
                 notes_context != _NO_NOTES
                 and len(notes_context) >= _MAP_REDUCE_NOTES_MIN_CHARS
@@ -291,6 +292,7 @@ class KojoService:
                     user_query=user_message,
                     history_block=history_block,
                     provider=active_provider,
+                    strictness=kojo_strictness,
                 )
             elif active_provider:
                 kojo_response = await llm.call_kojo(prompt if isinstance(prompt, str) else str(prompt), provider=active_provider)
@@ -762,6 +764,11 @@ def _list_document_sources(notes_context: str) -> list[str]:
     return sources
 
 
+def _normalize_strictness(strictness: Optional[str]) -> str:
+    normalized = (strictness or "medium").strip().lower()
+    return normalized if normalized in {"strict", "medium", "none"} else "medium"
+
+
 def _build_prompt(notes: str, user_message: str, history: list, strictness: str = "medium") -> str:
     history_lines: list[str] = []
     for msg in history[:-1]:
@@ -794,6 +801,8 @@ def _build_prompt(notes: str, user_message: str, history: list, strictness: str 
             "NOTE: The student has not uploaded any study materials yet. "
             "You can still answer general questions, but encourage them to upload notes for personalized help."
         )
+
+    strictness = _normalize_strictness(strictness)
 
     if strictness == "strict":
         constitution = """RESPONSE GUIDELINES (STRICT — stay within the student's notes):

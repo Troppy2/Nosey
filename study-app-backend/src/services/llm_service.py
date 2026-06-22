@@ -1991,7 +1991,12 @@ Return only the JSON object."""
         user_query: str,
         history_block: str = "",
         provider: Optional[str] = None,
+        strictness: str = "medium",
     ) -> str:
+        strictness = (strictness or "medium").strip().lower()
+        if strictness not in {"strict", "medium", "none"}:
+            strictness = "medium"
+
         documents = self._extract_document_blocks(notes)
         if not documents:
             logger.warning("map_reduce_long_answer: No documents found in notes")
@@ -2076,14 +2081,39 @@ Return only the JSON object."""
             )
         map_outputs_text = "\n\n".join(map_block_parts)
 
+        if strictness == "strict":
+            synthesis_rules = (
+                "- Cite sources inline using [source: SOURCE NAME].\n"
+                "- Only answer from the map-stage evidence.\n"
+                "- If the evidence does not cover the question, say you do not see it in the student's notes.\n"
+                "- Do not use general knowledge to fill gaps.\n"
+                "- Prefer high-confidence evidence and avoid unsupported claims.\n"
+                "- Keep answer clear and concise."
+            )
+        elif strictness == "none":
+            synthesis_rules = (
+                "- Use the map-stage evidence as helpful study context, but you are not limited to it.\n"
+                "- Answer the student's question as thoroughly as possible using general knowledge when needed.\n"
+                "- Cite note evidence inline using [source: SOURCE NAME] when you use it.\n"
+                "- When adding information beyond the notes, say it comes from general knowledge and should be verified with course materials.\n"
+                "- Use concrete examples and step-by-step explanations where useful.\n"
+                "- Keep answer clear and student-facing."
+            )
+        else:
+            synthesis_rules = (
+                "- Cite sources inline using [source: SOURCE NAME] when using note evidence.\n"
+                "- Ground the answer in the map-stage evidence where possible.\n"
+                "- If the notes do not fully cover the topic, fill the gap with general knowledge and clearly flag that part.\n"
+                "- If sources conflict, explicitly note the conflict and provide the safest interpretation.\n"
+                "- Prefer high-confidence evidence and avoid presenting unsupported note claims as sourced.\n"
+                "- Keep answer clear and concise."
+            )
+
         reduce_prompt = (
             "You are doing REDUCE-stage RAG synthesis.\n"
             "Merge the map-stage outputs into one final student-facing answer.\n"
             "Rules:\n"
-            "- Cite sources inline using [source: SOURCE NAME].\n"
-            "- If sources conflict, explicitly note the conflict and provide safest interpretation.\n"
-            "- Prefer high-confidence evidence and avoid unsupported claims.\n"
-            "- Keep answer clear and concise.\n\n"
+            f"{synthesis_rules}\n\n"
             f"{history_block}\n\n"
             f"USER QUESTION:\n{user_query}\n\n"
             "MAP OUTPUTS:\n"
