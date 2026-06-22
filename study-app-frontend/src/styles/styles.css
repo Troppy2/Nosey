@@ -1194,6 +1194,24 @@ h3 {
   line-height: 1.5;
 }
 
+/* Keep the entire Settings menu on one typeface (the sans face). The global h1/h2
+   rule sets serif (Lora), which left the page title, the session name, and the group
+   headings in serif while every control and label rendered in sans. Unify on sans for
+   a cohesive control-surface feel; size and weight still carry the hierarchy. */
+.settings-page h1,
+.settings-page h2,
+.settings-page .settings-group-title {
+  font-family: var(--font-sans);
+}
+
+.settings-page h1 {
+  letter-spacing: -0.02em;
+}
+
+.settings-page .settings-summary h2 {
+  letter-spacing: -0.01em;
+}
+
 .settings-group-title {
   margin: 0;
   padding-top: 18px;
