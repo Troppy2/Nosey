@@ -41,7 +41,7 @@ export default function CreateTest() {
   const [isCodingMode, setIsCodingMode] = useState(false);
   const [codingLanguage, setCodingLanguage] = useState("Python");
   const [customInstructions, setCustomInstructions] = useState("");
-  const { generationProvider, setGenerationProvider, betaMode } = useSettings();
+  const { generationProvider, betaMode } = useSettings();
 
   function countWords(text: string) {
     return text.trim().split(/\s+/).filter(Boolean).length;
@@ -120,17 +120,18 @@ export default function CreateTest() {
     localStorage.setItem(scopeKey(`nosey_create_test_form_${folderId}`), JSON.stringify(draft));
   }, [title, folderId, testType, countMcq, countFrq, countTf, countMs, countRank, isMathMode, isCodingMode, codingLanguage, difficulty, topicFocus, customInstructions, advancedMode]);
 
-  useEffect(() => {
-    if (!providerStatus) return;
-    const unavailable =
-      (generationProvider === "groq" && !providerStatus.groq) ||
+  // If the user's saved provider is currently unavailable, fall back to "auto" for THIS
+  // request only. Do not rewrite the shared `nosey_generation_provider` setting: it is read
+  // by Kojo chat, flashcards and LeetCode too, so overwriting it here would silently override
+  // the user's chosen LLM app-wide. The backend already falls back across providers for a
+  // specific pick, so sending "auto" here is just a frontend convenience, not a hard requirement.
+  const providerUnavailable =
+    !!providerStatus &&
+    ((generationProvider === "groq" && !providerStatus.groq) ||
       (generationProvider === "gemini" && !providerStatus.gemini) ||
       (generationProvider === "claude" && !providerStatus.claude) ||
-      (generationProvider === "ollama" && !providerStatus.ollama);
-    if (unavailable) {
-      setGenerationProvider("auto");
-    }
-  }, [providerStatus, generationProvider, setGenerationProvider]);
+      (generationProvider === "ollama" && !providerStatus.ollama));
+  const effectiveProvider = providerUnavailable ? "auto" : generationProvider;
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -154,7 +155,7 @@ export default function CreateTest() {
         difficulty: advancedMode ? difficulty : undefined,
         topicFocus: advancedMode && topicFocus.trim() ? topicFocus.trim() : undefined,
         customInstructions: advancedMode && customInstructions.trim() ? customInstructions.trim() : undefined,
-        generationProvider: generationProvider,
+        generationProvider: effectiveProvider,
         enableFallback: localStorage.getItem(scopeKey("nosey_question_fallback")) === "true",
       });
       sessionStorage.setItem(

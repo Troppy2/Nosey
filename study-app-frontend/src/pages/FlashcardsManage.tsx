@@ -37,7 +37,7 @@ export default function FlashcardsManage() {
   const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [confirmDeleteCard, setConfirmDeleteCard] = useState<Flashcard | null>(null);
-  const { generationProvider, setGenerationProvider } = useSettings();
+  const { generationProvider } = useSettings();
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -59,17 +59,17 @@ export default function FlashcardsManage() {
     fetchProviderStatus().then(setProviderStatus).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (!providerStatus) return;
-    const unavailable =
-      (generationProvider === "groq" && !providerStatus.groq) ||
+  // Fall back to "auto" for THIS request only when the saved provider is unavailable. Never
+  // rewrite the shared `nosey_generation_provider` setting here: it is also read by Kojo chat,
+  // test generation and LeetCode, so overwriting it would silently override the user's chosen
+  // LLM app-wide. The backend already falls back across providers for a specific pick.
+  const providerUnavailable =
+    !!providerStatus &&
+    ((generationProvider === "groq" && !providerStatus.groq) ||
       (generationProvider === "gemini" && !providerStatus.gemini) ||
       (generationProvider === "claude" && !providerStatus.claude) ||
-      (generationProvider === "ollama" && !providerStatus.ollama);
-    if (unavailable) {
-      setGenerationProvider("auto");
-    }
-  }, [providerStatus, generationProvider, setGenerationProvider]);
+      (generationProvider === "ollama" && !providerStatus.ollama));
+  const effectiveProvider = providerUnavailable ? "auto" : generationProvider;
 
   function startEdit(card: Flashcard) {
     setEditingId(card.id);
@@ -143,7 +143,7 @@ export default function FlashcardsManage() {
     setGenerating(true);
     setError(null);
     try {
-      const generated = await generateFlashcardsFromFile(id, files, 10, generationProvider, localStorage.getItem(scopeKey("nosey_question_fallback")) === "true");
+      const generated = await generateFlashcardsFromFile(id, files, 10, effectiveProvider, localStorage.getItem(scopeKey("nosey_question_fallback")) === "true");
       setCards((prev) => [...generated, ...prev]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate flashcards.");
@@ -161,7 +161,7 @@ export default function FlashcardsManage() {
         count: generateCount,
         prompt:
           "Create fresh flashcards using the folder's saved files and the current flashcards as context. Do not repeat existing cards, and focus on new concepts, definitions, examples, or comparisons that are not already covered.",
-        provider: generationProvider,
+        provider: effectiveProvider,
         enableFallback: localStorage.getItem(scopeKey("nosey_question_fallback")) === "true",
       });
       setCards((prev) => {
