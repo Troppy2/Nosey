@@ -4615,6 +4615,13 @@ h3 {
   overflow-y: auto;
 }
 
+/* Mobile-only drawer controls , hidden on desktop */
+.chat-mode-menu-btn,
+.chat-mode-sidebar-close,
+.chat-mode-sidebar-backdrop {
+  display: none;
+}
+
 .chat-mode-sidebar-header {
   display: flex;
   align-items: center;
@@ -4861,25 +4868,98 @@ h3 {
   cursor: not-allowed;
 }
 
-@media (max-width: 700px) {
+@media (max-width: 760px) {
+  /* Main chat fills the width; the sidebar becomes an off-canvas drawer */
   .chat-mode-shell {
-    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .chat-mode-sidebar-copy {
-    display: none;
+  .chat-mode-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 60;
+    width: min(86vw, 320px);
+    border-right: 1px solid rgba(113, 131, 85, 0.16);
+    box-shadow: 0 12px 40px rgba(38, 48, 31, 0.22);
+    transform: translateX(-100%);
+    transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
   }
 
-  .chat-mode-sidebar-header span {
-    display: none;
+  .chat-mode-sidebar--open {
+    transform: translateX(0);
   }
 
-  .chat-mode-folder-btn span {
-    display: none;
+  .chat-mode-sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: rgba(26, 37, 21, 0.42);
+    backdrop-filter: blur(1.5px);
+    animation: chat-mode-backdrop-in 0.2s ease;
   }
 
-  .chat-mode-folder-btn {
+  @keyframes chat-mode-backdrop-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* Show the hamburger trigger and the in-drawer close button */
+  .chat-mode-menu-btn {
+    display: inline-flex;
+    align-items: center;
     justify-content: center;
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 10px;
+    background: rgba(113, 131, 85, 0.1);
+    color: var(--green-dark);
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .chat-mode-menu-btn:active {
+    background: rgba(113, 131, 85, 0.2);
+  }
+
+  .chat-mode-sidebar-header {
+    justify-content: flex-start;
+    padding-right: 12px;
+  }
+
+  .chat-mode-sidebar-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    margin-left: auto;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #8fa07a;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+
+  .chat-mode-sidebar-close:active {
+    background: rgba(113, 131, 85, 0.14);
+    color: var(--ink);
+  }
+
+  /* Chat history needs more room on phones since it's the primary reason to open the drawer */
+  .kojo-chat-list {
+    max-height: none;
+  }
+
+  /* Touch devices have no hover , keep delete affordances visible */
+  .kojo-chat-item-delete {
+    opacity: 0.65;
   }
 
   .chat-mode-header-meta {
@@ -10264,14 +10344,7 @@ h3 {
 }
 
 @media (max-width: 480px) {
-  /* Chat mode full-page (KojoMode): hide the icon-only sidebar on very small screens */
-  .chat-mode-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .chat-mode-sidebar {
-    display: none;
-  }
+  /* KojoMode sidebar is an off-canvas drawer on phones (see 760px block) , do not hide it */
 
   /* Mock interview stage 1 topbar: wrap and make question tabs scrollable */
   .mock-stage1-topbar {
