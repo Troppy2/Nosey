@@ -775,13 +775,13 @@ export default function KojoMode() {
           {!isGeneralMode && (
             <button
               type="button"
-              className="kojo-header-btn"
+              className="kojo-header-btn kojo-header-btn--danger"
               onClick={() => setConfirmClear((c) => !c)}
               disabled={isLoading}
               title="Clear chat"
+              aria-label="Clear chat history"
             >
               <Trash2 size={17} />
-              <span>Clear</span>
             </button>
           )}
         </div>
