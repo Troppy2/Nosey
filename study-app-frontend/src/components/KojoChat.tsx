@@ -173,7 +173,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
 
           <div className="kojo-header-actions">
             <button
-              className="kojo-header-btn"
+              className="kojo-header-btn kojo-header-btn--danger"
               onClick={() => setConfirmClear((c) => !c)}
               type="button"
               aria-label="Clear chat history"

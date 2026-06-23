@@ -3103,6 +3103,17 @@ h3 {
   cursor: not-allowed;
 }
 
+.kojo-header-btn--danger:hover:not(:disabled) {
+  border-color: #e8b4b4;
+  background: #fdf2f2;
+  color: #c0392b;
+}
+
+.kojo-header-btn--danger:active:not(:disabled) {
+  background: #fae5e5;
+  transform: translateY(1px);
+}
+
 .kojo-clear-inline {
   display: flex;
   align-items: center;
