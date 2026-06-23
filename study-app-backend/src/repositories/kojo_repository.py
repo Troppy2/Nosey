@@ -150,11 +150,28 @@ class KojoRepository(BaseRepository[KojoConversation]):
         return list(reversed(messages))
 
     async def get_folder_notes_content(self, folder_id: int, user_id: int) -> str:
+        """Practice-test snapshots for the folder's tests (Kojo context).
+
+        Returns only practice-test PDF snapshots (file_type "pdf"). Those are
+        uploaded straight into test creation and never exist as live folder
+        files, so they cannot be deleted out from under Kojo and carry no
+        stale-content risk.
+
+        The "combined" snapshots (frozen copies of folder files taken at test
+        creation) are intentionally excluded: Kojo reads live folder files via
+        FileService.get_folder_files_content instead. This keeps deleted or
+        edited folder files from leaking back into Kojo through old test
+        snapshots, and avoids feeding Kojo duplicate copies of the same notes.
+        """
         stmt = (
             select(Note)
             .join(Test, Test.id == Note.test_id)
             .join(Folder, Folder.id == Test.folder_id)
-            .where(Test.folder_id == folder_id, Folder.user_id == user_id)
+            .where(
+                Test.folder_id == folder_id,
+                Folder.user_id == user_id,
+                Note.file_type == "pdf",
+            )
         )
         result = await self.session.execute(stmt)
         notes = result.scalars().all()
