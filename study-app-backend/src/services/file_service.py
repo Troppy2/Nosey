@@ -54,6 +54,11 @@ except ImportError:  # pragma: no cover - optional dependency
     Presentation = None  # type: ignore[assignment]
 
 
+# Hard cap on pages extracted from any PDF. Dense PDFs expand 5-10x in memory
+# during rendering; uncapped extraction OOMs the Render server before the file-size
+# check has any effect. 100 pages covers virtually all real study notes.
+_PDF_PAGE_CAP = 100
+
 _CODE_FILE_TYPES = {
     "py", "js", "ts", "tsx", "jsx", "java", "c", "cpp", "h", "hpp",
     "cs", "go", "rs", "swift", "kt", "scala", "rb", "php", "sql", "json", "xml", "yaml", "yml",
@@ -346,7 +351,9 @@ class FileService:
     def _extract_pdf_with_pymupdf4llm(self, data: bytes) -> str:
         if pymupdf4llm is None:
             raise ImportError("pymupdf4llm is not installed")
-        md = pymupdf4llm.to_markdown(fitz.open(stream=data, filetype="pdf"))
+        doc = fitz.open(stream=data, filetype="pdf")
+        pages = list(range(min(doc.page_count, _PDF_PAGE_CAP)))
+        md = pymupdf4llm.to_markdown(doc, pages=pages)
         if not md or not md.strip():
             raise ValueError("pymupdf4llm returned empty output")
         return md
@@ -379,7 +386,7 @@ class FileService:
 
     def _extract_pdf_with_pdfplumber(self, data: bytes) -> str:
         with pdfplumber.open(BytesIO(data)) as pdf:
-            page_count = len(pdf.pages)
+            page_count = min(len(pdf.pages), _PDF_PAGE_CAP)
             page_groups = _chunk_page_indexes(page_count, _preferred_pdf_workers())
             if len(page_groups) <= 1:
                 return _extract_pdfplumber_serial(pdf, page_groups[0] if page_groups else list(range(page_count)))
@@ -392,7 +399,7 @@ class FileService:
 
         document = fitz.open(stream=data, filetype="pdf")
         try:
-            page_count = int(document.page_count)
+            page_count = min(int(document.page_count), _PDF_PAGE_CAP)
             page_groups = _chunk_page_indexes(page_count, _preferred_pdf_workers())
             if len(page_groups) <= 1:
                 return _extract_pymupdf_serial(document, page_groups[0] if page_groups else list(range(page_count)))
