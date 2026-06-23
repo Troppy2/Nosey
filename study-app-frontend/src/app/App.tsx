@@ -10,7 +10,7 @@ import Folders from "../pages/Folders";
 import Landing from "../pages/Landing";
 import KojoMode from "../pages/KojoMode";
 import LeetCodeMode from "../pages/LeetCodeMode";
-import { isGuestSession, scopeKey } from "../lib/api";
+import { isAuthenticated, isGuestSession, scopeKey } from "../lib/api";
 import MockInterviewSetup from "../pages/MockInterviewSetup";
 import MockInterviewResume from "../pages/MockInterviewResume";
 import MockInterviewStage1 from "../pages/MockInterviewStage1";
@@ -33,6 +33,14 @@ function SignedInRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Gate for the app's protected routes. Anonymous visitors (no signed-in user
+// and no guest session) are sent to the landing/login page so they can make an
+// account or start as a guest, instead of auto-loading the dashboard.
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  if (!isAuthenticated()) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 // Saves user last visted page
 function PathTracker() {
   const location = useLocation();
@@ -49,7 +57,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Landing />} />
-        <Route element={<Sidebar />}>
+        <Route element={<RequireAuth><Sidebar /></RequireAuth>}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/folders" element={<Folders />} />
           <Route path="/folders/:folderId" element={<FolderDetail />} />
