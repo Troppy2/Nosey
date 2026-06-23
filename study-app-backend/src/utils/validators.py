@@ -8,8 +8,8 @@ ALLOWED_FILE_TYPES = {
     "py", "js", "ts", "tsx", "jsx", "java", "c", "cpp", "h", "hpp",
     "cs", "go", "rs", "swift", "kt", "scala", "rb", "php", "sql", "json", "xml", "yaml", "yml",
 }
-MAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file
-MAX_UPLOAD_TOTAL_SIZE_BYTES = 30 * 1024 * 1024  # 30 MB across uploaded files
+MAX_UPLOAD_FILE_SIZE_BYTES = 40 * 1024 * 1024  # 40 MB per file
+MAX_UPLOAD_TOTAL_SIZE_BYTES = 120 * 1024 * 1024  # 120 MB across uploaded files
 
 
 def normalize_file_extension(filename: Optional[str]) -> str:
