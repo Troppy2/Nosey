@@ -64,6 +64,13 @@ export function hasValidSession(): boolean {
   }
 }
 
+// True when someone is in an active session: a signed-in user, a guest, or
+// the local-dev sentinel token. Anonymous visitors have no token and should be
+// routed to the landing/login page rather than dropped onto a broken dashboard.
+export function isAuthenticated(): boolean {
+  return hasValidSession() || isGuestSession() || localStorage.getItem(TOKEN_KEY) !== null;
+}
+
 type RequestOptions = RequestInit & {
   allowMock?: boolean;
 };
