@@ -69,8 +69,8 @@ export default function Settings() {
     betaMode,
     setBetaMode,
   } = useSettings();
-  const ADMIN_EMAIL = "jamesinah34@gmail.com";
-  const isAdmin = !guest && user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const ADMIN_EMAILS = ["jamesinah34@gmail.com", "jamesinah883@gmail.com"];
+  const isAdmin = !guest && !!user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const initialized = useRef(false);
 

@@ -6,7 +6,7 @@ import { getStoredUser, isGuestSession, scopeKey } from "../lib/api";
 import { OnboardingTour } from "./OnboardingTour";
 import { AgeGateModal } from "./AgeGateModal";
 
-const ADMIN_EMAIL = "jamesinah34@gmail.com";
+const ADMIN_EMAILS = ["jamesinah34@gmail.com", "jamesinah883@gmail.com"];
 
 const sidebarStorageKey = "nosey_sidebar_collapsed";
 
@@ -24,7 +24,7 @@ export function Sidebar() {
   const { betaMode } = useSettings();
   const guest = isGuestSession();
   const currentUser = getStoredUser();
-  const isAdmin = currentUser?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const isAdmin = !!currentUser?.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase());
   const adminItem = { to: "/admin", label: "Admin", icon: ShieldCheck, beta: false, guestHidden: true, tourId: undefined };
   const kojoEnabled = currentUser?.kojo_enabled !== false;
   const navItems = [

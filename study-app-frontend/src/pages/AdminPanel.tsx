@@ -24,7 +24,7 @@ import {
 } from "../lib/api";
 import type { AdminStats, AdminUserRow } from "../lib/types";
 
-const ADMIN_EMAIL = "jamesinah34@gmail.com";
+const ADMIN_EMAILS = ["jamesinah34@gmail.com", "jamesinah883@gmail.com"];
 const REAUTH_WARN_SECONDS = 60;
 
 function formatMs(ms: number): string {
@@ -105,7 +105,7 @@ export default function AdminPanel() {
   const expiredCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (!user || user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+    if (!user || !ADMIN_EMAILS.includes(user.email.toLowerCase())) {
       navigate("/settings", { replace: true });
     }
   }, [user, navigate]);
@@ -167,7 +167,7 @@ export default function AdminPanel() {
     navigate("/settings");
   }
 
-  if (!user || user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+  if (!user || !ADMIN_EMAILS.includes(user.email.toLowerCase())) {
     return null;
   }
 
