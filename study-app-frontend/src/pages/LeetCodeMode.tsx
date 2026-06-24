@@ -71,6 +71,7 @@ import {
   fetchLCStreakChallenge,
   createLCStreakChallenge,
   completeLCStreakChallenge,
+  fetchSlashCommands,
 } from "../lib/api";
 import { runPythonLeetCode, traceLeetCodeExecution, type RunnerResult, type TraceResult } from "../lib/pyodideRunner";
 import { sanitizeLeetCodeHtml } from "../lib/leetcodeHtml";
@@ -792,6 +793,7 @@ export default function LeetCodeMode() {
   const [kojoResponse, setKojoResponse] = useState<string | null>(null);
   const [kojoLoading, setKojoLoading] = useState(false);
   const [kojoError, setKojoError] = useState<string | null>(null);
+  const [customSlashCommands, setCustomSlashCommands] = useState<SlashCommand[]>([]);
   const editorRef = useRef<any>(null);
   const currentCodeRef = useRef("");
   const currentProblemDataRef = useRef<LeetCodeProblemData | undefined>(undefined);
@@ -853,6 +855,7 @@ export default function LeetCodeMode() {
   const currentCodeTab = currentCodeWorkspace?.tabs.find((tab) => tab.id === currentCodeWorkspace.activeTabId) ?? currentCodeWorkspace?.tabs[0] ?? null;
   const currentCode = currentCodeTab?.code ?? "";
   const kojoShowsCommands = kojoOpen && kojoInput.trimStart().startsWith("/");
+  const allKojoCommands = [...CHAT_COMMANDS, ...customSlashCommands];
   const timerButtonLabel = timerRemainingSeconds == null ? "Timer" : `${Math.floor(timerRemainingSeconds / 60)}:${String(timerRemainingSeconds % 60).padStart(2, "0")}`;
 
   useEffect(() => {
@@ -979,6 +982,15 @@ export default function LeetCodeMode() {
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [betaMode]);
+
+  // On mount: fetch user-created slash commands from settings so they appear in the Kojo modal.
+  useEffect(() => {
+    if (isGuestSession()) return;
+    fetchSlashCommands()
+      .then(setCustomSlashCommands)
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // On mount: pull custom problems from DB and reconcile with localStorage. DB wins on
   // overlap; any local-only entries (created while a prior sync failed) get pushed up.
@@ -2928,7 +2940,7 @@ export default function LeetCodeMode() {
                 disabled={kojoLoading}
               />
               {kojoShowsCommands ? (
-                <SlashCommandMenu commands={CHAT_COMMANDS} onSelect={selectKojoCommand} />
+                <SlashCommandMenu commands={allKojoCommands} onSelect={selectKojoCommand} />
               ) : null}
             </div>
 
