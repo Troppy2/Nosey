@@ -1,6 +1,6 @@
 import time
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, File
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -68,6 +68,7 @@ async def create_conversation(
 @limiter.limit("20/minute")
 async def kojo_chat(
     request: Request,
+    response: Response,
     folder_id: int,
     body: KojoChatRequest,
     session: AsyncSession = Depends(get_session),
@@ -295,6 +296,7 @@ async def create_general_conversation(
 @limiter.limit("20/minute")
 async def general_chat(
     request: Request,
+    response: Response,
     conversation_id: int,
     body: GeneralChatRequest,
     session: AsyncSession = Depends(get_session),

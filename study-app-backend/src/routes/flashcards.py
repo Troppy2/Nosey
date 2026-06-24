@@ -1,6 +1,6 @@
 import time
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_session
@@ -53,6 +53,7 @@ async def create_flashcard(
 @limiter.limit("10/minute")
 async def generate_flashcards(
     request: Request,
+    response: Response,
     folder_id: int,
     data: FlashcardGenerateRequest,
     session: AsyncSession = Depends(get_session),
@@ -127,6 +128,7 @@ async def weak_flashcards(
 @limiter.limit("10/minute")
 async def generate_flashcards_from_file(
     request: Request,
+    response: Response,
     folder_id: int,
     notes_files: list[UploadFile] = File(...),
     count: int = Query(default=10, ge=1, le=50),

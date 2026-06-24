@@ -2,7 +2,7 @@ import hashlib
 import time
 from typing import Optional, Tuple
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.datastructures import UploadFile
@@ -217,6 +217,7 @@ async def _generate_questions_background(
 async def create_test(
     folder_id: int,
     request: Request,
+    response: Response,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
@@ -414,6 +415,7 @@ async def create_test(
 @limiter.limit("5/minute")
 async def regenerate_test(
     request: Request,
+    response: Response,
     test_id: int,
     data: RegenerateTestRequest,
     background_tasks: BackgroundTasks,
