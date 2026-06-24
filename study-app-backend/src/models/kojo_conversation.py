@@ -27,7 +27,9 @@ class KojoConversation(Base, TimestampMixin):
     )
     name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True, default=None)
 
-    cleared_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, default=None)
+    cleared_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, nullable=True, default=None, index=True
+    )
 
     user: Mapped[User] = relationship("User", back_populates="kojo_conversations")
     folder: Mapped[Optional[Folder]] = relationship("Folder", back_populates="kojo_conversations")

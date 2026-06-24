@@ -14,6 +14,14 @@ const TYPE_ROTATE_INTERVAL_MS = 5 * 60 * 1000;
 const TYPE_STEP_MS = 28;
 const STATS_RESET_BASELINE_KEY = "nosey_stats_reset_baseline";
 const COMPLETED_TEST_IDS_KEY = "nosey_completed_test_ids";
+const DASHBOARD_CACHE_KEY = "nosey_dashboard_cache";
+
+type DashboardCache = {
+  folders: Folder[];
+  tests: TestSummary[];
+  flashcards: Flashcard[];
+  resumableTests: ResumableTestInfo[];
+};
 
 function readCompletedTestIds(): Set<number> {
   try {
@@ -106,17 +114,61 @@ export default function Dashboard() {
   }, [displayTitle]);
 
   useEffect(() => {
+    let active = true;
+    let hadCache = false;
+
+    // Stale-while-revalidate: paint cached data instantly on revisit (like
+    // LeetCode mode), then refetch in the background and reconcile.
+    try {
+      const raw = sessionStorage.getItem(scopeKey(DASHBOARD_CACHE_KEY));
+      if (raw) {
+        const cached = JSON.parse(raw) as DashboardCache;
+        setFolders(cached.folders);
+        setTests(cached.tests);
+        setFlashcards(cached.flashcards);
+        setResumableTests(cached.resumableTests);
+        setIsLoading(false);
+        hadCache = true;
+      }
+    } catch {
+      /* ignore malformed cache */
+    }
+
     Promise.all([fetchFolders(), fetchTests(), fetchFlashcards(), getResumableTests()])
       .then(([folderData, testData, flashcardData, resumableData]) => {
+        if (!active) return;
         setFolders(folderData);
         setTests(testData);
         setFlashcards(flashcardData);
         setResumableTests(resumableData);
+        setError(null);
+        try {
+          sessionStorage.setItem(
+            scopeKey(DASHBOARD_CACHE_KEY),
+            JSON.stringify({
+              folders: folderData,
+              tests: testData,
+              flashcards: flashcardData,
+              resumableTests: resumableData,
+            }),
+          );
+        } catch {
+          /* ignore quota errors */
+        }
       })
       .catch((loadError) => {
-        setError(loadError instanceof Error ? loadError.message : "Unable to load your study data.");
+        // Keep showing cached data if the background refresh fails.
+        if (active && !hadCache) {
+          setError(loadError instanceof Error ? loadError.message : "Unable to load your study data.");
+        }
       })
-      .finally(() => setIsLoading(false));
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {

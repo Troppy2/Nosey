@@ -79,6 +79,19 @@ class ConversationFileDTO(BaseModel):
     uploaded_at: datetime
 
 
+class KojoBootstrapDTO(BaseModel):
+    """Combined payload for the chat screen's initial load.
+
+    Collapses the previous conversation-list, active-conversation, and
+    session-files fetches into a single round-trip. `active` and `files`
+    describe the most recent conversation (the one the UI opens by default).
+    """
+
+    conversations: list[KojoConversationSummaryDTO]
+    active: Optional[KojoConversationDTO] = None
+    files: list[ConversationFileDTO] = Field(default_factory=list)
+
+
 class GeneralChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=2000)
     provider: Optional[str] = Field(default=None)

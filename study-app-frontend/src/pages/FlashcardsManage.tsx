@@ -8,6 +8,7 @@ import { TextInput } from "../components/Field";
 import { MarkdownContent } from "../components/MarkdownContent";
 import {
   createFlashcard,
+  deleteAllFlashcards,
   deleteFlashcard,
   fetchFlashcards,
   fetchFolderFiles,
@@ -20,10 +21,17 @@ import {
 import { useSettings } from "../lib/useSettings";
 import type { Flashcard, ProviderStatus } from "../lib/types";
 
+const MANAGE_PAGE_SIZE = 50;
+
 export default function FlashcardsManage() {
   const { folderId } = useParams();
   const id = Number(folderId);
   const [cards, setCards] = useState<Flashcard[]>([]);
+  // Server offset for the next page fetch. Tracked independently of cards.length
+  // so optimistic add/delete don't shift the pagination window.
+  const [nextOffset, setNextOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editFront, setEditFront] = useState("");
@@ -41,8 +49,32 @@ export default function FlashcardsManage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetchFlashcards(id).then(setCards);
+    if (!id) return;
+    fetchFlashcards(id, { limit: MANAGE_PAGE_SIZE, offset: 0 }).then((data) => {
+      setCards(data);
+      setNextOffset(data.length);
+      setHasMore(data.length === MANAGE_PAGE_SIZE);
+    });
   }, [id]);
+
+  async function handleLoadMore() {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    setError(null);
+    try {
+      const batch = await fetchFlashcards(id, { limit: MANAGE_PAGE_SIZE, offset: nextOffset });
+      setCards((prev) => {
+        const seen = new Set(prev.map((card) => card.id));
+        return [...prev, ...batch.filter((card) => !seen.has(card.id))];
+      });
+      setNextOffset((offset) => offset + batch.length);
+      setHasMore(batch.length === MANAGE_PAGE_SIZE);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load more flashcards.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   useEffect(() => {
     if (!id) return;
@@ -129,10 +161,18 @@ export default function FlashcardsManage() {
   function handleDeleteAllFlashcards() {
     if (cards.length === 0) return;
     const prev = cards;
+    const prevOffset = nextOffset;
+    const prevHasMore = hasMore;
     setCards([]);
+    setNextOffset(0);
+    setHasMore(false);
     setShowDeleteAllModal(false);
-    Promise.all(prev.map((card) => deleteFlashcard(id, card.id))).catch((err) => {
+    // One bulk DELETE deletes every card in the folder (including unloaded
+    // pages), instead of firing one request per loaded card.
+    deleteAllFlashcards(id).catch((err) => {
       setCards(prev);
+      setNextOffset(prevOffset);
+      setHasMore(prevHasMore);
       setError(err instanceof Error ? err.message : "Failed to delete all flashcards.");
     });
   }
@@ -190,7 +230,10 @@ export default function FlashcardsManage() {
             Back to folder
           </Link>
           <h1>Manage Flashcards</h1>
-          <p className="muted">{cards.length} card{cards.length === 1 ? "" : "s"}</p>
+          <p className="muted">
+            {cards.length}
+            {hasMore ? "+" : ""} card{cards.length === 1 && !hasMore ? "" : "s"}
+          </p>
         </div>
         <div className="toolbar">
           <Button
@@ -332,6 +375,13 @@ export default function FlashcardsManage() {
             )}
           </div>
         )}
+        {hasMore ? (
+          <div className="button-row" style={{ justifyContent: "center", marginTop: "16px" }}>
+            <Button variant="secondary" onClick={handleLoadMore} disabled={loadingMore}>
+              {loadingMore ? "Loading..." : "Load more"}
+            </Button>
+          </div>
+        ) : null}
       </section>
 
       {confirmDeleteCard ? (

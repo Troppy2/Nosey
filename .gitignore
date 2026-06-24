@@ -43,3 +43,6 @@ claude/todo.md
 keep-alive.js
 keep-alive.txt
 PROJECT_SUMMARY.md
+
+# Local-only benchmarking tooling (not for deployment)
+study-app-backend/scripts/benchmark_latency.py

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import Select, case, func, select
+from sqlalchemy import Select, case, delete, func, select
 
 from src.models.flashcard import Flashcard, FlashcardAttempt
 from src.repositories.base_repository import BaseRepository
@@ -26,7 +26,28 @@ class FlashcardRepository(BaseRepository[Flashcard]):
     async def delete(self, card: Flashcard) -> None:
         await self.session.delete(card)
 
-    async def list_with_stats(self, folder_id: int, user_id: int) -> list[tuple[Flashcard, int, int, Optional[float], object]]:
+    async def delete_all_in_folder(self, folder_id: int) -> int:
+        """Bulk-delete every card in a folder in one statement.
+
+        Attempts are removed by the DB-level ON DELETE CASCADE on
+        flashcard_attempts.flashcard_id, so this stays a single round-trip
+        instead of N per-card DELETE calls from the client.
+        """
+        stmt = (
+            delete(Flashcard)
+            .where(Flashcard.folder_id == folder_id)
+            .execution_options(synchronize_session=False)
+        )
+        result = await self.session.execute(stmt)
+        return result.rowcount or 0
+
+    async def list_with_stats(
+        self,
+        folder_id: int,
+        user_id: int,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> list[tuple[Flashcard, int, int, Optional[float], object]]:
         correct_count = func.sum(case((FlashcardAttempt.correct.is_(True), 1), else_=0))
         total_count = func.count(FlashcardAttempt.id)
         stmt: Select[tuple[Flashcard, int, int, Optional[float], object]] = (
@@ -46,6 +67,10 @@ class FlashcardRepository(BaseRepository[Flashcard]):
             .group_by(Flashcard.id)
             .order_by(Flashcard.created_at.desc())
         )
+        if offset is not None:
+            stmt = stmt.offset(offset)
+        if limit is not None:
+            stmt = stmt.limit(limit)
         rows = await self.session.execute(stmt)
         return list(rows.all())
 
@@ -85,12 +110,24 @@ class FlashcardRepository(BaseRepository[Flashcard]):
     async def record_attempt(
         self, user_id: int, flashcard_id: int, correct: bool, time_ms: Optional[int]
     ) -> FlashcardAttempt:
+        # Compute the next attempt number inside the INSERT as a scalar subquery
+        # so recording an attempt is one DB round-trip, not SELECT MAX(...) then
+        # INSERT. Nothing reads attempt_number back, so the post-flush expiry of
+        # the SQL-expression column is harmless.
+        next_number = (
+            select(func.coalesce(func.max(FlashcardAttempt.attempt_number), 0) + 1)
+            .where(
+                FlashcardAttempt.user_id == user_id,
+                FlashcardAttempt.flashcard_id == flashcard_id,
+            )
+            .scalar_subquery()
+        )
         attempt = FlashcardAttempt(
             user_id=user_id,
             flashcard_id=flashcard_id,
             correct=correct,
             time_ms=time_ms,
-            attempt_number=await self.next_attempt_number(user_id, flashcard_id),
+            attempt_number=next_number,
         )
         self.session.add(attempt)
         await self.session.flush()

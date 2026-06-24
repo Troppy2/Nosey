@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import BIGINT_ID, Base, TimestampMixin
@@ -35,6 +35,12 @@ class Flashcard(Base, TimestampMixin):
 
 class FlashcardAttempt(Base, TimestampMixin):
     __tablename__ = "flashcard_attempts"
+    __table_args__ = (
+        # list_with_stats() joins on (flashcard_id, user_id); the single-column
+        # indexes below force PostgreSQL to pick one and filter the other in
+        # memory. This composite covers the join's double-filter directly.
+        Index("ix_flashcard_attempts_flashcard_user", "flashcard_id", "user_id"),
+    )
 
     id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(

@@ -115,6 +115,11 @@ class TestTakeResponse(BaseModel):
     is_coding_mode: bool = False
     coding_language: Optional[str] = None
     questions: list[QuestionPublic]
+    # Streaming generation: lets the take-test screen render questions as they arrive
+    # and keep polling until generation finishes.
+    generation_status: str = "ready"
+    generation_error: Optional[str] = None
+    expected_question_count: Optional[int] = None
 
 
 class CreateTestResponse(BaseModel):

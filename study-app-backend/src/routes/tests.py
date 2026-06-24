@@ -54,6 +54,33 @@ class _BytesUploadFile:
         pass  # no-op; bytes are always fully available
 
 
+async def _persist_generated(
+    repo: TestRepository,
+    test_id: int,
+    mcq_questions: list,
+    frq_questions: list,
+    start_order: int,
+) -> int:
+    """Write a batch of generated MCQ/FRQ questions; return the next display_order."""
+    display_order = start_order
+    for item in mcq_questions:
+        options = [
+            (option_text, index == item.correct_index)
+            for index, option_text in enumerate(item.options)
+        ]
+        await repo.add_mcq_question(test_id, item.question_text, display_order, options)
+        display_order += 1
+    for item in frq_questions:
+        await repo.add_frq_question(test_id, item.question_text, display_order, item.expected_answer)
+        display_order += 1
+    return display_order
+
+
+# Number of questions in the first streamed batch. Kept small so the very first
+# question lands fast; the remainder is generated in a single follow-up call.
+_FIRST_BATCH_SIZE = 5
+
+
 async def _generate_questions_background(
     test_id: int,
     user_id: int,
@@ -82,13 +109,41 @@ async def _generate_questions_background(
             repo = TestRepository(session)
             llm = LLMService()
 
-            if practice_test_content and notes_content:
-                mcq_questions, frq_questions = await llm.generate_from_practice_test_template(
+            # Dispatch a single generation call for the requested MCQ/FRQ counts. The
+            # three source paths (template / parse / notes) each have their own LLM
+            # entry point but share this MCQ/FRQ count contract.
+            async def run_generation(c_mcq: int, c_frq: int, prior: Optional[list[str]]):
+                if practice_test_content and notes_content:
+                    return await llm.generate_from_practice_test_template(
+                        notes=notes_content,
+                        practice_test_content=practice_test_content,
+                        test_type=test_type,
+                        count_mcq=c_mcq if test_type != "FRQ_only" else 0,
+                        count_frq=c_frq if test_type != "MCQ_only" else 0,
+                        is_math_mode=is_math_mode,
+                        difficulty=difficulty,
+                        topic_focus=topic_focus,
+                        is_coding_mode=is_coding_mode,
+                        coding_language=coding_language,
+                        custom_instructions=custom_instructions,
+                        provider=provider,
+                        enable_fallback=enable_fallback,
+                        prior_questions=prior,
+                    )
+                if practice_test_content:
+                    # Parsing extracts questions from a fixed document and has no
+                    # cross-batch dedup, so this path is never split (see below).
+                    return await llm.parse_practice_test(
+                        content=practice_test_content,
+                        count_mcq=c_mcq if test_type != "FRQ_only" else 0,
+                        count_frq=c_frq if test_type != "MCQ_only" else 0,
+                        provider=provider,
+                    )
+                return await llm.generate_test_questions(
                     notes=notes_content,
-                    practice_test_content=practice_test_content,
                     test_type=test_type,
-                    count_mcq=count_mcq if test_type != "FRQ_only" else 0,
-                    count_frq=count_frq if test_type != "MCQ_only" else 0,
+                    count_mcq=c_mcq,
+                    count_frq=c_frq,
                     is_math_mode=is_math_mode,
                     difficulty=difficulty,
                     topic_focus=topic_focus,
@@ -97,43 +152,48 @@ async def _generate_questions_background(
                     custom_instructions=custom_instructions,
                     provider=provider,
                     enable_fallback=enable_fallback,
-                    prior_questions=prior_questions,
-                )
-            elif practice_test_content:
-                mcq_questions, frq_questions = await llm.parse_practice_test(
-                    content=practice_test_content,
-                    count_mcq=count_mcq if test_type != "FRQ_only" else 0,
-                    count_frq=count_frq if test_type != "MCQ_only" else 0,
-                    provider=provider,
-                )
-            else:
-                mcq_questions, frq_questions = await llm.generate_test_questions(
-                    notes=notes_content,
-                    test_type=test_type,
-                    count_mcq=count_mcq,
-                    count_frq=count_frq,
-                    is_math_mode=is_math_mode,
-                    difficulty=difficulty,
-                    topic_focus=topic_focus,
-                    is_coding_mode=is_coding_mode,
-                    coding_language=coding_language,
-                    custom_instructions=custom_instructions,
-                    provider=provider,
-                    enable_fallback=enable_fallback,
-                    prior_questions=prior_questions,
+                    prior_questions=prior,
                 )
 
+            # Effective MCQ/FRQ counts after applying test-type rules. Used to decide
+            # the streaming split and the first-batch sizes.
+            eff_mcq = 0 if test_type == "FRQ_only" else count_mcq
+            eff_frq = 0 if test_type in ("MCQ_only", "Extreme") else count_frq
+            total_main = eff_mcq + eff_frq
+
+            # Stream in two phases (small first batch, then the rest) only when the test
+            # is big enough to benefit and the source path supports cross-batch dedup.
+            # parse_practice_test is single-phase to avoid duplicating extracted questions.
+            is_parse_only = bool(practice_test_content) and not notes_content
+            streaming = (not is_parse_only) and total_main > _FIRST_BATCH_SIZE
+
             display_order = 1
-            for item in mcq_questions:
-                options = [
-                    (option_text, index == item.correct_index)
-                    for index, option_text in enumerate(item.options)
-                ]
-                await repo.add_mcq_question(test_id, item.question_text, display_order, options)
-                display_order += 1
-            for item in frq_questions:
-                await repo.add_frq_question(test_id, item.question_text, display_order, item.expected_answer)
-                display_order += 1
+            if streaming:
+                first_mcq = min(eff_mcq, _FIRST_BATCH_SIZE)
+                first_frq = min(eff_frq, max(0, _FIRST_BATCH_SIZE - first_mcq))
+                mcq1, frq1 = await run_generation(first_mcq, first_frq, prior_questions)
+                display_order = await _persist_generated(repo, test_id, mcq1, frq1, display_order)
+                # Commit so pollers (separate sessions) see the first questions immediately.
+                await session.commit()
+                logger.info(
+                    "Streamed first batch for test_id=%s: mcq=%d frq=%d",
+                    test_id, len(mcq1), len(frq1),
+                )
+
+                rest_mcq = max(0, eff_mcq - first_mcq)
+                rest_frq = max(0, eff_frq - first_frq)
+                if rest_mcq or rest_frq:
+                    # Feed the first batch's questions in as "already seen" so the
+                    # remainder does not repeat them.
+                    seen = [q.question_text for q in mcq1] + [q.question_text for q in frq1]
+                    prior_for_rest = (prior_questions or []) + seen
+                    mcq2, frq2 = await run_generation(rest_mcq, rest_frq, prior_for_rest)
+                    display_order = await _persist_generated(repo, test_id, mcq2, frq2, display_order)
+            else:
+                mcq_questions, frq_questions = await run_generation(count_mcq, count_frq, prior_questions)
+                display_order = await _persist_generated(
+                    repo, test_id, mcq_questions, frq_questions, display_order
+                )
 
             # Extra (beta) question types. Isolated and best-effort: a failure here
             # must never break the MCQ/FRQ test that was already generated above.
@@ -353,6 +413,11 @@ async def create_test(
             notes_hash=notes_hash,
         )
         test.generation_status = "generating"
+        # Record how many questions this test will end up with so the take-test screen
+        # can show streaming progress while the background task fills them in.
+        eff_mcq = 0 if test_type == "FRQ_only" else count_mcq
+        eff_frq = 0 if test_type in ("MCQ_only", "Extreme") else count_frq
+        test.expected_question_count = eff_mcq + eff_frq + count_tf + count_ms + count_rank
 
         if combined_notes:
             note_label = ", ".join(n for _, n in notes_bytes) or "folder files"
@@ -469,6 +534,11 @@ async def regenerate_test(
 
         test.generation_status = "generating"
         test.generation_error = None
+        eff_mcq = 0 if test.test_type == "FRQ_only" else data.count_mcq
+        eff_frq = 0 if test.test_type in ("MCQ_only", "Extreme") else count_frq
+        test.expected_question_count = (
+            eff_mcq + eff_frq + data.count_tf + data.count_ms + data.count_rank
+        )
 
         prior_questions: list[str] = []
         if test.notes_hash:
