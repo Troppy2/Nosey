@@ -2,7 +2,7 @@ import logging
 from datetime import date
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_session
@@ -11,6 +11,7 @@ from src.models.user import User
 from src.repositories.user_repository import UserRepository
 from src.schemas.auth_schema import AuthResponse, DateOfBirthRequest, GoogleAuthRequest, UserResponse
 from src.services.auth_service import AuthService
+from src.limiter import limiter
 from src.utils.exceptions import StudyAppException
 
 logger = logging.getLogger(__name__)
@@ -19,12 +20,14 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/google", response_model=AuthResponse)
+@limiter.limit("10/minute")
 async def google_auth(
-    request: GoogleAuthRequest,
+    request: Request,
+    body: GoogleAuthRequest,
     session: AsyncSession = Depends(get_session),
 ) -> AuthResponse:
     try:
-        return await AuthService().authenticate_google_token(request.token, session)
+        return await AuthService().authenticate_google_token(body.token, session)
     except httpx.HTTPStatusError as exc:
         raise HTTPException(status_code=401, detail="Invalid Google token") from exc
     except httpx.RequestError as exc:
@@ -37,7 +40,9 @@ async def google_auth(
 
 
 @router.post("/guest", response_model=AuthResponse)
+@limiter.limit("5/minute")
 async def guest_auth(
+    request: Request,
     session: AsyncSession = Depends(get_session),
 ) -> AuthResponse:
     try:

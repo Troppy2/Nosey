@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.datastructures import UploadFile
 
 from src.database import async_session_maker, get_session
+from src.limiter import limiter
 from src.dependencies import get_current_user
 from src.models.folder import Folder
 from src.models.folder_file import FolderFile
@@ -212,6 +213,7 @@ async def _generate_questions_background(
     response_model=CreateTestResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit("5/minute")
 async def create_test(
     folder_id: int,
     request: Request,
@@ -409,7 +411,9 @@ async def create_test(
 
 
 @router.post("/tests/{test_id}/regenerate", response_model=CreateTestResponse)
+@limiter.limit("5/minute")
 async def regenerate_test(
+    request: Request,
     test_id: int,
     data: RegenerateTestRequest,
     background_tasks: BackgroundTasks,
