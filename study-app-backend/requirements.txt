@@ -25,4 +25,5 @@ langchain-community>=0.2.19
 langchain-text-splitters>=0.2.4
 qdrant-client>=1.11.0
 rank-bm25>=0.2.2
+slowapi==0.1.9
 # To install: pip install -r requirements.txt --no-deps --force-reinstall

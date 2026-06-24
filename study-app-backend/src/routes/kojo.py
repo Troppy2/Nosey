@@ -1,6 +1,6 @@
 import time
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +21,7 @@ from src.schemas.kojo_schema import (
     TestBlueprintRequest,
     TestBlueprintResponse,
 )
+from src.limiter import limiter
 from src.services.kojo_service import KojoService
 from src.services.llm_service import LLMService
 from src.utils.exceptions import LLMException, ResourceNotFoundException
@@ -64,7 +65,9 @@ async def create_conversation(
 
 
 @router.post("/folders/{folder_id}/chat", response_model=KojoChatResponse)
+@limiter.limit("20/minute")
 async def kojo_chat(
+    request: Request,
     folder_id: int,
     body: KojoChatRequest,
     session: AsyncSession = Depends(get_session),
@@ -289,7 +292,9 @@ async def create_general_conversation(
 
 
 @router.post("/conversations/{conversation_id}/chat", response_model=KojoChatResponse)
+@limiter.limit("20/minute")
 async def general_chat(
+    request: Request,
     conversation_id: int,
     body: GeneralChatRequest,
     session: AsyncSession = Depends(get_session),

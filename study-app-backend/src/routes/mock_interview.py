@@ -4,7 +4,7 @@ import asyncio
 import json
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,6 +30,7 @@ from src.schemas.mock_interview_schema import (
     Stage3MessageRequest,
     Stage3MessageResponse,
 )
+from src.limiter import limiter
 from src.services.file_service import FileService
 from src.services.leetcode_service import LeetCodeService
 from src.services.llm_service import LLMService
@@ -147,7 +148,9 @@ def _resume_verdict_label(score: int, passes: bool) -> str:
 
 
 @router.post("/{session_id}/resume/screen", response_model=ResumeScreenResult)
+@limiter.limit("5/minute")
 async def screen_resume(
+    request: Request,
     session_id: int,
     resume_file: Optional[UploadFile] = File(default=None),
     resume_text: Optional[str] = Form(default=None),
@@ -254,7 +257,9 @@ async def screen_resume(
 # ── Stage 1: grade submissions ────────────────────────────────────────────────
 
 @router.post("/{session_id}/stage1/grade", response_model=Stage1GradeResponse)
+@limiter.limit("5/minute")
 async def grade_stage1(
+    request: Request,
     session_id: int,
     body: Stage1GradeRequest,
     db: AsyncSession = Depends(get_session),
@@ -345,7 +350,9 @@ def _fallback_feedback(verdict: str, tests_passed: int, tests_total: int) -> str
 # ── Stage 2: submit coding answer ─────────────────────────────────────────────
 
 @router.post("/{session_id}/stage2/submit", response_model=Stage2SubmitResponse)
+@limiter.limit("5/minute")
 async def submit_stage2(
+    request: Request,
     session_id: int,
     body: Stage2SubmitRequest,
     db: AsyncSession = Depends(get_session),
@@ -383,7 +390,9 @@ async def submit_stage2(
 # ── Stage 2: conversational interview ────────────────────────────────────────
 
 @router.post("/{session_id}/stage2/message", response_model=Stage2MessageResponse)
+@limiter.limit("5/minute")
 async def stage2_message(
+    request: Request,
     session_id: int,
     body: Stage2MessageRequest,
     db: AsyncSession = Depends(get_session),
@@ -474,7 +483,9 @@ _COMPANY_CULTURE = {
 
 
 @router.post("/{session_id}/stage3/message", response_model=Stage3MessageResponse)
+@limiter.limit("5/minute")
 async def stage3_message(
+    request: Request,
     session_id: int,
     body: Stage3MessageRequest,
     db: AsyncSession = Depends(get_session),
@@ -586,7 +597,9 @@ async def _save_stage3_conversation_feedback(
 # ── Finish: overall summary ───────────────────────────────────────────────────
 
 @router.post("/{session_id}/finish", response_model=FinishResponse)
+@limiter.limit("5/minute")
 async def finish_interview(
+    request: Request,
     session_id: int,
     body: FinishRequest,
     db: AsyncSession = Depends(get_session),
