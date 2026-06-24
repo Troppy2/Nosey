@@ -107,7 +107,7 @@ async def admin_authenticate(
 ) -> AdminTokenResponse:
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Access denied")
-    if current_user.email.lower() != settings.admin_email.lower():
+    if current_user.email.lower() not in settings.admin_emails:
         raise HTTPException(status_code=403, detail="Access denied")
 
     auth_service = AuthService()

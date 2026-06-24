@@ -33,10 +33,6 @@ class Settings(BaseSettings):
     ollama_num_ctx: int = Field(default=8192, alias="OLLAMA_NUM_CTX")
     groq_api_key: Optional[str] = Field(default=None, alias="GROQ_API_KEY")
     google_ai_api_key: Optional[str] = Field(default=None, alias="GOOGLE_AI_API_KEY")
-    # Real Google Generative Language model. The UI may label this provider "DeepSeek",
-    # but the endpoint must point at a valid Gemini model. A previous refactor corrupted
-    # this to a non-existent "deepseek-v4-flash:cloud" model, which 404'd on every call.
-    google_ai_model: str = Field(default="gemini-2.0-flash", alias="GOOGLE_AI_MODEL")
     anthropic_api_key: Optional[str] = Field(default=None, alias="ANTHROPIC_API_KEY")
     anthropic_model: str = Field(default="claude-haiku-4-5-20251001", alias="ANTHROPIC_MODEL")
     environment: str = Field(default="production", alias="ENVIRONMENT")
@@ -64,7 +60,7 @@ class Settings(BaseSettings):
     qdrant_collection: str = Field(default="nosey_rag", alias="QDRANT_COLLECTION")
     rag_embedding_model: str = Field(default="all-MiniLM-L6-v2", alias="RAG_EMBEDDING_MODEL")
     rag_reranker_model: str = Field(default="cross-encoder/ms-marco-MiniLM-L-6-v2", alias="RAG_RERANKER_MODEL")
-    admin_email: str = Field(default="", alias="ADMIN_EMAIL")
+    admin_emails: Any = Field(default_factory=list, alias="ADMIN_EMAIL")
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -82,6 +78,19 @@ class Settings(BaseSettings):
     @field_validator("allowed_file_types", mode="before")
     @classmethod
     def parse_allowed_file_types(cls, value: Any) -> list[str]:
+        if isinstance(value, str):
+            stripped = value.strip()
+            if stripped.startswith("["):
+                try:
+                    return [item.lower() for item in json.loads(stripped)]
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            return [item.strip().lower() for item in stripped.split(",") if item.strip()]
+        return value
+
+    @field_validator("admin_emails", mode="before")
+    @classmethod
+    def parse_admin_emails(cls, value: Any) -> list[str]:
         if isinstance(value, str):
             stripped = value.strip()
             if stripped.startswith("["):

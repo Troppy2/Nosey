@@ -66,7 +66,7 @@ async def get_admin_user(
         raise HTTPException(status_code=404, detail="User not found")
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Access denied")
-    if user.email.lower() != settings.admin_email.lower():
+    if user.email.lower() not in settings.admin_emails:
         raise HTTPException(status_code=403, detail="Access denied")
     if user.admin_session_id != session_id:
         raise HTTPException(status_code=401, detail="Admin session invalidated. Another session may have started.")

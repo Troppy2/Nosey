@@ -43,7 +43,7 @@ class AuthService:
 
     async def authenticate_google_token(self, token: str, session: AsyncSession) -> AuthResponse:
         google_user = await self.verify_google_token(token)
-        is_admin = str(google_user["email"]).lower() == settings.admin_email.lower()
+        is_admin = str(google_user["email"]).lower() in settings.admin_emails
         repo = UserRepository(session)
         user = await repo.create_or_update(
             google_id=str(google_user["google_id"]),
