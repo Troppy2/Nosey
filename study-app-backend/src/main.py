@@ -21,16 +21,51 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from src.config import settings
 from src.limiter import limiter
 from src.routes import admin, attempts, auth, flashcards, folder_files, folders, health, kojo, leetcode, mock_interview, slash_commands, tests
+from src.utils.validators import MAX_UPLOAD_TOTAL_SIZE_BYTES
+
+_MAX_REQUEST_BODY_BYTES = MAX_UPLOAD_TOTAL_SIZE_BYTES
+
+
+class ContentSizeLimitMiddleware(BaseHTTPMiddleware):
+    """Reject requests whose Content-Length exceeds the upload cap before reading the body.
+
+    Browsers always send Content-Length for multipart file uploads, so this
+    prevents large PDFs from being buffered into memory and crashing the server.
+    Returns 413 with a JSON detail field so the frontend error display works.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        content_length = request.headers.get("content-length")
+        if content_length is not None:
+            try:
+                declared_size = int(content_length)
+            except ValueError:
+                declared_size = 0
+            if declared_size > _MAX_REQUEST_BODY_BYTES:
+                limit_mb = _MAX_REQUEST_BODY_BYTES // (1024 * 1024)
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": f"Upload too large. Maximum total size is {limit_mb} MB."},
+                )
+        return await call_next(request)
+
 
 app = FastAPI(title="Study App", version="0.1.0")
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# ContentSizeLimitMiddleware is added first so that CORSMiddleware (added second)
+# becomes the outermost wrapper. This ensures 413 responses include CORS headers
+# and the frontend error handler can read the "detail" field.
+app.add_middleware(ContentSizeLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
