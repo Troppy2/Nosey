@@ -13291,3 +13291,60 @@ select.lc-custom-input {
   background: var(--green-dark-mid);
   transform: translateY(-1px);
 }
+
+/* ── Streaming test generation ─────────────────────────────────────────────── */
+/* Full-screen state shown before the first streamed question lands. */
+.test-generating-splash {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  max-width: 360px;
+}
+
+.test-generating-splash strong {
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+
+.test-generating-splash .muted {
+  font-size: 0.85rem;
+}
+
+/* Slim banner above the question card while questions are still streaming in. */
+.generation-banner-streaming {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--green-lightest);
+  border: 1.5px solid var(--green-light-mid);
+  color: var(--green-dark);
+}
+
+/* Placeholder card shown when the student reaches a question that has not been
+   generated yet. Only the next slot is reachable, so this is brief. */
+.question-card--pending {
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.test-pending-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  color: var(--green-dark);
+}
+
+.test-pending-slot strong {
+  font-size: 0.98rem;
+  color: var(--ink);
+}
+
+.test-pending-slot .muted {
+  font-size: 0.82rem;
+}

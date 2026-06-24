@@ -1,5 +1,5 @@
 import Editor from "@monaco-editor/react";
-import { AlertCircle, ArrowLeft, ArrowRight, Bookmark, Bot, Calculator, Check, ChevronDown, ChevronUp, Code2, Eraser, Flag, GraduationCap, Highlighter, LayoutGrid, NotebookPen, Send, Sparkles, Strikethrough, Undo2, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, Bookmark, Bot, Calculator, Check, ChevronDown, ChevronUp, Code2, Eraser, Flag, GraduationCap, Highlighter, LayoutGrid, Loader2, NotebookPen, Send, Sparkles, Strikethrough, Undo2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -162,6 +162,26 @@ export default function TakeTest() {
       .catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Unable to load this test."));
   }, [numericTestId]);
 
+  // While the test is still being generated in the background, poll for newly
+  // streamed questions so they appear as soon as they are written. Polling stops
+  // once generation reaches a terminal state (ready or failed) or on unmount.
+  useEffect(() => {
+    if (test?.generation_status !== "generating") return;
+    let cancelled = false;
+    const timer = setInterval(async () => {
+      try {
+        const fresh = await fetchTest(numericTestId);
+        if (!cancelled) setTest(fresh);
+      } catch {
+        // Transient failure; keep polling. A persistent failure surfaces via status.
+      }
+    }, 1800);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [test?.generation_status, numericTestId]);
+
   // Persist question index so resume lands on the right question
   useEffect(() => {
     if (index > 0) {
@@ -179,7 +199,13 @@ export default function TakeTest() {
         event.preventDefault();
         setIndex((currentIndex) => {
           if (!test) return currentIndex;
-          return Math.min(currentIndex + 1, test.questions.length - 1);
+          const loaded = test.questions.length;
+          const generating = (test.generation_status ?? "ready") === "generating";
+          const expected = test.expected_question_count ?? loaded;
+          // While generating, allow stepping one slot past the last loaded question
+          // (a pending slot that shows a spinner), but never past the expected end.
+          const ceiling = generating ? Math.min(loaded, Math.max(expected - 1, 0)) : loaded - 1;
+          return Math.min(currentIndex + 1, ceiling);
         });
       } else if (event.key === "ArrowLeft") {
         event.preventDefault();
@@ -285,6 +311,21 @@ export default function TakeTest() {
   const question = test?.questions[index];
   const questionId = question?.id;
 
+  // ── Streaming generation state ─────────────────────────────────────────────
+  const genStatus = test?.generation_status ?? "ready";
+  const isGenerating = genStatus === "generating";
+  const genFailed = genStatus === "failed";
+  const loadedCount = test?.questions.length ?? 0;
+  const expectedCount = test?.expected_question_count ?? loadedCount;
+  // Slots to show in the progress denominator: the expected total while still
+  // generating, otherwise however many actually landed.
+  const totalSlots = isGenerating ? Math.max(expectedCount, loadedCount) : loadedCount;
+  const lastLoadedIndex = loadedCount - 1;
+  // Highest reachable index: one pending slot past the last loaded question while
+  // generating (so the student can see a spinner for the next question), else the
+  // last loaded question.
+  const maxIndex = isGenerating ? Math.min(loadedCount, Math.max(expectedCount - 1, 0)) : lastLoadedIndex;
+
   // Re-paint persisted highlights for the current question after each render.
   useEffect(() => {
     if (!toolsEnabled || questionId == null) return;
@@ -340,8 +381,11 @@ export default function TakeTest() {
   }
 
   const answeredCount = test ? test.questions.filter((item) => isQuestionAnswered(item, answers[item.id])).length : 0;
-  const progress = test ? ((index + 1) / test.questions.length) * 100 : 0;
-  const canSubmit = test ? test.questions.every((item) => isQuestionAnswered(item, answers[item.id])) : false;
+  const progress = totalSlots ? ((index + 1) / totalSlots) * 100 : 0;
+  // Can only submit once generation has finished and every loaded question is answered.
+  const canSubmit = test && !isGenerating && loadedCount > 0
+    ? test.questions.every((item) => isQuestionAnswered(item, answers[item.id]))
+    : false;
   const isMathMode = Boolean(test?.is_math_mode);
   const isCodingMode = Boolean(test?.is_coding_mode);
   const codingLanguage = test?.coding_language ?? "python";
@@ -392,7 +436,7 @@ export default function TakeTest() {
     }
   }
 
-  if (!test || !question) {
+  if (!test) {
     if (error) {
       return (
         <div className="page page-narrow">
@@ -416,7 +460,43 @@ export default function TakeTest() {
     );
   }
 
-  const isLast = index === test.questions.length - 1;
+  // Test shell loaded but no questions yet: either still warming up the first batch,
+  // or generation failed before producing anything.
+  if (loadedCount === 0) {
+    if (genFailed) {
+      return (
+        <div className="page page-narrow">
+          <EmptyState
+            icon={<AlertCircle />}
+            title="Generation failed"
+            body={test.generation_error || error || "We could not generate this test. Try again from the folder."}
+            action={
+              <Link to={test.folder_id ? `/folders/${test.folder_id}` : "/dashboard"}>
+                <Button>Back to folder</Button>
+              </Link>
+            }
+          />
+        </div>
+      );
+    }
+    return (
+      <div className="page centered-block">
+        <div className="test-generating-splash">
+          <span className="loader" />
+          <strong>Generating your test...</strong>
+          <span className="muted">
+            {expectedCount > 0
+              ? `Writing ${expectedCount} questions. The first one will appear in a moment.`
+              : "The first question will appear in a moment."}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // Last answerable question: only true once generation is done and we are on the
+  // final loaded question (so Submit never appears mid-stream).
+  const onLastReal = !isGenerating && index === lastLoadedIndex;
 
   return (
     <div className="test-screen">
@@ -483,7 +563,8 @@ export default function TakeTest() {
               )}
             </strong>
             <span>
-              Question {index + 1} of {test.questions.length} · {answeredCount} answered
+              Question {index + 1} of {totalSlots}
+              {isGenerating ? ` · ${loadedCount} generated so far` : ` · ${answeredCount} answered`}
             </span>
           </div>
           {betaMode && test.folder_id && (
@@ -605,7 +686,33 @@ export default function TakeTest() {
             </button>
           </div>
         )}
+        {isGenerating ? (
+          <div className="generation-banner generation-banner-streaming">
+            <Loader2 size={14} className="spin" />
+            Generating questions... {loadedCount} of {totalSlots} ready. You can start answering now.
+          </div>
+        ) : genFailed ? (
+          <div className="generation-banner generation-banner-warning">
+            Generation stopped early. {loadedCount} of {expectedCount} questions are available.
+            <span>
+              {test.generation_error
+                ? `Reason: ${test.generation_error}`
+                : "You can take these now, or retry generation from the folder."}
+            </span>
+          </div>
+        ) : null}
         {(() => {
+          if (!question) {
+            return (
+              <Card className="question-card question-card--pending">
+                <div className="test-pending-slot">
+                  <Loader2 size={26} className="spin" />
+                  <strong>Writing question {index + 1}...</strong>
+                  <span className="muted">{loadedCount} of {totalSlots} questions ready</span>
+                </div>
+              </Card>
+            );
+          }
           const questionCard = (
             <Card className="question-card">
           <div className="question-card-top">
@@ -715,12 +822,16 @@ export default function TakeTest() {
           <Button variant="secondary" disabled={index === 0} icon={<ArrowLeft size={18} />} onClick={() => setIndex(index - 1)}>
             Previous
           </Button>
-          {isLast ? (
+          {onLastReal ? (
             <Button disabled={!canSubmit || isSubmitting} icon={<Send size={18} />} onClick={handleSubmit}>
               {isSubmitting ? "Submitting..." : "Submit"}
             </Button>
+          ) : index >= maxIndex ? (
+            <Button variant="secondary" disabled icon={<Loader2 size={18} className="spin" />}>
+              Generating...
+            </Button>
           ) : (
-            <Button icon={<ArrowRight size={18} />} onClick={() => setIndex(index + 1)}>
+            <Button icon={<ArrowRight size={18} />} onClick={() => setIndex(Math.min(index + 1, maxIndex))}>
               Next
             </Button>
           )}

@@ -11,6 +11,7 @@ from src.repositories.folder_repository import FolderRepository
 from src.repositories.kojo_repository import KojoRepository
 from src.schemas.kojo_schema import (
     ConversationFileDTO,
+    KojoBootstrapDTO,
     KojoChatResponse,
     KojoClearResponse,
     KojoClearedConversationDTO,
@@ -204,6 +205,104 @@ class KojoService:
             KojoConversationSummaryDTO(id=c.id, name=c.name, folder_id=c.folder_id, created_at=c.created_at)
             for c in conversations
         ]
+
+    def _conversation_dto(self, conversation) -> KojoConversationDTO:
+        """Build a conversation DTO, hiding messages from before a clear."""
+        visible_messages = conversation.messages
+        if conversation.cleared_at is not None:
+            visible_messages = [
+                msg for msg in conversation.messages if msg.created_at > conversation.cleared_at
+            ]
+        return KojoConversationDTO(
+            id=conversation.id,
+            folder_id=conversation.folder_id,
+            messages=[
+                KojoMessageDTO(id=m.id, role=m.role, content=m.content, created_at=m.created_at)
+                for m in visible_messages
+            ],
+            created_at=conversation.created_at,
+            cleared_at=conversation.cleared_at,
+        )
+
+    def _files_dto(self, files) -> list[ConversationFileDTO]:
+        return [
+            ConversationFileDTO(
+                id=f.id,
+                file_name=f.file_name,
+                file_type=f.file_type,
+                size_bytes=f.size_bytes,
+                uploaded_at=f.uploaded_at,
+            )
+            for f in files
+        ]
+
+    async def bootstrap_folder(
+        self,
+        user_id: int,
+        folder_id: int,
+        session: AsyncSession,
+    ) -> KojoBootstrapDTO:
+        """Single-round-trip initial load for a folder's chat screen.
+
+        Returns the folder's conversation list plus the most recent
+        conversation's messages and session files, so the frontend no longer
+        chains list -> by-id -> files as three sequential network calls.
+        """
+        folder = await FolderRepository(session).get_owned(folder_id, user_id)
+        if folder is None:
+            raise ResourceNotFoundException("Folder")
+        repo = KojoRepository(session)
+        conversations = await repo.list_conversations_by_folder(user_id, folder_id)
+        if not conversations:
+            fresh = await repo.create_conversation(user_id, folder_id)
+            await session.commit()
+            return self._fresh_bootstrap(fresh, folder_id=fresh.folder_id)
+        return await self._bootstrap_from(repo, conversations, user_id)
+
+    async def bootstrap_general(
+        self,
+        user_id: int,
+        session: AsyncSession,
+    ) -> KojoBootstrapDTO:
+        """Single-round-trip initial load for the General (no folder) chat."""
+        repo = KojoRepository(session)
+        conversations = await repo.list_general_conversations(user_id)
+        if not conversations:
+            fresh = await repo.create_general_conversation(user_id)
+            await session.commit()
+            return self._fresh_bootstrap(fresh, folder_id=None)
+        return await self._bootstrap_from(repo, conversations, user_id)
+
+    def _fresh_bootstrap(self, conversation, folder_id) -> KojoBootstrapDTO:
+        summary = KojoConversationSummaryDTO(
+            id=conversation.id,
+            name=conversation.name,
+            folder_id=folder_id,
+            created_at=conversation.created_at,
+        )
+        active = KojoConversationDTO(
+            id=conversation.id,
+            folder_id=folder_id,
+            messages=[],
+            created_at=conversation.created_at,
+            cleared_at=conversation.cleared_at,
+        )
+        return KojoBootstrapDTO(conversations=[summary], active=active, files=[])
+
+    async def _bootstrap_from(
+        self, repo: KojoRepository, conversations: list, user_id: int
+    ) -> KojoBootstrapDTO:
+        summaries = [
+            KojoConversationSummaryDTO(
+                id=c.id, name=c.name, folder_id=c.folder_id, created_at=c.created_at
+            )
+            for c in conversations
+        ]
+        latest_id = conversations[0].id
+        active_conv = await repo.get_conversation_by_id(latest_id, user_id)
+        active = self._conversation_dto(active_conv) if active_conv else None
+        files = self._files_dto(await repo.get_conversation_files(latest_id))
+        return KojoBootstrapDTO(conversations=summaries, active=active, files=files)
 
     async def chat(
         self,

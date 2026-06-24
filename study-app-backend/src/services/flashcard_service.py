@@ -106,13 +106,30 @@ class FlashcardService:
         return [FlashcardResponse.model_validate(card) for card in cards]
 
     async def list_flashcards(
-        self, folder_id: int, user_id: int, session: AsyncSession
+        self,
+        folder_id: int,
+        user_id: int,
+        session: AsyncSession,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
     ) -> list[FlashcardResponse]:
         folder = await FolderRepository(session).get_owned(folder_id, user_id)
         if folder is None:
             raise ResourceNotFoundException("Folder")
-        rows = await FlashcardRepository(session).list_with_stats(folder_id, user_id)
+        rows = await FlashcardRepository(session).list_with_stats(
+            folder_id, user_id, limit=limit, offset=offset
+        )
         return [self._response_from_stats(*row) for row in rows]
+
+    async def delete_all_flashcards(
+        self, folder_id: int, user_id: int, session: AsyncSession
+    ) -> int:
+        folder = await FolderRepository(session).get_owned(folder_id, user_id)
+        if folder is None:
+            raise ResourceNotFoundException("Folder")
+        count = await FlashcardRepository(session).delete_all_in_folder(folder_id)
+        await session.commit()
+        return count
 
     async def list_flashcards_for_user(
         self, user_id: int, session: AsyncSession

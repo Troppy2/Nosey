@@ -100,11 +100,27 @@ async def generate_flashcards(
 @router.get("/folders/{folder_id}/flashcards", response_model=list[FlashcardResponse])
 async def list_flashcards(
     folder_id: int,
+    limit: Optional[int] = Query(default=None, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> list[FlashcardResponse]:
     try:
-        return await FlashcardService().list_flashcards(folder_id, user.id, session)
+        return await FlashcardService().list_flashcards(
+            folder_id, user.id, session, limit=limit, offset=offset or None
+        )
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.delete("/folders/{folder_id}/flashcards", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_all_flashcards(
+    folder_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> None:
+    try:
+        await FlashcardService().delete_all_flashcards(folder_id, user.id, session)
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

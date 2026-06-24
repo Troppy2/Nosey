@@ -22,6 +22,8 @@ import { MarkdownContent } from "../components/MarkdownContent";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
 import { SlashCommandMenu, type CommandOption } from "../components/SlashCommandMenu";
 import {
+  bootstrapKojoFolder,
+  bootstrapKojoGeneral,
   clearKojoConversation,
   createGeneralKojoConversation,
   createKojoConversation,
@@ -36,8 +38,6 @@ import {
   kojoChat,
   kojoChatGeneral,
   kojoTestBlueprint,
-  listGeneralKojoConversations,
-  listKojoConversations,
   uploadConversationFiles,
 } from "../lib/api";
 import type {
@@ -343,35 +343,21 @@ export default function KojoMode() {
     setDeletingConvId(null);
 
     const loadConversations = async () => {
-      if (folderId === null) {
-        // General mode
-        const convs = await listGeneralKojoConversations();
-        if (convs.length === 0) {
-          const fresh = await createGeneralKojoConversation();
-          setConversations([fresh]);
-          setConversationId(fresh.id);
-        } else {
-          setConversations(convs);
-          setConversationId(convs[0].id);
-          const conv = await fetchKojoConversationById(convs[0].id);
-          if (conv) setMessages(conv.messages);
-          fetchConversationFiles(convs[0].id).then(setSessionFiles);
-        }
-      } else {
-        // Folder mode
-        const convs = await listKojoConversations(folderId);
-        if (convs.length === 0) {
-          const fresh = await createKojoConversation(folderId);
-          setConversations([fresh]);
-          setConversationId(fresh.id);
-        } else {
-          setConversations(convs);
-          setConversationId(convs[0].id);
-          const conv = await fetchKojoConversationById(convs[0].id);
-          if (conv) setMessages(conv.messages);
-          fetchConversationFiles(convs[0].id).then(setSessionFiles);
-        }
+      // Single round-trip: conversation list + the most recent conversation's
+      // messages and files. The backend auto-creates a conversation when the
+      // folder (or General) has none, so `active` is present on success.
+      const bootstrap =
+        folderId === null ? await bootstrapKojoGeneral() : await bootstrapKojoFolder(folderId);
+      if (!bootstrap) return;
+
+      setConversations(bootstrap.conversations);
+      if (bootstrap.active) {
+        setConversationId(bootstrap.active.id);
+        setMessages(bootstrap.active.messages);
+      } else if (bootstrap.conversations.length > 0) {
+        setConversationId(bootstrap.conversations[0].id);
       }
+      setSessionFiles(bootstrap.files);
     };
 
     loadConversations().catch(() => {});

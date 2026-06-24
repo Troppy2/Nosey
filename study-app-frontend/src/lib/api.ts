@@ -16,6 +16,7 @@ import type {
   Flashcard,
   FlashcardUpdate,
   Folder,
+  KojoBootstrap,
   KojoChatResponse,
   KojoConversation,
   KojoConversationSummary,
@@ -477,13 +478,30 @@ export async function generateFlashcards(
   });
 }
 
-export async function fetchFlashcards(folderId?: number): Promise<Flashcard[]> {
+export async function fetchFlashcards(
+  folderId?: number,
+  opts?: { limit?: number; offset?: number },
+): Promise<Flashcard[]> {
   try {
-    const path = folderId ? `/folders/${folderId}/flashcards` : "/flashcards";
+    let path = folderId ? `/folders/${folderId}/flashcards` : "/flashcards";
+    // Pagination is only supported on the per-folder endpoint. Omit the params
+    // entirely to keep the legacy "return everything" behavior (study mode and
+    // the dashboard both rely on the full set).
+    if (folderId && opts) {
+      const params = new URLSearchParams();
+      if (opts.limit != null) params.set("limit", String(opts.limit));
+      if (opts.offset != null) params.set("offset", String(opts.offset));
+      const qs = params.toString();
+      if (qs) path += `?${qs}`;
+    }
     return await request<Flashcard[]>(path);
   } catch {
     return [];
   }
+}
+
+export async function deleteAllFlashcards(folderId: number): Promise<void> {
+  await request(`/folders/${folderId}/flashcards`, { method: "DELETE" });
 }
 
 export async function recordFlashcardAttempt(folderId: number, cardId: number, correct: boolean, timeMs: number) {
@@ -516,6 +534,27 @@ export async function kojoChat(
     method: "POST",
     body: JSON.stringify(body),
   });
+}
+
+// Single-round-trip initial load for a folder's chat: conversation list plus
+// the most recent conversation's messages and files. Replaces the previous
+// list -> by-id -> files waterfall. The backend auto-creates a conversation
+// when the folder has none, so `active` is always present on success.
+export async function bootstrapKojoFolder(folderId: number): Promise<KojoBootstrap | null> {
+  try {
+    return await request<KojoBootstrap>(`/kojo/folders/${folderId}/bootstrap`);
+  } catch {
+    return null;
+  }
+}
+
+// Same single-round-trip initial load for the General (no folder) chat.
+export async function bootstrapKojoGeneral(): Promise<KojoBootstrap | null> {
+  try {
+    return await request<KojoBootstrap>("/kojo/conversations/general/bootstrap");
+  } catch {
+    return null;
+  }
 }
 
 export async function listKojoConversations(folderId: number): Promise<KojoConversationSummary[]> {

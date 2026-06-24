@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, String, Text
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import BIGINT_ID, Base, TimestampMixin
@@ -29,6 +29,10 @@ class Test(Base, TimestampMixin):
     coding_language: Mapped[Optional[str]] = mapped_column(String(50))
     generation_status: Mapped[str] = mapped_column(String(20), nullable=False, default="ready", server_default="ready")
     generation_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Total number of questions this test is expected to contain once generation finishes.
+    # Set at create time so the take-test screen can show streaming progress ("12 of 100
+    # generated so far") while questions are still being written in the background.
+    expected_question_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     # SHA-256 of the source notes used to generate this test. Lets a later test built
     # from the SAME notes find and avoid repeating these questions ("fresh questions").
     notes_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)

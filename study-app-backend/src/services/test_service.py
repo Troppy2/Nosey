@@ -448,6 +448,9 @@ class TestService:
             is_coding_mode=test.is_coding_mode,
             coding_language=test.coding_language,
             questions=questions,
+            generation_status=test.generation_status,
+            generation_error=test.generation_error,
+            expected_question_count=test.expected_question_count,
         )
 
     async def update_test(

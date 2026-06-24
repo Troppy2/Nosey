@@ -114,6 +114,10 @@ export type TestTake = {
   is_coding_mode?: boolean;
   coding_language?: string | null;
   questions: Question[];
+  // Streaming generation: present while/after the test is generated in the background.
+  generation_status?: string;
+  generation_error?: string | null;
+  expected_question_count?: number | null;
 };
 
 export type SubmittedAnswer = {
@@ -347,6 +351,14 @@ export type KojoConversationSummary = {
   name?: string | null;
   folder_id?: ID | null;
   created_at: string;
+};
+
+// Combined initial-load payload: conversation list plus the most recent
+// conversation's messages and files, fetched in a single round-trip.
+export type KojoBootstrap = {
+  conversations: KojoConversationSummary[];
+  active?: KojoConversation | null;
+  files: ConversationFile[];
 };
 
 export type KojoChatResponse = {

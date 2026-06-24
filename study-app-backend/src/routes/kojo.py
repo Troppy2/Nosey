@@ -11,6 +11,7 @@ from src.repositories.usage_event_repository import UsageEventRepository
 from src.schemas.kojo_schema import (
     ConversationFileDTO,
     GeneralChatRequest,
+    KojoBootstrapDTO,
     KojoChatRequest,
     KojoChatResponse,
     KojoClearResponse,
@@ -58,6 +59,20 @@ async def create_conversation(
 ) -> KojoConversationSummaryDTO:
     try:
         return await KojoService().create_conversation(
+            user_id=user.id, folder_id=folder_id, session=session
+        )
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/folders/{folder_id}/bootstrap", response_model=KojoBootstrapDTO)
+async def bootstrap_folder(
+    folder_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> KojoBootstrapDTO:
+    try:
+        return await KojoService().bootstrap_folder(
             user_id=user.id, folder_id=folder_id, session=session
         )
     except ResourceNotFoundException as exc:
@@ -290,6 +305,14 @@ async def create_general_conversation(
     user: User = Depends(get_current_user),
 ) -> KojoConversationSummaryDTO:
     return await KojoService().create_general_conversation(user_id=user.id, session=session)
+
+
+@router.get("/conversations/general/bootstrap", response_model=KojoBootstrapDTO)
+async def bootstrap_general(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> KojoBootstrapDTO:
+    return await KojoService().bootstrap_general(user_id=user.id, session=session)
 
 
 @router.post("/conversations/{conversation_id}/chat", response_model=KojoChatResponse)
