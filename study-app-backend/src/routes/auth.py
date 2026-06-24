@@ -2,7 +2,7 @@ import logging
 from datetime import date
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_session
@@ -23,6 +23,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @limiter.limit("10/minute")
 async def google_auth(
     request: Request,
+    response: Response,
     body: GoogleAuthRequest,
     session: AsyncSession = Depends(get_session),
 ) -> AuthResponse:
@@ -43,6 +44,7 @@ async def google_auth(
 @limiter.limit("5/minute")
 async def guest_auth(
     request: Request,
+    response: Response,
     session: AsyncSession = Depends(get_session),
 ) -> AuthResponse:
     try:

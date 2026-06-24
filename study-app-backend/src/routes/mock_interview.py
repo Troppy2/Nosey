@@ -4,7 +4,7 @@ import asyncio
 import json
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -151,6 +151,7 @@ def _resume_verdict_label(score: int, passes: bool) -> str:
 @limiter.limit("5/minute")
 async def screen_resume(
     request: Request,
+    response: Response,
     session_id: int,
     resume_file: Optional[UploadFile] = File(default=None),
     resume_text: Optional[str] = Form(default=None),
@@ -260,6 +261,7 @@ async def screen_resume(
 @limiter.limit("5/minute")
 async def grade_stage1(
     request: Request,
+    response: Response,
     session_id: int,
     body: Stage1GradeRequest,
     db: AsyncSession = Depends(get_session),
@@ -353,6 +355,7 @@ def _fallback_feedback(verdict: str, tests_passed: int, tests_total: int) -> str
 @limiter.limit("5/minute")
 async def submit_stage2(
     request: Request,
+    response: Response,
     session_id: int,
     body: Stage2SubmitRequest,
     db: AsyncSession = Depends(get_session),
@@ -393,6 +396,7 @@ async def submit_stage2(
 @limiter.limit("5/minute")
 async def stage2_message(
     request: Request,
+    response: Response,
     session_id: int,
     body: Stage2MessageRequest,
     db: AsyncSession = Depends(get_session),
@@ -486,6 +490,7 @@ _COMPANY_CULTURE = {
 @limiter.limit("5/minute")
 async def stage3_message(
     request: Request,
+    response: Response,
     session_id: int,
     body: Stage3MessageRequest,
     db: AsyncSession = Depends(get_session),
@@ -600,6 +605,7 @@ async def _save_stage3_conversation_feedback(
 @limiter.limit("5/minute")
 async def finish_interview(
     request: Request,
+    response: Response,
     session_id: int,
     body: FinishRequest,
     db: AsyncSession = Depends(get_session),
