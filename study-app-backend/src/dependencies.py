@@ -31,17 +31,7 @@ async def get_current_user(
             raise HTTPException(status_code=404, detail="User not found")
         return user
     except (jwt.InvalidTokenError, ValidationException):
-        if settings.environment != "development":
-            raise HTTPException(status_code=401, detail="Invalid token")
-
-    user = await user_repo.create_or_update(
-        google_id="development-user",
-        email="dev@example.com",
-        full_name="Development User",
-        profile_picture_url=None,
-    )
-    await session.commit()
-    return user
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 
 async def get_admin_user(
