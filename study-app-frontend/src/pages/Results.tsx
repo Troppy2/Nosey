@@ -232,7 +232,7 @@ export default function Results() {
               <Button
                 icon={<Target size={16} />}
                 onClick={() => {
-                  setTargetedTitle(`Targeted Practice , ${attempt.test_title}`);
+                  setTargetedTitle(`Targeted Practice, ${attempt.test_title}`);
                   setShowTargetedModal(true);
                 }}
               >
