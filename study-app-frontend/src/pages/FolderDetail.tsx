@@ -28,6 +28,7 @@ export default function FolderDetail() {
   const [tests, setTests] = useState<TestSummary[]>([]);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [testsLoading, setTestsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [kojoOpen, setKojoOpen] = useState(false);
   const [filesOpen, setFilesOpen] = useState(false);
@@ -49,16 +50,23 @@ export default function FolderDetail() {
 
   useEffect(() => {
     if (!id) return;
-    Promise.all([fetchFolder(id), fetchTests(id), fetchFlashcards(id)])
-      .then(([folderData, testData, cardData]) => {
-        setFolder(folderData);
-        setTests(testData);
-        setFlashcards(cardData);
-      })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : "Unable to load folder.");
-      })
+    // The page shell only needs the folder itself, so gate the full-page spinner
+    // on that alone. Tests and flashcards load independently: a slow GET /tests
+    // (e.g. while a test generates in the background) must never freeze the whole
+    // folder page on a blank loading screen.
+    setIsLoading(true);
+    fetchFolder(id)
+      .then(setFolder)
+      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load folder."))
       .finally(() => setIsLoading(false));
+
+    setTestsLoading(true);
+    fetchTests(id)
+      .then(setTests)
+      .catch(() => {})
+      .finally(() => setTestsLoading(false));
+
+    fetchFlashcards(id).then(setFlashcards).catch(() => {});
   }, [id]);
 
   // Poll while any test is still generating
@@ -489,7 +497,16 @@ export default function FolderDetail() {
         const hasDrafts = failedTests.length > 0 || formDraft !== null;
         return (
           <>
-            {activeTests.length === 0 && failedTests.length === 0 ? (
+            {testsLoading && activeTests.length === 0 && failedTests.length === 0 ? (
+              <section>
+                <div className="section-title">
+                  <h2>Practice Tests</h2>
+                </div>
+                <div className="centered-block">
+                  <span className="loader" />
+                </div>
+              </section>
+            ) : activeTests.length === 0 && failedTests.length === 0 ? (
               <EmptyState
                 icon={<BookOpen />}
                 title="No tests yet"
