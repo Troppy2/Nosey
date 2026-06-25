@@ -6,13 +6,13 @@ fetch. cleared_at on kojo_conversations covers get_cleared_conversations()'s
 filter (small now, grows with chat history).
 
 Revision ID: 028_kojo_load_indexes
-Revises: 027_flashcard_attempts_composite_idx
+Revises: 027_flashcard_attempt_idx
 Create Date: 2026-06-24
 """
 from alembic import op
 
 revision = "028_kojo_load_indexes"
-down_revision = "027_flashcard_attempts_composite_idx"
+down_revision = "027_flashcard_attempt_idx"
 branch_labels = None
 depends_on = None
 
