@@ -182,18 +182,18 @@ export default function CreateTest() {
         localStorage.setItem(scopeKey(`nosey_test_params_${result.test_id}`), JSON.stringify(params));
         localStorage.removeItem(scopeKey(`nosey_create_test_form_${folderId}`));
       }
-      // Review-before-taking needs the full question set, so only enter the editor
-      // once generation is finished; otherwise wait in the folder list.
-      if (advancedMode && reviewBeforeTaking) {
-        if (result.generation_status === "ready") {
+      // Generation runs in the background. Land back in the folder (the original
+      // flow) instead of a dead-end loading screen: the folder polls and opens the
+      // test for taking as soon as the first questions are ready. Only a test that
+      // is already fully ready (rare fast path) opens straight away.
+      if (result.generation_status === "ready") {
+        if (advancedMode && reviewBeforeTaking) {
           navigate(`/test/${result.test_id}/edit`);
         } else {
-          navigate(`/folders/${folderId}`);
+          navigate(`/test/${result.test_id}`);
         }
       } else {
-        // Stream the test: land on the take screen right away and let questions
-        // appear as they are generated in the background.
-        navigate(`/test/${result.test_id}`);
+        navigate(`/folders/${folderId}`);
       }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to create that practice test.");

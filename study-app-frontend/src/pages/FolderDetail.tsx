@@ -661,7 +661,21 @@ function TestRow({
 
   return (
     <Card className={`test-row${showAttempts ? " test-row--attempts-open" : ""}`}>
-      {isGenerating ? (
+      {isGenerating && test.question_count > 0 ? (
+        // First questions are ready while the rest stream in: let the student
+        // open and start taking now. TakeTest streams the remainder.
+        <Link className="test-row-main" to={`/test/${test.id}`}>
+          <div>
+            <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {test.title}
+              <Loader2 size={15} className="spin" style={{ color: "var(--green-dark)" }} />
+            </h3>
+            <p className="muted small">
+              {test.question_count} question{test.question_count === 1 ? "" : "s"} ready · tap to start (still generating)
+            </p>
+          </div>
+        </Link>
+      ) : isGenerating ? (
         <div className="test-row-main" style={{ cursor: "default", opacity: 0.75 }}>
           <div>
             <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
