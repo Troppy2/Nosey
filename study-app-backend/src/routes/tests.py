@@ -102,114 +102,127 @@ async def _generate_questions_background(
     count_rank: int = 0,
     prior_questions: Optional[list[str]] = None,
 ) -> None:
-    """Run LLM generation and save questions; called as a FastAPI background task."""
-    async with async_session_maker() as session:
-        _t0 = time.monotonic()
-        try:
-            repo = TestRepository(session)
-            llm = LLMService()
+    """Run LLM generation and save questions; called as a FastAPI background task.
 
-            # Dispatch a single generation call for the requested MCQ/FRQ counts. The
-            # three source paths (template / parse / notes) each have their own LLM
-            # entry point but share this MCQ/FRQ count contract.
-            async def run_generation(c_mcq: int, c_frq: int, prior: Optional[list[str]]):
-                if practice_test_content and notes_content:
-                    return await llm.generate_from_practice_test_template(
-                        notes=notes_content,
-                        practice_test_content=practice_test_content,
-                        test_type=test_type,
-                        count_mcq=c_mcq if test_type != "FRQ_only" else 0,
-                        count_frq=c_frq if test_type != "MCQ_only" else 0,
-                        is_math_mode=is_math_mode,
-                        difficulty=difficulty,
-                        topic_focus=topic_focus,
-                        is_coding_mode=is_coding_mode,
-                        coding_language=coding_language,
-                        custom_instructions=custom_instructions,
-                        provider=provider,
-                        enable_fallback=enable_fallback,
-                        prior_questions=prior,
-                    )
-                if practice_test_content:
-                    # Parsing extracts questions from a fixed document and has no
-                    # cross-batch dedup, so this path is never split (see below).
-                    return await llm.parse_practice_test(
-                        content=practice_test_content,
-                        count_mcq=c_mcq if test_type != "FRQ_only" else 0,
-                        count_frq=c_frq if test_type != "MCQ_only" else 0,
-                        provider=provider,
-                    )
-                return await llm.generate_test_questions(
-                    notes=notes_content,
-                    test_type=test_type,
-                    count_mcq=c_mcq,
-                    count_frq=c_frq,
-                    is_math_mode=is_math_mode,
+    Connection discipline: NO DB session is held open across the LLM calls. Each
+    batch is generated first (LLM only, no DB), then written in a short-lived
+    session that is opened and closed immediately. Previously this task held one
+    pooled connection open for the entire ~30-60s generation (across the LLM
+    awaits), which starved concurrent requests such as GET /folders/{id}/tests
+    and made the folder page hang on its loading spinner while a test generated.
+    """
+    _t0 = time.monotonic()
+    llm = LLMService()
+
+    # Dispatch a single generation call for the requested MCQ/FRQ counts. The three
+    # source paths (template / parse / notes) each have their own LLM entry point
+    # but share this MCQ/FRQ count contract. No DB access here.
+    async def run_generation(c_mcq: int, c_frq: int, prior: Optional[list[str]]):
+        if practice_test_content and notes_content:
+            return await llm.generate_from_practice_test_template(
+                notes=notes_content,
+                practice_test_content=practice_test_content,
+                test_type=test_type,
+                count_mcq=c_mcq if test_type != "FRQ_only" else 0,
+                count_frq=c_frq if test_type != "MCQ_only" else 0,
+                is_math_mode=is_math_mode,
+                difficulty=difficulty,
+                topic_focus=topic_focus,
+                is_coding_mode=is_coding_mode,
+                coding_language=coding_language,
+                custom_instructions=custom_instructions,
+                provider=provider,
+                enable_fallback=enable_fallback,
+                prior_questions=prior,
+            )
+        if practice_test_content:
+            # Parsing extracts questions from a fixed document and has no
+            # cross-batch dedup, so this path is never split (see below).
+            return await llm.parse_practice_test(
+                content=practice_test_content,
+                count_mcq=c_mcq if test_type != "FRQ_only" else 0,
+                count_frq=c_frq if test_type != "MCQ_only" else 0,
+                provider=provider,
+            )
+        return await llm.generate_test_questions(
+            notes=notes_content,
+            test_type=test_type,
+            count_mcq=c_mcq,
+            count_frq=c_frq,
+            is_math_mode=is_math_mode,
+            difficulty=difficulty,
+            topic_focus=topic_focus,
+            is_coding_mode=is_coding_mode,
+            coding_language=coding_language,
+            custom_instructions=custom_instructions,
+            provider=provider,
+            enable_fallback=enable_fallback,
+            prior_questions=prior,
+        )
+
+    # Persist one MCQ/FRQ batch in a short-lived session, then release the
+    # connection. Commits so pollers (separate sessions) see the batch immediately.
+    async def persist_batch(mcq, frq, start_order: int) -> int:
+        async with async_session_maker() as session:
+            repo = TestRepository(session)
+            next_order = await _persist_generated(repo, test_id, mcq, frq, start_order)
+            await session.commit()
+            return next_order
+
+    try:
+        # Effective MCQ/FRQ counts after applying test-type rules. Used to decide
+        # the streaming split and the first-batch sizes.
+        eff_mcq = 0 if test_type == "FRQ_only" else count_mcq
+        eff_frq = 0 if test_type in ("MCQ_only", "Extreme") else count_frq
+        total_main = eff_mcq + eff_frq
+
+        # Stream in two phases (small first batch, then the rest) only when the test
+        # is big enough to benefit and the source path supports cross-batch dedup.
+        # parse_practice_test is single-phase to avoid duplicating extracted questions.
+        is_parse_only = bool(practice_test_content) and not notes_content
+        streaming = (not is_parse_only) and total_main > _FIRST_BATCH_SIZE
+
+        display_order = 1
+        if streaming:
+            first_mcq = min(eff_mcq, _FIRST_BATCH_SIZE)
+            first_frq = min(eff_frq, max(0, _FIRST_BATCH_SIZE - first_mcq))
+            mcq1, frq1 = await run_generation(first_mcq, first_frq, prior_questions)
+            display_order = await persist_batch(mcq1, frq1, display_order)
+            logger.info(
+                "Streamed first batch for test_id=%s: mcq=%d frq=%d",
+                test_id, len(mcq1), len(frq1),
+            )
+
+            rest_mcq = max(0, eff_mcq - first_mcq)
+            rest_frq = max(0, eff_frq - first_frq)
+            if rest_mcq or rest_frq:
+                # Feed the first batch's questions in as "already seen" so the
+                # remainder does not repeat them.
+                seen = [q.question_text for q in mcq1] + [q.question_text for q in frq1]
+                prior_for_rest = (prior_questions or []) + seen
+                mcq2, frq2 = await run_generation(rest_mcq, rest_frq, prior_for_rest)
+                display_order = await persist_batch(mcq2, frq2, display_order)
+        else:
+            mcq_questions, frq_questions = await run_generation(count_mcq, count_frq, prior_questions)
+            display_order = await persist_batch(mcq_questions, frq_questions, display_order)
+
+        # Extra (beta) question types. Isolated and best-effort: a failure here
+        # must never break the MCQ/FRQ test that was already generated above.
+        if count_tf or count_ms or count_rank:
+            try:
+                extra_source = notes_content or practice_test_content
+                tf_questions, ms_questions, rank_questions = await llm.generate_extra_question_types(
+                    notes=extra_source,
+                    count_tf=count_tf,
+                    count_ms=count_ms,
+                    count_rank=count_rank,
                     difficulty=difficulty,
                     topic_focus=topic_focus,
-                    is_coding_mode=is_coding_mode,
-                    coding_language=coding_language,
                     custom_instructions=custom_instructions,
                     provider=provider,
-                    enable_fallback=enable_fallback,
-                    prior_questions=prior,
                 )
-
-            # Effective MCQ/FRQ counts after applying test-type rules. Used to decide
-            # the streaming split and the first-batch sizes.
-            eff_mcq = 0 if test_type == "FRQ_only" else count_mcq
-            eff_frq = 0 if test_type in ("MCQ_only", "Extreme") else count_frq
-            total_main = eff_mcq + eff_frq
-
-            # Stream in two phases (small first batch, then the rest) only when the test
-            # is big enough to benefit and the source path supports cross-batch dedup.
-            # parse_practice_test is single-phase to avoid duplicating extracted questions.
-            is_parse_only = bool(practice_test_content) and not notes_content
-            streaming = (not is_parse_only) and total_main > _FIRST_BATCH_SIZE
-
-            display_order = 1
-            if streaming:
-                first_mcq = min(eff_mcq, _FIRST_BATCH_SIZE)
-                first_frq = min(eff_frq, max(0, _FIRST_BATCH_SIZE - first_mcq))
-                mcq1, frq1 = await run_generation(first_mcq, first_frq, prior_questions)
-                display_order = await _persist_generated(repo, test_id, mcq1, frq1, display_order)
-                # Commit so pollers (separate sessions) see the first questions immediately.
-                await session.commit()
-                logger.info(
-                    "Streamed first batch for test_id=%s: mcq=%d frq=%d",
-                    test_id, len(mcq1), len(frq1),
-                )
-
-                rest_mcq = max(0, eff_mcq - first_mcq)
-                rest_frq = max(0, eff_frq - first_frq)
-                if rest_mcq or rest_frq:
-                    # Feed the first batch's questions in as "already seen" so the
-                    # remainder does not repeat them.
-                    seen = [q.question_text for q in mcq1] + [q.question_text for q in frq1]
-                    prior_for_rest = (prior_questions or []) + seen
-                    mcq2, frq2 = await run_generation(rest_mcq, rest_frq, prior_for_rest)
-                    display_order = await _persist_generated(repo, test_id, mcq2, frq2, display_order)
-            else:
-                mcq_questions, frq_questions = await run_generation(count_mcq, count_frq, prior_questions)
-                display_order = await _persist_generated(
-                    repo, test_id, mcq_questions, frq_questions, display_order
-                )
-
-            # Extra (beta) question types. Isolated and best-effort: a failure here
-            # must never break the MCQ/FRQ test that was already generated above.
-            if count_tf or count_ms or count_rank:
-                try:
-                    extra_source = notes_content or practice_test_content
-                    tf_questions, ms_questions, rank_questions = await llm.generate_extra_question_types(
-                        notes=extra_source,
-                        count_tf=count_tf,
-                        count_ms=count_ms,
-                        count_rank=count_rank,
-                        difficulty=difficulty,
-                        topic_focus=topic_focus,
-                        custom_instructions=custom_instructions,
-                        provider=provider,
-                    )
+                async with async_session_maker() as session:
+                    repo = TestRepository(session)
                     for tf_item in tf_questions:
                         await repo.add_tf_question(test_id, tf_item.question_text, display_order, tf_item.correct_answer)
                         display_order += 1
@@ -223,16 +236,18 @@ async def _generate_questions_background(
                     for rank_item in rank_questions:
                         await repo.add_rank_question(test_id, rank_item.question_text, display_order, rank_item.items_in_correct_order)
                         display_order += 1
-                    logger.info(
-                        "Extra question types saved for test_id=%s: tf=%d ms=%d rank=%d",
-                        test_id, len(tf_questions), len(ms_questions), len(rank_questions),
-                    )
-                except Exception as extra_exc:
-                    logger.warning(
-                        "Extra question types failed for test_id=%s (test still valid): %s",
-                        test_id, extra_exc,
-                    )
+                    await session.commit()
+                logger.info(
+                    "Extra question types saved for test_id=%s: tf=%d ms=%d rank=%d",
+                    test_id, len(tf_questions), len(ms_questions), len(rank_questions),
+                )
+            except Exception as extra_exc:
+                logger.warning(
+                    "Extra question types failed for test_id=%s (test still valid): %s",
+                    test_id, extra_exc,
+                )
 
+        async with async_session_maker() as session:
             test = await session.get(Test, test_id)
             if test is not None:
                 test.generation_status = "ready"
@@ -244,28 +259,28 @@ async def _generate_questions_background(
             except Exception:
                 pass
             await session.commit()
-            logger.info("Background test generation complete", extra={"test_id": test_id})
-        except Exception as exc:
-            logger.warning("Background test generation failed for test_id=%s: %s", test_id, exc)
-            duration_ms = int((time.monotonic() - _t0) * 1000)
-            error_label = type(exc).__name__
-            async with async_session_maker() as err_session:
-                test = await err_session.get(Test, test_id)
-                if test is not None:
-                    test.generation_status = "failed"
-                    test.generation_error = str(exc)[:500]
-                try:
-                    await UsageEventRepository(err_session).log_event(
-                        user_id,
-                        "test_generation",
-                        duration_ms,
-                        provider=provider,
-                        success=False,
-                        error_type=error_label[:50],
-                    )
-                except Exception:
-                    pass
-                await err_session.commit()
+        logger.info("Background test generation complete", extra={"test_id": test_id})
+    except Exception as exc:
+        logger.warning("Background test generation failed for test_id=%s: %s", test_id, exc)
+        duration_ms = int((time.monotonic() - _t0) * 1000)
+        error_label = type(exc).__name__
+        async with async_session_maker() as err_session:
+            test = await err_session.get(Test, test_id)
+            if test is not None:
+                test.generation_status = "failed"
+                test.generation_error = str(exc)[:500]
+            try:
+                await UsageEventRepository(err_session).log_event(
+                    user_id,
+                    "test_generation",
+                    duration_ms,
+                    provider=provider,
+                    success=False,
+                    error_type=error_label[:50],
+                )
+            except Exception:
+                pass
+            await err_session.commit()
 
 
 async def _extract_and_generate_background(
@@ -298,19 +313,22 @@ async def _extract_and_generate_background(
     endpoint return immediately and the UI land in the folder right away.
     """
     try:
+        svc = FileService()
+        # Extract file text first, holding NO DB connection (extraction can take
+        # several seconds and runs in a worker thread).
+        if notes_bytes:
+            mock_files = [_BytesUploadFile(d, n) for d, n in notes_bytes]
+            notes_content, _ = await svc.extract_from_files(mock_files)  # type: ignore[arg-type]
+        else:
+            notes_content = ""
+
+        practice_test_content = ""
+        if practice_test_bytes is not None:
+            mock_pt = _BytesUploadFile(practice_test_bytes[0], practice_test_bytes[1])
+            practice_test_content, _ = await svc.extract_from_files([mock_pt])  # type: ignore[arg-type]
+
+        # Short-lived session: folder-file read + note writes only, then released.
         async with async_session_maker() as session:
-            svc = FileService()
-            if notes_bytes:
-                mock_files = [_BytesUploadFile(d, n) for d, n in notes_bytes]
-                notes_content, _ = await svc.extract_from_files(mock_files)  # type: ignore[arg-type]
-            else:
-                notes_content = ""
-
-            practice_test_content = ""
-            if practice_test_bytes is not None:
-                mock_pt = _BytesUploadFile(practice_test_bytes[0], practice_test_bytes[1])
-                practice_test_content, _ = await svc.extract_from_files([mock_pt])  # type: ignore[arg-type]
-
             folder_files_content = (
                 await svc.get_folder_files_content(folder_id, user_id, session)
                 if use_folder_files
