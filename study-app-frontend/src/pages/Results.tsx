@@ -453,7 +453,7 @@ function ReviewItem({ answer, number }: { answer: AnswerResult; number: number }
                 type="button"
               >
                 <Brain size={15} />
-                <span>Reasoning</span>
+                <span>AI-Reasoning</span>
                 <ChevronDown className={reasoningOpen ? "rotated" : ""} size={15} />
               </button>
               {reasoningOpen ? (
