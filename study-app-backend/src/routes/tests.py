@@ -268,6 +268,117 @@ async def _generate_questions_background(
                 await err_session.commit()
 
 
+async def _extract_and_generate_background(
+    test_id: int,
+    user_id: int,
+    folder_id: int,
+    notes_bytes: list[Tuple[bytes, str]],
+    practice_test_bytes: Optional[Tuple[bytes, str]],
+    use_folder_files: bool,
+    avoid_repeat: bool,
+    test_type: str,
+    count_mcq: int,
+    count_frq: int,
+    is_math_mode: bool,
+    difficulty: str,
+    topic_focus: Optional[str],
+    is_coding_mode: bool,
+    coding_language: Optional[str],
+    custom_instructions: Optional[str],
+    provider: Optional[str],
+    enable_fallback: bool,
+    count_tf: int = 0,
+    count_ms: int = 0,
+    count_rank: int = 0,
+) -> None:
+    """Extract uploaded files, persist notes, then run generation.
+
+    File extraction (PDF parsing) is CPU-heavy, so it is done here in the
+    background rather than on the create_test request. That lets the create
+    endpoint return immediately and the UI land in the folder right away.
+    """
+    try:
+        async with async_session_maker() as session:
+            svc = FileService()
+            if notes_bytes:
+                mock_files = [_BytesUploadFile(d, n) for d, n in notes_bytes]
+                notes_content, _ = await svc.extract_from_files(mock_files)  # type: ignore[arg-type]
+            else:
+                notes_content = ""
+
+            practice_test_content = ""
+            if practice_test_bytes is not None:
+                mock_pt = _BytesUploadFile(practice_test_bytes[0], practice_test_bytes[1])
+                practice_test_content, _ = await svc.extract_from_files([mock_pt])  # type: ignore[arg-type]
+
+            folder_files_content = (
+                await svc.get_folder_files_content(folder_id, user_id, session)
+                if use_folder_files
+                else ""
+            )
+            combined_notes = "\n\n---\n\n".join(
+                p for p in [notes_content, folder_files_content] if p
+            )
+
+            source_for_hash = combined_notes or practice_test_content
+            notes_hash = (
+                hashlib.sha256(source_for_hash.encode("utf-8")).hexdigest()
+                if source_for_hash
+                else None
+            )
+
+            repo = TestRepository(session)
+            test = await session.get(Test, test_id)
+            if test is None:
+                return
+            test.notes_hash = notes_hash
+            if combined_notes:
+                note_label = ", ".join(n for _, n in notes_bytes) or "folder files"
+                await repo.add_note(test_id, note_label[:255], "combined", combined_notes)
+            if practice_test_content:
+                pt_label = practice_test_bytes[1] if practice_test_bytes else "practice_test"
+                await repo.add_note(test_id, pt_label[:255], "pdf", practice_test_content)
+
+            prior_questions: list[str] = []
+            if notes_hash and avoid_repeat:
+                prior_questions = await repo.get_prior_question_texts(
+                    folder_id, notes_hash, exclude_test_id=test_id
+                )
+            await session.commit()
+    except Exception as exc:
+        logger.warning("File extraction failed for test_id=%s: %s", test_id, exc)
+        async with async_session_maker() as err_session:
+            test = await err_session.get(Test, test_id)
+            if test is not None:
+                test.generation_status = "failed"
+                test.generation_error = f"Could not read your files: {exc}"[:500]
+            await err_session.commit()
+        return
+
+    # Generation opens its own session and manages status (ready/failed) + streaming.
+    await _generate_questions_background(
+        test_id=test_id,
+        user_id=user_id,
+        notes_content=combined_notes,
+        practice_test_content=practice_test_content,
+        test_type=test_type,
+        count_mcq=count_mcq,
+        count_frq=count_frq,
+        is_math_mode=is_math_mode,
+        difficulty=difficulty,
+        topic_focus=topic_focus,
+        is_coding_mode=is_coding_mode,
+        coding_language=coding_language,
+        custom_instructions=custom_instructions,
+        provider=provider,
+        enable_fallback=enable_fallback,
+        count_tf=count_tf,
+        count_ms=count_ms,
+        count_rank=count_rank,
+        prior_questions=prior_questions,
+    )
+
+
 @router.post(
     "/folders/{folder_id}/tests",
     response_model=CreateTestResponse,
@@ -371,36 +482,14 @@ async def create_test(
                 f"Combined uploaded files exceed the {MAX_UPLOAD_TOTAL_SIZE_BYTES // (1024 * 1024)} MB limit"
             )
 
-        # ── Extract text synchronously (fast, CPU-only, no LLM) ──────────────
-        svc = FileService()
-        if notes_bytes:
-            mock_files = [_BytesUploadFile(d, n) for d, n in notes_bytes]
-            notes_content, notes_file_types = await svc.extract_from_files(mock_files)  # type: ignore[arg-type]
-        else:
-            notes_content, notes_file_types = "", []
+        # ── Create the test shell and return immediately ─────────────────────
+        # File extraction (PDF parsing) is CPU-heavy and used to run here, leaving
+        # the user on a spinner. We now create the test record, return right away
+        # so the UI lands in the folder, and do extraction + generation entirely in
+        # the background. notes_hash is computed in the background once files are read.
+        eff_mcq = 0 if test_type == "FRQ_only" else count_mcq
+        eff_frq = 0 if test_type in ("MCQ_only", "Extreme") else count_frq
 
-        practice_test_content = ""
-        if pt_bytes is not None:
-            mock_pt = _BytesUploadFile(pt_bytes[0], pt_bytes[1])
-            practice_test_content, _ = await svc.extract_from_files([mock_pt])  # type: ignore[arg-type]
-
-        folder_files_content = await svc.get_folder_files_content(folder_id, user.id, session)
-
-        use_folder_files = not notes_bytes
-        combined_notes = "\n\n---\n\n".join(
-            p for p in [notes_content, folder_files_content if use_folder_files else ""] if p
-        )
-
-        # Fingerprint the source material so a later test built from the SAME notes
-        # can find and avoid repeating questions the student has already seen.
-        source_for_hash = combined_notes or practice_test_content
-        notes_hash = (
-            hashlib.sha256(source_for_hash.encode("utf-8")).hexdigest()
-            if source_for_hash
-            else None
-        )
-
-        # ── Create test record immediately ────────────────────────────────────
         repo = TestRepository(session)
         test = await repo.create(
             folder_id,
@@ -410,39 +499,24 @@ async def create_test(
             is_math_mode=is_math_mode,
             is_coding_mode=is_coding_mode,
             coding_language=coding_language,
-            notes_hash=notes_hash,
+            notes_hash=None,
         )
         test.generation_status = "generating"
         # Record how many questions this test will end up with so the take-test screen
         # can show streaming progress while the background task fills them in.
-        eff_mcq = 0 if test_type == "FRQ_only" else count_mcq
-        eff_frq = 0 if test_type in ("MCQ_only", "Extreme") else count_frq
         test.expected_question_count = eff_mcq + eff_frq + count_tf + count_ms + count_rank
-
-        if combined_notes:
-            note_label = ", ".join(n for _, n in notes_bytes) or "folder files"
-            await repo.add_note(test.id, note_label[:255], "combined", combined_notes)
-        if practice_test_content:
-            pt_label = pt_bytes[1] if pt_bytes else "practice_test"
-            await repo.add_note(test.id, pt_label[:255], "pdf", practice_test_content)
-
-        # "Fresh questions": when enabled for this folder, collect questions from
-        # earlier tests built from the same notes so the LLM can avoid repeating them.
-        prior_questions: list[str] = []
-        if notes_hash and getattr(folder, "avoid_repeat_questions", True):
-            prior_questions = await repo.get_prior_question_texts(
-                folder_id, notes_hash, exclude_test_id=test.id
-            )
-
         await session.commit()
 
-        # ── Schedule LLM generation in the background ─────────────────────────
+        # ── Schedule extraction + LLM generation in the background ────────────
         background_tasks.add_task(
-            _generate_questions_background,
+            _extract_and_generate_background,
             test_id=test.id,
             user_id=user.id,
-            notes_content=combined_notes,
-            practice_test_content=practice_test_content,
+            folder_id=folder_id,
+            notes_bytes=notes_bytes,
+            practice_test_bytes=pt_bytes,
+            use_folder_files=(not notes_bytes),
+            avoid_repeat=bool(getattr(folder, "avoid_repeat_questions", True)),
             test_type=test_type,
             count_mcq=count_mcq,
             count_frq=count_frq,
@@ -457,14 +531,13 @@ async def create_test(
             count_tf=count_tf,
             count_ms=count_ms,
             count_rank=count_rank,
-            prior_questions=prior_questions,
         )
 
         return CreateTestResponse(
             test_id=test.id,
             title=test.title,
             questions_generated=0,
-            message="Your test is being generated. Check back in a moment — it'll be ready shortly.",
+            message="Your test is being generated. It'll be ready shortly.",
             generation_status="generating",
         )
 
