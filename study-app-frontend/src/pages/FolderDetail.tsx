@@ -29,6 +29,8 @@ export default function FolderDetail() {
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [testsLoading, setTestsLoading] = useState(true);
+  // Bumped to restart the tests load/poll (e.g. after a Retry kicks off a new generation).
+  const [testsReloadNonce, setTestsReloadNonce] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [kojoOpen, setKojoOpen] = useState(false);
   const [filesOpen, setFilesOpen] = useState(false);
@@ -51,33 +53,54 @@ export default function FolderDetail() {
   useEffect(() => {
     if (!id) return;
     // The page shell only needs the folder itself, so gate the full-page spinner
-    // on that alone. Tests and flashcards load independently: a slow GET /tests
-    // (e.g. while a test generates in the background) must never freeze the whole
-    // folder page on a blank loading screen.
+    // on that alone. Tests and flashcards load independently so a slow GET /tests
+    // never freezes the whole folder page.
     setIsLoading(true);
     fetchFolder(id)
       .then(setFolder)
       .catch((err) => setError(err instanceof Error ? err.message : "Unable to load folder."))
       .finally(() => setIsLoading(false));
 
-    setTestsLoading(true);
-    fetchTests(id)
-      .then(setTests)
-      .catch(() => {})
-      .finally(() => setTestsLoading(false));
-
     fetchFlashcards(id).then(setFlashcards).catch(() => {});
   }, [id]);
 
-  // Poll while any test is still generating
+  // Load the tests list and keep it fresh by re-firing on an interval.
+  // Re-firing is essential: right after a test is created, the backend can leave
+  // the FIRST GET /tests pending for the entire generation (it only resolves when
+  // generation finishes), while a fresh request resolves promptly. Firing a new
+  // request every few seconds means a later one returns on its own - the same
+  // effect as a manual page reload - so the section never stays stuck on a
+  // spinner. Polling stops once nothing is generating.
   useEffect(() => {
-    const hasGenerating = tests.some((t) => t.generation_status === "generating");
-    if (!hasGenerating) return;
-    const pollId = setInterval(() => {
-      fetchTests(id).then(setTests).catch(() => {});
+    if (!id) return;
+    let cancelled = false;
+    let done = false;
+    setTestsLoading(true);
+
+    const load = () => {
+      fetchTests(id)
+        .then((data) => {
+          if (cancelled || done) return;
+          setTests(data);
+          setTestsLoading(false);
+          if (!data.some((t) => t.generation_status === "generating")) {
+            done = true;
+            clearInterval(poll);
+          }
+        })
+        .catch(() => {});
+    };
+
+    load();
+    const poll = setInterval(() => {
+      if (!cancelled && !done) load();
     }, 4000);
-    return () => clearInterval(pollId);
-  }, [id, tests]);
+
+    return () => {
+      cancelled = true;
+      clearInterval(poll);
+    };
+  }, [id, testsReloadNonce]);
 
   useEffect(() => {
     if (!id) return;
@@ -126,6 +149,8 @@ export default function FolderDetail() {
       await regenerateTest(test.id, params);
       const refreshed = await fetchTests(id);
       setTests(refreshed);
+      // Restart the tests poll so the regenerating test is tracked to completion.
+      setTestsReloadNonce((n) => n + 1);
     } catch (err) {
       setRetryError({
         testId: test.id,
