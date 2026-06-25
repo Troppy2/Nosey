@@ -467,61 +467,90 @@ export default function AdminPanel() {
         <p className="muted">Loading stats...</p>
       ) : null}
 
-      {/* User roster */}
-      <section className="admin-section">
-        <h2 className="admin-section-title">All users ({users.length})</h2>
-        {users.length === 0 && !loading ? (
-          <p className="muted small">No users found.</p>
-        ) : (
-          <div className="admin-table-wrap">
-            <table className="admin-table admin-users-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Verified</th>
-                  <th>Admin</th>
-                  <th>Type</th>
-                  <th>Joined</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((u) => {
-                  const isGuest = u.email.endsWith("@nosey.guest");
-                  return (
-                    <tr key={u.id}>
-                      <td className="admin-cell-id">#{u.id}</td>
-                      <td>{u.full_name ?? <span className="muted">-</span>}</td>
-                      <td className="admin-cell-email">{u.email}</td>
-                      <td>
-                        <span className={`admin-badge ${u.email_verified ? "admin-badge--green" : "admin-badge--muted"}`}>
-                          {u.email_verified ? "Yes" : "No"}
-                        </span>
-                      </td>
-                      <td>
-                        {u.is_admin ? (
-                          <span className="admin-badge admin-badge--blue">Admin</span>
-                        ) : (
-                          <span className="muted">-</span>
-                        )}
-                      </td>
-                      <td>
-                        <span className={`admin-badge ${isGuest ? "admin-badge--muted" : "admin-badge--green"}`}>
-                          {isGuest ? "Guest" : "Member"}
-                        </span>
-                      </td>
-                      <td className="admin-cell-date">
-                        {new Date(u.created_at).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      {/* Authenticated user roster */}
+      {(() => {
+        const realUsers = users.filter((u) => !u.email.endsWith("@nosey.guest"));
+        const guestUsers = users.filter((u) => u.email.endsWith("@nosey.guest"));
+        return (
+          <>
+            <section className="admin-section">
+              <h2 className="admin-section-title">Authenticated users ({realUsers.length})</h2>
+              {realUsers.length === 0 && !loading ? (
+                <p className="muted small">No authenticated users found.</p>
+              ) : (
+                <div className="admin-table-wrap">
+                  <table className="admin-table admin-users-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Verified</th>
+                        <th>Admin</th>
+                        <th>Joined</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {realUsers.map((u) => (
+                        <tr key={u.id}>
+                          <td className="admin-cell-id">#{u.id}</td>
+                          <td>{u.full_name ?? <span className="muted">-</span>}</td>
+                          <td className="admin-cell-email">{u.email}</td>
+                          <td>
+                            <span className={`admin-badge ${u.email_verified ? "admin-badge--green" : "admin-badge--muted"}`}>
+                              {u.email_verified ? "Yes" : "No"}
+                            </span>
+                          </td>
+                          <td>
+                            {u.is_admin ? (
+                              <span className="admin-badge admin-badge--blue">Admin</span>
+                            ) : (
+                              <span className="muted">-</span>
+                            )}
+                          </td>
+                          <td className="admin-cell-date">
+                            {new Date(u.created_at).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            <section className="admin-section">
+              <h2 className="admin-section-title">Guest sessions ({guestUsers.length})</h2>
+              {guestUsers.length === 0 && !loading ? (
+                <p className="muted small">No guest sessions found.</p>
+              ) : (
+                <div className="admin-table-wrap">
+                  <table className="admin-table admin-users-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Token (email)</th>
+                        <th>Created</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {guestUsers.map((u) => (
+                        <tr key={u.id}>
+                          <td className="admin-cell-id">#{u.id}</td>
+                          <td className="admin-cell-email">{u.email}</td>
+                          <td className="admin-cell-date">
+                            {new Date(u.created_at).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </>
+        );
+      })()}
     </div>
   );
 }
