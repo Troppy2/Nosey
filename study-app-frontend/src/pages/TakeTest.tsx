@@ -489,6 +489,14 @@ export default function TakeTest() {
               ? `Writing ${expectedCount} questions. The first one will appear in a moment.`
               : "The first question will appear in a moment."}
           </span>
+          <Link
+            className="back-link"
+            to={test.folder_id ? `/folders/${test.folder_id}` : "/dashboard"}
+            style={{ marginTop: 12 }}
+          >
+            <ArrowLeft size={16} />
+            {test.folder_id ? "Back to folder" : "Back to dashboard"}
+          </Link>
         </div>
       </div>
     );
