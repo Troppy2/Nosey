@@ -1,8 +1,9 @@
+import asyncio
 import hashlib
 import time
 from typing import Optional, Tuple
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.datastructures import UploadFile
@@ -38,6 +39,24 @@ from src.utils.validators import MAX_UPLOAD_TOTAL_SIZE_BYTES
 
 router = APIRouter(tags=["tests"])
 logger = get_logger(__name__)
+
+
+# Strong references to detached generation tasks. We deliberately do NOT use
+# FastAPI BackgroundTasks for generation: those run *inside* the ASGI response
+# cycle, so with a single uvicorn worker and HTTP/1.1 keep-alive the POST's TCP
+# connection stays busy for the whole ~30-60s generation. The browser then reuses
+# that same keep-alive connection for one of the post-create GETs (e.g.
+# GET /folders/{id}/tests), which hangs until generation finishes. Spawning the
+# work with asyncio.create_task frees the connection as soon as the 201 returns.
+# A reference is kept here so the task is not garbage-collected mid-run.
+_generation_tasks: set[asyncio.Task] = set()
+
+
+def _spawn_generation(coro) -> None:
+    """Detach a generation coroutine from the request/response cycle."""
+    task = asyncio.create_task(coro)
+    _generation_tasks.add(task)
+    task.add_done_callback(_generation_tasks.discard)
 
 
 class _BytesUploadFile:
@@ -407,7 +426,6 @@ async def create_test(
     folder_id: int,
     request: Request,
     response: Response,
-    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> CreateTestResponse:
@@ -525,30 +543,33 @@ async def create_test(
         test.expected_question_count = eff_mcq + eff_frq + count_tf + count_ms + count_rank
         await session.commit()
 
-        # ── Schedule extraction + LLM generation in the background ────────────
-        background_tasks.add_task(
-            _extract_and_generate_background,
-            test_id=test.id,
-            user_id=user.id,
-            folder_id=folder_id,
-            notes_bytes=notes_bytes,
-            practice_test_bytes=pt_bytes,
-            use_folder_files=(not notes_bytes),
-            avoid_repeat=bool(getattr(folder, "avoid_repeat_questions", True)),
-            test_type=test_type,
-            count_mcq=count_mcq,
-            count_frq=count_frq,
-            is_math_mode=is_math_mode,
-            difficulty=difficulty,
-            topic_focus=topic_focus,
-            is_coding_mode=is_coding_mode,
-            coding_language=coding_language,
-            custom_instructions=custom_instructions,
-            provider=provider,
-            enable_fallback=enable_fallback,
-            count_tf=count_tf,
-            count_ms=count_ms,
-            count_rank=count_rank,
+        # ── Schedule extraction + LLM generation off the request cycle ────────
+        # Detached via asyncio.create_task (NOT FastAPI BackgroundTasks) so the
+        # 201 response frees this HTTP connection immediately. See _spawn_generation.
+        _spawn_generation(
+            _extract_and_generate_background(
+                test_id=test.id,
+                user_id=user.id,
+                folder_id=folder_id,
+                notes_bytes=notes_bytes,
+                practice_test_bytes=pt_bytes,
+                use_folder_files=(not notes_bytes),
+                avoid_repeat=bool(getattr(folder, "avoid_repeat_questions", True)),
+                test_type=test_type,
+                count_mcq=count_mcq,
+                count_frq=count_frq,
+                is_math_mode=is_math_mode,
+                difficulty=difficulty,
+                topic_focus=topic_focus,
+                is_coding_mode=is_coding_mode,
+                coding_language=coding_language,
+                custom_instructions=custom_instructions,
+                provider=provider,
+                enable_fallback=enable_fallback,
+                count_tf=count_tf,
+                count_ms=count_ms,
+                count_rank=count_rank,
+            )
         )
 
         return CreateTestResponse(
@@ -574,7 +595,6 @@ async def regenerate_test(
     response: Response,
     test_id: int,
     data: RegenerateTestRequest,
-    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> CreateTestResponse:
@@ -641,27 +661,28 @@ async def regenerate_test(
 
         await session.commit()
 
-        background_tasks.add_task(
-            _generate_questions_background,
-            test_id=test.id,
-            user_id=user.id,
-            notes_content=notes_content,
-            practice_test_content=practice_test_content,
-            test_type=test.test_type,
-            count_mcq=data.count_mcq,
-            count_frq=count_frq,
-            is_math_mode=test.is_math_mode,
-            difficulty=difficulty,
-            topic_focus=(data.topic_focus.strip()[:200] if data.topic_focus else None),
-            is_coding_mode=test.is_coding_mode,
-            coding_language=test.coding_language or "Python",
-            custom_instructions=(data.custom_instructions.strip()[:500] if data.custom_instructions else None),
-            provider=provider,
-            enable_fallback=data.enable_fallback,
-            count_tf=data.count_tf,
-            count_ms=data.count_ms,
-            count_rank=data.count_rank,
-            prior_questions=prior_questions,
+        _spawn_generation(
+            _generate_questions_background(
+                test_id=test.id,
+                user_id=user.id,
+                notes_content=notes_content,
+                practice_test_content=practice_test_content,
+                test_type=test.test_type,
+                count_mcq=data.count_mcq,
+                count_frq=count_frq,
+                is_math_mode=test.is_math_mode,
+                difficulty=difficulty,
+                topic_focus=(data.topic_focus.strip()[:200] if data.topic_focus else None),
+                is_coding_mode=test.is_coding_mode,
+                coding_language=test.coding_language or "Python",
+                custom_instructions=(data.custom_instructions.strip()[:500] if data.custom_instructions else None),
+                provider=provider,
+                enable_fallback=data.enable_fallback,
+                count_tf=data.count_tf,
+                count_ms=data.count_ms,
+                count_rank=data.count_rank,
+                prior_questions=prior_questions,
+            )
         )
 
         return CreateTestResponse(

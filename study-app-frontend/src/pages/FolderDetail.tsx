@@ -64,20 +64,21 @@ export default function FolderDetail() {
     fetchFlashcards(id).then(setFlashcards).catch(() => {});
   }, [id]);
 
-  // Load the tests list and keep it fresh by re-firing on an interval.
-  // Re-firing is essential: right after a test is created, the backend can leave
-  // the FIRST GET /tests pending for the entire generation (it only resolves when
-  // generation finishes), while a fresh request resolves promptly. Firing a new
-  // request every few seconds means a later one returns on its own - the same
-  // effect as a manual page reload - so the section never stays stuck on a
-  // spinner. Polling stops once nothing is generating.
+  // Load the tests list and keep it fresh by re-firing every few seconds while a
+  // test is generating, so the section reflects streaming progress and flips to
+  // "ready" on its own. The poll is non-overlapping: a new request is only fired
+  // after the previous one settles (the `inFlight` guard), so requests can never
+  // pile up. Polling stops once nothing is generating.
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
     let done = false;
+    let inFlight = false;
     setTestsLoading(true);
 
     const load = () => {
+      if (inFlight) return;
+      inFlight = true;
       fetchTests(id)
         .then((data) => {
           if (cancelled || done) return;
@@ -88,7 +89,10 @@ export default function FolderDetail() {
             clearInterval(poll);
           }
         })
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => {
+          inFlight = false;
+        });
     };
 
     load();
