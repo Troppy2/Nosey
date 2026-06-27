@@ -10,7 +10,7 @@ import { MarkdownContent } from "../components/MarkdownContent";
 import { MathInput } from "../components/MathInput";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
 import { API_BASE_URL, fetchTest, getDraftAttempt, kojoChat, saveDraftAttempt, scopeKey, submitAttempt } from "../lib/api";
-import { applyTextHighlights, clearTextHighlights, getContainedSelectionText, HIGHLIGHT_SUPPORTED } from "../lib/highlightRanges";
+import { applyTextHighlights, clearTextHighlights, getSelectionSignature, HIGHLIGHT_SUPPORTED } from "../lib/highlightRanges";
 import { useSettings } from "../lib/useSettings";
 import type { DraftAttemptAnswer, Question, SubmittedAnswer, TestTake } from "../lib/types";
 
@@ -360,12 +360,12 @@ export default function TakeTest() {
     if (!highlightMode || questionId == null) return;
     const container = questionTextRef.current;
     if (!container) return;
-    const text = getContainedSelectionText(container);
-    if (!text) return;
+    const signature = getSelectionSignature(container);
+    if (!signature) return;
     setHighlights((prev) => {
       const existing = prev[questionId] ?? [];
-      if (existing.includes(text)) return prev;
-      return { ...prev, [questionId]: [...existing, text] };
+      if (existing.includes(signature)) return prev;
+      return { ...prev, [questionId]: [...existing, signature] };
     });
     window.getSelection()?.removeAllRanges();
   }
