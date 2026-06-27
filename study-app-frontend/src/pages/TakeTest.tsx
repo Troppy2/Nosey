@@ -68,9 +68,10 @@ export default function TakeTest() {
   // Learning mode is only usable while beta mode is on and the test belongs to a folder.
   const learningActive = betaMode && learningMode && Boolean(test?.folder_id);
 
-  // ── Test tools (beta only) ─────────────────────────────────────────────────
-  // All tools are gated behind beta mode and persist per test in localStorage.
-  const toolsEnabled = betaMode;
+  // ── Test tools ─────────────────────────────────────────────────────────────
+  // Available to all users (no LLM cost). State persists per test in localStorage.
+  // Learning Mode (the LLM-backed Ask Kojo assistant) stays beta-gated separately.
+  const toolsEnabled = true;
   const [navOpen, setNavOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [highlightMode, setHighlightMode] = useState(false);
