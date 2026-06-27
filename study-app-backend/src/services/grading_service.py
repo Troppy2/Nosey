@@ -182,32 +182,76 @@ class GradingService:
         user_answer: str,
         grade: FRQGrade,
     ) -> FRQGrade:
-        """Replace the plain deterministic feedback with an LLM-written guide.
+        """Replace the plain deterministic feedback with an LLM-written guide, and
+        sanity-check the stored answer key against the LLM's own judgement.
 
         Skips the LLM call when there is no configured correct answer (the grade
         already carries a config-error message). On LLM failure, keeps the original
         deterministic feedback.
+
+        Answer-key correction: the stored key is occasionally a generation-time
+        hallucination. When the LLM is confident the key is wrong, we correct only in
+        the student's favour (flip incorrect -> correct when they picked the option the
+        LLM believes is truly correct) and never take points away based on the LLM,
+        which can itself be wrong. Any disagreement sets flagged_uncertain so the
+        Results page can surface a "this grade may be off" warning.
         """
         correct_answer = self._correct_answer_text(question)
         if not correct_answer:
             return grade
 
-        explanation, reasoning = await self.llm_service.explain_objective_answer(
+        options = [o.option_text for o in question.mcq_options] or None
+        result = await self.llm_service.explain_objective_answer(
             question=question.question_text,
             correct_answer=correct_answer,
             user_answer=user_answer,
             is_correct=grade.is_correct,
+            options=options,
         )
-        if not explanation:
+        if not result.feedback:
             return grade
 
+        is_correct = grade.is_correct
+        flagged_uncertain = grade.flagged_uncertain
+
+        # The LLM thinks the stored answer key is wrong. Surface it, and restore the
+        # point if the student actually picked the option the LLM believes is correct.
+        if not result.answer_key_ok and result.actual_correct_answer:
+            flagged_uncertain = True
+            # Only single-answer types (MCQ/TF) have an unambiguous "did the student
+            # pick the truly-correct option" check. MS/RANK stay flagged only.
+            if not is_correct and question.question_type in ("MCQ", "TF"):
+                chosen = self._resolve_chosen_option(question, user_answer)
+                llm_correct = result.actual_correct_answer.strip().lower()
+                if chosen is not None and chosen.option_text.strip().lower() == llm_correct:
+                    is_correct = True
+
         return FRQGrade(
-            is_correct=grade.is_correct,
-            feedback=explanation,
-            reasoning=reasoning,
-            flagged_uncertain=grade.flagged_uncertain,
+            is_correct=is_correct,
+            feedback=result.feedback,
+            reasoning=result.reasoning,
+            flagged_uncertain=flagged_uncertain,
             confidence=grade.confidence,
         )
+
+    def _resolve_chosen_option(self, question: Question, user_answer: str):
+        """Resolve a student's MCQ/TF answer to the MCQOption they selected.
+
+        Mirrors the matching logic in _grade_mcq: accepts either the option text or a
+        single letter (a/b/c...). Returns None when nothing matches.
+        """
+        normalized = user_answer.strip().lower()
+        for option in question.mcq_options:
+            if option.option_text.strip().lower() == normalized:
+                return option
+        letter_index = (
+            ord(normalized[0]) - ord("a")
+            if len(normalized) == 1 and normalized.isalpha()
+            else -1
+        )
+        if 0 <= letter_index < len(question.mcq_options):
+            return question.mcq_options[letter_index]
+        return None
 
     def _grade_mcq(self, question: Question, user_answer: str) -> FRQGrade:
         correct_options = [option for option in question.mcq_options if option.is_correct]
