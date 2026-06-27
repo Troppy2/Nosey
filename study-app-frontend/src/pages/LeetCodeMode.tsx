@@ -732,7 +732,30 @@ function isRunnable(problemData?: LeetCodeProblemData) {
 }
 
 
-const STREAK_CHALLENGE_SLUG = "trapping-rain-water";
+// Last-resort fallback only. Normally the streak rescue problem is a random unsolved
+// Medium/Hard drawn from the verified + custom catalog (see pickStreakChallengeSlug).
+const STREAK_CHALLENGE_FALLBACK_SLUG = "trapping-rain-water";
+
+function randomFrom<T>(items: T[]): T {
+  return items[Math.floor(Math.random() * items.length)];
+}
+
+// Pick the Save My Streak rescue problem from the combined verified + custom pool.
+// Preference ladder so the challenge is always achievable and never a repeat:
+//   1. a random unsolved Medium/Hard
+//   2. any unsolved problem (so power users who cleared all Medium/Hard still get one)
+//   3. a random Medium/Hard even if solved (everything is done)
+//   4. the hardcoded fallback (pool somehow empty, should not happen)
+function pickStreakChallengeSlug(pool: Problem[], progress: Record<string, boolean>): string {
+  const isMidOrHard = (p: Problem) => p.difficulty === "Medium" || p.difficulty === "Hard";
+  const unsolvedMidHard = pool.filter((p) => isMidOrHard(p) && !progress[p.slug]);
+  if (unsolvedMidHard.length > 0) return randomFrom(unsolvedMidHard).slug;
+  const unsolved = pool.filter((p) => !progress[p.slug]);
+  if (unsolved.length > 0) return randomFrom(unsolved).slug;
+  const midHard = pool.filter(isMidOrHard);
+  if (midHard.length > 0) return randomFrom(midHard).slug;
+  return STREAK_CHALLENGE_FALLBACK_SLUG;
+}
 
 function fillStreakGap(currentDates: string[]): string[] {
   if (currentDates.length === 0) return [todayKey()];
@@ -1107,10 +1130,20 @@ export default function LeetCodeMode() {
     streakChallenge !== null &&
     streakChallenge.completed_at === null;
 
+  // The actual rescue problem chosen for this challenge (random per streak loss).
+  // Look it up across verified + all custom problems so the node can show its real
+  // title/difficulty and navigate to its real category.
+  const streakChallengeProblem = streakChallenge
+    ? [...UNIQUE_PROBLEMS, ...allCustomProblemList].find((p) => p.slug === streakChallenge.problem_slug) ?? null
+    : null;
+
   async function ensureStreakChallengeExists() {
     if (isGuestSession() || !betaMode) return;
     if (streakChallenge && streakChallenge.completed_at === null) return;
-    const created = await createLCStreakChallenge();
+    // Pick a fresh random unsolved Medium/Hard from the verified + custom catalog.
+    // The pick is locked in on the server row, so it stays fixed until completed.
+    const slug = pickStreakChallengeSlug([...UNIQUE_PROBLEMS, ...customProblemList], progress);
+    const created = await createLCStreakChallenge(slug);
     if (created) setStreakChallenge(created);
   }
 
@@ -2220,7 +2253,13 @@ export default function LeetCodeMode() {
             <button
               type="button"
               className="lc-streak-node"
-              onClick={() => setView({ type: "problem", categoryId: "arrays", problemSlug: STREAK_CHALLENGE_SLUG })}
+              onClick={() =>
+                setView({
+                  type: "problem",
+                  categoryId: streakChallengeProblem?.categoryId ?? "arrays",
+                  problemSlug: streakChallenge?.problem_slug ?? STREAK_CHALLENGE_FALLBACK_SLUG,
+                })
+              }
             >
               <span className="lc-streak-node-icon">
                 <ShieldAlert size={22} />
@@ -2231,8 +2270,14 @@ export default function LeetCodeMode() {
                   <span className="lc-streak-badge">Beta</span>
                 </span>
                 <span className="lc-streak-node-meta">
-                  <span className="lc-difficulty lc-difficulty--hard">Hard</span>
-                  <span className="lc-streak-node-desc">Trapping Rain Water - no Kojo, no NeetCode</span>
+                  {streakChallengeProblem ? (
+                    <span className={`lc-difficulty lc-difficulty--${difficultyClass(streakChallengeProblem.difficulty)}`}>
+                      {streakChallengeProblem.difficulty}
+                    </span>
+                  ) : null}
+                  <span className="lc-streak-node-desc">
+                    {(streakChallengeProblem?.title ?? "Rescue problem")} - no Kojo, no NeetCode
+                  </span>
                 </span>
                 {streakChallenge?.expires_at ? (
                   <small className="lc-streak-node-expires">
