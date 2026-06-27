@@ -23,6 +23,7 @@ from src.schemas.leetcode_schema import (
     LCNotesSyncRequest,
     LCProgressResponse,
     LCProgressSyncRequest,
+    LCStreakChallengeCreateRequest,
     LCStreakChallengeResponse,
     LCWorkspaceResponse,
     LCWorkspacesResponse,
@@ -36,7 +37,9 @@ from src.schemas.leetcode_schema import (
 from src.services.leetcode_service import LeetCodeService
 from src.utils.exceptions import LLMException, ResourceNotFoundException
 
-STREAK_CHALLENGE_SLUG = "trapping-rain-water"
+# Last-resort fallback only. The client normally picks the rescue problem (a random
+# unsolved Medium/Hard from the verified + custom catalog) and sends it on create.
+STREAK_CHALLENGE_FALLBACK_SLUG = "trapping-rain-water"
 
 router = APIRouter(prefix="/leetcode", tags=["leetcode"])
 
@@ -420,10 +423,12 @@ async def get_streak_challenge(
 
 @router.post("/streak-challenge", response_model=LCStreakChallengeResponse, status_code=status.HTTP_201_CREATED)
 async def create_streak_challenge(
+    payload: Optional[LCStreakChallengeCreateRequest] = None,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> LCStreakChallengeResponse:
-    # Only one active (uncompleted) challenge at a time.
+    # Only one active (uncompleted) challenge at a time. The problem stays fixed while
+    # this challenge is active; a fresh random one is picked on the next streak loss.
     existing = (
         await session.execute(
             select(LCStreakChallenge)
@@ -436,9 +441,10 @@ async def create_streak_challenge(
     ).scalar_one_or_none()
     if existing:
         return _serialize_streak_challenge(existing)
+    requested_slug = (payload.problem_slug or "").strip() if payload else ""
     row = LCStreakChallenge(
         user_id=user.id,
-        problem_slug=STREAK_CHALLENGE_SLUG,
+        problem_slug=requested_slug or STREAK_CHALLENGE_FALLBACK_SLUG,
         expires_at=None,
     )
     session.add(row)

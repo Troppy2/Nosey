@@ -150,6 +150,13 @@ class LCGeneratedCustomProblem(BaseModel):
 
 # ── Streak challenge (Save My Streak, beta-only) ──────────────────────────────
 
+class LCStreakChallengeCreateRequest(BaseModel):
+    # The client picks the rescue problem (it owns the verified catalog, the
+    # difficulties, and the per-user completed state) and passes the slug here.
+    # Optional so an empty POST still works and falls back to a server default.
+    problem_slug: Optional[str] = None
+
+
 class LCStreakChallengeResponse(BaseModel):
     id: int
     problem_slug: str

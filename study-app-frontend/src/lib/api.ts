@@ -957,9 +957,12 @@ export async function fetchLCStreakChallenge(): Promise<import("./types").LCStre
   }
 }
 
-export async function createLCStreakChallenge(): Promise<import("./types").LCStreakChallenge | null> {
+export async function createLCStreakChallenge(problemSlug?: string): Promise<import("./types").LCStreakChallenge | null> {
   try {
-    return await request<import("./types").LCStreakChallenge>("/leetcode/streak-challenge", { method: "POST" });
+    return await request<import("./types").LCStreakChallenge>("/leetcode/streak-challenge", {
+      method: "POST",
+      body: JSON.stringify({ problem_slug: problemSlug ?? null }),
+    });
   } catch {
     return null;
   }
