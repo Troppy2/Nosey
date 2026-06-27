@@ -46,3 +46,6 @@ PROJECT_SUMMARY.md
 
 # Local-only benchmarking tooling (not for deployment)
 study-app-backend/scripts/benchmark_latency.py
+
+# Personal feature-planning scratchpad (not for deployment)
+LEARNING_MODES_AND_GAMES.md
