@@ -46,17 +46,38 @@ export function getContainedSelectionText(container: HTMLElement): string | null
   return text.length > 0 ? text : null;
 }
 
-// Rebuilds the highlight ranges for `container` from `snippets`. Replaces any
+// Returns a unique identifier for a selected range (text + offset from container start).
+// This lets us highlight only the specific instance that was selected, not all occurrences.
+export function getSelectionSignature(container: HTMLElement): string | null {
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null;
+  const range = selection.getRangeAt(0);
+  if (!container.contains(range.commonAncestorContainer)) return null;
+
+  const text = selection.toString().trim();
+  if (!text) return null;
+
+  // Get the offset from the start of the container to the start of the selection
+  const preCaretRange = range.cloneRange();
+  preCaretRange.selectNodeContents(container);
+  preCaretRange.setEnd(range.startContainer, range.startOffset);
+  const offset = preCaretRange.toString().length;
+
+  return `${text}|${offset}`;
+}
+
+// Rebuilds the highlight ranges for `container` from `signatures`. Replaces any
 // previously registered highlight. Skips text inside KaTeX math so we never
 // split rendered equations.
-export function applyTextHighlights(container: HTMLElement, snippets: string[]): void {
+// Signatures are in format "text|offset" to uniquely identify which instance to highlight.
+export function applyTextHighlights(container: HTMLElement, signatures: string[]): void {
   const HighlightImpl = getHighlightCtor();
   const registry = getRegistry();
   if (!HighlightImpl || !registry) return;
 
   const highlight = new HighlightImpl();
 
-  if (snippets.length > 0) {
+  if (signatures.length > 0) {
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
       acceptNode(node) {
         const parent = node.parentElement;
@@ -73,19 +94,39 @@ export function applyTextHighlights(container: HTMLElement, snippets: string[]):
       textNodes.push(node as Text);
     }
 
-    for (const snippet of snippets) {
-      const needle = snippet.toLowerCase();
-      if (!needle) continue;
+    for (const signature of signatures) {
+      const parts = signature.split("|");
+      if (parts.length !== 2) continue;
+
+      const text = parts[0];
+      const targetOffset = parseInt(parts[1], 10);
+      if (!text || isNaN(targetOffset)) continue;
+
+      const needle = text.toLowerCase();
+      let currentOffset = 0;
+      let foundCount = 0;
+
       for (const textNode of textNodes) {
-        const haystack = (textNode.textContent ?? "").toLowerCase();
-        let from = haystack.indexOf(needle);
-        while (from !== -1) {
-          const range = document.createRange();
-          range.setStart(textNode, from);
-          range.setEnd(textNode, from + snippet.length);
-          highlight.add(range);
-          from = haystack.indexOf(needle, from + snippet.length);
+        const nodeText = textNode.textContent ?? "";
+        const nodeTextLower = nodeText.toLowerCase();
+
+        let from = 0;
+        while ((from = nodeTextLower.indexOf(needle, from)) !== -1) {
+          // Check if this match is at the target offset
+          if (currentOffset + from === targetOffset) {
+            const range = document.createRange();
+            range.setStart(textNode, from);
+            range.setEnd(textNode, from + text.length);
+            highlight.add(range);
+            foundCount++;
+            break; // Only highlight the one matching instance
+          }
+          from += 1;
         }
+
+        if (foundCount > 0) break; // Found the target, move to next signature
+
+        currentOffset += nodeText.length;
       }
     }
   }
