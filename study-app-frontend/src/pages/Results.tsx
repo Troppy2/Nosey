@@ -435,6 +435,16 @@ function ReviewItem({ answer, number }: { answer: AnswerResult; number: number }
       </button>
       {open ? (
         <div className="review-detail">
+          {answer.flagged_uncertain ? (
+            <div className="review-flagged-notice">
+              <AlertTriangle size={16} />
+              <span>
+                This grade may be off. The auto-generated answer key for this question looks
+                questionable, so Nosey flagged it for review. If you think your answer was right,
+                read the explanation below and trust your own judgement.
+              </span>
+            </div>
+          ) : null}
           <div>
             <span>Your answer</span>
             <div className="math-answer-text review-answer-markdown">

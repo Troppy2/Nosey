@@ -13348,3 +13348,23 @@ select.lc-custom-input {
 .test-pending-slot .muted {
   font-size: 0.82rem;
 }
+
+/* Results: warning shown when a question's stored answer key looks wrong */
+.review-detail .review-flagged-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #92400e;
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.review-flagged-notice svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #d97706;
+}

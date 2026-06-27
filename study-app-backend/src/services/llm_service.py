@@ -70,6 +70,23 @@ class GeneratedFlashcard:
 
 
 @dataclass(frozen=True)
+class ObjectiveExplanation:
+    """Result of explaining (and sanity-checking) an objective question.
+
+    feedback / reasoning are the visible Markdown guide. answer_key_ok is the
+    LLM's verdict on whether the stored correct answer is actually correct given
+    the full option list. actual_correct_answer is the option text the LLM
+    believes is truly correct when it disagrees with the stored key. When the LLM
+    call fails, feedback is "" and answer_key_ok is True (so the caller keeps the
+    deterministic grade unchanged).
+    """
+    feedback: str
+    reasoning: Optional[str]
+    answer_key_ok: bool = True
+    actual_correct_answer: Optional[str] = None
+
+
+@dataclass(frozen=True)
 class _ExtractedTerm:
     term: str
     definition: str
@@ -1422,14 +1439,19 @@ Rules:
         correct_answer: str,
         user_answer: str,
         is_correct: bool,
-    ) -> tuple[str, Optional[str]]:
+        options: Optional[list[str]] = None,
+    ) -> ObjectiveExplanation:
         """Write a short Markdown guide for an objective question (MCQ/TF/MS/Ranking).
 
-        Correctness is decided deterministically by the grading service; this only
-        produces the "how to solve and why it's correct" explanation. Returns a
-        (feedback, reasoning) pair: feedback is the clean default-visible explanation,
-        reasoning is the optional collapsible working. Returns ("", None) on failure so
-        the caller can fall back to its plain feedback.
+        Correctness is decided deterministically by the grading service; this writes
+        the "how to solve and why it's correct" explanation AND, when the full option
+        list is supplied, sanity-checks the stored answer key. The LLM can spot a
+        hallucinated key (the stored "correct" option is actually wrong) and report
+        which option is truly correct. The grading service uses that verdict to avoid
+        penalising a student who picked the genuinely correct option.
+
+        Returns an ObjectiveExplanation. On failure it returns feedback="" with
+        answer_key_ok=True so the caller falls back to its plain deterministic grade.
         """
         status = (
             "The student answered CORRECTLY."
@@ -1441,11 +1463,31 @@ Rules:
             if is_correct
             else "- Point out why the student's answer is wrong and the likely misconception."
         )
+        options_block = ""
+        verdict_instructions = ""
+        verdict_json_fields = ""
+        if options:
+            options_lines = "\n".join(f"- {opt}" for opt in options)
+            options_block = f"\nALL ANSWER OPTIONS:\n{options_lines}\n"
+            verdict_instructions = (
+                "\nThe CORRECT ANSWER above is the answer key recorded for this question. "
+                "It was generated automatically and may occasionally be wrong. Independently "
+                "decide which option is actually correct. Only contradict the recorded key when "
+                "you are confident it is factually wrong: set answer_key_ok to false and put the "
+                "option text you believe is truly correct in actual_correct_answer. If the "
+                "recorded key is correct (or you are unsure), set answer_key_ok to true. Base "
+                'your written explanation on the genuinely correct answer, not a wrong key.\n'
+            )
+            verdict_json_fields = (
+                ', "answer_key_ok": true or false, '
+                '"actual_correct_answer": "the option text that is truly correct (only when answer_key_ok is false)"'
+            )
+
         prompt = f"""You are a tutor writing a short explanation for a test question the student just answered.
 
 QUESTION:
 {question}
-
+{options_block}
 CORRECT ANSWER:
 {correct_answer}
 
@@ -1453,7 +1495,7 @@ STUDENT'S ANSWER:
 {user_answer}
 
 {status}
-
+{verdict_instructions}
 Write a concise explanation in Markdown that:
 - States the correct answer and explains WHY it is correct.
 - Gives a brief how-to-solve walkthrough (the reasoning or steps to reach it).
@@ -1465,16 +1507,26 @@ Do any messy thinking or self-correction in "reasoning" only. "feedback" must be
 final explanation, with NO "wait", "let me reconsider", "actually", or "oh".
 
 Return JSON only:
-{{"reasoning": "your private working (may be messy, can be empty)", "feedback": "the clean markdown explanation"}}
+{{"reasoning": "your private working (may be messy, can be empty)", "feedback": "the clean markdown explanation"{verdict_json_fields}}}
 """
         try:
             data = await self._complete_json(prompt)
             feedback = str(data.get("feedback", "")).strip()[:2000]
             reasoning = str(data.get("reasoning", "")).strip()[:2000] or None
-            return feedback, reasoning
+            # answer_key_ok defaults to True (trust the stored key) unless the LLM
+            # explicitly flags it false. Missing field => no verdict requested/given.
+            answer_key_ok = bool(data.get("answer_key_ok", True))
+            actual = data.get("actual_correct_answer")
+            actual_correct_answer = str(actual).strip()[:500] if actual else None
+            return ObjectiveExplanation(
+                feedback=feedback,
+                reasoning=reasoning,
+                answer_key_ok=answer_key_ok,
+                actual_correct_answer=actual_correct_answer,
+            )
         except Exception as exc:
             logger.warning("LLM objective explanation failed: %s", exc)
-            return "", None
+            return ObjectiveExplanation(feedback="", reasoning=None)
 
     async def generate_flashcards(
         self,
