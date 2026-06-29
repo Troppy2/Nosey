@@ -258,9 +258,11 @@ export default function Settings() {
           <span className="pill">{guest ? "Guest session" : user ? "Signed in" : "Signed out"}</span>
           <h2>{user?.full_name ?? "No active session"}</h2>
           {user?.email ? <p className="muted small">{user.email}</p> : null}
-          <p className="muted">
-            Guest mode works like a normal workspace, but it is limited to one folder and one practice test until you sign in.
-          </p>
+          {guest ? (
+            <p className="muted">
+              Guest mode works like a normal workspace, but it is limited to one folder and one practice test until you sign in.
+            </p>
+          ) : null}
         </div>
 
         {signInSuccess ? (
