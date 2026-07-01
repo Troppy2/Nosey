@@ -164,11 +164,65 @@ function Inline({ text, reg, pk }: { text: string; reg: MathEntry[]; pk: string 
   );
 }
 
+// ── Fence normalization ───────────────────────────────────────────────────────
+// The block parser only recognizes a fenced code block when ``` sits at the
+// START of a line. LLMs sometimes glue an opening fence onto prose
+// ("implementation: ```java if (...)") and drop a stray closing ``` on its own
+// line. That makes the code render as literal backticks while the stray fence
+// gets misread as an opening fence, swallowing following text as code.
+//
+// This pass reflows every triple-backtick delimiter onto its own line and, for
+// an opening fence, splits code that was glued after the language token onto the
+// next line. Correctly formatted input (fences already on their own lines) is
+// left effectively unchanged.
+function normalizeFences(raw: string): string {
+  if (!raw.includes("```")) return raw;
+
+  let out = "";
+  let rest = raw;
+  let inFence = false;
+
+  while (true) {
+    const idx = rest.indexOf("```");
+    if (idx === -1) {
+      out += rest;
+      break;
+    }
+    out += rest.slice(0, idx);
+    rest = rest.slice(idx + 3);
+
+    // Put the fence delimiter at the start of its own line.
+    if (out.length > 0 && !out.endsWith("\n")) out += "\n";
+    out += "```";
+
+    if (!inFence) {
+      // Opening fence: the info string (language) runs to the end of the line.
+      // If code was glued after the language token, push it to the next line.
+      const nl = rest.indexOf("\n");
+      const firstLine = nl === -1 ? rest : rest.slice(0, nl);
+      const glued = firstLine.match(/^([A-Za-z0-9+#_.-]*)[ \t]+(\S.*)$/);
+      if (glued) {
+        out += glued[1] + "\n" + glued[2];
+        rest = nl === -1 ? "" : rest.slice(nl);
+      }
+      inFence = true;
+    } else {
+      // Closing fence: make sure following content starts on a fresh line.
+      if (rest.length > 0 && !rest.startsWith("\n")) out += "\n";
+      inFence = false;
+    }
+  }
+
+  return out;
+}
+
 // ── Block parser ──────────────────────────────────────────────────────────────
 
 export function MarkdownContent({ content }: { content: string }) {
+  // Step 0: reflow malformed code fences onto their own lines
+  const fenced = normalizeFences(content);
   // Step 1: extract math into placeholders
-  const [withPlaceholders, reg] = extractMath(content);
+  const [withPlaceholders, reg] = extractMath(fenced);
   // Step 2: auto-wrap bare LaTeX lines that have no delimiters
   const normalized = autoWrapMath(withPlaceholders, reg);
 
