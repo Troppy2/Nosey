@@ -31,7 +31,7 @@ class Folder(Base, TimestampMixin):
     kojo_auto_index: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     kojo_persona: Mapped[Optional[str]] = mapped_column(String(32))
     is_archived: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
-    avoid_repeat_questions: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    avoid_repeat_questions: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
 
     user: Mapped[User] = relationship("User", back_populates="folders")
     tests: Mapped[list[Test]] = relationship(

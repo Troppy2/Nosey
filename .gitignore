@@ -9,6 +9,9 @@ node_modules/
 dist/
 coverage/
 
+# Log files
+*.log
+
 .venv/
 __pycache__/
 *.py[cod]
@@ -49,3 +52,6 @@ study-app-backend/scripts/benchmark_latency.py
 
 # Personal feature-planning scratchpad (not for deployment)
 LEARNING_MODES_AND_GAMES.md
+
+
+*.tex
