@@ -1604,6 +1604,13 @@ h3 {
   padding: 40px;
 }
 
+/* Grid children default to min-width: auto, so a wide child (e.g. a long
+   non-wrapping code block) forces the track to expand and spill past the card.
+   Allowing them to shrink lets inner overflow-x: auto scroll within the box. */
+.question-card > * {
+  min-width: 0;
+}
+
 .test-question-markdown .kojo-markdown {
   font-size: clamp(1.2rem, 2vw, 1.8rem);
   line-height: 1.35;
@@ -3450,6 +3457,7 @@ h3 {
   padding: 14px 16px;
   margin: 10px 0;
   overflow-x: auto;
+  max-width: 100%;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 0.82rem;
   line-height: 1.6;
