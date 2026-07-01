@@ -430,9 +430,9 @@ export default function FolderDetail() {
               </div>
               <button
                 type="button"
-                className={`folder-kojo-toggle${folder.avoid_repeat_questions !== false ? " folder-kojo-toggle--on" : ""}`}
-                onClick={() => void updateKojoSetting({ avoid_repeat_questions: !(folder.avoid_repeat_questions !== false) })}
-                aria-checked={folder.avoid_repeat_questions !== false}
+                className={`folder-kojo-toggle${folder.avoid_repeat_questions === true ? " folder-kojo-toggle--on" : ""}`}
+                onClick={() => void updateKojoSetting({ avoid_repeat_questions: !(folder.avoid_repeat_questions === true) })}
+                aria-checked={folder.avoid_repeat_questions === true}
                 role="switch"
               >
                 <span className="folder-kojo-toggle-thumb" />

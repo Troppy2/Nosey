@@ -242,6 +242,24 @@ class LLMService:
             "  - Keep the options about the topic, but vary the wording so the correct answer is not too obvious\n"
         )
 
+    def _code_formatting_guidance(self) -> str:
+        """Instruction for well-formed code blocks inside question_text / answers.
+
+        The frontend markdown renderer only treats ``` as a code fence when it
+        sits at the start of a line. LLMs tend to glue the opening fence onto
+        prose ('...operation: ```java') and the closing fence onto trailing text
+        ('``` What value is printed?'), which makes code render as literal text
+        and swallows the following question. This tells the model to keep fences
+        on their own lines and preserve real indentation.
+        """
+        return (
+            "CODE FORMATTING (when a question, option, or answer contains code):\n"
+            "  - Wrap every code snippet in a fenced markdown block with a language tag, e.g. ```java ... ```.\n"
+            "  - The opening fence with its language MUST be on its own line. Do not put any prose on the same line as ``` (write 'Consider this code:\\n```java', never 'Consider this code: ```java').\n"
+            "  - The closing ``` MUST be on its own line with nothing after it. Put any following question text on the next line (write '```\\nWhat value is printed?', never '``` What value is printed?').\n"
+            "  - Inside JSON strings, use \\n for every real newline so the code keeps its line breaks and indentation. Indent nested blocks (loop and if bodies) with 2 or 4 spaces; do not collapse multiple statements onto one line.\n"
+        )
+
     async def generate_test_questions(
         self,
         notes: str,
@@ -708,6 +726,7 @@ class LLMService:
             f"{concepts_block}"
             f"{mcq_instructions}\n"
             f"{frq_instructions}\n"
+            f"{self._code_formatting_guidance()}\n"
             "CRITICAL: Return ONLY valid JSON. No markdown, no text before or after.\n"
             "Response must be EXACTLY this format:\n"
             '{"mcq": [{"question_text": "...", "options": ["a", "b", "c", "d"], "correct_index": 0}], "frq": [{"question_text": "...", "expected_answer": "..."}]}\n'
@@ -770,6 +789,7 @@ class LLMService:
             f"SOURCE CONTEXT:\n{source_context[:_GENERATE_CHAR_LIMIT]}\n\n"
             f"{mcq_instructions}\n"
             f"{frq_instructions}\n"
+            f"{self._code_formatting_guidance()}\n"
             "CRITICAL: Return ONLY valid JSON. No markdown, no text before or after.\n"
             "Response must be EXACTLY this format:\n"
             '{"mcq": [{"question_text": "...", "options": ["a", "b", "c", "d"], "correct_index": 0}], "frq": [{"question_text": "...", "expected_answer": "..."}]}\n'
@@ -2390,13 +2410,14 @@ Return only the JSON object."""
 
     async def _complete_anthropic(self, prompt: str) -> dict[str, object]:
         async def _do() -> dict[str, object]:
-            # Haiku has limited context. If prompt is very large, truncate notes/examples.
+            # Haiku 4.5 has a 200K-token context window (~800K chars), so normal
+            # generation prompts never need truncation. Do NOT front-slice the
+            # prompt: the JSON schema and format instructions live at the tail,
+            # and dropping them produces off-schema or empty output. Only warn on
+            # pathologically large inputs, well above the real working range.
             actual_prompt = safe_serialize_payload(prompt)
-            if len(actual_prompt) > 12_000:
-                logger.warning("Prompt size %d exceeds Haiku optimum; may cause parsing failures. Consider breaking into smaller requests.", len(actual_prompt))
-                # Truncate trailing notes/context sections to ~10k
-                if len(actual_prompt) > 15_000:
-                    actual_prompt = actual_prompt[:12_000] + "\n[... context truncated ...]"
+            if len(actual_prompt) > 200_000:
+                logger.warning("Prompt size %d is unusually large for a generation call.", len(actual_prompt))
             logger.debug(
                 "Sending LLM payload provider=%s length=%d preview=%s",
                 "claude",

@@ -554,7 +554,7 @@ async def create_test(
                 notes_bytes=notes_bytes,
                 practice_test_bytes=pt_bytes,
                 use_folder_files=(not notes_bytes),
-                avoid_repeat=bool(getattr(folder, "avoid_repeat_questions", True)),
+                avoid_repeat=bool(getattr(folder, "avoid_repeat_questions", False)),
                 test_type=test_type,
                 count_mcq=count_mcq,
                 count_frq=count_frq,
@@ -654,7 +654,7 @@ async def regenerate_test(
         prior_questions: list[str] = []
         if test.notes_hash:
             folder = test.folder
-            if folder is not None and getattr(folder, "avoid_repeat_questions", True):
+            if folder is not None and getattr(folder, "avoid_repeat_questions", False):
                 prior_questions = await repo.get_prior_question_texts(
                     test.folder_id, test.notes_hash, exclude_test_id=test.id
                 )

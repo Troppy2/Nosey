@@ -36,7 +36,7 @@ class FolderResponse(BaseModel):
     kojo_auto_index: bool = True
     kojo_persona: Optional[str] = None
     is_archived: bool = False
-    avoid_repeat_questions: bool = True
+    avoid_repeat_questions: bool = False
     created_at: datetime
     updated_at: datetime
     test_count: int = 0
