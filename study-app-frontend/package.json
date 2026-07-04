@@ -16,6 +16,7 @@
     "driver.js": "^1.4.0",
     "katex": "^0.16.45",
     "lucide-react": "^0.487.0",
+    "mathlive": "^0.110.0",
     "react": "^18.3.1",
     "react-bootstrap-icons": "^1.11.6",
     "react-dom": "^18.3.1",
