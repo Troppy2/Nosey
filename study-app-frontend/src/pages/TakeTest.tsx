@@ -327,6 +327,17 @@ export default function TakeTest() {
   // last loaded question.
   const maxIndex = isGenerating ? Math.min(loadedCount, Math.max(expectedCount - 1, 0)) : lastLoadedIndex;
 
+  // Keep the current index inside the reachable range whenever that range
+  // shrinks. Generation can finish "ready" with fewer questions than
+  // expected_question_count (best-effort extra types, dedup, validators), and
+  // the student may be parked on the pending slot one past the last loaded
+  // question. Without this clamp they would be stuck on a "Writing question
+  // N..." spinner that never resolves (GH #35). The resume flow can also
+  // restore an out-of-range saved index; this covers that too.
+  useEffect(() => {
+    setIndex((current) => Math.min(current, Math.max(maxIndex, 0)));
+  }, [maxIndex]);
+
   // Re-paint persisted highlights for the current question after each render.
   useEffect(() => {
     if (!toolsEnabled || questionId == null) return;
@@ -462,15 +473,25 @@ export default function TakeTest() {
   }
 
   // Test shell loaded but no questions yet: either still warming up the first batch,
-  // or generation failed before producing anything.
+  // or generation reached a terminal state without producing anything.
   if (loadedCount === 0) {
-    if (genFailed) {
+    // "failed" is the explicit error state; "ready" with zero questions means
+    // generation finished but every question was dropped (validators, dedup).
+    // Both are terminal, so show an end state instead of the splash: the poll
+    // only runs while status is "generating", so the splash would spin forever.
+    if (genFailed || !isGenerating) {
       return (
         <div className="page page-narrow">
           <EmptyState
             icon={<AlertCircle />}
-            title="Generation failed"
-            body={test.generation_error || error || "We could not generate this test. Try again from the folder."}
+            title={genFailed ? "Generation failed" : "No questions were generated"}
+            body={
+              test.generation_error ||
+              error ||
+              (genFailed
+                ? "We could not generate this test. Try again from the folder."
+                : "Generation finished without producing any questions. Retry it from the folder.")
+            }
             action={
               <Link to={test.folder_id ? `/folders/${test.folder_id}` : "/dashboard"}>
                 <Button>Back to folder</Button>
@@ -712,6 +733,12 @@ export default function TakeTest() {
         ) : null}
         {(() => {
           if (!question) {
+            // Belt and braces: only show the "writing..." slot while generation
+            // is actually running. If the index is out of range after generation
+            // ended, the clamp effect snaps it back to the last real question on
+            // the next render, so render nothing for that one frame instead of a
+            // spinner that would never resolve.
+            if (!isGenerating) return null;
             return (
               <Card className="question-card question-card--pending">
                 <div className="test-pending-slot">
