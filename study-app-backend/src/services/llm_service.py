@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import difflib
 import hashlib
 import json
 from collections import OrderedDict
@@ -143,6 +144,13 @@ _RETRIEVAL_EMBED_CACHE_SIZE = 4096
 _RETRIEVAL_RESULT_CACHE_SIZE = 512
 _MAP_REDUCE_MAX_DOCS = 6
 _SAME_PROVIDER_TOPUP_ATTEMPTS = 2
+
+# Server-side duplicate detection (GH #34): a generated question whose normalized
+# text matches a prior question exactly, or with a SequenceMatcher ratio at or above
+# this threshold, is treated as a repeat and dropped.
+_DUP_SIMILARITY_THRESHOLD = 0.9
+# Cap on how many prior questions each candidate is fuzzily compared against.
+_PRIOR_DUP_MAX_KEYS = 200
 _AI_SERVICES_UNAVAILABLE_MESSAGE = (
     "An error has occurred. Test generation can't happen right now because AI services are unavailable."
 )
@@ -1754,6 +1762,14 @@ Return only the JSON object."""
         if novelty_block:
             shared_prompt = f"{shared_prompt}\n\n{novelty_block}"
 
+        # Server-side duplicate guard (GH #34). The novelty block above is instruction-only
+        # and models do not reliably obey it, so every parsed question is also checked here
+        # against the prior-question list; matches are dropped and the slots refill through
+        # the existing top-up paths. Dropped items are kept as a last resort (see below).
+        prior_keys = self._normalized_question_keys(prior_questions)
+        dropped_mcq: list[GeneratedMCQ] = []
+        dropped_frq: list[GeneratedFRQ] = []
+
         last_error: Optional[Exception] = None
         # Best partial output seen across all providers — used for cross-provider topup.
         best_mcq: list[GeneratedMCQ] = []
@@ -1761,14 +1777,11 @@ Return only the JSON object."""
 
         for candidate in provider_candidates:
             try:
-                # For Haiku, add aggressive truncation if prompt would be too large
-                candidate_prompt = shared_prompt
-                if candidate == "claude" and len(candidate_prompt) > 10_000:
-                    # Truncate the shared prompt to keep Haiku manageable
-                    candidate_prompt = candidate_prompt[:9_000] + "\n[...truncated for brevity...]"
-                    logger.info("Truncated prompt for Claude to %d chars", len(candidate_prompt))
-
-                data = await self._complete_json(candidate_prompt, provider=candidate)
+                # Do NOT truncate the prompt per-provider. A front-slice for Claude here
+                # used to drop the prompt tail, which silently deleted the novelty
+                # "DO NOT REPEAT" block (root cause of GH #34) and the JSON format spec.
+                # Haiku's 200K context never needs it (see _complete_anthropic).
+                data = await self._complete_json(shared_prompt, provider=candidate)
                 mcq, frq = self._parse_generated_test(
                     data,
                     count_mcq,
@@ -1778,6 +1791,9 @@ Return only the JSON object."""
                     diagnostics=diagnostics,
                     allow_fallback=False,
                 )
+                mcq, frq, dup_mcq, dup_frq = self._split_prior_duplicates(mcq, frq, prior_keys)
+                dropped_mcq.extend(dup_mcq)
+                dropped_frq.extend(dup_frq)
 
                 # Same-provider top-up first to avoid expensive cross-provider retries
                 # when output is near-complete (e.g., 19/20).
@@ -1809,6 +1825,11 @@ Return only the JSON object."""
                             diagnostics=diagnostics,
                             allow_fallback=False,
                         )
+                        add_mcq, add_frq, dup_mcq, dup_frq = self._split_prior_duplicates(
+                            add_mcq, add_frq, prior_keys
+                        )
+                        dropped_mcq.extend(dup_mcq)
+                        dropped_frq.extend(dup_frq)
                         mcq, frq = self._merge_generated_questions(
                             mcq, frq, add_mcq, add_frq, count_mcq, count_frq
                         )
@@ -1864,6 +1885,11 @@ Return only the JSON object."""
                         diagnostics=diagnostics,
                         allow_fallback=False,
                     )
+                    add_mcq, add_frq, dup_mcq, dup_frq = self._split_prior_duplicates(
+                        add_mcq, add_frq, prior_keys
+                    )
+                    dropped_mcq.extend(dup_mcq)
+                    dropped_frq.extend(dup_frq)
                     best_mcq, best_frq = self._merge_generated_questions(
                         best_mcq, best_frq, add_mcq, add_frq, count_mcq, count_frq
                     )
@@ -1878,6 +1904,27 @@ Return only the JSON object."""
                         "Provider %s cross-provider topup failed: %s", topup_candidate, topup_exc
                     )
 
+            if len(best_mcq) >= count_mcq and len(best_frq) >= count_frq:
+                diagnostics.update({"fallback_used": False, "fallback_reason": None, "note_grounded": True})
+                self._set_last_generation_meta(diagnostics)
+                return best_mcq[:count_mcq], best_frq[:count_frq]
+
+        # Last resort for GH #34 drops: if the test is still short after every provider
+        # and top-up, put dropped prior-duplicates back rather than failing the test or
+        # padding with generic filler. A repeated question beats a broken test.
+        if (len(best_mcq) < count_mcq or len(best_frq) < count_frq) and (dropped_mcq or dropped_frq):
+            readd_before = len(best_mcq) + len(best_frq)
+            best_mcq, best_frq = self._merge_generated_questions(
+                best_mcq, best_frq, dropped_mcq, dropped_frq, count_mcq, count_frq
+            )
+            readded = len(best_mcq) + len(best_frq) - readd_before
+            if readded:
+                logger.warning(
+                    "Re-added %d prior-duplicate questions to fill the test after all "
+                    "providers and top-ups came up short",
+                    readded,
+                )
+                diagnostics["prior_duplicates_readded"] = readded
             if len(best_mcq) >= count_mcq and len(best_frq) >= count_frq:
                 diagnostics.update({"fallback_used": False, "fallback_reason": None, "note_grounded": True})
                 self._set_last_generation_meta(diagnostics)
@@ -1932,6 +1979,68 @@ Return only the JSON object."""
         })
         self._set_last_generation_meta(diagnostics)
         return fill_mcq[:count_mcq], fill_frq[:count_frq]
+
+    def _question_dup_key(self, text: str) -> str:
+        """Normalize question text for duplicate comparison."""
+        return re.sub(r"\s+", " ", (text or "").strip().lower())
+
+    def _normalized_question_keys(self, prior_questions: Optional[list[str]]) -> list[str]:
+        keys = [self._question_dup_key(q) for q in (prior_questions or [])]
+        return [k for k in keys if k][:_PRIOR_DUP_MAX_KEYS]
+
+    def _is_prior_duplicate(self, key: str, prior_keys: list[str]) -> bool:
+        """True when a normalized question matches a prior question exactly or near-exactly.
+
+        Fuzzy matching (difflib ratio) catches near-verbatim rephrasings the exact
+        check misses; the length pre-filter and quick_ratio guards keep it cheap.
+        """
+        if not key:
+            return False
+        for prior in prior_keys:
+            if key == prior:
+                return True
+            longer = max(len(key), len(prior))
+            if longer and abs(len(key) - len(prior)) > longer * (1 - _DUP_SIMILARITY_THRESHOLD):
+                continue
+            matcher = difflib.SequenceMatcher(None, key, prior)
+            if (
+                matcher.real_quick_ratio() >= _DUP_SIMILARITY_THRESHOLD
+                and matcher.quick_ratio() >= _DUP_SIMILARITY_THRESHOLD
+                and matcher.ratio() >= _DUP_SIMILARITY_THRESHOLD
+            ):
+                return True
+        return False
+
+    def _split_prior_duplicates(
+        self,
+        mcq: list[GeneratedMCQ],
+        frq: list[GeneratedFRQ],
+        prior_keys: list[str],
+    ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ], list[GeneratedMCQ], list[GeneratedFRQ]]:
+        """Split generated questions into (kept_mcq, kept_frq, dup_mcq, dup_frq).
+
+        Server-side enforcement for GH #34: the prompt's novelty block asks the model
+        not to repeat prior questions, but models do not reliably comply, so repeats
+        are filtered here and their slots refilled by the caller's top-up paths.
+        """
+        if not prior_keys:
+            return mcq, frq, [], []
+        kept_mcq: list[GeneratedMCQ] = []
+        kept_frq: list[GeneratedFRQ] = []
+        dup_mcq: list[GeneratedMCQ] = []
+        dup_frq: list[GeneratedFRQ] = []
+        for item in mcq:
+            key = self._question_dup_key(item.question_text)
+            (dup_mcq if self._is_prior_duplicate(key, prior_keys) else kept_mcq).append(item)
+        for item in frq:
+            key = self._question_dup_key(item.question_text)
+            (dup_frq if self._is_prior_duplicate(key, prior_keys) else kept_frq).append(item)
+        if dup_mcq or dup_frq:
+            logger.info(
+                "Dropped %d MCQ and %d FRQ duplicating prior questions (GH #34 guard)",
+                len(dup_mcq), len(dup_frq),
+            )
+        return kept_mcq, kept_frq, dup_mcq, dup_frq
 
     def _build_novelty_block(self, prior_questions: Optional[list[str]]) -> str:
         """Build the "fresh questions" instruction block.
