@@ -18,7 +18,7 @@ from src.services.rag_service import HybridRAGService
 from src.utils.logger import get_logger
 from src.utils.latex_utils import normalize_latex
 from src.utils.serialization import safe_serialize_payload
-from typing import Any, Optional
+from typing import Any, AsyncIterator, Awaitable, Callable, Optional
 
 logger = get_logger(__name__)
 
@@ -117,6 +117,105 @@ class _RetrievalChunk:
     source: str
     text: str
     tokens: tuple[str, ...]
+
+
+class _StreamingQuestionExtractor:
+    """Incrementally pulls completed question dicts out of a streamed JSON response.
+
+    Expects the generation response shape {"mcq": [ {...}, ... ], "frq": [ {...}, ... ]}
+    arriving as arbitrary text chunks. A character-level scanner tracks JSON structure
+    (string/escape state and a container stack); each time an object element inside the
+    top-level "mcq" or "frq" array closes, that slice is parsed and emitted immediately,
+    without waiting for the rest of the response. Non-structural noise around the JSON
+    (markdown fences, prose preambles) is skipped naturally because scanning only reacts
+    to structural characters outside strings. Elements that fail to parse are skipped;
+    the stream keeps going.
+    """
+
+    def __init__(self, loads: Any) -> None:
+        # loads: callable(str) -> dict, e.g. LLMService._loads_json, so streamed
+        # elements get the same LaTeX-backslash repair as batch responses.
+        self._loads = loads
+        self._buffer = ""
+        self._pos = 0
+        self._stack: list[str] = []
+        self._in_string = False
+        self._escape = False
+        self._string_start = -1
+        self._last_string = ""
+        self._pending_key: Optional[str] = None
+        self._section: Optional[str] = None  # "mcq" | "frq" while inside that array
+        self._section_depth = 0  # stack depth of the active section array
+        self._element_start = -1
+
+    @property
+    def full_text(self) -> str:
+        return self._buffer
+
+    def feed(self, chunk: str) -> list[tuple[str, dict]]:
+        """Consume a text chunk; return question dicts completed by it."""
+        self._buffer += chunk
+        out: list[tuple[str, dict]] = []
+        buf = self._buffer
+        i = self._pos
+        while i < len(buf):
+            ch = buf[i]
+            if self._in_string:
+                if self._escape:
+                    self._escape = False
+                elif ch == "\\":
+                    self._escape = True
+                elif ch == '"':
+                    self._in_string = False
+                    self._last_string = buf[self._string_start:i]
+                i += 1
+                continue
+            if ch == '"':
+                self._in_string = True
+                self._string_start = i + 1
+            elif ch == ":":
+                # A key in the top-level object; remember it so the next '[' can be
+                # identified as the mcq/frq array.
+                if len(self._stack) == 1 and self._stack[0] == "{":
+                    self._pending_key = self._last_string.strip().lower()
+            elif ch == "{":
+                self._stack.append("{")
+                if self._section is not None and len(self._stack) == self._section_depth + 1:
+                    self._element_start = i
+            elif ch == "[":
+                self._stack.append("[")
+                if (
+                    len(self._stack) == 2
+                    and self._stack[0] == "{"
+                    and self._pending_key in ("mcq", "frq")
+                ):
+                    self._section = self._pending_key
+                    self._section_depth = len(self._stack)
+            elif ch == "}":
+                if self._stack and self._stack[-1] == "{":
+                    self._stack.pop()
+                if (
+                    self._section is not None
+                    and self._element_start >= 0
+                    and len(self._stack) == self._section_depth
+                ):
+                    raw_element = buf[self._element_start : i + 1]
+                    self._element_start = -1
+                    try:
+                        parsed = self._loads(raw_element)
+                        if isinstance(parsed, dict):
+                            out.append((self._section, parsed))
+                    except Exception:
+                        logger.debug("Skipping unparseable streamed element: %s", raw_element[:200])
+            elif ch == "]":
+                if self._stack and self._stack[-1] == "[":
+                    self._stack.pop()
+                if self._section is not None and len(self._stack) < self._section_depth:
+                    self._section = None
+                    self._element_start = -1
+            i += 1
+        self._pos = i
+        return out
 
 
 @dataclass(frozen=True)
@@ -283,6 +382,7 @@ class LLMService:
         provider: Optional[str] = None,
         enable_fallback: bool = True,
         prior_questions: Optional[list[str]] = None,
+        on_question: Optional[Callable[[str, object], Awaitable[None]]] = None,
     ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
         if self._is_mcq_only_mode(test_type):
             count_frq = 0
@@ -347,6 +447,7 @@ class LLMService:
                 diagnostics=diagnostics,
                 enable_fallback=enable_fallback,
                 prior_questions=prior_questions,
+                on_question=on_question,
             )
 
         if is_math_mode:
@@ -371,6 +472,7 @@ class LLMService:
                     math_mode=True,
                     enable_fallback=enable_fallback,
                     prior_questions=prior_questions,
+                    on_question=on_question,
                 )
             except Exception:
                 if not enable_fallback:
@@ -398,6 +500,7 @@ class LLMService:
                 custom_instructions=custom_instructions,
                 enable_fallback=enable_fallback,
                 prior_questions=prior_questions,
+                on_question=on_question,
             )
         except Exception:
             if not enable_fallback:
@@ -930,6 +1033,7 @@ class LLMService:
         provider: Optional[str] = None,
         enable_fallback: bool = True,
         prior_questions: Optional[list[str]] = None,
+        on_question: Optional[Callable[[str, object], Awaitable[None]]] = None,
     ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
         """Generate questions from study notes using practice test as a style template.
         
@@ -1081,6 +1185,7 @@ class LLMService:
                 diagnostics=diagnostics,
                 enable_fallback=enable_fallback,
                 prior_questions=prior_questions,
+                on_question=on_question,
             )
         except Exception:
             if not enable_fallback:
@@ -1724,6 +1829,7 @@ Return only the JSON object."""
         custom_instructions: Optional[str] = None,
         enable_fallback: bool = True,
         prior_questions: Optional[list[str]] = None,
+        on_question: Optional[Callable[[str, object], Awaitable[None]]] = None,
     ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
         from src.utils.exceptions import LLMException
 
@@ -1761,6 +1867,24 @@ Return only the JSON object."""
         novelty_block = self._build_novelty_block(prior_questions)
         if novelty_block:
             shared_prompt = f"{shared_prompt}\n\n{novelty_block}"
+
+        # Streamed mode: the caller wants each question delivered (persisted) the
+        # moment it is generated. Once a question has been handed to on_question it
+        # cannot be taken back, so the streaming flow never restarts a provider from
+        # scratch; it only ever asks for the remaining slots.
+        if on_question is not None:
+            return await self._generate_test_attempts_streaming(
+                shared_prompt=shared_prompt,
+                provider_candidates=provider_candidates,
+                notes=notes,
+                count_mcq=count_mcq,
+                count_frq=count_frq,
+                diagnostics=diagnostics,
+                math_mode=math_mode,
+                enable_fallback=enable_fallback,
+                prior_questions=prior_questions,
+                on_question=on_question,
+            )
 
         # Server-side duplicate guard (GH #34). The novelty block above is instruction-only
         # and models do not reliably obey it, so every parsed question is also checked here
@@ -1980,6 +2104,203 @@ Return only the JSON object."""
         self._set_last_generation_meta(diagnostics)
         return fill_mcq[:count_mcq], fill_frq[:count_frq]
 
+    async def _generate_test_attempts_streaming(
+        self,
+        shared_prompt: str,
+        provider_candidates: list[str],
+        notes: str,
+        count_mcq: int,
+        count_frq: int,
+        diagnostics: dict[str, object],
+        math_mode: bool,
+        enable_fallback: bool,
+        prior_questions: Optional[list[str]],
+        on_question: Callable[[str, object], Awaitable[None]],
+    ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
+        """Streamed counterpart of the provider loop in _generate_test_attempts.
+
+        Questions are handed to on_question (which persists them) the moment they
+        finish streaming, so they can never be taken back. That changes the retry
+        shape: instead of letting each provider regenerate from scratch, every
+        attempt after the first emission asks only for the REMAINING slots via the
+        existing top-up prompt. Total LLM call count stays at or below the blob
+        path's (one call per provider, plus the phase-2 top-ups it already had).
+        Providers that cannot stream fail fast in phase 1 and are still used by the
+        non-streamed phase 2, so a setup with no streamable provider behaves exactly
+        like today's single-blob call.
+        """
+        from src.utils.exceptions import LLMException
+
+        emitted_mcq: list[GeneratedMCQ] = []
+        emitted_frq: list[GeneratedFRQ] = []
+        # Dedup pool: prior questions plus everything emitted during this run.
+        seen_keys: list[str] = self._normalized_question_keys(prior_questions)
+        dropped_mcq: list[GeneratedMCQ] = []
+        dropped_frq: list[GeneratedFRQ] = []
+        last_error: Optional[Exception] = None
+        diagnostics["streamed"] = True
+
+        async def emit(kind: str, item: object) -> None:
+            if kind == "mcq":
+                emitted_mcq.append(item)  # type: ignore[arg-type]
+            else:
+                emitted_frq.append(item)  # type: ignore[arg-type]
+            await on_question(kind, item)
+
+        def accept(kind: str, item: object) -> bool:
+            """Capacity + duplicate gate; duplicates are kept for the last resort."""
+            if kind == "mcq" and len(emitted_mcq) >= count_mcq:
+                return False
+            if kind == "frq" and len(emitted_frq) >= count_frq:
+                return False
+            key = self._question_dup_key(item.question_text)  # type: ignore[attr-defined]
+            if not key:
+                return False
+            if self._is_prior_duplicate(key, seen_keys):
+                (dropped_mcq if kind == "mcq" else dropped_frq).append(item)  # type: ignore[arg-type]
+                return False
+            seen_keys.append(key)
+            return True
+
+        def remaining() -> tuple[int, int]:
+            return max(0, count_mcq - len(emitted_mcq)), max(0, count_frq - len(emitted_frq))
+
+        def build_prompt() -> str:
+            rem_mcq, rem_frq = remaining()
+            if emitted_mcq or emitted_frq:
+                return self._build_provider_topup_prompt(
+                    shared_prompt, emitted_mcq, emitted_frq, rem_mcq, rem_frq
+                )
+            return shared_prompt
+
+        def satisfied() -> bool:
+            return len(emitted_mcq) >= count_mcq and len(emitted_frq) >= count_frq
+
+        # Phase 1: streamed attempts. A mid-stream failure keeps everything already
+        # emitted; the next provider is only asked for what is still missing.
+        for candidate in provider_candidates:
+            if satisfied():
+                break
+            emitted_before = len(emitted_mcq) + len(emitted_frq)
+            try:
+                async for kind, item in self._stream_questions(
+                    candidate, build_prompt(), math_mode=math_mode
+                ):
+                    if accept(kind, item):
+                        await emit(kind, item)
+                    if satisfied():
+                        break
+                logger.info(
+                    "Provider %s streamed %d questions (%d/%d MCQ, %d/%d FRQ total)",
+                    candidate,
+                    len(emitted_mcq) + len(emitted_frq) - emitted_before,
+                    len(emitted_mcq), count_mcq, len(emitted_frq), count_frq,
+                )
+            except Exception as exc:
+                last_error = exc
+                logger.warning(
+                    "Provider %s streamed generation failed (kept %d questions so far): %s",
+                    candidate, len(emitted_mcq) + len(emitted_frq), exc,
+                )
+
+        # Phase 2: non-streamed top-up for whatever is still missing. This is also
+        # the whole path when no available provider supports streaming.
+        for candidate in provider_candidates:
+            if satisfied():
+                break
+            rem_mcq, rem_frq = remaining()
+            try:
+                data = await self._complete_json(build_prompt(), provider=candidate)
+                add_mcq, add_frq = self._parse_generated_test(
+                    data,
+                    rem_mcq,
+                    rem_frq,
+                    notes,
+                    math_mode=math_mode,
+                    diagnostics=diagnostics,
+                    allow_fallback=False,
+                )
+                for mcq_item in add_mcq:
+                    if accept("mcq", mcq_item):
+                        await emit("mcq", mcq_item)
+                for frq_item in add_frq:
+                    if accept("frq", frq_item):
+                        await emit("frq", frq_item)
+            except Exception as exc:
+                last_error = exc
+                logger.warning("Provider %s streamed-mode top-up failed: %s", candidate, exc)
+
+        if satisfied():
+            diagnostics.update({"fallback_used": False, "fallback_reason": None, "note_grounded": True})
+            self._set_last_generation_meta(diagnostics)
+            return emitted_mcq[:count_mcq], emitted_frq[:count_frq]
+
+        # Last resort for GH #34 drops (mirrors the blob path): a repeated question
+        # beats a failed test or generic filler.
+        readded = 0
+        for mcq_item in dropped_mcq:
+            if len(emitted_mcq) < count_mcq:
+                await emit("mcq", mcq_item)
+                readded += 1
+        for frq_item in dropped_frq:
+            if len(emitted_frq) < count_frq:
+                await emit("frq", frq_item)
+                readded += 1
+        if readded:
+            logger.warning(
+                "Re-added %d prior-duplicate questions in streamed mode to fill the test", readded
+            )
+            diagnostics["prior_duplicates_readded"] = readded
+        if satisfied():
+            diagnostics.update({"fallback_used": False, "fallback_reason": None, "note_grounded": True})
+            self._set_last_generation_meta(diagnostics)
+            return emitted_mcq[:count_mcq], emitted_frq[:count_frq]
+
+        if not enable_fallback:
+            diagnostics.update({
+                "fallback_used": False,
+                "fallback_reason": "generation_failed_insufficient_questions",
+                "note_grounded": False,
+                "generated_mcq": len(emitted_mcq),
+                "generated_frq": len(emitted_frq),
+            })
+            self._set_last_generation_meta(diagnostics)
+            logger.warning(
+                "Streamed test generation came up short: %d/%d MCQ and %d/%d FRQ after all providers",
+                len(emitted_mcq), count_mcq, len(emitted_frq), count_frq,
+            )
+            raise LLMException(
+                "Practice test could not be generated. The AI provider may be rate-limited or "
+                "temporarily unavailable, or it returned no usable questions for these notes. "
+                "Retry in a moment, or try a different provider."
+            ) from last_error
+
+        # enable_fallback ON: fill the gap with note-based questions, delivered
+        # through the same callback so the caller persists them incrementally too.
+        rem_mcq, rem_frq = remaining()
+        fallback_builder = self._fallback_math_questions if math_mode else self._fallback_questions
+        gap_mcq, gap_frq = fallback_builder(notes, rem_mcq, rem_frq)
+        for mcq_item in gap_mcq:
+            if accept("mcq", mcq_item):
+                await emit("mcq", mcq_item)
+        for frq_item in gap_frq:
+            if accept("frq", frq_item):
+                await emit("frq", frq_item)
+        had_real_output = bool(
+            len(emitted_mcq) + len(emitted_frq) > len(gap_mcq) + len(gap_frq)
+        )
+        diagnostics.update({
+            "fallback_used": True,
+            "fallback_reason": (
+                "provider_partial_output_filled"
+                if had_real_output
+                else ("llm_exception_math" if math_mode else "llm_exception")
+            ),
+            "note_grounded": False,
+        })
+        self._set_last_generation_meta(diagnostics)
+        return emitted_mcq[:count_mcq], emitted_frq[:count_frq]
+
     def _question_dup_key(self, text: str) -> str:
         """Normalize question text for duplicate comparison."""
         return re.sub(r"\s+", " ", (text or "").strip().lower())
@@ -2147,6 +2468,231 @@ Return only the JSON object."""
         if provider == "ollama":
             return await self._complete_ollama(prompt)
         raise LLMException(f"Unsupported LLM provider: {provider}")
+
+    # ── Streamed generation (per-question arrival) ───────────────────────────
+    # These stream the SAME single generation call the blob path makes; they do not
+    # add LLM calls. Token deltas are fed through _StreamingQuestionExtractor so each
+    # question can be persisted the moment its JSON object completes. No _with_retry
+    # wrapper here: a 429 on stream start simply fails this provider and the caller
+    # moves on (the non-streaming top-up fallback still has retry).
+
+    async def _stream_text_groq(self, prompt: str) -> AsyncIterator[str]:
+        prompt_body = self._prepare_llm_payload(prompt, "groq")
+        async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
+            async with client.stream(
+                "POST",
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.groq_api_key}",
+                    "Content-Type": "application/json; charset=utf-8",
+                },
+                json={
+                    "model": "llama-3.3-70b-versatile",
+                    "messages": [{"role": "user", "content": prompt_body}],
+                    "temperature": 0.2,
+                    "max_tokens": _JSON_MAX_TOKENS,
+                    # NOTE: no response_format here; Groq's JSON mode rejects
+                    # streaming. The extractor tolerates prose around the JSON.
+                    "stream": True,
+                },
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[len("data:"):].strip()
+                    if not data or data == "[DONE]":
+                        continue
+                    try:
+                        event = json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
+                    choices = event.get("choices") or []
+                    delta = (choices[0].get("delta") or {}) if choices else {}
+                    text = delta.get("content")
+                    if text:
+                        yield str(text)
+
+    async def _stream_text_anthropic(self, prompt: str) -> AsyncIterator[str]:
+        prompt_body = self._prepare_llm_payload(prompt, "claude")
+        async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
+            async with client.stream(
+                "POST",
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": settings.anthropic_api_key or "",
+                    "anthropic-version": "2023-06-01",
+                    "Content-Type": "application/json; charset=utf-8",
+                },
+                json={
+                    "model": settings.anthropic_model,
+                    "max_tokens": _JSON_MAX_TOKENS,
+                    "temperature": 0.1,
+                    "system": "You MUST respond with ONLY valid JSON. No text before or after. No markdown. No backticks. No explanation. Start with { or [. End with } or ]. Every response must be valid JSON that can be parsed by json.loads().",
+                    "messages": [{"role": "user", "content": prompt_body}],
+                    "stream": True,
+                },
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[len("data:"):].strip()
+                    if not data:
+                        continue
+                    try:
+                        event = json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
+                    if event.get("type") == "content_block_delta":
+                        delta = event.get("delta") or {}
+                        text = delta.get("text")
+                        if text:
+                            yield str(text)
+
+    async def _stream_text_gemini(self, prompt: str) -> AsyncIterator[str]:
+        prompt_body = self._prepare_llm_payload(prompt, "gemini")
+        async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
+            async with client.stream(
+                "POST",
+                f"https://generativelanguage.googleapis.com/v1beta/models/{settings.google_ai_model}:streamGenerateContent",
+                params={"key": settings.google_ai_api_key, "alt": "sse"},
+                headers={"Content-Type": "application/json; charset=utf-8"},
+                json={
+                    "contents": [{"parts": [{"text": prompt_body}]}],
+                    "generationConfig": {
+                        "maxOutputTokens": _JSON_MAX_TOKENS,
+                        "temperature": 0.2,
+                        "responseMimeType": "application/json",
+                    },
+                },
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[len("data:"):].strip()
+                    if not data:
+                        continue
+                    try:
+                        event = json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
+                    candidates = event.get("candidates") or []
+                    if not candidates:
+                        continue
+                    parts = ((candidates[0].get("content") or {}).get("parts")) or []
+                    for part in parts:
+                        text = part.get("text")
+                        if text:
+                            yield str(text)
+
+    async def _stream_text_ollama(self, prompt: str) -> AsyncIterator[str]:
+        prompt_body = self._prepare_llm_payload(prompt, "ollama")
+        headers = {"Content-Type": "application/json; charset=utf-8"}
+        if settings.ollama_api_key:
+            headers["Authorization"] = f"Bearer {settings.ollama_api_key}"
+        async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
+            async with client.stream(
+                "POST",
+                f"{settings.ollama_base_url.rstrip('/')}/api/generate",
+                headers=headers,
+                json={
+                    "model": settings.ollama_model,
+                    "prompt": prompt_body,
+                    "stream": True,
+                    "format": "json",
+                    "options": {
+                        "num_predict": _JSON_MAX_TOKENS,
+                        "num_ctx": settings.ollama_num_ctx,
+                    },
+                },
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line.strip():
+                        continue
+                    try:
+                        event = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    text = event.get("response")
+                    if text:
+                        yield str(text)
+                    if event.get("done"):
+                        break
+
+    async def _stream_llm_text(self, provider: str, prompt: str) -> AsyncIterator[str]:
+        from src.utils.exceptions import LLMException
+
+        if provider == "groq":
+            if not settings.groq_api_key:
+                raise LLMException("Groq is not configured. Add your Groq API key in Settings.")
+            stream = self._stream_text_groq(prompt)
+        elif provider == "claude":
+            if not settings.anthropic_api_key:
+                raise LLMException("Anthropic is not configured. Add your Anthropic API key in Settings.")
+            stream = self._stream_text_anthropic(prompt)
+        elif provider == "gemini":
+            if not settings.google_ai_api_key:
+                raise LLMException("DeepSeek is not configured. Add your AI API key in Settings.")
+            stream = self._stream_text_gemini(prompt)
+        elif provider == "ollama":
+            stream = self._stream_text_ollama(prompt)
+        else:
+            raise LLMException(f"Streaming is not supported for provider: {provider}")
+        async for chunk in stream:
+            yield chunk
+
+    async def _stream_questions(
+        self,
+        provider: str,
+        prompt: str,
+        math_mode: bool = False,
+    ) -> AsyncIterator[tuple[str, GeneratedMCQ | GeneratedFRQ]]:
+        """Stream one generation call, yielding validated questions as they complete.
+
+        If the stream finishes without yielding anything usable (e.g. the model used
+        an off-schema shape the incremental scanner could not follow), the fully
+        accumulated text is parsed once as a normal blob response, so the call is
+        never wasted.
+        """
+        extractor = _StreamingQuestionExtractor(self._loads_json)
+        yielded = 0
+        async for chunk in self._stream_llm_text(provider, prompt):
+            for kind, raw_item in extractor.feed(chunk):
+                if kind == "mcq":
+                    built: Optional[GeneratedMCQ | GeneratedFRQ] = self._build_mcq_from_item(
+                        raw_item, math_mode=math_mode
+                    )
+                else:
+                    built = self._build_frq_from_item(raw_item, math_mode=math_mode)
+                if built is not None:
+                    yielded += 1
+                    yield kind, built
+
+        if yielded == 0 and extractor.full_text.strip():
+            try:
+                data = self._loads_json(extractor.full_text)
+            except Exception:
+                logger.warning(
+                    "Provider %s stream produced no incrementally parseable questions "
+                    "and the full text was not valid JSON either", provider,
+                )
+                return
+            for kind, key in (("mcq", "mcq"), ("frq", "frq")):
+                raw_list = data.get(key, [])
+                if not isinstance(raw_list, list):
+                    continue
+                for raw_item in raw_list:
+                    if kind == "mcq":
+                        salvage: Optional[GeneratedMCQ | GeneratedFRQ] = self._build_mcq_from_item(
+                            raw_item, math_mode=math_mode
+                        )
+                    else:
+                        salvage = self._build_frq_from_item(raw_item, math_mode=math_mode)
+                    if salvage is not None:
+                        yield kind, salvage
 
     def _prepare_llm_payload(self, payload: object, provider: str) -> str:
         serialized = safe_serialize_payload(payload)
@@ -2921,6 +3467,35 @@ Return only the JSON object."""
             cleaned = cleaned[0].upper() + cleaned[1:]
         return cleaned
 
+    def _build_mcq_from_item(self, item: object, math_mode: bool = False) -> Optional[GeneratedMCQ]:
+        """Normalize, validate, and convert one raw MCQ dict; None if invalid.
+
+        Shared by the batch parser (_parse_generated_test) and the streamed
+        per-question path so both apply identical validation.
+        """
+        item = self._normalize_mcq_item(item)
+        validator = self._is_valid_math_mcq if math_mode else self._is_valid_mcq
+        if not validator(item):
+            return None
+        raw_options = [str(o) for o in item["options"]][:4]  # type: ignore[index]
+        options = [normalize_latex(o) for o in raw_options]
+        return GeneratedMCQ(
+            question_text=self._strip_source_references(normalize_latex(str(item.get("question_text", "Study question")))),  # type: ignore[union-attr]
+            options=options,
+            correct_index=max(0, min(3, int(item.get("correct_index", 0)))),  # type: ignore[union-attr]
+        )
+
+    def _build_frq_from_item(self, item: object, math_mode: bool = False) -> Optional[GeneratedFRQ]:
+        """Normalize, validate, and convert one raw FRQ dict; None if invalid."""
+        item = self._normalize_frq_item(item)
+        validator = self._is_valid_math_frq if math_mode else self._is_valid_frq
+        if not validator(item):
+            return None
+        return GeneratedFRQ(
+            question_text=self._strip_source_references(normalize_latex(str(item.get("question_text", "")).strip())),  # type: ignore[union-attr]
+            expected_answer=self._strip_source_references(normalize_latex(str(item.get("expected_answer", "")).strip())),  # type: ignore[union-attr]
+        )
+
     def _parse_generated_test(
         self,
         data: dict[str, object],
@@ -2935,31 +3510,16 @@ Return only the JSON object."""
         frq_raw = data.get("frq", [])
         mcq: list[GeneratedMCQ] = []
         frq: list[GeneratedFRQ] = []
-        mcq_validator = self._is_valid_math_mcq if math_mode else self._is_valid_mcq
-        frq_validator = self._is_valid_math_frq if math_mode else self._is_valid_frq
         if isinstance(mcq_raw, list):
             for item in mcq_raw:
-                item = self._normalize_mcq_item(item)
-                if mcq_validator(item):
-                    raw_options = [str(o) for o in item["options"]][:4]  # type: ignore[index]
-                    options = [normalize_latex(o) for o in raw_options]
-                    mcq.append(
-                        GeneratedMCQ(
-                            question_text=self._strip_source_references(normalize_latex(str(item.get("question_text", "Study question")))),  # type: ignore[union-attr]
-                            options=options,
-                            correct_index=max(0, min(3, int(item.get("correct_index", 0)))),  # type: ignore[union-attr]
-                        )
-                    )
+                built_mcq = self._build_mcq_from_item(item, math_mode=math_mode)
+                if built_mcq is not None:
+                    mcq.append(built_mcq)
         if isinstance(frq_raw, list):
             for item in frq_raw:
-                item = self._normalize_frq_item(item)
-                if frq_validator(item):
-                    frq.append(
-                        GeneratedFRQ(
-                            question_text=self._strip_source_references(normalize_latex(str(item.get("question_text", "")).strip())),  # type: ignore[union-attr]
-                            expected_answer=self._strip_source_references(normalize_latex(str(item.get("expected_answer", "")).strip())),  # type: ignore[union-attr]
-                        )
-                    )
+                built_frq = self._build_frq_from_item(item, math_mode=math_mode)
+                if built_frq is not None:
+                    frq.append(built_frq)
 
         # Diagnostics: distinguish "model returned nothing" from "everything failed validation".
         raw_mcq_count = len(mcq_raw) if isinstance(mcq_raw, list) else 0

@@ -136,7 +136,12 @@ async def _generate_questions_background(
     # Dispatch a single generation call for the requested MCQ/FRQ counts. The three
     # source paths (template / parse / notes) each have their own LLM entry point
     # but share this MCQ/FRQ count contract. No DB access here.
-    async def run_generation(c_mcq: int, c_frq: int, prior: Optional[list[str]]):
+    # on_question switches the call into streamed mode: each generated question is
+    # delivered through the callback the moment it completes (parse path excluded;
+    # it never streams).
+    async def run_generation(
+        c_mcq: int, c_frq: int, prior: Optional[list[str]], on_question=None
+    ):
         if practice_test_content and notes_content:
             return await llm.generate_from_practice_test_template(
                 notes=notes_content,
@@ -153,6 +158,7 @@ async def _generate_questions_background(
                 provider=provider,
                 enable_fallback=enable_fallback,
                 prior_questions=prior,
+                on_question=on_question,
             )
         if practice_test_content:
             # Parsing extracts questions from a fixed document and has no
@@ -177,6 +183,7 @@ async def _generate_questions_background(
             provider=provider,
             enable_fallback=enable_fallback,
             prior_questions=prior,
+            on_question=on_question,
         )
 
     # Persist one MCQ/FRQ batch in a short-lived session, then release the
@@ -216,11 +223,52 @@ async def _generate_questions_background(
             rest_frq = max(0, eff_frq - first_frq)
             if rest_mcq or rest_frq:
                 # Feed the first batch's questions in as "already seen" so the
-                # remainder does not repeat them.
+                # remainder does not repeat them (prompt novelty block + server-side
+                # dedup in llm_service, GH #34).
                 seen = [q.question_text for q in mcq1] + [q.question_text for q in frq1]
                 prior_for_rest = (prior_questions or []) + seen
-                mcq2, frq2 = await run_generation(rest_mcq, rest_frq, prior_for_rest)
-                display_order = await persist_batch(mcq2, frq2, display_order)
+
+                # Questions 6+ arrive one at a time: the LLM response is token-
+                # streamed and each question is committed the moment its JSON
+                # object completes, so the polling take-test screen renders it
+                # immediately instead of waiting for the whole remainder blob.
+                def _norm(text: str) -> str:
+                    return " ".join((text or "").split()).lower()
+
+                persisted_keys: set[str] = set()
+
+                async def persist_streamed_question(kind: str, item) -> None:
+                    nonlocal display_order
+                    async with async_session_maker() as q_session:
+                        q_repo = TestRepository(q_session)
+                        if kind == "mcq":
+                            q_options = [
+                                (option_text, index == item.correct_index)
+                                for index, option_text in enumerate(item.options)
+                            ]
+                            await q_repo.add_mcq_question(
+                                test_id, item.question_text, display_order, q_options
+                            )
+                        else:
+                            await q_repo.add_frq_question(
+                                test_id, item.question_text, display_order, item.expected_answer
+                            )
+                        await q_session.commit()
+                    display_order += 1
+                    persisted_keys.add(_norm(item.question_text))
+
+                mcq2, frq2 = await run_generation(
+                    rest_mcq, rest_frq, prior_for_rest,
+                    on_question=persist_streamed_question,
+                )
+                # Safety net: some fallback returns inside the LLM service bypass
+                # the callback (e.g. the note-based fallback built after an
+                # exception). Persist anything returned that was not already
+                # committed by the streamed callback.
+                leftover_mcq = [q for q in mcq2 if _norm(q.question_text) not in persisted_keys]
+                leftover_frq = [q for q in frq2 if _norm(q.question_text) not in persisted_keys]
+                if leftover_mcq or leftover_frq:
+                    display_order = await persist_batch(leftover_mcq, leftover_frq, display_order)
         else:
             mcq_questions, frq_questions = await run_generation(count_mcq, count_frq, prior_questions)
             display_order = await persist_batch(mcq_questions, frq_questions, display_order)
