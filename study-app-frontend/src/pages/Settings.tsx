@@ -67,7 +67,6 @@ export default function Settings() {
     kojoStrictness,
     setKojoStrictness,
     betaMode,
-    setBetaMode,
   } = useSettings();
   const ADMIN_EMAILS = ["jamesinah34@gmail.com", "jamesinah883@gmail.com"];
   const isAdmin = !guest && !!user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
@@ -373,26 +372,13 @@ export default function Settings() {
 
         <h2 className="settings-group-title">App preferences</h2>
 
-        {!guest ? (
+        {!guest && betaMode ? (
           <CollapsibleSection title="Beta features">
             <p className="muted small">
-              Enable experimental features: LeetCode mode and Mock Interview. These are works-in-progress and may have rough edges.
+              Beta features are enabled for your account: LeetCode mode and Mock Interview. These are works-in-progress and may have rough edges. Access is granted by an admin.
             </p>
             <div className="settings-reset-row">
-              <button
-                type="button"
-                role="switch"
-                className={`settings-toggle-switch${betaMode ? " settings-toggle-switch--on" : ""}`}
-                onClick={() => setBetaMode(!betaMode)}
-                aria-pressed={betaMode}
-              >
-                <span className="settings-toggle-track">
-                  <span className="settings-toggle-thumb" />
-                </span>
-                <span className="settings-toggle-label">
-                  {betaMode ? "Beta features on" : "Beta features off"}
-                </span>
-              </button>
+              <span className="pill">Beta access enabled</span>
             </div>
           </CollapsibleSection>
         ) : null}
