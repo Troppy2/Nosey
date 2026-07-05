@@ -303,7 +303,7 @@ export default function Settings() {
             onChange={(event) => handleChangeGenerationProvider(event.target.value)}
             hint="This setting feeds Create Test, Flashcards, Kojo, and other AI workflows."
           >
-            {GENERATION_PROVIDER_OPTIONS.map((option) => (
+            {GENERATION_PROVIDER_OPTIONS.filter((option) => option.value !== "claude" || isAdmin).map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </SelectInput>
