@@ -21,6 +21,7 @@ import {
   getAdminToken,
   getAdminTokenExpiresAt,
   getStoredUser,
+  setUserBeta,
 } from "../lib/api";
 import type { AdminStats, AdminUserRow } from "../lib/types";
 
@@ -101,6 +102,21 @@ export default function AdminPanel() {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reauthing, setReauthing] = useState(false);
+  const [betaUpdating, setBetaUpdating] = useState<AdminUserRow["id"] | null>(null);
+  const [betaError, setBetaError] = useState<string | null>(null);
+
+  async function handleToggleBeta(u: AdminUserRow) {
+    setBetaError(null);
+    setBetaUpdating(u.id);
+    try {
+      const updated = await setUserBeta(u.id, !u.is_beta);
+      setUsers((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+    } catch (e) {
+      setBetaError(e instanceof Error ? e.message : "Failed to update beta access");
+    } finally {
+      setBetaUpdating(null);
+    }
+  }
 
   const expiredCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -475,6 +491,7 @@ export default function AdminPanel() {
           <>
             <section className="admin-section">
               <h2 className="admin-section-title">Authenticated users ({realUsers.length})</h2>
+              {betaError ? <p className="admin-error small">{betaError}</p> : null}
               {realUsers.length === 0 && !loading ? (
                 <p className="muted small">No authenticated users found.</p>
               ) : (
@@ -487,6 +504,7 @@ export default function AdminPanel() {
                         <th>Email</th>
                         <th>Verified</th>
                         <th>Admin</th>
+                        <th>Beta</th>
                         <th>Joined</th>
                       </tr>
                     </thead>
@@ -506,6 +524,24 @@ export default function AdminPanel() {
                               <span className="admin-badge admin-badge--blue">Admin</span>
                             ) : (
                               <span className="muted">-</span>
+                            )}
+                          </td>
+                          <td>
+                            {u.is_admin ? (
+                              <span className="admin-badge admin-badge--green" title="Admins always have beta access">
+                                Yes (admin)
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                className={`admin-badge admin-badge--btn ${u.is_beta ? "admin-badge--green" : "admin-badge--muted"}`}
+                                onClick={() => handleToggleBeta(u)}
+                                disabled={betaUpdating === u.id}
+                                aria-pressed={u.is_beta}
+                                title="Toggle beta access for this user"
+                              >
+                                {betaUpdating === u.id ? "..." : u.is_beta ? "Yes" : "No"}
+                              </button>
                             )}
                           </td>
                           <td className="admin-cell-date">

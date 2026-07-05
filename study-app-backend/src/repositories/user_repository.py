@@ -74,6 +74,11 @@ class UserRepository(BaseRepository[User]):
         await self.session.flush()
         return user
 
+    async def set_beta(self, user: User, is_beta: bool) -> User:
+        user.is_beta = is_beta
+        await self.session.flush()
+        return user
+
     async def update_date_of_birth(self, user: User, dob: date) -> User:
         user.date_of_birth = dob
         user.age = _compute_age(dob)

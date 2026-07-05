@@ -1144,3 +1144,10 @@ export async function fetchAdminStats(): Promise<AdminStats> {
 export async function fetchAdminUsers(): Promise<AdminUserRow[]> {
   return adminRequest<AdminUserRow[]>("/admin/users");
 }
+
+export async function setUserBeta(userId: ID, isBeta: boolean): Promise<AdminUserRow> {
+  return adminRequest<AdminUserRow>(`/admin/users/${userId}/beta`, {
+    method: "PATCH",
+    body: JSON.stringify({ is_beta: isBeta }),
+  });
+}
