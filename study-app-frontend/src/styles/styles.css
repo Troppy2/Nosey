@@ -10748,6 +10748,28 @@ h3 {
   color: #1d4ed8;
 }
 
+/* Clickable badge used as the per-user beta access toggle in the admin roster. */
+.admin-badge--btn {
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: filter 0.15s ease;
+}
+
+.admin-badge--btn:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+.admin-badge--btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.admin-error {
+  color: #dc2626;
+  margin-bottom: 12px;
+}
+
 /* Error banner */
 .admin-error-banner {
   display: flex;

@@ -29,6 +29,7 @@ class AdminUserRow(BaseModel):
     full_name: Optional[str]
     profile_picture_url: Optional[str]
     is_admin: bool
+    is_beta: bool
     email_verified: bool
     created_at: str
     updated_at: str
@@ -41,6 +42,7 @@ class AdminUserRow(BaseModel):
             full_name=user.full_name,
             profile_picture_url=user.profile_picture_url,
             is_admin=user.is_admin,
+            is_beta=user.is_beta,
             email_verified=user.email_verified,
             created_at=user.created_at.isoformat(),
             updated_at=user.updated_at.isoformat(),
@@ -164,6 +166,26 @@ async def list_all_users(
     user_repo = UserRepository(session)
     users = await user_repo.get_all_users()
     return [AdminUserRow.from_user(u) for u in users]
+
+
+class SetBetaRequest(BaseModel):
+    is_beta: bool
+
+
+@router.patch("/users/{user_id}/beta", response_model=AdminUserRow)
+async def set_user_beta(
+    user_id: int,
+    payload: SetBetaRequest,
+    admin_user: User = Depends(get_admin_user),
+    session: AsyncSession = Depends(get_session),
+) -> AdminUserRow:
+    user_repo = UserRepository(session)
+    user = await user_repo.get_by_id(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    await user_repo.set_beta(user, payload.is_beta)
+    await session.commit()
+    return AdminUserRow.from_user(user)
 
 
 async def _gather_stats(user_repo: UserRepository, usage_repo: UsageEventRepository):

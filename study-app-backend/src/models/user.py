@@ -27,6 +27,7 @@ class User(Base, TimestampMixin):
     full_name: Mapped[Optional[str]] = mapped_column(String(255))
     profile_picture_url: Mapped[Optional[str]] = mapped_column(Text)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    is_beta: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     admin_session_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
     date_of_birth: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
