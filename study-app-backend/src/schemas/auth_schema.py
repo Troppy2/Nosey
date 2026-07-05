@@ -22,6 +22,7 @@ class UserResponse(BaseModel):
     full_name: Optional[str] = None
     profile_picture_url: Optional[str] = None
     is_admin: bool = False
+    is_beta: bool = False
     email_verified: bool = False
     date_of_birth: Optional[date] = None
     age: Optional[int] = None

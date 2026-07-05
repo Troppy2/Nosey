@@ -231,6 +231,7 @@ export type AuthUser = {
   profile_picture_url?: string | null;
   is_guest?: boolean;
   is_admin?: boolean;
+  is_beta?: boolean;
   email_verified?: boolean;
   date_of_birth?: string | null;
   age?: number | null;
@@ -243,6 +244,7 @@ export type AdminUserRow = {
   full_name: string | null;
   profile_picture_url: string | null;
   is_admin: boolean;
+  is_beta: boolean;
   email_verified: boolean;
   created_at: string;
   updated_at: string;
