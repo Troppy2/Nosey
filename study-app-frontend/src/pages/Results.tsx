@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
+import { FeatureSurvey } from "../components/FeatureSurvey";
 import { SelectInput, TextInput } from "../components/Field";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
@@ -383,6 +384,8 @@ export default function Results() {
           ))}
         </div>
       </section>
+
+      {!isGuestSession() ? <FeatureSurvey feature="testing" trigger={!!attempt} /> : null}
     </div>
   );
 

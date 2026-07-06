@@ -5,8 +5,9 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
+import { FeatureSurvey } from "../components/FeatureSurvey";
 import { MarkdownContent } from "../components/MarkdownContent";
-import { deleteFlashcard, fetchFlashcards, fetchFolders, recordFlashcardAttempt, scopeKey } from "../lib/api";
+import { deleteFlashcard, fetchFlashcards, fetchFolders, isGuestSession, recordFlashcardAttempt, scopeKey } from "../lib/api";
 import type { Flashcard, Folder } from "../lib/types";
 
 export default function Flashcards() {
@@ -241,6 +242,7 @@ export default function Flashcards() {
             </Link>
           </div>
         </Card>
+        {!isGuestSession() ? <FeatureSurvey feature="flashcards" trigger={complete} /> : null}
       </div>
     );
   }
