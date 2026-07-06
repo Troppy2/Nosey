@@ -31,49 +31,78 @@ export default function SignIn() {
 
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const initialized = useRef(false);
+  // Container Google renders its official button into. Clicking that button
+  // opens the Google account-chooser window and returns an ID-token credential
+  // to the callback below (unlike One Tap, which only shows a dismissible hint).
+  const googleButtonRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (hasValidSession()) navigate(redirectTo, { replace: true });
   }, [navigate, redirectTo]);
 
   useEffect(() => {
-    if (!clientId || initialized.current) return;
+    if (!clientId) return;
+
+    const handleCredential = async (resp: any) => {
+      if (!resp?.credential) return;
+      setGoogleLoading(true);
+      try {
+        const user = await googleSignIn(resp.credential);
+        // New accounts have no date of birth yet: gate on the age prompt before
+        // completing the redirect. Returning users skip straight through.
+        if (!user.date_of_birth) {
+          setShowDobModal(true);
+          setGoogleLoading(false);
+        } else {
+          navigate(redirectTo);
+        }
+      } catch (err) {
+        console.error(err);
+        setGoogleLoading(false);
+      }
+    };
+
+    // Initializes Google Identity and renders the account-chooser button into
+    // our container. Safe to call once the GSI script and the container exist.
+    const setup = () => {
+      const g = (window as any).google;
+      if (!g?.accounts?.id || !googleButtonRef.current) return;
+      if (!initialized.current) {
+        g.accounts.id.initialize({ client_id: clientId, callback: handleCredential });
+        initialized.current = true;
+      }
+      g.accounts.id.renderButton(googleButtonRef.current, {
+        type: "standard",
+        theme: "outline",
+        size: "large",
+        text: "continue_with",
+        shape: "pill",
+        logo_alignment: "center",
+        width: 300,
+      });
+    };
+
+    // If the GSI script is already present (e.g. returning to this page), render
+    // immediately; otherwise load it and render on load.
+    if ((window as any).google?.accounts?.id) {
+      setup();
+      return;
+    }
+
     const script = document.createElement("script");
     script.src = "https://accounts.google.com/gsi/client";
     script.async = true;
     script.defer = true;
     script.onload = () => {
       try {
-        (window as any).google.accounts.id.initialize({
-          client_id: clientId,
-          callback: async (resp: any) => {
-            if (!resp?.credential) return;
-            setGoogleLoading(true);
-            try {
-              const user = await googleSignIn(resp.credential);
-              // New accounts have no date of birth yet: gate on the age prompt
-              // before completing the redirect. Returning users skip straight
-              // through.
-              if (!user.date_of_birth) {
-                setShowDobModal(true);
-                setGoogleLoading(false);
-              } else {
-                navigate(redirectTo);
-              }
-            } catch (err) {
-              console.error(err);
-              setGoogleLoading(false);
-            }
-          },
-        });
-        initialized.current = true;
+        setup();
       } catch (e) {
         console.warn("Google Identity init failed", e);
       }
     };
     document.head.appendChild(script);
     return () => {
-      document.head.removeChild(script);
+      script.remove();
     };
   }, [clientId, navigate, redirectTo]);
 
@@ -104,22 +133,24 @@ export default function SignIn() {
             </p>
           </div>
           <div className="signin-actions">
-            <Button
-              fullWidth
-              icon={<LogIn size={18} />}
-              disabled={googleLoading}
-              onClick={() => {
-                if (clientId && (window as any).google?.accounts?.id) {
-                  (window as any).google.accounts.id.prompt();
-                  return;
-                }
-                // Local-dev fallback when no Google client ID is configured.
-                setGoogleSession();
-                navigate(redirectTo);
-              }}
-            >
-              {googleLoading ? "Signing in..." : "Continue with Google"}
-            </Button>
+            {clientId ? (
+              <div className="google-btn-wrap">
+                <div ref={googleButtonRef} />
+                {googleLoading && <p className="small muted signin-loading">Signing in...</p>}
+              </div>
+            ) : (
+              // Local-dev fallback when no Google client ID is configured.
+              <Button
+                fullWidth
+                icon={<LogIn size={18} />}
+                onClick={() => {
+                  setGoogleSession();
+                  navigate(redirectTo);
+                }}
+              >
+                Continue with Google
+              </Button>
+            )}
           </div>
           <div className="trust-note">
             <ShieldCheck size={17} />
