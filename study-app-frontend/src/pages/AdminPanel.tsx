@@ -144,22 +144,53 @@ export default function AdminPanel() {
   const loadData = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
-    try {
-      const [s, u, sv] = await Promise.all([fetchAdminStats(), fetchAdminUsers(), fetchAdminSurveys()]);
-      setStats(s);
-      setUsers(u);
-      setSurveys(sv);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to load admin data.";
-      if (msg.toLowerCase().includes("expired") || msg.toLowerCase().includes("invalid")) {
-        setAuthed(false);
-        setReauthing(true);
-      } else {
-        setLoadError(msg);
-      }
-    } finally {
+
+    // Load each section independently so one failing endpoint does not blank the
+    // whole panel. Previously this used Promise.all, so a single 500 (e.g. the
+    // surveys endpoint) took down stats, users, and surveys together.
+    const [statsRes, usersRes, surveysRes] = await Promise.allSettled([
+      fetchAdminStats(),
+      fetchAdminUsers(),
+      fetchAdminSurveys(),
+    ]);
+
+    const reasonMessage = (r: PromiseSettledResult<unknown>): string =>
+      r.status === "rejected"
+        ? r.reason instanceof Error
+          ? r.reason.message
+          : String(r.reason)
+        : "";
+
+    // A single admin token backs all three calls, so an expired/invalid session
+    // fails them all with an auth error. Re-authenticate rather than showing
+    // per-section errors.
+    const results: PromiseSettledResult<unknown>[] = [statsRes, usersRes, surveysRes];
+    const authExpired = results.some((r) => {
+      const msg = reasonMessage(r).toLowerCase();
+      return msg.includes("expired") || msg.includes("invalid");
+    });
+    if (authExpired) {
+      setAuthed(false);
+      setReauthing(true);
       setLoading(false);
+      return;
     }
+
+    if (statsRes.status === "fulfilled") setStats(statsRes.value);
+    if (usersRes.status === "fulfilled") setUsers(usersRes.value);
+    if (surveysRes.status === "fulfilled") setSurveys(surveysRes.value);
+
+    // Surface any non-auth failures as a non-fatal banner while the sections that
+    // did load still render.
+    const failures: string[] = [];
+    if (statsRes.status === "rejected") failures.push(`Stats (${reasonMessage(statsRes)})`);
+    if (usersRes.status === "rejected") failures.push(`Users (${reasonMessage(usersRes)})`);
+    if (surveysRes.status === "rejected") failures.push(`Feature surveys (${reasonMessage(surveysRes)})`);
+    setLoadError(
+      failures.length ? `Some sections failed to load: ${failures.join("; ")}` : null,
+    );
+
+    setLoading(false);
   }, []);
 
   useEffect(() => {
