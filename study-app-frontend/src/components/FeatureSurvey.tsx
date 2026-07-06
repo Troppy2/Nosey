@@ -10,6 +10,17 @@ const FEATURE_LABELS: Record<SurveyFeature, string> = {
   kojo: "chatting with Kojo",
 };
 
+// Live feedback as the user hovers or selects a star. Index 0 is the resting
+// state before any rating is chosen.
+const RATING_LABELS = [
+  "Tap a star to rate",
+  "Not for me",
+  "Could be better",
+  "It was fine",
+  "Really good",
+  "Loved it",
+];
+
 interface FeatureSurveyProps {
   feature: SurveyFeature;
   // Rising-edge trigger. When this flips from false to true, the component
@@ -64,6 +75,8 @@ export function FeatureSurvey({ feature, trigger, onResolved }: FeatureSurveyPro
 
   if (!visible) return null;
 
+  const activeRating = hover || rating;
+
   return (
     <div className="modal-backdrop" onMouseDown={resolve}>
       <div
@@ -73,32 +86,40 @@ export function FeatureSurvey({ feature, trigger, onResolved }: FeatureSurveyPro
         aria-label="Feedback survey"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <button className="privacy-modal-close" onClick={resolve} aria-label="Close">
+        <button className="privacy-modal-close survey-close" onClick={resolve} aria-label="Close">
           <X size={18} />
         </button>
-        <h2>Quick question</h2>
-        <p className="muted small">How was {FEATURE_LABELS[feature]}? Your rating helps us improve Nosey.</p>
 
-        <div className="survey-stars" role="radiogroup" aria-label="Rating out of 5">
-          {[1, 2, 3, 4, 5].map((n) => (
-            <button
-              key={n}
-              type="button"
-              className={`survey-star${n <= (hover || rating) ? " survey-star--on" : ""}`}
-              onClick={() => setRating(n)}
-              onMouseEnter={() => setHover(n)}
-              onMouseLeave={() => setHover(0)}
-              aria-label={`${n} star${n === 1 ? "" : "s"}`}
-              aria-pressed={rating === n}
-            >
-              <Star size={30} />
-            </button>
-          ))}
+        <div className="survey-head">
+          <p className="survey-eyebrow">One quick thing</p>
+          <h2 className="survey-title">How was {FEATURE_LABELS[feature]}?</h2>
+        </div>
+
+        <div className="survey-rate">
+          <div className="survey-stars" role="radiogroup" aria-label="Rating out of 5">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button
+                key={n}
+                type="button"
+                className={`survey-star${n <= activeRating ? " survey-star--on" : ""}`}
+                onClick={() => setRating(n)}
+                onMouseEnter={() => setHover(n)}
+                onMouseLeave={() => setHover(0)}
+                aria-label={`${n} star${n === 1 ? "" : "s"}`}
+                aria-pressed={rating === n}
+              >
+                <Star size={34} strokeWidth={1.75} />
+              </button>
+            ))}
+          </div>
+          <p className={`survey-rating-label${activeRating ? " survey-rating-label--set" : ""}`}>
+            {RATING_LABELS[activeRating]}
+          </p>
         </div>
 
         <textarea
           className="survey-comment"
-          placeholder="Anything else? (optional)"
+          placeholder="Tell us more (optional)"
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           maxLength={1000}
@@ -115,7 +136,7 @@ export function FeatureSurvey({ feature, trigger, onResolved }: FeatureSurveyPro
             onClick={handleSubmit}
             disabled={rating < 1 || submitting}
           >
-            {submitting ? "Sending…" : "Submit"}
+            {submitting ? "Sending…" : "Send feedback"}
           </button>
         </div>
       </div>
