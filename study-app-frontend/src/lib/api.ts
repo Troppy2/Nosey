@@ -73,6 +73,31 @@ export function isAuthenticated(): boolean {
   return hasValidSession() || isGuestSession() || localStorage.getItem(TOKEN_KEY) !== null;
 }
 
+// Sanitizes a post-login redirect target so we only ever navigate to an
+// internal, same-origin path. Prevents open-redirect abuse via a crafted
+// `?redirect=` query param (e.g. `//evil.com`, `https://evil.com`, or a
+// backslash trick). Anything that is not a plain root-relative path falls back
+// to the dashboard.
+export function sanitizeRedirect(raw: string | null | undefined): string {
+  const fallback = "/dashboard";
+  if (!raw) return fallback;
+  let value: string;
+  try {
+    value = decodeURIComponent(raw);
+  } catch {
+    return fallback;
+  }
+  // Must be a root-relative path. Reject protocol-relative ("//host"),
+  // backslash tricks ("/\\host" and "\\host"), and absolute URLs ("https://host").
+  if (!value.startsWith("/")) return fallback;
+  if (value.startsWith("//") || value.startsWith("/\\")) return fallback;
+  if (value.includes("://")) return fallback;
+  // Reject control characters (code points below 0x20) that could smuggle a
+  // redirect past the checks.
+  if (Array.from(value).some((c) => c.charCodeAt(0) < 0x20)) return fallback;
+  return value;
+}
+
 type RequestOptions = RequestInit & {
   allowMock?: boolean;
 };
