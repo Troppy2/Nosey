@@ -11,6 +11,7 @@ import type {
   DraftAttemptAnswer,
   DraftAttemptResponse,
   InterviewChatMessage,
+  ID,
   KojoClearResponse,
   KojoClearedConversation,
   Flashcard,
