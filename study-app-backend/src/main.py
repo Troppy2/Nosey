@@ -27,7 +27,7 @@ from starlette.responses import JSONResponse
 
 from src.config import settings
 from src.limiter import limiter
-from src.routes import admin, attempts, auth, flashcards, folder_files, folders, health, kojo, leetcode, mock_interview, slash_commands, tests
+from src.routes import admin, attempts, auth, flashcards, folder_files, folders, health, kojo, leetcode, mock_interview, slash_commands, surveys, tests
 from src.utils.validators import MAX_UPLOAD_TOTAL_SIZE_BYTES
 
 _MAX_REQUEST_BODY_BYTES = MAX_UPLOAD_TOTAL_SIZE_BYTES
@@ -86,3 +86,4 @@ app.include_router(kojo.router)
 app.include_router(leetcode.router)
 app.include_router(mock_interview.router)
 app.include_router(slash_commands.router)
+app.include_router(surveys.router)
