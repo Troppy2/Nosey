@@ -17,13 +17,14 @@ import {
   adminAuthenticate,
   clearAdminToken,
   fetchAdminStats,
+  fetchAdminSurveys,
   fetchAdminUsers,
   getAdminToken,
   getAdminTokenExpiresAt,
   getStoredUser,
   setUserBeta,
 } from "../lib/api";
-import type { AdminStats, AdminUserRow } from "../lib/types";
+import type { AdminStats, AdminSurveysResponse, AdminUserRow } from "../lib/types";
 
 const ADMIN_EMAILS = ["jamesinah34@gmail.com", "jamesinah883@gmail.com"];
 const REAUTH_WARN_SECONDS = 60;
@@ -99,6 +100,7 @@ export default function AdminPanel() {
 
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<AdminUserRow[]>([]);
+  const [surveys, setSurveys] = useState<AdminSurveysResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reauthing, setReauthing] = useState(false);
@@ -143,9 +145,10 @@ export default function AdminPanel() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [s, u] = await Promise.all([fetchAdminStats(), fetchAdminUsers()]);
+      const [s, u, sv] = await Promise.all([fetchAdminStats(), fetchAdminUsers(), fetchAdminSurveys()]);
       setStats(s);
       setUsers(u);
+      setSurveys(sv);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to load admin data.";
       if (msg.toLowerCase().includes("expired") || msg.toLowerCase().includes("invalid")) {
@@ -481,6 +484,53 @@ export default function AdminPanel() {
         </>
       ) : loading ? (
         <p className="muted">Loading stats...</p>
+      ) : null}
+
+      {/* Feature surveys */}
+      {surveys && surveys.summary.length > 0 ? (
+        <section className="admin-section">
+          <h2 className="admin-section-title">Feature surveys</h2>
+          <div className="admin-survey-grid">
+            {surveys.summary.map((s) => (
+              <div key={s.feature} className="admin-survey-card">
+                <span className="admin-survey-feature">{formatFeatureName(s.feature)}</span>
+                <strong className="admin-survey-rating">
+                  {s.avg_rating.toFixed(1)}
+                  <span className="admin-survey-rating-max">/5</span>
+                </strong>
+                <span className="muted small">
+                  {s.count} response{s.count === 1 ? "" : "s"}
+                </span>
+              </div>
+            ))}
+          </div>
+          {surveys.recent.some((r) => r.comment) ? (
+            <div className="admin-survey-comments">
+              <h3 className="admin-survey-comments-title">Recent comments</h3>
+              {surveys.recent
+                .filter((r) => r.comment)
+                .slice(0, 15)
+                .map((r) => (
+                  <div key={r.id} className="admin-survey-comment">
+                    <div className="admin-survey-comment-head">
+                      <span className="admin-badge admin-badge--muted">{formatFeatureName(r.feature)}</span>
+                      <span className="admin-survey-comment-rating" aria-label={`${r.rating} out of 5`}>
+                        {"★".repeat(r.rating)}
+                        {"☆".repeat(5 - r.rating)}
+                      </span>
+                      <span className="admin-cell-date">{new Date(r.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <p className="admin-survey-comment-text">{r.comment}</p>
+                  </div>
+                ))}
+            </div>
+          ) : null}
+        </section>
+      ) : surveys && surveys.summary.length === 0 && !loading ? (
+        <section className="admin-section">
+          <h2 className="admin-section-title">Feature surveys</h2>
+          <p className="muted small">No survey responses yet.</p>
+        </section>
       ) : null}
 
       {/* Authenticated user roster */}

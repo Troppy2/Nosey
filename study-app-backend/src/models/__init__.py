@@ -13,6 +13,7 @@ from src.models.mock_interview import MockInterviewSession
 from src.models.note import Note
 from src.models.question import Question
 from src.models.slash_command import SlashCommand
+from src.models.survey_response import SurveyResponse
 from src.models.test import Test
 from src.models.usage_event import UsageEvent
 from src.models.user import User
@@ -38,6 +39,7 @@ __all__ = [
     "Note",
     "Question",
     "SlashCommand",
+    "SurveyResponse",
     "Test",
     "UsageEvent",
     "User",
