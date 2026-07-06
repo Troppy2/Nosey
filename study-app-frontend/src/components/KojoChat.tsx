@@ -1,8 +1,9 @@
 import { AlertCircle, Bot, Maximize2, Minimize2, Send, Sparkles, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { clearKojoConversation, fetchKojoConversation, fetchProviderStatus, kojoChat } from "../lib/api";
+import { clearKojoConversation, fetchKojoConversation, fetchProviderStatus, isGuestSession, kojoChat } from "../lib/api";
 import type { KojoMessage, ProviderStatus } from "../lib/types";
 import { useSettings } from "../lib/useSettings";
+import { FeatureSurvey } from "./FeatureSurvey";
 import { MarkdownContent } from "./MarkdownContent";
 import { useLocation } from 'react-router-dom'
 
@@ -43,6 +44,20 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
   const { generationProvider } = useSettings();
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Tracks whether the user actually sent a message this session, so the survey
+  // only fires after real interaction (not just opening an existing chat).
+  const hasInteractedRef = useRef(false);
+  const [closingSurvey, setClosingSurvey] = useState(false);
+
+  // Route close attempts through the survey: if the user chatted, offer the
+  // survey first and defer the real close until it resolves.
+  function handleClose() {
+    if (hasInteractedRef.current && !isGuestSession()) {
+      setClosingSurvey(true);
+    } else {
+      onClose();
+    }
+  }
 
 
 
@@ -72,6 +87,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
   async function handleSend(text?: string) {
     const messageText = (text ?? input).trim();
     if (!messageText || isLoading) return;
+    hasInteractedRef.current = true;
 
     const userMsg: KojoMessage = {
       id: Date.now(),
@@ -148,7 +164,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
   return (
     <>
       {!isFullscreen && (
-        <div className="kojo-backdrop" onClick={onClose} aria-hidden="true" />
+        <div className="kojo-backdrop" onClick={handleClose} aria-hidden="true" />
       )}
       <div
         className={`kojo-panel${isFullscreen ? " kojo-panel--fullscreen" : ""}`}
@@ -193,7 +209,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
             </button>
             <button
               className="kojo-header-btn"
-              onClick={onClose}
+              onClick={handleClose}
               type="button"
               aria-label="Close Kojo"
               title="Close"
@@ -341,6 +357,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
           </div>
         </div>
       </div>
+      <FeatureSurvey feature="kojo" trigger={closingSurvey} onResolved={onClose} />
     </>
   );
 }
