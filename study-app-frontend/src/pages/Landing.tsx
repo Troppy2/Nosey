@@ -1,9 +1,9 @@
-import { ArrowRight, BookOpen, Brain, FileText, LogIn, ShieldCheck, X } from "lucide-react";
+import { BookOpen, Brain, FileText, LogIn, ShieldCheck, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
-import { setGoogleSession, guestSignIn, googleSignIn, submitDateOfBirth, hasValidSession } from "../lib/api";
-import { useEffect, useRef, useState } from "react";
+import { guestSignIn, hasValidSession } from "../lib/api";
+import { useEffect, useState } from "react";
 
 const features = [
   {
@@ -25,17 +25,13 @@ const features = [
 
 export default function Landing() {
   const navigate = useNavigate();
-  const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
     if (hasValidSession()) navigate("/dashboard", { replace: true });
   }, [navigate]);
+
   const [guestLoading, setGuestLoading] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
-  const [showDobModal, setShowDobModal] = useState(false);
-  const [dob, setDob] = useState("");
-  const [dobError, setDobError] = useState<string | null>(null);
-  const [dobLoading, setDobLoading] = useState(false);
 
   useEffect(() => {
     if (!privacyOpen) return;
@@ -43,46 +39,6 @@ export default function Landing() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [privacyOpen]);
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  const initialized = useRef(false);
-
-  useEffect(() => {
-    if (!clientId || initialized.current) return;
-    const script = document.createElement("script");
-    script.src = "https://accounts.google.com/gsi/client";
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      try {
-        (window as any).google.accounts.id.initialize({
-          client_id: clientId,
-          callback: async (resp: any) => {
-            if (!resp?.credential) return;
-            setGoogleLoading(true);
-            try {
-              const user = await googleSignIn(resp.credential);
-              if (!user.date_of_birth) {
-                setShowDobModal(true);
-                setGoogleLoading(false);
-              } else {
-                navigate("/dashboard");
-              }
-            } catch (err) {
-              console.error(err);
-              setGoogleLoading(false);
-            }
-          },
-        });
-        initialized.current = true;
-      } catch (e) {
-        console.warn("Google Identity init failed", e);
-      }
-    };
-    document.head.appendChild(script);
-    return () => {
-      document.head.removeChild(script);
-    };
-  }, [clientId, navigate]);
 
   return (
     <main className="landing">
@@ -109,21 +65,19 @@ export default function Landing() {
             <Button
               fullWidth
               icon={<LogIn size={18} />}
-              onClick={async () => {
-                if (clientId && (window as any).google?.accounts?.id) {
-                  (window as any).google.accounts.id.prompt();
-                  return;
-                }
-                setGoogleSession();
-                navigate("/dashboard");
-              }}
+              onClick={() => navigate("/sign-in")}
             >
-              {googleLoading ? "Signing in..." : "Google sign in"}
+              Sign in
             </Button>
-            <Button
-              fullWidth
-              icon={<ArrowRight size={19} />}
-              variant="secondary"
+          </div>
+          <div className="trust-note">
+            <ShieldCheck size={17} />
+            <span>Sign in to save your notes, tests, and progress across devices.</span>
+          </div>
+          <div className="guest-skip">
+            <button
+              type="button"
+              className="guest-skip-link"
               disabled={guestLoading}
               onClick={async () => {
                 setGuestLoading(true);
@@ -135,12 +89,8 @@ export default function Landing() {
                 }
               }}
             >
-              {guestLoading ? "Starting…" : "Continue as guest"}
-            </Button>
-          </div>
-          <div className="trust-note">
-            <ShieldCheck size={17} />
-            <span>AI feedback can be wrong, so answers stay tied to your uploaded notes.</span>
+              {guestLoading ? "Starting a guest session..." : "or keep looking around as a guest"}
+            </button>
           </div>
         </Card>
 
@@ -174,43 +124,6 @@ export default function Landing() {
           </button>
         </footer>
       </section>
-
-      {showDobModal && (
-        <div className="modal-backdrop">
-          <div className="modal-card" role="dialog" aria-modal="true" aria-label="Date of birth" onMouseDown={(e) => e.stopPropagation()}>
-            <h2>One quick thing</h2>
-            <p className="muted">We use your date of birth to personalize your experience. This is kept private and never shared.</p>
-            <input
-              type="date"
-              className="modal-input"
-              value={dob}
-              onChange={(e) => { setDob(e.target.value); setDobError(null); }}
-              max={new Date().toISOString().split("T")[0]}
-              autoFocus
-            />
-            {dobError && <p style={{ color: "var(--red, #c0392b)", fontSize: "0.875rem" }}>{dobError}</p>}
-            <div className="button-row">
-              <Button
-                variant="primary"
-                disabled={!dob || dobLoading}
-                onClick={async () => {
-                  setDobLoading(true);
-                  setDobError(null);
-                  try {
-                    await submitDateOfBirth(dob);
-                    navigate("/dashboard");
-                  } catch {
-                    setDobError("Could not save your date of birth. Please try again.");
-                    setDobLoading(false);
-                  }
-                }}
-              >
-                {dobLoading ? "Saving..." : "Continue"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {privacyOpen && (
         <div className="modal-backdrop" onMouseDown={() => setPrivacyOpen(false)}>

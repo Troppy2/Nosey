@@ -8,6 +8,7 @@ import FlashcardsManage from "../pages/FlashcardsManage";
 import FolderDetail from "../pages/FolderDetail";
 import Folders from "../pages/Folders";
 import Landing from "../pages/Landing";
+import SignIn from "../pages/SignIn";
 import KojoMode from "../pages/KojoMode";
 import LeetCodeMode from "../pages/LeetCodeMode";
 import { isAuthenticated, isGuestSession, scopeKey } from "../lib/api";
@@ -57,6 +58,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Landing />} />
+        <Route path="/sign-in" element={<SignIn />} />
         <Route element={<RequireAuth><Sidebar /></RequireAuth>}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/folders" element={<Folders />} />
