@@ -10,9 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database import get_session
 from src.dependencies import get_admin_user, get_current_user
 from src.models.user import User
+from src.repositories.survey_repository import SurveyRepository
 from src.repositories.usage_event_repository import UsageEventRepository
 from src.repositories.user_repository import UserRepository
 from src.schemas.auth_schema import AdminTokenResponse
+from src.schemas.survey_schema import AdminSurveysResponse, SurveyFeatureSummary, SurveyRecentRow
 from src.services.auth_service import AuthService, ADMIN_TOKEN_TTL_SECONDS
 from src.config import settings
 
@@ -166,6 +168,20 @@ async def list_all_users(
     user_repo = UserRepository(session)
     users = await user_repo.get_all_users()
     return [AdminUserRow.from_user(u) for u in users]
+
+
+@router.get("/surveys", response_model=AdminSurveysResponse)
+async def get_admin_surveys(
+    admin_user: User = Depends(get_admin_user),
+    session: AsyncSession = Depends(get_session),
+) -> AdminSurveysResponse:
+    survey_repo = SurveyRepository(session)
+    summary = await survey_repo.get_summary()
+    recent = await survey_repo.get_recent(limit=50)
+    return AdminSurveysResponse(
+        summary=[SurveyFeatureSummary(**row) for row in summary],
+        recent=[SurveyRecentRow.model_validate(r) for r in recent],
+    )
 
 
 class SetBetaRequest(BaseModel):
