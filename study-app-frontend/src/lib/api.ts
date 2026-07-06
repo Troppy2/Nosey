@@ -1,5 +1,6 @@
 import type {
   AdminStats,
+  AdminSurveysResponse,
   AdminTokenResponse,
   AdminUserRow,
   AttemptDetail,
@@ -42,6 +43,7 @@ import type {
   SlashCommand,
   SlashCommandInput,
   SubmittedAnswer,
+  SurveyFeature,
   TestBlueprint,
   TestSummary,
   TestTake,
@@ -1175,5 +1177,21 @@ export async function setUserBeta(userId: ID, isBeta: boolean): Promise<AdminUse
   return adminRequest<AdminUserRow>(`/admin/users/${userId}/beta`, {
     method: "PATCH",
     body: JSON.stringify({ is_beta: isBeta }),
+  });
+}
+
+export async function fetchAdminSurveys(): Promise<AdminSurveysResponse> {
+  return adminRequest<AdminSurveysResponse>("/admin/surveys");
+}
+
+// Best-effort: a failed survey submit should never surface to the user.
+export async function submitSurvey(payload: {
+  feature: SurveyFeature;
+  rating: number;
+  comment?: string;
+}): Promise<void> {
+  await request<{ status: string }>("/surveys", {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }

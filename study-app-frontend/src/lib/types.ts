@@ -575,3 +575,26 @@ export type MockInterviewFinishResponse = {
   stage3_verdict?: string | null;
   hiring_recommendation: string;
 };
+
+// Post-feature satisfaction surveys
+export type SurveyFeature = "flashcards" | "testing" | "kojo";
+
+export type AdminSurveySummary = {
+  feature: string;
+  count: number;
+  avg_rating: number;
+};
+
+export type AdminSurveyRecent = {
+  id: ID;
+  user_id: ID;
+  feature: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+};
+
+export type AdminSurveysResponse = {
+  summary: AdminSurveySummary[];
+  recent: AdminSurveyRecent[];
+};
