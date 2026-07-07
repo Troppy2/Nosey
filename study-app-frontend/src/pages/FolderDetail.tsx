@@ -299,7 +299,7 @@ export default function FolderDetail() {
           >
             Folder Settings
           </Button>
-          <Link to={`/flashcards/${id}`}>
+          <Link to={`/flashcards/${id}/review`}>
             <Button variant="secondary" icon={<Brain size={18} />}>
               Study Flashcards
             </Button>
