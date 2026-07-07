@@ -10,7 +10,7 @@ import {
   XCircle,
   Zap,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import {
@@ -525,10 +525,20 @@ export default function AdminPanel() {
             {surveys.summary.map((s) => (
               <div key={s.feature} className="admin-survey-card">
                 <span className="admin-survey-feature">{formatFeatureName(s.feature)}</span>
-                <strong className="admin-survey-rating">
-                  {s.avg_rating.toFixed(1)}
-                  <span className="admin-survey-rating-max">/5</span>
-                </strong>
+                <div className="admin-survey-score">
+                  <strong className="admin-survey-rating">
+                    {s.avg_rating.toFixed(1)}
+                    <span className="admin-survey-rating-max">/5</span>
+                  </strong>
+                  <div
+                    className="admin-rating-meter"
+                    style={{ "--fill": `${(s.avg_rating / 5) * 100}%` } as CSSProperties}
+                    aria-hidden="true"
+                  >
+                    <span className="admin-rating-meter-track">★★★★★</span>
+                    <span className="admin-rating-meter-fill">★★★★★</span>
+                  </div>
+                </div>
                 <span className="muted small">
                   {s.count} response{s.count === 1 ? "" : "s"}
                 </span>
@@ -545,9 +555,13 @@ export default function AdminPanel() {
                   <div key={r.id} className="admin-survey-comment">
                     <div className="admin-survey-comment-head">
                       <span className="admin-badge admin-badge--muted">{formatFeatureName(r.feature)}</span>
-                      <span className="admin-survey-comment-rating" aria-label={`${r.rating} out of 5`}>
-                        {"★".repeat(r.rating)}
-                        {"☆".repeat(5 - r.rating)}
+                      <span
+                        className="admin-rating-meter admin-rating-meter--sm"
+                        style={{ "--fill": `${(r.rating / 5) * 100}%` } as CSSProperties}
+                        aria-label={`${r.rating} out of 5`}
+                      >
+                        <span className="admin-rating-meter-track" aria-hidden="true">★★★★★</span>
+                        <span className="admin-rating-meter-fill" aria-hidden="true">★★★★★</span>
                       </span>
                       <span className="admin-cell-date">{new Date(r.created_at).toLocaleDateString()}</span>
                     </div>
