@@ -13684,45 +13684,89 @@ select.lc-custom-input {
   cursor: default;
 }
 
-/* ── Admin: feature survey results ── */
+/* ── Admin: feature survey results ──
+   Reuses the modal's honey accent (--admin-star) so ratings read consistently
+   app-wide. The star meter turns a bare average into something scannable: a
+   muted 5-star track with a honey overlay clipped to the score. */
 .admin-survey-grid {
+  --admin-star: #e0a12e;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
   gap: 12px;
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 }
 
 .admin-survey-card {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 14px 16px;
-  border: 1px solid var(--green-lightest);
+  gap: 10px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: var(--green-lightest);
+  background: var(--white, #fff);
 }
 
 .admin-survey-feature {
+  font-size: 0.78rem;
   font-weight: 600;
-  color: var(--ink);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--green-dark-mid);
+}
+
+.admin-survey-score {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .admin-survey-rating {
-  font-size: 1.6rem;
-  color: var(--green-dark);
-  line-height: 1.1;
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1;
 }
 
 .admin-survey-rating-max {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--muted);
-  font-weight: 400;
+  font-weight: 500;
+  margin-left: 2px;
+}
+
+/* Star meter: two stacked star runs, the fill clipped to width: var(--fill). */
+.admin-rating-meter {
+  --admin-star: #e0a12e;
+  position: relative;
+  display: inline-block;
+  font-size: 0.95rem;
+  line-height: 1;
+  letter-spacing: 2px;
+  white-space: nowrap;
+}
+
+.admin-rating-meter-track {
+  color: var(--green-light-mid);
+}
+
+.admin-rating-meter-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--fill, 0%);
+  overflow: hidden;
+  color: var(--admin-star);
+}
+
+.admin-rating-meter--sm {
+  font-size: 0.82rem;
+  letter-spacing: 1.5px;
 }
 
 .admin-survey-comments {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .admin-survey-comments-title {
@@ -13732,9 +13776,11 @@ select.lc-custom-input {
 }
 
 .admin-survey-comment {
-  padding: 10px 14px;
-  border: 1px solid var(--green-lightest);
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--green-light-mid);
   border-radius: 10px;
+  background: var(--white, #fff);
 }
 
 .admin-survey-comment-head {
@@ -13744,15 +13790,15 @@ select.lc-custom-input {
   margin-bottom: 6px;
 }
 
-.admin-survey-comment-rating {
-  color: #f5b301;
-  font-size: 0.85rem;
-  letter-spacing: 1px;
+/* Push the date to the right edge of the comment header. */
+.admin-survey-comment-head .admin-cell-date {
+  margin-left: auto;
 }
 
 .admin-survey-comment-text {
   margin: 0;
   color: var(--ink);
   font-size: 0.9rem;
+  line-height: 1.5;
   white-space: pre-wrap;
 }
