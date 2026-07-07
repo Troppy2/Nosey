@@ -533,7 +533,7 @@ export default function Dashboard() {
                     weakCards.map((card) => (
                       <Link
                         key={card.id}
-                        to={`/flashcards/${card.folder_id}?card=${card.id}`}
+                        to={`/flashcards/${card.folder_id}/review?card=${card.id}`}
                         className="weak-card-link"
                       >
                         <Card tone="dark" interactive className="weak-card">

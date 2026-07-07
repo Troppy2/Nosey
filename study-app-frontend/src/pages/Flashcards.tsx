@@ -217,8 +217,8 @@ export default function Flashcards() {
           title={`No flashcards available for ${selectedFolder?.name ?? "this class"}`}
           body="There is nothing available for this class right now. Try another class folder."
           action={
-            <Link to="/flashcards">
-              <Button>Back to Class Folders</Button>
+            <Link to={selectedFolderId != null ? `/flashcards/${selectedFolderId}` : "/flashcards"}>
+              <Button>Back to Modes</Button>
             </Link>
           }
         />
@@ -251,7 +251,7 @@ export default function Flashcards() {
     <div className="flash-screen">
       <header className="flash-header">
         <div className="flash-header-row">
-          <Link className="flash-back-btn" to="/flashcards" aria-label="Back to class folders" title="Back to class folders">
+          <Link className="flash-back-btn" to={selectedFolderId != null ? `/flashcards/${selectedFolderId}` : "/flashcards"} aria-label="Back to modes" title="Back to modes">
             <ArrowLeft size={18} />
           </Link>
           <div className="flash-header-title">
