@@ -13676,3 +13676,493 @@ select.lc-custom-input {
   font-size: 0.9rem;
   white-space: pre-wrap;
 }
+
+/* ============================================================
+   Learning Modes hub (mode picker)
+   ============================================================ */
+.mode-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+}
+
+.mode-header .flash-back-btn {
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+
+.mode-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+@media (min-width: 620px) {
+  .mode-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.mode-card {
+  --mode-accent: var(--green-dark);
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.4rem;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--white);
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+  color: var(--ink);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.mode-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--mode-accent);
+}
+
+.mode-card:focus-visible {
+  outline: 2px solid var(--mode-accent);
+  outline-offset: 2px;
+}
+
+.mode-card--disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.mode-card-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+
+.mode-card-body h2 {
+  margin: 0.15rem 0 0.35rem;
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+}
+
+.mode-card-body p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.mode-card-meta {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.mode-empty-note {
+  margin-top: 1.1rem;
+}
+
+/* ============================================================
+   Matching game
+   ============================================================ */
+.match-screen {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 1.25rem 1.25rem 2.5rem;
+}
+
+.match-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 4rem 1rem;
+  color: var(--green-dark);
+}
+
+.match-loading svg {
+  animation: match-spin 1.4s ease-in-out infinite;
+}
+
+@keyframes match-spin {
+  0%,
+  100% {
+    transform: rotate(-8deg) scale(1);
+  }
+  50% {
+    transform: rotate(8deg) scale(1.08);
+  }
+}
+
+/* Header + HUD */
+.match-header {
+  margin-bottom: 1.25rem;
+}
+
+.match-header-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.match-header-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.match-header-title .eyebrow {
+  color: var(--warning);
+}
+
+.match-header-title h1 {
+  margin: 0.1rem 0 0;
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.match-round-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(217, 119, 6, 0.12);
+  color: var(--warning);
+  font-weight: 700;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.match-round-pill span {
+  font-size: 0.72rem;
+  opacity: 0.75;
+}
+
+.match-hud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.4rem;
+  margin: 1rem 0 0.75rem;
+}
+
+.match-hud-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.match-hud-item svg {
+  color: var(--green-dark);
+}
+
+.match-hud-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+
+.match-hud-unit {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.match-progress {
+  height: 6px;
+}
+
+/* Board */
+.match-board-wrap {
+  position: relative;
+  transition: opacity var(--transition-normal), filter var(--transition-normal);
+}
+
+.match-board-wrap.is-clearing {
+  opacity: 0.4;
+  filter: saturate(0.6);
+}
+
+.match-board {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.7rem;
+}
+
+@media (min-width: 620px) {
+  .match-board {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.85rem;
+  }
+}
+
+@media (min-width: 900px) {
+  .match-board[data-count="16"],
+  .match-board[data-count="20"] {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.match-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-height: 96px;
+  padding: 0.7rem 0.75rem;
+  border-radius: 14px;
+  border: 1.5px solid var(--border);
+  background: var(--white);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast),
+    border-color var(--transition-fast), background var(--transition-fast);
+}
+
+/* Two tile families so the columns read as two things to pair: terms sit on a
+   warm cream tint, definitions on white with a green edge. */
+.match-tile--front {
+  background: var(--green-lightest);
+  border-color: var(--green-light);
+}
+
+.match-tile--back {
+  background: var(--white);
+  border-color: var(--green-light-mid);
+}
+
+.match-tile:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.match-tile:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.match-tile.is-selected {
+  border-color: var(--warning);
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.22);
+  transform: translateY(-2px);
+}
+
+.match-tile.is-mismatch {
+  border-color: var(--error);
+  background: rgba(220, 38, 38, 0.08);
+  animation: match-shake 0.4s ease;
+}
+
+@keyframes match-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-5px);
+  }
+  40%,
+  80% {
+    transform: translateX(5px);
+  }
+}
+
+/* Matched tiles keep their grid slot (no reflow jump) but drop back to a quiet
+   done state with a success tint. */
+.match-tile.is-matched {
+  border-color: var(--success);
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.72;
+  animation: match-pop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.match-tile.is-matched::after {
+  content: "";
+  position: absolute;
+  top: 0.5rem;
+  right: 0.55rem;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--success);
+  opacity: 0.9;
+}
+
+@keyframes match-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.match-tile-side {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.match-tile--front .match-tile-side {
+  color: var(--green-dark);
+}
+
+.match-tile-text {
+  font-size: 0.88rem;
+  line-height: 1.35;
+  max-height: 5.4em;
+  overflow-y: auto;
+}
+
+.match-tile-text .kojo-markdown > *:first-child {
+  margin-top: 0;
+}
+
+.match-tile-text .kojo-markdown > *:last-child {
+  margin-bottom: 0;
+}
+
+.match-tile-text .kojo-md-p {
+  margin: 0.2rem 0;
+}
+
+/* Round-clear toast */
+.match-round-toast {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  animation: match-toast-in 0.3s ease;
+  pointer-events: none;
+}
+
+@keyframes match-toast-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.match-hint {
+  margin: 1.1rem 0 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* Results */
+.match-results {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.6rem;
+  padding: 2.25rem 1.75rem;
+}
+
+.match-results-badge {
+  display: grid;
+  place-items: center;
+  width: 78px;
+  height: 78px;
+  border-radius: 999px;
+  background: rgba(217, 119, 6, 0.14);
+  color: var(--warning);
+  margin-bottom: 0.25rem;
+}
+
+.match-results h1 {
+  margin: 0;
+  font-family: var(--font-serif);
+}
+
+.match-record-flag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  background: var(--success);
+  color: var(--white);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.match-stat-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  width: 100%;
+  margin: 1.25rem 0 0.5rem;
+}
+
+@media (min-width: 520px) {
+  .match-stat-row {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.match-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.85rem 0.5rem;
+  border-radius: 12px;
+  background: var(--green-lightest);
+}
+
+.match-stat-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.match-stat-value {
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .match-tile,
+  .match-tile.is-matched,
+  .match-tile.is-mismatch,
+  .match-loading svg,
+  .match-round-toast {
+    animation: none;
+    transition: none;
+  }
+}
