@@ -4,6 +4,8 @@ import { Sidebar } from "../components/Sidebar";
 import CreateTest from "../pages/CreateTest";
 import Dashboard from "../pages/Dashboard";
 import Flashcards from "../pages/Flashcards";
+import LearningModes from "../pages/LearningModes";
+import Matching from "../pages/Matching";
 import FlashcardsManage from "../pages/FlashcardsManage";
 import FolderDetail from "../pages/FolderDetail";
 import Folders from "../pages/Folders";
@@ -67,8 +69,10 @@ export default function App() {
           <Route path="/test/:testId" element={<TakeTest />} />
           <Route path="/test/:testId/edit" element={<QuestionEditor />} />
           <Route path="/results/:attemptId" element={<Results />} />
-          <Route path="/flashcards" element={<Flashcards />} />
-          <Route path="/flashcards/:folderId" element={<Flashcards />} />
+          <Route path="/flashcards" element={<LearningModes />} />
+          <Route path="/flashcards/:folderId" element={<LearningModes />} />
+          <Route path="/flashcards/:folderId/review" element={<Flashcards />} />
+          <Route path="/flashcards/:folderId/matching" element={<Matching />} />
           <Route path="/folders/:folderId/flashcards/manage" element={<FlashcardsManage />} />
           <Route path="/leetcode" element={<SignedInRoute><LeetCodeMode /></SignedInRoute>} />
           <Route path="/mock-interview" element={<MockInterviewSetup />} />
