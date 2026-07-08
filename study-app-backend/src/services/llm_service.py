@@ -1718,6 +1718,146 @@ Return JSON only:
         logger.warning("LLM flashcard generation failed; using fallback")
         return self._fallback_flashcards(content, count, prompt)
 
+    # ── Learning Modules (lesson track authoring) ────────────────────────────
+    # Three separate single-purpose calls (outline, one lesson, one quiz), each
+    # dispatched through _complete_json which owns the provider-fallback loop.
+    # Lesson authoring and quiz generation are deliberately NOT bundled into one
+    # call (project rule: one task per LLM call so fallback stays predictable).
+
+    def _module_instructions_block(self, custom_instructions: Optional[str]) -> str:
+        """Format the user's free-text guidance for the module prompts."""
+        text = (custom_instructions or "").strip()[:500]
+        if not text:
+            return ""
+        return (
+            "STUDENT'S CUSTOM INSTRUCTIONS (follow them wherever they do not conflict "
+            f"with the rules above): {text}\n\n"
+        )
+
+    async def generate_module_outline(
+        self,
+        notes: str,
+        module_count: int,
+        provider: Optional[str] = None,
+        custom_instructions: Optional[str] = None,
+    ) -> list[dict[str, str]]:
+        """Split the folder's notes into an ordered track of module topics.
+
+        Returns up to module_count items of {"title", "summary"}. Raises
+        LLMException if no provider produced a usable outline.
+        """
+        from src.utils.exceptions import LLMException
+
+        count = max(1, min(10, int(module_count)))
+        prompt = (
+            f"You are designing a learning track that teaches a student their own course notes.\n"
+            f"Split the material below into exactly {count} focused lesson modules, ordered so that "
+            "earlier modules build the foundation for later ones.\n"
+            "Return a JSON object ONLY with key \"modules\": an array of objects, each with:\n"
+            "- \"title\": a short, specific module title (max 10 words, no numbering).\n"
+            "- \"summary\": one or two sentences describing exactly what slice of the material this module covers.\n"
+            "Each module must cover a distinct slice of the notes; together they should cover the important material. "
+            "Do not invent topics that are not in the notes.\n\n"
+            f"{self._module_instructions_block(custom_instructions)}"
+            f"NOTES:\n{notes[:12000]}"
+        )
+        data = await self._complete_json(prompt, provider=provider)
+        raw_modules = data.get("modules")
+        outline: list[dict[str, str]] = []
+        if isinstance(raw_modules, list):
+            for item in raw_modules:
+                if not isinstance(item, dict):
+                    continue
+                title = str(item.get("title") or "").strip()
+                summary = str(item.get("summary") or "").strip()
+                if title:
+                    outline.append({"title": title[:255], "summary": summary[:2000]})
+        if not outline:
+            raise LLMException("The AI could not build a module outline from these notes. Try again.")
+        return outline[:count]
+
+    async def generate_module_lesson(
+        self,
+        notes: str,
+        module_title: str,
+        module_summary: str,
+        provider: Optional[str] = None,
+        custom_instructions: Optional[str] = None,
+    ) -> str:
+        """Author one short markdown lesson for a single module topic."""
+        from src.utils.exceptions import LLMException
+
+        prompt = (
+            "You are writing one short lesson in a learning track built from a student's own notes.\n"
+            f"MODULE TITLE: {module_title}\n"
+            f"MODULE SCOPE: {module_summary or 'Cover the module topic using the notes.'}\n\n"
+            "Write the lesson as Markdown: a few short paragraphs (roughly 200-350 words), with one or two "
+            "## headings and at least one concrete example. Stay strictly within this module's scope and "
+            "ground every claim in the notes. If the material is mathematical, write math as LaTeX using $...$ "
+            "for inline and $$...$$ for display equations. If the material is code, use fenced code blocks "
+            "with a language tag. Do not include a quiz, exercises, or a closing summary of the whole course.\n"
+            "Return a JSON object ONLY with key \"lesson\" whose value is the full Markdown lesson as a string.\n\n"
+            f"{self._module_instructions_block(custom_instructions)}"
+            f"NOTES:\n{notes[:12000]}"
+        )
+        data = await self._complete_json(prompt, provider=provider)
+        lesson = str(data.get("lesson") or "").strip()
+        if not lesson:
+            raise LLMException("The AI returned an empty lesson. Try again.")
+        return lesson
+
+    async def generate_module_quiz(
+        self,
+        lesson_content: str,
+        module_title: str,
+        count: int = 5,
+        provider: Optional[str] = None,
+        custom_instructions: Optional[str] = None,
+    ) -> list[dict[str, object]]:
+        """Generate an MCQ quiz for one lesson.
+
+        Returns items of {"question": str, "options": [str x4], "correct_index": int}.
+        """
+        from src.utils.exceptions import LLMException
+
+        quiz_count = max(1, min(10, int(count)))
+        prompt = (
+            f"Write a {quiz_count}-question multiple-choice quiz that checks whether a student understood "
+            "the lesson below. Every question must be answerable from the lesson alone.\n"
+            "Return a JSON object ONLY with key \"questions\": an array of objects, each with:\n"
+            "- \"question\": the question text.\n"
+            "- \"options\": an array of exactly 4 answer strings.\n"
+            "- \"correct_index\": the 0-based index of the correct option.\n"
+            "Distractors must be plausible but clearly wrong per the lesson. Vary which index is correct.\n"
+            "If a question or option contains math, write it as LaTeX delimited with $...$ (inline only, "
+            "no $$ blocks). Use backtick code spans for identifiers or short code.\n\n"
+            f"{self._module_instructions_block(custom_instructions)}"
+            f"LESSON ({module_title}):\n{lesson_content[:12000]}"
+        )
+        data = await self._complete_json(prompt, provider=provider)
+        raw_questions = data.get("questions")
+        quiz: list[dict[str, object]] = []
+        if isinstance(raw_questions, list):
+            for item in raw_questions:
+                if not isinstance(item, dict):
+                    continue
+                question = str(item.get("question") or "").strip()
+                options_raw = item.get("options")
+                options = (
+                    [str(o).strip() for o in options_raw if str(o).strip()][:6]
+                    if isinstance(options_raw, list)
+                    else []
+                )
+                try:
+                    correct_index = int(item.get("correct_index"))  # type: ignore[arg-type]
+                except (TypeError, ValueError):
+                    continue
+                if question and len(options) >= 2 and 0 <= correct_index < len(options):
+                    quiz.append({"question": question, "options": options, "correct_index": correct_index})
+        if not quiz:
+            raise LLMException("The AI could not build a quiz for this lesson. Try again.")
+        return quiz[:quiz_count]
+
     async def generate_custom_problem(
         self,
         code: str,
