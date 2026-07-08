@@ -205,6 +205,42 @@ export type Flashcard = {
   last_attempted?: string | null;
 };
 
+export type LearningQuizQuestion = {
+  question: string;
+  options: string[];
+};
+
+export type LearningModule = {
+  id: ID;
+  order_index: number;
+  title: string;
+  summary?: string | null;
+  lesson_content?: string | null;
+  quiz?: LearningQuizQuestion[] | null;
+  best_score?: number | null;
+  passed: boolean;
+  ready: boolean;
+};
+
+export type LearningTrack = {
+  id: ID;
+  folder_id: ID;
+  status: "generating" | "ready" | "failed";
+  error?: string | null;
+  module_count: number;
+  custom_instructions?: string | null;
+  notes_stale: boolean;
+  modules: LearningModule[];
+};
+
+export type QuizAttemptResult = {
+  score: number;
+  total: number;
+  passed: boolean;
+  correct_indices: number[];
+  best_score: number;
+};
+
 export type TestCreationParams = {
   title: string;
   folderId: number;

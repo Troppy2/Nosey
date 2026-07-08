@@ -1,4 +1,4 @@
-import { ArrowLeft, FolderOpen, Layers, Puzzle } from "lucide-react";
+import { ArrowLeft, FolderOpen, GraduationCap, Layers, Puzzle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Card } from "../components/Card";
@@ -108,6 +108,17 @@ export default function LearningModes() {
             title="Matching"
             blurb="Race the clock to pair every term with its definition across timed rounds."
             meta="Game / beta"
+          />
+        ) : null}
+        {betaMode ? (
+          <ModeCard
+            to={`/flashcards/${selectedFolderId}/modules`}
+            disabled={false}
+            icon={<GraduationCap size={26} />}
+            accent="var(--info)"
+            title="Learning Modules"
+            blurb="AI-written lessons from your notes, read aloud, each followed by a short quiz."
+            meta="Lessons / beta"
           />
         ) : null}
       </section>

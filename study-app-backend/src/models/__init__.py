@@ -8,6 +8,7 @@ from src.models.frq_answer import FRQAnswer
 from src.models.kojo_conversation import KojoConversation
 from src.models.kojo_message import KojoMessage
 from src.models.lc_sync import LCActivityDate, LCCodeWorkspace, LCProgress, LCStreakChallenge
+from src.models.learning_module import LearningModule, LearningTrack
 from src.models.mcq_option import MCQOption
 from src.models.mock_interview import MockInterviewSession
 from src.models.note import Note
@@ -34,6 +35,8 @@ __all__ = [
     "LCCodeWorkspace",
     "LCProgress",
     "LCStreakChallenge",
+    "LearningModule",
+    "LearningTrack",
     "MCQOption",
     "MockInterviewSession",
     "Note",

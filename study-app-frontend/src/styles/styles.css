@@ -14166,3 +14166,590 @@ select.lc-custom-input {
     transition: none;
   }
 }
+
+/* ============================================================
+   Learning Modules
+   ============================================================ */
+.lm-spin {
+  animation: lm-spin 1s linear infinite;
+}
+
+@keyframes lm-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.lm-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 4rem 1rem;
+  color: var(--green-dark);
+}
+
+.lm-header-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Setup card */
+.lm-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1.5rem;
+}
+
+.lm-setup-label {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.lm-count-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.lm-count-slider {
+  flex: 1;
+  accent-color: var(--green-dark);
+}
+
+.lm-count-value {
+  font-family: var(--font-serif);
+  font-size: 1.6rem;
+  font-weight: 700;
+  min-width: 2ch;
+  text-align: center;
+  color: var(--green-dark);
+}
+
+/* Status banners */
+.lm-failed,
+.lm-stale {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1rem 1.15rem;
+  margin-bottom: 1rem;
+}
+
+.lm-failed svg {
+  color: var(--error);
+  flex-shrink: 0;
+}
+
+.lm-failed div {
+  flex: 1;
+  min-width: 0;
+}
+
+.lm-failed p,
+.lm-stale p {
+  margin: 0.15rem 0 0;
+}
+
+.lm-stale {
+  background: rgba(217, 119, 6, 0.08);
+  border-color: rgba(217, 119, 6, 0.35);
+}
+
+.lm-stale svg {
+  color: var(--warning);
+  flex-shrink: 0;
+}
+
+.lm-stale p {
+  flex: 1;
+  font-size: 0.9rem;
+}
+
+.lm-generating-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 1rem;
+  margin-bottom: 1rem;
+  border-radius: 12px;
+  background: var(--green-lightest);
+  border: 1px dashed var(--green-light-mid);
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.lm-generating-bar svg {
+  color: var(--green-dark);
+  flex-shrink: 0;
+}
+
+.lm-generating-bar span {
+  flex: 1;
+}
+
+.lm-cancel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: none;
+  background: transparent;
+  color: var(--error);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.25rem 0.4rem;
+  border-radius: 8px;
+}
+
+.lm-cancel-btn:hover {
+  background: rgba(220, 38, 38, 0.08);
+}
+
+/* Module list */
+.lm-module-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.lm-module-row {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--white);
+  text-decoration: none;
+  color: var(--ink);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+a.lm-module-row:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--green-dark);
+}
+
+a.lm-module-row:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.lm-module-row.is-locked,
+.lm-module-row.is-pending {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.lm-module-row.is-passed {
+  border-color: rgba(16, 185, 129, 0.45);
+  background: rgba(16, 185, 129, 0.06);
+}
+
+.lm-module-num {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-weight: 700;
+  font-size: 0.92rem;
+  flex-shrink: 0;
+}
+
+.lm-module-row.is-passed .lm-module-num {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+}
+
+.lm-module-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.lm-module-title {
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.lm-module-summary {
+  font-size: 0.82rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.lm-module-state {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.lm-module-row.is-passed .lm-module-state {
+  color: var(--success);
+}
+
+.lm-module-row.is-open .lm-module-state {
+  color: var(--green-dark);
+}
+
+.lm-skeleton {
+  display: block;
+  width: 55%;
+  height: 0.95em;
+  border-radius: 6px;
+  background: var(--gray-200);
+}
+
+.lm-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.4rem;
+  padding: 1.75rem;
+  margin-top: 1.25rem;
+  color: var(--green-dark);
+}
+
+.lm-done h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+}
+
+/* Lesson page */
+.lm-tts-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 1rem;
+  border-radius: 12px;
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light);
+}
+
+.lm-tts-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--green-light-mid);
+  background: var(--white);
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.lm-tts-btn:hover {
+  border-color: var(--green-dark);
+}
+
+.lm-tts-btn--main {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+  color: var(--white);
+}
+
+.lm-tts-btn--main:hover {
+  background: var(--green-dark-mid);
+}
+
+/* Paragraph stepper (prev / position / next) */
+.lm-tts-steps {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.lm-tts-btn--step {
+  padding: 0.4rem 0.55rem;
+}
+
+.lm-tts-btn--step:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.lm-tts-pos {
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  min-width: 3.2em;
+  text-align: center;
+}
+
+.lm-tts-rates {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
+.lm-tts-rate {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.3rem 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.lm-tts-rate.is-active {
+  background: var(--white);
+  color: var(--green-dark);
+  box-shadow: var(--shadow-sm);
+}
+
+.lm-lesson-card {
+  padding: 1.5rem 1.6rem;
+  line-height: 1.6;
+}
+
+/* Lesson blocks: one per markdown paragraph so the TTS can highlight the block
+   it is currently reading (follow-along). */
+.lm-lesson-block {
+  padding: 0.35rem 0.6rem;
+  margin: 0 -0.6rem;
+  border-radius: 10px;
+  border-left: 3px solid transparent;
+  transition: background var(--transition-normal), border-color var(--transition-normal);
+}
+
+.lm-lesson-block.is-speaking {
+  background: var(--green-lightest);
+  border-left-color: var(--green-dark);
+}
+
+/* Quieter marker for the saved/stepped reading position while not speaking. */
+.lm-lesson-block.is-cursor {
+  border-left-color: var(--green-light-mid);
+}
+
+.lm-lesson-block .kojo-md-p:first-child,
+.lm-lesson-block .kojo-md-heading:first-child {
+  margin-top: 0;
+}
+
+.lm-lesson-block .kojo-md-p:last-child {
+  margin-bottom: 0;
+}
+
+/* Setup: custom instructions */
+.lm-label-optional {
+  font-weight: 500;
+  font-size: 0.8rem;
+}
+
+.lm-instructions-input {
+  width: 100%;
+  resize: vertical;
+  min-height: 70px;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--white);
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.lm-instructions-input:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 1px;
+}
+
+.lm-char-count {
+  margin: -0.4rem 0 0;
+  text-align: right;
+}
+
+/* Quiz */
+.lm-quiz {
+  margin-top: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.lm-quiz-title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
+}
+
+.lm-quiz-question {
+  padding: 1.1rem 1.2rem;
+}
+
+.lm-quiz-q-text {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin: 0 0 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.lm-quiz-q-num {
+  color: var(--green-dark);
+  flex-shrink: 0;
+}
+
+.lm-quiz-q-md {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Quiz text goes through MarkdownContent for LaTeX/code; strip the paragraph
+   margins so questions and options stay compact. */
+.lm-quiz-q-md .kojo-md-p,
+.lm-quiz-option-text .kojo-md-p {
+  margin: 0;
+}
+
+.lm-quiz-q-md .kojo-md-p + .kojo-md-p,
+.lm-quiz-option-text .kojo-md-p + .kojo-md-p {
+  margin-top: 0.3rem;
+}
+
+.lm-quiz-q-md .math-block,
+.lm-quiz-option-text .math-block {
+  margin: 0.35rem 0;
+  overflow-x: auto;
+}
+
+.lm-quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.lm-quiz-option {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--white);
+  text-align: left;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.lm-quiz-option:hover:not(:disabled) {
+  border-color: var(--green-dark);
+}
+
+.lm-quiz-option:disabled {
+  cursor: default;
+}
+
+.lm-quiz-option-letter {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.lm-quiz-option-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.lm-quiz-option.is-chosen {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+}
+
+.lm-quiz-option.is-correct {
+  border-color: var(--success);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.lm-quiz-option.is-correct svg {
+  color: var(--success);
+}
+
+.lm-quiz-option.is-wrong {
+  border-color: var(--error);
+  background: rgba(220, 38, 38, 0.06);
+}
+
+.lm-quiz-option.is-wrong svg {
+  color: var(--error);
+}
+
+.lm-quiz-result {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.2rem 1.3rem;
+  flex-wrap: wrap;
+}
+
+.lm-quiz-result.is-pass {
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
+.lm-quiz-result.is-pass > svg {
+  color: var(--success);
+}
+
+.lm-quiz-result.is-fail > svg {
+  color: var(--error);
+}
+
+.lm-quiz-result-body {
+  flex: 1;
+  min-width: 200px;
+}
+
+.lm-quiz-result-body p {
+  margin: 0.2rem 0 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lm-spin {
+    animation: none;
+  }
+  .lm-module-row,
+  a.lm-module-row:hover,
+  .lm-lesson-block {
+    transition: none;
+    transform: none;
+  }
+}
