@@ -107,11 +107,12 @@ export default function AdminPanel() {
   const [betaUpdating, setBetaUpdating] = useState<AdminUserRow["id"] | null>(null);
   const [betaError, setBetaError] = useState<string | null>(null);
 
-  async function handleToggleBeta(u: AdminUserRow) {
+  async function handleSetBeta(u: AdminUserRow, isBeta: boolean) {
+    if (isBeta === u.is_beta) return;
     setBetaError(null);
     setBetaUpdating(u.id);
     try {
-      const updated = await setUserBeta(u.id, !u.is_beta);
+      const updated = await setUserBeta(u.id, isBeta);
       setUsers((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
     } catch (e) {
       setBetaError(e instanceof Error ? e.message : "Failed to update beta access");
@@ -613,16 +614,17 @@ export default function AdminPanel() {
                                 Yes (admin)
                               </span>
                             ) : (
-                              <button
-                                type="button"
-                                className={`admin-badge admin-badge--btn ${u.is_beta ? "admin-badge--green" : "admin-badge--muted"}`}
-                                onClick={() => handleToggleBeta(u)}
+                              <select
+                                className={`admin-beta-select ${u.is_beta ? "admin-beta-select--on" : ""}`}
+                                value={u.is_beta ? "true" : "false"}
+                                onChange={(e) => handleSetBeta(u, e.target.value === "true")}
                                 disabled={betaUpdating === u.id}
-                                aria-pressed={u.is_beta}
-                                title="Toggle beta access for this user"
+                                title="Set beta access for this user"
+                                aria-label={`Beta access for ${u.email}`}
                               >
-                                {betaUpdating === u.id ? "..." : u.is_beta ? "Yes" : "No"}
-                              </button>
+                                <option value="true">True</option>
+                                <option value="false">False</option>
+                              </select>
                             )}
                           </td>
                           <td className="admin-cell-date">
