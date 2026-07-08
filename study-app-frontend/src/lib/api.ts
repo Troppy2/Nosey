@@ -24,6 +24,8 @@ import type {
   KojoConversationSummary,
   LCCustomProblem,
   LCGeneratedCustomProblem,
+  LearningTrack,
+  QuizAttemptResult,
   LeetCodeGradeResponse,
   LeetCodeHintResponse,
   LeetCodeProblemData,
@@ -545,6 +547,46 @@ export async function recordFlashcardAttempt(folderId: number, cardId: number, c
 
 export async function fetchProviderStatus(): Promise<ProviderStatus> {
   return request<ProviderStatus>("/kojo/providers/status");
+}
+
+// ── Learning Modules ─────────────────────────────────────────────────────────
+
+// Returns null when the folder has no track yet (backend 404s in that case).
+export async function fetchLearningTrack(folderId: number): Promise<LearningTrack | null> {
+  try {
+    return await request<LearningTrack>(`/folders/${folderId}/learning-track`);
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("Learning track not found")) {
+      return null;
+    }
+    throw err;
+  }
+}
+
+export async function createLearningTrack(
+  folderId: number,
+  moduleCount: number,
+  options?: { provider?: string; customInstructions?: string },
+): Promise<LearningTrack> {
+  return request<LearningTrack>(`/folders/${folderId}/learning-track`, {
+    method: "POST",
+    body: JSON.stringify({
+      module_count: moduleCount,
+      ...(options?.provider ? { provider: options.provider } : {}),
+      ...(options?.customInstructions ? { custom_instructions: options.customInstructions } : {}),
+    }),
+  });
+}
+
+export async function deleteLearningTrack(folderId: number): Promise<void> {
+  await request(`/folders/${folderId}/learning-track`, { method: "DELETE" });
+}
+
+export async function submitModuleQuiz(moduleId: number, answers: number[]): Promise<QuizAttemptResult> {
+  return request<QuizAttemptResult>(`/learning-modules/${moduleId}/quiz-attempt`, {
+    method: "POST",
+    body: JSON.stringify({ answers }),
+  });
 }
 
 export async function kojoChat(
