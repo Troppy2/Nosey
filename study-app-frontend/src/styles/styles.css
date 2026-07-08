@@ -10748,19 +10748,31 @@ h3 {
   color: #1d4ed8;
 }
 
-/* Clickable badge used as the per-user beta access toggle in the admin roster. */
-.admin-badge--btn {
-  border: none;
-  cursor: pointer;
+/* Dropdown used to set per-user beta access in the admin roster. */
+.admin-beta-select {
   font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--green-lightest);
+  background: var(--green-lightest);
+  color: var(--muted);
+  cursor: pointer;
   transition: filter 0.15s ease;
 }
 
-.admin-badge--btn:hover:not(:disabled) {
-  filter: brightness(0.95);
+.admin-beta-select--on {
+  background: #dcfce7;
+  border-color: #dcfce7;
+  color: #16a34a;
 }
 
-.admin-badge--btn:disabled {
+.admin-beta-select:hover:not(:disabled) {
+  filter: brightness(0.97);
+}
+
+.admin-beta-select:disabled {
   cursor: default;
   opacity: 0.6;
 }
