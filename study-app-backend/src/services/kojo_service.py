@@ -22,6 +22,7 @@ from src.schemas.kojo_schema import (
     TestBlueprintResponse,
     GeneralChatRequest,
 )
+from src.services import kojo_context_cache
 from src.services.file_service import FileService
 from src.services.llm_service import LLMService
 from src.services.rag_service import HybridRAGService
@@ -251,6 +252,9 @@ class KojoService:
         folder = await FolderRepository(session).get_owned(folder_id, user_id)
         if folder is None:
             raise ResourceNotFoundException("Folder")
+        # Warm the folder context in the background so the first chat message
+        # doesn't pay the notes + files assembly cost on top of the LLM call.
+        kojo_context_cache.schedule_warm(folder_id, user_id)
         repo = KojoRepository(session)
         conversations = await repo.list_conversations_by_folder(user_id, folder_id)
         if not conversations:
@@ -327,8 +331,11 @@ class KojoService:
         else:
             conversation = await repo.get_or_create_conversation(user_id, folder_id)
 
-        notes = await repo.get_folder_notes_content(folder_id, user_id)
-        folder_files = await FileService().get_folder_files_content(folder_id, user_id, session)
+        # Folder-level context (notes + folder files) is cached across chat
+        # turns; only the conversation-scoped session files are read live.
+        folder_context, cache_hit = await kojo_context_cache.get_folder_context(
+            folder_id, user_id, session
+        )
         session_files = await repo.get_conversation_files(conversation.id)
         session_files_content = "\n\n---\n\n".join(
             f"[Session upload: {f.file_name}]\n{f.content}" for f in session_files if f.content
@@ -338,12 +345,12 @@ class KojoService:
             extra={
                 "user_id": user_id,
                 "folder_id": folder_id,
-                "notes_length": len(notes),
-                "folder_files_length": len(folder_files),
+                "folder_context_length": len(folder_context),
+                "context_cache_hit": cache_hit,
                 "session_files_count": len(session_files),
             }
         )
-        context_parts = [part for part in (notes, folder_files, session_files_content) if part]
+        context_parts = [part for part in (folder_context, session_files_content) if part]
         notes_context = "\n\n---\n\n".join(context_parts) if context_parts else _NO_NOTES
 
         # Check if user is asking to review wrong answers
@@ -691,10 +698,10 @@ class KojoService:
         if folder is None:
             raise ResourceNotFoundException("Folder")
 
-        notes = await KojoRepository(session).get_folder_notes_content(folder_id, user_id)
-        folder_files = await FileService().get_folder_files_content(folder_id, user_id, session)
-        context_parts = [part for part in (notes, folder_files) if part]
-        notes_context = "\n\n---\n\n".join(context_parts) if context_parts else ""
+        # Same folder-level context (and cache) as chat().
+        notes_context, _ = await kojo_context_cache.get_folder_context(
+            folder_id, user_id, session
+        )
 
         result = await LLMService().generate_test_blueprint(
             user_message=user_message,
