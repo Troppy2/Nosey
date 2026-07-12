@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { LoadingNotice } from "../components/Loaders";
 import { sendStage2Message, submitStage2 } from "../lib/api";
 import type { CodingProblemInfo, InterviewChatMessage, MockInterviewSession } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
@@ -196,8 +197,12 @@ export default function MockInterviewStage2() {
         >
           <Users size={20} />
         </div>
-        <p className="muted">Preparing your interviewer…</p>
-        <Loader2 size={20} className="spin" style={{ color: "var(--green-dark)" }} />
+        <LoadingNotice
+          title="Preparing your interviewer"
+          estimate="Reading the role and your resume. About 10 seconds."
+          slowNote="Still preparing. Your interviewer opens as soon as this finishes."
+          slowAfterMs={14000}
+        />
       </div>
     );
   }

@@ -5,6 +5,7 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { MarkdownContent } from "../components/MarkdownContent";
+import { Skeleton } from "../components/Skeletons";
 import { fetchFlashcards, fetchFolders, recordFlashcardAttempt, scopeKey } from "../lib/api";
 import { useSettings } from "../lib/useSettings";
 import type { Flashcard, Folder } from "../lib/types";
@@ -261,12 +262,22 @@ export default function Matching() {
   if (numericFolderId == null) return <Navigate to="/flashcards" replace />;
   if (!betaMode) return <Navigate to={`/flashcards/${numericFolderId}`} replace />;
 
+  // The board itself is the loading state: face-down tiles shimmering in the
+  // real board grid while the deck shuffles, under the spinning puzzle piece.
   if (phase === "loading") {
     return (
       <div className="page page-narrow">
-        <div className="match-loading">
+        <div className="match-loading match-loading--with-board">
           <Puzzle size={30} />
           <p className="muted">Shuffling the board.</p>
+        </div>
+        <div className="match-board" data-count={12} role="status" aria-label="Shuffling the board">
+          {Array.from({ length: 12 }, (_, i) => (
+            <div className="skel-match-tile" key={i} aria-hidden="true">
+              <Skeleton width={`${[64, 48, 72, 44, 58, 68, 40, 62, 52, 70, 46, 60][i]}%`} height="0.8rem" />
+              <Skeleton width="34%" height="0.65rem" />
+            </div>
+          ))}
         </div>
       </div>
     );

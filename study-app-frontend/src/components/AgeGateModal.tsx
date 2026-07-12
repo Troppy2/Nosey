@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "./Button";
+import { InlineLoading } from "./Loaders";
 import { getMe, isGuestSession, submitDateOfBirth } from "../lib/api";
 
 // Pops the date-of-birth modal for an already signed-in user whose age is null
@@ -55,7 +56,7 @@ export function AgeGateModal() {
               }
             }}
           >
-            {dobLoading ? "Saving..." : "Continue"}
+            {dobLoading ? <InlineLoading label="Saving" /> : "Continue"}
           </Button>
         </div>
       </div>

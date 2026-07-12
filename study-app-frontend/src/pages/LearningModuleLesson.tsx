@@ -2,7 +2,6 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
-  Loader2,
   Pause,
   Play,
   RotateCcw,
@@ -16,6 +15,7 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { MarkdownContent } from "../components/MarkdownContent";
+import { SkeletonText } from "../components/Skeletons";
 import { fetchLearningTrack, scopeKey, submitModuleQuiz } from "../lib/api";
 import { useSettings } from "../lib/useSettings";
 import type { LearningTrack, QuizAttemptResult } from "../lib/types";
@@ -310,10 +310,7 @@ export default function LearningModuleLesson() {
   if (!loaded) {
     return (
       <div className="page page-narrow">
-        <div className="lm-loading">
-          <Loader2 size={28} className="lm-spin" />
-          <p className="muted">Loading the lesson.</p>
-        </div>
+        <SkeletonText lines={7} label="Loading the lesson" />
       </div>
     );
   }

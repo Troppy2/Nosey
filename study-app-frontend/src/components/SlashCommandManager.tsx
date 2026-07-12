@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { Button } from "./Button";
 import { ConfirmModal } from "./ConfirmModal";
 import { TextArea, TextInput } from "./Field";
+import { InlineLoading } from "./Loaders";
+import { SkeletonList } from "./Skeletons";
 import {
   createSlashCommand,
   deleteSlashCommand,
@@ -190,7 +192,7 @@ export default function SlashCommandManager({ commands, loading = false, onChang
             </Button>
           ) : null}
           <Button type="submit" icon={saving ? <Check size={15} className="icon-check" /> : <Plus size={15} className="icon-plus" />} disabled={saving}>
-            {saving ? "Saving" : editingId ? "Update" : "Create"}
+            {saving ? <InlineLoading label="Saving" /> : editingId ? "Update" : "Create"}
           </Button>
         </div>
       </form>
@@ -202,7 +204,7 @@ export default function SlashCommandManager({ commands, loading = false, onChang
 
       <div className="slash-manager-list" aria-live="polite">
         {loading ? (
-          <p className="muted small">Loading slash commands...</p>
+          <SkeletonList rows={3} label="Loading slash commands" />
         ) : visibleCommands.length === 0 ? (
           <p className="muted small">{commands.length === 0 ? "No custom commands yet." : "No commands match that search."}</p>
         ) : (

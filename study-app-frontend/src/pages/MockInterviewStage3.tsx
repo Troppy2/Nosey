@@ -1,6 +1,7 @@
 import { AlertCircle, ChevronRight, Loader2, LogOut, MessageSquare, Send } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { LoadingNotice } from "../components/Loaders";
 import { sendStage3Message } from "../lib/api";
 import type { InterviewChatMessage, MockInterviewSession } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
@@ -123,8 +124,12 @@ export default function MockInterviewStage3() {
         >
           <MessageSquare size={18} />
         </div>
-        <p className="muted">Preparing your behavioral interview…</p>
-        <Loader2 size={20} className="spin" style={{ color: "var(--green-dark)" }} />
+        <LoadingNotice
+          title="Preparing your behavioral interview"
+          estimate="Writing questions from the role and your resume. About 10 seconds."
+          slowNote="Still preparing. Your first question opens as soon as this finishes."
+          slowAfterMs={14000}
+        />
       </div>
     );
   }

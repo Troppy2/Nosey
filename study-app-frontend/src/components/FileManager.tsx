@@ -3,6 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { type FolderFile, type SkippedFile, addFolderTextNote, deleteFolderFile, fetchFolderFiles, uploadFolderFiles } from "../lib/api";
 import { Button } from "./Button";
 import { ConfirmModal } from "./ConfirmModal";
+import { InlineLoading } from "./Loaders";
+import { ProgressBar } from "./Progress";
+import { SkeletonList } from "./Skeletons";
 
 const MAX_FILE_SIZE_MB = 100;
 const MAX_TOTAL_SIZE_MB = 300;
@@ -199,7 +202,15 @@ export function FileManager({ folderId, onClose }: Props) {
             onChange={(e) => handleUpload(e.target.files)}
           />
         </label>
-        ) : (
+        ) : null}
+
+        {/* The upload is one fetch with no progress events, so the sweep is the
+            honest shape: something is moving, we cannot say how far along. */}
+        {mode === "upload" && isUploading ? (
+          <ProgressBar label="Uploading, then extracting the text" />
+        ) : null}
+
+        {mode !== "upload" ? (
           <div className="file-manager-paste">
             <input
               type="text"
@@ -227,11 +238,11 @@ export function FileManager({ folderId, onClose }: Props) {
                 disabled={isSavingNote || !noteContent.trim()}
                 onClick={() => void handleSaveNote()}
               >
-                {isSavingNote ? "Saving…" : "Save note"}
+                {isSavingNote ? <InlineLoading label="Saving" /> : "Save note"}
               </Button>
             </div>
           </div>
-        )}
+        ) : null}
         <p className="muted small file-manager-hint">
           {mode === "upload"
             ? `PDF, DOCX, TXT, MD, PPTX and code files · ${MAX_FILE_SIZE_MB} MB per file`
@@ -272,7 +283,7 @@ export function FileManager({ folderId, onClose }: Props) {
         {/* File list */}
         <div style={{ overflowY: "auto", flex: 1 }}>
           {isLoading ? (
-            <div className="centered-block"><span className="loader" /></div>
+            <SkeletonList rows={3} label="Loading your files" />
           ) : (files ?? []).length === 0 ? (
             <div style={{ textAlign: "center", padding: "32px 0", color: "var(--muted)" }}>
               <FileText size={32} style={{ opacity: 0.3, marginBottom: 8 }} />

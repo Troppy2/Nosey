@@ -1,6 +1,7 @@
-import { AlertCircle, CheckCircle2, Loader2, Minus, RefreshCw, Trophy, XCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, Minus, RefreshCw, Trophy, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { LoadingNotice } from "../components/Loaders";
 import { finishMockInterview } from "../lib/api";
 import type { MockInterviewFinishResponse, MockInterviewSession } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
@@ -88,8 +89,12 @@ export default function MockInterviewSummary() {
     return (
       <div className="page page-narrow mock-loading">
         <Trophy size={32} style={{ color: "var(--green-dark)" }} />
-        <p className="muted">Generating your interview debrief…</p>
-        <Loader2 size={22} className="spin" style={{ marginTop: 4, color: "var(--green-dark)" }} />
+        <LoadingNotice
+          title="Writing your interview debrief"
+          estimate="Pulling together every stage you completed. Around 20 seconds."
+          slowNote="Still writing. A full three-stage debrief takes the longest. Keep this page open."
+          slowAfterMs={25000}
+        />
       </div>
     );
   }

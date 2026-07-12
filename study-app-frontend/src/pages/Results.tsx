@@ -6,8 +6,10 @@ import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { FeatureSurvey } from "../components/FeatureSurvey";
 import { SelectInput, TextInput } from "../components/Field";
+import { LoadingNotice } from "../components/Loaders";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
+import { SkeletonScoreSummary } from "../components/Skeletons";
 import { createTest, fetchAttemptDetail, fetchFolder, fetchReviewSummary, isGuestSession } from "../lib/api";
 import { scoreTone } from "../lib/format";
 import type { AnswerResult, AttemptDetail } from "../lib/types";
@@ -97,10 +99,12 @@ export default function Results() {
     );
   }
 
+  // Results land straight from the grading overlay, so the page skeleton is
+  // shaped like what arrives: the green score hero, the stat row, the answers.
   if (!attempt) {
     return (
-      <div className="page centered-block">
-        <span className="loader" />
+      <div className="page page-narrow">
+        <SkeletonScoreSummary />
       </div>
     );
   }
@@ -203,6 +207,15 @@ export default function Results() {
               </Button>
             )}
           </div>
+          {loadingReview ? (
+            <LoadingNotice
+              compact
+              title="Writing your study notes"
+              estimate="Kojo is working through the answers you missed. About 15 seconds."
+              slowNote="Still writing. A long list of missed answers takes Kojo a while to work through."
+              slowAfterMs={18000}
+            />
+          ) : null}
           {reviewError ? (
             <p className="muted small" style={{ color: "var(--red, #e53e3e)", marginTop: 8 }}>{reviewError}</p>
           ) : null}

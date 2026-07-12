@@ -16,6 +16,9 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { LoadingNotice } from "../components/Loaders";
+import type { ProgressStage } from "../components/Progress";
+import { ProgressOverlay, useStagedProgress } from "../components/Progress";
 import { fetchLeetCodeProblem, gradeStage1, type Stage1SubmissionItem } from "../lib/api";
 import { runPythonLeetCode, type RunnerResult } from "../lib/pyodideRunner";
 import { isLeetCodeRunnable, sanitizeLeetCodeHtml } from "../lib/leetcodeHtml";
@@ -129,6 +132,7 @@ export default function MockInterviewStage1() {
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [graded, setGraded] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [finished, setFinished] = useState(false);
 
@@ -371,12 +375,17 @@ export default function MockInterviewStage1() {
       });
 
       setFinished(true);
-      navigate(`/mock-interview/${sessionId}/stage1-results`, {
-        state: { gradeResponse: response, session: locationState?.session, selectedStages, problems },
-      });
+      setGraded(true);
+      // Let the bar land on 100 before the results page takes over.
+      window.setTimeout(() => {
+        navigate(`/mock-interview/${sessionId}/stage1-results`, {
+          state: { gradeResponse: response, session: locationState?.session, selectedStages, problems },
+        });
+      }, 700);
     } catch (e: unknown) {
       setSubmitError(e instanceof Error ? e.message : "Grading failed. Try again.");
       setSubmitting(false);
+      setGraded(false);
     }
   }
 
@@ -384,11 +393,34 @@ export default function MockInterviewStage1() {
     (qs) => qs.ranOnce || qs.code.trim().length > 60 || qs.isExpired,
   ).length;
 
+  // Every solution goes to the model for review, so the wait scales with how
+  // many problems were in the assessment.
+  const gradingStages = useMemo<ProgressStage[]>(
+    () => [
+      { label: "Collecting your solutions", seconds: 1.5 },
+      {
+        label:
+          questions.length === 1
+            ? "Reviewing your solution"
+            : `Reviewing your ${questions.length} solutions`,
+        seconds: Math.max(6, questions.length * 5),
+      },
+      { label: "Scoring and writing feedback", seconds: 4 },
+    ],
+    [questions.length],
+  );
+
+  const grading = useStagedProgress(gradingStages, { running: submitting, done: graded });
+
   if (missingContext || !current) {
     return (
       <div className="mock-loading" style={{ height: "100vh" }}>
-        <Loader2 size={20} className="spin" style={{ color: "var(--green-dark)" }} />
-        <p className="muted">Loading your assessment…</p>
+        <LoadingNotice
+          title="Loading your assessment"
+          estimate="Pulling the problems and your saved code. A few seconds."
+          slowNote="Still loading. If this does not clear, go back and reopen the assessment."
+          slowAfterMs={10000}
+        />
       </div>
     );
   }
@@ -725,6 +757,17 @@ export default function MockInterviewStage1() {
           )}
         </button>
       </div>
+
+      {submitting ? (
+        <ProgressOverlay
+          eyebrow="Assessment"
+          title="Grading your submission"
+          percent={grading.percent}
+          stages={gradingStages}
+          activeStage={grading.activeStage}
+          note="Every solution gets read line by line, which is the slow part. Keep this page open."
+        />
+      ) : null}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { BookOpen, Brain, FileText, LogIn, ShieldCheck, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { InlineLoading } from "../components/Loaders";
 import { guestSignIn, hasValidSession } from "../lib/api";
 import { useEffect, useState } from "react";
 
@@ -89,7 +90,11 @@ export default function Landing() {
                 }
               }}
             >
-              {guestLoading ? "Starting a guest session..." : "or keep looking around as a guest"}
+              {guestLoading ? (
+                <InlineLoading label="Starting a guest session" />
+              ) : (
+                "or keep looking around as a guest"
+              )}
             </button>
           </div>
         </Card>
