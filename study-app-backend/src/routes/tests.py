@@ -31,6 +31,7 @@ from src.schemas.test_schema import (
 )
 from src.services.file_service import FileService
 from src.services.grading_service import GradingService
+from src.services.kojo_context_cache import invalidate_folder
 from src.services.llm_service import LLMService
 from src.services.test_service import TestService
 from src.utils.exceptions import LLMException, ResourceNotFoundException, StudyAppException
@@ -430,6 +431,8 @@ async def _extract_and_generate_background(
                     folder_id, notes_hash, exclude_test_id=test_id
                 )
             await session.commit()
+            # New test notes are part of Kojo's folder context.
+            invalidate_folder(folder_id)
     except Exception as exc:
         logger.warning("File extraction failed for test_id=%s: %s", test_id, exc)
         async with async_session_maker() as err_session:
