@@ -6,6 +6,7 @@ import { Card } from "../components/Card";
 import { CollapsibleSection } from "../components/CollapsibleSection";
 import { ConfirmModal, TypeToConfirmModal } from "../components/ConfirmModal";
 import { SelectInput } from "../components/Field";
+import { SkeletonList } from "../components/Skeletons";
 import {
   deleteAccount,
   fetchArchivedFolders,
@@ -436,7 +437,7 @@ export default function Settings() {
             ) : null}
 
             {loadingCleared ? (
-              <p className="muted small">Loading cleared chats…</p>
+              <SkeletonList rows={2} label="Loading cleared chats" />
             ) : clearedConversations.length === 0 ? (
               <p className="muted small">No recently cleared Kojo chats.</p>
             ) : (
@@ -474,7 +475,7 @@ export default function Settings() {
           ) : null}
 
           {loadingArchived ? (
-            <p className="muted small">Loading archived classes…</p>
+            <SkeletonList rows={2} label="Loading archived classes" />
           ) : archivedFolders.length === 0 ? (
             <p className="muted small">No archived classes.</p>
           ) : (

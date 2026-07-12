@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./Button";
+import { InlineLoading } from "./Loaders";
 
 type ConfirmModalProps = {
   title: string;
@@ -103,7 +104,7 @@ export function TypeToConfirmModal({
         <div className="button-row">
           <Button variant="secondary" onClick={onCancel} disabled={loading}>Cancel</Button>
           <Button variant="danger" onClick={onConfirm} disabled={!canConfirm}>
-            {loading ? "Deleting…" : confirmLabel}
+            {loading ? <InlineLoading label="Deleting" /> : confirmLabel}
           </Button>
         </div>
       </div>

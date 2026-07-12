@@ -16,6 +16,8 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmModal } from "../components/ConfirmModal";
+import { ProgressBar } from "../components/Progress";
+import { SkeletonList } from "../components/Skeletons";
 import { createLearningTrack, deleteLearningTrack, fetchLearningTrack } from "../lib/api";
 import { useSettings } from "../lib/useSettings";
 import type { LearningTrack } from "../lib/types";
@@ -113,10 +115,7 @@ export default function LearningModulesPage() {
   if (!loaded) {
     return (
       <div className="page page-narrow">
-        <div className="lm-loading">
-          <Loader2 size={28} className="lm-spin" />
-          <p className="muted">Loading your learning track.</p>
-        </div>
+        <SkeletonList rows={4} label="Loading your learning track" />
       </div>
     );
   }
@@ -258,9 +257,14 @@ export default function LearningModulesPage() {
       ) : null}
 
       {track.status === "generating" ? (
-        <div className="lm-generating-bar">
-          <Loader2 size={16} className="lm-spin" />
-          <span>Writing lessons and quizzes. You can start module 1 as soon as it's ready.</span>
+        <div className="lm-generating-bar lm-generating-bar--progress">
+          <ProgressBar
+            value={readyCount}
+            max={targetCount}
+            label="Writing lessons and quizzes"
+            detail={`${readyCount} of ${targetCount} ready`}
+          />
+          <span>You can start module 1 as soon as it's ready.</span>
           <button
             className="lm-cancel-btn"
             type="button"

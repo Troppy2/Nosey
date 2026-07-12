@@ -5,6 +5,7 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmModal, RenameModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
+import { SkeletonFolderMiniGrid, SkeletonStatGrid, SkeletonTestRows, SkeletonWeakStack } from "../components/Skeletons";
 import { deleteTest, fetchFlashcards, fetchFolders, fetchTests, getResumableTests, getStoredUser, scopeKey, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
 import type { Flashcard, Folder, ResumableTestInfo, TestSummary } from "../lib/types";
@@ -380,9 +381,35 @@ export default function Dashboard() {
         {error ? <div className="form-error">{error}</div> : null}
 
         {isLoading ? (
-          <div className="centered-block">
-            <span className="loader" />
-          </div>
+          // Full trace of the loaded dashboard: stat grid, then the two-column
+          // layout with Folders + Recent Tests in the main column and the dark
+          // Review These stack in the sidebar. Section titles are static
+          // content, so they render for real.
+          <>
+            <SkeletonStatGrid label="Loading your stats" />
+            <div className="dashboard-layout">
+              <div className="dashboard-main">
+                <section>
+                  <div className="section-title">
+                    <h2>Folders</h2>
+                  </div>
+                  <SkeletonFolderMiniGrid label="Loading your folders" />
+                </section>
+                <section>
+                  <div className="section-title">
+                    <h2>Recent Tests</h2>
+                  </div>
+                  <SkeletonTestRows rows={3} label="Loading your recent tests" />
+                </section>
+              </div>
+              <aside>
+                <div className="section-title">
+                  <h2>Review These</h2>
+                </div>
+                <SkeletonWeakStack count={2} />
+              </aside>
+            </div>
+          </>
         ) : (
           <>
             <section id="tour-stat-grid" className="grid grid-3 stat-grid">

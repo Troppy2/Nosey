@@ -2,6 +2,7 @@ import { ArrowLeft, BookOpen, LogIn, ShieldCheck } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { InlineLoading } from "../components/Loaders";
 import {
   googleSignIn,
   hasValidSession,
@@ -136,7 +137,11 @@ export default function SignIn() {
             {clientId ? (
               <div className="google-btn-wrap">
                 <div ref={googleButtonRef} />
-                {googleLoading && <p className="small muted signin-loading">Signing in...</p>}
+                {googleLoading && (
+                  <p className="small muted signin-loading">
+                    <InlineLoading label="Signing you in" />
+                  </p>
+                )}
               </div>
             ) : (
               // Local-dev fallback when no Google client ID is configured.

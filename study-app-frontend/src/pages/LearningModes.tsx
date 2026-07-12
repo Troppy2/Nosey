@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { Button } from "../components/Button";
+import { Skeleton, SkeletonFolderGrid } from "../components/Skeletons";
 import { fetchFolders } from "../lib/api";
 import { useSettings } from "../lib/useSettings";
 import type { Folder } from "../lib/types";
@@ -17,9 +18,13 @@ export default function LearningModes() {
   const selectedFolderId = folderId ? Number(folderId) : null;
   const { betaMode } = useSettings();
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchFolders().then(setFolders).catch(() => setFolders([]));
+    fetchFolders()
+      .then(setFolders)
+      .catch(() => setFolders([]))
+      .finally(() => setLoading(false));
   }, []);
 
   // Step 1: folder picker.
@@ -34,7 +39,11 @@ export default function LearningModes() {
           </div>
         </header>
 
-        {folders.length === 0 ? (
+        {/* Without the loading gate the empty state flashes on every visit
+            before the fetch lands. */}
+        {loading ? (
+          <SkeletonFolderGrid count={4} label="Loading your class folders" />
+        ) : folders.length === 0 ? (
           <EmptyState
             icon={<FolderOpen />}
             title="No class folders yet"
@@ -69,10 +78,14 @@ export default function LearningModes() {
     );
   }
 
-  // Step 2: mode picker for the chosen folder.
+  // Step 2: mode picker for the chosen folder. The mode cards are static
+  // content, so they render immediately; only the folder's own details (name,
+  // card count, whether modes are locked) wait on the fetch.
   const folder = folders.find((f) => f.id === selectedFolderId) ?? null;
   const cardCount = folder?.flashcard_count ?? 0;
-  const hasCards = cardCount > 0;
+  // While loading, treat modes as available: flashing them disabled and then
+  // unlocking reads worse than the reverse, and each mode handles empty decks.
+  const hasCards = loading || cardCount > 0;
 
   return (
     <div className="page page-narrow">
@@ -80,13 +93,21 @@ export default function LearningModes() {
         <Link className="flash-back-btn" to="/flashcards" aria-label="Back to class folders" title="Back to class folders">
           <ArrowLeft size={18} />
         </Link>
-        <div>
-          <span className="eyebrow">{folder?.subject ?? "Class folder"}</span>
-          <h1>{folder?.name ?? "Learning Modes"}</h1>
-          <p className="muted">
-            {cardCount} card{cardCount === 1 ? "" : "s"} in this class. Pick a way to study.
-          </p>
-        </div>
+        {loading ? (
+          <div className="mode-header-loading" role="status" aria-label="Loading this class">
+            <Skeleton width="90px" height="0.7rem" />
+            <Skeleton width="220px" height="1.5rem" />
+            <Skeleton width="260px" height="0.85rem" />
+          </div>
+        ) : (
+          <div>
+            <span className="eyebrow">{folder?.subject ?? "Class folder"}</span>
+            <h1>{folder?.name ?? "Learning Modes"}</h1>
+            <p className="muted">
+              {cardCount} card{cardCount === 1 ? "" : "s"} in this class. Pick a way to study.
+            </p>
+          </div>
+        )}
       </header>
 
       <section className="mode-grid">
@@ -123,7 +144,7 @@ export default function LearningModes() {
         ) : null}
       </section>
 
-      {!hasCards ? (
+      {!loading && !hasCards ? (
         <p className="muted small mode-empty-note">
           This class has no flashcards yet. Add or generate some to start studying.
         </p>

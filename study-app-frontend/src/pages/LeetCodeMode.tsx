@@ -48,6 +48,7 @@ import {
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MarkdownContent } from "../components/MarkdownContent";
+import { LoadingNotice } from "../components/Loaders";
 import { ConfirmModal } from "../components/ConfirmModal";
 import CodingTabs from "../components/Tab";
 import { SlashCommandMenu, type CommandOption as SlashCommand } from "../components/SlashCommandMenu";
@@ -2835,10 +2836,13 @@ export default function LeetCodeMode() {
             ) : null}
 
             {gradeLoading ? (
-              <div className="lc-grade-loading">
-                <Loader2 size={14} className="spin" />
-                <span>Kojo is grading your submission…</span>
-              </div>
+              <LoadingNotice
+                compact
+                title="Kojo is grading your submission"
+                estimate="Reading your solution and checking the approach. About 15 seconds."
+                slowNote="Still reading. A long solution takes Kojo longer to work through."
+                slowAfterMs={18000}
+              />
             ) : null}
 
             {gradeFeedback && !gradeLoading ? (

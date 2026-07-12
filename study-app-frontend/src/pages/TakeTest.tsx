@@ -6,9 +6,13 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { TextArea } from "../components/Field";
+import { InlineLoading, LoadingNotice } from "../components/Loaders";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { MathInput } from "../components/MathInput";
+import type { ProgressStage } from "../components/Progress";
+import { ProgressOverlay, useStagedProgress } from "../components/Progress";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
+import { SkeletonQuestionCard } from "../components/Skeletons";
 import { API_BASE_URL, fetchTest, getDraftAttempt, kojoChat, saveDraftAttempt, scopeKey, submitAttempt } from "../lib/api";
 import { applyTextHighlights, clearTextHighlights, getSelectionSignature, HIGHLIGHT_SUPPORTED } from "../lib/highlightRanges";
 import { useSettings } from "../lib/useSettings";
@@ -49,6 +53,7 @@ export default function TakeTest() {
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [graded, setGraded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [generationMeta, setGenerationMeta] = useState<GenerationMeta | null>(null);
   const [showResumeDialog, setShowResumeDialog] = useState(false);
@@ -430,9 +435,36 @@ export default function TakeTest() {
     [answers],
   );
 
+  // Grading is one round trip, so there is nothing real to count. What we do
+  // know is the pipeline: the answer key is instant, and every written answer
+  // goes to Kojo, which is what makes a long test slow. Sizing the stages off
+  // the actual question mix keeps the bar's pace roughly honest.
+  const gradingStages = useMemo<ProgressStage[]>(() => {
+    const questions = test?.questions ?? [];
+    const written = questions.filter((question) => question.type === "FRQ").length;
+    const keyed = questions.length - written;
+    const stages: ProgressStage[] = [{ label: "Collecting your answers", seconds: 1.5 }];
+    if (keyed > 0) {
+      stages.push({ label: "Checking against the answer key", seconds: 2 });
+    }
+    if (written > 0) {
+      stages.push({
+        label:
+          written === 1 ? "Reading your written answer" : `Reading your ${written} written answers`,
+        seconds: Math.max(5, written * 3),
+      });
+    }
+    stages.push({ label: "Scoring and writing feedback", seconds: 3.5 });
+    return stages;
+  }, [test]);
+
+  const hasWrittenAnswers = gradingStages.some((stage) => stage.label.startsWith("Reading"));
+  const grading = useStagedProgress(gradingStages, { running: isSubmitting, done: graded });
+
   async function handleSubmit() {
     if (!test || !canSubmit) return;
     setIsSubmitting(true);
+    setGraded(false);
     try {
       const result = await submitAttempt(test.id, submittedAnswers);
       localStorage.removeItem(scopeKey(`nosey_test_index_${numericTestId}`));
@@ -441,10 +473,14 @@ export default function TakeTest() {
       const completedKey = scopeKey("nosey_completed_test_ids");
       const existing = JSON.parse(localStorage.getItem(completedKey) ?? "[]") as number[];
       localStorage.setItem(completedKey, JSON.stringify([...new Set([...existing, test.id])]));
-      navigate(`/results/${result.attempt_id}`);
+      // Let the bar finish its run to 100 and the last stage tick over before
+      // leaving. Cutting straight to results throws away the payoff.
+      setGraded(true);
+      window.setTimeout(() => navigate(`/results/${result.attempt_id}`), 700);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to submit this test.");
       setIsSubmitting(false);
+      setGraded(false);
     }
   }
 
@@ -465,9 +501,11 @@ export default function TakeTest() {
         </div>
       );
     }
+    // The question card is the whole page, so stand in for it rather than
+    // spinning: pill, prompt, and option rows exactly where they will land.
     return (
-      <div className="page centered-block">
-        <span className="loader" />
+      <div className="page page-narrow">
+        <SkeletonQuestionCard />
       </div>
     );
   }
@@ -504,13 +542,16 @@ export default function TakeTest() {
     return (
       <div className="page centered-block">
         <div className="test-generating-splash">
-          <span className="loader" />
-          <strong>Generating your test...</strong>
-          <span className="muted">
-            {expectedCount > 0
-              ? `Writing ${expectedCount} questions. The first one will appear in a moment.`
-              : "The first question will appear in a moment."}
-          </span>
+          <LoadingNotice
+            title="Generating your test"
+            estimate={
+              expectedCount > 0
+                ? `Writing ${expectedCount} questions. The first one usually lands within 20 seconds.`
+                : "The first question usually lands within 20 seconds."
+            }
+            slowNote="Still writing. Dense notes can take a minute or more. You can leave this page, generation keeps running and the test will be waiting in your folder."
+            slowAfterMs={25000}
+          />
           <Link
             className="back-link"
             to={test.folder_id ? `/folders/${test.folder_id}` : "/dashboard"}
@@ -860,7 +901,7 @@ export default function TakeTest() {
           </Button>
           {onLastReal ? (
             <Button disabled={!canSubmit || isSubmitting} icon={<Send size={18} />} onClick={handleSubmit}>
-              {isSubmitting ? "Submitting..." : "Submit"}
+              {isSubmitting ? <InlineLoading label="Submitting" /> : "Submit"}
             </Button>
           ) : index >= maxIndex ? (
             <Button variant="secondary" disabled icon={<Loader2 size={18} className="spin" />}>
@@ -935,6 +976,21 @@ export default function TakeTest() {
           </div>
         </>
       )}
+
+      {isSubmitting ? (
+        <ProgressOverlay
+          eyebrow="Marking"
+          title="Grading your test"
+          percent={grading.percent}
+          stages={gradingStages}
+          activeStage={grading.activeStage}
+          note={
+            hasWrittenAnswers
+              ? "Kojo reads every written answer, which is the slow part. Keep this page open."
+              : "Keep this page open. Your results are almost ready."
+          }
+        />
+      ) : null}
     </div>
   );
 }

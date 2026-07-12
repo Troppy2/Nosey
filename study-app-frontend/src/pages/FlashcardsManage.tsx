@@ -5,6 +5,7 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { TextInput } from "../components/Field";
+import { InlineLoading, LoadingNotice } from "../components/Loaders";
 import { MarkdownContent } from "../components/MarkdownContent";
 import {
   createFlashcard,
@@ -273,7 +274,7 @@ export default function FlashcardsManage() {
             variant="secondary"
             disabled={generating}
           >
-            {generating ? "Generating..." : "Generate from file"}
+            {generating ? <InlineLoading label="Generating" /> : "Generate from file"}
           </Button>
           <Button
             icon={<Plus size={18} />}
@@ -281,7 +282,7 @@ export default function FlashcardsManage() {
             variant="secondary"
             disabled={generatingMore}
           >
-            {generatingMore ? "Generating..." : "Generate more"}
+            {generatingMore ? <InlineLoading label="Generating" /> : "Generate more"}
           </Button>
           <label className="flashcard-gen-count">
             Cards to add
@@ -295,7 +296,21 @@ export default function FlashcardsManage() {
             />
           </label>
         </div>
-        <p className="muted small">AI model is set in Settings.</p>
+        {generating || generatingMore ? (
+          <LoadingNotice
+            compact
+            title={generating ? "Reading your file" : `Writing ${generateCount} new cards`}
+            estimate={
+              generating
+                ? "Pulling the key ideas out, then writing cards. Around 20 seconds."
+                : "Around 20 seconds. Your existing cards stay where they are."
+            }
+            slowNote="Still going. A long file can take a minute or more. Leaving this page cancels it."
+            slowAfterMs={25000}
+          />
+        ) : (
+          <p className="muted small">AI model is set in Settings.</p>
+        )}
       </Card>
 
       <Card tone="soft" className="add-card-form">
@@ -378,7 +393,7 @@ export default function FlashcardsManage() {
         {hasMore ? (
           <div className="button-row" style={{ justifyContent: "center", marginTop: "16px" }}>
             <Button variant="secondary" onClick={handleLoadMore} disabled={loadingMore}>
-              {loadingMore ? "Loading..." : "Load more"}
+              {loadingMore ? <InlineLoading label="Loading more…" /> : "Load more"}
             </Button>
           </div>
         ) : null}

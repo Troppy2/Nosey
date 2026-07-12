@@ -14765,3 +14765,619 @@ a.lm-module-row:focus-visible {
     transform: none;
   }
 }
+
+/* ── Loading library: Skeletons.tsx / Progress.tsx / Loaders.tsx ─────────────
+   Skeletons for content loads, ProgressBar for countable/staged waits,
+   Spinner/InlineLoading for short indeterminate actions. Spinners reuse the
+   .loader ring defined near the top of this file. */
+
+/* Percentage-based sweep so the highlight travels the full width of any bone,
+   from a narrow pill to a full-width prompt line. A fixed pixel band leaves
+   wide bones half-swept, which reads as broken. */
+@keyframes skel-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0% 0; }
+}
+
+.skel {
+  display: inline-block;
+  height: 0.8rem;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #e4ecda 32%, #f4f8ec 50%, #e4ecda 68%);
+  background-size: 300% 100%;
+  animation: skel-shimmer 1.6s infinite ease-in-out;
+}
+
+.skel--circle {
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.skel-text {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.skel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skel-list-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--green-light-mid);
+  border-radius: 8px;
+}
+
+.skel-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--green-light-mid);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md);
+}
+
+.skel-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ProgressBar wrapper. Scoped under .progress-block so the raw
+   .progress-track divs in Flashcards/Matching/TakeTest are unaffected. */
+.progress-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.progress-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.progress-detail {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--green-dark);
+}
+
+.progress-block .progress-fill {
+  position: relative;
+  min-width: 8px;
+  background: linear-gradient(90deg, var(--green-mid), var(--green-dark));
+}
+
+/* Highlighter nib: the bright tip where the fill is being drawn in. */
+.progress-block .progress-fill::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 1px;
+  width: 4px;
+  height: 4px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: var(--green-lightest);
+  opacity: 0.9;
+}
+
+@keyframes progress-sweep {
+  0% { margin-left: -35%; }
+  100% { margin-left: 100%; }
+}
+
+.progress-track--indeterminate .progress-fill {
+  width: 35%;
+  animation: progress-sweep 1.3s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+.inline-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skel {
+    animation: none;
+    background: #e4ecda;
+  }
+
+  .progress-track--indeterminate .progress-fill {
+    animation: none;
+    margin-left: 0;
+    width: 100%;
+    opacity: 0.35;
+  }
+}
+
+/* Learning Modules generating bar, progress variant: the ProgressBar stacks
+   above the hint text, cancel stays on the hint row. */
+.lm-generating-bar--progress {
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 0.45rem;
+  padding: 0.85rem 1rem;
+}
+
+.lm-generating-bar--progress .progress-block {
+  flex-basis: 100%;
+}
+
+/* Keep the bar's flex:1 span rule from stretching the ProgressBar's own
+   label/detail spans. */
+.lm-generating-bar--progress .progress-block span {
+  flex: initial;
+}
+
+/* ── LoadingNotice: spinner + what to expect ──────────────────────────────────
+   For waits with nothing countable to show. Reads as a note pinned to the page
+   (dashed rule, same as .empty-state) rather than a card, because it is
+   temporary: the content it stands in for is on its way. */
+
+.loading-notice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 40px 24px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.46);
+  border: 1px dashed var(--green-light-mid);
+  border-radius: 8px;
+}
+
+.loading-notice-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.loading-notice strong {
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+/* The estimate is keyed on its own text, so swapping in the slow note
+   cross-fades instead of snapping. */
+.loading-notice-hint {
+  animation: fade-in 400ms ease;
+}
+
+/* Row layout for sitting under a button or inside a panel. */
+.loading-notice--compact {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  text-align: left;
+}
+
+.loading-notice--compact strong {
+  font-size: 0.9rem;
+}
+
+/* ── ProgressOverlay: the marking sheet ───────────────────────────────────────
+   Blocking wait for an action the user cannot work around. The rubric ticks
+   off stage by stage while the highlighter is drawn across the track, so the
+   wait has structure the user can read. Used for grading a submitted test. */
+
+.progress-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(38, 48, 31, 0.55);
+  backdrop-filter: blur(8px);
+  animation: fade-in 0.2s ease;
+}
+
+.progress-overlay-card {
+  display: flex;
+  width: min(440px, 100%);
+  flex-direction: column;
+  gap: 20px;
+  padding: 30px 28px;
+  background: var(--white);
+  border: 1px solid var(--green-light-mid);
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+}
+
+.progress-overlay-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.progress-overlay-card h2 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: 1.4rem;
+  line-height: 1.25;
+}
+
+/* A full highlighter stroke, not a hairline meter: this is the one place the
+   bar is the subject of the screen rather than trim on it. */
+.progress-overlay-card .progress-track {
+  height: 12px;
+  background: var(--green-lightest);
+}
+
+.progress-overlay-card .progress-head {
+  font-size: 0.78rem;
+}
+
+.progress-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.progress-stage {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  transition: color var(--transition-normal), opacity var(--transition-normal);
+}
+
+.progress-stage-mark {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  place-items: center;
+  border: 1.5px solid var(--green-light-mid);
+  border-radius: 999px;
+  transition: background var(--transition-normal), border-color var(--transition-normal);
+}
+
+.progress-stage--pending {
+  opacity: 0.42;
+}
+
+.progress-stage--active {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* The spinner brings its own ring, so the mark gets out of its way. */
+.progress-stage--active .progress-stage-mark {
+  border-color: transparent;
+}
+
+.progress-stage--done .progress-stage-mark {
+  color: var(--white);
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+}
+
+.progress-overlay-note {
+  margin: 0;
+  padding-top: 4px;
+  border-top: 1px solid var(--gray-200);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-overlay,
+  .loading-notice-hint {
+    animation: none;
+  }
+}
+
+/* ── Context-aware skeleton presets ──────────────────────────────────────────
+   Each preset traces the layout of the page it stands in for, bone for bone,
+   and reuses the page's own grid classes so mobile breakpoints match the real
+   content. Dimensions below are copied from the components they mirror. */
+
+/* Folder picker cards (.folder-card is 300px min-height, dot top-right). */
+.skel-folder-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 300px;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--green-light-mid);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md);
+}
+
+.skel-folder-dot {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+}
+
+.skel-folder-top {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skel-folder-top .skel:first-of-type {
+  margin-bottom: 10px;
+}
+
+.skel-folder-icon {
+  border-radius: 8px;
+}
+
+.skel-folder-footer {
+  display: flex;
+  gap: 12px;
+}
+
+/* Dashboard folder minis (.folder-mini: 132px, icon left). */
+.skel-folder-mini {
+  display: flex;
+  gap: 16px;
+  min-height: 132px;
+  padding: 22px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--green-light-mid);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md);
+}
+
+.skel-folder-mini-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.skel-folder-mini-body .skel-folder-footer {
+  margin-top: auto;
+}
+
+/* Test rows (.test-row: 18px 20px padding, action cluster right). */
+.skel-test-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px 20px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--green-light-mid);
+  border-radius: 8px;
+}
+
+.skel-test-row-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.test-list .skel-test-row + .skel-test-row {
+  margin-top: 10px;
+}
+
+/* Results score hero: keeps the soft green wash of .score-hero so the page
+   still opens on a green banner while the score itself shimmers. */
+.skel-score-hero {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  margin-bottom: 24px;
+  padding: 48px 32px;
+  background: linear-gradient(160deg, var(--green-light), var(--green-light-mid));
+  border: 1px solid var(--green-light-mid);
+  border-radius: 8px;
+}
+
+.skel-score-hero .skel {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.55) 32%, rgba(255, 255, 255, 0.85) 50%, rgba(255, 255, 255, 0.55) 68%);
+  background-size: 300% 100%;
+}
+
+.result-stats .skel-card {
+  align-items: flex-start;
+}
+
+/* TakeTest question card: pill + counter, prompt, four option rows. */
+.skel-question-card {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 26px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--green-light-mid);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md);
+}
+
+.skel-question-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.skel-pill {
+  border-radius: 999px;
+}
+
+.skel-question-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skel-question-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skel-option-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Flashcard face: tall centered card like the review deck. */
+.skel-flashcard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 320px;
+  padding: 32px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--green-light-mid);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md);
+}
+
+.skel-flashcard-text {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+}
+
+/* Kojo chat shell: sidebar rail + alternating bubbles. Grid mirrors
+   .chat-mode-shell's 280px sidebar and collapses the same way on mobile. */
+.skel-chat {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  height: 100%;
+  min-height: 60vh;
+  /* .chat-mode-shell is itself a 280px + 1fr grid; without this the whole
+     skeleton would be squeezed into the sidebar column. */
+  grid-column: 1 / -1;
+}
+
+.skel-chat-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px 18px;
+  border-right: 1px solid rgba(113, 131, 85, 0.14);
+}
+
+.skel-chat-side-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.skel-chat-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+.skel-chat-bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 16px;
+}
+
+.skel-chat-bubble--kojo {
+  width: min(72%, 420px);
+  background: rgba(255, 255, 255, 0.72);
+  border-bottom-left-radius: 4px;
+}
+
+.skel-chat-bubble--user {
+  align-self: flex-end;
+  width: min(52%, 300px);
+  background: var(--green-lightest);
+  border-bottom-right-radius: 4px;
+}
+
+@media (max-width: 720px) {
+  .skel-chat {
+    grid-template-columns: 1fr;
+  }
+
+  .skel-chat-sidebar {
+    display: none;
+  }
+}
+
+/* Dashboard "Review These" weak cards: keeps the dark gradient of .card-dark
+   with light-on-dark bones, same trick as the score hero. */
+.skel-weak-card {
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+  background: linear-gradient(135deg, var(--green-dark), #536342);
+  border-radius: 8px;
+}
+
+.skel-weak-card .skel {
+  background: linear-gradient(90deg, rgba(233, 245, 219, 0.28) 32%, rgba(233, 245, 219, 0.5) 50%, rgba(233, 245, 219, 0.28) 68%);
+  background-size: 300% 100%;
+}
+
+/* Learning Modes header while the folder details load. */
+.mode-header-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Page-header stand-in: eyebrow bone over a title bone. */
+.skel-page-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Matching board: face-down tiles shimmering in the real board grid while the
+   deck shuffles. Tile size copies .match-tile (96px, radius 14). */
+.match-loading--with-board {
+  padding: 1.5rem 1rem 2rem;
+}
+
+.skel-match-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 96px;
+  padding: 0.7rem 0.75rem;
+  border: 1.5px solid var(--green-light-mid);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}

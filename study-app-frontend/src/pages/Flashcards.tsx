@@ -7,6 +7,7 @@ import { ConfirmModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
 import { FeatureSurvey } from "../components/FeatureSurvey";
 import { MarkdownContent } from "../components/MarkdownContent";
+import { SkeletonFlashcard, SkeletonFolderGrid } from "../components/Skeletons";
 import { deleteFlashcard, fetchFlashcards, fetchFolders, isGuestSession, recordFlashcardAttempt, scopeKey } from "../lib/api";
 import type { Flashcard, Folder } from "../lib/types";
 
@@ -25,9 +26,14 @@ export default function Flashcards() {
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [loadingFolders, setLoadingFolders] = useState(true);
+  const [loadingCards, setLoadingCards] = useState(initialFolderId != null);
 
   useEffect(() => {
-    fetchFolders().then(setFolders).catch(() => setFolders([]));
+    fetchFolders()
+      .then(setFolders)
+      .catch(() => setFolders([]))
+      .finally(() => setLoadingFolders(false));
   }, []);
 
   useEffect(() => {
@@ -85,18 +91,22 @@ export default function Flashcards() {
       setStudied(new Set());
       setFlipped(false);
       setStartedAt(Date.now());
+      setLoadingCards(false);
       return;
     }
 
-    fetchFlashcards(selectedFolderId).then((data) => {
-      setCards(data);
-      const saved = localStorage.getItem(scopeKey(`nosey_flashcard_index_${selectedFolderId}`));
-      const savedIndex = saved !== null ? Math.min(Number(saved), data.length - 1) : 0;
-      setIndex(Math.max(savedIndex, 0));
-      setStudied(new Set());
-      setFlipped(false);
-      setStartedAt(Date.now());
-    });
+    setLoadingCards(true);
+    fetchFlashcards(selectedFolderId)
+      .then((data) => {
+        setCards(data);
+        const saved = localStorage.getItem(scopeKey(`nosey_flashcard_index_${selectedFolderId}`));
+        const savedIndex = saved !== null ? Math.min(Number(saved), data.length - 1) : 0;
+        setIndex(Math.max(savedIndex, 0));
+        setStudied(new Set());
+        setFlipped(false);
+        setStartedAt(Date.now());
+      })
+      .finally(() => setLoadingCards(false));
   }, [selectedFolderId]);
 
   // Deep link from the dashboard "Review These" cards: jump straight to that card
@@ -174,7 +184,9 @@ export default function Flashcards() {
           </div>
         </header>
 
-        {folders.length === 0 ? (
+        {loadingFolders ? (
+          <SkeletonFolderGrid count={4} label="Loading your class folders" />
+        ) : folders.length === 0 ? (
           <EmptyState
             icon={<FolderOpen />}
             title="No class folders yet"
@@ -205,6 +217,16 @@ export default function Flashcards() {
             ))}
           </section>
         )}
+      </div>
+    );
+  }
+
+  // The deck is the page, so stand in for the card face rather than telling the
+  // user the class is empty before we know that it is.
+  if (loadingCards) {
+    return (
+      <div className="page page-narrow">
+        <SkeletonFlashcard />
       </div>
     );
   }

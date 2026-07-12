@@ -5,6 +5,7 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { SelectInput, TextInput } from "../components/Field";
+import { InlineLoading, LoadingNotice } from "../components/Loaders";
 import { createTest, fetchFolderFiles, fetchFolders, fetchProviderStatus, scopeKey } from "../lib/api";
 import { useSettings } from "../lib/useSettings";
 import type { Folder, ProviderStatus, TestCreationParams } from "../lib/types";
@@ -665,12 +666,24 @@ export default function CreateTest() {
             )}
           </Card>
 
+          {/* The upload is the part the user waits on here: generation itself
+              runs in the background and they land back in the folder. */}
+          {isSubmitting ? (
+            <LoadingNotice
+              compact
+              title={files.length > 0 ? "Uploading your notes" : "Setting up your test"}
+              estimate="Generation starts as soon as this finishes, and you can leave once it does."
+              slowNote="Still uploading. Large PDFs take a while. Keep this page open until it finishes."
+              slowAfterMs={15000}
+            />
+          ) : null}
+
           <div className="button-row split">
             <Link to="/dashboard">
               <Button variant="secondary">Cancel</Button>
             </Link>
             <Button disabled={!canSubmit} type="submit">
-              {isSubmitting ? "Generating..." : "Generate Test"}
+              {isSubmitting ? <InlineLoading label="Generating" /> : "Generate Test"}
             </Button>
           </div>
         </form>

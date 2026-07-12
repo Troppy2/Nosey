@@ -6,11 +6,13 @@ import { Card } from "../components/Card";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
 import { TextInput } from "../components/Field";
+import { SkeletonFolderGrid } from "../components/Skeletons";
 import { createFolder, deleteFolder, fetchFolders, scopeKey, updateFolder } from "../lib/api";
 import type { Folder } from "../lib/types";
 
 export default function Folders() {
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [view, setView] = useState<"grid" | "list">(
     () => (localStorage.getItem(scopeKey("nosey_folder_view")) as "grid" | "list") ?? "grid"
   );
@@ -25,7 +27,9 @@ export default function Folders() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchFolders().then(setFolders);
+    fetchFolders()
+      .then(setFolders)
+      .finally(() => setIsLoading(false));
   }, []);
 
   async function handleSubmit(event: FormEvent) {
@@ -111,7 +115,11 @@ export default function Folders() {
 
       {error ? <div className="form-error">{error}</div> : null}
 
-      {folders.length === 0 ? (
+      {/* Without this the empty state flashes on every visit before the fetch
+          lands, telling the user they have no folders when they do. */}
+      {isLoading ? (
+        <SkeletonFolderGrid count={4} label="Loading your folders" />
+      ) : folders.length === 0 ? (
         <EmptyState
           icon={<FolderOpen />}
           title="No folders yet"
