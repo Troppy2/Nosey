@@ -20,6 +20,7 @@ import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
+import { SkeletonChatShell } from "../components/Skeletons";
 import { SlashCommandMenu, type CommandOption } from "../components/SlashCommandMenu";
 import {
   bootstrapKojoFolder,
@@ -591,10 +592,12 @@ export default function KojoMode() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
+  // Mirrors the chat shell: sidebar rail of classes beside the message column,
+  // so the two-pane layout is already standing when the chat arrives.
   if (loadingFolders) {
     return (
       <div className="chat-mode-shell">
-        <div className="centered-block"><span className="loader" /></div>
+        <SkeletonChatShell />
       </div>
     );
   }

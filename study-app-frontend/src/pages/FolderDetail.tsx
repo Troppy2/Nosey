@@ -8,6 +8,7 @@ import { EmptyState } from "../components/EmptyState";
 import { FileManager } from "../components/FileManager";
 import { KojoChat } from "../components/KojoChat";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
+import { Skeleton, SkeletonTestRows } from "../components/Skeletons";
 import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, getStoredUser, isGuestSession, regenerateTest, reindexFolderFiles, scopeKey, updateFolder, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
 import type { AttemptSummary, Flashcard, Folder, TestCreationParams, TestSummary } from "../lib/types";
@@ -257,12 +258,23 @@ export default function FolderDetail() {
     }
   }
 
+  // Mirrors the loaded page: eyebrow + title header up top, then the
+  // Practice Tests section with its row list.
   if (isLoading) {
     return (
       <div className="page">
-        <div className="centered-block">
-          <span className="loader" />
-        </div>
+        <header className="page-header" role="status" aria-label="Loading this folder">
+          <div className="skel-page-head">
+            <Skeleton width="80px" height="0.7rem" />
+            <Skeleton width="240px" height="1.6rem" />
+          </div>
+        </header>
+        <section>
+          <div className="section-title">
+            <h2>Practice Tests</h2>
+          </div>
+          <SkeletonTestRows rows={3} label="Loading this folder's tests" />
+        </section>
       </div>
     );
   }
@@ -531,9 +543,7 @@ export default function FolderDetail() {
                 <div className="section-title">
                   <h2>Practice Tests</h2>
                 </div>
-                <div className="centered-block">
-                  <span className="loader" />
-                </div>
+                <SkeletonTestRows rows={2} label="Loading practice tests" />
               </section>
             ) : activeTests.length === 0 && failedTests.length === 0 ? (
               <EmptyState

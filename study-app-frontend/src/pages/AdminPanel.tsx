@@ -13,6 +13,8 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
+import { Spinner } from "../components/Loaders";
+import { SkeletonList, SkeletonStatGrid } from "../components/Skeletons";
 import {
   adminAuthenticate,
   clearAdminToken,
@@ -271,11 +273,11 @@ export default function AdminPanel() {
           {expiresAt ? <TimeRemaining expiresAt={expiresAt} /> : null}
           <Button
             variant="secondary"
-            icon={<RefreshCw size={15} />}
+            icon={loading ? <Spinner size="sm" label="Refreshing" /> : <RefreshCw size={15} />}
             onClick={() => void loadData()}
             disabled={loading}
           >
-            {loading ? "Loading..." : "Refresh"}
+            {loading ? "Refreshing…" : "Refresh"}
           </Button>
           <Button variant="secondary" onClick={() => void handleAuth()} disabled={authLoading}>
             {authLoading ? "Renewing..." : "Renew session"}
@@ -515,7 +517,10 @@ export default function AdminPanel() {
           ) : null}
         </>
       ) : loading ? (
-        <p className="muted">Loading stats...</p>
+        <>
+          <SkeletonStatGrid count={4} label="Loading admin stats" />
+          <SkeletonList rows={5} label="Loading user roster" />
+        </>
       ) : null}
 
       {/* Feature surveys */}

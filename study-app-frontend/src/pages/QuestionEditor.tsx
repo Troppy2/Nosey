@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmModal } from "../components/ConfirmModal";
+import { SkeletonList } from "../components/Skeletons";
 import {
   addQuestion,
   deleteQuestion,
@@ -433,7 +434,7 @@ export default function QuestionEditor() {
       {error && <div className="form-error">{error}</div>}
 
       {loading ? (
-        <p className="muted">Loading questions…</p>
+        <SkeletonList rows={4} label="Loading questions" />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {questions.length === 0 && !loading && (
