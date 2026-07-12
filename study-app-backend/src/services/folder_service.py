@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.repositories.folder_repository import FolderRepository
 from src.schemas.folder_schema import FolderCreate, FolderResponse, FolderUpdate
+from src.services.kojo_context_cache import invalidate_folder
 from src.utils.exceptions import ResourceNotFoundException
 
 
@@ -79,3 +80,6 @@ class FolderService:
             raise ResourceNotFoundException("Folder")
         await session.delete(folder)
         await session.commit()
+        # Free the cached Kojo context; folder ids are not reused, this is
+        # purely to release the memory early instead of waiting for the TTL.
+        invalidate_folder(folder_id)
