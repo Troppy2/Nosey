@@ -21,6 +21,7 @@ from src.schemas.test_schema import (
     TestUpdate,
 )
 from src.services.file_service import FileService
+from src.services.kojo_context_cache import invalidate_folder
 from src.services.llm_service import LLMService
 from src.utils.exceptions import ResourceNotFoundException, ValidationException
 from src.utils.validators import VALID_TEST_TYPES
@@ -471,5 +472,8 @@ class TestService:
         test = await TestRepository(session).get_owned(test_id, user_id)
         if test is None:
             raise ResourceNotFoundException("Test")
+        folder_id = test.folder_id
         await TestRepository(session).delete(test)
         await session.commit()
+        # The test's note snapshots were part of Kojo's folder context.
+        invalidate_folder(folder_id)

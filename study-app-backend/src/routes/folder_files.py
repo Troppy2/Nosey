@@ -18,6 +18,7 @@ from src.models.folder_file import FolderFile
 from src.models.user import User
 from src.repositories.usage_event_repository import UsageEventRepository
 from src.services.file_service import FileService
+from src.services.kojo_context_cache import invalidate_folder
 from src.utils.exceptions import ValidationException
 from src.utils.logger import get_logger
 from src.utils.validators import (
@@ -130,6 +131,7 @@ async def _extract_and_update(
             except Exception:
                 pass
             await session.commit()
+            invalidate_folder(folder_id)
             logger.info(
                 "Background extraction complete",
                 extra={"file_id": file_id, "file_name": file_name, "status": record.upload_status},
@@ -245,6 +247,8 @@ async def upload_folder_files(
         )
 
     await session.commit()
+    if created:
+        invalidate_folder(folder_id)
     return UploadResult(uploaded=created, skipped=skipped)
 
 
@@ -328,6 +332,7 @@ async def add_folder_text_note(
         pass
 
     await session.commit()
+    invalidate_folder(folder_id)
     logger.info(
         "Text note added to folder",
         extra={"file_name": title, "folder_id": folder_id, "size_bytes": content_bytes},
@@ -385,3 +390,4 @@ async def delete_folder_file(
     if result.rowcount == 0:
         raise HTTPException(status_code=404, detail="File not found")
     await session.commit()
+    invalidate_folder(folder_id)
