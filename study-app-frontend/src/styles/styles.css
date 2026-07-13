@@ -14608,6 +14608,56 @@ a.lm-module-row:focus-visible {
   border: 1px solid var(--green-light);
 }
 
+/* Direct file upload on the track setup card */
+.lm-file-input {
+  display: none;
+}
+
+.lm-file-list {
+  list-style: none;
+  margin: -0.3rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lm-file-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--green-light);
+  border-radius: 8px;
+  background: var(--green-lightest);
+  color: var(--ink);
+  font-size: 0.85rem;
+}
+
+.lm-file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lm-file-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--green-dark);
+  cursor: pointer;
+}
+
+.lm-file-remove:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
 /* Article editor (lesson page) */
 .lm-edit-card {
   display: flex;
