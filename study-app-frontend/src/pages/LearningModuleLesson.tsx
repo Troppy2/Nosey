@@ -213,6 +213,10 @@ export default function LearningModuleLesson() {
   const chunksRef = useRef<string[]>([]);
   const stoppedRef = useRef(false);
   const rateRef = useRef(1);
+  // Chrome keeps firing onend/onerror for utterances that were cancelled, and
+  // acting on those advances the queue while "paused" (audio keeps playing).
+  // Every (re)start bumps the session; callbacks from older sessions no-op.
+  const playSessionRef = useRef(0);
 
   const audioPosKey = numericModuleId != null ? scopeKey(`nosey_lm_audio_${numericModuleId}`) : "";
 
@@ -326,6 +330,7 @@ export default function LearningModuleLesson() {
 
   const speakChunk = useCallback(() => {
     if (stoppedRef.current) return;
+    const session = playSessionRef.current;
     const index = chunkIndexRef.current;
     const chunk = chunksRef.current[index];
     if (!chunk) {
@@ -337,18 +342,25 @@ export default function LearningModuleLesson() {
     const utterance = new SpeechSynthesisUtterance(chunk);
     utterance.rate = rateRef.current;
     if (voiceRef.current) utterance.voice = voiceRef.current;
-    utterance.onstart = () => updateChunkPos(index);
+    utterance.onstart = () => {
+      if (playSessionRef.current === session) updateChunkPos(index);
+    };
     utterance.onend = () => {
+      if (playSessionRef.current !== session || stoppedRef.current) return;
       chunkIndexRef.current += 1;
       speakChunk();
     };
-    utterance.onerror = () => setSpeech("idle");
+    utterance.onerror = () => {
+      // Cancels surface here as errors too; only a live session goes idle.
+      if (playSessionRef.current === session && !stoppedRef.current) setSpeech("idle");
+    };
     window.speechSynthesis.speak(utterance);
   }, [updateChunkPos]);
 
   const startSpeechFrom = useCallback(
     (fromChunk: number) => {
       if (!ttsSupported || speechChunks.length === 0) return;
+      playSessionRef.current += 1;
       window.speechSynthesis.cancel();
       stoppedRef.current = false;
       chunksRef.current = speechChunks;
@@ -359,21 +371,24 @@ export default function LearningModuleLesson() {
     [ttsSupported, speechChunks, speakChunk],
   );
 
-  // One button, podcast semantics: play picks up from the saved position,
-  // pause/resume while running.
+  // One button, podcast semantics. Pause is deliberately NOT
+  // speechSynthesis.pause(): Chrome's pause is unreliable (the queue can keep
+  // playing right through it). Pausing hard-cancels instead, and resume
+  // replays from the start of the current chunk, which costs at most a
+  // sentence or two of repetition.
   function togglePlayback() {
     if (speech === "playing") {
-      window.speechSynthesis.pause();
+      playSessionRef.current += 1;
+      stoppedRef.current = true;
+      window.speechSynthesis.cancel();
       setSpeech("paused");
-    } else if (speech === "paused") {
-      window.speechSynthesis.resume();
-      setSpeech("playing");
     } else {
       startSpeechFrom(chunkPos);
     }
   }
 
   const stopSpeech = useCallback(() => {
+    playSessionRef.current += 1;
     stoppedRef.current = true;
     window.speechSynthesis.cancel();
     setSpeech("idle");
@@ -388,11 +403,10 @@ export default function LearningModuleLesson() {
   function changeRate(newRate: number) {
     setRate(newRate);
     rateRef.current = newRate;
-    // A rate change applies from the next chunk; restart the current chunk so
-    // it takes effect immediately.
+    // Session-safe restart of the current chunk so the change is heard
+    // immediately (a raw cancel + speak races stale onend callbacks).
     if (speech === "playing") {
-      window.speechSynthesis.cancel();
-      speakChunk();
+      startSpeechFrom(chunkIndexRef.current);
     }
   }
 
@@ -405,18 +419,17 @@ export default function LearningModuleLesson() {
     } else {
       localStorage.removeItem(key);
     }
-    // Like a rate change: restart the current chunk so the new voice is heard
-    // immediately instead of on the next paragraph.
+    // Like a rate change: session-safe restart so the new voice is heard now.
     if (speech === "playing") {
-      window.speechSynthesis.cancel();
-      speakChunk();
+      startSpeechFrom(chunkIndexRef.current);
     }
   }
 
   function previewVoice() {
     if (!ttsSupported) return;
+    // Halt the lesson queue (session bump makes its callbacks inert), then
+    // speak a one-off sample outside the queue.
     stopSpeech();
-    stoppedRef.current = false;
     const sample = new SpeechSynthesisUtterance(
       "This is how your lessons will sound. Binary search runs in O of log n time.",
     );
@@ -431,6 +444,7 @@ export default function LearningModuleLesson() {
   useEffect(() => {
     return () => {
       if (ttsSupported) {
+        playSessionRef.current += 1;
         stoppedRef.current = true;
         window.speechSynthesis.cancel();
         setSpeech("idle");
