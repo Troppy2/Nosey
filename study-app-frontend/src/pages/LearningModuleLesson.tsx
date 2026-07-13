@@ -29,14 +29,67 @@ import {
 import { useSettings } from "../lib/useSettings";
 import type { LearningTrack, QuizAttemptResult } from "../lib/types";
 
+// Converts notation TTS engines mangle or skip into the words a teacher would
+// say aloud: Big-O, exponents, subscripts, comparison operators, indexing, and
+// function calls. Runs on every speech block as a safety net; the LLM-written
+// narration script should already be plain prose, but raw notation must never
+// reach the voice as symbols it silently drops.
+function notationToSpeech(text: string): string {
+  let out = text;
+  // Complexity classes first, before the generic call rule: O(n log n) -> "O of n log n".
+  // (?<!\w) instead of \b because \b never matches before the non-ASCII Θ/Ω.
+  out = out.replace(/(?<!\w)(O|Θ|Theta|Ω|Omega)\(([^()]*)\)/g, (_m, fn: string, inner: string) => {
+    const name = fn === "Θ" ? "big theta" : fn === "Ω" ? "big omega" : fn === "O" ? "O" : fn;
+    return `${name} of ${inner}`;
+  });
+  // Common LaTeX commands that survive stripping.
+  out = out.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, " $1 over $2 ");
+  out = out.replace(/\\sqrt\{?\(?([\w+\-^ ]+)\)?\}?/g, " the square root of $1 ");
+  out = out.replace(/\\sum\b/g, " the sum of ");
+  out = out.replace(/\\int\b/g, " the integral of ");
+  out = out.replace(/\\infty\b/g, " infinity ");
+  out = out.replace(/\\pi\b/g, " pi ");
+  out = out.replace(/\\cdot\b|\\times\b|×|·/g, " times ");
+  out = out.replace(/\\le(q)?\b/g, " less than or equal to ");
+  out = out.replace(/\\ge(q)?\b/g, " greater than or equal to ");
+  out = out.replace(/\\ne(q)?\b/g, " not equal to ");
+  // Unknown LaTeX commands read as gibberish; drop the backslash word, keep args.
+  out = out.replace(/\\[a-zA-Z]+/g, " ");
+  // Exponents and subscripts: n^2 "n squared", x^k "x to the power of k", a_i "a sub i".
+  out = out.replace(/(\w)\^\{?2\}?(?!\w)/g, "$1 squared");
+  out = out.replace(/(\w)\^\{?3\}?(?!\w)/g, "$1 cubed");
+  out = out.replace(/(\w)\^\{?([\w+\-]+)\}?/g, "$1 to the power of $2");
+  out = out.replace(/\b(\w)_\{?(\w+)\}?/g, "$1 sub $2");
+  // Operators the voice skips or misreads.
+  out = out.replace(/<=/g, " less than or equal to ");
+  out = out.replace(/>=/g, " greater than or equal to ");
+  out = out.replace(/!==?/g, " not equal to ");
+  out = out.replace(/===?/g, " equals ");
+  out = out.replace(/(\s)=(\s)/g, "$1equals$2");
+  out = out.replace(/(\s)\+(\s)/g, "$1plus$2");
+  out = out.replace(/(\s)\*(\s)/g, "$1times$2");
+  out = out.replace(/->|→/g, " to ");
+  out = out.replace(/\bn!/g, "n factorial");
+  // Code shapes: arr[i] "arr at index i", foo() "the foo function", f(x) "f of x".
+  out = out.replace(/\b(\w+)\[(\w+)\]/g, "$1 at index $2");
+  out = out.replace(/\b([a-zA-Z_]\w*)\(\)/g, "the $1 function");
+  out = out.replace(/\b([a-zA-Z_]\w*)\(([^()]*)\)/g, "$1 of $2");
+  // Leftover braces from LaTeX arguments.
+  out = out.replace(/[{}]/g, " ");
+  return out;
+}
+
 // Converts a markdown lesson into plain sentences the Web Speech API can read
-// without announcing syntax. Code blocks and equations are summarized rather
-// than read symbol by symbol.
+// without announcing syntax. Fenced code blocks are summarized (reading code
+// line by line aloud is worse than useless); everything else, including inline
+// math and code spans, is unwrapped and passed through notationToSpeech so the
+// voice reads "O of n" instead of skipping "O(n)".
 function markdownToSpeech(markdown: string): string {
   let text = markdown;
   text = text.replace(/```[\s\S]*?```/g, " Here, see the code example on screen. ");
-  text = text.replace(/\$\$[\s\S]*?\$\$/g, " See the equation on screen. ");
-  text = text.replace(/\$[^$\n]+\$/g, " (see the expression on screen) ");
+  // Unwrap math instead of hiding it; notationToSpeech makes it speakable.
+  text = text.replace(/\$\$([\s\S]*?)\$\$/g, " $1 ");
+  text = text.replace(/\$([^$\n]+)\$/g, " $1 ");
   text = text.replace(/^#{1,6}\s*/gm, "");
   text = text.replace(/\*\*([^*]+)\*\*/g, "$1");
   text = text.replace(/\*([^*]+)\*/g, "$1");
@@ -45,6 +98,7 @@ function markdownToSpeech(markdown: string): string {
   text = text.replace(/^[-*+]\s+/gm, "");
   text = text.replace(/^\d+\.\s+/gm, "");
   text = text.replace(/\|/g, " ");
+  text = notationToSpeech(text);
   return text.replace(/\s+/g, " ").trim();
 }
 
