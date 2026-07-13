@@ -24,6 +24,7 @@ from src.schemas.learning_module_schema import (
     QuizAttemptRequest,
     QuizAttemptResponse,
     QuizQuestionPublic,
+    UpdateLearningModuleRequest,
 )
 from src.services.file_service import FileService
 from src.services.llm_service import LLMService
@@ -356,6 +357,80 @@ async def delete_learning_track(
         await session.commit()
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.patch("/learning-modules/{module_id}", response_model=LearningModuleResponse)
+# One LLM call per save; limited so edit-save cannot become a quota drain.
+@limiter.limit("5/minute;30/hour")
+async def update_module_lesson(
+    module_id: int,
+    request: Request,
+    response: Response,
+    data: UpdateLearningModuleRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LearningModuleResponse:
+    """Save a user-edited lesson, then rebuild its narration script and quiz.
+
+    The edit is committed BEFORE the LLM call so the user's writing is never
+    lost. If the regen call fails, the edited lesson stays saved with the old
+    quiz and a cleared tts_script (the frontend's stripped-markdown TTS
+    fallback keeps working), and the client gets a 503 explaining that.
+    """
+    try:
+        module = await session.scalar(
+            select(LearningModule)
+            .join(LearningTrack, LearningTrack.id == LearningModule.track_id)
+            .join(Folder, Folder.id == LearningTrack.folder_id)
+            .where(LearningModule.id == module_id, Folder.user_id == user.id)
+        )
+        if module is None:
+            raise ResourceNotFoundException("Learning module")
+        if not module.lesson_content:
+            raise StudyAppException("This module is still being generated. Try again shortly.")
+
+        lesson = data.lesson_content.strip()
+        if not lesson:
+            raise StudyAppException("The lesson cannot be empty.")
+
+        track = await session.get(LearningTrack, module.track_id)
+
+        # Persist the edit first. tts_script is cleared because the old script
+        # narrates text that no longer exists; until the regen below lands, TTS
+        # falls back to reading the edited markdown directly.
+        module.lesson_content = lesson
+        module.tts_script = None
+        await session.commit()
+
+        support = await LLMService().regenerate_module_support(
+            lesson,
+            module.title,
+            quiz_count=QUIZ_QUESTION_COUNT,
+            provider=track.provider if track else None,
+            custom_instructions=track.custom_instructions if track else None,
+        )
+
+        # The row may have been deleted mid-call (track rebuild/delete).
+        module = await session.get(LearningModule, module.id)
+        if module is None:
+            raise ResourceNotFoundException("Learning module")
+        module.tts_script = str(support.get("tts_script") or "") or None
+        module.quiz_json = json.dumps(support["quiz"])
+        await session.commit()
+
+        return _module_to_response(module)
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except LLMException as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Your edits were saved, but rebuilding the audio script and quiz failed. "
+                f"The previous quiz still applies. ({exc})"
+            ),
+        ) from exc
+    except StudyAppException as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/learning-modules/{module_id}/quiz-attempt", response_model=QuizAttemptResponse)

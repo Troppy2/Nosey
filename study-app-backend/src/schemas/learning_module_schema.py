@@ -12,6 +12,12 @@ class CreateLearningTrackRequest(BaseModel):
     custom_instructions: Optional[str] = Field(default=None, max_length=10000)
 
 
+class UpdateLearningModuleRequest(BaseModel):
+    # User-edited lesson markdown; replaces lesson_content wholesale. The
+    # narration script and quiz are regenerated from it server-side.
+    lesson_content: str = Field(min_length=1, max_length=100000)
+
+
 class QuizQuestionPublic(BaseModel):
     """A quiz question as sent to the client: no correct_index (graded server-side)."""
 

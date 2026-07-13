@@ -24,6 +24,7 @@ import type {
   KojoConversationSummary,
   LCCustomProblem,
   LCGeneratedCustomProblem,
+  LearningModule,
   LearningTrack,
   QuizAttemptResult,
   LeetCodeGradeResponse,
@@ -580,6 +581,15 @@ export async function createLearningTrack(
 
 export async function deleteLearningTrack(folderId: number): Promise<void> {
   await request(`/folders/${folderId}/learning-track`, { method: "DELETE" });
+}
+
+// Saves a user-edited lesson; the backend rebuilds the narration script and
+// quiz from it before responding, so this call can take LLM-generation time.
+export async function updateModuleLesson(moduleId: number, lessonContent: string): Promise<LearningModule> {
+  return request<LearningModule>(`/learning-modules/${moduleId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ lesson_content: lessonContent }),
+  });
 }
 
 export async function submitModuleQuiz(moduleId: number, answers: number[]): Promise<QuizAttemptResult> {

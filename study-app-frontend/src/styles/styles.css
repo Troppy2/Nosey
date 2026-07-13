@@ -14608,6 +14608,22 @@ a.lm-module-row:focus-visible {
   border: 1px solid var(--green-light);
 }
 
+/* Article editor (lesson page) */
+.lm-edit-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.lm-edit-area {
+  width: 100%;
+  min-height: 55vh;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+
 /* Quiz */
 .lm-quiz {
   margin-top: 1.75rem;

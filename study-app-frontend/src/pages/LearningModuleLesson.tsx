@@ -2,7 +2,9 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
+  Loader2,
   Pause,
+  Pencil,
   Play,
   RotateCcw,
   SkipBack,
@@ -16,7 +18,7 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { SkeletonText } from "../components/Skeletons";
-import { fetchLearningTrack, scopeKey, submitModuleQuiz } from "../lib/api";
+import { fetchLearningTrack, scopeKey, submitModuleQuiz, updateModuleLesson } from "../lib/api";
 import { useSettings } from "../lib/useSettings";
 import type { LearningTrack, QuizAttemptResult } from "../lib/types";
 
@@ -94,6 +96,12 @@ export default function LearningModuleLesson() {
   const [result, setResult] = useState<QuizAttemptResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ── Article editing ─────────────────────────────────────────────────────────
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   // ── TTS ────────────────────────────────────────────────────────────────────
   const ttsSupported = typeof window !== "undefined" && "speechSynthesis" in window;
@@ -328,6 +336,48 @@ export default function LearningModuleLesson() {
     setError(null);
   }
 
+  function startEditing() {
+    if (!module?.lesson_content) return;
+    stopSpeech();
+    setDraft(module.lesson_content);
+    setEditError(null);
+    setEditing(true);
+  }
+
+  async function handleSaveEdit() {
+    if (!module || savingEdit) return;
+    const lesson = draft.trim();
+    if (!lesson) {
+      setEditError("The lesson cannot be empty.");
+      return;
+    }
+    setSavingEdit(true);
+    setEditError(null);
+    try {
+      const updated = await updateModuleLesson(module.id, lesson);
+      // Swap the fresh module (new lesson, narration script, and quiz) into
+      // the track and clear any in-progress quiz state, which referred to the
+      // old questions.
+      if (track) {
+        setTrack({
+          ...track,
+          modules: track.modules.map((m) => (m.id === updated.id ? updated : m)),
+        });
+      }
+      setAnswers({});
+      setResult(null);
+      updateCursor(0);
+      setEditing(false);
+    } catch (err) {
+      // On a 503 the edit itself was saved server-side (only the regen
+      // failed), so the message from the backend explains what to do; keep
+      // the editor open so the user does not lose context either way.
+      setEditError(err instanceof Error ? err.message : "Could not save your edits. Try again.");
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
   if (numericFolderId == null || numericModuleId == null) return <Navigate to="/flashcards" replace />;
   if (!betaMode) return <Navigate to={`/flashcards/${numericFolderId}`} replace />;
 
@@ -369,16 +419,64 @@ export default function LearningModuleLesson() {
         >
           <ArrowLeft size={18} />
         </Link>
-        <div>
+        <div className="lm-header-main">
           <span className="eyebrow">
             Module {moduleIndex + 1} of {track?.modules.length ?? "?"}
           </span>
           <h1>{module.title}</h1>
           {module.summary ? <p className="muted">{module.summary}</p> : null}
         </div>
+        {!editing ? (
+          <div className="flash-header-actions">
+            <button
+              className="flash-icon-btn"
+              onClick={startEditing}
+              type="button"
+              aria-label="Edit article"
+              title="Edit article"
+              disabled={savingEdit}
+            >
+              <Pencil size={17} />
+            </button>
+          </div>
+        ) : null}
       </header>
 
-      {ttsSupported ? (
+      {editing ? (
+        <Card className="lm-lesson-card lm-edit-card">
+          <label className="lm-setup-label" htmlFor="lm-edit-area">
+            Edit article
+          </label>
+          <p className="muted small">
+            Plain markdown. When you save, the audio script and quiz are rebuilt to match your
+            version, which can take a minute.
+          </p>
+          <textarea
+            id="lm-edit-area"
+            className="lm-instructions-input lm-edit-area"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            disabled={savingEdit}
+          />
+          {editError ? <div className="form-error">{editError}</div> : null}
+          <div className="button-row">
+            <Button onClick={() => void handleSaveEdit()} disabled={savingEdit || !draft.trim()}>
+              {savingEdit ? (
+                <>
+                  <Loader2 size={16} className="lm-spin" /> Saving and rebuilding…
+                </>
+              ) : (
+                "Save article"
+              )}
+            </Button>
+            <Button variant="secondary" onClick={() => setEditing(false)} disabled={savingEdit}>
+              Cancel
+            </Button>
+          </div>
+        </Card>
+      ) : null}
+
+      {!editing && ttsSupported ? (
         <div className="lm-tts-bar" role="group" aria-label="Read lesson aloud">
           {speech === "idle" ? (
             <button className="lm-tts-btn lm-tts-btn--main" type="button" onClick={startSpeech}>
@@ -449,6 +547,7 @@ export default function LearningModuleLesson() {
         </div>
       ) : null}
 
+      {editing ? null : (
       <Card className="lm-lesson-card">
         {lessonBlocks.map((block, index) => {
           // The current block shows the full "speaking" highlight while the
@@ -468,7 +567,9 @@ export default function LearningModuleLesson() {
           );
         })}
       </Card>
+      )}
 
+      {editing ? null : (
       <section className="lm-quiz">
         <h2 className="lm-quiz-title">Check your understanding</h2>
         <p className="muted small">
@@ -565,6 +666,7 @@ export default function LearningModuleLesson() {
           </Card>
         )}
       </section>
+      )}
     </div>
   );
 }
