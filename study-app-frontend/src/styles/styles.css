@@ -13527,62 +13527,129 @@ select.lc-custom-input {
   margin: 0;
 }
 
-/* ── Feature survey modal ── */
+/* ── Feature survey modal ──
+   Warm honey (--survey-gold) is the one accent that steps outside the sage
+   palette; it belongs with green the way honey belongs with a garden, and it
+   reads instantly as "rating." Everything else stays quiet so the star row and
+   its live caption carry the moment. */
 .survey-card {
-  max-width: 420px;
+  --survey-gold: #e0a12e;
+  max-width: 400px;
+  gap: 20px;
+  padding: 28px 28px 24px;
+  background: var(--white, #fff);
+  position: relative;
   text-align: center;
+}
+
+.survey-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+}
+
+.survey-head {
+  display: grid;
+  gap: 6px;
+}
+
+.survey-eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--green-dark-mid);
+}
+
+.survey-title {
+  margin: 0;
+  font-size: 1.28rem;
+  line-height: 1.25;
+  color: var(--ink);
+}
+
+.survey-rate {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
 }
 
 .survey-stars {
   display: flex;
   justify-content: center;
-  gap: 6px;
-  margin: 18px 0 14px;
+  gap: 8px;
 }
 
 .survey-star {
   background: none;
   border: none;
   cursor: pointer;
-  padding: 2px;
-  color: var(--muted);
+  padding: 3px;
+  color: var(--green-light-mid);
   line-height: 0;
-  transition: color 0.12s ease, transform 0.12s ease;
+  border-radius: 8px;
+  transition: color 0.14s ease, transform 0.14s ease;
 }
 
 .survey-star:hover {
-  transform: scale(1.12);
+  transform: scale(1.14) translateY(-1px);
+}
+
+.survey-star:active {
+  transform: scale(1.02);
 }
 
 .survey-star--on {
-  color: #f5b301;
+  color: var(--survey-gold);
 }
 
 .survey-star--on svg {
-  fill: #f5b301;
+  fill: var(--survey-gold);
+}
+
+/* Caption reserves its own line so lighting up a star never shifts the layout. */
+.survey-rating-label {
+  margin: 0;
+  min-height: 1.2em;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--muted);
+  transition: color 0.14s ease;
+}
+
+.survey-rating-label--set {
+  color: var(--green-dark);
+  font-weight: 600;
 }
 
 .survey-comment {
   width: 100%;
   box-sizing: border-box;
   resize: vertical;
-  padding: 10px 12px;
-  border: 1px solid var(--green-lightest);
-  border-radius: 10px;
+  padding: 11px 13px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 12px;
   font: inherit;
+  font-size: 0.92rem;
   color: var(--ink);
-  background: var(--white, #fff);
-  margin-bottom: 16px;
+  background: var(--green-lightest);
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+
+.survey-comment::placeholder {
+  color: var(--gray-500);
 }
 
 .survey-comment:focus {
   outline: none;
   border-color: var(--green-dark);
+  background: var(--white, #fff);
 }
 
 .survey-actions {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
   gap: 10px;
 }
 
@@ -13592,69 +13659,126 @@ select.lc-custom-input {
   cursor: pointer;
   color: var(--muted);
   font: inherit;
-  padding: 9px 14px;
+  font-weight: 500;
+  padding: 10px 14px;
   border-radius: 10px;
+  transition: background 0.14s ease, color 0.14s ease;
 }
 
 .survey-dismiss:hover {
   background: var(--green-lightest);
+  color: var(--ink);
 }
 
 .survey-submit {
+  flex: 1;
   background: var(--green-dark);
   color: #fff;
   border: none;
   cursor: pointer;
   font: inherit;
   font-weight: 600;
-  padding: 9px 18px;
+  padding: 10px 18px;
   border-radius: 10px;
+  transition: background 0.14s ease, opacity 0.14s ease, transform 0.1s ease;
+}
+
+.survey-submit:not(:disabled):hover {
+  background: var(--green-dark-mid);
+}
+
+.survey-submit:not(:disabled):active {
+  transform: translateY(1px);
 }
 
 .survey-submit:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: default;
 }
 
-/* ── Admin: feature survey results ── */
+/* ── Admin: feature survey results ──
+   Reuses the modal's honey accent (--admin-star) so ratings read consistently
+   app-wide. The star meter turns a bare average into something scannable: a
+   muted 5-star track with a honey overlay clipped to the score. */
 .admin-survey-grid {
+  --admin-star: #e0a12e;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
   gap: 12px;
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 }
 
 .admin-survey-card {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 14px 16px;
-  border: 1px solid var(--green-lightest);
+  gap: 10px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: var(--green-lightest);
+  background: var(--white, #fff);
 }
 
 .admin-survey-feature {
+  font-size: 0.78rem;
   font-weight: 600;
-  color: var(--ink);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--green-dark-mid);
+}
+
+.admin-survey-score {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .admin-survey-rating {
-  font-size: 1.6rem;
-  color: var(--green-dark);
-  line-height: 1.1;
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1;
 }
 
 .admin-survey-rating-max {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--muted);
-  font-weight: 400;
+  font-weight: 500;
+  margin-left: 2px;
+}
+
+/* Star meter: two stacked star runs, the fill clipped to width: var(--fill). */
+.admin-rating-meter {
+  --admin-star: #e0a12e;
+  position: relative;
+  display: inline-block;
+  font-size: 0.95rem;
+  line-height: 1;
+  letter-spacing: 2px;
+  white-space: nowrap;
+}
+
+.admin-rating-meter-track {
+  color: var(--green-light-mid);
+}
+
+.admin-rating-meter-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--fill, 0%);
+  overflow: hidden;
+  color: var(--admin-star);
+}
+
+.admin-rating-meter--sm {
+  font-size: 0.82rem;
+  letter-spacing: 1.5px;
 }
 
 .admin-survey-comments {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .admin-survey-comments-title {
@@ -13664,9 +13788,11 @@ select.lc-custom-input {
 }
 
 .admin-survey-comment {
-  padding: 10px 14px;
-  border: 1px solid var(--green-lightest);
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--green-light-mid);
   border-radius: 10px;
+  background: var(--white, #fff);
 }
 
 .admin-survey-comment-head {
@@ -13676,16 +13802,16 @@ select.lc-custom-input {
   margin-bottom: 6px;
 }
 
-.admin-survey-comment-rating {
-  color: #f5b301;
-  font-size: 0.85rem;
-  letter-spacing: 1px;
+/* Push the date to the right edge of the comment header. */
+.admin-survey-comment-head .admin-cell-date {
+  margin-left: auto;
 }
 
 .admin-survey-comment-text {
   margin: 0;
   color: var(--ink);
   font-size: 0.9rem;
+  line-height: 1.5;
   white-space: pre-wrap;
 }
 
