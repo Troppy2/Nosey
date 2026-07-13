@@ -14573,80 +14573,95 @@ a.lm-module-row:focus-visible {
   font-family: var(--font-serif);
 }
 
-/* Lesson page */
-.lm-tts-bar {
+/* Lesson page: podcast-style narration player. The script is a spoken rewrite
+   of the article (notation in words), not a word-for-word read, so playback is
+   a player at the top instead of a follow-along text highlight. */
+.lm-audio-player {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem 0.8rem;
+  gap: 0.8rem;
+  padding: 0.7rem 0.9rem;
   margin-bottom: 1rem;
   border-radius: 12px;
   background: var(--green-lightest);
   border: 1px solid var(--green-light);
 }
 
-.lm-tts-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  border: 1px solid var(--green-light-mid);
-  background: var(--white);
-  color: var(--ink);
-  font-size: 0.85rem;
-  font-weight: 600;
-  padding: 0.4rem 0.8rem;
+.lm-audio-toggle {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border: none;
   border-radius: 999px;
-  cursor: pointer;
-  transition: background var(--transition-fast), border-color var(--transition-fast);
-}
-
-.lm-tts-btn:hover {
-  border-color: var(--green-dark);
-}
-
-.lm-tts-btn--main {
   background: var(--green-dark);
-  border-color: var(--green-dark);
   color: var(--white);
+  cursor: pointer;
+  transition: background var(--transition-fast);
 }
 
-.lm-tts-btn--main:hover {
+.lm-audio-toggle:hover {
   background: var(--green-dark-mid);
 }
 
-/* Paragraph stepper (prev / position / next) */
-.lm-tts-steps {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
+.lm-audio-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.lm-tts-btn--step {
-  padding: 0.4rem 0.55rem;
+.lm-audio-titles {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
-.lm-tts-btn--step:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+.lm-audio-titles strong {
+  font-size: 0.9rem;
 }
 
-.lm-tts-pos {
-  font-size: 0.78rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-  min-width: 3.2em;
-  text-align: center;
+/* Draggable seek slider styled as the progress track. */
+.lm-audio-seek {
+  width: 100%;
+  height: 6px;
+  margin: 5px 0;
+  accent-color: var(--green-dark);
+  cursor: pointer;
 }
 
-.lm-tts-rates {
+.lm-audio-seek:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 3px;
+}
+
+.lm-audio-restart {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--green-dark);
+  cursor: pointer;
+}
+
+.lm-audio-restart:hover {
+  border-color: var(--green-dark);
+}
+
+.lm-audio-rates {
   display: inline-flex;
   gap: 0.25rem;
-  margin-left: auto;
+  flex-shrink: 0;
 }
 
-.lm-tts-rate {
+.lm-audio-rate {
   border: none;
   background: transparent;
   color: var(--muted);
@@ -14657,10 +14672,88 @@ a.lm-module-row:focus-visible {
   cursor: pointer;
 }
 
-.lm-tts-rate.is-active {
+.lm-audio-rate.is-active {
   background: var(--white);
   color: var(--green-dark);
   box-shadow: var(--shadow-sm);
+}
+
+/* Speed pills wrap under the progress row on narrow screens. */
+@media (max-width: 560px) {
+  .lm-audio-player {
+    flex-wrap: wrap;
+  }
+  .lm-audio-rates {
+    margin-left: 52px;
+  }
+}
+
+/* Pencil dropdown: edit article / change voice */
+.lm-menu-wrap {
+  position: relative;
+}
+
+.lm-header-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--white);
+  border: 1px solid var(--green-light-mid);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+}
+
+.lm-header-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.5rem 0.65rem;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lm-header-menu button:hover {
+  background: var(--green-lightest);
+}
+
+.lm-header-menu button svg {
+  color: var(--green-dark);
+  flex-shrink: 0;
+}
+
+/* Narration voice picker */
+.lm-voice-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.25rem 1.4rem;
+  margin-bottom: 1rem;
+}
+
+.lm-voice-select {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--white);
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.lm-voice-select:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 1px;
 }
 
 .lm-lesson-card {
@@ -14668,8 +14761,8 @@ a.lm-module-row:focus-visible {
   line-height: 1.6;
 }
 
-/* Lesson blocks: one per markdown paragraph so the TTS can highlight the block
-   it is currently reading (follow-along). */
+/* Lesson blocks: one per markdown paragraph, highlighted while the player is
+   reading them (paragraph-level position, driven by the audio player). */
 .lm-lesson-block {
   padding: 0.35rem 0.6rem;
   margin: 0 -0.6rem;
@@ -14683,7 +14776,7 @@ a.lm-module-row:focus-visible {
   border-left-color: var(--green-dark);
 }
 
-/* Quieter marker for the saved/stepped reading position while not speaking. */
+/* Quieter marker for the paused/saved position while not speaking. */
 .lm-lesson-block.is-cursor {
   border-left-color: var(--green-light-mid);
 }

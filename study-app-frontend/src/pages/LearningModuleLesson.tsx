@@ -6,10 +6,8 @@ import {
   Pencil,
   Play,
   RotateCcw,
-  SkipBack,
-  SkipForward,
-  Square,
   Video,
+  Volume2,
   XCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -201,20 +199,65 @@ export default function LearningModuleLesson() {
   const [savingVideo, setSavingVideo] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
 
-  // ── TTS ────────────────────────────────────────────────────────────────────
+  // ── Audio narration ─────────────────────────────────────────────────────────
+  // The narration is a spoken rewrite of the article (notation in words), not
+  // a word-for-word read, so it plays as a podcast-style audio player at the
+  // top of the page rather than pretending to follow the text line by line.
   const ttsSupported = typeof window !== "undefined" && "speechSynthesis" in window;
   const [speech, setSpeech] = useState<SpeechState>("idle");
   const [rate, setRate] = useState(1);
-  // The current reading position (paragraph block). Highlighted on screen,
-  // moved by the TTS as it reads, steppable with prev/next, and persisted to
-  // localStorage per module so the reader resumes where they left off.
-  const [cursorBlock, setCursorBlock] = useState(0);
+  // Position in the chunk queue: drives the progress bar and, persisted to
+  // localStorage per module, lets the listener resume where they left off.
+  const [chunkPos, setChunkPos] = useState(0);
   const chunkIndexRef = useRef(0);
-  const chunksRef = useRef<{ blockIndex: number; text: string }[]>([]);
+  const chunksRef = useRef<{ text: string; blockIndex: number }[]>([]);
   const stoppedRef = useRef(false);
   const rateRef = useRef(1);
+  // Chrome keeps firing onend/onerror for utterances that were cancelled, and
+  // acting on those advances the queue while "paused" (audio keeps playing).
+  // Every (re)start bumps the session; callbacks from older sessions no-op.
+  const playSessionRef = useRef(0);
 
-  const cursorKey = numericModuleId != null ? scopeKey(`nosey_lm_block_${numericModuleId}`) : "";
+  const audioPosKey = numericModuleId != null ? scopeKey(`nosey_lm_audio_${numericModuleId}`) : "";
+
+  // ── Narration voice ─────────────────────────────────────────────────────────
+  // Voices come from the browser's speechSynthesis (Chrome ships Google
+  // voices). The pick is device-wide, not per module.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [voiceFormOpen, setVoiceFormOpen] = useState(false);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [voiceURI, setVoiceURI] = useState<string>(
+    () => (typeof window !== "undefined" ? localStorage.getItem(scopeKey("nosey_lm_voice")) ?? "" : ""),
+  );
+  const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
+
+  // getVoices() is empty until the browser loads its list; voiceschanged fires
+  // when it is ready (and again if the list updates).
+  useEffect(() => {
+    if (!ttsSupported) return;
+    const load = () => setVoices(window.speechSynthesis.getVoices());
+    load();
+    window.speechSynthesis.addEventListener("voiceschanged", load);
+    return () => window.speechSynthesis.removeEventListener("voiceschanged", load);
+  }, [ttsSupported]);
+
+  useEffect(() => {
+    voiceRef.current = voices.find((v) => v.voiceURI === voiceURI) ?? null;
+  }, [voices, voiceURI]);
+
+  // English voices first (lessons are English), Google voices first within
+  // that, so Chrome users see the good options at the top.
+  const voiceOptions = useMemo(() => {
+    return [...voices].sort((a, b) => {
+      const aEn = a.lang.toLowerCase().startsWith("en") ? 0 : 1;
+      const bEn = b.lang.toLowerCase().startsWith("en") ? 0 : 1;
+      if (aEn !== bEn) return aEn - bEn;
+      const aGoogle = a.name.includes("Google") ? 0 : 1;
+      const bGoogle = b.name.includes("Google") ? 0 : 1;
+      if (aGoogle !== bGoogle) return aGoogle - bGoogle;
+      return a.name.localeCompare(b.name);
+    });
+  }, [voices]);
 
   useEffect(() => {
     if (numericFolderId == null) return;
@@ -242,41 +285,59 @@ export default function LearningModuleLesson() {
     [module?.lesson_content],
   );
 
-  // What the voice actually reads, one entry per on-screen block. Modules
-  // generated with a tts_script get the LLM-written narration (math and code
-  // described in words); its paragraphs mirror the lesson blocks, so they map
-  // 1:1 when the counts line up and proportionally when they drift. Older
-  // modules fall back to stripping the lesson markdown. markdownToSpeech runs
-  // on script paragraphs too as a safety net against stray markdown/LaTeX.
-  const speechBlocks = useMemo(() => {
-    if (module?.tts_script && lessonBlocks.length > 0) {
+  // The narration source: the LLM-written script when present (notation and
+  // code already in words), otherwise the stripped lesson markdown for tracks
+  // generated before scripts existed. markdownToSpeech runs on script
+  // paragraphs too as a safety net against stray markdown or LaTeX.
+  //
+  // Each chunk carries the lesson block it narrates so the article can
+  // highlight the paragraph currently being read: script paragraphs map to
+  // blocks 1:1 when the counts line up and proportionally when they drift
+  // (the script mirrors the lesson paragraph by paragraph, so this is
+  // paragraph-accurate even though the wording is a spoken rewrite).
+  const speechChunks = useMemo(() => {
+    if (module?.tts_script) {
       const paragraphs = module.tts_script
         .split(/\n\s*\n/)
         .map((p) => markdownToSpeech(p))
         .filter(Boolean);
-      const lastBlock = lessonBlocks.length - 1;
-      return paragraphs.map((text, i) => ({
-        blockIndex:
+      const lastBlock = Math.max(0, lessonBlocks.length - 1);
+      return paragraphs.flatMap((paragraph, i) => {
+        const blockIndex =
           paragraphs.length === lessonBlocks.length
             ? i
-            : Math.min(lastBlock, Math.round((i * lastBlock) / Math.max(1, paragraphs.length - 1))),
-        text,
-      }));
+            : Math.min(lastBlock, Math.round((i * lastBlock) / Math.max(1, paragraphs.length - 1)));
+        return splitForSpeech(paragraph).map((text) => ({ text, blockIndex }));
+      });
     }
-    return lessonBlocks
-      .map((block, blockIndex) => ({ blockIndex, text: markdownToSpeech(block) }))
-      .filter((b) => b.text);
+    return lessonBlocks.flatMap((block, blockIndex) => {
+      const text = markdownToSpeech(block);
+      return text ? splitForSpeech(text).map((t) => ({ text: t, blockIndex })) : [];
+    });
   }, [module?.tts_script, lessonBlocks]);
 
-  // The key is kept in a ref so the stable speech callbacks can persist the
-  // cursor without being recreated per module.
-  const cursorKeyRef = useRef(cursorKey);
-  cursorKeyRef.current = cursorKey;
+  // The paragraph the player is on, for the article highlight.
+  const currentBlock = speechChunks[chunkPos]?.blockIndex ?? 0;
 
-  // Moves the reading position AND saves it (position 0 = "start", not stored).
-  const updateCursor = useCallback((index: number) => {
-    setCursorBlock(index);
-    const key = cursorKeyRef.current;
+  // Rough listen time at 1x for the player label (~170 spoken words a minute).
+  const estMinutes = useMemo(() => {
+    const words = speechChunks
+      .map((c) => c.text)
+      .join(" ")
+      .split(/\s+/)
+      .filter(Boolean).length;
+    return Math.max(1, Math.round(words / 170));
+  }, [speechChunks]);
+
+  // The key is kept in a ref so the stable speech callbacks can persist the
+  // position without being recreated per module.
+  const audioPosKeyRef = useRef(audioPosKey);
+  audioPosKeyRef.current = audioPosKey;
+
+  // Moves the playback position AND saves it (position 0 = "start", not stored).
+  const updateChunkPos = useCallback((index: number) => {
+    setChunkPos(index);
+    const key = audioPosKeyRef.current;
     if (!key) return;
     if (index > 0) {
       localStorage.setItem(key, String(index));
@@ -285,110 +346,142 @@ export default function LearningModuleLesson() {
     }
   }, []);
 
-  // Restore the saved reading position whenever the module's blocks load.
+  // Restore the saved playback position whenever the module's audio loads.
   useEffect(() => {
-    if (lessonBlocks.length === 0) return;
-    const saved = cursorKey ? Number(localStorage.getItem(cursorKey) ?? "0") : 0;
+    if (speechChunks.length === 0) return;
+    const saved = audioPosKey ? Number(localStorage.getItem(audioPosKey) ?? "0") : 0;
     const clamped =
-      Number.isFinite(saved) && saved > 0 ? Math.min(saved, lessonBlocks.length - 1) : 0;
-    setCursorBlock(clamped);
-  }, [cursorKey, lessonBlocks.length]);
+      Number.isFinite(saved) && saved > 0 ? Math.min(saved, speechChunks.length - 1) : 0;
+    setChunkPos(clamped);
+  }, [audioPosKey, speechChunks.length]);
 
   const speakChunk = useCallback(() => {
     if (stoppedRef.current) return;
-    const chunk = chunksRef.current[chunkIndexRef.current];
+    const session = playSessionRef.current;
+    const index = chunkIndexRef.current;
+    const chunk = chunksRef.current[index];
     if (!chunk) {
-      // Natural end of the lesson: reading position resets to the top.
+      // Natural end of the narration: playback position resets to the top.
       setSpeech("idle");
-      updateCursor(0);
+      updateChunkPos(0);
       return;
     }
     const utterance = new SpeechSynthesisUtterance(chunk.text);
     utterance.rate = rateRef.current;
-    utterance.onstart = () => updateCursor(chunk.blockIndex);
+    if (voiceRef.current) utterance.voice = voiceRef.current;
+    utterance.onstart = () => {
+      if (playSessionRef.current === session) updateChunkPos(index);
+    };
     utterance.onend = () => {
+      if (playSessionRef.current !== session || stoppedRef.current) return;
       chunkIndexRef.current += 1;
       speakChunk();
     };
-    utterance.onerror = () => setSpeech("idle");
+    utterance.onerror = () => {
+      // Cancels surface here as errors too; only a live session goes idle.
+      if (playSessionRef.current === session && !stoppedRef.current) setSpeech("idle");
+    };
     window.speechSynthesis.speak(utterance);
-  }, [updateCursor]);
+  }, [updateChunkPos]);
 
-  // Builds the chunk queue and starts speaking from the given block. Chunks are
-  // tagged with their source block so the reader can follow the highlight.
   const startSpeechFrom = useCallback(
-    (fromBlock: number) => {
-      if (!ttsSupported || speechBlocks.length === 0) return;
+    (fromChunk: number) => {
+      if (!ttsSupported || speechChunks.length === 0) return;
+      playSessionRef.current += 1;
       window.speechSynthesis.cancel();
       stoppedRef.current = false;
-      chunksRef.current = speechBlocks.flatMap((block) => {
-        if (block.blockIndex < fromBlock) return [];
-        return splitForSpeech(block.text).map((text) => ({ blockIndex: block.blockIndex, text }));
-      });
-      chunkIndexRef.current = 0;
+      chunksRef.current = speechChunks;
+      chunkIndexRef.current = Math.min(Math.max(fromChunk, 0), speechChunks.length - 1);
       setSpeech("playing");
       speakChunk();
     },
-    [ttsSupported, speechBlocks, speakChunk],
+    [ttsSupported, speechChunks, speakChunk],
   );
 
-  function startSpeech() {
-    // "Listen" picks up from the saved/stepped reading position.
-    startSpeechFrom(cursorBlock);
-  }
-
-  function pauseSpeech() {
-    window.speechSynthesis.pause();
-    setSpeech("paused");
-  }
-
-  function resumeSpeech() {
-    window.speechSynthesis.resume();
-    setSpeech("playing");
+  // One button, podcast semantics. Pause is deliberately NOT
+  // speechSynthesis.pause(): Chrome's pause is unreliable (the queue can keep
+  // playing right through it). Pausing hard-cancels instead, and resume
+  // replays from the start of the current chunk, which costs at most a
+  // sentence or two of repetition.
+  function togglePlayback() {
+    if (speech === "playing") {
+      playSessionRef.current += 1;
+      stoppedRef.current = true;
+      window.speechSynthesis.cancel();
+      setSpeech("paused");
+    } else {
+      startSpeechFrom(chunkPos);
+    }
   }
 
   const stopSpeech = useCallback(() => {
+    playSessionRef.current += 1;
     stoppedRef.current = true;
     window.speechSynthesis.cancel();
     setSpeech("idle");
   }, []);
 
-  // Step the reading position to a specific block. While playing, the voice
-  // jumps there and keeps reading; otherwise only the highlight moves and
-  // "Listen" will start from it.
-  function jumpToBlock(target: number) {
-    const clamped = Math.min(Math.max(target, 0), lessonBlocks.length - 1);
-    if (speech === "playing") {
-      startSpeechFrom(clamped);
-    } else {
-      if (speech === "paused") {
-        // A paused queue can't be retargeted; drop it and let Listen restart.
-        stoppedRef.current = true;
-        window.speechSynthesis.cancel();
-        setSpeech("idle");
-      }
-      updateCursor(clamped);
-    }
+  function restartPlayback() {
+    stopSpeech();
+    updateChunkPos(0);
+    startSpeechFrom(0);
   }
-
-  // Keep the current block in view: while listening it follows the voice, and
-  // on load it brings the reader back to where they left off.
-  useEffect(() => {
-    if (cursorBlock === 0 && speech === "idle") return;
-    const el = document.getElementById(`lm-lesson-block-${cursorBlock}`);
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    el?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
-  }, [cursorBlock, speech]);
 
   function changeRate(newRate: number) {
     setRate(newRate);
     rateRef.current = newRate;
-    // A rate change applies from the next chunk; restart the current chunk so
-    // it takes effect immediately.
+    // Session-safe restart of the current chunk so the change is heard
+    // immediately (a raw cancel + speak races stale onend callbacks).
     if (speech === "playing") {
-      window.speechSynthesis.cancel();
-      speakChunk();
+      startSpeechFrom(chunkIndexRef.current);
     }
+  }
+
+  function selectVoice(uri: string) {
+    setVoiceURI(uri);
+    voiceRef.current = voices.find((v) => v.voiceURI === uri) ?? null;
+    const key = scopeKey("nosey_lm_voice");
+    if (uri) {
+      localStorage.setItem(key, uri);
+    } else {
+      localStorage.removeItem(key);
+    }
+    // Like a rate change: session-safe restart so the new voice is heard now.
+    if (speech === "playing") {
+      startSpeechFrom(chunkIndexRef.current);
+    }
+  }
+
+  // Keep the paragraph being read in view while the narration plays.
+  useEffect(() => {
+    if (speech !== "playing") return;
+    const el = document.getElementById(`lm-lesson-block-${currentBlock}`);
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+  }, [currentBlock, speech]);
+
+  // Seek by dragging the progress slider. While dragging (commit=false) only
+  // the position marker moves; on release (commit=true) playback jumps there
+  // if it was running. Paused/idle seeks just move where play will start.
+  function seekTo(index: number, commit: boolean) {
+    const clamped = Math.min(Math.max(index, 0), Math.max(0, speechChunks.length - 1));
+    updateChunkPos(clamped);
+    if (commit && speech === "playing") {
+      startSpeechFrom(clamped);
+    }
+  }
+
+  function previewVoice() {
+    if (!ttsSupported) return;
+    // Halt the lesson queue (session bump makes its callbacks inert), then
+    // speak a one-off sample outside the queue.
+    stopSpeech();
+    const sample = new SpeechSynthesisUtterance(
+      "This is how your lessons will sound. Binary search runs in O of log n time.",
+    );
+    sample.rate = rateRef.current;
+    if (voiceRef.current) sample.voice = voiceRef.current;
+    window.speechSynthesis.speak(sample);
   }
 
   // Stop reading when leaving the page OR switching to another module (the
@@ -397,6 +490,7 @@ export default function LearningModuleLesson() {
   useEffect(() => {
     return () => {
       if (ttsSupported) {
+        playSessionRef.current += 1;
         stoppedRef.current = true;
         window.speechSynthesis.cancel();
         setSpeech("idle");
@@ -484,7 +578,7 @@ export default function LearningModuleLesson() {
       }
       setAnswers({});
       setResult(null);
-      updateCursor(0);
+      updateChunkPos(0);
       setEditing(false);
     } catch (err) {
       // On a 503 the edit itself was saved server-side (only the regen
@@ -560,19 +654,142 @@ export default function LearningModuleLesson() {
             >
               <Video size={17} />
             </button>
-            <button
-              className="flash-icon-btn"
-              onClick={startEditing}
-              type="button"
-              aria-label="Edit article"
-              title="Edit article"
-              disabled={savingEdit}
-            >
-              <Pencil size={17} />
-            </button>
+            <div className="lm-menu-wrap">
+              <button
+                className="flash-icon-btn"
+                onClick={() => setMenuOpen((open) => !open)}
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                aria-label="Lesson options"
+                title="Lesson options"
+                disabled={savingEdit}
+              >
+                <Pencil size={17} />
+              </button>
+              {menuOpen ? (
+                <div className="lm-header-menu" role="menu">
+                  <button
+                    role="menuitem"
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setVoiceFormOpen(false);
+                      startEditing();
+                    }}
+                  >
+                    <Pencil size={15} /> Edit article
+                  </button>
+                  <button
+                    role="menuitem"
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setVoiceFormOpen((open) => !open);
+                    }}
+                  >
+                    <Volume2 size={15} /> Change voice
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </div>
         ) : null}
       </header>
+
+      {!editing && voiceFormOpen ? (
+        <Card className="lm-voice-form">
+          <label className="lm-setup-label" htmlFor="lm-voice-select">
+            Narration voice
+          </label>
+          <p className="muted small">
+            Voices come from your browser: Chrome includes Google voices, other browsers offer
+            their own. Your pick applies to every lesson on this device.
+          </p>
+          <select
+            id="lm-voice-select"
+            className="lm-voice-select"
+            value={voiceURI}
+            onChange={(e) => selectVoice(e.target.value)}
+          >
+            <option value="">Browser default</option>
+            {voiceOptions.map((voice) => (
+              <option key={voice.voiceURI} value={voice.voiceURI}>
+                {voice.name} ({voice.lang})
+              </option>
+            ))}
+          </select>
+          <div className="button-row">
+            <Button variant="secondary" onClick={previewVoice}>
+              Preview voice
+            </Button>
+            <Button variant="secondary" onClick={() => setVoiceFormOpen(false)}>
+              Done
+            </Button>
+          </div>
+        </Card>
+      ) : null}
+
+      {!editing && ttsSupported && speechChunks.length > 0 ? (
+        <div className="lm-audio-player" role="group" aria-label="Listen to this lesson">
+          <button
+            className="lm-audio-toggle"
+            type="button"
+            onClick={togglePlayback}
+            aria-label={speech === "playing" ? "Pause narration" : "Play narration"}
+          >
+            {speech === "playing" ? <Pause size={20} /> : <Play size={20} />}
+          </button>
+          <div className="lm-audio-body">
+            <div className="lm-audio-titles">
+              <strong>Listen to this lesson</strong>
+              <span className="muted small">
+                {speech === "playing"
+                  ? "Playing"
+                  : speech === "paused"
+                    ? "Paused"
+                    : chunkPos > 0
+                      ? "Resume where you left off"
+                      : `About ${estMinutes} min`}
+              </span>
+            </div>
+            <input
+              className="lm-audio-seek"
+              type="range"
+              min={0}
+              max={Math.max(0, speechChunks.length - 1)}
+              value={chunkPos}
+              aria-label="Seek position in the narration"
+              onChange={(e) => seekTo(Number(e.target.value), false)}
+              onPointerUp={(e) => seekTo(Number((e.target as HTMLInputElement).value), true)}
+              onKeyUp={(e) => seekTo(Number((e.target as HTMLInputElement).value), true)}
+            />
+          </div>
+          {chunkPos > 0 ? (
+            <button
+              className="lm-audio-restart"
+              type="button"
+              onClick={restartPlayback}
+              aria-label="Start over from the beginning"
+              title="Start over"
+            >
+              <RotateCcw size={15} />
+            </button>
+          ) : null}
+          <div className="lm-audio-rates" aria-label="Playback speed">
+            {[0.75, 1, 1.25, 1.5, 2].map((option) => (
+              <button
+                key={option}
+                type="button"
+                className={`lm-audio-rate ${rate === option ? "is-active" : ""}`}
+                onClick={() => changeRate(option)}
+              >
+                {option}x
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {!editing && videoFormOpen ? (
         <Card className="lm-video-form">
@@ -648,87 +865,17 @@ export default function LearningModuleLesson() {
         </Card>
       ) : null}
 
-      {!editing && ttsSupported ? (
-        <div className="lm-tts-bar" role="group" aria-label="Read lesson aloud">
-          {speech === "idle" ? (
-            <button className="lm-tts-btn lm-tts-btn--main" type="button" onClick={startSpeech}>
-              <Play size={16} /> {cursorBlock > 0 ? "Resume" : "Listen"}
-            </button>
-          ) : speech === "playing" ? (
-            <button className="lm-tts-btn lm-tts-btn--main" type="button" onClick={pauseSpeech}>
-              <Pause size={16} /> Pause
-            </button>
-          ) : (
-            <button className="lm-tts-btn lm-tts-btn--main" type="button" onClick={resumeSpeech}>
-              <Play size={16} /> Resume
-            </button>
-          )}
-          {speech !== "idle" ? (
-            <button className="lm-tts-btn" type="button" onClick={stopSpeech} aria-label="Stop reading">
-              <Square size={14} /> Stop
-            </button>
-          ) : null}
-          {speech === "idle" && cursorBlock > 0 ? (
-            <button
-              className="lm-tts-btn"
-              type="button"
-              onClick={() => jumpToBlock(0)}
-              aria-label="Start over from the first paragraph"
-              title="Start over from the first paragraph"
-            >
-              <RotateCcw size={14} /> Start over
-            </button>
-          ) : null}
-          <div className="lm-tts-steps" role="group" aria-label="Move between paragraphs">
-            <button
-              className="lm-tts-btn lm-tts-btn--step"
-              type="button"
-              onClick={() => jumpToBlock(cursorBlock - 1)}
-              disabled={cursorBlock <= 0}
-              aria-label="Previous paragraph"
-              title="Previous paragraph"
-            >
-              <SkipBack size={14} />
-            </button>
-            <span className="lm-tts-pos" aria-live="polite">
-              {cursorBlock + 1} / {lessonBlocks.length}
-            </span>
-            <button
-              className="lm-tts-btn lm-tts-btn--step"
-              type="button"
-              onClick={() => jumpToBlock(cursorBlock + 1)}
-              disabled={cursorBlock >= lessonBlocks.length - 1}
-              aria-label="Next paragraph"
-              title="Next paragraph"
-            >
-              <SkipForward size={14} />
-            </button>
-          </div>
-          <div className="lm-tts-rates" aria-label="Reading speed">
-            {[0.75, 1, 1.25, 1.5].map((option) => (
-              <button
-                key={option}
-                type="button"
-                className={`lm-tts-rate ${rate === option ? "is-active" : ""}`}
-                onClick={() => changeRate(option)}
-              >
-                {option}x
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
       {editing ? null : (
       <Card className="lm-lesson-card">
         {lessonBlocks.map((block, index) => {
-          // The current block shows the full "speaking" highlight while the
-          // voice is on it, and a quieter position marker when idle/paused.
-          const isCurrent = cursorBlock === index;
+          // Paragraph-level "now reading" marker driven by the player. The
+          // narration is a spoken rewrite, so the highlight shows which
+          // paragraph is being covered, not a word-for-word position.
+          const isCurrent = index === currentBlock;
           const stateClass = isCurrent
             ? speech === "playing"
               ? "is-speaking"
-              : cursorBlock > 0 || speech !== "idle"
+              : speech === "paused" || chunkPos > 0
                 ? "is-cursor"
                 : ""
             : "";
