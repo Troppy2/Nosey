@@ -592,6 +592,14 @@ export async function updateModuleLesson(moduleId: number, lessonContent: string
   });
 }
 
+// Attaches (or clears, with null) the module's video link. Display only.
+export async function updateModuleVideo(moduleId: number, videoUrl: string | null): Promise<LearningModule> {
+  return request<LearningModule>(`/learning-modules/${moduleId}/video`, {
+    method: "PATCH",
+    body: JSON.stringify({ video_url: videoUrl }),
+  });
+}
+
 export async function submitModuleQuiz(moduleId: number, answers: number[]): Promise<QuizAttemptResult> {
   return request<QuizAttemptResult>(`/learning-modules/${moduleId}/quiz-attempt`, {
     method: "POST",

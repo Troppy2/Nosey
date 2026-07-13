@@ -25,6 +25,7 @@ from src.schemas.learning_module_schema import (
     QuizAttemptResponse,
     QuizQuestionPublic,
     UpdateLearningModuleRequest,
+    UpdateModuleVideoRequest,
 )
 from src.services.file_service import FileService
 from src.services.llm_service import LLMService
@@ -197,6 +198,7 @@ def _module_to_response(module: LearningModule) -> LearningModuleResponse:
         summary=module.summary,
         lesson_content=module.lesson_content,
         tts_script=module.tts_script,
+        video_url=module.video_url,
         quiz=quiz,
         best_score=module.best_score,
         passed=module.passed,
@@ -357,6 +359,37 @@ async def delete_learning_track(
         await session.commit()
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.patch("/learning-modules/{module_id}/video", response_model=LearningModuleResponse)
+async def update_module_video(
+    module_id: int,
+    data: UpdateModuleVideoRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LearningModuleResponse:
+    """Attach (or clear) the module's video link. Display only, no LLM."""
+    try:
+        module = await session.scalar(
+            select(LearningModule)
+            .join(LearningTrack, LearningTrack.id == LearningModule.track_id)
+            .join(Folder, Folder.id == LearningTrack.folder_id)
+            .where(LearningModule.id == module_id, Folder.user_id == user.id)
+        )
+        if module is None:
+            raise ResourceNotFoundException("Learning module")
+
+        url = (data.video_url or "").strip()
+        if url and not url.lower().startswith(("http://", "https://")):
+            raise StudyAppException("The video link must start with http:// or https://.")
+
+        module.video_url = url or None
+        await session.commit()
+        return _module_to_response(module)
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except StudyAppException as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.patch("/learning-modules/{module_id}", response_model=LearningModuleResponse)

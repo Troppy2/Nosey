@@ -83,6 +83,9 @@ class LearningModule(Base, TimestampMixin):
     # Correct answers are stripped before this reaches the client; grading is
     # done server-side on quiz submit.
     quiz_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # One optional user-attached video link, embedded at the bottom of the
+    # article. Display only; never fed to the LLM.
+    video_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     best_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     passed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 
