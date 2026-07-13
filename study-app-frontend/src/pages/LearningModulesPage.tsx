@@ -4,11 +4,13 @@ import {
   BookOpenCheck,
   CheckCircle2,
   ChevronRight,
+  FileText,
   GraduationCap,
   Loader2,
   Lock,
   RefreshCcw,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -18,7 +20,13 @@ import { Card } from "../components/Card";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { ProgressBar } from "../components/Progress";
 import { SkeletonList } from "../components/Skeletons";
-import { createLearningTrack, deleteLearningTrack, fetchLearningTrack } from "../lib/api";
+import {
+  createLearningTrack,
+  deleteLearningTrack,
+  fetchFolderFiles,
+  fetchLearningTrack,
+  uploadFolderFiles,
+} from "../lib/api";
 import { useSettings } from "../lib/useSettings";
 import type { LearningTrack } from "../lib/types";
 
@@ -41,6 +49,22 @@ export default function LearningModulesPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showRebuildModal, setShowRebuildModal] = useState(false);
   const pollRef = useRef<number | null>(null);
+
+  // Direct upload on the setup screen: files are saved into the folder (same
+  // pipeline as everywhere else), so they also benefit tests and flashcards.
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [genPhase, setGenPhase] = useState<"idle" | "uploading" | "extracting" | "starting">("idle");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  function addPendingFiles(list: FileList | null) {
+    if (!list || list.length === 0) return;
+    const incoming = Array.from(list);
+    setPendingFiles((prev) => {
+      // Dedupe by name+size so re-picking the same file is a no-op.
+      const seen = new Set(prev.map((f) => `${f.name}|${f.size}`));
+      return [...prev, ...incoming.filter((f) => !seen.has(`${f.name}|${f.size}`))];
+    });
+  }
 
   const loadTrack = useCallback(async () => {
     if (numericFolderId == null) return;
@@ -73,6 +97,36 @@ export default function LearningModulesPage() {
     setBusy(true);
     setError(null);
     try {
+      if (pendingFiles.length > 0) {
+        setGenPhase("uploading");
+        const result = await uploadFolderFiles(numericFolderId, pendingFiles);
+        if (result.uploaded.length === 0) {
+          throw new Error(result.skipped[0]?.reason ?? "No files could be uploaded.");
+        }
+
+        // Text extraction runs server-side in the background; wait for it so
+        // the track build actually sees the new notes.
+        setGenPhase("extracting");
+        const ids = new Set(result.uploaded.map((f) => f.id));
+        const deadline = Date.now() + 120_000;
+        for (;;) {
+          const mine = (await fetchFolderFiles(numericFolderId)).filter((f) => ids.has(f.id));
+          if (!mine.some((f) => f.upload_status === "processing")) {
+            const failed = mine.filter((f) => f.upload_status === "error");
+            if (mine.length > 0 && failed.length === mine.length) {
+              throw new Error(failed[0]?.upload_error ?? "Your files could not be read.");
+            }
+            break;
+          }
+          if (Date.now() > deadline) {
+            throw new Error("Reading your files is taking too long. Try again in a moment.");
+          }
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+        }
+        setPendingFiles([]);
+      }
+
+      setGenPhase("starting");
       const created = await createLearningTrack(numericFolderId, moduleCount, {
         customInstructions: customInstructions.trim() || undefined,
       });
@@ -81,6 +135,7 @@ export default function LearningModulesPage() {
       setError(err instanceof Error ? err.message : "Could not start generation.");
     } finally {
       setBusy(false);
+      setGenPhase("idle");
     }
   }
 
@@ -165,6 +220,59 @@ export default function LearningModulesPage() {
               soon as it's ready.
             </p>
           ) : null}
+          <label className="lm-setup-label" htmlFor="lm-file-input">
+            Add notes <span className="muted lm-label-optional">(optional)</span>
+          </label>
+          <p className="muted small">
+            Upload files here and they're saved into this folder before the track is built, exactly
+            like uploading for a test. PDF, DOCX, TXT, MD, HTML, and PPTX are supported.
+          </p>
+          <input
+            id="lm-file-input"
+            ref={fileInputRef}
+            className="lm-file-input"
+            type="file"
+            multiple
+            accept=".pdf,.docx,.txt,.md,.html,.pptx"
+            onChange={(e) => {
+              addPendingFiles(e.target.files);
+              e.target.value = "";
+            }}
+          />
+          <div className="button-row">
+            <Button
+              variant="secondary"
+              icon={<Upload size={16} />}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={busy}
+            >
+              Choose files
+            </Button>
+          </div>
+          {pendingFiles.length > 0 ? (
+            <ul className="lm-file-list">
+              {pendingFiles.map((file) => (
+                <li key={`${file.name}|${file.size}`} className="lm-file-item">
+                  <FileText size={15} />
+                  <span className="lm-file-name">{file.name}</span>
+                  <button
+                    type="button"
+                    className="lm-file-remove"
+                    aria-label={`Remove ${file.name}`}
+                    title="Remove"
+                    disabled={busy}
+                    onClick={() =>
+                      setPendingFiles((prev) =>
+                        prev.filter((f) => `${f.name}|${f.size}` !== `${file.name}|${file.size}`),
+                      )
+                    }
+                  >
+                    <X size={14} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <label className="lm-setup-label" htmlFor="lm-custom-instructions">
             Custom instructions <span className="muted lm-label-optional">(optional)</span>
           </label>
@@ -180,7 +288,13 @@ export default function LearningModulesPage() {
           {error ? <div className="form-error">{error}</div> : null}
           <div className="button-row">
             <Button icon={<GraduationCap size={18} />} onClick={() => void handleGenerate()} disabled={busy}>
-              {busy ? "Starting…" : "Generate track"}
+              {genPhase === "uploading"
+                ? "Uploading notes…"
+                : genPhase === "extracting"
+                  ? "Reading your files…"
+                  : busy
+                    ? "Starting…"
+                    : "Generate track"}
             </Button>
           </div>
         </Card>
