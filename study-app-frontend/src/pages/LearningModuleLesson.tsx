@@ -10,6 +10,7 @@ import {
   SkipBack,
   SkipForward,
   Square,
+  Video,
   XCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -18,7 +19,13 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { SkeletonText } from "../components/Skeletons";
-import { fetchLearningTrack, scopeKey, submitModuleQuiz, updateModuleLesson } from "../lib/api";
+import {
+  fetchLearningTrack,
+  scopeKey,
+  submitModuleQuiz,
+  updateModuleLesson,
+  updateModuleVideo,
+} from "../lib/api";
 import { useSettings } from "../lib/useSettings";
 import type { LearningTrack, QuizAttemptResult } from "../lib/types";
 
@@ -82,6 +89,37 @@ function splitForSpeech(text: string, maxLen = 220): string[] {
   return chunks;
 }
 
+// Turns a pasted video URL into an embeddable player source. YouTube and
+// Vimeo pages cannot be iframed directly, so they map to their embed hosts;
+// direct media files play in a <video> tag; anything else renders as a link.
+function toVideoEmbed(url: string): { kind: "iframe" | "video" | "link"; src: string } {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
+    if (host === "youtube.com" || host === "m.youtube.com" || host === "youtube-nocookie.com") {
+      const id = parsed.searchParams.get("v") ?? parsed.pathname.match(/\/(?:shorts|embed|live)\/([\w-]+)/)?.[1];
+      if (id) return { kind: "iframe", src: `https://www.youtube-nocookie.com/embed/${id}` };
+    }
+    if (host === "youtu.be") {
+      const id = parsed.pathname.slice(1).split("/")[0];
+      if (id) return { kind: "iframe", src: `https://www.youtube-nocookie.com/embed/${id}` };
+    }
+    if (host === "vimeo.com") {
+      const id = parsed.pathname.match(/\/(\d+)/)?.[1];
+      if (id) return { kind: "iframe", src: `https://player.vimeo.com/video/${id}` };
+    }
+    if (host === "player.vimeo.com" || parsed.pathname.includes("/embed/")) {
+      return { kind: "iframe", src: url };
+    }
+    if (/\.(mp4|webm|ogg|mov)(\?|$)/i.test(parsed.pathname)) {
+      return { kind: "video", src: url };
+    }
+  } catch {
+    /* fall through to link */
+  }
+  return { kind: "link", src: url };
+}
+
 type SpeechState = "idle" | "playing" | "paused";
 
 export default function LearningModuleLesson() {
@@ -102,6 +140,12 @@ export default function LearningModuleLesson() {
   const [draft, setDraft] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+
+  // ── Video resource ──────────────────────────────────────────────────────────
+  const [videoFormOpen, setVideoFormOpen] = useState(false);
+  const [videoDraft, setVideoDraft] = useState("");
+  const [savingVideo, setSavingVideo] = useState(false);
+  const [videoError, setVideoError] = useState<string | null>(null);
 
   // ── TTS ────────────────────────────────────────────────────────────────────
   const ttsSupported = typeof window !== "undefined" && "speechSynthesis" in window;
@@ -336,6 +380,26 @@ export default function LearningModuleLesson() {
     setError(null);
   }
 
+  async function handleSaveVideo(url: string | null) {
+    if (!module || savingVideo) return;
+    setSavingVideo(true);
+    setVideoError(null);
+    try {
+      const updated = await updateModuleVideo(module.id, url);
+      if (track) {
+        setTrack({
+          ...track,
+          modules: track.modules.map((m) => (m.id === updated.id ? updated : m)),
+        });
+      }
+      setVideoFormOpen(false);
+    } catch (err) {
+      setVideoError(err instanceof Error ? err.message : "Could not save the video link.");
+    } finally {
+      setSavingVideo(false);
+    }
+  }
+
   function startEditing() {
     if (!module?.lesson_content) return;
     stopSpeech();
@@ -430,6 +494,20 @@ export default function LearningModuleLesson() {
           <div className="flash-header-actions">
             <button
               className="flash-icon-btn"
+              onClick={() => {
+                setVideoDraft(module.video_url ?? "");
+                setVideoError(null);
+                setVideoFormOpen((open) => !open);
+              }}
+              type="button"
+              aria-label={module.video_url ? "Edit video link" : "Add video link"}
+              title={module.video_url ? "Edit video link" : "Add video link"}
+              disabled={savingVideo}
+            >
+              <Video size={17} />
+            </button>
+            <button
+              className="flash-icon-btn"
               onClick={startEditing}
               type="button"
               aria-label="Edit article"
@@ -441,6 +519,43 @@ export default function LearningModuleLesson() {
           </div>
         ) : null}
       </header>
+
+      {!editing && videoFormOpen ? (
+        <Card className="lm-video-form">
+          <label className="lm-setup-label" htmlFor="lm-video-url">
+            Video link
+          </label>
+          <p className="muted small">
+            Paste a YouTube, Vimeo, or direct video link. It plays at the bottom of this article.
+          </p>
+          <input
+            id="lm-video-url"
+            className="lm-instructions-input lm-video-input"
+            type="url"
+            placeholder="https://www.youtube.com/watch?v=..."
+            value={videoDraft}
+            onChange={(e) => setVideoDraft(e.target.value)}
+            disabled={savingVideo}
+          />
+          {videoError ? <div className="form-error">{videoError}</div> : null}
+          <div className="button-row">
+            <Button
+              onClick={() => void handleSaveVideo(videoDraft.trim() || null)}
+              disabled={savingVideo || !videoDraft.trim()}
+            >
+              {savingVideo ? "Saving…" : "Save link"}
+            </Button>
+            {module.video_url ? (
+              <Button variant="secondary" onClick={() => void handleSaveVideo(null)} disabled={savingVideo}>
+                Remove video
+              </Button>
+            ) : null}
+            <Button variant="secondary" onClick={() => setVideoFormOpen(false)} disabled={savingVideo}>
+              Cancel
+            </Button>
+          </div>
+        </Card>
+      ) : null}
 
       {editing ? (
         <Card className="lm-lesson-card lm-edit-card">
@@ -566,6 +681,32 @@ export default function LearningModuleLesson() {
             </div>
           );
         })}
+        {module.video_url ? (
+          (() => {
+            const embed = toVideoEmbed(module.video_url);
+            return (
+              <div className="lm-video-resource">
+                <span className="eyebrow">Video resource</span>
+                {embed.kind === "iframe" ? (
+                  <div className="lm-video-frame">
+                    <iframe
+                      src={embed.src}
+                      title="Video resource"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                ) : embed.kind === "video" ? (
+                  <video className="lm-video-player" src={embed.src} controls />
+                ) : (
+                  <a href={embed.src} target="_blank" rel="noopener noreferrer">
+                    {embed.src}
+                  </a>
+                )}
+              </div>
+            );
+          })()
+        ) : null}
       </Card>
       )}
 

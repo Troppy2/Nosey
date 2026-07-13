@@ -12,6 +12,11 @@ class CreateLearningTrackRequest(BaseModel):
     custom_instructions: Optional[str] = Field(default=None, max_length=10000)
 
 
+class UpdateModuleVideoRequest(BaseModel):
+    # http(s) link to attach under the article; null/empty clears it.
+    video_url: Optional[str] = Field(default=None, max_length=500)
+
+
 class UpdateLearningModuleRequest(BaseModel):
     # User-edited lesson markdown; replaces lesson_content wholesale. The
     # narration script and quiz are regenerated from it server-side.
@@ -33,6 +38,8 @@ class LearningModuleResponse(BaseModel):
     lesson_content: Optional[str] = None
     # Spoken-word script for TTS; null on modules generated before it existed.
     tts_script: Optional[str] = None
+    # User-attached video link shown under the article (display only).
+    video_url: Optional[str] = None
     quiz: Optional[list[QuizQuestionPublic]] = None
     best_score: Optional[int] = None
     passed: bool
