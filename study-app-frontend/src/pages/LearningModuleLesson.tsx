@@ -136,6 +136,32 @@ export default function LearningModuleLesson() {
     [module?.lesson_content],
   );
 
+  // What the voice actually reads, one entry per on-screen block. Modules
+  // generated with a tts_script get the LLM-written narration (math and code
+  // described in words); its paragraphs mirror the lesson blocks, so they map
+  // 1:1 when the counts line up and proportionally when they drift. Older
+  // modules fall back to stripping the lesson markdown. markdownToSpeech runs
+  // on script paragraphs too as a safety net against stray markdown/LaTeX.
+  const speechBlocks = useMemo(() => {
+    if (module?.tts_script && lessonBlocks.length > 0) {
+      const paragraphs = module.tts_script
+        .split(/\n\s*\n/)
+        .map((p) => markdownToSpeech(p))
+        .filter(Boolean);
+      const lastBlock = lessonBlocks.length - 1;
+      return paragraphs.map((text, i) => ({
+        blockIndex:
+          paragraphs.length === lessonBlocks.length
+            ? i
+            : Math.min(lastBlock, Math.round((i * lastBlock) / Math.max(1, paragraphs.length - 1))),
+        text,
+      }));
+    }
+    return lessonBlocks
+      .map((block, blockIndex) => ({ blockIndex, text: markdownToSpeech(block) }))
+      .filter((b) => b.text);
+  }, [module?.tts_script, lessonBlocks]);
+
   // The key is kept in a ref so the stable speech callbacks can persist the
   // cursor without being recreated per module.
   const cursorKeyRef = useRef(cursorKey);
@@ -186,20 +212,18 @@ export default function LearningModuleLesson() {
   // tagged with their source block so the reader can follow the highlight.
   const startSpeechFrom = useCallback(
     (fromBlock: number) => {
-      if (!ttsSupported || lessonBlocks.length === 0) return;
+      if (!ttsSupported || speechBlocks.length === 0) return;
       window.speechSynthesis.cancel();
       stoppedRef.current = false;
-      chunksRef.current = lessonBlocks.flatMap((block, blockIndex) => {
-        if (blockIndex < fromBlock) return [];
-        const speechText = markdownToSpeech(block);
-        if (!speechText) return [];
-        return splitForSpeech(speechText).map((text) => ({ blockIndex, text }));
+      chunksRef.current = speechBlocks.flatMap((block) => {
+        if (block.blockIndex < fromBlock) return [];
+        return splitForSpeech(block.text).map((text) => ({ blockIndex: block.blockIndex, text }));
       });
       chunkIndexRef.current = 0;
       setSpeech("playing");
       speakChunk();
     },
-    [ttsSupported, lessonBlocks, speakChunk],
+    [ttsSupported, speechBlocks, speakChunk],
   );
 
   function startSpeech() {

@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 class LearningTrack(Base, TimestampMixin):
     """An AI-authored learning track built from a folder's saved notes.
 
-    One track per folder (regenerating replaces it). The track owns up to 10
+    One track per folder (regenerating replaces it). The track owns up to 20
     ordered LearningModule rows; generation runs as a detached background task
     (same pattern as test generation) and fills modules in one by one, so the
     frontend can poll and show progress while the track builds.
@@ -30,7 +30,7 @@ class LearningTrack(Base, TimestampMixin):
     # generating | ready | failed
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="generating", server_default="generating")
     error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    # How many modules the user asked for (1-10). Modules appear as they generate.
+    # How many modules the user asked for (1-20). Modules appear as they generate.
     module_count: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
     # SHA-256 of the folder notes used to build this track. Compared against the
     # current folder files on read so the UI can offer a rebuild when notes change.
@@ -56,10 +56,11 @@ class LearningTrack(Base, TimestampMixin):
 class LearningModule(Base, TimestampMixin):
     """One lesson + quiz step in a LearningTrack.
 
-    lesson_content and quiz_json are nullable: the outline call creates the row
-    (title + summary) first, then lesson and quiz land in later LLM calls. A
-    module is "ready" once both are present. Folders are single-user, so quiz
-    progress (best_score / passed) lives directly on the row.
+    lesson_content, tts_script, and quiz_json are nullable: the outline call
+    creates the row (title + summary) first, then one bundled LLM call fills in
+    lesson + tts_script + quiz together. A module is "ready" once lesson and
+    quiz are present. Folders are single-user, so quiz progress
+    (best_score / passed) lives directly on the row.
     """
 
     __tablename__ = "learning_modules"
@@ -71,8 +72,13 @@ class LearningModule(Base, TimestampMixin):
     order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    # Markdown lesson (a few short paragraphs; may contain LaTeX/code fences).
+    # Markdown lesson article (multi-section; may contain LaTeX/code fences).
     lesson_content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # LLM-written spoken script mirroring the lesson paragraph by paragraph,
+    # with math/code described in words so TTS never reads raw LaTeX. Nullable
+    # for tracks generated before this column existed; the frontend falls back
+    # to stripping markdown from lesson_content when absent.
+    tts_script: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # JSON array of {"question": str, "options": [str], "correct_index": int}.
     # Correct answers are stripped before this reaches the client; grading is
     # done server-side on quiz submit.

@@ -6,9 +6,10 @@ from pydantic import BaseModel, Field
 
 
 class CreateLearningTrackRequest(BaseModel):
-    module_count: int = Field(default=5, ge=1, le=10)
+    module_count: int = Field(default=5, ge=1, le=20)
     provider: Optional[str] = None
-    custom_instructions: Optional[str] = Field(default=None, max_length=500)
+    # Generous ceiling as an abuse/token-cost guard; the UI does not surface it.
+    custom_instructions: Optional[str] = Field(default=None, max_length=10000)
 
 
 class QuizQuestionPublic(BaseModel):
@@ -24,6 +25,8 @@ class LearningModuleResponse(BaseModel):
     title: str
     summary: Optional[str] = None
     lesson_content: Optional[str] = None
+    # Spoken-word script for TTS; null on modules generated before it existed.
+    tts_script: Optional[str] = None
     quiz: Optional[list[QuizQuestionPublic]] = None
     best_score: Optional[int] = None
     passed: bool

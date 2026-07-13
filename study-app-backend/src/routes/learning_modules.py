@@ -121,14 +121,17 @@ async def _generate_track_background(
             await session.commit()
             module_ids = [m.id for m in modules]
 
-        # Phase 2: fill each module in order. One lesson call, then one quiz
-        # call (kept separate per the one-task-per-LLM-call rule). Each write is
-        # its own short session + commit so progress streams to the poller.
+        # Phase 2: fill each module in order with ONE bundled LLM call returning
+        # lesson + tts_script + quiz together (a single authoring task, so this
+        # does not violate the one-task-per-call rule; it halves per-module
+        # calls, which matters at 20 modules). Each write is its own short
+        # session + commit so progress streams to the poller.
         for module_id, item in zip(module_ids, outline):
-            lesson = await llm.generate_module_lesson(
+            content = await llm.generate_module_content(
                 notes,
                 item["title"],
                 item.get("summary", ""),
+                quiz_count=QUIZ_QUESTION_COUNT,
                 provider=provider,
                 custom_instructions=custom_instructions,
             )
@@ -136,21 +139,9 @@ async def _generate_track_background(
                 module = await session.get(LearningModule, module_id)
                 if module is None:
                     return  # cancelled
-                module.lesson_content = lesson
-                await session.commit()
-
-            quiz = await llm.generate_module_quiz(
-                lesson,
-                item["title"],
-                count=QUIZ_QUESTION_COUNT,
-                provider=provider,
-                custom_instructions=custom_instructions,
-            )
-            async with async_session_maker() as session:
-                module = await session.get(LearningModule, module_id)
-                if module is None:
-                    return  # cancelled
-                module.quiz_json = json.dumps(quiz)
+                module.lesson_content = str(content["lesson"])
+                module.tts_script = str(content.get("tts_script") or "") or None
+                module.quiz_json = json.dumps(content["quiz"])
                 await session.commit()
 
         # Phase 3: mark ready + usage event.
@@ -204,6 +195,7 @@ def _module_to_response(module: LearningModule) -> LearningModuleResponse:
         title=module.title,
         summary=module.summary,
         lesson_content=module.lesson_content,
+        tts_script=module.tts_script,
         quiz=quiz,
         best_score=module.best_score,
         passed=module.passed,
@@ -225,7 +217,10 @@ async def _get_owned_folder(folder_id: int, user_id: int, session: AsyncSession)
     response_model=LearningTrackResponse,
     status_code=status.HTTP_201_CREATED,
 )
-@limiter.limit("5/minute")
+# Track builds are the most LLM-expensive endpoint in the app (1 outline +
+# 1 bundled call per module, up to 21 calls per build), so creation is limited
+# per-minute AND per-hour to stop rebuild spam from draining provider quota.
+@limiter.limit("3/minute;10/hour")
 async def create_learning_track(
     folder_id: int,
     request: Request,
@@ -256,7 +251,7 @@ async def create_learning_track(
                     "provider must be auto, groq, google, anthropic, gemini, claude, or ollama"
                 )
 
-        custom_instructions = (data.custom_instructions or "").strip()[:500] or None
+        custom_instructions = (data.custom_instructions or "").strip()[:10000] or None
 
         # Rebuild semantics: replace any existing track. Deleting the old row is
         # also the cancel signal for an in-flight generation (see background task).
