@@ -210,7 +210,7 @@ export default function LearningModuleLesson() {
   // localStorage per module, lets the listener resume where they left off.
   const [chunkPos, setChunkPos] = useState(0);
   const chunkIndexRef = useRef(0);
-  const chunksRef = useRef<string[]>([]);
+  const chunksRef = useRef<{ text: string; blockIndex: number }[]>([]);
   const stoppedRef = useRef(false);
   const rateRef = useRef(1);
   // Chrome keeps firing onend/onerror for utterances that were cancelled, and
@@ -289,16 +289,43 @@ export default function LearningModuleLesson() {
   // code already in words), otherwise the stripped lesson markdown for tracks
   // generated before scripts existed. markdownToSpeech runs on script
   // paragraphs too as a safety net against stray markdown or LaTeX.
+  //
+  // Each chunk carries the lesson block it narrates so the article can
+  // highlight the paragraph currently being read: script paragraphs map to
+  // blocks 1:1 when the counts line up and proportionally when they drift
+  // (the script mirrors the lesson paragraph by paragraph, so this is
+  // paragraph-accurate even though the wording is a spoken rewrite).
   const speechChunks = useMemo(() => {
-    const paragraphs = module?.tts_script
-      ? module.tts_script.split(/\n\s*\n/).map((p) => markdownToSpeech(p))
-      : lessonBlocks.map((block) => markdownToSpeech(block));
-    return paragraphs.filter(Boolean).flatMap((p) => splitForSpeech(p));
+    if (module?.tts_script) {
+      const paragraphs = module.tts_script
+        .split(/\n\s*\n/)
+        .map((p) => markdownToSpeech(p))
+        .filter(Boolean);
+      const lastBlock = Math.max(0, lessonBlocks.length - 1);
+      return paragraphs.flatMap((paragraph, i) => {
+        const blockIndex =
+          paragraphs.length === lessonBlocks.length
+            ? i
+            : Math.min(lastBlock, Math.round((i * lastBlock) / Math.max(1, paragraphs.length - 1)));
+        return splitForSpeech(paragraph).map((text) => ({ text, blockIndex }));
+      });
+    }
+    return lessonBlocks.flatMap((block, blockIndex) => {
+      const text = markdownToSpeech(block);
+      return text ? splitForSpeech(text).map((t) => ({ text: t, blockIndex })) : [];
+    });
   }, [module?.tts_script, lessonBlocks]);
+
+  // The paragraph the player is on, for the article highlight.
+  const currentBlock = speechChunks[chunkPos]?.blockIndex ?? 0;
 
   // Rough listen time at 1x for the player label (~170 spoken words a minute).
   const estMinutes = useMemo(() => {
-    const words = speechChunks.join(" ").split(/\s+/).filter(Boolean).length;
+    const words = speechChunks
+      .map((c) => c.text)
+      .join(" ")
+      .split(/\s+/)
+      .filter(Boolean).length;
     return Math.max(1, Math.round(words / 170));
   }, [speechChunks]);
 
@@ -339,7 +366,7 @@ export default function LearningModuleLesson() {
       updateChunkPos(0);
       return;
     }
-    const utterance = new SpeechSynthesisUtterance(chunk);
+    const utterance = new SpeechSynthesisUtterance(chunk.text);
     utterance.rate = rateRef.current;
     if (voiceRef.current) utterance.voice = voiceRef.current;
     utterance.onstart = () => {
@@ -424,6 +451,14 @@ export default function LearningModuleLesson() {
       startSpeechFrom(chunkIndexRef.current);
     }
   }
+
+  // Keep the paragraph being read in view while the narration plays.
+  useEffect(() => {
+    if (speech !== "playing") return;
+    const el = document.getElementById(`lm-lesson-block-${currentBlock}`);
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+  }, [currentBlock, speech]);
 
   // Seek by dragging the progress slider. While dragging (commit=false) only
   // the position marker moves; on release (commit=true) playback jumps there
@@ -832,11 +867,24 @@ export default function LearningModuleLesson() {
 
       {editing ? null : (
       <Card className="lm-lesson-card">
-        {lessonBlocks.map((block, index) => (
-          <div key={index} className="lm-lesson-block">
-            <MarkdownContent content={block} />
-          </div>
-        ))}
+        {lessonBlocks.map((block, index) => {
+          // Paragraph-level "now reading" marker driven by the player. The
+          // narration is a spoken rewrite, so the highlight shows which
+          // paragraph is being covered, not a word-for-word position.
+          const isCurrent = index === currentBlock;
+          const stateClass = isCurrent
+            ? speech === "playing"
+              ? "is-speaking"
+              : speech === "paused" || chunkPos > 0
+                ? "is-cursor"
+                : ""
+            : "";
+          return (
+            <div key={index} id={`lm-lesson-block-${index}`} className={`lm-lesson-block ${stateClass}`}>
+              <MarkdownContent content={block} />
+            </div>
+          );
+        })}
       </Card>
       )}
 
