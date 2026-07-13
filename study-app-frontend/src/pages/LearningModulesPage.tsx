@@ -148,7 +148,7 @@ export default function LearningModulesPage() {
               className="lm-count-slider"
               type="range"
               min={1}
-              max={10}
+              max={20}
               value={moduleCount}
               onChange={(e) => setModuleCount(Number(e.target.value))}
             />
@@ -156,8 +156,15 @@ export default function LearningModulesPage() {
           </div>
           <p className="muted small">
             Built from the notes saved in this folder. More modules split the material into finer
-            slices; 10 is the maximum.
+            slices; 20 is the maximum.
           </p>
+          {moduleCount > 10 ? (
+            <p className="muted small lm-count-warning">
+              Heads up: big tracks take a while. Each module is written one at a time, so{" "}
+              {moduleCount} modules can take several minutes to finish. You can start module 1 as
+              soon as it's ready.
+            </p>
+          ) : null}
           <label className="lm-setup-label" htmlFor="lm-custom-instructions">
             Custom instructions <span className="muted lm-label-optional">(optional)</span>
           </label>
@@ -165,12 +172,11 @@ export default function LearningModulesPage() {
             id="lm-custom-instructions"
             className="lm-instructions-input"
             rows={3}
-            maxLength={500}
+            maxLength={10000}
             placeholder='e.g. "Focus on the proofs", "Use lots of real-world examples", "Assume I am new to this subject"'
             value={customInstructions}
             onChange={(e) => setCustomInstructions(e.target.value)}
           />
-          <p className="muted small lm-char-count">{customInstructions.length}/500</p>
           {error ? <div className="form-error">{error}</div> : null}
           <div className="button-row">
             <Button icon={<GraduationCap size={18} />} onClick={() => void handleGenerate()} disabled={busy}>

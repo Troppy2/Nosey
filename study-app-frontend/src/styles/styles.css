@@ -14600,6 +14600,14 @@ a.lm-module-row:focus-visible {
   text-align: right;
 }
 
+.lm-count-warning {
+  margin: -0.3rem 0 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light);
+}
+
 /* Quiz */
 .lm-quiz {
   margin-top: 1.75rem;

@@ -216,6 +216,9 @@ export type LearningModule = {
   title: string;
   summary?: string | null;
   lesson_content?: string | null;
+  // LLM-written spoken narration script; null on modules generated before it
+  // existed (TTS then falls back to stripping the lesson markdown).
+  tts_script?: string | null;
   quiz?: LearningQuizQuestion[] | null;
   best_score?: number | null;
   passed: boolean;

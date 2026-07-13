@@ -1719,14 +1719,18 @@ Return JSON only:
         return self._fallback_flashcards(content, count, prompt)
 
     # ── Learning Modules (lesson track authoring) ────────────────────────────
-    # Three separate single-purpose calls (outline, one lesson, one quiz), each
-    # dispatched through _complete_json which owns the provider-fallback loop.
-    # Lesson authoring and quiz generation are deliberately NOT bundled into one
-    # call (project rule: one task per LLM call so fallback stays predictable).
+    # One outline call, then ONE bundled call per module returning
+    # {lesson, tts_script, quiz}. Bundling is safe here (unlike mixing tests and
+    # flashcards) because all three parts are a single authoring task over the
+    # same source with the same provider requirements and failure mode; it
+    # halves the per-module call count, which matters at 20 modules. All calls
+    # dispatch through _complete_json which owns the provider-fallback loop and
+    # already runs at the high _JSON_MAX_TOKENS budget the longer bundled
+    # response needs.
 
     def _module_instructions_block(self, custom_instructions: Optional[str]) -> str:
         """Format the user's free-text guidance for the module prompts."""
-        text = (custom_instructions or "").strip()[:500]
+        text = (custom_instructions or "").strip()[:10000]
         if not text:
             return ""
         return (
@@ -1748,7 +1752,7 @@ Return JSON only:
         """
         from src.utils.exceptions import LLMException
 
-        count = max(1, min(10, int(module_count)))
+        count = max(1, min(20, int(module_count)))
         prompt = (
             f"You are designing a learning track that teaches a student their own course notes.\n"
             f"Split the material below into exactly {count} focused lesson modules, ordered so that "
@@ -1776,66 +1780,9 @@ Return JSON only:
             raise LLMException("The AI could not build a module outline from these notes. Try again.")
         return outline[:count]
 
-    async def generate_module_lesson(
-        self,
-        notes: str,
-        module_title: str,
-        module_summary: str,
-        provider: Optional[str] = None,
-        custom_instructions: Optional[str] = None,
-    ) -> str:
-        """Author one short markdown lesson for a single module topic."""
-        from src.utils.exceptions import LLMException
-
-        prompt = (
-            "You are writing one short lesson in a learning track built from a student's own notes.\n"
-            f"MODULE TITLE: {module_title}\n"
-            f"MODULE SCOPE: {module_summary or 'Cover the module topic using the notes.'}\n\n"
-            "Write the lesson as Markdown: a few short paragraphs (roughly 200-350 words), with one or two "
-            "## headings and at least one concrete example. Stay strictly within this module's scope and "
-            "ground every claim in the notes. If the material is mathematical, write math as LaTeX using $...$ "
-            "for inline and $$...$$ for display equations. If the material is code, use fenced code blocks "
-            "with a language tag. Do not include a quiz, exercises, or a closing summary of the whole course.\n"
-            "Return a JSON object ONLY with key \"lesson\" whose value is the full Markdown lesson as a string.\n\n"
-            f"{self._module_instructions_block(custom_instructions)}"
-            f"NOTES:\n{notes[:12000]}"
-        )
-        data = await self._complete_json(prompt, provider=provider)
-        lesson = str(data.get("lesson") or "").strip()
-        if not lesson:
-            raise LLMException("The AI returned an empty lesson. Try again.")
-        return lesson
-
-    async def generate_module_quiz(
-        self,
-        lesson_content: str,
-        module_title: str,
-        count: int = 5,
-        provider: Optional[str] = None,
-        custom_instructions: Optional[str] = None,
-    ) -> list[dict[str, object]]:
-        """Generate an MCQ quiz for one lesson.
-
-        Returns items of {"question": str, "options": [str x4], "correct_index": int}.
-        """
-        from src.utils.exceptions import LLMException
-
-        quiz_count = max(1, min(10, int(count)))
-        prompt = (
-            f"Write a {quiz_count}-question multiple-choice quiz that checks whether a student understood "
-            "the lesson below. Every question must be answerable from the lesson alone.\n"
-            "Return a JSON object ONLY with key \"questions\": an array of objects, each with:\n"
-            "- \"question\": the question text.\n"
-            "- \"options\": an array of exactly 4 answer strings.\n"
-            "- \"correct_index\": the 0-based index of the correct option.\n"
-            "Distractors must be plausible but clearly wrong per the lesson. Vary which index is correct.\n"
-            "If a question or option contains math, write it as LaTeX delimited with $...$ (inline only, "
-            "no $$ blocks). Use backtick code spans for identifiers or short code.\n\n"
-            f"{self._module_instructions_block(custom_instructions)}"
-            f"LESSON ({module_title}):\n{lesson_content[:12000]}"
-        )
-        data = await self._complete_json(prompt, provider=provider)
-        raw_questions = data.get("questions")
+    @staticmethod
+    def _parse_module_quiz(raw_questions: object, quiz_count: int) -> list[dict[str, object]]:
+        """Validate the quiz array from a module-generation response."""
         quiz: list[dict[str, object]] = []
         if isinstance(raw_questions, list):
             for item in raw_questions:
@@ -1854,9 +1801,70 @@ Return JSON only:
                     continue
                 if question and len(options) >= 2 and 0 <= correct_index < len(options):
                     quiz.append({"question": question, "options": options, "correct_index": correct_index})
+        return quiz[:quiz_count]
+
+    async def generate_module_content(
+        self,
+        notes: str,
+        module_title: str,
+        module_summary: str,
+        quiz_count: int = 5,
+        provider: Optional[str] = None,
+        custom_instructions: Optional[str] = None,
+    ) -> dict[str, object]:
+        """Author one full module in a single bundled LLM call.
+
+        Returns {"lesson": str, "tts_script": str, "quiz": [{"question", "options",
+        "correct_index"}]}. tts_script may be "" if the model omitted it (the
+        frontend falls back to stripped-markdown TTS); lesson and quiz are
+        required and raise LLMException when missing.
+        """
+        from src.utils.exceptions import LLMException
+
+        count = max(1, min(10, int(quiz_count)))
+        prompt = (
+            "You are writing one complete lesson module in a learning track built from a student's own notes.\n"
+            f"MODULE TITLE: {module_title}\n"
+            f"MODULE SCOPE: {module_summary or 'Cover the module topic using the notes.'}\n\n"
+            "Produce THREE parts and return them as ONE JSON object with keys \"lesson\", \"tts_script\", "
+            "and \"questions\".\n\n"
+            "1. \"lesson\": a thorough Markdown article of roughly 800-1200 words: a short introduction, "
+            "3-5 sections under ## headings that develop the topic step by step, multiple concrete worked "
+            "examples, and a brief recap of this module only. Stay strictly within this module's scope and "
+            "ground every claim in the notes; do not pad with generic filler. If the material is mathematical, "
+            "write math as LaTeX using $...$ for inline and $$...$$ for display equations. If the material is "
+            "code, use fenced code blocks with a language tag. Do not include a quiz or exercises.\n\n"
+            "2. \"tts_script\": the same article rewritten as a spoken narration script. Plain prose only: no "
+            "markdown syntax, no LaTeX, no code fences. Read math out in words (e.g. write 'x squared plus two x' "
+            "instead of '$x^2 + 2x$') and walk through code examples in words (e.g. 'the function loops over each "
+            "item and returns the total'). Mirror the lesson paragraph by paragraph: one spoken paragraph per "
+            "lesson paragraph or heading block, in the same order, separated by blank lines, so the on-screen "
+            "text can be highlighted in sync while it is read aloud. Cover the full content of the lesson; do "
+            "not abbreviate it.\n\n"
+            f"3. \"questions\": a {count}-question multiple-choice quiz checking that the student understood the "
+            "lesson. Every question must be answerable from the lesson alone. Each item is an object with:\n"
+            "- \"question\": the question text.\n"
+            "- \"options\": an array of exactly 4 answer strings.\n"
+            "- \"correct_index\": the 0-based index of the correct option.\n"
+            "Distractors must be plausible but clearly wrong per the lesson. Vary which index is correct. "
+            "If a question or option contains math, write it as LaTeX delimited with $...$ (inline only, "
+            "no $$ blocks). Use backtick code spans for identifiers or short code.\n\n"
+            f"{self._module_instructions_block(custom_instructions)}"
+            f"NOTES:\n{notes[:12000]}"
+        )
+        data = await self._complete_json(prompt, provider=provider)
+
+        lesson = str(data.get("lesson") or "").strip()
+        if not lesson:
+            raise LLMException("The AI returned an empty lesson. Try again.")
+
+        tts_script = str(data.get("tts_script") or "").strip()
+
+        quiz = self._parse_module_quiz(data.get("questions"), count)
         if not quiz:
             raise LLMException("The AI could not build a quiz for this lesson. Try again.")
-        return quiz[:quiz_count]
+
+        return {"lesson": lesson, "tts_script": tts_script, "quiz": quiz}
 
     async def generate_custom_problem(
         self,
