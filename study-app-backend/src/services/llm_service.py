@@ -1866,6 +1866,55 @@ Return JSON only:
 
         return {"lesson": lesson, "tts_script": tts_script, "quiz": quiz}
 
+    async def regenerate_module_support(
+        self,
+        lesson_content: str,
+        module_title: str,
+        quiz_count: int = 5,
+        provider: Optional[str] = None,
+        custom_instructions: Optional[str] = None,
+    ) -> dict[str, object]:
+        """Rebuild the narration script + quiz after a user edits a lesson.
+
+        One bundled call whose source is the edited lesson itself (not the
+        folder notes). Returns {"tts_script": str, "quiz": [...]}; quiz is
+        required and raises LLMException when missing, tts_script may be ""
+        (the frontend then falls back to stripped-markdown TTS).
+        """
+        from src.utils.exceptions import LLMException
+
+        count = max(1, min(10, int(quiz_count)))
+        prompt = (
+            "A student has edited one lesson article in their learning track. Produce TWO companion "
+            "pieces for the edited article below and return them as ONE JSON object with keys "
+            "\"tts_script\" and \"questions\".\n\n"
+            "1. \"tts_script\": the article rewritten as a spoken narration script. Plain prose only: no "
+            "markdown syntax, no LaTeX, no code fences. Read math out in words (e.g. write 'x squared plus "
+            "two x' instead of '$x^2 + 2x$') and walk through code examples in words. Mirror the article "
+            "paragraph by paragraph: one spoken paragraph per article paragraph or heading block, in the "
+            "same order, separated by blank lines, so the on-screen text can be highlighted in sync while "
+            "it is read aloud. Cover the full content of the article; do not abbreviate it.\n\n"
+            f"2. \"questions\": a {count}-question multiple-choice quiz checking that the student understood "
+            "the article. Every question must be answerable from the article alone. Each item is an object with:\n"
+            "- \"question\": the question text.\n"
+            "- \"options\": an array of exactly 4 answer strings.\n"
+            "- \"correct_index\": the 0-based index of the correct option.\n"
+            "Distractors must be plausible but clearly wrong per the article. Vary which index is correct. "
+            "If a question or option contains math, write it as LaTeX delimited with $...$ (inline only, "
+            "no $$ blocks). Use backtick code spans for identifiers or short code.\n\n"
+            f"{self._module_instructions_block(custom_instructions)}"
+            f"ARTICLE ({module_title}):\n{lesson_content[:24000]}"
+        )
+        data = await self._complete_json(prompt, provider=provider)
+
+        tts_script = str(data.get("tts_script") or "").strip()
+
+        quiz = self._parse_module_quiz(data.get("questions"), count)
+        if not quiz:
+            raise LLMException("The AI could not rebuild the quiz from your edited lesson. Try again.")
+
+        return {"tts_script": tts_script, "quiz": quiz}
+
     async def generate_custom_problem(
         self,
         code: str,
