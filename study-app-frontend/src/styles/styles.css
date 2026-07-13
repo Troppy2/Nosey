@@ -14600,62 +14600,33 @@ a.lm-module-row:focus-visible {
   text-align: right;
 }
 
+/* Build-time note above 10 modules; same amber idiom as the .lm-stale banner
+   so every "heads up" in Learning Modules reads the same way. */
 .lm-count-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
   margin: -0.3rem 0 0;
-  padding: 0.5rem 0.7rem;
-  border-radius: 8px;
-  background: var(--green-lightest);
-  border: 1px solid var(--green-light);
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(217, 119, 6, 0.08);
+  border: 1px solid rgba(217, 119, 6, 0.35);
 }
 
-/* Direct file upload on the track setup card */
+.lm-count-warning svg {
+  color: var(--warning);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.lm-count-warning p {
+  margin: 0;
+}
+
+/* Direct file upload on the track setup card. Chosen files render with the
+   shared .selected-files rows from the test upload flow. */
 .lm-file-input {
   display: none;
-}
-
-.lm-file-list {
-  list-style: none;
-  margin: -0.3rem 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.lm-file-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0.45rem 0.65rem;
-  border: 1px solid var(--green-light);
-  border-radius: 8px;
-  background: var(--green-lightest);
-  color: var(--ink);
-  font-size: 0.85rem;
-}
-
-.lm-file-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.lm-file-remove {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--green-dark);
-  cursor: pointer;
-}
-
-.lm-file-remove:hover {
-  background: rgba(0, 0, 0, 0.06);
 }
 
 /* Article editor (lesson page) */
@@ -14663,35 +14634,51 @@ a.lm-module-row:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  padding: 1.25rem 1.4rem;
 }
 
 .lm-edit-area {
   width: 100%;
   min-height: 55vh;
   resize: vertical;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.85rem;
   line-height: 1.55;
 }
 
-/* Video resource (lesson page) */
+/* Video resource (lesson page): its own card between the article and the
+   quiz, so the player never sits inside the article's prose padding. */
 .lm-video-form {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  padding: 1.25rem 1.4rem;
+  margin-bottom: 1rem;
 }
 
 .lm-video-input {
   width: 100%;
+  min-height: 0;
+  resize: none;
 }
 
-.lm-video-resource {
-  margin-top: 1.5rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--green-light);
+.lm-video-card {
+  margin-top: 1rem;
+  padding: 1.25rem 1.4rem;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.75rem;
+}
+
+.lm-video-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.lm-video-source {
+  color: var(--green-dark);
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 /* 16:9 responsive frame for embedded players */
@@ -14700,6 +14687,7 @@ a.lm-module-row:focus-visible {
   width: 100%;
   aspect-ratio: 16 / 9;
   border-radius: 10px;
+  border: 1px solid var(--green-light-mid);
   overflow: hidden;
   background: #000;
 }
@@ -14715,7 +14703,12 @@ a.lm-module-row:focus-visible {
 .lm-video-player {
   width: 100%;
   border-radius: 10px;
+  border: 1px solid var(--green-light-mid);
   background: #000;
+}
+
+.lm-video-fallback {
+  margin: 0;
 }
 
 /* Quiz */

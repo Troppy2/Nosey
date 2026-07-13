@@ -2,7 +2,6 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
-  Loader2,
   Pause,
   Pencil,
   Play,
@@ -17,6 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { InlineLoading, LoadingNotice } from "../components/Loaders";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { SkeletonText } from "../components/Skeletons";
 import {
@@ -543,7 +543,7 @@ export default function LearningModuleLesson() {
               onClick={() => void handleSaveVideo(videoDraft.trim() || null)}
               disabled={savingVideo || !videoDraft.trim()}
             >
-              {savingVideo ? "Saving…" : "Save link"}
+              {savingVideo ? <InlineLoading label="Saving" /> : "Save link"}
             </Button>
             {module.video_url ? (
               <Button variant="secondary" onClick={() => void handleSaveVideo(null)} disabled={savingVideo}>
@@ -574,15 +574,18 @@ export default function LearningModuleLesson() {
             disabled={savingEdit}
           />
           {editError ? <div className="form-error">{editError}</div> : null}
+          {savingEdit ? (
+            <LoadingNotice
+              compact
+              title="Rebuilding the audio script and quiz"
+              estimate="Your edits are already saved. This usually takes under a minute."
+              slowNote="Still working. Long articles take longer to narrate and quiz."
+              slowAfterMs={45000}
+            />
+          ) : null}
           <div className="button-row">
             <Button onClick={() => void handleSaveEdit()} disabled={savingEdit || !draft.trim()}>
-              {savingEdit ? (
-                <>
-                  <Loader2 size={16} className="lm-spin" /> Saving and rebuilding…
-                </>
-              ) : (
-                "Save article"
-              )}
+              {savingEdit ? <InlineLoading label="Saving" /> : "Save article"}
             </Button>
             <Button variant="secondary" onClick={() => setEditing(false)} disabled={savingEdit}>
               Cancel
@@ -681,34 +684,51 @@ export default function LearningModuleLesson() {
             </div>
           );
         })}
-        {module.video_url ? (
-          (() => {
-            const embed = toVideoEmbed(module.video_url);
-            return (
-              <div className="lm-video-resource">
-                <span className="eyebrow">Video resource</span>
-                {embed.kind === "iframe" ? (
-                  <div className="lm-video-frame">
-                    <iframe
-                      src={embed.src}
-                      title="Video resource"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  </div>
-                ) : embed.kind === "video" ? (
-                  <video className="lm-video-player" src={embed.src} controls />
-                ) : (
-                  <a href={embed.src} target="_blank" rel="noopener noreferrer">
-                    {embed.src}
-                  </a>
-                )}
-              </div>
-            );
-          })()
-        ) : null}
       </Card>
       )}
+
+      {!editing && module.video_url ? (
+        (() => {
+          const embed = toVideoEmbed(module.video_url);
+          let host = module.video_url;
+          try {
+            host = new URL(module.video_url).hostname.replace(/^www\./, "");
+          } catch {
+            /* keep the raw url */
+          }
+          return (
+            <Card className="lm-video-card">
+              <div className="lm-video-head">
+                <span className="eyebrow">Video resource</span>
+                <a
+                  className="lm-video-source small"
+                  href={module.video_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open on {host}
+                </a>
+              </div>
+              {embed.kind === "iframe" ? (
+                <div className="lm-video-frame">
+                  <iframe
+                    src={embed.src}
+                    title="Video resource"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              ) : embed.kind === "video" ? (
+                <video className="lm-video-player" src={embed.src} controls />
+              ) : (
+                <p className="muted small lm-video-fallback">
+                  This link can't be embedded here. Use "Open on {host}" above to watch it.
+                </p>
+              )}
+            </Card>
+          );
+        })()
+      ) : null}
 
       {editing ? null : (
       <section className="lm-quiz">

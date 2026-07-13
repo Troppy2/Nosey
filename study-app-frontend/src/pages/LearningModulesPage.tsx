@@ -4,7 +4,6 @@ import {
   BookOpenCheck,
   CheckCircle2,
   ChevronRight,
-  FileText,
   GraduationCap,
   Loader2,
   Lock,
@@ -18,6 +17,7 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ConfirmModal } from "../components/ConfirmModal";
+import { InlineLoading, LoadingNotice } from "../components/Loaders";
 import { ProgressBar } from "../components/Progress";
 import { SkeletonList } from "../components/Skeletons";
 import {
@@ -214,11 +214,14 @@ export default function LearningModulesPage() {
             slices; 20 is the maximum.
           </p>
           {moduleCount > 10 ? (
-            <p className="muted small lm-count-warning">
-              Heads up: big tracks take a while. Each module is written one at a time, so{" "}
-              {moduleCount} modules can take several minutes to finish. You can start module 1 as
-              soon as it's ready.
-            </p>
+            <div className="lm-count-warning">
+              <AlertCircle size={16} />
+              <p className="small">
+                Big tracks take a while. Each module is written one at a time, so {moduleCount}{" "}
+                modules can take several minutes to finish. You can start module 1 as soon as it's
+                ready.
+              </p>
+            </div>
           ) : null}
           <label className="lm-setup-label" htmlFor="lm-file-input">
             Add notes <span className="muted lm-label-optional">(optional)</span>
@@ -233,7 +236,7 @@ export default function LearningModulesPage() {
             className="lm-file-input"
             type="file"
             multiple
-            accept=".pdf,.docx,.txt,.md,.html,.pptx"
+            accept=".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml"
             onChange={(e) => {
               addPendingFiles(e.target.files);
               e.target.value = "";
@@ -250,16 +253,14 @@ export default function LearningModulesPage() {
             </Button>
           </div>
           {pendingFiles.length > 0 ? (
-            <ul className="lm-file-list">
+            <div className="selected-files">
               {pendingFiles.map((file) => (
-                <li key={`${file.name}|${file.size}`} className="lm-file-item">
-                  <FileText size={15} />
-                  <span className="lm-file-name">{file.name}</span>
+                <div className="selected-file" key={`${file.name}|${file.size}`}>
+                  <span>
+                    {file.name} · {(file.size / (1024 * 1024)).toFixed(1)} MB
+                  </span>
                   <button
                     type="button"
-                    className="lm-file-remove"
-                    aria-label={`Remove ${file.name}`}
-                    title="Remove"
                     disabled={busy}
                     onClick={() =>
                       setPendingFiles((prev) =>
@@ -267,11 +268,11 @@ export default function LearningModulesPage() {
                       )
                     }
                   >
-                    <X size={14} />
+                    Remove
                   </button>
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           ) : null}
           <label className="lm-setup-label" htmlFor="lm-custom-instructions">
             Custom instructions <span className="muted lm-label-optional">(optional)</span>
@@ -286,15 +287,30 @@ export default function LearningModulesPage() {
             onChange={(e) => setCustomInstructions(e.target.value)}
           />
           {error ? <div className="form-error">{error}</div> : null}
+          {genPhase === "uploading" || genPhase === "extracting" ? (
+            <LoadingNotice
+              compact
+              title={genPhase === "uploading" ? "Uploading your notes" : "Reading your files"}
+              estimate="The track build starts as soon as this finishes."
+              slowNote="Still reading. Large PDFs take a while. Keep this page open until it finishes."
+              slowAfterMs={15000}
+            />
+          ) : null}
           <div className="button-row">
             <Button icon={<GraduationCap size={18} />} onClick={() => void handleGenerate()} disabled={busy}>
-              {genPhase === "uploading"
-                ? "Uploading notes…"
-                : genPhase === "extracting"
-                  ? "Reading your files…"
-                  : busy
-                    ? "Starting…"
-                    : "Generate track"}
+              {busy ? (
+                <InlineLoading
+                  label={
+                    genPhase === "uploading"
+                      ? "Uploading"
+                      : genPhase === "extracting"
+                        ? "Reading files"
+                        : "Starting"
+                  }
+                />
+              ) : (
+                "Generate track"
+              )}
             </Button>
           </div>
         </Card>
