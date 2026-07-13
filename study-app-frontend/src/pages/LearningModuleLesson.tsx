@@ -578,7 +578,7 @@ export default function LearningModuleLesson() {
       }
       setAnswers({});
       setResult(null);
-      updateCursor(0);
+      updateChunkPos(0);
       setEditing(false);
     } catch (err) {
       // On a 503 the edit itself was saved server-side (only the regen
