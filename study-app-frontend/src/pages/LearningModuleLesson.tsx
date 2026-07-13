@@ -425,6 +425,17 @@ export default function LearningModuleLesson() {
     }
   }
 
+  // Seek by dragging the progress slider. While dragging (commit=false) only
+  // the position marker moves; on release (commit=true) playback jumps there
+  // if it was running. Paused/idle seeks just move where play will start.
+  function seekTo(index: number, commit: boolean) {
+    const clamped = Math.min(Math.max(index, 0), Math.max(0, speechChunks.length - 1));
+    updateChunkPos(clamped);
+    if (commit && speech === "playing") {
+      startSpeechFrom(clamped);
+    }
+  }
+
   function previewVoice() {
     if (!ttsSupported) return;
     // Halt the lesson queue (session bump makes its callbacks inert), then
@@ -707,18 +718,17 @@ export default function LearningModuleLesson() {
                       : `About ${estMinutes} min`}
               </span>
             </div>
-            <div
-              className="lm-audio-track"
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={speechChunks.length}
-              aria-valuenow={chunkPos}
-            >
-              <div
-                className="lm-audio-fill"
-                style={{ width: `${Math.round((chunkPos / Math.max(1, speechChunks.length - 1)) * 100)}%` }}
-              />
-            </div>
+            <input
+              className="lm-audio-seek"
+              type="range"
+              min={0}
+              max={Math.max(0, speechChunks.length - 1)}
+              value={chunkPos}
+              aria-label="Seek position in the narration"
+              onChange={(e) => seekTo(Number(e.target.value), false)}
+              onPointerUp={(e) => seekTo(Number((e.target as HTMLInputElement).value), true)}
+              onKeyUp={(e) => seekTo(Number((e.target as HTMLInputElement).value), true)}
+            />
           </div>
           {chunkPos > 0 ? (
             <button
@@ -732,7 +742,7 @@ export default function LearningModuleLesson() {
             </button>
           ) : null}
           <div className="lm-audio-rates" aria-label="Playback speed">
-            {[0.75, 1, 1.25, 1.5].map((option) => (
+            {[0.75, 1, 1.25, 1.5, 2].map((option) => (
               <button
                 key={option}
                 type="button"
