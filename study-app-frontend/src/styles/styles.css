@@ -14761,10 +14761,24 @@ a.lm-module-row:focus-visible {
   line-height: 1.6;
 }
 
-/* Lesson blocks: one per markdown paragraph. */
+/* Lesson blocks: one per markdown paragraph, highlighted while the player is
+   reading them (paragraph-level position, driven by the audio player). */
 .lm-lesson-block {
   padding: 0.35rem 0.6rem;
   margin: 0 -0.6rem;
+  border-radius: 10px;
+  border-left: 3px solid transparent;
+  transition: background var(--transition-normal), border-color var(--transition-normal);
+}
+
+.lm-lesson-block.is-speaking {
+  background: var(--green-lightest);
+  border-left-color: var(--green-dark);
+}
+
+/* Quieter marker for the paused/saved position while not speaking. */
+.lm-lesson-block.is-cursor {
+  border-left-color: var(--green-light-mid);
 }
 
 .lm-lesson-block .kojo-md-p:first-child,
