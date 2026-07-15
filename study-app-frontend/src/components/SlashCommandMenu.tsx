@@ -5,7 +5,7 @@ export type CommandOption = {
   label: string;
   description: string;
   prompt: string;
-  actionType?: "chat" | "blueprint";
+  actionType?: "chat" | "blueprint" | "create_folder" | "create_flashcards" | "create_module" | "start_matching";
 };
 
 type Props = {

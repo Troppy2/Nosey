@@ -1,6 +1,7 @@
-import { Bot, ChevronDown, ChevronUp, Layers, MessageSquare, Sparkles, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Layers, MessageSquare, Sparkles, X } from "lucide-react";
+import KojoMascot from "./KojoMascot";
 import { ReactNode, useEffect, useRef, useState } from "react";
-import { createFlashcard, kojoChat } from "../lib/api";
+import { createFlashcard, kojoChat, kojoChatStream } from "../lib/api";
 import { MarkdownContent } from "./MarkdownContent";
 
 type Position = { x: number; y: number };
@@ -133,19 +134,35 @@ export function SelectionKojoAssistant({ folderId, folderName, children, onAskKo
       if (mode !== "explain" || !selectedText || response || isLoading) return;
       setIsLoading(true);
       setError(null);
+      const prompt = [
+        "You are Kojo, a study companion.",
+        "Explain the selected text in simple terms and describe what the question is asking.",
+        "Do not give the direct answer.",
+        "Focus on reasoning, context, and how to approach it.",
+        "Use clear, concise language and include math formatting if present.",
+        "",
+        `Folder: ${folderName}`,
+        `Selected text:\n${selectedText}`,
+      ].join("\n");
+      let streamed = "";
+      let placed = false;
+      const onDelta = (delta: string) => {
+        streamed += delta;
+        if (!placed) {
+          placed = true;
+          setIsLoading(false); // swap the skeleton for streaming text
+        }
+        setResponse(streamed);
+      };
       try {
-        const prompt = [
-          "You are Kojo, a study companion.",
-          "Explain the selected text in simple terms and describe what the question is asking.",
-          "Do not give the direct answer.",
-          "Focus on reasoning, context, and how to approach it.",
-          "Use clear, concise language and include math formatting if present.",
-          "",
-          `Folder: ${folderName}`,
-          `Selected text:\n${selectedText}`,
-        ].join("\n");
-        const result = await kojoChat(folderId, prompt);
-        setResponse(result.response);
+        try {
+          const result = await kojoChatStream(folderId, prompt, onDelta);
+          setResponse(result.response);
+        } catch (streamErr) {
+          if (placed) throw streamErr;
+          const result = await kojoChat(folderId, prompt);
+          setResponse(result.response);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Kojo could not explain this selection.");
       } finally {
@@ -300,13 +317,12 @@ export function SelectionKojoAssistant({ folderId, folderName, children, onAskKo
         <div className="selection-kojo-header kojo-header" onMouseDown={handleDragStart}>
           <div className="kojo-header-left">
             <div className="kojo-avatar">
-              <Bot size={18} />
+              <KojoMascot state={isLoading ? "loading" : "idle"} />
             </div>
             <div className="kojo-header-info">
               <span className="kojo-header-name">
                 <Sparkles size={13} className="kojo-title-icon" />
                 Kojo
-                <span className="kojo-header-online" aria-label="online" />
               </span>
               <span className="kojo-header-sub">{folderName}</span>
             </div>
