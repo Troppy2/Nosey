@@ -4350,43 +4350,53 @@ h3 {
 
 .math-tab {
   flex-shrink: 0;
-  padding: 8px 14px;
+  padding: 9px 14px;
   font-size: 0.78rem;
   font-weight: 600;
   background: none;
   border: none;
+  border-bottom: 2px solid transparent;
   cursor: pointer;
   color: var(--green-dark-mid);
-  transition: background var(--transition-fast);
+  transition: background var(--transition-fast), color var(--transition-fast);
   white-space: nowrap;
+}
+
+.math-tab:hover {
+  background: var(--green-lightest);
 }
 
 .math-tab.active {
   background: var(--green-lightest);
   color: var(--green-dark);
-  border-bottom: 2px solid var(--green-dark);
+  border-bottom-color: var(--green-dark);
+}
+
+.math-tab:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: -2px;
 }
 
 .math-keyboard-symbols {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
   gap: 6px;
   padding: 10px;
 }
 
 .math-sym-btn {
-  min-width: 44px;
-  min-height: 38px;
-  padding: 4px 10px;
+  height: 42px;
+  min-width: 0;
+  padding: 4px 6px;
   background: var(--white);
   border: 1.5px solid var(--green-light);
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background var(--transition-fast), border-color var(--transition-fast);
-  font-size: 0.9rem;
+  overflow: hidden;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .math-sym-btn:hover {
@@ -4394,8 +4404,18 @@ h3 {
   border-color: var(--green-dark);
 }
 
+.math-sym-btn:active {
+  transform: translateY(1px);
+}
+
+.math-sym-btn:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 1px;
+}
+
 .math-sym-btn .katex {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
+  max-width: 100%;
 }
 
 /* ── File manager ── */
