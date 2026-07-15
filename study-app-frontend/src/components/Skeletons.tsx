@@ -131,7 +131,6 @@ export function SkeletonFolderGrid({
     <section className="folder-grid" role="status" aria-label={label}>
       {Array.from({ length: count }, (_, i) => (
         <div className="skel-folder-card" key={i}>
-          <Skeleton circle width="12px" height="12px" className="skel-folder-dot" />
           <div className="skel-folder-top">
             <Skeleton width="34px" height="34px" className="skel-folder-icon" />
             <Skeleton width="62%" height="1.15rem" />
