@@ -1158,6 +1158,33 @@ class KojoService:
         await session.commit()
         return self._action_card_dto(card)
 
+    async def _assert_entity_owned(
+        self, entity_type: str, entity_id: int, user_id: int, session: AsyncSession
+    ) -> None:
+        """Guards resolve_action against attaching a card to another user's
+        entity: entity_type/entity_id come straight from the request body, so
+        without this a caller could point their own card at any folder,
+        track, or flashcard-holding folder id."""
+        from sqlalchemy import select
+
+        from src.models.learning_module import LearningTrack
+
+        if entity_type == "folder":
+            if await FolderRepository(session).get_owned(entity_id, user_id) is None:
+                raise ResourceNotFoundException("Folder")
+        elif entity_type == "flashcards":
+            # entity_id is the folder the generated cards live in.
+            if await FolderRepository(session).get_owned(entity_id, user_id) is None:
+                raise ResourceNotFoundException("Folder")
+        elif entity_type == "learning_track":
+            track = await session.scalar(
+                select(LearningTrack).where(LearningTrack.id == entity_id)
+            )
+            if track is None or await FolderRepository(session).get_owned(track.folder_id, user_id) is None:
+                raise ResourceNotFoundException("LearningTrack")
+        else:
+            raise ValidationException(f"Unknown entity type: {entity_type}")
+
     async def _entity_deleted(self, card, user_id: int, session: AsyncSession) -> bool:
         """True when a confirmed card's created entity no longer exists."""
         if card.status != "confirmed" or card.entity_type is None or card.entity_id is None:
@@ -1175,9 +1202,11 @@ class KojoService:
             return folder is None
         if card.entity_type == "learning_track":
             track = await session.scalar(
-                select(LearningTrack.id).where(LearningTrack.id == card.entity_id)
+                select(LearningTrack).where(LearningTrack.id == card.entity_id)
             )
-            return track is None
+            if track is None:
+                return True
+            return await FolderRepository(session).get_owned(track.folder_id, user_id) is None
         if card.entity_type == "flashcards":
             # entity_id is the folder; the payload carries the generated card ids.
             try:
@@ -1230,6 +1259,8 @@ class KojoService:
         card = await repo.get_action_card_owned(card_id, user_id)
         if card is None:
             raise ResourceNotFoundException("ActionCard")
+        if entity_type is not None and entity_id is not None:
+            await self._assert_entity_owned(entity_type, entity_id, user_id, session)
         card.status = status
         card.resolved_at = datetime.utcnow()
         if entity_type is not None:
