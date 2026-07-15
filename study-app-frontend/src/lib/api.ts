@@ -18,6 +18,8 @@ import type {
   Flashcard,
   FlashcardUpdate,
   Folder,
+  KojoActionCard,
+  KojoActionType,
   KojoBootstrap,
   KojoChatResponse,
   KojoConversation,
@@ -107,6 +109,62 @@ type RequestOptions = RequestInit & {
   allowMock?: boolean;
 };
 
+function formatApiErrorDetail(detail: unknown): string {
+  if (typeof detail === "string") {
+    return detail;
+  }
+
+  if (Array.isArray(detail)) {
+    const parts = detail
+      .map((item) => {
+        if (typeof item === "string") {
+          return item;
+        }
+
+        if (item && typeof item === "object") {
+          const record = item as Record<string, unknown>;
+          const loc = Array.isArray(record.loc) ? record.loc.map(String).join(".") : "";
+          const msg = typeof record.msg === "string" ? record.msg : null;
+          if (loc && msg) {
+            return `${loc}: ${msg}`;
+          }
+          if (msg) {
+            return msg;
+          }
+          try {
+            return JSON.stringify(item);
+          } catch {
+            return String(item);
+          }
+        }
+
+        return String(item);
+      })
+      .filter((item) => item.length > 0);
+
+    if (parts.length > 0) {
+      return parts.join("; ");
+    }
+  }
+
+  if (detail && typeof detail === "object") {
+    const record = detail as Record<string, unknown>;
+    if (typeof record.message === "string") {
+      return record.message;
+    }
+    if (typeof record.detail === "string") {
+      return record.detail;
+    }
+    try {
+      return JSON.stringify(detail);
+    } catch {
+      return String(detail);
+    }
+  }
+
+  return String(detail);
+}
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const token = localStorage.getItem(TOKEN_KEY);
   const headers = new Headers(options.headers);
@@ -133,7 +191,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     let message = `Request failed: ${response.status}`;
     try {
       const body = await response.json();
-      if (body?.detail) message = String(body.detail);
+      if (body?.detail !== undefined) message = formatApiErrorDetail(body.detail);
     } catch { /* ignore parse errors */ }
     throw new Error(message);
   }
@@ -624,6 +682,137 @@ export async function kojoChat(
   });
 }
 
+// Consumes a Kojo Server-Sent-Events stream. Calls onDelta for each token
+// chunk as it arrives and resolves with the final KojoChatResponse once the
+// server emits its "done" event. Rejects on an "error" event or transport
+// failure. EventSource can't send the Authorization header, so this uses fetch
+// with a manual ReadableStream reader over the same SSE framing.
+// Handlers for a Kojo stream. Passing a bare function is shorthand for
+// { onDelta }, so existing callers keep working. Set reasoning: true to ask the
+// server for a visible reasoning pass, delivered via onReasoning.
+export type KojoStreamHandlers =
+  | ((delta: string) => void)
+  | {
+      onDelta: (delta: string) => void;
+      onReasoning?: (delta: string) => void;
+      reasoning?: boolean;
+    };
+
+function normalizeHandlers(h: KojoStreamHandlers) {
+  return typeof h === "function" ? { onDelta: h, onReasoning: undefined, reasoning: false } : h;
+}
+
+async function consumeKojoStream(
+  path: string,
+  body: Record<string, unknown>,
+  handlers: KojoStreamHandlers,
+): Promise<KojoChatResponse> {
+  const { onDelta, onReasoning } = normalizeHandlers(handlers);
+  const token = localStorage.getItem(TOKEN_KEY);
+  const headers = new Headers({ "Content-Type": "application/json" });
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok || !response.body) {
+    if (response.status === 401 && token && token !== GUEST_TOKEN) {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
+      window.location.href = "/";
+    }
+    let message = `Request failed: ${response.status}`;
+    try {
+      const errBody = await response.json();
+      if (errBody?.detail !== undefined) message = formatApiErrorDetail(errBody.detail);
+    } catch { /* ignore */ }
+    throw new Error(message);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let done: KojoChatResponse | null = null;
+
+  const handleEvent = (raw: string) => {
+    // Each SSE record is one or more "data:" lines; we emit single-line JSON.
+    const line = raw.split("\n").find((l) => l.startsWith("data:"));
+    if (!line) return;
+    const payload = line.slice(line.indexOf(":") + 1).trim();
+    if (!payload) return;
+    let event: Record<string, unknown>;
+    try {
+      event = JSON.parse(payload);
+    } catch {
+      return;
+    }
+    if (event.type === "delta") {
+      onDelta(String(event.text ?? ""));
+    } else if (event.type === "reasoning") {
+      onReasoning?.(String(event.text ?? ""));
+    } else if (event.type === "done") {
+      done = {
+        response: String(event.response ?? ""),
+        conversation_id: event.conversation_id as ID,
+        message_id: event.message_id as ID,
+        flagged_uncertain: Boolean(event.flagged_uncertain),
+        conversation_name: (event.conversation_name as string | null) ?? null,
+      };
+    } else if (event.type === "error") {
+      throw new Error(String(event.message ?? "Kojo failed to respond. Try again."));
+    }
+  };
+
+  for (;;) {
+    const { value, done: streamDone } = await reader.read();
+    if (streamDone) break;
+    buffer += decoder.decode(value, { stream: true });
+    let sep: number;
+    while ((sep = buffer.indexOf("\n\n")) !== -1) {
+      const raw = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      handleEvent(raw);
+    }
+  }
+  if (buffer.trim()) handleEvent(buffer);
+
+  if (!done) throw new Error("Kojo stream ended before completing. Try again.");
+  return done;
+}
+
+export async function kojoChatStream(
+  folderId: number,
+  message: string,
+  handlers: KojoStreamHandlers,
+  provider?: string,
+  strictness?: string,
+  conversationId?: number,
+): Promise<KojoChatResponse> {
+  const body: Record<string, unknown> = { message };
+  if (provider) body.provider = provider;
+  if (strictness) body.strictness = strictness;
+  if (conversationId !== undefined) body.conversation_id = conversationId;
+  if (typeof handlers === "object" && handlers.reasoning) body.reasoning = true;
+  return consumeKojoStream(`/kojo/folders/${folderId}/chat/stream`, body, handlers);
+}
+
+export async function kojoChatGeneralStream(
+  conversationId: number,
+  message: string,
+  handlers: KojoStreamHandlers,
+  provider?: string,
+  strictness?: string,
+): Promise<KojoChatResponse> {
+  const body: Record<string, unknown> = { message };
+  if (provider) body.provider = provider;
+  if (strictness) body.strictness = strictness;
+  if (typeof handlers === "object" && handlers.reasoning) body.reasoning = true;
+  return consumeKojoStream(`/kojo/conversations/${conversationId}/chat/stream`, body, handlers);
+}
+
 // Single-round-trip initial load for a folder's chat: conversation list plus
 // the most recent conversation's messages and files. Replaces the previous
 // list -> by-id -> files waterfall. The backend auto-creates a conversation
@@ -669,6 +858,16 @@ export async function fetchKojoConversationById(conversationId: number): Promise
 
 export async function deleteKojoConversation(conversationId: number): Promise<void> {
   await request(`/kojo/conversations/${conversationId}`, { method: "DELETE" });
+}
+
+export async function renameKojoConversation(
+  conversationId: number,
+  name: string,
+): Promise<KojoConversationSummary> {
+  return request<KojoConversationSummary>(`/kojo/conversations/${conversationId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ name }),
+  });
 }
 
 export async function listGeneralKojoConversations(): Promise<KojoConversationSummary[]> {
@@ -937,6 +1136,47 @@ export async function kojoTestBlueprint(
   if (provider) body.provider = provider;
   return request<TestBlueprint>(`/kojo/folders/${folderId}/test-blueprint`, {
     method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+// ── Kojo action cards (chat-proposed creations) ──────────────────────────────
+
+export async function proposeKojoAction(
+  conversationId: number,
+  actionType: KojoActionType,
+  message: string,
+  provider?: string,
+  messageId?: number,
+): Promise<KojoActionCard> {
+  const body: Record<string, unknown> = { action_type: actionType, message };
+  if (provider) body.provider = provider;
+  if (messageId !== undefined) body.message_id = messageId;
+  return request<KojoActionCard>(`/kojo/conversations/${conversationId}/action-cards`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchKojoActionCards(conversationId: number): Promise<KojoActionCard[]> {
+  try {
+    return await request<KojoActionCard[]>(`/kojo/conversations/${conversationId}/action-cards`);
+  } catch {
+    return [];
+  }
+}
+
+export async function resolveKojoActionCard(
+  cardId: number,
+  status: "confirmed" | "dismissed",
+  extra?: { entityType?: string; entityId?: number; payload?: Record<string, unknown> },
+): Promise<KojoActionCard> {
+  const body: Record<string, unknown> = { status };
+  if (extra?.entityType) body.entity_type = extra.entityType;
+  if (extra?.entityId !== undefined) body.entity_id = extra.entityId;
+  if (extra?.payload) body.payload = extra.payload;
+  return request<KojoActionCard>(`/kojo/action-cards/${cardId}`, {
+    method: "PATCH",
     body: JSON.stringify(body),
   });
 }

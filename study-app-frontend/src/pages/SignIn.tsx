@@ -1,4 +1,4 @@
-import { ArrowLeft, BookOpen, LogIn, ShieldCheck } from "lucide-react";
+import { ArrowLeft, LogIn, ShieldCheck } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -116,9 +116,8 @@ export default function SignIn() {
         </button>
 
         <div className="landing-brand">
-          <div className="brand-mark">
-            <BookOpen size={25} />
-          </div>
+          {/* The app icon itself, so the sign-in page matches the browser tab */}
+          <span className="brand-mark brand-mark--art" role="img" aria-label="Nosey" />
           <div>
             <h1>Sign in to Nosey</h1>
             <p>Save your notes, tests, and progress across devices.</p>
