@@ -379,6 +379,30 @@ export type KojoMessage = {
   message_type?: KojoMessageType; // frontend-only: distinguishes blueprint messages
   blueprint?: TestBlueprint; // frontend-only: attached to blueprint messages
   blueprint_test_id?: ID; // frontend-only: set after successful generation
+  reasoning?: string; // frontend-only: ephemeral streamed reasoning pass (not persisted)
+  streaming?: boolean; // frontend-only: true while this assistant message is still streaming
+};
+
+export type KojoActionType = "create_folder" | "create_flashcards" | "create_module" | "start_matching";
+
+export type KojoActionCardStatus = "proposed" | "confirmed" | "dismissed";
+
+// Persisted chat action proposal. payload holds the LLM-extracted fields per
+// action type (create_folder: name/subject/description; create_flashcards:
+// title/count/prompt; create_module: module_count/custom_instructions;
+// all types: intro), plus entity_title/flashcard_ids after confirm.
+export type KojoActionCard = {
+  id: ID;
+  conversation_id: ID;
+  message_id?: ID | null;
+  action_type: KojoActionType;
+  status: KojoActionCardStatus;
+  payload: Record<string, unknown>;
+  entity_type?: string | null;
+  entity_id?: ID | null;
+  entity_deleted: boolean;
+  created_at: string;
+  resolved_at?: string | null;
 };
 
 export type KojoConversation = {

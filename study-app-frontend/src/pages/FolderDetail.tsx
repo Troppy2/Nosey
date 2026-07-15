@@ -1,4 +1,5 @@
-import { Archive, BookOpen, Bot, Brain, ChevronDown, ChevronUp, Edit3, Files, FolderOpen, History, Info, Loader2, Plus, RotateCcw, ScrollText, Settings, Trash2, X } from "lucide-react";
+import { Archive, BookOpen, Brain, ChevronDown, ChevronUp, Edit3, Files, FolderOpen, History, Info, Loader2, Plus, RotateCcw, ScrollText, Settings, Trash2, X } from "lucide-react";
+import KojoMascot from "../components/KojoMascot";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -6,10 +7,8 @@ import { Card } from "../components/Card";
 import { ConfirmModal, RenameModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
 import { FileManager } from "../components/FileManager";
-import { KojoChat } from "../components/KojoChat";
-import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
 import { Skeleton, SkeletonTestRows } from "../components/Skeletons";
-import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, getStoredUser, isGuestSession, regenerateTest, reindexFolderFiles, scopeKey, updateFolder, updateTest } from "../lib/api";
+import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, regenerateTest, reindexFolderFiles, scopeKey, updateFolder, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
 import type { AttemptSummary, Flashcard, Folder, TestCreationParams, TestSummary } from "../lib/types";
 
@@ -23,8 +22,6 @@ const PERSONA_DESCRIPTIONS: Record<string, string> = {
 export default function FolderDetail() {
   const { folderId } = useParams();
   const navigate = useNavigate();
-  const guest = isGuestSession();
-  const kojoEnabled = getStoredUser()?.kojo_enabled !== false;
   const [folder, setFolder] = useState<Folder | null>(null);
   const [tests, setTests] = useState<TestSummary[]>([]);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
@@ -33,7 +30,6 @@ export default function FolderDetail() {
   // Bumped to restart the tests load/poll (e.g. after a Retry kicks off a new generation).
   const [testsReloadNonce, setTestsReloadNonce] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [kojoOpen, setKojoOpen] = useState(false);
   const [filesOpen, setFilesOpen] = useState(false);
   const [kojoSettingsOpen, setKojoSettingsOpen] = useState(false);
   const [renamingTest, setRenamingTest] = useState<TestSummary | null>(null);
@@ -280,7 +276,7 @@ export default function FolderDetail() {
   }
 
   const pageContent = (
-    <div className={`page ${kojoOpen ? "page--kojo-open" : ""}`}>
+    <div className="page">
       <header className="page-header">
         <div>
           <span className="eyebrow">{folder?.subject ?? "Folder"}</span>
@@ -290,46 +286,28 @@ export default function FolderDetail() {
         <div className="toolbar">
           <Button
             variant="secondary"
-            icon={<Files size={18} />}
+            icon={<Files size={24} />}
             onClick={() => setFilesOpen(true)}
           >
-            Manage Files
+            Manage Notes
           </Button>
-          {!guest && kojoEnabled ? (
-            <Button
-              variant="secondary"
-              icon={<Bot size={18} />}
-              onClick={() => setKojoOpen((o) => !o)}
-            >
-              {kojoOpen ? "Close Kojo" : "Ask Kojo"}
-            </Button>
-          ) : null}
           <Button
             variant="secondary"
-            icon={kojoSettingsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            icon={kojoSettingsOpen ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
             onClick={() => setKojoSettingsOpen((o) => !o)}
           >
             Folder Settings
           </Button>
-          <Link to={`/flashcards/${id}/review`}>
-            <Button variant="secondary" icon={<Brain size={18} />}>
-              Study Flashcards
-            </Button>
-          </Link>
           <Link to={`/folders/${id}/flashcards/manage`}>
-            <Button variant="secondary" icon={<Settings size={18} />}>
+            <Button variant="secondary" icon={<Settings size={24} />}>
               Manage Flashcards
             </Button>
           </Link>
           <Link to={`/create-test?folderId=${id}`}>
-            <Button icon={<Plus size={18} />}>New Test</Button>
+            <Button icon={<Plus size={24} />}>New Test</Button>
           </Link>
         </div>
       </header>
-
-      {kojoOpen && folder ? (
-        <KojoChat folderId={id} folderName={folder.name} onClose={() => setKojoOpen(false)} />
-      ) : null}
 
       {filesOpen ? (
         <FileManager folderId={id} onClose={() => setFilesOpen(false)} />
@@ -338,7 +316,7 @@ export default function FolderDetail() {
       {kojoSettingsOpen && folder ? (
         <div className="folder-kojo-settings">
           <div className="folder-kojo-settings-header">
-            <Bot size={16} />
+            <KojoMascot state="idle" />
             <span>Kojo Chat Settings</span>
             <span className="muted small">Controls how Kojo behaves with this folder</span>
           </div>
@@ -635,7 +613,7 @@ export default function FolderDetail() {
       })()}
 
       <div className="folder-detail-footer">
-        <FolderOpen size={18} style={{ color: folder?.color ?? "var(--green-dark)" }} />
+        <FolderOpen size={24} style={{ color: folder?.color ?? "var(--green-dark)" }} />
         <span className="muted small">
           {folder?.test_count ?? 0} tests · {folder?.flashcard_count ?? 0} flashcards
         </span>
@@ -675,11 +653,7 @@ export default function FolderDetail() {
 
   return folder ? (
     <>
-      {guest ? pageContent : (
-        <SelectionKojoAssistant folderId={id} folderName={folder.name}>
-          {pageContent}
-        </SelectionKojoAssistant>
-      )}
+      {pageContent}
       {modals}
     </>
   ) : (
@@ -845,7 +819,7 @@ function PromptModal({
             <p className="muted small">{test.title}</p>
           </div>
           <button className="prompt-modal-close" onClick={onClose} type="button" aria-label="Close">
-            <X size={18} />
+            <X size={24} />
           </button>
         </div>
         <div className="prompt-modal-body">

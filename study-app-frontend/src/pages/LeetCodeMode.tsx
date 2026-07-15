@@ -4,7 +4,6 @@ import {
   ArrowRight,
   Binary,
   BookOpen,
-  Bot,
   Braces,
   Calculator,
   CheckCircle2,
@@ -45,6 +44,7 @@ import {
   Archive,
   ArchiveRestore,
 } from "lucide-react";
+import KojoMascot from "../components/KojoMascot";
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MarkdownContent } from "../components/MarkdownContent";
@@ -2848,7 +2848,7 @@ export default function LeetCodeMode() {
             {gradeFeedback && !gradeLoading ? (
               <div className="lc-grade-feedback">
                 <div className="lc-grade-feedback-header">
-                  <Bot size={14} />
+                  <KojoMascot state="idle" />
                   <span>Kojo's feedback</span>
                 </div>
                 <MarkdownContent content={gradeFeedback} />
@@ -2966,7 +2966,7 @@ export default function LeetCodeMode() {
           <div className="lc-kojo-backdrop" onClick={() => { setKojoOpen(false); setKojoResponse(null); }} />
           <div className="lc-kojo-modal">
             <div className="lc-kojo-modal-header">
-              <div className="kojo-avatar"><Bot size={16} /></div>
+              <div className="kojo-avatar"><KojoMascot state={kojoLoading ? "loading" : "idle"} /></div>
               <span><Sparkles size={13} className="kojo-title-icon" /> Ask Kojo for a hint</span>
               <button type="button" className="lc-kojo-close" onClick={() => { setKojoOpen(false); setKojoResponse(null); }} aria-label="Close">
                 <X size={17} />
@@ -2998,7 +2998,7 @@ export default function LeetCodeMode() {
 
             <div className="lc-kojo-modal-footer">
               {kojoLoading ? (
-                <div className="kojo-thinking"><span /><span /><span /></div>
+                <div className="kojo-thinking-mascot"><KojoMascot state="loading" /><span className="kojo-thinking-label">thinking…</span></div>
               ) : (
                 <button type="button" className="button button--primary lc-kojo-send" onClick={() => handleKojoSend()} disabled={!kojoInput.trim()}>
                   <Send size={15} />

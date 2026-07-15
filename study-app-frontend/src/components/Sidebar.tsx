@@ -1,4 +1,4 @@
-import { BookOpen, Brain, ChevronLeft, ChevronRight, Code2, FolderOpen, LayoutDashboard, Menu, MessageCircle, Settings, ShieldCheck, X } from "lucide-react";
+import { Brain, ChevronLeft, ChevronRight, Code2, FolderOpen, LayoutDashboard, Menu, MessageCircle, Settings, ShieldCheck, X } from "lucide-react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { useSettings } from "../lib/useSettings";
@@ -103,9 +103,7 @@ export function Sidebar() {
       {/* Mobile top bar , shown only on phones (<760px) */}
       <div className="mobile-topbar">
         <Link className="brand-lockup brand-link" to="/dashboard" aria-label="Go to dashboard">
-          <div className="brand-mark">
-            <BookOpen size={20} />
-          </div>
+          <span className="brand-mark brand-mark--art" role="img" aria-label="Nosey" />
           <strong>Nosey</strong>
         </Link>
         <button
@@ -136,9 +134,7 @@ export function Sidebar() {
         {/* sidebar-header wraps brand controls; close is hidden on desktop */}
         <div className="sidebar-header">
           <Link className="brand-lockup brand-link" to="/dashboard" aria-label="Go to dashboard" title="Go to dashboard">
-            <div className="brand-mark">
-              <BookOpen size={22} />
-            </div>
+            <span className="brand-mark brand-mark--art" role="img" aria-label="Nosey" />
             <div className="brand-copy">
               <strong>Nosey</strong>
               <span>Study workspace</span>
