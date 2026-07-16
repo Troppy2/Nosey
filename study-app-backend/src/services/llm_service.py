@@ -1996,17 +1996,22 @@ Return only the JSON object."""
     async def _candidate_providers(self, provider: Optional[str] = None) -> list[str]:
         normalized = self._normalize_generation_provider(provider)
 
+        # Order is cost-ascending: the local Ollama model first (free), then the
+        # cheaper paid APIs, and Claude LAST because it is the most expensive.
+        # This ordering is the fallback chain for "auto" AND the tail order when
+        # a specific provider is chosen, so Claude is always the last resort.
         providers: list[str] = []
+
+        status = await self.check_providers_status()
+        if status.get("ollama"):
+            providers.append("ollama")
+
         if settings.groq_api_key:
             providers.append("groq")
         if settings.google_ai_api_key:
             providers.append("gemini")
         if settings.anthropic_api_key:
             providers.append("claude")
-
-        status = await self.check_providers_status()
-        if status.get("ollama"):
-            providers.append("ollama")
 
         if normalized != "auto":
             # Honor the user's explicit pick by trying it first, but DON'T hard-fail if it

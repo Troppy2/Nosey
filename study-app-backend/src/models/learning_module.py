@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import BIGINT_ID, Base, TimestampMixin
@@ -14,14 +14,25 @@ if TYPE_CHECKING:
 class LearningTrack(Base, TimestampMixin):
     """An AI-authored learning track built from a folder's saved notes.
 
-    One track per folder (regenerating replaces it). The track owns up to 20
-    ordered LearningModule rows; generation runs as a detached background task
-    (same pattern as test generation) and fills modules in one by one, so the
-    frontend can poll and show progress while the track builds.
+    A folder has at most one ACTIVE track (regenerating replaces it) plus any
+    number of archived tracks kept for later review. The partial unique index
+    enforces the "one active track per folder" rule while letting archived
+    tracks accumulate. The track owns up to 20 ordered LearningModule rows;
+    generation runs as a detached background task (same pattern as test
+    generation) and fills modules in one by one, so the frontend can poll and
+    show progress while the track builds.
     """
 
     __tablename__ = "learning_tracks"
-    __table_args__ = (UniqueConstraint("folder_id", name="uq_learning_tracks_folder_id"),)
+    __table_args__ = (
+        Index(
+            "uq_learning_tracks_active_folder",
+            "folder_id",
+            unique=True,
+            postgresql_where=text("is_archived = false"),
+            sqlite_where=text("is_archived = 0"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)
     folder_id: Mapped[int] = mapped_column(
@@ -40,6 +51,9 @@ class LearningTrack(Base, TimestampMixin):
     # (e.g. "focus on proofs", "explain like I'm new to the subject"). Stored so
     # a rebuild reuses the same instructions.
     custom_instructions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Soft-archive: an archived track drops out of the folder's active slot
+    # (freeing it for a new build) but is kept so the user can revisit it.
+    is_archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 
     folder: Mapped[Folder] = relationship("Folder")
     modules: Mapped[list[LearningModule]] = relationship(
