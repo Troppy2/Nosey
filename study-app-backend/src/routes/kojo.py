@@ -11,6 +11,7 @@ from src.database import get_session
 from src.dependencies import get_current_user
 from src.models.user import User
 from src.repositories.usage_event_repository import UsageEventRepository
+from src.utils.provider_policy import resolve_request_provider
 from src.schemas.kojo_schema import (
     ConversationFileDTO,
     KojoActionCardDTO,
@@ -101,13 +102,14 @@ async def kojo_chat(
 ) -> KojoChatResponse:
     if user.age is not None and user.age < 15:
         raise HTTPException(status_code=403, detail="Kojo chat is not available for users under 15")
+    provider = resolve_request_provider(user, body.provider)
     _t0 = time.monotonic()
     try:
         result = await KojoService().chat(
             user_id=user.id,
             folder_id=folder_id,
             user_message=body.message,
-            provider=body.provider,
+            provider=provider,
             strictness=body.strictness,
             conversation_id=body.conversation_id,
             session=session,
@@ -115,7 +117,7 @@ async def kojo_chat(
         duration_ms = int((time.monotonic() - _t0) * 1000)
         try:
             await UsageEventRepository(session).log_event(
-                user.id, "kojo_chat", duration_ms, provider=body.provider
+                user.id, "kojo_chat", duration_ms, provider=provider
             )
             await session.commit()
         except Exception:
@@ -127,7 +129,7 @@ async def kojo_chat(
         duration_ms = int((time.monotonic() - _t0) * 1000)
         try:
             await UsageEventRepository(session).log_event(
-                user.id, "kojo_chat", duration_ms, provider=body.provider,
+                user.id, "kojo_chat", duration_ms, provider=provider,
                 success=False, error_type="LLMException"
             )
             await session.commit()
@@ -160,6 +162,8 @@ async def kojo_chat_stream(
     if user.age is not None and user.age < 15:
         raise HTTPException(status_code=403, detail="Kojo chat is not available for users under 15")
 
+    provider = resolve_request_provider(user, body.provider)
+
     async def event_stream() -> AsyncIterator[str]:
         _t0 = time.monotonic()
         success = True
@@ -169,7 +173,7 @@ async def kojo_chat_stream(
                 user_id=user.id,
                 folder_id=folder_id,
                 user_message=body.message,
-                provider=body.provider,
+                provider=provider,
                 strictness=body.strictness,
                 conversation_id=body.conversation_id,
                 reasoning=bool(body.reasoning),
@@ -193,7 +197,7 @@ async def kojo_chat_stream(
             duration_ms = int((time.monotonic() - _t0) * 1000)
             try:
                 await UsageEventRepository(session).log_event(
-                    user.id, "kojo_chat", duration_ms, provider=body.provider,
+                    user.id, "kojo_chat", duration_ms, provider=provider,
                     success=success, error_type=error_type,
                 )
                 await session.commit()
@@ -263,7 +267,7 @@ async def test_blueprint(
             user_id=user.id,
             folder_id=folder_id,
             user_message=body.message,
-            provider=body.provider,
+            provider=resolve_request_provider(user, body.provider),
             session=session,
         )
     except ResourceNotFoundException as exc:
@@ -407,7 +411,7 @@ async def general_chat(
             user_id=user.id,
             conversation_id=conversation_id,
             user_message=body.message,
-            provider=body.provider,
+            provider=resolve_request_provider(user, body.provider),
             strictness=body.strictness,
             session=session,
         )
@@ -427,13 +431,15 @@ async def general_chat_stream(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> StreamingResponse:
+    provider = resolve_request_provider(user, body.provider)
+
     async def event_stream() -> AsyncIterator[str]:
         try:
             async for event in KojoService().general_chat_stream(
                 user_id=user.id,
                 conversation_id=conversation_id,
                 user_message=body.message,
-                provider=body.provider,
+                provider=provider,
                 strictness=body.strictness,
                 reasoning=bool(body.reasoning),
                 session=session,
@@ -466,7 +472,7 @@ async def propose_action_card(
             conversation_id=conversation_id,
             action_type=body.action_type,
             user_message=body.message,
-            provider=body.provider,
+            provider=resolve_request_provider(user, body.provider),
             message_id=body.message_id,
             session=session,
         )

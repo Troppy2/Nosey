@@ -641,6 +641,32 @@ export async function deleteLearningTrack(folderId: number): Promise<void> {
   await request(`/folders/${folderId}/learning-track`, { method: "DELETE" });
 }
 
+// Archives the whole track (freeing the folder's active slot so a new track can
+// be built) or restores it. Restore is refused server-side if an active track
+// already exists.
+export async function archiveLearningTrack(trackId: number, archived: boolean): Promise<LearningTrack> {
+  return request<LearningTrack>(`/learning-tracks/${trackId}/archive`, {
+    method: "PATCH",
+    body: JSON.stringify({ archived }),
+  });
+}
+
+// Archived tracks for a folder (newest first), for the hub's Archived section.
+export async function fetchArchivedTracks(folderId: number): Promise<LearningTrack[]> {
+  return request<LearningTrack[]>(`/folders/${folderId}/learning-tracks/archived`);
+}
+
+// The full track owning a module (active or archived), so the lesson page can
+// render a lesson that belongs to an archived track.
+export async function fetchTrackForModule(moduleId: number): Promise<LearningTrack> {
+  return request<LearningTrack>(`/learning-modules/${moduleId}/track`);
+}
+
+// Permanently deletes a specific track by id (used to purge an archived track).
+export async function deleteTrackById(trackId: number): Promise<void> {
+  await request(`/learning-tracks/${trackId}`, { method: "DELETE" });
+}
+
 // Saves a user-edited lesson; the backend rebuilds the narration script and
 // quiz from it before responding, so this call can take LLM-generation time.
 export async function updateModuleLesson(moduleId: number, lessonContent: string): Promise<LearningModule> {
