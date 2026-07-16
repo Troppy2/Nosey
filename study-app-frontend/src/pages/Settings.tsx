@@ -293,21 +293,27 @@ export default function Settings() {
 
         <h2 className="settings-group-title">AI &amp; models</h2>
 
-        <CollapsibleSection title="LLM model override">
-          <p className="muted small">
-            Choose the default provider Nosey should use for all LLM-powered features.
-          </p>
-          <SelectInput
-            label="Default provider"
-            value={generationProvider}
-            onChange={(event) => handleChangeGenerationProvider(event.target.value)}
-            hint="This setting feeds Create Test, Flashcards, Kojo, and other AI workflows."
-          >
-            {GENERATION_PROVIDER_OPTIONS.filter((option) => option.value !== "claude" || isAdmin).map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </SelectInput>
-        </CollapsibleSection>
+        {/* Model override is a privileged control: only admins and beta users may
+            pick a model. Everyone else is pinned server-side to the automatic
+            chain (Ollama-first, Claude last), so the selector is hidden for them. */}
+        {betaMode ? (
+          <CollapsibleSection title="LLM model override">
+            <p className="muted small">
+              Choose the default provider Nosey should use for all LLM-powered features.
+            </p>
+            <SelectInput
+              label="Default provider"
+              value={generationProvider}
+              onChange={(event) => handleChangeGenerationProvider(event.target.value)}
+              hint="This setting feeds Create Test, Flashcards, Kojo, and other AI workflows."
+            >
+              {/* Admin and beta users get full override, Claude included. */}
+              {GENERATION_PROVIDER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </SelectInput>
+          </CollapsibleSection>
+        ) : null}
 
         <CollapsibleSection title="Question Fallback">
           <p className="muted small">

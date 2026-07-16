@@ -235,6 +235,10 @@ export type LearningTrack = {
   module_count: number;
   custom_instructions?: string | null;
   notes_stale: boolean;
+  // Archived tracks are kept for review but do not occupy the folder's active
+  // slot. The hub lists them under an "Archived" section.
+  is_archived?: boolean;
+  created_at?: string | null;
   modules: LearningModule[];
 };
 

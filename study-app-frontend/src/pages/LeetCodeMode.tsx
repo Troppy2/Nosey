@@ -1712,6 +1712,20 @@ export default function LeetCodeMode() {
 
   function handleMonacoMount(editor: any, monaco: Monaco) {
     editorRef.current = editor;
+
+    // Monaco measures glyph widths at mount using whatever font is available
+    // then. JetBrains Mono loads asynchronously (Google Fonts, display=swap),
+    // so the first measurement uses the fallback font. When the real font
+    // swaps in, the glyphs change width but the cached metrics do not, which
+    // pushes the caret out of alignment. Remeasure once the font is ready.
+    if (typeof document !== "undefined" && document.fonts?.ready) {
+      const remeasure = () => monaco.editor.remeasureFonts();
+      document.fonts.ready.then(remeasure);
+      // Also remeasure if JetBrains Mono finishes loading after fonts.ready
+      // has already resolved (first paint with fallback, swap arrives later).
+      document.fonts.load("14px 'JetBrains Mono'").then(remeasure).catch(() => {});
+    }
+
     monaco.languages.registerDocumentFormattingEditProvider("python", {
       provideDocumentFormattingEdits(model: Monaco['editor']['ITextModel']) {
         const lines = model.getValue().split("\n").map((l: string) => l.trimEnd());
@@ -2944,7 +2958,7 @@ export default function LeetCodeMode() {
                 // otherwise it paints a collapsed black box you cannot type into.
                 automaticLayout: true,
                 fontSize: 14,
-                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                fontFamily: "Menlo, Consolas, 'Cascadia Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
                 minimap: { enabled: false },
                 quickSuggestions: false,
                 suggestOnTriggerCharacters: false,

@@ -17505,42 +17505,11 @@ button.kojo-blueprint-head:hover {
   padding-top: 8px;
 }
 
-/* Learning Modules: archived section (track page) */
-.lm-archive-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  color: var(--ink-soft, #6b7280);
-  padding: 0.35rem;
-  border-radius: 8px;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s ease, background 0.15s ease;
-}
-
-.lm-module-row:hover .lm-archive-btn,
-.lm-archive-btn:focus-visible {
-  opacity: 1;
-}
-
-.lm-module-list--archived .lm-archive-btn {
-  opacity: 1;
-}
-
-.lm-archive-btn:hover {
-  background: rgba(0, 0, 0, 0.06);
-  color: var(--ink);
-}
-
-.lm-archive-btn:disabled {
-  opacity: 0.4;
-  cursor: wait;
-}
-
+/* Learning Modules: archived tracks section (track hub) */
 .lm-archived-section {
-  margin-top: 1.1rem;
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1.1rem;
 }
 
 .lm-archived-toggle {
@@ -17561,27 +17530,55 @@ button.kojo-blueprint-head:hover {
   border-color: var(--green-dark);
 }
 
-.lm-archived-toggle .lm-chevron-open {
+.lm-chevron-open {
   transform: rotate(90deg);
 }
 
+.lm-archived-tracks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+}
+
+.lm-archived-track {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--white);
+  padding: 0.4rem 0.5rem 0.4rem 0.2rem;
+}
+
+.lm-archived-track-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.lm-archived-track-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 0.45rem 0.35rem;
+  text-align: left;
+}
+
+.lm-archived-track-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .lm-module-list--archived {
-  margin-top: 0.7rem;
-}
-
-.lm-module-row.is-archived {
-  opacity: 0.75;
-}
-
-.lm-module-row.is-archived:hover {
-  opacity: 1;
-}
-
-/* Touch devices have no hover: keep the archive button always visible. */
-@media (hover: none) {
-  .lm-archive-btn {
-    opacity: 1;
-  }
+  margin-top: 0.5rem;
+  padding: 0 0.35rem 0.35rem;
 }
 
 /* ── Kojo streaming: staged thinking, typing caret, reasoning ─────────────────

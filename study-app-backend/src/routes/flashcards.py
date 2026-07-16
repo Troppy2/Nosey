@@ -7,6 +7,7 @@ from src.database import get_session
 from src.dependencies import get_current_user
 from src.models.user import User
 from src.repositories.usage_event_repository import UsageEventRepository
+from src.utils.provider_policy import resolve_request_provider
 from src.schemas.flashcard_schema import (
     FlashcardAttemptCreate,
     FlashcardCreate,
@@ -59,6 +60,7 @@ async def generate_flashcards(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> list[FlashcardResponse]:
+    provider = resolve_request_provider(user, data.provider)
     _t0 = time.monotonic()
     try:
         service = FlashcardService()
@@ -69,7 +71,7 @@ async def generate_flashcards(
                 user.id,
                 data.count,
                 session,
-                provider=data.provider,
+                provider=provider,
                 enable_fallback=data.enable_fallback,
             )
         else:
@@ -79,13 +81,13 @@ async def generate_flashcards(
                 data.prompt or "",
                 data.count,
                 session,
-                provider=data.provider,
+                provider=provider,
                 enable_fallback=data.enable_fallback,
             )
         duration_ms = int((time.monotonic() - _t0) * 1000)
         try:
             await UsageEventRepository(session).log_event(
-                user.id, "flashcard_generation", duration_ms, provider=data.provider
+                user.id, "flashcard_generation", duration_ms, provider=provider
             )
             await session.commit()
         except Exception:
@@ -160,7 +162,7 @@ async def generate_flashcards_from_file(
             notes_files,
             count,
             session,
-            provider=provider,
+            provider=resolve_request_provider(user, provider),
             enable_fallback=enable_fallback,
         )
     except ResourceNotFoundException as exc:

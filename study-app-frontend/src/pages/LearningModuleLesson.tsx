@@ -18,7 +18,7 @@ import { InlineLoading, LoadingNotice } from "../components/Loaders";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { SkeletonText } from "../components/Skeletons";
 import {
-  fetchLearningTrack,
+  fetchTrackForModule,
   scopeKey,
   submitModuleQuiz,
   updateModuleLesson,
@@ -306,12 +306,15 @@ export default function LearningModuleLesson() {
   }, [voices]);
 
   useEffect(() => {
-    if (numericFolderId == null) return;
-    fetchLearningTrack(numericFolderId)
+    if (numericModuleId == null) return;
+    // Load the track that owns this module (active OR archived) so lessons from
+    // an archived track still render; fetching by folder returns only the
+    // active track.
+    fetchTrackForModule(numericModuleId)
       .then(setTrack)
       .catch(() => setTrack(null))
       .finally(() => setLoaded(true));
-  }, [numericFolderId]);
+  }, [numericModuleId]);
 
   const module = useMemo(
     () => track?.modules.find((m) => m.id === numericModuleId) ?? null,

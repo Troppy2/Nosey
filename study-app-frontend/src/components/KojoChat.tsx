@@ -42,7 +42,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearNotice, setClearNotice] = useState<string | null>(null);
   const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
-  const { generationProvider } = useSettings();
+  const { generationProvider, betaMode } = useSettings();
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   // Tracks whether the user actually sent a message this session, so the survey
@@ -180,14 +180,17 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
     }
   }
 
-  const modelPicker = (
+  // The model indicator is only meaningful for users who can actually pick a
+  // model (admin/beta). Everyone else is pinned to the automatic chain
+  // server-side, so showing a provider name would be misleading; hide it.
+  const modelPicker = betaMode ? (
     <div className="kojo-model-picker kojo-model-picker--locked" title={`Model: ${PROVIDER_LABELS[generationProvider] ?? generationProvider}`}>
       <span className="kojo-model-btn kojo-model-btn--static">
         {generationProvider in PROVIDER_LABELS ? generationProvider : "auto"}
         {hasProviderWarn ? <span className="kojo-model-warn-dot" /> : null}
       </span>
     </div>
-  );
+  ) : null;
 
   return (
     <>
