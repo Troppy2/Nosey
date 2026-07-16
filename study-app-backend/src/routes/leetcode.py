@@ -36,6 +36,7 @@ from src.schemas.leetcode_schema import (
 )
 from src.services.leetcode_service import LeetCodeService
 from src.utils.exceptions import LLMException, ResourceNotFoundException
+from src.utils.provider_policy import resolve_request_provider
 
 # Last-resort fallback only. The client normally picks the rescue problem (a random
 # unsolved Medium/Hard from the verified + custom catalog) and sends it on create.
@@ -70,7 +71,7 @@ async def kojo_leetcode_hint(
             title=body.title,
             user_message=body.message,
             user_code=body.user_code,
-            provider=body.provider,
+            provider=resolve_request_provider(user, body.provider),
             statement=body.statement,
         )
     except ResourceNotFoundException as exc:
@@ -91,7 +92,7 @@ async def grade_leetcode_submission(
             user_code=body.user_code,
             test_results=body.test_results,
             all_passed=body.all_passed,
-            provider=body.provider,
+            provider=resolve_request_provider(user, body.provider),
             statement=body.statement,
         )
     except ResourceNotFoundException as exc:
@@ -385,7 +386,7 @@ async def generate_custom_problem(
         return await LeetCodeService().generate_custom_problem(
             code=body.code,
             hint=body.hint,
-            provider=body.provider,
+            provider=resolve_request_provider(user, body.provider),
         )
     except LLMException as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc

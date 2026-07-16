@@ -202,6 +202,12 @@ export default function TakeTest() {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
         return; // Don't interfere with typing
       }
+      // Don't interfere with the STEM answer editor: the MathLive <math-field>
+      // web component and the on-screen symbol keyboard are not <input>/<textarea>,
+      // so their arrow keys would otherwise fall through and jump questions.
+      if (event.target instanceof Element && event.target.closest(".math-input-wrap")) {
+        return;
+      }
       if (event.key === "ArrowRight") {
         event.preventDefault();
         setIndex((currentIndex) => {

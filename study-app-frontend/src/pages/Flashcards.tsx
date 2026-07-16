@@ -202,7 +202,6 @@ export default function Flashcards() {
             {folders.map((folder) => (
               <Card key={folder.id} interactive className="folder-card flash-folder-card">
                 <Link className="folder-card-main" to={`/flashcards/${folder.id}`}>
-                  <span className="folder-dot" style={{ background: folder.color ?? "var(--green-dark)" }} />
                   <div>
                     <FolderOpen size={34} style={{ color: folder.color ?? "var(--green-dark)" }} />
                     <h2>{folder.name}</h2>

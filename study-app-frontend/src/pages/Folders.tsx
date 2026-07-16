@@ -212,7 +212,6 @@ function FolderGridCard({
   return (
     <Card interactive className="folder-card">
       <Link className="folder-card-main" to={`/folders/${folder.id}`}>
-        <span className="folder-dot" style={{ background: folder.color ?? "var(--green-dark)" }} />
         <div>
           <FolderOpen size={34} style={{ color: folder.color ?? "var(--green-dark)" }} />
           <h2>{folder.name}</h2>
