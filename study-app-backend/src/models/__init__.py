@@ -21,6 +21,7 @@ from src.models.usage_event import UsageEvent
 from src.models.user import User
 from src.models.user_answer import UserAnswer
 from src.models.user_attempt import UserAttempt
+from src.models.user_memory import UserMemory
 
 __all__ = [
     "Base",
@@ -50,4 +51,5 @@ __all__ = [
     "User",
     "UserAnswer",
     "UserAttempt",
+    "UserMemory",
 ]

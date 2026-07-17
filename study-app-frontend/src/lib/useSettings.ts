@@ -5,7 +5,12 @@ export const SETTINGS_KEYS = {
   questionFallback: "nosey_question_fallback",
   generationProvider: "nosey_generation_provider",
   kojoStrictness: "nosey_kojo_strictness",
+  kojoCustomInstruction: "nosey_kojo_custom_instruction",
 } as const;
+
+// Kojo custom instructions are capped so they can't crowd out the notes context
+// or blow the prompt budget. Enforced on write; the backend clamps again.
+export const KOJO_CUSTOM_INSTRUCTION_MAX = 500;
 
 // Key used by api.ts to store the current user record. Beta access is derived
 // from that record (admin-granted), so we watch it for cross-tab/login changes.
@@ -66,6 +71,9 @@ export function useSettings() {
   const [kojoStrictness, setKojoStrictnessState] = useState(() =>
     readStringSetting(SETTINGS_KEYS.kojoStrictness, "medium"),
   );
+  const [kojoCustomInstruction, setKojoCustomInstructionState] = useState(() =>
+    readStringSetting(SETTINGS_KEYS.kojoCustomInstruction, ""),
+  );
   const [betaMode, setBetaModeState] = useState(deriveBetaAccess);
 
   // Sync state when another instance of useSettings writes a setting.
@@ -79,6 +87,9 @@ export function useSettings() {
       }
       if (e.key === scopeKey(SETTINGS_KEYS.kojoStrictness) && e.newValue !== null) {
         setKojoStrictnessState(e.newValue);
+      }
+      if (e.key === scopeKey(SETTINGS_KEYS.kojoCustomInstruction) && e.newValue !== null) {
+        setKojoCustomInstructionState(e.newValue);
       }
       // Beta access follows the stored user record (admin-granted). Re-derive
       // when it changes in another tab (login/logout or an admin grant picked
@@ -106,6 +117,12 @@ export function useSettings() {
     writeSetting(scopeKey(SETTINGS_KEYS.kojoStrictness), value);
   }
 
+  function setKojoCustomInstruction(value: string) {
+    const clamped = value.slice(0, KOJO_CUSTOM_INSTRUCTION_MAX);
+    setKojoCustomInstructionState(clamped);
+    writeSetting(scopeKey(SETTINGS_KEYS.kojoCustomInstruction), clamped);
+  }
+
   return {
     questionFallbackEnabled,
     setQuestionFallbackEnabled,
@@ -113,6 +130,8 @@ export function useSettings() {
     setGenerationProvider,
     kojoStrictness,
     setKojoStrictness,
+    kojoCustomInstruction,
+    setKojoCustomInstruction,
     betaMode,
   };
 }

@@ -24,6 +24,7 @@ import type {
   KojoChatResponse,
   KojoConversation,
   KojoConversationSummary,
+  KojoMemory,
   LCCustomProblem,
   LCGeneratedCustomProblem,
   LearningModule,
@@ -697,11 +698,13 @@ export async function kojoChat(
   provider?: string,
   strictness?: string,
   conversationId?: number,
+  customInstruction?: string,
 ): Promise<KojoChatResponse> {
   const body: Record<string, unknown> = { message };
   if (provider) body.provider = provider;
   if (strictness) body.strictness = strictness;
   if (conversationId !== undefined) body.conversation_id = conversationId;
+  if (customInstruction) body.custom_instruction = customInstruction;
   return request<KojoChatResponse>(`/kojo/folders/${folderId}/chat`, {
     method: "POST",
     body: JSON.stringify(body),
@@ -732,6 +735,7 @@ async function consumeKojoStream(
   path: string,
   body: Record<string, unknown>,
   handlers: KojoStreamHandlers,
+  signal?: AbortSignal,
 ): Promise<KojoChatResponse> {
   const { onDelta, onReasoning } = normalizeHandlers(handlers);
   const token = localStorage.getItem(TOKEN_KEY);
@@ -742,6 +746,7 @@ async function consumeKojoStream(
     method: "POST",
     headers,
     body: JSON.stringify(body),
+    signal,
   });
 
   if (!response.ok || !response.body) {
@@ -816,13 +821,16 @@ export async function kojoChatStream(
   provider?: string,
   strictness?: string,
   conversationId?: number,
+  customInstruction?: string,
+  signal?: AbortSignal,
 ): Promise<KojoChatResponse> {
   const body: Record<string, unknown> = { message };
   if (provider) body.provider = provider;
   if (strictness) body.strictness = strictness;
   if (conversationId !== undefined) body.conversation_id = conversationId;
+  if (customInstruction) body.custom_instruction = customInstruction;
   if (typeof handlers === "object" && handlers.reasoning) body.reasoning = true;
-  return consumeKojoStream(`/kojo/folders/${folderId}/chat/stream`, body, handlers);
+  return consumeKojoStream(`/kojo/folders/${folderId}/chat/stream`, body, handlers, signal);
 }
 
 export async function kojoChatGeneralStream(
@@ -831,12 +839,34 @@ export async function kojoChatGeneralStream(
   handlers: KojoStreamHandlers,
   provider?: string,
   strictness?: string,
+  customInstruction?: string,
+  signal?: AbortSignal,
 ): Promise<KojoChatResponse> {
   const body: Record<string, unknown> = { message };
   if (provider) body.provider = provider;
   if (strictness) body.strictness = strictness;
+  if (customInstruction) body.custom_instruction = customInstruction;
   if (typeof handlers === "object" && handlers.reasoning) body.reasoning = true;
-  return consumeKojoStream(`/kojo/conversations/${conversationId}/chat/stream`, body, handlers);
+  return consumeKojoStream(`/kojo/conversations/${conversationId}/chat/stream`, body, handlers, signal);
+}
+
+// Regenerate the last assistant answer in a conversation (folder or general).
+// The backend deletes the previous assistant turn and streams a fresh answer to
+// the same prompt, so no duplicate user message is created.
+export async function regenerateKojoStream(
+  conversationId: number,
+  handlers: KojoStreamHandlers,
+  provider?: string,
+  strictness?: string,
+  customInstruction?: string,
+  signal?: AbortSignal,
+): Promise<KojoChatResponse> {
+  const body: Record<string, unknown> = {};
+  if (provider) body.provider = provider;
+  if (strictness) body.strictness = strictness;
+  if (customInstruction) body.custom_instruction = customInstruction;
+  if (typeof handlers === "object" && handlers.reasoning) body.reasoning = true;
+  return consumeKojoStream(`/kojo/conversations/${conversationId}/regenerate/stream`, body, handlers, signal);
 }
 
 // Single-round-trip initial load for a folder's chat: conversation list plus
@@ -913,14 +943,39 @@ export async function kojoChatGeneral(
   message: string,
   provider?: string,
   strictness?: string,
+  customInstruction?: string,
 ): Promise<KojoChatResponse> {
   const body: Record<string, unknown> = { message };
   if (provider) body.provider = provider;
   if (strictness) body.strictness = strictness;
+  if (customInstruction) body.custom_instruction = customInstruction;
   return request<KojoChatResponse>(`/kojo/conversations/${conversationId}/chat`, {
     method: "POST",
     body: JSON.stringify(body),
   });
+}
+
+// Weekly user memory: a short server-generated recap of what the student has
+// been studying. Regenerated on demand when older than ~7 days.
+export async function fetchKojoMemory(): Promise<KojoMemory | null> {
+  try {
+    return await request<KojoMemory>("/kojo/memory");
+  } catch {
+    return null;
+  }
+}
+
+// Regenerate the weekly memory. `force` regenerates even if still fresh (used by
+// the Settings "Regenerate now" button); without it the server only rebuilds a
+// stale memory, so it's cheap to call on entering chat mode.
+export async function refreshKojoMemory(force = false): Promise<KojoMemory | null> {
+  try {
+    return await request<KojoMemory>(`/kojo/memory/refresh${force ? "?force=true" : ""}`, {
+      method: "POST",
+    });
+  } catch {
+    return null;
+  }
 }
 
 export async function gradeLeetCodeSubmission(

@@ -25,7 +25,9 @@ from src.schemas.kojo_schema import (
     KojoClearedConversationDTO,
     KojoConversationDTO,
     KojoConversationSummaryDTO,
+    KojoMemoryDTO,
     KojoRestoreResponse,
+    RegenerateRequest,
     RenameConversationRequest,
     TestBlueprintRequest,
     TestBlueprintResponse,
@@ -33,6 +35,7 @@ from src.schemas.kojo_schema import (
 from src.limiter import limiter
 from src.services.kojo_service import KojoService
 from src.services.llm_service import LLMService
+from src.services.memory_service import MemoryService, is_stale
 from src.utils.exceptions import LLMException, ResourceNotFoundException, ValidationException
 from src.utils.logger import get_logger
 
@@ -112,6 +115,7 @@ async def kojo_chat(
             provider=provider,
             strictness=body.strictness,
             conversation_id=body.conversation_id,
+            custom_instruction=body.custom_instruction,
             session=session,
         )
         duration_ms = int((time.monotonic() - _t0) * 1000)
@@ -177,6 +181,7 @@ async def kojo_chat_stream(
                 strictness=body.strictness,
                 conversation_id=body.conversation_id,
                 reasoning=bool(body.reasoning),
+                custom_instruction=body.custom_instruction,
                 session=session,
             ):
                 yield _sse(event)
@@ -413,6 +418,7 @@ async def general_chat(
             user_message=body.message,
             provider=resolve_request_provider(user, body.provider),
             strictness=body.strictness,
+            custom_instruction=body.custom_instruction,
             session=session,
         )
     except ResourceNotFoundException as exc:
@@ -442,6 +448,7 @@ async def general_chat_stream(
                 provider=provider,
                 strictness=body.strictness,
                 reasoning=bool(body.reasoning),
+                custom_instruction=body.custom_instruction,
                 session=session,
             ):
                 yield _sse(event)
@@ -454,6 +461,94 @@ async def general_chat_stream(
             logger.warning("Kojo general stream unexpected error: %s", exc)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+
+@router.post("/conversations/{conversation_id}/regenerate/stream")
+@limiter.limit("20/minute")
+async def regenerate_stream(
+    request: Request,
+    response: Response,
+    conversation_id: int,
+    body: RegenerateRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> StreamingResponse:
+    if user.age is not None and user.age < 15:
+        raise HTTPException(status_code=403, detail="Kojo chat is not available for users under 15")
+
+    provider = resolve_request_provider(user, body.provider)
+
+    async def event_stream() -> AsyncIterator[str]:
+        _t0 = time.monotonic()
+        success = True
+        error_type = None
+        try:
+            async for event in KojoService().regenerate_stream(
+                user_id=user.id,
+                conversation_id=conversation_id,
+                provider=provider,
+                strictness=body.strictness,
+                reasoning=bool(body.reasoning),
+                custom_instruction=body.custom_instruction,
+                session=session,
+            ):
+                yield _sse(event)
+        except ResourceNotFoundException as exc:
+            success = False
+            error_type = "ResourceNotFoundException"
+            yield _sse({"type": "error", "message": str(exc)})
+        except LLMException as exc:
+            success = False
+            error_type = "LLMException"
+            yield _sse({"type": "error", "message": str(exc)})
+        except Exception as exc:  # noqa: BLE001
+            success = False
+            error_type = "Exception"
+            yield _sse({"type": "error", "message": "Kojo failed to regenerate a response. Try again."})
+            logger.warning("Kojo regenerate stream unexpected error: %s", exc)
+        finally:
+            duration_ms = int((time.monotonic() - _t0) * 1000)
+            try:
+                await UsageEventRepository(session).log_event(
+                    user.id, "kojo_regenerate", duration_ms, provider=provider,
+                    success=success, error_type=error_type,
+                )
+                await session.commit()
+            except Exception:
+                pass
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+
+@router.get("/memory", response_model=KojoMemoryDTO)
+async def get_memory(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> KojoMemoryDTO:
+    memory = await MemoryService().get(user.id, session)
+    return KojoMemoryDTO(
+        content=memory.content if memory else None,
+        generated_at=memory.generated_at if memory else None,
+        stale=is_stale(memory),
+    )
+
+
+@router.post("/memory/refresh", response_model=KojoMemoryDTO)
+@limiter.limit("6/minute")
+async def refresh_memory(
+    request: Request,
+    response: Response,
+    force: bool = False,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> KojoMemoryDTO:
+    provider = resolve_request_provider(user, None)
+    memory = await MemoryService().ensure_fresh(user.id, session, provider=provider, force=force)
+    return KojoMemoryDTO(
+        content=memory.content or None,
+        generated_at=memory.generated_at,
+        stale=is_stale(memory),
+    )
 
 
 @router.post("/conversations/{conversation_id}/action-cards", response_model=KojoActionCardDTO, status_code=201)

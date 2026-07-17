@@ -1,6 +1,7 @@
 import katex from "katex";
 import "katex/dist/katex.min.css";
-import React from "react";
+import { Check, Copy } from "lucide-react";
+import React, { useState } from "react";
 
 // ── KaTeX ─────────────────────────────────────────────────────────────────────
 
@@ -269,9 +270,46 @@ function normalizeFences(raw: string): string {
   return out;
 }
 
+// ── Code block ──────────────────────────────────────────────────────────────
+// A fenced code block with an optional language label and a copy button. The
+// copy button is opt-in (enableCopy) so surfaces like test options stay
+// unchanged; only the chat surface turns it on.
+function CodeBlock({ lang, src, enableCopy }: { lang: string; src: string; enableCopy: boolean }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(src);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable (insecure context or denied) , silently no-op */
+    }
+  }
+
+  const showHead = enableCopy || !!lang;
+
+  return (
+    <pre className="kojo-code-block">
+      {showHead && (
+        <div className="kojo-code-head">
+          {lang && <span className="kojo-code-lang">{lang}</span>}
+          {enableCopy && (
+            <button type="button" className="kojo-code-copy" onClick={copy} aria-label={copied ? "Copied" : "Copy code"}>
+              {copied ? <Check size={13} /> : <Copy size={13} />}
+              {copied ? "Copied" : "Copy"}
+            </button>
+          )}
+        </div>
+      )}
+      <code>{src}</code>
+    </pre>
+  );
+}
+
 // ── Block parser ──────────────────────────────────────────────────────────────
 
-export function MarkdownContent({ content }: { content: string }) {
+export function MarkdownContent({ content, enableCodeCopy = false }: { content: string; enableCodeCopy?: boolean }) {
   // Step 0: reflow malformed code fences onto their own lines
   const fenced = normalizeFences(content);
   // Step 1: extract math into placeholders
@@ -331,12 +369,7 @@ export function MarkdownContent({ content }: { content: string }) {
         else if (expr.startsWith("\\(") && expr.endsWith("\\)")) expr = expr.slice(2, -2).trim();
         nodes.push(<div key={k++} className="math-block" dangerouslySetInnerHTML={{ __html: rkx(expr, true) }} />);
       } else {
-        nodes.push(
-          <pre key={k++} className="kojo-code-block">
-            {lang && <span className="kojo-code-lang">{lang}</span>}
-            <code>{src}</code>
-          </pre>,
-        );
+        nodes.push(<CodeBlock key={k++} lang={lang} src={src} enableCopy={enableCodeCopy} />);
       }
       continue;
     }

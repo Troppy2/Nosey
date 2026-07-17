@@ -12,20 +12,22 @@ import {
   fetchArchivedFolders,
   fetchClearedKojoConversations,
   fetchFlashcards,
+  fetchKojoMemory,
   fetchSlashCommands,
   fetchTests,
   getStoredUser,
   googleSignIn,
   isGuestSession,
+  refreshKojoMemory,
   restoreKojoConversation,
   scopeKey,
   setGoogleSession,
   signOut,
   unarchiveFolder,
 } from "../lib/api";
-import { useSettings } from "../lib/useSettings";
+import { KOJO_CUSTOM_INSTRUCTION_MAX, useSettings } from "../lib/useSettings";
 import { useEffect, useRef, useState } from "react";
-import type { Folder, KojoClearedConversation, SlashCommand } from "../lib/types";
+import type { Folder, KojoClearedConversation, KojoMemory, SlashCommand } from "../lib/types";
 import SlashCommandManager from "../components/SlashCommandManager";
 
 const GENERATION_PROVIDER_OPTIONS = [
@@ -67,8 +69,13 @@ export default function Settings() {
     setGenerationProvider,
     kojoStrictness,
     setKojoStrictness,
+    kojoCustomInstruction,
+    setKojoCustomInstruction,
     betaMode,
   } = useSettings();
+  const [memory, setMemory] = useState<KojoMemory | null>(null);
+  const [loadingMemory, setLoadingMemory] = useState(true);
+  const [refreshingMemory, setRefreshingMemory] = useState(false);
   const ADMIN_EMAILS = ["jamesinah34@gmail.com", "jamesinah883@gmail.com"];
   const isAdmin = !guest && !!user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -86,6 +93,23 @@ export default function Settings() {
     const folders = await fetchArchivedFolders();
     setArchivedFolders(folders);
     setLoadingArchived(false);
+  }
+
+  async function loadMemory() {
+    setLoadingMemory(true);
+    const result = await fetchKojoMemory();
+    setMemory(result);
+    setLoadingMemory(false);
+  }
+
+  async function handleRegenerateMemory() {
+    setRefreshingMemory(true);
+    try {
+      const result = await refreshKojoMemory(true);
+      if (result) setMemory(result);
+    } finally {
+      setRefreshingMemory(false);
+    }
   }
 
   async function handleUnarchive(folderId: number) {
@@ -146,6 +170,12 @@ export default function Settings() {
   useEffect(() => {
     void loadArchivedFolders();
   }, [user?.id]);
+
+  useEffect(() => {
+    if (guest) { setLoadingMemory(false); return; }
+    void loadMemory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, guest]);
 
   useEffect(() => {
     setLoadingSlashCommands(true);
@@ -364,6 +394,70 @@ export default function Settings() {
                     </span>
                   </button>
                 ))}
+              </div>
+            </CollapsibleSection>
+
+            <CollapsibleSection title="Kojo custom instruction">
+              <p className="muted small">
+                A standing instruction Kojo follows in every chat, like "Explain with real-world
+                analogies" or "Keep answers under five sentences." It shapes style and focus but
+                won't override Kojo's grounding in your notes.
+              </p>
+              <textarea
+                className="settings-custom-instruction"
+                value={kojoCustomInstruction}
+                onChange={(e) => setKojoCustomInstruction(e.target.value)}
+                maxLength={KOJO_CUSTOM_INSTRUCTION_MAX}
+                rows={3}
+                placeholder="e.g. Explain things simply and quiz me at the end of each answer."
+              />
+              <div className="settings-custom-instruction-foot">
+                <span className="muted small">
+                  {kojoCustomInstruction.length}/{KOJO_CUSTOM_INSTRUCTION_MAX}
+                </span>
+                {kojoCustomInstruction && (
+                  <button
+                    type="button"
+                    className="settings-inline-clear"
+                    onClick={() => setKojoCustomInstruction("")}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </CollapsibleSection>
+
+            <CollapsibleSection title="Your weekly memory">
+              <p className="muted small">
+                A short recap of what you've been studying, refreshed about once a week. Kojo uses
+                it to remember your work and personalize its answers.
+              </p>
+              {loadingMemory ? (
+                <p className="muted small">Loading your memory...</p>
+              ) : memory?.content ? (
+                <div className="settings-memory-card">
+                  <p className="settings-memory-text">{memory.content}</p>
+                  {memory.generated_at && (
+                    <p className="muted small settings-memory-date">
+                      Updated {new Date(memory.generated_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="muted small">
+                  No memory yet. Take a test, review flashcards, or chat with Kojo, then regenerate it here.
+                </p>
+              )}
+              <div className="settings-reset-row">
+                <button
+                  type="button"
+                  className="settings-secondary-btn"
+                  onClick={handleRegenerateMemory}
+                  disabled={refreshingMemory}
+                >
+                  <RotateCcw size={14} />
+                  {refreshingMemory ? "Regenerating..." : "Regenerate now"}
+                </button>
               </div>
             </CollapsibleSection>
 

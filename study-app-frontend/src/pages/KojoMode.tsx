@@ -5,7 +5,10 @@ import {
   BookOpen,
   Check,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
+  Copy,
   ExternalLink,
   Files,
   FolderOpen,
@@ -15,16 +18,20 @@ import {
   Lightbulb,
   ListChecks,
   Menu,
+  Pencil,
   Puzzle,
   MessageSquarePlus,
   PanelLeftClose,
   PanelLeftOpen,
   Paperclip,
   Plus,
+  RotateCcw,
   Search,
   Sparkles,
+  Square,
   Target,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -59,6 +66,8 @@ import {
   kojoChatGeneralStream,
   kojoTestBlueprint,
   proposeKojoAction,
+  refreshKojoMemory,
+  regenerateKojoStream,
   renameKojoConversation,
   uploadConversationFiles,
 } from "../lib/api";
@@ -159,6 +168,120 @@ function formatFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// Short uppercase type badge for a file (PDF, DOCX, MD, ...), from its type or
+// filename extension.
+function fileBadge(file: ConversationFile): string {
+  const raw = file.file_type || file.file_name.split(".").pop() || "file";
+  return raw.replace(/^\./, "").toUpperCase().slice(0, 4);
+}
+
+// ── Prompt edit history (localStorage) ───────────────────────────────────────
+// When a user edits a prompt and resends it, the resent message keeps a list of
+// its earlier versions so they can be browsed inline. This is a client-side
+// convenience only: it never hits the backend. Shape:
+//   { [conversationId]: { [messageId]: string[] } }
+// where the array is oldest -> newest, last entry being the sent text.
+const PROMPT_VERSIONS_KEY = "nosey_kojo_prompt_versions_v1";
+const MAX_VERSIONS_PER_MSG = 20;
+
+type VersionStore = Record<string, Record<string, string[]>>;
+
+function readVersionStore(): VersionStore {
+  try {
+    const raw = localStorage.getItem(PROMPT_VERSIONS_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? (parsed as VersionStore) : {};
+  } catch {
+    return {};
+  }
+}
+
+function loadConvVersions(conversationId: number): Record<number, string[]> {
+  const conv = readVersionStore()[String(conversationId)] ?? {};
+  const out: Record<number, string[]> = {};
+  for (const [id, versions] of Object.entries(conv)) {
+    if (Array.isArray(versions) && versions.length > 1) out[Number(id)] = versions;
+  }
+  return out;
+}
+
+function saveConvVersion(conversationId: number, messageId: number, versions: string[]) {
+  try {
+    const store = readVersionStore();
+    const key = String(conversationId);
+    const conv = store[key] ?? {};
+    conv[String(messageId)] = versions.slice(-MAX_VERSIONS_PER_MSG);
+    store[key] = conv;
+    localStorage.setItem(PROMPT_VERSIONS_KEY, JSON.stringify(store));
+  } catch {
+    /* storage full or unavailable , history is best-effort */
+  }
+}
+
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ── Composer drafts + last chat location (localStorage) ──────────────────────
+// Unsent text is kept per conversation so switching away and back doesn't lose
+// what you were typing. The last folder/conversation is remembered so reopening
+// chat mode returns you where you left off. Both are client-only conveniences.
+const DRAFT_PREFIX = "nosey_kojo_draft_";
+const LAST_LOCATION_KEY = "nosey_kojo_last_location_v1";
+
+function draftKey(conversationId: number): string {
+  return `${DRAFT_PREFIX}${conversationId}`;
+}
+
+function loadDraft(conversationId: number): string {
+  try {
+    return localStorage.getItem(draftKey(conversationId)) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function saveDraft(conversationId: number, text: string) {
+  try {
+    if (text) localStorage.setItem(draftKey(conversationId), text);
+    else localStorage.removeItem(draftKey(conversationId));
+  } catch {
+    /* storage unavailable , drafts are best-effort */
+  }
+}
+
+type LastLocation = { folderId: number | null; conversationId: number | null };
+
+function loadLastLocation(): LastLocation | null {
+  try {
+    const raw = localStorage.getItem(LAST_LOCATION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") {
+      return {
+        folderId: typeof parsed.folderId === "number" ? parsed.folderId : null,
+        conversationId: typeof parsed.conversationId === "number" ? parsed.conversationId : null,
+      };
+    }
+  } catch {
+    /* ignore malformed value */
+  }
+  return null;
+}
+
+function saveLastLocation(loc: LastLocation) {
+  try {
+    localStorage.setItem(LAST_LOCATION_KEY, JSON.stringify(loc));
+  } catch {
+    /* best-effort */
+  }
 }
 
 // ── Blueprint card ───────────────────────────────────────────────────────────
@@ -315,12 +438,12 @@ function BlueprintCard({ message, folderId, provider, onGenerate, onCancel }: Bl
 
 function updatedLabel(iso: string) {
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-  if (days < 1) return "Updated today";
-  if (days === 1) return "Updated yesterday";
-  if (days < 30) return `Updated ${days} days ago`;
+  if (days < 1) return "Created today";
+  if (days === 1) return "Created yesterday";
+  if (days < 30) return `Created ${days} days ago`;
   const months = Math.floor(days / 30);
-  if (months < 12) return `Updated ${months} ${months === 1 ? "month" : "months"} ago`;
-  return "Updated over a year ago";
+  if (months < 12) return `Created ${months} ${months === 1 ? "month" : "months"} ago`;
+  return "Created over a year ago";
 }
 
 type FolderBrowserProps = {
@@ -445,13 +568,37 @@ type FolderHomeProps = {
   conversations: KojoConversationSummary[];
   files: ConversationFile[];
   disabled: boolean;
+  uploading: boolean;
+  uploadError: string | null;
+  onUpload: (files: FileList | File[]) => void;
   onBack: () => void;
   onOpenConversation: (conv: KojoConversationSummary) => void;
   onStartChat: (text: string) => void;
 };
 
-function FolderHome({ folder, conversations, files, disabled, onBack, onOpenConversation, onStartChat }: FolderHomeProps) {
+const FILE_ACCEPT = ".pdf,.md,.txt,.tex,.html,.docx,.pptx";
+
+function FolderHome({ folder, conversations, files, disabled, uploading, uploadError, onUpload, onBack, onOpenConversation, onStartChat }: FolderHomeProps) {
   const [draft, setDraft] = useState("");
+  const [dragging, setDragging] = useState(false);
+  const filesInputRef = useRef<HTMLInputElement>(null);
+  // Drag enter/leave fire per child element; a depth counter keeps the dropzone
+  // highlight steady instead of flickering as the pointer crosses children.
+  const dragDepthRef = useRef(0);
+
+  const canUpload = !disabled && !uploading;
+
+  function pickFiles() {
+    if (canUpload) filesInputRef.current?.click();
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    dragDepthRef.current = 0;
+    setDragging(false);
+    if (!canUpload) return;
+    if (e.dataTransfer.files?.length) onUpload(e.dataTransfer.files);
+  }
 
   function submit() {
     const text = draft.trim();
@@ -543,21 +690,64 @@ function FolderHome({ folder, conversations, files, disabled, onBack, onOpenConv
             </Link>
           </section>
 
-          <section className="kojo-home-card">
-            <p className="chat-mode-section-label">files</p>
+          <section
+            className={`kojo-home-card kojo-files-card${dragging ? " kojo-files-card--drag" : ""}`}
+            onDragEnter={(e) => { e.preventDefault(); if (!canUpload) return; dragDepthRef.current += 1; setDragging(true); }}
+            onDragOver={(e) => { e.preventDefault(); }}
+            onDragLeave={(e) => { e.preventDefault(); dragDepthRef.current -= 1; if (dragDepthRef.current <= 0) setDragging(false); }}
+            onDrop={handleDrop}
+          >
+            <div className="kojo-files-head">
+              <p className="chat-mode-section-label">files</p>
+              <button
+                type="button"
+                className="kojo-files-add"
+                onClick={pickFiles}
+                disabled={!canUpload}
+                aria-label="Add files"
+                title="Add files"
+              >
+                {uploading ? <span className="loader loader--sm" /> : <Plus size={15} />}
+              </button>
+            </div>
+
+            <input
+              ref={filesInputRef}
+              type="file"
+              multiple
+              accept={FILE_ACCEPT}
+              style={{ display: "none" }}
+              onChange={(e) => {
+                if (e.target.files?.length) onUpload(e.target.files);
+                e.target.value = "";
+              }}
+            />
+
             {files.length === 0 ? (
-              <p className="kojo-home-empty">No files attached to this chat yet.</p>
+              <button type="button" className="kojo-files-drop" onClick={pickFiles} disabled={!canUpload}>
+                <Upload size={18} />
+                <span className="kojo-files-drop-main">
+                  Drop files here or <span className="kojo-files-drop-link">browse</span>
+                </span>
+                <span className="kojo-files-drop-hint">PDF, DOCX, PPTX, MD, TXT</span>
+              </button>
             ) : (
-              files.map((f) => (
-                <div key={f.id} className="chat-mode-doc-row">
-                  <Paperclip size={13} className="chat-mode-doc-icon" />
-                  <span className="chat-mode-doc-info">
-                    <span className="chat-mode-doc-name" title={f.file_name}>{f.file_name}</span>
-                    <span className="chat-mode-doc-meta">{formatFileSize(f.size_bytes)}</span>
-                  </span>
-                </div>
-              ))
+              <div className="kojo-files-list">
+                {files.map((f) => (
+                  <div key={f.id} className="chat-mode-doc-row kojo-file-row">
+                    <Paperclip size={13} className="chat-mode-doc-icon" />
+                    <span className="chat-mode-doc-info">
+                      <span className="chat-mode-doc-name" title={f.file_name}>{f.file_name}</span>
+                      <span className="chat-mode-doc-meta">{formatFileSize(f.size_bytes)}</span>
+                    </span>
+                    <span className="kojo-file-badge">{fileBadge(f)}</span>
+                  </div>
+                ))}
+              </div>
             )}
+
+            {uploadError && <p className="kojo-files-error">{uploadError}</p>}
+            {dragging && <div className="kojo-files-overlay" aria-hidden="true"><Upload size={20} /><span>Drop to add</span></div>}
           </section>
         </aside>
       </div>
@@ -568,7 +758,7 @@ function FolderHome({ folder, conversations, files, disabled, onBack, onOpenConv
 // ── Main page ────────────────────────────────────────────────────────────────
 
 export default function KojoMode() {
-  const { generationProvider, kojoStrictness, betaMode } = useSettings();
+  const { generationProvider, kojoStrictness, kojoCustomInstruction, betaMode } = useSettings();
 
   const storedUser = getStoredUser();
   if (storedUser?.kojo_enabled === false) {
@@ -582,9 +772,19 @@ export default function KojoMode() {
     );
   }
 
+  // Remembered chat location, read once so reopening chat mode lands the user
+  // back in the folder + conversation they left. The conversation id is applied
+  // after its folder's conversation list loads (see the bootstrap effect).
+  const initialLocationRef = useRef<LastLocation | null>(loadLastLocation());
+  const pendingRestoreConvIdRef = useRef<number | null>(
+    initialLocationRef.current?.conversationId ?? null,
+  );
+
   const [folders, setFolders] = useState<Folder[]>([]);
   // null = General mode (no folder), number = specific folder
-  const [folderId, setFolderId] = useState<number | null>(GENERAL_FOLDER_ID);
+  const [folderId, setFolderId] = useState<number | null>(
+    initialLocationRef.current?.folderId ?? GENERAL_FOLDER_ID,
+  );
   const [loadingFolders, setLoadingFolders] = useState(true);
   const [conversations, setConversations] = useState<KojoConversationSummary[]>([]);
   const [conversationId, setConversationId] = useState<number | null>(null);
@@ -611,6 +811,32 @@ export default function KojoMode() {
   const [view, setView] = useState<"chat" | "folders" | "home">("chat");
   // Non-null while the header title is being renamed inline (double-click).
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
+
+  // ── User-bubble actions (copy / edit / retry / version history) ──
+  // Id of the user message copied most recently (drives the transient check).
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+  // Id of the user message being edited inline (null when none).
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  // Earlier versions of resent prompts for the active conversation, keyed by
+  // user message id (oldest -> newest). Hydrated from localStorage.
+  const [promptVersions, setPromptVersions] = useState<Record<number, string[]>>({});
+  // Which version index is currently shown per message (defaults to newest).
+  const [versionView, setVersionView] = useState<Record<number, number>>({});
+
+  // ── Assistant-bubble actions (reload / stop / answer history) ──
+  // Regenerated answer versions keyed by assistant message id (oldest -> newest).
+  // Kept in memory only: the previous answer is deleted server-side on reload, so
+  // the switcher is a within-session comparison aid, not persisted history.
+  const [answerVersions, setAnswerVersions] = useState<Record<number, string[]>>({});
+  const [answerView, setAnswerView] = useState<Record<number, number>>({});
+  // Assistant message id currently being regenerated (shows its loading state).
+  const [regeneratingId, setRegeneratingId] = useState<number | null>(null);
+  // Controller for the in-flight stream, so the send button can stop it.
+  const abortRef = useRef<AbortController | null>(null);
+  // Text queued to send once a freshly created conversation's id is committed to
+  // state (used by the folder-home composer, which starts a brand-new chat).
+  const pendingSendRef = useRef<string | null>(null);
 
   // Persisted chat action cards for the active conversation (beta)
   const [actionCards, setActionCards] = useState<KojoActionCardType[]>([]);
@@ -716,6 +942,23 @@ export default function KojoMode() {
       if (!bootstrap) return;
 
       setConversations(bootstrap.conversations);
+
+      // Restore the exact conversation the user left off in, if it still exists
+      // in this folder. Applied once, then cleared so later folder switches use
+      // the normal "latest conversation" default.
+      const restoreId = pendingRestoreConvIdRef.current;
+      pendingRestoreConvIdRef.current = null;
+      const restoreTarget =
+        restoreId != null ? bootstrap.conversations.find((c) => c.id === restoreId) : undefined;
+
+      if (restoreTarget && (!bootstrap.active || bootstrap.active.id !== restoreTarget.id)) {
+        setConversationId(restoreTarget.id);
+        fetchKojoConversationById(restoreTarget.id).then((c) => { if (c) setMessages(c.messages); });
+        fetchConversationFiles(restoreTarget.id).then(setSessionFiles);
+        fetchKojoActionCards(restoreTarget.id).then(setActionCards);
+        return;
+      }
+
       if (bootstrap.active) {
         setConversationId(bootstrap.active.id);
         setMessages(bootstrap.active.messages);
@@ -731,9 +974,45 @@ export default function KojoMode() {
     inputRef.current?.focus();
   }, [folderId, loadingFolders]);
 
+  // Regenerate the weekly memory if it has gone stale. Fire-and-forget on entry
+  // so it never blocks the chat; the backend no-ops when the memory is fresh.
+  useEffect(() => {
+    if (loadingFolders) return;
+    void refreshKojoMemory();
+  }, [loadingFolders]);
+
+  // Remember the current folder + conversation so reopening chat mode returns
+  // here. Skipped until a conversation is resolved to avoid clobbering the saved
+  // location with a transient null during folder switches.
+  useEffect(() => {
+    if (loadingFolders || conversationId === null) return;
+    saveLastLocation({ folderId, conversationId });
+  }, [folderId, conversationId, loadingFolders]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
+
+  // Hydrate resent-prompt history and the saved composer draft for the active
+  // conversation. Editing state is reset here so a half-typed edit never bleeds
+  // across conversation switches.
+  useEffect(() => {
+    setEditingId(null);
+    setVersionView({});
+    setPromptVersions(conversationId === null ? {} : loadConvVersions(conversationId));
+    setInput(conversationId === null ? "" : loadDraft(conversationId));
+  }, [conversationId]);
+
+  // Flush a queued send once the new conversation's id is live in state, so the
+  // message lands in the just-created chat rather than the previous one.
+  useEffect(() => {
+    if (conversationId !== null && pendingSendRef.current !== null) {
+      const text = pendingSendRef.current;
+      pendingSendRef.current = null;
+      void handleSend(text);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId]);
 
   const selectedFolder = folders.find((f) => f.id === folderId) ?? null;
 
@@ -748,6 +1027,15 @@ export default function KojoMode() {
     () => actionCards.filter((c) => c.status === "confirmed"),
     [actionCards],
   );
+
+  // Reload only makes sense on the newest answer: the backend regenerates the
+  // conversation's last turn, so older bubbles can't be individually reloaded.
+  const lastAssistantId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "assistant") return messages[i].id;
+    }
+    return null;
+  }, [messages]);
 
   // Message stream with action cards merged in at their timestamps. Both sides
   // carry UTC wall-clock ISO strings, so lexicographic comparison is enough.
@@ -836,7 +1124,12 @@ export default function KojoMode() {
 
   // ── Chat flow ──────────────────────────────────────────────────────────────
 
-  async function handleSend(text?: string, display?: string, actionType?: CommandOption["actionType"]) {
+  async function handleSend(
+    text?: string,
+    display?: string,
+    actionType?: CommandOption["actionType"],
+    priorVersions?: string[],
+  ) {
     const msg = (text ?? input).trim();
     if (!msg || isLoading || conversationId === null) return;
 
@@ -872,11 +1165,15 @@ export default function KojoMode() {
       { id: tempId, role: "assistant", content: "", reasoning: "", streaming: true, created_at: new Date().toISOString() },
     ]);
     setInput("");
+    saveDraft(convId, "");
     setClearNotice(null);
     if (inputRef.current) inputRef.current.style.height = "auto";
     setIsLoading(true);
     setStreamingId(tempId);
     setError(null);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     let content = "";
     let reasoning = "";
@@ -897,14 +1194,16 @@ export default function KojoMode() {
       try {
         const handlers = { onDelta, onReasoning, reasoning: true };
         result = isGeneralMode
-          ? await kojoChatGeneralStream(convId, msg, handlers, generationProvider, kojoStrictness)
-          : await kojoChatStream(folderId!, msg, handlers, generationProvider, kojoStrictness, convId);
+          ? await kojoChatGeneralStream(convId, msg, handlers, generationProvider, kojoStrictness, kojoCustomInstruction, controller.signal)
+          : await kojoChatStream(folderId!, msg, handlers, generationProvider, kojoStrictness, convId, kojoCustomInstruction, controller.signal);
       } catch (streamErr) {
+        // User pressed stop: handled in the outer catch, don't retry.
+        if (controller.signal.aborted) throw streamErr;
         // Fall back to the non-streamed endpoint only if nothing streamed yet.
         if (streamedAny) throw streamErr;
         result = isGeneralMode
-          ? await kojoChatGeneral(convId, msg, generationProvider, kojoStrictness)
-          : await kojoChat(folderId!, msg, generationProvider, kojoStrictness, convId);
+          ? await kojoChatGeneral(convId, msg, generationProvider, kojoStrictness, kojoCustomInstruction)
+          : await kojoChat(folderId!, msg, generationProvider, kojoStrictness, convId, kojoCustomInstruction);
       }
 
       const assistantMsg: KojoMessage = {
@@ -914,11 +1213,21 @@ export default function KojoMode() {
         created_at: new Date().toISOString(),
         reasoning: reasoning || undefined,
       };
+      // The real user message id the backend assigns (one before the assistant).
+      const userId = result.message_id - 1;
       setMessages((prev) => [
         ...prev.filter((m) => m.id !== tempId && m.id !== userMsg.id),
-        { ...userMsg, id: result.message_id - 1 },
+        { ...userMsg, id: userId },
         assistantMsg,
       ]);
+
+      // Persist the resent-prompt history against the real message id so the
+      // version switcher survives a reload. Only when this was an edit-resend.
+      if (priorVersions && priorVersions.length > 1) {
+        saveConvVersion(convId, userId, priorVersions);
+        setPromptVersions((prev) => ({ ...prev, [userId]: priorVersions }));
+        setVersionView((prev) => ({ ...prev, [userId]: priorVersions.length - 1 }));
+      }
 
       // Auto-name: update conversation list when server returns a generated name
       if (result.conversation_name) {
@@ -927,13 +1236,36 @@ export default function KojoMode() {
         );
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Kojo failed to respond. Try again.");
-      setMessages((prev) => prev.filter((m) => m.id !== tempId && m.id !== userMsg.id));
+      if (controller.signal.aborted) {
+        // Stopped by the user. Keep whatever streamed so far as the final answer
+        // (the backend rolled this turn back, so it lives only in the UI); drop
+        // the bubble entirely if nothing arrived yet.
+        setMessages((prev) =>
+          content
+            ? prev.map((m) => (m.id === tempId ? { ...m, content, reasoning: reasoning || undefined, streaming: false, stopped: true } : m))
+            : prev.filter((m) => m.id !== tempId),
+        );
+      } else {
+        // Keep the user bubble in place (flagged failed) so a Retry button can
+        // resend it, rather than dropping the message and only showing a banner.
+        setMessages((prev) =>
+          prev
+            .filter((m) => m.id !== tempId)
+            .map((m) => (m.id === userMsg.id ? { ...m, failed: true } : m)),
+        );
+      }
     } finally {
+      abortRef.current = null;
       setStreamingId(null);
       setIsLoading(false);
       inputRef.current?.focus();
     }
+  }
+
+  // Abort the in-flight stream (send or regenerate). The turn's partial output is
+  // kept in the UI; the composer re-enables so a new prompt can be sent.
+  function handleStop() {
+    abortRef.current?.abort();
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -948,9 +1280,165 @@ export default function KojoMode() {
 
   function handleInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     setInput(e.target.value);
+    if (conversationId !== null) saveDraft(conversationId, e.target.value);
     const el = e.target;
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+  }
+
+  // ── User-bubble actions ──────────────────────────────────────────────────
+
+  // Text currently shown for a user message: the selected history version if it
+  // has one, otherwise the message content.
+  function shownVersion(msg: KojoMessage): string {
+    const versions = promptVersions[msg.id];
+    if (!versions || versions.length === 0) return msg.content;
+    const idx = versionView[msg.id] ?? versions.length - 1;
+    return versions[idx] ?? msg.content;
+  }
+
+  async function handleCopyPrompt(msg: KojoMessage) {
+    const ok = await copyToClipboard(shownVersion(msg));
+    if (!ok) return;
+    setCopiedId(msg.id);
+    setTimeout(() => setCopiedId((c) => (c === msg.id ? null : c)), 1500);
+  }
+
+  function handleRetry(msg: KojoMessage) {
+    if (isLoading) return;
+    setMessages((prev) => prev.filter((m) => m.id !== msg.id));
+    void handleSend(msg.content, msg.display);
+  }
+
+  function beginEdit(msg: KojoMessage) {
+    setEditingId(msg.id);
+    setEditDraft(shownVersion(msg));
+  }
+
+  function submitEdit(msg: KojoMessage) {
+    const next = editDraft.trim();
+    setEditingId(null);
+    if (!next || isLoading) return;
+    // Build the version chain: prior history (or the original text) plus the
+    // new text. The resent turn carries the whole chain so it can be browsed.
+    const base = promptVersions[msg.id] ?? [msg.content];
+    const versions = [...base, next];
+    void handleSend(next, undefined, undefined, versions);
+  }
+
+  function stepVersion(id: number, len: number, dir: -1 | 1) {
+    setVersionView((prev) => {
+      const cur = prev[id] ?? len - 1;
+      const nextIdx = Math.min(len - 1, Math.max(0, cur + dir));
+      return { ...prev, [id]: nextIdx };
+    });
+  }
+
+  // ── Assistant-bubble actions ─────────────────────────────────────────────
+
+  // Text currently shown for an assistant answer: the selected regenerated
+  // version if it has one, otherwise the message content.
+  function shownAnswer(msg: KojoMessage): string {
+    const versions = answerVersions[msg.id];
+    if (!versions || versions.length === 0) return msg.content;
+    const idx = answerView[msg.id] ?? versions.length - 1;
+    return versions[idx] ?? msg.content;
+  }
+
+  async function handleCopyAnswer(msg: KojoMessage) {
+    const ok = await copyToClipboard(shownAnswer(msg));
+    if (!ok) return;
+    setCopiedId(msg.id);
+    setTimeout(() => setCopiedId((c) => (c === msg.id ? null : c)), 1500);
+  }
+
+  function stepAnswerVersion(id: number, len: number, dir: -1 | 1) {
+    setAnswerView((prev) => {
+      const cur = prev[id] ?? len - 1;
+      const nextIdx = Math.min(len - 1, Math.max(0, cur + dir));
+      return { ...prev, [id]: nextIdx };
+    });
+  }
+
+  // Regenerate the answer for an assistant message in place. The backend deletes
+  // the prior answer and streams a fresh one; the old answer is retained locally
+  // as a version so the ‹1/2› switcher can compare them within this session.
+  async function handleReloadAnswer(msg: KojoMessage) {
+    if (isLoading || conversationId === null) return;
+    const convId = conversationId;
+    const previous = shownAnswer(msg);
+
+    setRegeneratingId(msg.id);
+    setIsLoading(true);
+    setStreamingId(msg.id);
+    setError(null);
+    setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, content: "", reasoning: "", streaming: true } : m)));
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    let content = "";
+    let reasoning = "";
+    const onDelta = (delta: string) => {
+      content += delta;
+      setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, content } : m)));
+    };
+    const onReasoning = (delta: string) => {
+      reasoning += delta;
+      setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, reasoning } : m)));
+    };
+
+    try {
+      const result = await regenerateKojoStream(
+        convId,
+        { onDelta, onReasoning, reasoning: true },
+        generationProvider,
+        kojoStrictness,
+        kojoCustomInstruction,
+        controller.signal,
+      );
+      const newId = result.message_id;
+      const versions = [...(answerVersions[msg.id] ?? [previous]), result.response];
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === msg.id
+            ? { ...m, id: newId, content: result.response, reasoning: reasoning || undefined, streaming: false }
+            : m,
+        ),
+      );
+      // Move the version history onto the new message id and show the newest.
+      setAnswerVersions((prev) => {
+        const next = { ...prev };
+        delete next[msg.id];
+        next[newId] = versions;
+        return next;
+      });
+      setAnswerView((prev) => {
+        const next = { ...prev };
+        delete next[msg.id];
+        next[newId] = versions.length - 1;
+        return next;
+      });
+    } catch (err) {
+      if (controller.signal.aborted) {
+        // Stopped mid-regenerate: keep the partial if any, else restore the
+        // previous answer so the bubble is never left blank.
+        setMessages((prev) =>
+          prev.map((m) => (m.id === msg.id ? { ...m, content: content || previous, reasoning: reasoning || undefined, streaming: false } : m)),
+        );
+      } else {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === msg.id ? { ...m, content: previous, streaming: false } : m)),
+        );
+        setError(err instanceof Error ? err.message : "Kojo couldn't regenerate that answer. Try again.");
+      }
+    } finally {
+      abortRef.current = null;
+      setRegeneratingId(null);
+      setStreamingId(null);
+      setIsLoading(false);
+      inputRef.current?.focus();
+    }
   }
 
   async function handleClear() {
@@ -1081,9 +1569,27 @@ export default function KojoMode() {
     handleOpenFolder(folder);
   }
 
-  function handleStartChatFromHome(text: string) {
+  // The folder-home composer always opens a brand-new chat: create a fresh
+  // conversation, then send the first message into it (queued until its id is in
+  // state so the message doesn't land in the previously active conversation).
+  async function handleStartChatFromHome(text: string) {
     setView("chat");
-    void handleSend(text);
+    const trimmed = text.trim();
+    if (!trimmed || isLoading) return;
+    if (folderId === null) { void handleSend(trimmed); return; }
+    try {
+      const fresh = await createKojoConversation(folderId);
+      setConversations((prev) => [fresh, ...prev]);
+      setMessages([]);
+      setSessionFiles([]);
+      setActionCards([]);
+      setError(null);
+      setDeletingConvId(null);
+      pendingSendRef.current = trimmed;
+      setConversationId(fresh.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to start new chat.");
+    }
   }
 
   function handleOpenConversationFromHome(conv: KojoConversationSummary) {
@@ -1372,6 +1878,9 @@ export default function KojoMode() {
             conversations={conversations}
             files={sessionFiles}
             disabled={conversationId === null || isLoading}
+            uploading={isUploading}
+            uploadError={uploadError}
+            onUpload={handleUpload}
             onBack={() => setView("folders")}
             onOpenConversation={handleOpenConversationFromHome}
             onStartChat={handleStartChatFromHome}
@@ -1463,6 +1972,10 @@ export default function KojoMode() {
                   // Staged indicator only before any token arrives; once reasoning
                   // streams, its disclosure carries the "thinking" state.
                   const showStaged = awaitingAnswer && !msg.reasoning;
+                  const ansVersions = answerVersions[msg.id];
+                  const hasAnswerVersions = !!ansVersions && ansVersions.length > 1;
+                  const ansIdx = hasAnswerVersions ? (answerView[msg.id] ?? ansVersions!.length - 1) : 0;
+                  const answerText = hasAnswerVersions ? ansVersions![ansIdx] : msg.content;
                   return (
                     <div key={msg.id} className="kojo-message kojo-message--assistant">
                       <div className={`kojo-msg-avatar${awaitingAnswer ? " kojo-msg-avatar--working" : ""}`}>
@@ -1474,15 +1987,106 @@ export default function KojoMode() {
                         )}
                         {msg.content ? (
                           <div className="kojo-answer">
-                            <MarkdownContent content={msg.content} />
+                            <MarkdownContent content={answerText} enableCodeCopy />
                             {isStreaming && <span className="kojo-caret" aria-hidden="true" />}
                           </div>
                         ) : showStaged ? (
                           <KojoStagedThinking />
                         ) : null}
-                        {!isStreaming && (
-                          <span className="kojo-message-time">{formatTime(msg.created_at)}</span>
+                        {!isStreaming && msg.content && (
+                          <div className="kojo-answer-meta">
+                            {hasAnswerVersions && (
+                              <div className="kojo-version-switch" role="group" aria-label="Answer versions">
+                                <button
+                                  type="button"
+                                  onClick={() => stepAnswerVersion(msg.id, ansVersions!.length, -1)}
+                                  disabled={ansIdx === 0}
+                                  aria-label="Previous answer"
+                                >
+                                  <ChevronLeft size={13} />
+                                </button>
+                                <span>{ansIdx + 1}/{ansVersions!.length}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => stepAnswerVersion(msg.id, ansVersions!.length, 1)}
+                                  disabled={ansIdx === ansVersions!.length - 1}
+                                  aria-label="Next answer"
+                                >
+                                  <ChevronRight size={13} />
+                                </button>
+                              </div>
+                            )}
+                            <div className="kojo-answer-actions">
+                              <button
+                                type="button"
+                                className="kojo-user-action"
+                                onClick={() => void handleCopyAnswer(msg)}
+                                aria-label={copiedId === msg.id ? "Copied" : "Copy response"}
+                                title="Copy"
+                              >
+                                {copiedId === msg.id ? <Check size={13} /> : <Copy size={13} />}
+                              </button>
+                              {msg.id === lastAssistantId && !msg.stopped && (
+                                <button
+                                  type="button"
+                                  className="kojo-user-action"
+                                  onClick={() => void handleReloadAnswer(msg)}
+                                  aria-label="Regenerate response"
+                                  title="Regenerate"
+                                  disabled={isLoading}
+                                >
+                                  <RotateCcw size={13} />
+                                </button>
+                              )}
+                            </div>
+                            <span className="kojo-message-time">{formatTime(msg.created_at)}</span>
+                          </div>
                         )}
+                      </div>
+                    </div>
+                  );
+                }
+
+                const versions = promptVersions[msg.id];
+                const hasVersions = !!versions && versions.length > 1;
+                const viewIdx = hasVersions ? (versionView[msg.id] ?? versions!.length - 1) : 0;
+                const bubbleText = hasVersions ? versions![viewIdx] : msg.content;
+                const isEditing = editingId === msg.id;
+                // Command-pill messages (slash actions) hide their raw prompt, so
+                // editing them makes no sense; copy/retry still apply.
+                const canEdit = !msg.display && !msg.failed;
+
+                if (isEditing) {
+                  return (
+                    <div key={msg.id} className="kojo-message kojo-message--user">
+                      <div className="kojo-user-col kojo-user-col--editing">
+                        <div className="kojo-user-edit">
+                          <textarea
+                            className="kojo-user-edit-input"
+                            value={editDraft}
+                            onChange={(e) => setEditDraft(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitEdit(msg); }
+                              if (e.key === "Escape") { e.preventDefault(); setEditingId(null); }
+                            }}
+                            rows={2}
+                            autoFocus
+                            aria-label="Edit prompt"
+                          />
+                          <div className="kojo-user-edit-actions">
+                            <button type="button" className="kojo-user-edit-cancel" onClick={() => setEditingId(null)}>
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              className="kojo-user-edit-send"
+                              onClick={() => submitEdit(msg)}
+                              disabled={!editDraft.trim() || isLoading}
+                            >
+                              Send
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   );
@@ -1491,14 +2095,77 @@ export default function KojoMode() {
                 return (
                   <div key={msg.id} className="kojo-message kojo-message--user">
                     <div className="kojo-user-col">
-                      <div className="kojo-user-bubble">
+                      <div className={`kojo-user-bubble${msg.failed ? " kojo-user-bubble--failed" : ""}`}>
                         {msg.display ? (
                           <span className="kojo-command-pill"><Sparkles size={11} />{msg.display}</span>
                         ) : (
-                          <p>{msg.content}</p>
+                          <p>{bubbleText}</p>
                         )}
                       </div>
-                      <span className="kojo-message-time kojo-message-time--user">{formatTime(msg.created_at)}</span>
+
+                      {msg.failed ? (
+                        <div className="kojo-user-failed" role="alert">
+                          <AlertCircle size={12} />
+                          <span>Couldn't send.</span>
+                          <button
+                            type="button"
+                            className="kojo-user-retry"
+                            onClick={() => handleRetry(msg)}
+                            disabled={isLoading}
+                          >
+                            <RotateCcw size={12} />
+                            Retry
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="kojo-user-meta">
+                          {hasVersions && (
+                            <div className="kojo-version-switch" role="group" aria-label="Prompt versions">
+                              <button
+                                type="button"
+                                onClick={() => stepVersion(msg.id, versions!.length, -1)}
+                                disabled={viewIdx === 0}
+                                aria-label="Previous version"
+                              >
+                                <ChevronLeft size={13} />
+                              </button>
+                              <span>{viewIdx + 1}/{versions!.length}</span>
+                              <button
+                                type="button"
+                                onClick={() => stepVersion(msg.id, versions!.length, 1)}
+                                disabled={viewIdx === versions!.length - 1}
+                                aria-label="Next version"
+                              >
+                                <ChevronRight size={13} />
+                              </button>
+                            </div>
+                          )}
+                          <div className="kojo-user-actions">
+                            <button
+                              type="button"
+                              className="kojo-user-action"
+                              onClick={() => void handleCopyPrompt(msg)}
+                              aria-label={copiedId === msg.id ? "Copied" : "Copy prompt"}
+                              title="Copy"
+                            >
+                              {copiedId === msg.id ? <Check size={13} /> : <Copy size={13} />}
+                            </button>
+                            {canEdit && (
+                              <button
+                                type="button"
+                                className="kojo-user-action"
+                                onClick={() => beginEdit(msg)}
+                                aria-label="Edit prompt"
+                                title="Edit"
+                                disabled={isLoading}
+                              >
+                                <Pencil size={13} />
+                              </button>
+                            )}
+                          </div>
+                          <span className="kojo-message-time kojo-message-time--user">{formatTime(msg.created_at)}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -1630,15 +2297,27 @@ export default function KojoMode() {
                   disabled={isLoading || conversationId === null}
                 />
 
-                <button
-                  className="kojo-send"
-                  onClick={() => handleSend()}
-                  disabled={!input.trim() || isLoading || conversationId === null}
-                  type="button"
-                  aria-label="Send"
-                >
-                  <ArrowUp size={16} />
-                </button>
+                {streamingId !== null ? (
+                  <button
+                    className="kojo-send kojo-send--stop"
+                    onClick={handleStop}
+                    type="button"
+                    aria-label="Stop Kojo"
+                    title="Stop"
+                  >
+                    <Square size={13} />
+                  </button>
+                ) : (
+                  <button
+                    className="kojo-send"
+                    onClick={() => handleSend()}
+                    disabled={!input.trim() || isLoading || conversationId === null}
+                    type="button"
+                    aria-label="Send"
+                  >
+                    <ArrowUp size={16} />
+                  </button>
+                )}
               </div>
             </div>
             <p className="chat-mode-input-hint">↵ send · ⇧↵ new line{!isGeneralMode || betaMode ? " · / for commands" : ""}</p>

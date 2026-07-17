@@ -385,6 +385,16 @@ export type KojoMessage = {
   blueprint_test_id?: ID; // frontend-only: set after successful generation
   reasoning?: string; // frontend-only: ephemeral streamed reasoning pass (not persisted)
   streaming?: boolean; // frontend-only: true while this assistant message is still streaming
+  failed?: boolean; // frontend-only: send failed, bubble kept so the user can retry
+  stopped?: boolean; // frontend-only: stream stopped by the user; turn not persisted server-side
+};
+
+// Weekly server-generated recap of what the student has been studying. `stale`
+// is true when it is older than the refresh window and due for regeneration.
+export type KojoMemory = {
+  content: string | null;
+  generated_at: string | null;
+  stale: boolean;
 };
 
 export type KojoActionType = "create_folder" | "create_flashcards" | "create_module" | "start_matching";
