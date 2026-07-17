@@ -4,7 +4,6 @@ import {
   ArrowRight,
   Binary,
   BookOpen,
-  Bot,
   Braces,
   Calculator,
   CheckCircle2,
@@ -45,6 +44,7 @@ import {
   Archive,
   ArchiveRestore,
 } from "lucide-react";
+import KojoMascot from "../components/KojoMascot";
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MarkdownContent } from "../components/MarkdownContent";
@@ -1712,6 +1712,20 @@ export default function LeetCodeMode() {
 
   function handleMonacoMount(editor: any, monaco: Monaco) {
     editorRef.current = editor;
+
+    // Monaco measures glyph widths at mount using whatever font is available
+    // then. JetBrains Mono loads asynchronously (Google Fonts, display=swap),
+    // so the first measurement uses the fallback font. When the real font
+    // swaps in, the glyphs change width but the cached metrics do not, which
+    // pushes the caret out of alignment. Remeasure once the font is ready.
+    if (typeof document !== "undefined" && document.fonts?.ready) {
+      const remeasure = () => monaco.editor.remeasureFonts();
+      document.fonts.ready.then(remeasure);
+      // Also remeasure if JetBrains Mono finishes loading after fonts.ready
+      // has already resolved (first paint with fallback, swap arrives later).
+      document.fonts.load("14px 'JetBrains Mono'").then(remeasure).catch(() => {});
+    }
+
     monaco.languages.registerDocumentFormattingEditProvider("python", {
       provideDocumentFormattingEdits(model: Monaco['editor']['ITextModel']) {
         const lines = model.getValue().split("\n").map((l: string) => l.trimEnd());
@@ -2848,7 +2862,7 @@ export default function LeetCodeMode() {
             {gradeFeedback && !gradeLoading ? (
               <div className="lc-grade-feedback">
                 <div className="lc-grade-feedback-header">
-                  <Bot size={14} />
+                  <KojoMascot state="idle" />
                   <span>Kojo's feedback</span>
                 </div>
                 <MarkdownContent content={gradeFeedback} />
@@ -2944,7 +2958,7 @@ export default function LeetCodeMode() {
                 // otherwise it paints a collapsed black box you cannot type into.
                 automaticLayout: true,
                 fontSize: 14,
-                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                fontFamily: "Menlo, Consolas, 'Cascadia Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
                 minimap: { enabled: false },
                 quickSuggestions: false,
                 suggestOnTriggerCharacters: false,
@@ -2966,7 +2980,7 @@ export default function LeetCodeMode() {
           <div className="lc-kojo-backdrop" onClick={() => { setKojoOpen(false); setKojoResponse(null); }} />
           <div className="lc-kojo-modal">
             <div className="lc-kojo-modal-header">
-              <div className="kojo-avatar"><Bot size={16} /></div>
+              <div className="kojo-avatar"><KojoMascot state={kojoLoading ? "loading" : "idle"} /></div>
               <span><Sparkles size={13} className="kojo-title-icon" /> Ask Kojo for a hint</span>
               <button type="button" className="lc-kojo-close" onClick={() => { setKojoOpen(false); setKojoResponse(null); }} aria-label="Close">
                 <X size={17} />
@@ -2998,7 +3012,7 @@ export default function LeetCodeMode() {
 
             <div className="lc-kojo-modal-footer">
               {kojoLoading ? (
-                <div className="kojo-thinking"><span /><span /><span /></div>
+                <div className="kojo-thinking-mascot"><KojoMascot state="loading" /><span className="kojo-thinking-label">thinking…</span></div>
               ) : (
                 <button type="button" className="button button--primary lc-kojo-send" onClick={() => handleKojoSend()} disabled={!kojoInput.trim()}>
                   <Send size={15} />

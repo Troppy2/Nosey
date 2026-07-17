@@ -18,6 +18,7 @@ from src.models.learning_module import LearningModule, LearningTrack
 from src.models.user import User
 from src.repositories.usage_event_repository import UsageEventRepository
 from src.schemas.learning_module_schema import (
+    ArchiveTrackRequest,
     CreateLearningTrackRequest,
     LearningModuleResponse,
     LearningTrackResponse,
@@ -31,6 +32,7 @@ from src.services.file_service import FileService
 from src.services.llm_service import LLMService
 from src.utils.exceptions import LLMException, ResourceNotFoundException, StudyAppException
 from src.utils.logger import get_logger
+from src.utils.provider_policy import resolve_request_provider
 
 router = APIRouter(tags=["learning-modules"])
 logger = get_logger(__name__)
@@ -206,6 +208,21 @@ def _module_to_response(module: LearningModule) -> LearningModuleResponse:
     )
 
 
+def _track_to_response(track: LearningTrack, notes_stale: bool = False) -> LearningTrackResponse:
+    return LearningTrackResponse(
+        id=track.id,
+        folder_id=track.folder_id,
+        status=track.status,
+        error=track.error,
+        module_count=track.module_count,
+        custom_instructions=track.custom_instructions,
+        notes_stale=notes_stale,
+        is_archived=track.is_archived,
+        created_at=track.created_at.isoformat() if track.created_at else None,
+        modules=[_module_to_response(m) for m in track.modules],
+    )
+
+
 async def _get_owned_folder(folder_id: int, user_id: int, session: AsyncSession) -> Folder:
     folder = await session.scalar(
         select(Folder).where(Folder.id == folder_id, Folder.user_id == user_id)
@@ -253,13 +270,20 @@ async def create_learning_track(
                 raise StudyAppException(
                     "provider must be auto, groq, google, anthropic, gemini, claude, or ollama"
                 )
+        # Non-admin/non-beta users cannot pick a model: pin to the auto chain
+        # (Ollama-first, Claude last), enforced before the detached build task.
+        provider = resolve_request_provider(user, provider)
 
         custom_instructions = (data.custom_instructions or "").strip()[:10000] or None
 
-        # Rebuild semantics: replace any existing track. Deleting the old row is
-        # also the cancel signal for an in-flight generation (see background task).
+        # Rebuild semantics: replace the folder's ACTIVE track only (archived
+        # tracks are kept). Deleting the old row is also the cancel signal for
+        # an in-flight generation (see background task).
         existing = await session.scalar(
-            select(LearningTrack).where(LearningTrack.folder_id == folder_id)
+            select(LearningTrack).where(
+                LearningTrack.folder_id == folder_id,
+                LearningTrack.is_archived.is_(False),
+            )
         )
         if existing is not None:
             await session.delete(existing)
@@ -286,16 +310,7 @@ async def create_learning_track(
             )
         )
 
-        return LearningTrackResponse(
-            id=track.id,
-            folder_id=folder_id,
-            status="generating",
-            error=None,
-            module_count=data.module_count,
-            custom_instructions=custom_instructions,
-            notes_stale=False,
-            modules=[],
-        )
+        return _track_to_response(track)
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except LLMException as exc:
@@ -314,7 +329,7 @@ async def get_learning_track(
         await _get_owned_folder(folder_id, user.id, session)
         track = await session.scalar(
             select(LearningTrack)
-            .where(LearningTrack.folder_id == folder_id)
+            .where(LearningTrack.folder_id == folder_id, LearningTrack.is_archived.is_(False))
             .options(selectinload(LearningTrack.modules))
         )
         if track is None:
@@ -327,18 +342,97 @@ async def get_learning_track(
             current_notes = await FileService().get_folder_files_content(folder_id, user.id, session)
             notes_stale = bool(current_notes) and _hash_notes(current_notes) != track.notes_hash
 
-        return LearningTrackResponse(
-            id=track.id,
-            folder_id=folder_id,
-            status=track.status,
-            error=track.error,
-            module_count=track.module_count,
-            custom_instructions=track.custom_instructions,
-            notes_stale=notes_stale,
-            modules=[_module_to_response(m) for m in track.modules],
-        )
+        return _track_to_response(track, notes_stale=notes_stale)
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/folders/{folder_id}/learning-tracks/archived", response_model=list[LearningTrackResponse])
+async def list_archived_tracks(
+    folder_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[LearningTrackResponse]:
+    """Archived tracks for a folder, newest first, for the hub's Archived list."""
+    try:
+        await _get_owned_folder(folder_id, user.id, session)
+        tracks = (
+            await session.scalars(
+                select(LearningTrack)
+                .where(LearningTrack.folder_id == folder_id, LearningTrack.is_archived.is_(True))
+                .options(selectinload(LearningTrack.modules))
+                .order_by(LearningTrack.created_at.desc())
+            )
+        ).all()
+        return [_track_to_response(t) for t in tracks]
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/learning-modules/{module_id}/track", response_model=LearningTrackResponse)
+async def get_track_for_module(
+    module_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LearningTrackResponse:
+    """The full track that owns a module, active OR archived. Lets the lesson
+    page render a lesson from an archived track (fetch by folder returns only
+    the active track)."""
+    try:
+        track = await session.scalar(
+            select(LearningTrack)
+            .join(LearningModule, LearningModule.track_id == LearningTrack.id)
+            .join(Folder, Folder.id == LearningTrack.folder_id)
+            .where(LearningModule.id == module_id, Folder.user_id == user.id)
+            .options(selectinload(LearningTrack.modules))
+        )
+        if track is None:
+            raise ResourceNotFoundException("Learning module")
+        return _track_to_response(track)
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.patch("/learning-tracks/{track_id}/archive", response_model=LearningTrackResponse)
+async def set_track_archived(
+    track_id: int,
+    data: ArchiveTrackRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LearningTrackResponse:
+    """Archive a track (freeing the folder's active slot) or restore it.
+
+    Restoring is refused when the folder already has an active track, since a
+    folder can hold only one active track at a time (partial unique index)."""
+    try:
+        track = await session.scalar(
+            select(LearningTrack)
+            .join(Folder, Folder.id == LearningTrack.folder_id)
+            .where(LearningTrack.id == track_id, Folder.user_id == user.id)
+            .options(selectinload(LearningTrack.modules))
+        )
+        if track is None:
+            raise ResourceNotFoundException("Learning track")
+
+        if not data.archived and track.is_archived:
+            active = await session.scalar(
+                select(LearningTrack.id).where(
+                    LearningTrack.folder_id == track.folder_id,
+                    LearningTrack.is_archived.is_(False),
+                )
+            )
+            if active is not None:
+                raise StudyAppException(
+                    "This folder already has an active track. Archive or delete it before restoring."
+                )
+
+        track.is_archived = data.archived
+        await session.commit()
+        return _track_to_response(track)
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except StudyAppException as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.delete("/folders/{folder_id}/learning-track", status_code=status.HTTP_204_NO_CONTENT)
@@ -347,11 +441,35 @@ async def delete_learning_track(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> None:
-    """Delete the folder's track. Doubles as cancel while generation is running."""
+    """Delete the folder's ACTIVE track. Doubles as cancel while generation is
+    running. Archived tracks are deleted via delete_track_by_id."""
     try:
         await _get_owned_folder(folder_id, user.id, session)
         track = await session.scalar(
-            select(LearningTrack).where(LearningTrack.folder_id == folder_id)
+            select(LearningTrack).where(
+                LearningTrack.folder_id == folder_id, LearningTrack.is_archived.is_(False)
+            )
+        )
+        if track is None:
+            raise ResourceNotFoundException("Learning track")
+        await session.delete(track)
+        await session.commit()
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.delete("/learning-tracks/{track_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_track_by_id(
+    track_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> None:
+    """Permanently delete a specific track (used to purge an archived track)."""
+    try:
+        track = await session.scalar(
+            select(LearningTrack)
+            .join(Folder, Folder.id == LearningTrack.folder_id)
+            .where(LearningTrack.id == track_id, Folder.user_id == user.id)
         )
         if track is None:
             raise ResourceNotFoundException("Learning track")

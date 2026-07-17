@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from src.models.conversation_file import ConversationFile
 from src.models.folder import Folder
+from src.models.kojo_action_card import KojoActionCard
 from src.models.kojo_conversation import KojoConversation
 from src.models.kojo_message import KojoMessage
 from src.models.note import Note
@@ -104,6 +105,18 @@ class KojoRepository(BaseRepository[KojoConversation]):
         if conversation and not conversation.name:
             conversation.name = name
             await self.session.flush()
+
+    async def rename_conversation(
+        self, conversation_id: int, user_id: int, name: str
+    ) -> Optional[KojoConversation]:
+        """User-driven rename. Unlike set_conversation_name (the auto-namer, which
+        only fills a blank), this overwrites whatever name is already there."""
+        conversation = await self.get_conversation_by_id(conversation_id, user_id)
+        if conversation is None:
+            return None
+        conversation.name = name
+        await self.session.flush()
+        return conversation
 
     async def get_owned(self, conversation_id: int, user_id: int) -> Optional[KojoConversation]:
         stmt = (
@@ -286,6 +299,45 @@ class KojoRepository(BaseRepository[KojoConversation]):
         for f in result.scalars().all():
             await self.session.delete(f)
         await self.session.flush()
+
+    async def add_action_card(
+        self,
+        conversation_id: int,
+        action_type: str,
+        payload_json: str,
+        message_id: Optional[int] = None,
+    ) -> KojoActionCard:
+        card = KojoActionCard(
+            conversation_id=conversation_id,
+            message_id=message_id,
+            action_type=action_type,
+            status="proposed",
+            payload_json=payload_json,
+        )
+        self.session.add(card)
+        await self.session.flush()
+        return card
+
+    async def get_action_cards(self, conversation_id: int) -> list[KojoActionCard]:
+        stmt = (
+            select(KojoActionCard)
+            .where(KojoActionCard.conversation_id == conversation_id)
+            .order_by(KojoActionCard.created_at)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_action_card_owned(
+        self, card_id: int, user_id: int
+    ) -> Optional[KojoActionCard]:
+        stmt = (
+            select(KojoActionCard)
+            .join(KojoConversation, KojoConversation.id == KojoActionCard.conversation_id)
+            .where(
+                and_(KojoActionCard.id == card_id, KojoConversation.user_id == user_id)
+            )
+        )
+        return await self.session.scalar(stmt)
 
     async def get_cleared_conversations(self, user_id: int) -> list[KojoConversation]:
         cutoff = datetime.utcnow() - timedelta(hours=_CLEAR_WINDOW_HOURS)

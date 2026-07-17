@@ -18,7 +18,7 @@ import { InlineLoading, LoadingNotice } from "../components/Loaders";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { SkeletonText } from "../components/Skeletons";
 import {
-  fetchLearningTrack,
+  fetchTrackForModule,
   scopeKey,
   submitModuleQuiz,
   updateModuleLesson,
@@ -121,6 +121,52 @@ function splitLessonBlocks(markdown: string): string[] {
   }
   if (current.length) blocks.push(current.join("\n"));
   return blocks;
+}
+
+// Content words used to align a spoken-script paragraph with the lesson
+// paragraph it narrates. Short/function words are dropped so the overlap
+// score reflects topic words, which survive the spoken rewrite.
+function contentWords(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 3),
+  );
+}
+
+// Aligns script paragraphs to lesson blocks by word overlap, monotonically:
+// each paragraph maps to the block (at or after the previous match, within a
+// small lookahead window) that shares the most content words with it. This
+// keeps the highlight on the paragraph actually being read even when the
+// script merges headings into prose or skips code blocks, where a
+// proportional index would run ahead.
+function alignParagraphsToBlocks(paragraphs: string[], blocks: string[]): number[] {
+  const blockWords = blocks.map(contentWords);
+  const lookahead = 4;
+  let cursor = 0;
+  return paragraphs.map((paragraph) => {
+    const words = contentWords(paragraph);
+    let best = cursor;
+    let bestScore = 0;
+    const end = Math.min(blocks.length - 1, cursor + lookahead);
+    for (let b = cursor; b <= end; b++) {
+      let score = 0;
+      for (const w of words) if (blockWords[b].has(w)) score++;
+      // Normalize by block size so tiny blocks (headings) don't lose to
+      // long blocks that match a few words by chance.
+      const norm = score / Math.max(1, Math.min(words.size, blockWords[b].size));
+      if (norm > bestScore) {
+        bestScore = norm;
+        best = b;
+      }
+    }
+    // No meaningful overlap (e.g. a transition sentence): stay on the
+    // current block rather than jumping.
+    if (bestScore > 0.15) cursor = best;
+    return cursor;
+  });
 }
 
 // Chrome silently stops long utterances, so the lesson is split into short
@@ -260,12 +306,15 @@ export default function LearningModuleLesson() {
   }, [voices]);
 
   useEffect(() => {
-    if (numericFolderId == null) return;
-    fetchLearningTrack(numericFolderId)
+    if (numericModuleId == null) return;
+    // Load the track that owns this module (active OR archived) so lessons from
+    // an archived track still render; fetching by folder returns only the
+    // active track.
+    fetchTrackForModule(numericModuleId)
       .then(setTrack)
       .catch(() => setTrack(null))
       .finally(() => setLoaded(true));
-  }, [numericFolderId]);
+  }, [numericModuleId]);
 
   const module = useMemo(
     () => track?.modules.find((m) => m.id === numericModuleId) ?? null,
@@ -301,12 +350,12 @@ export default function LearningModuleLesson() {
         .split(/\n\s*\n/)
         .map((p) => markdownToSpeech(p))
         .filter(Boolean);
-      const lastBlock = Math.max(0, lessonBlocks.length - 1);
+      const blockForParagraph =
+        paragraphs.length === lessonBlocks.length
+          ? paragraphs.map((_, i) => i)
+          : alignParagraphsToBlocks(paragraphs, lessonBlocks);
       return paragraphs.flatMap((paragraph, i) => {
-        const blockIndex =
-          paragraphs.length === lessonBlocks.length
-            ? i
-            : Math.min(lastBlock, Math.round((i * lastBlock) / Math.max(1, paragraphs.length - 1)));
+        const blockIndex = blockForParagraph[i] ?? 0;
         return splitForSpeech(paragraph).map((text) => ({ text, blockIndex }));
       });
     }

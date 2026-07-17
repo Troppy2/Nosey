@@ -45,9 +45,7 @@ export default function Landing() {
     <main className="landing">
       <section className="landing-card">
         <div className="landing-brand">
-          <div className="brand-mark">
-            <BookOpen size={25} />
-          </div>
+          <span className="brand-mark brand-mark--art" role="img" aria-label="Nosey" />
           <div>
             <h1>Nosey</h1>
             <p>Free study practice from your own notes.</p>

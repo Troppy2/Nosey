@@ -1,5 +1,7 @@
 import {
   AlertCircle,
+  Archive,
+  ArchiveRestore,
   ArrowLeft,
   BookOpenCheck,
   CheckCircle2,
@@ -21,8 +23,11 @@ import { InlineLoading, LoadingNotice } from "../components/Loaders";
 import { ProgressBar } from "../components/Progress";
 import { SkeletonList } from "../components/Skeletons";
 import {
+  archiveLearningTrack,
   createLearningTrack,
   deleteLearningTrack,
+  deleteTrackById,
+  fetchArchivedTracks,
   fetchFolderFiles,
   fetchLearningTrack,
   uploadFolderFiles,
@@ -48,6 +53,15 @@ export default function LearningModulesPage() {
   const [error, setError] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showRebuildModal, setShowRebuildModal] = useState(false);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
+  // Archived tracks for this folder, listed under a collapsed section at the
+  // bottom of the hub. Each can be viewed, restored, or permanently deleted.
+  const [archivedTracks, setArchivedTracks] = useState<LearningTrack[]>([]);
+  const [showArchived, setShowArchived] = useState(false);
+  // Which archived track's module list is expanded inline for viewing.
+  const [openArchivedId, setOpenArchivedId] = useState<number | null>(null);
+  const [archiveBusy, setArchiveBusy] = useState(false);
+  const [deleteArchivedId, setDeleteArchivedId] = useState<number | null>(null);
   const pollRef = useRef<number | null>(null);
 
   // Direct upload on the setup screen: files are saved into the folder (same
@@ -79,9 +93,19 @@ export default function LearningModulesPage() {
     }
   }, [numericFolderId]);
 
+  const loadArchived = useCallback(async () => {
+    if (numericFolderId == null) return;
+    try {
+      setArchivedTracks(await fetchArchivedTracks(numericFolderId));
+    } catch {
+      /* archived list is non-critical; leave it as-is on failure */
+    }
+  }, [numericFolderId]);
+
   useEffect(() => {
     void loadTrack();
-  }, [loadTrack]);
+    void loadArchived();
+  }, [loadTrack, loadArchived]);
 
   // Poll while generating so modules appear as the background job fills them in.
   useEffect(() => {
@@ -162,6 +186,174 @@ export default function LearningModulesPage() {
       setShowDeleteModal(false);
       setShowRebuildModal(false);
     }
+  }
+
+  // Archive the whole active track: it leaves the active slot (so a new track
+  // can be built) but is kept under the Archived section for later review.
+  async function handleArchiveTrack() {
+    if (track == null || archiveBusy) return;
+    setArchiveBusy(true);
+    setError(null);
+    try {
+      await archiveLearningTrack(track.id, true);
+      setTrack(null);
+      await loadArchived();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not archive the track.");
+    } finally {
+      setArchiveBusy(false);
+      setShowArchiveModal(false);
+    }
+  }
+
+  // Restore an archived track as the folder's active track. Refused server-side
+  // when an active track already exists, so surface that message.
+  async function handleRestoreTrack(trackId: number) {
+    if (archiveBusy) return;
+    setArchiveBusy(true);
+    setError(null);
+    try {
+      const restored = await archiveLearningTrack(trackId, false);
+      setTrack(restored);
+      await loadArchived();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not restore the track.");
+    } finally {
+      setArchiveBusy(false);
+    }
+  }
+
+  async function handleDeleteArchivedTrack(trackId: number) {
+    if (archiveBusy) return;
+    setArchiveBusy(true);
+    setError(null);
+    try {
+      await deleteTrackById(trackId);
+      await loadArchived();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete the archived track.");
+    } finally {
+      setArchiveBusy(false);
+      setDeleteArchivedId(null);
+    }
+  }
+
+  // Archived-tracks section, shown at the bottom of both the setup screen (when
+  // there is no active track) and the active-track screen. Each archived track
+  // expands inline to its module list; modules stay openable so old lessons can
+  // be reviewed. A track can also be restored (if the active slot is free) or
+  // permanently deleted.
+  function renderArchivedTracks() {
+    if (archivedTracks.length === 0) return null;
+    const hasActiveTrack = track != null;
+    return (
+      <div className="lm-archived-section">
+        <button
+          className="lm-archived-toggle"
+          type="button"
+          onClick={() => setShowArchived((v) => !v)}
+          aria-expanded={showArchived}
+        >
+          <Archive size={15} />
+          Archived tracks ({archivedTracks.length})
+          <ChevronRight size={16} className={showArchived ? "lm-chevron-open" : ""} />
+        </button>
+        {showArchived ? (
+          <div className="lm-archived-tracks">
+            {archivedTracks.map((at) => {
+              const open = openArchivedId === at.id;
+              const done = at.modules.filter((m) => m.passed).length;
+              const dateLabel = at.created_at
+                ? new Date(at.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+                : null;
+              return (
+                <div key={at.id} className="lm-archived-track">
+                  <div className="lm-archived-track-head">
+                    <button
+                      type="button"
+                      className="lm-archived-track-toggle"
+                      onClick={() => setOpenArchivedId(open ? null : at.id)}
+                      aria-expanded={open}
+                    >
+                      <ChevronRight size={16} className={open ? "lm-chevron-open" : ""} />
+                      <span className="lm-archived-track-title">
+                        {at.modules.length} module{at.modules.length === 1 ? "" : "s"}
+                        {dateLabel ? ` · ${dateLabel}` : ""}
+                      </span>
+                      <span className="muted small">{done} completed</span>
+                    </button>
+                    <div className="row-actions">
+                      <button
+                        type="button"
+                        className="flash-icon-btn"
+                        aria-label="Restore track"
+                        title={hasActiveTrack ? "Archive your active track first to restore this one" : "Restore track"}
+                        disabled={archiveBusy || hasActiveTrack}
+                        onClick={() => void handleRestoreTrack(at.id)}
+                      >
+                        <ArchiveRestore size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        className="flash-icon-btn flash-icon-btn--danger"
+                        aria-label="Delete archived track"
+                        title="Delete permanently"
+                        disabled={archiveBusy}
+                        onClick={() => setDeleteArchivedId(at.id)}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                  {open ? (
+                    <ol className="lm-module-list lm-module-list--archived">
+                      {at.modules.map((module, index) => (
+                        <li key={module.id}>
+                          {module.ready ? (
+                            <Link
+                              className={`lm-module-row ${module.passed ? "is-passed" : "is-open"}`}
+                              to={`/flashcards/${numericFolderId}/modules/${module.id}`}
+                            >
+                              <span className="lm-module-num">{index + 1}</span>
+                              <span className="lm-module-body">
+                                <span className="lm-module-title">{module.title}</span>
+                                {module.summary ? (
+                                  <span className="lm-module-summary muted">{module.summary}</span>
+                                ) : null}
+                              </span>
+                              <span className="lm-module-state">
+                                {module.passed ? <CheckCircle2 size={20} /> : <ChevronRight size={20} />}
+                              </span>
+                            </Link>
+                          ) : (
+                            <div className="lm-module-row is-locked" aria-disabled="true">
+                              <span className="lm-module-num">{index + 1}</span>
+                              <span className="lm-module-body">
+                                <span className="lm-module-title">{module.title}</span>
+                              </span>
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ol>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+        {deleteArchivedId != null ? (
+          <ConfirmModal
+            title="Delete Archived Track"
+            message="This permanently removes the archived track, its lessons, and quiz progress. This cannot be undone."
+            confirmLabel={archiveBusy ? "Deleting…" : "Delete track"}
+            danger
+            onConfirm={() => void handleDeleteArchivedTrack(deleteArchivedId)}
+            onCancel={() => setDeleteArchivedId(null)}
+          />
+        ) : null}
+      </div>
+    );
   }
 
   if (numericFolderId == null) return <Navigate to="/flashcards" replace />;
@@ -314,6 +506,8 @@ export default function LearningModulesPage() {
             </Button>
           </div>
         </Card>
+
+        {renderArchivedTracks()}
       </div>
     );
   }
@@ -349,6 +543,16 @@ export default function LearningModulesPage() {
               disabled={busy}
             >
               <RefreshCcw size={17} />
+            </button>
+            <button
+              className="flash-icon-btn"
+              onClick={() => setShowArchiveModal(true)}
+              type="button"
+              aria-label="Archive track"
+              title="Archive track"
+              disabled={busy || archiveBusy}
+            >
+              <Archive size={17} />
             </button>
             <button
               className="flash-icon-btn flash-icon-btn--danger"
@@ -479,6 +683,8 @@ export default function LearningModulesPage() {
           ))}
       </ol>
 
+      {renderArchivedTracks()}
+
       {track.status === "ready" && passedCount === track.modules.length && track.modules.length > 0 ? (
         <Card className="lm-done">
           <BookOpenCheck size={34} />
@@ -504,6 +710,15 @@ export default function LearningModulesPage() {
           confirmLabel={busy ? "Rebuilding…" : "Rebuild"}
           onConfirm={() => void handleDelete(true)}
           onCancel={() => setShowRebuildModal(false)}
+        />
+      ) : null}
+      {showArchiveModal ? (
+        <ConfirmModal
+          title="Archive Learning Track"
+          message="This tucks the whole track away under Archived. It keeps your lessons and quiz progress, and frees this folder to build a new track. You can restore or revisit it anytime."
+          confirmLabel={archiveBusy ? "Archiving…" : "Archive track"}
+          onConfirm={() => void handleArchiveTrack()}
+          onCancel={() => setShowArchiveModal(false)}
         />
       ) : null}
     </div>

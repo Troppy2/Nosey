@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from datetime import datetime, timedelta
 
@@ -10,7 +11,9 @@ from src.repositories.attempt_repository import AttemptRepository
 from src.repositories.folder_repository import FolderRepository
 from src.repositories.kojo_repository import KojoRepository
 from src.schemas.kojo_schema import (
+    ACTION_TYPES,
     ConversationFileDTO,
+    KojoActionCardDTO,
     KojoBootstrapDTO,
     KojoChatResponse,
     KojoClearResponse,
@@ -26,7 +29,8 @@ from src.services import kojo_context_cache
 from src.services.file_service import FileService
 from src.services.llm_service import LLMService
 from src.services.rag_service import HybridRAGService
-from src.utils.exceptions import LLMException, ResourceNotFoundException
+from src.utils.exceptions import LLMException, ResourceNotFoundException, ValidationException
+from src.utils.latex_utils import normalize_latex
 from src.utils.logger import get_logger
 from typing import Optional, cast
 
@@ -94,6 +98,175 @@ def _format_wrong_answers_context(wrong_answers_data: list[tuple]) -> str:
                 lines.append(f"Correct Answer: {question.frq_answer.expected_answer}")
 
     return "\n".join(lines)
+
+
+_REASONING_START = "<<<REASONING>>>"
+_REASONING_ANSWER = "<<<ANSWER>>>"
+
+# Analytical / multi-step intents where a reasoning pass earns its extra tokens.
+_REASONING_INTENT_PHRASES = (
+    "how does", "how do", "walk me through", "step by step", "difference between",
+    "compare and contrast", "show that", "work through", "break down",
+    "what happens", "reason through",
+)
+_REASONING_INTENT_WORDS = (
+    "explain", "why", "compare", "contrast", "derive", "prove", "solve",
+    "calculate", "evaluate", "analyze", "analyse", "justify", "elaborate",
+    "summarize", "synthesize",
+)
+
+
+def _reasoning_worthwhile(user_message: str) -> bool:
+    """True when a prompt is complex enough that a reasoning pass helps.
+
+    Simple lookups and short factual questions ("define osmosis", "what is the
+    capital of France") skip reasoning to save tokens and latency; analytical,
+    multi-step, or math prompts get it.
+    """
+    m = user_message.lower()
+    words = re.findall(r"[a-zA-Z]{2,}", m)
+    if len(words) >= 12:
+        return True
+    if any(phrase in m for phrase in _REASONING_INTENT_PHRASES):
+        return True
+    if any(re.search(rf"\b{re.escape(w)}\b", m) for w in _REASONING_INTENT_WORDS):
+        return True
+    # Math-ish: a digit next to an operator, or an operator next to a variable.
+    if re.search(r"\d\s*[-+*/=^]\s*\w", m) or re.search(r"[-+*/=^]\s*[a-zA-Z]", m):
+        return True
+    return False
+
+
+def _wrap_reasoning_prompt(prompt: str) -> str:
+    """Append the reasoning output-format directive to a Kojo prompt.
+
+    The model emits a short thinking pass, then the final answer, split by
+    sentinel markers the streaming splitter uses to route each part to its own
+    channel. The markers are ASCII sentinels the model is very unlikely to
+    produce in normal prose.
+    """
+    return (
+        f"{prompt}\n\n"
+        "OUTPUT FORMAT (follow exactly):\n"
+        f"1. Write the line {_REASONING_START} on its own, then 2 to 4 short sentences "
+        "of your genuine thinking: what the student is really asking, what their notes say, "
+        "and your plan. Keep it brief and plain.\n"
+        f"2. Write the line {_REASONING_ANSWER} on its own, then give ONLY the final answer "
+        "for the student, following all the response guidelines above.\n"
+        f"Use {_REASONING_START} and {_REASONING_ANSWER} exactly once each, nowhere else."
+    )
+
+
+class _ReasoningSplitter:
+    """Routes a Kojo token stream into 'reasoning' and 'answer' channels.
+
+    Text before the ANSWER marker is reasoning; text after it is the answer.
+    Handles markers that arrive split across chunks by holding back a small
+    tail. If the stream ends without an ANSWER marker (model ignored the
+    format), the whole output is promoted to the answer so a response is never
+    lost.
+    """
+
+    def __init__(self) -> None:
+        self.raw = ""
+        self.in_answer = False
+        self._reasoning_emitted = 0
+        self._answer_emitted = 0
+        self.promoted = False
+
+    def _reasoning_visible(self) -> Optional[str]:
+        """Reasoning text with the START marker stripped, or None if we should
+        wait because the START marker may still be arriving."""
+        idx = self.raw.find(_REASONING_START)
+        if idx != -1:
+            return self.raw[idx + len(_REASONING_START):]
+        # START not found yet. If what we have so far is a prefix of the START
+        # marker, hold everything back: the marker is still streaming in.
+        stripped = self.raw.lstrip()
+        if len(stripped) < len(_REASONING_START) and _REASONING_START.startswith(stripped):
+            return None
+        # The marker will never appear at the front: treat all as reasoning.
+        return self.raw
+
+    def feed(self, chunk: str) -> list[tuple[str, str]]:
+        out: list[tuple[str, str]] = []
+        self.raw += chunk
+
+        if not self.in_answer:
+            mark_idx = self.raw.find(_REASONING_ANSWER)
+            if mark_idx == -1:
+                visible = self._reasoning_visible()
+                if visible is None:
+                    return out  # still waiting for the START marker
+                # Hold back a tail that could be the start of the ANSWER marker.
+                hold = len(_REASONING_ANSWER) - 1
+                safe_end = max(0, len(visible) - hold)
+                new = visible[self._reasoning_emitted:safe_end]
+                if new:
+                    out.append(("reasoning", new))
+                    self._reasoning_emitted += len(new)
+                return out
+            # ANSWER marker found: flush remaining reasoning up to it, then switch.
+            region = self.raw[:mark_idx]
+            start_idx = region.find(_REASONING_START)
+            visible = region[start_idx + len(_REASONING_START):] if start_idx != -1 else region
+            new = visible[self._reasoning_emitted:]
+            if new:
+                out.append(("reasoning", new))
+                self._reasoning_emitted += len(new)
+            self.in_answer = True
+
+        mark_idx = self.raw.find(_REASONING_ANSWER)
+        answer_region = self.raw[mark_idx + len(_REASONING_ANSWER):]
+        new = answer_region[self._answer_emitted:]
+        if new:
+            out.append(("answer", new))
+            self._answer_emitted += len(new)
+        return out
+
+    def flush(self) -> list[tuple[str, str]]:
+        out: list[tuple[str, str]] = []
+        if not self.in_answer:
+            # No answer marker ever arrived: emit remaining reasoning, then
+            # promote the whole thing to the answer so a response is never lost.
+            idx = self.raw.find(_REASONING_START)
+            visible = self.raw[idx + len(_REASONING_START):] if idx != -1 else self.raw
+            new = visible[self._reasoning_emitted:]
+            if new:
+                out.append(("reasoning", new))
+                self._reasoning_emitted += len(new)
+            self.promoted = True
+            out.append(("answer", visible))
+            self._answer_emitted = len(visible)
+        return out
+
+
+async def _stream_answer(llm, prompt: str, provider, reasoning: bool, answer_chunks: list):
+    """Stream a Kojo response, optionally splitting a reasoning pass first.
+
+    Appends answer text to answer_chunks (so the caller can persist the final
+    message) and yields {"type": "reasoning"|"delta", "text": str} events.
+    """
+    if reasoning:
+        wrapped = _wrap_reasoning_prompt(prompt)
+        splitter = _ReasoningSplitter()
+        async for chunk in llm.stream_kojo(wrapped, provider=provider):
+            for channel, text in splitter.feed(chunk):
+                if channel == "reasoning":
+                    yield {"type": "reasoning", "text": text}
+                else:
+                    answer_chunks.append(text)
+                    yield {"type": "delta", "text": text}
+        for channel, text in splitter.flush():
+            if channel == "reasoning":
+                yield {"type": "reasoning", "text": text}
+            else:
+                answer_chunks.append(text)
+                yield {"type": "delta", "text": text}
+    else:
+        async for chunk in llm.stream_kojo(prompt, provider=provider):
+            answer_chunks.append(chunk)
+            yield {"type": "delta", "text": chunk}
 
 
 class KojoService:
@@ -173,6 +346,69 @@ class KojoService:
             flagged_uncertain=False,
             conversation_name=auto_name,
         )
+
+    async def general_chat_stream(
+        self,
+        user_id: int,
+        conversation_id: int,
+        user_message: str,
+        session: AsyncSession,
+        provider: Optional[str] = None,
+        strictness: Optional[str] = "medium",
+        reasoning: bool = False,
+    ):
+        """Streaming variant of general_chat.
+
+        Yields event dicts: {"type": "delta", "text": str} as answer tokens
+        arrive (and {"type": "reasoning", ...} when reasoning is enabled), then
+        a final {"type": "done", ...} carrying the persisted message id and the
+        normalized answer. The saved message is the answer only, identical to
+        what general_chat would have stored.
+        """
+        repo = KojoRepository(session)
+        conversation = await repo.get_conversation_by_id(conversation_id, user_id)
+        if conversation is None:
+            raise ResourceNotFoundException("Conversation")
+
+        session_files = await repo.get_conversation_files(conversation.id)
+        session_files_content = "\n\n---\n\n".join(
+            f"[Session upload: {f.file_name}]\n{f.content}" for f in session_files if f.content
+        )
+        notes_context = session_files_content if session_files_content else _NO_NOTES
+
+        await repo.add_message(conversation.id, "user", user_message)
+        history = await repo.get_history(conversation.id, limit=10, after=conversation.cleared_at)
+        prompt = _build_prompt(notes_context, user_message, history, strictness=strictness or "medium")
+
+        llm = LLMService()
+        answer_chunks: list[str] = []
+        use_reasoning = reasoning and _reasoning_worthwhile(user_message)
+        try:
+            async for event in _stream_answer(llm, prompt, provider, use_reasoning, answer_chunks):
+                yield event
+        except Exception as exc:
+            logger.warning("Kojo general stream LLM call failed: %s", exc)
+            raise LLMException("Kojo failed to generate a response. Try again.") from exc
+
+        kojo_response = normalize_latex("".join(answer_chunks)).strip()
+        kojo_msg = await repo.add_message(conversation.id, "assistant", kojo_response)
+
+        auto_name: Optional[str] = None
+        if conversation.name is None:
+            raw = user_message.strip()
+            auto_name = (raw[:57] + "…") if len(raw) > 60 else raw
+            await repo.set_conversation_name(conversation.id, auto_name)
+
+        await session.commit()
+
+        yield {
+            "type": "done",
+            "response": kojo_response,
+            "conversation_id": conversation.id,
+            "message_id": kojo_msg.id,
+            "flagged_uncertain": False,
+            "conversation_name": auto_name,
+        }
 
     async def create_conversation(
         self,
@@ -438,6 +674,136 @@ class KojoService:
             conversation_name=auto_name,
         )
 
+    async def chat_stream(
+        self,
+        user_id: int,
+        folder_id: int,
+        user_message: str,
+        session: AsyncSession,
+        provider: Optional[str] = None,
+        strictness: Optional[str] = "medium",
+        conversation_id: Optional[int] = None,
+        reasoning: bool = False,
+    ):
+        """Streaming variant of chat().
+
+        Yields {"type": "delta", "text": str} events as tokens arrive, then a
+        {"type": "done", ...} event. The persisted assistant message is
+        identical to the non-streamed path. The map-reduce long-answer path and
+        the "no wrong answers" early return are not token-streamed (they have no
+        single underlying stream); they emit their full text as one delta so the
+        frontend consumes every entry point through the same code path.
+        """
+        repo = KojoRepository(session)
+
+        folder = await FolderRepository(session).get_owned(folder_id, user_id)
+        if folder is None:
+            raise ResourceNotFoundException("Folder")
+
+        if conversation_id is not None:
+            conversation = await repo.get_conversation_by_id(conversation_id, user_id)
+            if conversation is None:
+                raise ResourceNotFoundException("Conversation")
+        else:
+            conversation = await repo.get_or_create_conversation(user_id, folder_id)
+
+        folder_context, cache_hit = await kojo_context_cache.get_folder_context(
+            folder_id, user_id, session
+        )
+        session_files = await repo.get_conversation_files(conversation.id)
+        session_files_content = "\n\n---\n\n".join(
+            f"[Session upload: {f.file_name}]\n{f.content}" for f in session_files if f.content
+        )
+        context_parts = [part for part in (folder_context, session_files_content) if part]
+        notes_context = "\n\n---\n\n".join(context_parts) if context_parts else _NO_NOTES
+
+        # Prebuilt full text for the non-token-streamed branches.
+        prebuilt: Optional[str] = None
+        prompt: Optional[str] = None
+
+        if _is_review_wrong_answers_request(user_message):
+            wrong_answers_result = await AttemptRepository(session).get_recent_wrong_answers(user_id)
+            if wrong_answers_result:
+                _attempt, wrong_answers_data = wrong_answers_result
+                await repo.add_message(conversation.id, "user", user_message)
+                history = await repo.get_history(conversation.id, limit=10, after=conversation.cleared_at)
+                wrong_answers_context = _format_wrong_answers_context(wrong_answers_data)
+                prompt = _build_review_wrong_answers_prompt(notes_context, wrong_answers_context, user_message, history)
+            else:
+                await repo.add_message(conversation.id, "user", user_message)
+                prebuilt = "You don't have any wrong answers from your most recent test to review. Keep practicing!"
+        else:
+            await repo.add_message(conversation.id, "user", user_message)
+            history = await repo.get_history(conversation.id, limit=10, after=conversation.cleared_at)
+            prompt = _build_prompt(notes_context, user_message, history, strictness=strictness or "medium")
+
+        llm = LLMService()
+        kojo_strictness = _normalize_strictness(strictness)
+        use_map_reduce = (
+            prebuilt is None
+            and notes_context != _NO_NOTES
+            and len(notes_context) >= _MAP_REDUCE_NOTES_MIN_CHARS
+            and _is_long_answer_request(user_message)
+            and not _is_review_wrong_answers_request(user_message)
+        )
+
+        answer_chunks: list[str] = []
+        try:
+            if prebuilt is not None:
+                # Fixed string (no wrong answers to review); not token-streamed.
+                kojo_response = prebuilt
+                yield {"type": "delta", "text": prebuilt}
+            elif use_map_reduce:
+                # Multi-call synthesis has no single stream; emit as one delta.
+                history_block = _build_history_block(history)
+                full = await llm.map_reduce_long_answer(
+                    notes=notes_context,
+                    user_query=user_message,
+                    history_block=history_block,
+                    provider=provider,
+                    strictness=kojo_strictness,
+                )
+                kojo_response = full
+                yield {"type": "delta", "text": full}
+            else:
+                use_reasoning = reasoning and _reasoning_worthwhile(user_message)
+                async for event in _stream_answer(llm, str(prompt), provider, use_reasoning, answer_chunks):
+                    yield event
+                kojo_response = normalize_latex("".join(answer_chunks)).strip()
+        except Exception as exc:
+            logger.warning("Kojo stream LLM call failed: %s", exc)
+            raise LLMException("Kojo failed to generate a response. Try again.") from exc
+
+        flagged = (
+            "can't help" in kojo_response.lower()
+            or "cannot help" in kojo_response.lower()
+            or "not covered in your" in kojo_response.lower()
+        )
+
+        kojo_msg = await repo.add_message(conversation.id, "assistant", kojo_response)
+
+        auto_name: Optional[str] = None
+        if conversation.name is None:
+            raw = user_message.strip()
+            auto_name = (raw[:57] + "…") if len(raw) > 60 else raw
+            await repo.set_conversation_name(conversation.id, auto_name)
+
+        await session.commit()
+
+        logger.info(
+            "Kojo chat stream completed",
+            extra={"user_id": user_id, "conversation_id": conversation.id, "context_cache_hit": cache_hit},
+        )
+
+        yield {
+            "type": "done",
+            "response": kojo_response,
+            "conversation_id": conversation.id,
+            "message_id": kojo_msg.id,
+            "flagged_uncertain": flagged,
+            "conversation_name": auto_name,
+        }
+
     async def get_conversation_detail(
         self,
         user_id: int,
@@ -471,6 +837,21 @@ class KojoService:
         if not deleted:
             raise ResourceNotFoundException("Conversation")
         await session.commit()
+
+    async def rename_conversation(
+        self,
+        user_id: int,
+        conversation_id: int,
+        name: str,
+        session: AsyncSession,
+    ) -> KojoConversationSummaryDTO:
+        conversation = await KojoRepository(session).rename_conversation(
+            conversation_id, user_id, name.strip()
+        )
+        if conversation is None:
+            raise ResourceNotFoundException("Conversation")
+        await session.commit()
+        return KojoConversationSummaryDTO.model_validate(conversation)
 
     async def get_conversation(
         self,
@@ -709,6 +1090,192 @@ class KojoService:
             provider=provider,
         )
         return TestBlueprintResponse(**result)
+
+    # ── Action cards (chat-proposed creations) ──────────────────────────────
+
+    def _action_card_dto(self, card, entity_deleted: bool = False) -> KojoActionCardDTO:
+        try:
+            payload = json.loads(card.payload_json or "{}")
+        except (TypeError, ValueError):
+            payload = {}
+        return KojoActionCardDTO(
+            id=card.id,
+            conversation_id=card.conversation_id,
+            message_id=card.message_id,
+            action_type=card.action_type,
+            status=card.status,
+            payload=payload,
+            entity_type=card.entity_type,
+            entity_id=card.entity_id,
+            entity_deleted=entity_deleted,
+            created_at=card.created_at,
+            resolved_at=card.resolved_at,
+        )
+
+    async def propose_action(
+        self,
+        user_id: int,
+        conversation_id: int,
+        action_type: str,
+        user_message: str,
+        session: AsyncSession,
+        provider: Optional[str] = None,
+        message_id: Optional[int] = None,
+    ) -> KojoActionCardDTO:
+        if action_type not in ACTION_TYPES:
+            raise ValidationException(f"Unknown action type: {action_type}")
+        repo = KojoRepository(session)
+        conversation = await repo.get_conversation_by_id(conversation_id, user_id)
+        if conversation is None:
+            raise ResourceNotFoundException("Conversation")
+
+        if action_type == "start_matching":
+            # Pure navigation: no LLM extraction needed, the card just needs
+            # a folder pick (frontend) and an intro line.
+            payload = {"intro": "Ready to practice? Pick a folder with flashcards and I'll start matching mode."}
+        else:
+            history = await repo.get_history(
+                conversation.id, limit=10, after=conversation.cleared_at
+            )
+            history_block = _build_history_block(history)
+            try:
+                payload = await LLMService().generate_action_proposal(
+                    action_type=action_type,
+                    user_message=user_message,
+                    history_block=history_block,
+                    provider=provider,
+                )
+            except Exception as exc:
+                logger.warning("Kojo action proposal LLM call failed: %s", exc)
+                raise LLMException("Kojo couldn't draft that plan. Try again.") from exc
+
+        card = await repo.add_action_card(
+            conversation_id=conversation.id,
+            action_type=action_type,
+            payload_json=json.dumps(payload),
+            message_id=message_id,
+        )
+        await session.commit()
+        return self._action_card_dto(card)
+
+    async def _assert_entity_owned(
+        self, entity_type: str, entity_id: int, user_id: int, session: AsyncSession
+    ) -> None:
+        """Guards resolve_action against attaching a card to another user's
+        entity: entity_type/entity_id come straight from the request body, so
+        without this a caller could point their own card at any folder,
+        track, or flashcard-holding folder id."""
+        from sqlalchemy import select
+
+        from src.models.learning_module import LearningTrack
+
+        if entity_type == "folder":
+            if await FolderRepository(session).get_owned(entity_id, user_id) is None:
+                raise ResourceNotFoundException("Folder")
+        elif entity_type == "flashcards":
+            # entity_id is the folder the generated cards live in.
+            if await FolderRepository(session).get_owned(entity_id, user_id) is None:
+                raise ResourceNotFoundException("Folder")
+        elif entity_type == "learning_track":
+            track = await session.scalar(
+                select(LearningTrack).where(LearningTrack.id == entity_id)
+            )
+            if track is None or await FolderRepository(session).get_owned(track.folder_id, user_id) is None:
+                raise ResourceNotFoundException("LearningTrack")
+        else:
+            raise ValidationException(f"Unknown entity type: {entity_type}")
+
+    async def _entity_deleted(self, card, user_id: int, session: AsyncSession) -> bool:
+        """True when a confirmed card's created entity no longer exists."""
+        if card.status != "confirmed" or card.entity_type is None or card.entity_id is None:
+            return False
+        from sqlalchemy import select
+
+        from src.models.flashcard import Flashcard
+        from src.models.folder import Folder
+        from src.models.learning_module import LearningTrack
+
+        if card.entity_type == "folder":
+            folder = await session.scalar(
+                select(Folder.id).where(Folder.id == card.entity_id, Folder.user_id == user_id)
+            )
+            return folder is None
+        if card.entity_type == "learning_track":
+            track = await session.scalar(
+                select(LearningTrack).where(LearningTrack.id == card.entity_id)
+            )
+            if track is None:
+                return True
+            return await FolderRepository(session).get_owned(track.folder_id, user_id) is None
+        if card.entity_type == "flashcards":
+            # entity_id is the folder; the payload carries the generated card ids.
+            try:
+                payload = json.loads(card.payload_json or "{}")
+                ids = [int(i) for i in payload.get("flashcard_ids", [])]
+            except (TypeError, ValueError):
+                ids = []
+            if not ids:
+                folder = await session.scalar(
+                    select(Folder.id).where(Folder.id == card.entity_id, Folder.user_id == user_id)
+                )
+                return folder is None
+            remaining = await session.scalar(
+                select(Flashcard.id).where(Flashcard.id.in_(ids)).limit(1)
+            )
+            return remaining is None
+        return False
+
+    async def list_action_cards(
+        self,
+        user_id: int,
+        conversation_id: int,
+        session: AsyncSession,
+    ) -> list[KojoActionCardDTO]:
+        repo = KojoRepository(session)
+        conversation = await repo.get_conversation_by_id(conversation_id, user_id)
+        if conversation is None:
+            raise ResourceNotFoundException("Conversation")
+        cards = await repo.get_action_cards(conversation.id)
+        if conversation.cleared_at is not None:
+            cards = [c for c in cards if c.created_at > conversation.cleared_at]
+        return [
+            self._action_card_dto(c, entity_deleted=await self._entity_deleted(c, user_id, session))
+            for c in cards
+        ]
+
+    async def resolve_action(
+        self,
+        user_id: int,
+        card_id: int,
+        status: str,
+        session: AsyncSession,
+        entity_type: Optional[str] = None,
+        entity_id: Optional[int] = None,
+        payload_update: Optional[dict] = None,
+    ) -> KojoActionCardDTO:
+        if status not in {"confirmed", "dismissed"}:
+            raise ValidationException("status must be 'confirmed' or 'dismissed'")
+        repo = KojoRepository(session)
+        card = await repo.get_action_card_owned(card_id, user_id)
+        if card is None:
+            raise ResourceNotFoundException("ActionCard")
+        if entity_type is not None and entity_id is not None:
+            await self._assert_entity_owned(entity_type, entity_id, user_id, session)
+        card.status = status
+        card.resolved_at = datetime.utcnow()
+        if entity_type is not None:
+            card.entity_type = entity_type
+        if entity_id is not None:
+            card.entity_id = entity_id
+        if payload_update:
+            try:
+                payload = json.loads(card.payload_json or "{}")
+            except (TypeError, ValueError):
+                payload = {}
+            payload.update(payload_update)
+            card.payload_json = json.dumps(payload)
+        await session.commit()
+        return self._action_card_dto(card)
 
     async def get_cleared_conversations(
         self,

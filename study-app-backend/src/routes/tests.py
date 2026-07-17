@@ -36,6 +36,7 @@ from src.services.llm_service import LLMService
 from src.services.test_service import TestService
 from src.utils.exceptions import LLMException, ResourceNotFoundException, StudyAppException
 from src.utils.logger import get_logger
+from src.utils.provider_policy import resolve_request_provider
 from src.utils.validators import MAX_UPLOAD_TOTAL_SIZE_BYTES
 
 router = APIRouter(tags=["tests"])
@@ -530,6 +531,10 @@ async def create_test(
                 raise StudyAppException(
                     "provider must be auto, groq, google, anthropic, gemini, claude, or ollama"
                 )
+        # Non-admin/non-beta users cannot pick a model: pin to the auto chain
+        # (Ollama-first, Claude last). Enforced here so it also covers the
+        # detached generation task spawned below.
+        provider = resolve_request_provider(user, provider)
         enable_fallback = str(form.get("enable_fallback", "true")).lower() not in ("false", "0", "no")
 
         if not title or not test_type:
@@ -683,6 +688,7 @@ async def regenerate_test(
                 raise StudyAppException(
                     "provider must be auto, groq, google, anthropic, gemini, claude, or ollama"
                 )
+        provider = resolve_request_provider(user, provider)
 
         difficulty = data.difficulty.strip().lower()
         if difficulty not in ("easy", "medium", "hard", "mixed"):

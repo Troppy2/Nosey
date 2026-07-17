@@ -1,4 +1,4 @@
-import { ArrowLeft, Calculator, Code2, FileText, Settings2, Upload } from "lucide-react";
+import { ArrowLeft, Atom, Calculator, Code2, FileText, Settings2, Upload } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -264,9 +264,9 @@ export default function CreateTest() {
 
   return (
     <div className="page page-narrow">
-      <Link className="back-link" to="/dashboard">
+      <Link className="back-link" to={folderId ? `/folders/${folderId}` : "/folders"}>
         <ArrowLeft size={16} />
-        Dashboard
+        Folder
       </Link>
       <header className="page-header">
         <div>
@@ -358,9 +358,9 @@ export default function CreateTest() {
                   className={`math-mode-toggle ${isMathMode && !isCodingMode ? "active" : ""}`}
                   onClick={() => { setIsMathMode((v) => !v); setIsCodingMode(false); }}
                 >
-                  <Calculator size={16} />
+                  <Atom size={16} />
                   <span>
-                    <strong>Math mode</strong>
+                    <strong>STEM mode</strong>
                     <span className="math-mode-toggle-sub">
                       Generates calculation problems · LaTeX rendering · step-by-step explanations
                     </span>

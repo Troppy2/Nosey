@@ -1996,17 +1996,22 @@ Return only the JSON object."""
     async def _candidate_providers(self, provider: Optional[str] = None) -> list[str]:
         normalized = self._normalize_generation_provider(provider)
 
+        # Order is cost-ascending: the local Ollama model first (free), then the
+        # cheaper paid APIs, and Claude LAST because it is the most expensive.
+        # This ordering is the fallback chain for "auto" AND the tail order when
+        # a specific provider is chosen, so Claude is always the last resort.
         providers: list[str] = []
+
+        status = await self.check_providers_status()
+        if status.get("ollama"):
+            providers.append("ollama")
+
         if settings.groq_api_key:
             providers.append("groq")
         if settings.google_ai_api_key:
             providers.append("gemini")
         if settings.anthropic_api_key:
             providers.append("claude")
-
-        status = await self.check_providers_status()
-        if status.get("ollama"):
-            providers.append("ollama")
 
         if normalized != "auto":
             # Honor the user's explicit pick by trying it first, but DON'T hard-fail if it
@@ -3136,6 +3141,217 @@ Return only the JSON object."""
             "Kojo failed to generate a response — all providers are unavailable. Try again."
         ) from last_error
 
+    # ── Kojo plain-text streaming ────────────────────────────────────────────
+    # These mirror the _complete_text_* methods (same models, temps, token
+    # budgets, plain text — NOT the JSON-configured _stream_text_* generation
+    # streams) but yield token deltas as they arrive. No _with_retry wrapper:
+    # a mid-stream failure fails this provider so stream_kojo's auto path can
+    # fall through to the next one only if nothing was emitted yet.
+
+    async def _stream_text_kojo_groq(self, prompt: str) -> AsyncIterator[str]:
+        prompt_body = self._prepare_llm_payload(prompt, "groq")
+        async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
+            async with client.stream(
+                "POST",
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.groq_api_key}",
+                    "Content-Type": "application/json; charset=utf-8",
+                },
+                json={
+                    "model": "llama-3.1-8b-instant",
+                    "messages": [{"role": "user", "content": prompt_body}],
+                    "temperature": 0.7,
+                    "max_tokens": settings.llm_max_tokens,
+                    "stream": True,
+                },
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[len("data:"):].strip()
+                    if not data or data == "[DONE]":
+                        continue
+                    try:
+                        event = json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
+                    choices = event.get("choices") or []
+                    delta = (choices[0].get("delta") or {}) if choices else {}
+                    text = delta.get("content")
+                    if text:
+                        yield str(text)
+
+    async def _stream_text_kojo_anthropic(self, prompt: str) -> AsyncIterator[str]:
+        prompt_body = self._prepare_llm_payload(prompt, "claude")
+        async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
+            async with client.stream(
+                "POST",
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": settings.anthropic_api_key or "",
+                    "anthropic-version": "2023-06-01",
+                    "Content-Type": "application/json; charset=utf-8",
+                },
+                json={
+                    "model": settings.anthropic_model,
+                    "max_tokens": settings.llm_max_tokens,
+                    "messages": [{"role": "user", "content": prompt_body}],
+                    "stream": True,
+                },
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[len("data:"):].strip()
+                    if not data:
+                        continue
+                    try:
+                        event = json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
+                    if event.get("type") == "content_block_delta":
+                        delta = event.get("delta") or {}
+                        text = delta.get("text")
+                        if text:
+                            yield str(text)
+
+    async def _stream_text_kojo_gemini(self, prompt: str) -> AsyncIterator[str]:
+        prompt_body = self._prepare_llm_payload(prompt, "gemini")
+        async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
+            async with client.stream(
+                "POST",
+                f"https://generativelanguage.googleapis.com/v1beta/models/{settings.google_ai_model}:streamGenerateContent",
+                params={"key": settings.google_ai_api_key, "alt": "sse"},
+                headers={"Content-Type": "application/json; charset=utf-8"},
+                json={
+                    "contents": [{"parts": [{"text": prompt_body}]}],
+                    "generationConfig": {
+                        "maxOutputTokens": settings.llm_max_tokens,
+                        "temperature": 0.7,
+                    },
+                },
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[len("data:"):].strip()
+                    if not data:
+                        continue
+                    try:
+                        event = json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
+                    candidates = event.get("candidates") or []
+                    if not candidates:
+                        continue
+                    parts = ((candidates[0].get("content") or {}).get("parts")) or []
+                    for part in parts:
+                        text = part.get("text")
+                        if text:
+                            yield str(text)
+
+    async def _stream_text_kojo_ollama(self, prompt: str) -> AsyncIterator[str]:
+        prompt_body = self._prepare_llm_payload(prompt, "ollama")
+        headers = {"Content-Type": "application/json; charset=utf-8"}
+        if settings.ollama_api_key:
+            headers["Authorization"] = f"Bearer {settings.ollama_api_key}"
+        async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
+            async with client.stream(
+                "POST",
+                f"{settings.ollama_base_url.rstrip('/')}/api/generate",
+                headers=headers,
+                json={
+                    "model": settings.ollama_model,
+                    "prompt": prompt_body,
+                    "stream": True,
+                    "options": {
+                        "num_predict": settings.llm_max_tokens,
+                        "num_ctx": settings.ollama_num_ctx,
+                    },
+                },
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line.strip():
+                        continue
+                    try:
+                        event = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    text = event.get("response")
+                    if text:
+                        yield str(text)
+                    if event.get("done"):
+                        break
+
+    async def stream_kojo(
+        self, prompt: str, provider: Optional[str] = None
+    ) -> AsyncIterator[str]:
+        """Stream a Kojo chat response as plain-text deltas.
+
+        Mirrors call_kojo's provider selection and auto-fallback. Fallback to
+        the next provider is only safe before the first delta is emitted: once a
+        provider has streamed any text, switching would duplicate output, so a
+        mid-stream failure raises instead.
+        """
+        from src.utils.exceptions import LLMException
+
+        _STREAM_DISPATCH: dict[str, Any] = {
+            "gemini": self._stream_text_kojo_gemini,
+            "groq": self._stream_text_kojo_groq,
+            "ollama": self._stream_text_kojo_ollama,
+            "claude": self._stream_text_kojo_anthropic,
+        }
+
+        normalized = self._normalize_generation_provider(provider)
+
+        if normalized != "auto":
+            fn = _STREAM_DISPATCH.get(normalized)
+            if fn is None:
+                raise LLMException(f"Unsupported LLM provider: {normalized}")
+            try:
+                async for chunk in fn(prompt):
+                    yield chunk
+            except LLMException:
+                raise
+            except Exception as exc:
+                raise LLMException(f"Kojo error: {exc}") from exc
+            return
+
+        candidates = await self._candidate_providers("auto")
+        if not candidates:
+            raise LLMException(
+                "No AI provider is available. Add an API key in Settings or start Ollama."
+            )
+
+        last_error: Optional[Exception] = None
+        for candidate in candidates:
+            fn = _STREAM_DISPATCH.get(candidate)
+            if fn is None:
+                continue
+            emitted = False
+            try:
+                async for chunk in fn(prompt):
+                    emitted = True
+                    yield chunk
+                return
+            except Exception as exc:
+                if emitted:
+                    # Already streamed part of a response; cannot restart cleanly.
+                    raise LLMException(f"Kojo stream interrupted: {exc}") from exc
+                last_error = exc
+                logger.warning("Kojo stream provider %s failed; trying next: %s", candidate, exc)
+
+        if isinstance(last_error, LLMException):
+            raise last_error
+        raise LLMException(
+            "Kojo failed to generate a response — all providers are unavailable. Try again."
+        ) from last_error
+
     async def _complete_text_gemini(self, prompt: str) -> str:
         async def _do() -> str:
             prompt_body = self._prepare_llm_payload(prompt, "gemini")
@@ -4252,4 +4468,90 @@ Rules:
             "difficulty": difficulty,
             "topic_focus": str(result["topic_focus"])[:200] if result.get("topic_focus") else None,
             "intro": str(result.get("intro", "Here's a test plan based on your notes."))[:500],
+        }
+
+    async def generate_action_proposal(
+        self,
+        action_type: str,
+        user_message: str,
+        history_block: str,
+        provider: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Extract structured fields for a chat action card (folder/flashcards/module).
+
+        Same single-call JSON-extraction pattern as generate_test_blueprint:
+        one _complete_json call, then manual validation and clamping. The
+        conversation history is the source for chat-derived custom
+        instructions, per the chat-redesign decisions.
+        """
+        history_section = f"\nCONVERSATION SO FAR:\n{history_block}\n" if history_block else ""
+
+        if action_type == "create_folder":
+            schema = """{
+  "name": "<short folder name derived from the subject matter>",
+  "subject": "<subject area string, or null>",
+  "description": "<one-line folder description, or null>",
+  "intro": "<one friendly sentence summarizing the proposed folder>"
+}"""
+            rules = "- Keep the name under 8 words and specific to the topic discussed."
+        elif action_type == "create_flashcards":
+            schema = """{
+  "title": "<short label for this flashcard set, e.g. 'Photosynthesis terms'>",
+  "count": <integer 1-50, default 10>,
+  "prompt": "<generation instructions distilled from the conversation: the topic, what to emphasize, any constraints the student mentioned>",
+  "intro": "<one friendly sentence summarizing the proposed flashcards>"
+}"""
+            rules = "- The prompt field must capture what the student actually discussed, not generic filler."
+        elif action_type == "create_module":
+            schema = """{
+  "module_count": <integer 1-20, default 5>,
+  "custom_instructions": "<instructions distilled from the conversation: focus areas, depth, what the student struggles with; or null if nothing specific>",
+  "intro": "<one friendly sentence summarizing the proposed learning module track>"
+}"""
+            rules = "- custom_instructions is null unless the conversation gives real guidance."
+        else:
+            raise LLMException(f"Unknown action type: {action_type}")
+
+        prompt = f"""You are an action-planning assistant inside a study tool called Nosey.
+The student asked the study chat to perform an action. Extract the parameters for it.
+{history_section}
+STUDENT'S REQUEST: {user_message}
+
+Return ONLY valid JSON with exactly these fields:
+{schema}
+
+Rules:
+{rules}
+- Derive everything from the request and the conversation; never invent topics the student didn't mention.
+- intro should be warm and specific."""
+
+        result = await self._complete_json(prompt, provider=provider)
+
+        def _clamp(val: object, lo: int, hi: int, default: int) -> int:
+            try:
+                return max(lo, min(hi, int(val)))  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                return default
+
+        if action_type == "create_folder":
+            return {
+                "name": str(result.get("name") or "New folder")[:120],
+                "subject": str(result["subject"])[:120] if result.get("subject") else None,
+                "description": str(result["description"])[:300] if result.get("description") else None,
+                "intro": str(result.get("intro", "Here's a folder to keep this material together."))[:500],
+            }
+        if action_type == "create_flashcards":
+            return {
+                "title": str(result.get("title") or "Flashcards")[:120],
+                "count": _clamp(result.get("count"), 1, 50, 10),
+                "prompt": str(result.get("prompt") or user_message)[:2000],
+                "intro": str(result.get("intro", "Here's a flashcard set based on our chat."))[:500],
+            }
+        return {
+            "module_count": _clamp(result.get("module_count"), 1, 20, 5),
+            "custom_instructions": (
+                str(result["custom_instructions"])[:10000]
+                if result.get("custom_instructions") else None
+            ),
+            "intro": str(result.get("intro", "Here's a learning module plan based on our chat."))[:500],
         }

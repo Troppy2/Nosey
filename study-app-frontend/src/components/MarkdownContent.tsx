@@ -109,6 +109,71 @@ type Seg =
   | { k: "code"; v: string }
   | { k: "math"; entry: MathEntry };
 
+// Finds the closing delimiter for an emphasis run starting at `start`.
+// For bold (**), a matching ** is preferred; if none exists, a lone * is
+// accepted as a tolerant closer. LLMs frequently emit malformed bold like
+// "**Step 3:*" (opened with **, closed with a single *) , without this the
+// whole run fails to parse and the asterisks render literally.
+function findEmphasisCloser(chunk: string, start: number, wantDouble: boolean): [number, number] {
+  const isLoneStar = (j: number) => chunk[j] === "*" && chunk[j + 1] !== "*" && chunk[j - 1] !== "*";
+
+  if (wantDouble) {
+    const dbl = chunk.indexOf("**", start);
+    if (dbl > start) return [dbl, 2];
+    // Fallback: a malformed bold run closed by a single *.
+    for (let j = start; j < chunk.length; j++) {
+      if (j > start && isLoneStar(j)) return [j, 1];
+    }
+    return [-1, 0];
+  }
+
+  for (let j = start; j < chunk.length; j++) {
+    if (j > start && isLoneStar(j)) return [j, 1];
+  }
+  return [-1, 0];
+}
+
+// Scans a non-math text chunk into bold / italic / code / text segments.
+// A hand-rolled scanner (rather than one regex) so an unbalanced bold run can
+// gracefully close on a single star instead of failing outright.
+function scanEmphasis(chunk: string): Seg[] {
+  const out: Seg[] = [];
+  let buf = "";
+  const flush = () => { if (buf) { out.push({ k: "text", v: buf }); buf = ""; } };
+
+  let i = 0;
+  while (i < chunk.length) {
+    const c = chunk[i];
+
+    if (c === "`") {
+      const end = chunk.indexOf("`", i + 1);
+      if (end > i + 1) { flush(); out.push({ k: "code", v: chunk.slice(i + 1, end) }); i = end + 1; continue; }
+    }
+
+    if (c === "*") {
+      const isDouble = chunk[i + 1] === "*";
+      const contentStart = i + (isDouble ? 2 : 1);
+      const next = chunk[contentStart];
+      // Valid opener: content follows and it isn't another star.
+      if (next !== undefined && next !== "*") {
+        const [closeIdx, closeLen] = findEmphasisCloser(chunk, contentStart, isDouble);
+        if (closeIdx !== -1) {
+          flush();
+          out.push({ k: isDouble ? "bold" : "italic", v: chunk.slice(contentStart, closeIdx) });
+          i = closeIdx + closeLen;
+          continue;
+        }
+      }
+    }
+
+    buf += c;
+    i++;
+  }
+
+  flush();
+  return out;
+}
+
 function tokenizeInline(text: string, reg: MathEntry[]): Seg[] {
   const segs: Seg[] = [];
 
@@ -124,19 +189,7 @@ function tokenizeInline(text: string, reg: MathEntry[]): Seg[] {
 
     const chunk = parts[i];
     if (!chunk) continue;
-
-    // Bold uses (?:(?!\*\*).)+  so it stops at ** but allows single * inside.
-    const mdRe = /(\*\*((?:(?!\*\*).)+)\*\*|\*([^*\n]+)\*|`([^`\n]+)`)/g;
-    let last = 0;
-    let m: RegExpExecArray | null;
-    while ((m = mdRe.exec(chunk)) !== null) {
-      if (m.index > last) segs.push({ k: "text", v: chunk.slice(last, m.index) });
-      if (m[2] !== undefined) segs.push({ k: "bold", v: m[2] });
-      else if (m[3] !== undefined) segs.push({ k: "italic", v: m[3] });
-      else if (m[4] !== undefined) segs.push({ k: "code", v: m[4] });
-      last = m.index + m[0].length;
-    }
-    if (last < chunk.length) segs.push({ k: "text", v: chunk.slice(last) });
+    segs.push(...scanEmphasis(chunk));
   }
 
   return segs;
