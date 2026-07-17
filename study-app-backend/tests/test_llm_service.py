@@ -435,16 +435,49 @@ class TestCompleteTextGroq:
 
 class TestCompleteJsonDispatch:
 
-    async def test_prefers_groq_when_key_is_set(self):
+    async def test_prefers_ollama_when_available(self):
+        """Auto routing is cost-ascending: the free local model is tried first
+        even when a paid provider key is present (Claude is the last resort)."""
         svc = LLMService()
         svc._complete_groq = AsyncMock(return_value={"result": "groq"})
         svc._complete_ollama = AsyncMock(return_value={"result": "ollama"})
+        svc.check_providers_status = AsyncMock(return_value={"ollama": True})
+
+        with patch("src.services.llm_service.settings", fake_settings(groq_key=FAKE_KEY)):
+            result = await svc._complete_json("prompt")
+
+        svc._complete_ollama.assert_awaited_once()
+        svc._complete_groq.assert_not_awaited()
+        assert result == {"result": "ollama"}
+
+    async def test_uses_groq_when_ollama_is_unavailable(self):
+        """With Ollama down, the chain moves to the cheapest paid provider."""
+        svc = LLMService()
+        svc._complete_groq = AsyncMock(return_value={"result": "groq"})
+        svc._complete_ollama = AsyncMock(return_value={"result": "ollama"})
+        svc.check_providers_status = AsyncMock(return_value={"ollama": False})
 
         with patch("src.services.llm_service.settings", fake_settings(groq_key=FAKE_KEY)):
             result = await svc._complete_json("prompt")
 
         svc._complete_groq.assert_awaited_once()
         svc._complete_ollama.assert_not_awaited()
+        assert result == {"result": "groq"}
+
+    async def test_falls_through_to_groq_when_ollama_errors(self):
+        """Ollama-first must not become a single point of failure: an Ollama
+        error (e.g. a 401 from the cloud endpoint) falls through to the next
+        provider rather than failing the whole generation."""
+        svc = LLMService()
+        svc._complete_ollama = AsyncMock(side_effect=LLMException("Ollama error (401)"))
+        svc._complete_groq = AsyncMock(return_value={"result": "groq"})
+        svc.check_providers_status = AsyncMock(return_value={"ollama": True})
+
+        with patch("src.services.llm_service.settings", fake_settings(groq_key=FAKE_KEY)):
+            result = await svc._complete_json("prompt")
+
+        svc._complete_ollama.assert_awaited_once()
+        svc._complete_groq.assert_awaited_once()
         assert result == {"result": "groq"}
 
     async def test_falls_back_to_ollama_when_key_is_none(self):
@@ -464,10 +497,25 @@ class TestCompleteJsonDispatch:
 
 class TestCallKojo:
 
-    async def test_uses_groq_text_when_key_set(self):
+    async def test_uses_ollama_text_when_available(self):
+        """Kojo chat follows the same cost-ascending chain as JSON generation."""
         svc = LLMService()
         svc._complete_text_groq = AsyncMock(return_value="Groq answer")
         svc._complete_text_ollama = AsyncMock(return_value="Ollama answer")
+        svc.check_providers_status = AsyncMock(return_value={"ollama": True})
+
+        with patch("src.services.llm_service.settings", fake_settings(groq_key=FAKE_KEY)):
+            result = await svc.call_kojo("Explain transactions")
+
+        assert result == "Ollama answer"
+        svc._complete_text_ollama.assert_awaited_once()
+        svc._complete_text_groq.assert_not_awaited()
+
+    async def test_uses_groq_text_when_ollama_is_unavailable(self):
+        svc = LLMService()
+        svc._complete_text_groq = AsyncMock(return_value="Groq answer")
+        svc._complete_text_ollama = AsyncMock(return_value="Ollama answer")
+        svc.check_providers_status = AsyncMock(return_value={"ollama": False})
 
         with patch("src.services.llm_service.settings", fake_settings(groq_key=FAKE_KEY)):
             result = await svc.call_kojo("Explain transactions")
