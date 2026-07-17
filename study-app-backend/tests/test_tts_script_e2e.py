@@ -23,9 +23,30 @@ import pytest
 from src.config import settings
 from src.services.llm_service import LLMService
 
+_LOCAL_HOSTS = ("http://localhost", "http://127.0.0.1")
+
+
+def _ollama_is_usable() -> bool:
+    """True only when Ollama can actually serve a request.
+
+    Checking ollama_base_url alone is not enough: it defaults to the cloud
+    endpoint, so it is always truthy and these live tests ran (and 401'd) in CI
+    where no key is set. The cloud endpoint needs a key; a local daemon does not.
+    """
+    base_url = (settings.ollama_base_url or "").strip()
+    if not base_url:
+        return False
+    if settings.ollama_api_key:
+        return True
+    return base_url.startswith(_LOCAL_HOSTS)
+
+
 pytestmark = pytest.mark.skipif(
-    not (settings.ollama_api_key or settings.ollama_base_url),
-    reason="Ollama is not configured; e2e TTS tests need a real provider.",
+    not _ollama_is_usable(),
+    reason=(
+        "Ollama has no usable credentials (cloud endpoint without OLLAMA_API_KEY); "
+        "e2e TTS tests need a real provider."
+    ),
 )
 
 # Notes dense with the notation the user reported the TTS mangling: Big-O,
