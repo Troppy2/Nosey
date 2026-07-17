@@ -34,11 +34,16 @@ class KojoConversationSummaryDTO(BaseModel):
     created_at: datetime
 
 
+class RenameConversationRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
 class KojoChatRequest(BaseModel):
-    message: str = Field(..., min_length=1, max_length=2000)
+    message: str = Field(..., min_length=1, max_length=80000)
     provider: Optional[str] = Field(default=None, description="Optional LLM provider override: 'auto', 'groq', 'ollama', or 'gemini'")
     strictness: Optional[str] = Field(default="medium", description="Constitution strictness: 'strict', 'medium', or 'none'")
     conversation_id: Optional[int] = Field(default=None, description="Specific conversation to continue; if omitted uses latest for folder")
+    reasoning: Optional[bool] = Field(default=False, description="Stream a visible reasoning pass before the answer (streaming endpoints only)")
 
 
 class KojoChatResponse(BaseModel):
@@ -93,13 +98,46 @@ class KojoBootstrapDTO(BaseModel):
 
 
 class GeneralChatRequest(BaseModel):
-    message: str = Field(..., min_length=1, max_length=2000)
+    message: str = Field(..., min_length=1, max_length=8000)
     provider: Optional[str] = Field(default=None)
     strictness: Optional[str] = Field(default="medium")
+    reasoning: Optional[bool] = Field(default=False, description="Stream a visible reasoning pass before the answer (streaming endpoints only)")
+
+
+ACTION_TYPES = {"create_folder", "create_flashcards", "create_module", "start_matching"}
+
+
+class KojoActionCardDTO(BaseModel):
+    id: int
+    conversation_id: int
+    message_id: Optional[int] = None
+    action_type: str
+    status: str
+    payload: dict
+    entity_type: Optional[str] = None
+    entity_id: Optional[int] = None
+    # True when the created entity no longer exists (deleted from its own page)
+    entity_deleted: bool = False
+    created_at: datetime
+    resolved_at: Optional[datetime] = None
+
+
+class ProposeActionRequest(BaseModel):
+    action_type: str = Field(..., description="create_folder | create_flashcards | create_module | start_matching")
+    message: str = Field(..., min_length=1, max_length=8000)
+    provider: Optional[str] = Field(default=None)
+    message_id: Optional[int] = Field(default=None, description="User message the card anchors to")
+
+
+class ResolveActionRequest(BaseModel):
+    status: str = Field(..., description="confirmed | dismissed")
+    entity_type: Optional[str] = Field(default=None, max_length=40)
+    entity_id: Optional[int] = None
+    payload: Optional[dict] = Field(default=None, description="Merged into the stored payload (edited fields, created entity title, etc.)")
 
 
 class TestBlueprintRequest(BaseModel):
-    message: str = Field(..., min_length=1, max_length=2000)
+    message: str = Field(..., min_length=1, max_length=8000)
     provider: Optional[str] = Field(default=None)
 
 

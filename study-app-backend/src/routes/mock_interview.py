@@ -33,6 +33,7 @@ from src.services.file_service import FileService
 from src.services.leetcode_service import LeetCodeService
 from src.services.llm_service import LLMService
 from src.utils.exceptions import LLMException, ValidationException
+from src.utils.provider_policy import resolve_request_provider
 
 router = APIRouter(prefix="/mock-interview", tags=["mock-interview"])
 
@@ -211,7 +212,7 @@ async def screen_resume(
 
     try:
         llm = LLMService()
-        raw = await llm.call_kojo(prompt, provider=provider)
+        raw = await llm.call_kojo(prompt, provider=resolve_request_provider(user, provider))
         raw = raw.strip()
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
@@ -286,7 +287,7 @@ async def grade_stage1(
                 user_code=sub.code,
                 test_results=sub.test_results,
                 all_passed=sub.all_passed,
-                provider=body.provider,
+                provider=resolve_request_provider(user, body.provider),
             )
             feedback = result.feedback
         except Exception:
@@ -377,7 +378,7 @@ async def submit_stage2(
 
     try:
         llm = LLMService()
-        feedback = await llm.call_kojo(prompt, provider=body.provider)
+        feedback = await llm.call_kojo(prompt, provider=resolve_request_provider(user, body.provider))
     except LLMException as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
@@ -443,7 +444,7 @@ async def stage2_message(
 
     try:
         llm = LLMService()
-        raw = await llm.call_kojo(full_prompt, provider=body.provider)
+        raw = await llm.call_kojo(full_prompt, provider=resolve_request_provider(user, body.provider))
         raw = raw.strip()
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
@@ -495,6 +496,7 @@ async def stage3_message(
     user: User = Depends(get_current_user),
 ) -> Stage3MessageResponse:
     row = await _load_session(session_id, user, db)
+    provider = resolve_request_provider(user, body.provider)
     company_label = _COMPANY_LABELS.get(row.company, row.company.title())
     candidate = _candidate_name(user)
     culture_hint = _COMPANY_CULTURE.get(row.company, "performance, teamwork, and impact")
@@ -536,7 +538,7 @@ async def stage3_message(
 
     try:
         llm = LLMService()
-        raw = await llm.call_kojo(full_prompt, provider=body.provider)
+        raw = await llm.call_kojo(full_prompt, provider=provider)
         raw = raw.strip()
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
@@ -555,7 +557,7 @@ async def stage3_message(
             company_label=company_label,
             candidate=candidate,
             db=db,
-            provider=body.provider,
+            provider=provider,
         )
     else:
         row.status = STATUS_STAGE3
@@ -648,7 +650,7 @@ async def finish_interview(
 
     try:
         llm = LLMService()
-        overall_feedback = await llm.call_kojo(prompt, provider=body.provider)
+        overall_feedback = await llm.call_kojo(prompt, provider=resolve_request_provider(user, body.provider))
     except LLMException as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 

@@ -11,6 +11,7 @@ from src.models.base import BIGINT_ID, Base, TimestampMixin
 if TYPE_CHECKING:
     from src.models.conversation_file import ConversationFile
     from src.models.folder import Folder
+    from src.models.kojo_action_card import KojoActionCard
     from src.models.kojo_message import KojoMessage
     from src.models.user import User
 
@@ -44,6 +45,12 @@ class KojoConversation(Base, TimestampMixin):
         back_populates="conversation",
         cascade="all, delete-orphan",
         order_by="ConversationFile.uploaded_at",
+    )
+    action_cards: Mapped[list[KojoActionCard]] = relationship(
+        "KojoActionCard",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        order_by="KojoActionCard.created_at",
     )
 
     def __repr__(self) -> str:

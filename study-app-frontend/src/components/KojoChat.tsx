@@ -1,6 +1,7 @@
-import { AlertCircle, Bot, Maximize2, Minimize2, Send, Sparkles, Trash2, X } from "lucide-react";
+import { AlertCircle, Maximize2, Minimize2, Send, Sparkles, Trash2, X } from "lucide-react";
+import KojoMascot from "./KojoMascot";
 import { useEffect, useRef, useState } from "react";
-import { clearKojoConversation, fetchKojoConversation, fetchProviderStatus, isGuestSession, kojoChat } from "../lib/api";
+import { clearKojoConversation, fetchKojoConversation, fetchProviderStatus, isGuestSession, kojoChat, kojoChatStream } from "../lib/api";
 import type { KojoMessage, ProviderStatus } from "../lib/types";
 import { useSettings } from "../lib/useSettings";
 import { FeatureSurvey } from "./FeatureSurvey";
@@ -41,7 +42,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearNotice, setClearNotice] = useState<string | null>(null);
   const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
-  const { generationProvider } = useSettings();
+  const { generationProvider, betaMode } = useSettings();
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   // Tracks whether the user actually sent a message this session, so the survey
@@ -102,8 +103,35 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
     setIsLoading(true);
     setError(null);
 
+    // Streaming assistant bubble. The placeholder is inserted on the first
+    // delta so the "thinking" indicator shows until real text arrives.
+    const tempId = Date.now() + 1;
+    let streamed = "";
+    let placed = false;
+    const onDelta = (delta: string) => {
+      streamed += delta;
+      if (!placed) {
+        placed = true;
+        setIsLoading(false);
+        setMessages((prev) => [
+          ...prev,
+          { id: tempId, role: "assistant", content: streamed, created_at: new Date().toISOString() },
+        ]);
+      } else {
+        setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, content: streamed } : m)));
+      }
+    };
+
     try {
-      const result = await kojoChat(folderId, messageText, generationProvider);
+      let result;
+      try {
+        result = await kojoChatStream(folderId, messageText, onDelta, generationProvider);
+      } catch (streamErr) {
+        // If the stream failed before producing any text, fall back to the
+        // non-streamed endpoint so a transient stream issue still answers.
+        if (placed) throw streamErr;
+        result = await kojoChat(folderId, messageText, generationProvider);
+      }
       const assistantMsg: KojoMessage = {
         id: result.message_id,
         role: "assistant",
@@ -111,13 +139,13 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
         created_at: new Date().toISOString(),
       };
       setMessages((prev) => [
-        ...prev.slice(0, -1),
+        ...prev.filter((m) => m.id !== tempId && m.id !== userMsg.id),
         { ...userMsg, id: result.message_id - 1 },
         assistantMsg,
       ]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kojo failed to respond. Try again.");
-      setMessages((prev) => prev.slice(0, -1));
+      setMessages((prev) => prev.filter((m) => m.id !== tempId && m.id !== userMsg.id));
     } finally {
       setIsLoading(false);
       inputRef.current?.focus();
@@ -152,14 +180,17 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
     }
   }
 
-  const modelPicker = (
+  // The model indicator is only meaningful for users who can actually pick a
+  // model (admin/beta). Everyone else is pinned to the automatic chain
+  // server-side, so showing a provider name would be misleading; hide it.
+  const modelPicker = betaMode ? (
     <div className="kojo-model-picker kojo-model-picker--locked" title={`Model: ${PROVIDER_LABELS[generationProvider] ?? generationProvider}`}>
       <span className="kojo-model-btn kojo-model-btn--static">
         {generationProvider in PROVIDER_LABELS ? generationProvider : "auto"}
         {hasProviderWarn ? <span className="kojo-model-warn-dot" /> : null}
       </span>
     </div>
-  );
+  ) : null;
 
   return (
     <>
@@ -175,13 +206,12 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
         <div className="kojo-header">
           <div className="kojo-header-left">
             <div className="kojo-avatar">
-              <Bot size={18} />
+              <KojoMascot state={isLoading ? "loading" : "idle"} />
             </div>
             <div className="kojo-header-info">
               <span className="kojo-header-name">
                 <Sparkles size={13} className="kojo-title-icon" />
                 Kojo
-                <span className="kojo-header-online" aria-label="online" />
               </span>
               <span className="kojo-header-sub">{folderName}</span>
             </div>
@@ -249,7 +279,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
             {messages.length === 0 && !isLoading ? (
               <div className="kojo-empty">
                 <div className="kojo-empty-icon">
-                  <Sparkles size={28} />
+                  <KojoMascot state="idle" />
                 </div>
                 <p className="kojo-empty-title">Hi, I'm Kojo</p>
                 <p className="kojo-empty-sub">
@@ -275,7 +305,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
                 msg.role === "assistant" ? (
                   <div key={msg.id} className="kojo-message kojo-message--assistant">
                     <div className="kojo-msg-avatar">
-                      <Bot size={14} />
+                      <KojoMascot state="idle" />
                     </div>
                     <div className="kojo-message-body">
                       <div className="kojo-message-meta">
@@ -298,14 +328,11 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
 
             {isLoading && (
               <div className="kojo-message kojo-message--assistant">
-                <div className="kojo-msg-avatar"><Bot size={14} /></div>
+                <div className="kojo-msg-avatar kojo-msg-avatar--working"><KojoMascot state="loading" /></div>
                 <div className="kojo-message-body">
                   <div className="kojo-message-meta">
                     <span className="kojo-message-label">Kojo</span>
                     <span className="kojo-message-time kojo-thinking-label">thinking…</span>
-                  </div>
-                  <div className="kojo-thinking">
-                    <span /><span /><span />
                   </div>
                 </div>
               </div>

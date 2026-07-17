@@ -1,5 +1,6 @@
 import Editor from "@monaco-editor/react";
-import { AlertCircle, ArrowLeft, ArrowRight, Bookmark, Bot, Calculator, Check, ChevronDown, ChevronUp, Code2, Eraser, Flag, GraduationCap, Highlighter, LayoutGrid, Loader2, NotebookPen, Send, Sparkles, Strikethrough, Undo2, X } from "lucide-react";
+import KojoMascot from "../components/KojoMascot";
+import { AlertCircle, ArrowLeft, ArrowRight, Atom, Bookmark, Calculator, Check, ChevronDown, ChevronUp, Code2, Eraser, Flag, GraduationCap, Highlighter, LayoutGrid, Loader2, NotebookPen, Send, Sparkles, Strikethrough, Undo2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -200,6 +201,12 @@ export default function TakeTest() {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
         return; // Don't interfere with typing
+      }
+      // Don't interfere with the STEM answer editor: the MathLive <math-field>
+      // web component and the on-screen symbol keyboard are not <input>/<textarea>,
+      // so their arrow keys would otherwise fall through and jump questions.
+      if (event.target instanceof Element && event.target.closest(".math-input-wrap")) {
+        return;
       }
       if (event.key === "ArrowRight") {
         event.preventDefault();
@@ -613,17 +620,17 @@ export default function TakeTest() {
           <div className="progress-fill" style={{ width: `${progress}%` }} />
         </div>
         <header>
-          <Link className="back-link" to="/dashboard">
+          <Link className="back-link" to={test.folder_id ? `/folders/${test.folder_id}` : "/folders"}>
             <ArrowLeft size={16} />
-            Dashboard
+            Folder
           </Link>
           <div>
             <strong>
               {test.title}
               {isMathMode && (
                 <span className="math-mode-badge">
-                  <Calculator size={12} />
-                  Math
+                  <Atom size={12} />
+                  STEM
                 </span>
               )}
               {isCodingMode && (
@@ -752,7 +759,7 @@ export default function TakeTest() {
               Highlight any text to ask Kojo, grounded in your notes.
             </span>
             <button type="button" className="learning-mode-ask-btn" onClick={() => openKojo()}>
-              <Bot size={15} />
+              <KojoMascot state="idle" />
               Ask Kojo
             </button>
           </div>
@@ -792,94 +799,94 @@ export default function TakeTest() {
           }
           const questionCard = (
             <Card className="question-card">
-          <div className="question-card-top">
-            <span className="pill">{questionTypeLabel(question)}</span>
-            {toolsEnabled && bookmarks.has(question.id) ? (
-              <span className="question-stuck-badge"><Flag size={12} /> Stuck</span>
-            ) : null}
-          </div>
-          {toolsEnabled && highlightMode ? (
-            <div className="test-highlight-hint">
-              <span><Highlighter size={14} /> Select text in the question to highlight it.</span>
-              {(highlights[question.id]?.length ?? 0) > 0 ? (
-                <button type="button" className="test-highlight-clear" onClick={clearCurrentHighlights}>
-                  <Eraser size={13} /> Clear
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-          <div
-            className="test-question-markdown"
-            ref={questionTextRef}
-            onMouseUp={toolsEnabled ? captureHighlight : undefined}
-            onTouchEnd={toolsEnabled ? captureHighlight : undefined}
-          >
-            <MarkdownContent content={question.question_text} />
-          </div>
-          {question.type === "MCQ" ? (
-            <MCQQuestion
-              question={question}
-              answer={answers[question.id]}
-              onAnswer={(answer) => setAnswers({ ...answers, [question.id]: answer })}
-              toolsEnabled={toolsEnabled}
-              crossed={crossouts[question.id] ?? []}
-              onToggleCross={toggleCrossout}
-            />
-          ) : question.type === "TF" ? (
-            <TFQuestion
-              question={question}
-              answer={answers[question.id]}
-              onAnswer={(answer) => setAnswers({ ...answers, [question.id]: answer })}
-            />
-          ) : question.type === "MS" ? (
-            <MSQuestion
-              question={question}
-              answer={answers[question.id]}
-              onAnswer={(answer) => setAnswers({ ...answers, [question.id]: answer })}
-            />
-          ) : question.type === "RANK" ? (
-            <RankQuestion
-              question={question}
-              answer={answers[question.id]}
-              onAnswer={(answer) => setAnswers({ ...answers, [question.id]: answer })}
-            />
-          ) : isCodingMode ? (
-            <div className="code-editor-wrap">
-              <label className="field-label">Your code</label>
-              <div className="code-editor-frame">
-                <Editor
-                  height="320px"
-                  language={codingLanguage.toLowerCase()}
-                  value={answers[question.id] ?? ""}
-                  onChange={(val) => setAnswers({ ...answers, [question.id]: val ?? "" })}
-                  theme="vs-dark"
-                  options={{
-                    fontSize: 14,
-                    minimap: { enabled: false },
-                    scrollBeyondLastLine: false,
-                    lineNumbers: "on",
-                    wordWrap: "on",
-                    automaticLayout: true,
-                  }}
-                />
+              <div className="question-card-top">
+                <span className="pill">{questionTypeLabel(question)}</span>
+                {toolsEnabled && bookmarks.has(question.id) ? (
+                  <span className="question-stuck-badge"><Flag size={12} /> Stuck</span>
+                ) : null}
               </div>
-              <p className="muted" style={{ fontSize: "0.8rem", marginTop: 6 }}>
-                Write your solution in {codingLanguage}. Your code will be reviewed by AI.
-              </p>
-            </div>
-          ) : isMathMode ? (
-            <MathInput
-              value={answers[question.id] ?? ""}
-              onChange={(val) => setAnswers({ ...answers, [question.id]: val })}
-            />
-          ) : (
-            <TextArea
-              label="Your answer"
-              value={answers[question.id] ?? ""}
-              onChange={(event) => setAnswers({ ...answers, [question.id]: event.target.value })}
-              placeholder="Use the details from your notes..."
-            />
-          )}
+              {toolsEnabled && highlightMode ? (
+                <div className="test-highlight-hint">
+                  <span><Highlighter size={14} /> Select text in the question to highlight it.</span>
+                  {(highlights[question.id]?.length ?? 0) > 0 ? (
+                    <button type="button" className="test-highlight-clear" onClick={clearCurrentHighlights}>
+                      <Eraser size={13} /> Clear
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+              <div
+                className="test-question-markdown"
+                ref={questionTextRef}
+                onMouseUp={toolsEnabled ? captureHighlight : undefined}
+                onTouchEnd={toolsEnabled ? captureHighlight : undefined}
+              >
+                <MarkdownContent content={question.question_text} />
+              </div>
+              {question.type === "MCQ" ? (
+                <MCQQuestion
+                  question={question}
+                  answer={answers[question.id]}
+                  onAnswer={(answer) => setAnswers({ ...answers, [question.id]: answer })}
+                  toolsEnabled={toolsEnabled}
+                  crossed={crossouts[question.id] ?? []}
+                  onToggleCross={toggleCrossout}
+                />
+              ) : question.type === "TF" ? (
+                <TFQuestion
+                  question={question}
+                  answer={answers[question.id]}
+                  onAnswer={(answer) => setAnswers({ ...answers, [question.id]: answer })}
+                />
+              ) : question.type === "MS" ? (
+                <MSQuestion
+                  question={question}
+                  answer={answers[question.id]}
+                  onAnswer={(answer) => setAnswers({ ...answers, [question.id]: answer })}
+                />
+              ) : question.type === "RANK" ? (
+                <RankQuestion
+                  question={question}
+                  answer={answers[question.id]}
+                  onAnswer={(answer) => setAnswers({ ...answers, [question.id]: answer })}
+                />
+              ) : isCodingMode ? (
+                <div className="code-editor-wrap">
+                  <label className="field-label">Your code</label>
+                  <div className="code-editor-frame">
+                    <Editor
+                      height="320px"
+                      language={codingLanguage.toLowerCase()}
+                      value={answers[question.id] ?? ""}
+                      onChange={(val) => setAnswers({ ...answers, [question.id]: val ?? "" })}
+                      theme="vs-dark"
+                      options={{
+                        fontSize: 14,
+                        minimap: { enabled: false },
+                        scrollBeyondLastLine: false,
+                        lineNumbers: "on",
+                        wordWrap: "on",
+                        automaticLayout: true,
+                      }}
+                    />
+                  </div>
+                  <p className="muted" style={{ fontSize: "0.8rem", marginTop: 6 }}>
+                    Write your solution in {codingLanguage}. Your code will be reviewed by AI.
+                  </p>
+                </div>
+              ) : isMathMode ? (
+                <MathInput
+                  value={answers[question.id] ?? ""}
+                  onChange={(val) => setAnswers({ ...answers, [question.id]: val })}
+                />
+              ) : (
+                <TextArea
+                  label="Your answer"
+                  value={answers[question.id] ?? ""}
+                  onChange={(event) => setAnswers({ ...answers, [question.id]: event.target.value })}
+                  placeholder="Use the details from your notes..."
+                />
+              )}
             </Card>
           );
           if (learningActive && test.folder_id) {
@@ -938,7 +945,7 @@ export default function TakeTest() {
           <div className="lc-kojo-backdrop" onClick={() => { setKojoOpen(false); setKojoResponse(null); }} />
           <div className="lc-kojo-modal">
             <div className="lc-kojo-modal-header">
-              <div className="kojo-avatar"><Bot size={16} /></div>
+              <div className="kojo-avatar"><KojoMascot state={kojoLoading ? "loading" : "idle"} /></div>
               <span><Sparkles size={13} className="kojo-title-icon" /> Ask Kojo</span>
               <button type="button" className="lc-kojo-close" onClick={() => { setKojoOpen(false); setKojoResponse(null); }} aria-label="Close">
                 <X size={17} />
@@ -965,7 +972,7 @@ export default function TakeTest() {
 
             <div className="lc-kojo-modal-footer">
               {kojoLoading ? (
-                <div className="kojo-thinking"><span /><span /><span /></div>
+                <div className="kojo-thinking-mascot"><KojoMascot state="loading" /><span className="kojo-thinking-label">thinking…</span></div>
               ) : (
                 <button type="button" className="button button--primary lc-kojo-send" onClick={() => void handleKojoSend()} disabled={!kojoInput.trim()}>
                   <Send size={15} />

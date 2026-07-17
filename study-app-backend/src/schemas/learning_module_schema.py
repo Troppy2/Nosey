@@ -23,6 +23,12 @@ class UpdateLearningModuleRequest(BaseModel):
     lesson_content: str = Field(min_length=1, max_length=100000)
 
 
+class ArchiveTrackRequest(BaseModel):
+    # True archives the whole track (frees the folder's active slot); false
+    # restores it as the active track (rejected if one already exists).
+    archived: bool
+
+
 class QuizQuestionPublic(BaseModel):
     """A quiz question as sent to the client: no correct_index (graded server-side)."""
 
@@ -58,6 +64,11 @@ class LearningTrackResponse(BaseModel):
     # True when the folder's current notes no longer match the notes this track
     # was built from; the UI offers a rebuild.
     notes_stale: bool
+    # Archived tracks live under the hub's "Archived" section, viewable but not
+    # occupying the folder's active slot.
+    is_archived: bool = False
+    # ISO timestamp used to label archived tracks in the hub list.
+    created_at: Optional[str] = None
     modules: list[LearningModuleResponse]
 
 
