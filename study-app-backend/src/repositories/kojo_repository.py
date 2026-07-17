@@ -146,6 +146,13 @@ class KojoRepository(BaseRepository[KojoConversation]):
         await self.session.flush()
         return message
 
+    async def delete_message_by_id(self, message_id: int) -> None:
+        """Hard-delete a single message (used when regenerating an answer)."""
+        message = await self.session.get(KojoMessage, message_id)
+        if message is not None:
+            await self.session.delete(message)
+            await self.session.flush()
+
     async def get_history(
         self, conversation_id: int, limit: int = 10, after: Optional[datetime] = None
     ) -> list[KojoMessage]:

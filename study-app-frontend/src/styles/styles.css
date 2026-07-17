@@ -17723,3 +17723,529 @@ button.kojo-blueprint-head:hover {
     animation: none;
   }
 }
+
+/* ═══════════════════════════════════════════════════
+   Code-block copy button + chat-mode user-bubble actions
+   (copy prompt, edit + resend, retry, version switcher)
+═══════════════════════════════════════════════════ */
+
+/* ── Code block header (language label + copy) ── */
+.kojo-code-head {
+  position: sticky;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  min-height: 16px;
+}
+
+/* The language label now lives inside the flex header; drop its own margin so
+   spacing comes from the header. Placed after earlier .kojo-code-lang rules so
+   it wins on equal specificity (including the test-option override). */
+.kojo-code-block .kojo-code-head .kojo-code-lang {
+  margin-bottom: 0;
+}
+
+.kojo-code-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: currentColor;
+  opacity: 0.62;
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  line-height: 1;
+  padding: 3px 7px;
+  cursor: pointer;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+
+.kojo-code-copy:hover {
+  opacity: 1;
+  background: rgba(127, 127, 127, 0.16);
+}
+
+.kojo-code-copy:focus-visible {
+  opacity: 1;
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+}
+
+/* ── User bubble action row (chat mode) ── */
+.chat-mode-shell .kojo-user-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* Timestamp sits in the flex meta row now; drop its standalone top margin so it
+   aligns with the action buttons instead of dropping below them. */
+.chat-mode-shell .kojo-user-meta .kojo-message-time--user,
+.chat-mode-shell .kojo-user-meta .kojo-message-time {
+  margin-top: 0;
+}
+
+.chat-mode-shell .kojo-user-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.chat-mode-shell .kojo-user-col:hover .kojo-user-actions,
+.chat-mode-shell .kojo-user-actions:focus-within {
+  opacity: 1;
+}
+
+.chat-mode-shell .kojo-user-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--k-faint);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.chat-mode-shell .kojo-user-action:hover {
+  background: var(--k-hover);
+  color: var(--k-ink);
+}
+
+.chat-mode-shell .kojo-user-action:focus-visible {
+  outline: 2px solid var(--k-accent);
+  outline-offset: 1px;
+}
+
+.chat-mode-shell .kojo-user-action:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── Prompt version switcher ── */
+.chat-mode-shell .kojo-version-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  color: var(--k-faint);
+}
+
+.chat-mode-shell .kojo-version-switch span {
+  min-width: 26px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-mode-shell .kojo-version-switch button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--k-faint);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.chat-mode-shell .kojo-version-switch button:hover:not(:disabled) {
+  background: var(--k-hover);
+  color: var(--k-ink);
+}
+
+.chat-mode-shell .kojo-version-switch button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* ── Failed send + retry ── */
+.chat-mode-shell .kojo-user-bubble--failed {
+  background: #9a4038;
+}
+
+.chat-mode-shell .kojo-user-failed {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  color: #b3352b;
+}
+
+.chat-mode-shell .kojo-user-retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #e2b4ae;
+  border-radius: 999px;
+  background: #fdf3f2;
+  color: #b3352b;
+  font-family: inherit;
+  font-size: 0.72rem;
+  padding: 2px 9px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.chat-mode-shell .kojo-user-retry:hover:not(:disabled) {
+  background: #f9e6e4;
+}
+
+.chat-mode-shell .kojo-user-retry:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ── Inline prompt edit ── */
+.chat-mode-shell .kojo-user-col--editing {
+  max-width: 100%;
+  width: 100%;
+  align-items: stretch;
+}
+
+.chat-mode-shell .kojo-user-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.chat-mode-shell .kojo-user-edit-input {
+  width: 100%;
+  border: 1px solid var(--k-line);
+  border-radius: 12px;
+  background: var(--k-field);
+  color: var(--k-ink);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.chat-mode-shell .kojo-user-edit-input:focus {
+  outline: none;
+  border-color: var(--k-accent);
+  box-shadow: 0 0 0 3px var(--k-accent-tint);
+}
+
+.chat-mode-shell .kojo-user-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.chat-mode-shell .kojo-user-edit-cancel,
+.chat-mode-shell .kojo-user-edit-send {
+  border-radius: 8px;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background 0.12s ease, opacity 0.12s ease;
+}
+
+.chat-mode-shell .kojo-user-edit-cancel {
+  border: 1px solid var(--k-line);
+  background: transparent;
+  color: var(--k-muted);
+}
+
+.chat-mode-shell .kojo-user-edit-cancel:hover {
+  background: var(--k-hover);
+}
+
+.chat-mode-shell .kojo-user-edit-send {
+  border: none;
+  background: var(--k-accent);
+  color: #fff;
+}
+
+.chat-mode-shell .kojo-user-edit-send:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Touch devices have no hover: keep the bubble actions visible. */
+@media (hover: none) {
+  .chat-mode-shell .kojo-user-actions {
+    opacity: 1;
+  }
+}
+
+/* ── Assistant answer action row (copy / regenerate / answer switcher) ── */
+.chat-mode-shell .kojo-answer-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.chat-mode-shell .kojo-answer-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.chat-mode-shell .kojo-message--assistant:hover .kojo-answer-actions,
+.chat-mode-shell .kojo-answer-actions:focus-within {
+  opacity: 1;
+}
+
+.chat-mode-shell .kojo-answer-meta .kojo-message-time {
+  margin-top: 0;
+}
+
+@media (hover: none) {
+  .chat-mode-shell .kojo-answer-actions {
+    opacity: 1;
+  }
+}
+
+/* ── Stop button (send button while Kojo is streaming) ── */
+.chat-mode-shell .kojo-send--stop {
+  background: var(--k-ink);
+  color: var(--k-canvas);
+}
+
+.chat-mode-shell .kojo-send--stop:hover {
+  background: var(--k-ink-2);
+}
+
+.chat-mode-shell .kojo-send--stop svg {
+  fill: currentColor;
+}
+
+/* ── Settings: Kojo custom instruction + weekly memory ── */
+.settings-custom-instruction {
+  width: 100%;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  padding: 10px 12px;
+  resize: vertical;
+  margin-top: 8px;
+}
+
+.settings-custom-instruction:focus {
+  outline: none;
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.15);
+}
+
+.settings-custom-instruction-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
+.settings-inline-clear {
+  border: none;
+  background: none;
+  color: var(--green-dark);
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.settings-inline-clear:hover {
+  text-decoration: underline;
+}
+
+.settings-memory-card {
+  border: 1px solid var(--green-light-mid);
+  border-radius: 10px;
+  background: var(--green-lightest);
+  padding: 12px 14px;
+  margin: 10px 0;
+}
+
+.settings-memory-text {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.settings-memory-date {
+  margin: 8px 0 0;
+}
+
+.settings-secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--green-dark);
+  font-family: inherit;
+  font-size: 0.88rem;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.settings-secondary-btn:hover:not(:disabled) {
+  background: var(--green-lightest);
+}
+
+.settings-secondary-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* ── Folder-home Files card: upload target (click + drag-and-drop) ── */
+.chat-mode-shell .kojo-files-card {
+  position: relative;
+}
+
+.chat-mode-shell .kojo-files-card--drag {
+  border-color: var(--k-accent);
+  box-shadow: 0 0 0 3px var(--k-accent-tint);
+}
+
+.chat-mode-shell .kojo-files-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.chat-mode-shell .kojo-files-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--k-line);
+  border-radius: 7px;
+  background: var(--k-field);
+  color: var(--k-ink);
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.chat-mode-shell .kojo-files-add:hover:not(:disabled) {
+  background: var(--k-hover);
+  border-color: var(--k-accent);
+}
+
+.chat-mode-shell .kojo-files-add:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.chat-mode-shell .kojo-files-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 18px 12px;
+  border: 1.5px dashed var(--k-line);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--k-muted);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.chat-mode-shell .kojo-files-drop:hover:not(:disabled) {
+  border-color: var(--k-accent);
+  background: var(--k-hover);
+  color: var(--k-ink);
+}
+
+.chat-mode-shell .kojo-files-drop:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.chat-mode-shell .kojo-files-drop-main {
+  font-size: 0.82rem;
+}
+
+.chat-mode-shell .kojo-files-drop-link {
+  color: var(--k-accent);
+  font-weight: 600;
+}
+
+.chat-mode-shell .kojo-files-drop-hint {
+  font-size: 0.7rem;
+  color: var(--k-faint);
+}
+
+.chat-mode-shell .kojo-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+}
+
+.chat-mode-shell .kojo-file-row {
+  align-items: center;
+}
+
+.chat-mode-shell .kojo-file-badge {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-family: var(--font-sans);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--k-faint);
+  border: 1px solid var(--k-line);
+  border-radius: 4px;
+  padding: 2px 5px;
+}
+
+.chat-mode-shell .kojo-files-error {
+  margin: 8px 0 0;
+  font-size: 0.72rem;
+  color: #b3352b;
+}
+
+.chat-mode-shell .kojo-files-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 14px;
+  background: rgba(246, 249, 241, 0.92);
+  color: var(--k-accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+  pointer-events: none;
+}

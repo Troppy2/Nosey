@@ -44,6 +44,7 @@ class KojoChatRequest(BaseModel):
     strictness: Optional[str] = Field(default="medium", description="Constitution strictness: 'strict', 'medium', or 'none'")
     conversation_id: Optional[int] = Field(default=None, description="Specific conversation to continue; if omitted uses latest for folder")
     reasoning: Optional[bool] = Field(default=False, description="Stream a visible reasoning pass before the answer (streaming endpoints only)")
+    custom_instruction: Optional[str] = Field(default=None, max_length=500, description="User's standing instruction for how Kojo should behave in chat")
 
 
 class KojoChatResponse(BaseModel):
@@ -102,6 +103,24 @@ class GeneralChatRequest(BaseModel):
     provider: Optional[str] = Field(default=None)
     strictness: Optional[str] = Field(default="medium")
     reasoning: Optional[bool] = Field(default=False, description="Stream a visible reasoning pass before the answer (streaming endpoints only)")
+    custom_instruction: Optional[str] = Field(default=None, max_length=500, description="User's standing instruction for how Kojo should behave in chat")
+
+
+class RegenerateRequest(BaseModel):
+    """Regenerate the last assistant turn. Carries no message: the backend reuses
+    the conversation's most recent user prompt."""
+    provider: Optional[str] = Field(default=None)
+    strictness: Optional[str] = Field(default="medium")
+    reasoning: Optional[bool] = Field(default=False)
+    custom_instruction: Optional[str] = Field(default=None, max_length=500)
+
+
+class KojoMemoryDTO(BaseModel):
+    """Weekly recap of the student's study activity, shown in Settings and fed
+    into Kojo's prompt. `stale` marks it as due for regeneration."""
+    content: Optional[str] = None
+    generated_at: Optional[datetime] = None
+    stale: bool = True
 
 
 ACTION_TYPES = {"create_folder", "create_flashcards", "create_module", "start_matching"}
