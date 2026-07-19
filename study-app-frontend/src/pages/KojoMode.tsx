@@ -34,7 +34,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import KojoActionCard from "../components/KojoActionCard";
@@ -86,25 +86,24 @@ import { useSettings } from "../lib/useSettings";
 // composer row stay compact without truncating what Kojo actually receives.
 // actionType (when set) opens a creation card instead of sending a chat turn.
 type Suggestion = {
-  icon: ReactNode;
   label: string;
   prompt: string;
   actionType?: KojoActionType;
 };
 
 const SUGGESTIONS: Suggestion[] = [
-  { icon: <BookOpen size={13} />, label: "Explain the notes", prompt: "Explain the main concepts in these notes" },
-  { icon: <Target size={13} />, label: "Exam focus", prompt: "What should I focus on for the exam?" },
-  { icon: <Lightbulb size={13} />, label: "Give an analogy", prompt: "Give me an analogy to understand a key idea" },
-  { icon: <Layers size={13} />, label: "Create flashcards", prompt: "Make flashcards from what we've been discussing", actionType: "create_flashcards" },
-  { icon: <ClipboardList size={13} />, label: "Create a test", prompt: "Create a practice test from this folder" },
+  { label: "Explain the notes", prompt: "Explain the main concepts in these notes" },
+  { label: "Exam focus", prompt: "What should I focus on for the exam?" },
+  { label: "Give an analogy", prompt: "Give me an analogy to understand a key idea" },
+  { label: "Create flashcards", prompt: "Make flashcards from what we've been discussing", actionType: "create_flashcards" },
+  { label: "Create a test", prompt: "Create a practice test from this folder" },
 ];
 
 const GENERAL_SUGGESTIONS: Suggestion[] = [
-  { icon: <BookOpen size={13} />, label: "Explain a concept", prompt: "Help me understand a concept" },
-  { icon: <ListChecks size={13} />, label: "Step by step", prompt: "Explain something step by step" },
-  { icon: <Layers size={13} />, label: "Create flashcards", prompt: "Make flashcards from what we've been discussing", actionType: "create_flashcards" },
-  { icon: <Lightbulb size={13} />, label: "Plan my studying", prompt: "Help me plan what to study" },
+  { label: "Explain a concept", prompt: "Help me understand a concept" },
+  { label: "Step by step", prompt: "Explain something step by step" },
+  { label: "Create flashcards", prompt: "Make flashcards from what we've been discussing", actionType: "create_flashcards" },
+  { label: "Plan my studying", prompt: "Help me plan what to study" },
 ];
 
 const BUILT_IN_COMMANDS: CommandOption[] = [
@@ -141,11 +140,11 @@ const ACTION_DEFAULT_PROMPTS: Record<KojoActionType, string> = {
 };
 
 // The plus-menu's "create" section: everything Kojo can build from the chat.
-const ACTION_MENU_ITEMS: Array<{ actionType: KojoActionType; label: string; icon: ReactNode }> = [
-  { actionType: "create_flashcards", label: "Create flashcards", icon: <Layers size={13} /> },
-  { actionType: "create_module", label: "Create learning modules", icon: <GraduationCap size={13} /> },
-  { actionType: "start_matching", label: "Start a matching game", icon: <Puzzle size={13} /> },
-  { actionType: "create_folder", label: "Create a new folder", icon: <FolderPlus size={13} /> },
+const ACTION_MENU_ITEMS: Array<{ actionType: KojoActionType; label: string }> = [
+  { actionType: "create_flashcards", label: "Create flashcards" },
+  { actionType: "create_module", label: "Create learning modules" },
+  { actionType: "start_matching", label: "Start a matching game" },
+  { actionType: "create_folder", label: "Create a new folder" },
 ];
 
 // folderId = null means "General" mode (no folder)
@@ -1917,7 +1916,6 @@ export default function KojoMode() {
                   <div className="kojo-suggestions">
                     {suggestions.map((s) => (
                       <button key={s.label} className="kojo-suggestion" onClick={() => handleSend(s.prompt, undefined, s.actionType)} type="button">
-                        {s.icon}
                         {s.label}
                       </button>
                     ))}
@@ -2207,7 +2205,6 @@ export default function KojoMode() {
               <div className="chat-mode-input-chips kojo-suggestions">
                 {suggestions.map((s) => (
                   <button key={s.label} className="kojo-suggestion" onClick={() => handleSend(s.prompt, undefined, s.actionType)} type="button">
-                    {s.icon}
                     {s.label}
                   </button>
                 ))}
@@ -2265,7 +2262,6 @@ export default function KojoMode() {
                                 );
                               }}
                             >
-                              {item.icon}
                               <span>{item.label}</span>
                             </button>
                           ))}

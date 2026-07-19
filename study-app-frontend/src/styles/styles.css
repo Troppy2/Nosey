@@ -1323,7 +1323,7 @@ h3 {
   flex-wrap: wrap;
 }
 
-.settings-toggle-switch {
+.toggle-switch {
   display: inline-flex;
   align-items: center;
   gap: 12px;
@@ -1335,25 +1335,25 @@ h3 {
   color: var(--ink);
 }
 
-.settings-toggle-switch:hover .settings-toggle-track {
+.toggle-switch:hover .toggle-switch-track {
   opacity: 0.85;
 }
 
-.settings-toggle-track {
+.toggle-switch-track {
   position: relative;
   width: 56px;
   height: 30px;
   border-radius: 15px;
   background: var(--green-light);
-  transition: background var(--transition-fast);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
   flex-shrink: 0;
 }
 
-.settings-toggle-switch--on .settings-toggle-track {
+.toggle-switch--on .toggle-switch-track {
   background: var(--green-dark);
 }
 
-.settings-toggle-thumb {
+.toggle-switch-thumb {
   position: absolute;
   top: 4px;
   left: 4px;
@@ -1365,11 +1365,11 @@ h3 {
   transition: transform var(--transition-fast);
 }
 
-.settings-toggle-switch--on .settings-toggle-thumb {
+.toggle-switch--on .toggle-switch-thumb {
   transform: translateX(26px);
 }
 
-.settings-toggle-label {
+.toggle-switch-label {
   font-weight: 500;
   color: var(--ink);
 }
@@ -5092,6 +5092,23 @@ h3 {
   --lc-surface: rgba(255, 255, 255, 0.72);
 }
 
+/* KojoCode: one keyboard focus ring for every interactive surface. Any element
+   carrying an lc- class gets a single consistent ring, so buttons, tabs, chips,
+   links, toggles, and options that previously showed no keyboard state now do.
+   Text fields keep their own border-glow focus and opt out just below.
+   Element-specific :focus-visible rules defined later in the file still win on
+   source order, so intentional per-component treatments are preserved. */
+[class*="lc-"]:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+input[class*="lc-"]:focus-visible,
+textarea[class*="lc-"]:focus-visible,
+select[class*="lc-"]:focus-visible {
+  outline: none;
+}
+
 .lc-hero {
   display: flex;
   align-items: flex-start;
@@ -5242,7 +5259,77 @@ h3 {
 }
 
 .lc-toolbar-btn--timer {
-  min-width: 96px;
+  min-width: 104px;
+  min-height: 36px;
+  gap: 7px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-toolbar-btn--timer .lc-tb-label--timer {
+  display: inline;
+}
+
+.lc-timer-ring {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.lc-timer-ring-track {
+  stroke: rgba(113, 131, 85, 0.18);
+}
+
+.lc-timer-ring-progress {
+  stroke: var(--green-dark);
+  transition: stroke-dashoffset 0.8s linear, stroke 160ms ease;
+}
+
+.lc-timer-ring--idle .lc-timer-ring-track {
+  stroke: rgba(113, 131, 85, 0.42);
+  stroke-dasharray: 2 3;
+}
+
+.lc-toolbar-btn--timer-idle {
+  color: #526442;
+}
+
+.lc-toolbar-btn--timer-calm {
+  border-color: rgba(113, 131, 85, 0.45);
+  background: rgba(233, 245, 219, 0.58);
+}
+
+.lc-toolbar-btn--timer-warn {
+  border-color: rgba(202, 138, 4, 0.44);
+  background: #fff9e8;
+  color: #8a5a06;
+}
+
+.lc-timer-ring--warn .lc-timer-ring-track {
+  stroke: rgba(202, 138, 4, 0.18);
+}
+
+.lc-timer-ring--warn .lc-timer-ring-progress {
+  stroke: #ca8a04;
+}
+
+.lc-toolbar-btn--timer-alert {
+  border-color: rgba(220, 38, 38, 0.48);
+  background: #fff3f3;
+  color: #a32020;
+  animation: lc-timer-alert-pulse 1.4s ease-in-out infinite;
+}
+
+.lc-timer-ring--alert .lc-timer-ring-track {
+  stroke: rgba(220, 38, 38, 0.17);
+}
+
+.lc-timer-ring--alert .lc-timer-ring-progress {
+  stroke: #dc2626;
+}
+
+@keyframes lc-timer-alert-pulse {
+  50% { box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1); }
 }
 
 .lc-coding-tab:hover {
@@ -5328,6 +5415,21 @@ h3 {
   font-size: 1rem;
 }
 
+/* Difficulty split: tint each count with the shared difficulty palette so the
+   Easy/Medium/Hard breakdown is scannable at a glance. Reuses the exact colors
+   from .lc-difficulty--* (used on problem rows and filter chips). */
+.lc-stat-tile--split .lc-split-val--easy {
+  color: #166534;
+}
+
+.lc-stat-tile--split .lc-split-val--medium {
+  color: #92400e;
+}
+
+.lc-stat-tile--split .lc-split-val--hard {
+  color: #991b1b;
+}
+
 .lc-stat-tile--streak {
   position: relative;
   cursor: default;
@@ -5360,8 +5462,8 @@ h3 {
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 18px 92px;
-  padding: 8px 0 28px;
+  gap: 26px 92px;
+  padding: 12px 0 32px;
 }
 
 .lc-roadmap::before {
@@ -5381,11 +5483,11 @@ h3 {
   position: relative;
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr);
-  gap: 12px;
-  min-height: 96px;
-  padding: 16px;
+  gap: 14px;
+  min-height: 104px;
+  padding: 20px;
   border: 1px solid color-mix(in srgb, var(--lc-accent) 34%, white);
-  border-radius: 8px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.9);
   box-shadow: var(--shadow-sm);
   text-align: left;
@@ -5523,12 +5625,16 @@ h3 {
   color: var(--ink);
 }
 
+/* Comfortable card grid instead of a dense bordered list: each problem is its own
+   card, arranged in a responsive grid rather than stacked rows. */
 .lc-problem-list {
-  overflow: hidden;
-  border: 1px solid var(--lc-border);
-  border-radius: 8px;
-  background: var(--white);
-  box-shadow: var(--shadow-sm);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  overflow: visible;
+  border: none;
+  background: transparent;
+  box-shadow: none;
 }
 
 .lc-problem-row {
@@ -5537,8 +5643,26 @@ h3 {
   align-items: center;
   gap: 12px;
   min-height: 58px;
-  padding: 10px 14px;
-  border-bottom: 1px solid rgba(181, 201, 154, 0.38);
+  padding: 14px 16px;
+  border: 1px solid var(--lc-border);
+  border-radius: 12px;
+  background: var(--white);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.13s ease, transform 0.13s ease;
+}
+
+.lc-problem-row:hover {
+  box-shadow: 0 6px 18px rgba(38, 48, 31, 0.1);
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-problem-row {
+    transition: none;
+  }
+  .lc-problem-row:hover {
+    transform: none;
+  }
 }
 
 /* Archived rows drop the completion checkbox, so the grid loses its first column. */
@@ -5557,8 +5681,14 @@ h3 {
   border-bottom: 0;
 }
 
+/* Done cards keep the same white card background as unsolved ones (a full-tint wash
+   made them nearly disappear against the page's own green background); "done" reads
+   instead through a clear green left accent plus the filled checkmark. */
 .lc-problem-row--done {
-  background: rgba(233, 245, 219, 0.54);
+  background: var(--white);
+  border-color: color-mix(in srgb, var(--green-dark) 40%, var(--lc-border));
+  border-left: 4px solid var(--green-dark);
+  padding-left: 13px;
 }
 
 .lc-problem-check {
@@ -5689,8 +5819,35 @@ h3 {
 .lc-editor-actions {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 10px;
   flex-wrap: wrap;
+}
+
+/* Toolbar clusters: grouped labeled sections (Run/Submit, Timer, Notes, Ask Kojo)
+   instead of one bare row of icon buttons. */
+.lc-toolbar-cluster {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 9px;
+  background: rgba(233, 245, 219, 0.5);
+}
+
+.lc-toolbar-cluster-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted, #596949);
+  margin-right: 2px;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .lc-toolbar-cluster-label {
+    display: none;
+  }
 }
 
 .lc-toolbar-btn {
@@ -5922,12 +6079,86 @@ h3 {
   width: 460px;
 }
 
+/* Ask-Kojo drawer variant: a real slide-in side panel, not a floating card over a
+   dimming full-screen backdrop, so the editor stays visible and usable while it's
+   open (per the KojoCode redesign: "never crushes the editor"). */
+.lc-kojo-backdrop--drawer {
+  background: transparent;
+}
+
+.lc-kojo-modal--drawer {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 380px;
+  max-width: min(380px, 100vw);
+  max-height: none;
+  border-radius: 0;
+  border-top: none;
+  border-bottom: none;
+  border-left: 1px solid var(--lc-border);
+  box-shadow: -8px 0 24px rgba(38, 48, 31, 0.12);
+  animation: lc-kojo-drawer-in 0.18s ease-out;
+}
+
+@keyframes lc-kojo-drawer-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-kojo-modal--drawer {
+    animation: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .lc-kojo-modal--drawer {
+    width: 100%;
+    max-width: 100vw;
+  }
+}
+
 .lc-timer-modal {
-  width: 420px;
+  width: min(438px, calc(100vw - 32px));
+  overflow: hidden;
+  border-color: rgba(113, 131, 85, 0.32);
+  box-shadow: 0 24px 64px rgba(38, 48, 31, 0.2);
 }
 
 .lc-timer-modal-header {
-  background: rgba(233, 245, 219, 0.58);
+  position: relative;
+  display: block;
+  padding: 25px 58px 22px 24px;
+  background: linear-gradient(135deg, #eff7e4, #dcebc9);
+  border-bottom: 1px solid rgba(113, 131, 85, 0.2);
+}
+
+.lc-timer-modal-header h2 {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-family: "Lora", Georgia, serif;
+  font-size: 1.45rem;
+  line-height: 1.22;
+}
+
+.lc-timer-modal-header .lc-kojo-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+}
+
+.lc-timer-modal-eyebrow {
+  display: block;
+  color: #5c7045;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .lc-timer-avatar {
@@ -5937,8 +6168,8 @@ h3 {
 
 .lc-timer-modal-body {
   display: grid;
-  gap: 14px;
-  padding: 14px;
+  gap: 18px;
+  padding: 24px;
 }
 
 .lc-timer-modal-presets {
@@ -5948,52 +6179,104 @@ h3 {
 }
 
 .lc-timer-modal-preset {
-  min-height: 44px;
-  padding: 10px 12px;
+  display: flex;
+  min-height: 86px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 12px;
   border: 1px solid var(--lc-border);
-  border-radius: 10px;
-  background: var(--white);
+  border-radius: 12px;
+  background: #fbfdf8;
   color: var(--ink);
-  font-size: 0.9rem;
-  font-weight: 800;
   cursor: pointer;
-  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .lc-timer-modal-preset:hover {
   transform: translateY(-1px);
   border-color: var(--green-dark);
   background: var(--green-lightest);
+  box-shadow: 0 6px 16px rgba(113, 131, 85, 0.13);
+}
+
+.lc-timer-modal-preset:focus-visible,
+.lc-timer-modal-input:focus-within {
+  outline: 3px solid rgba(113, 131, 85, 0.25);
+  outline-offset: 2px;
+}
+
+.lc-timer-modal-preset-value {
+  font-family: "Lora", Georgia, serif;
+  font-size: 1.65rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.lc-timer-modal-preset-value::after {
+  content: " min";
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.lc-timer-modal-preset-caption {
+  color: #657653;
+  font-size: 0.7rem;
+  font-weight: 700;
 }
 
 .lc-timer-modal-input {
-  display: grid;
-  gap: 6px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 54px;
+  padding: 0 16px;
+  border: 1px solid var(--lc-border);
+  border-radius: 12px;
+  background: #fbfdf8;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.lc-timer-modal-input span {
-  color: #5e6f4c;
-  font-size: 0.78rem;
-  font-weight: 800;
-  text-transform: uppercase;
+.lc-timer-modal-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #77866a;
+  font-size: 0.7rem;
+  font-weight: 700;
   letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lc-timer-modal-divider::before,
+.lc-timer-modal-divider::after {
+  height: 1px;
+  flex: 1;
+  background: var(--lc-border);
+  content: "";
 }
 
 .lc-timer-modal-input input {
   width: 100%;
-  min-height: 42px;
-  padding: 10px 12px;
-  border: 1px solid var(--lc-border);
-  border-radius: 10px;
-  background: var(--white);
+  min-height: 50px;
+  padding: 0 42px 0 0;
+  border: 0;
+  background: transparent;
   color: var(--ink);
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   font-weight: 700;
   outline: none;
+  font-variant-numeric: tabular-nums;
 }
 
-.lc-timer-modal-input input:focus {
-  border-color: var(--green-dark);
+.lc-timer-modal-unit {
+  position: absolute;
+  right: 16px;
+  color: #5e6f4c;
+  font-size: 0.8rem;
+  font-weight: 800;
 }
 
 .lc-timer-modal-actions {
@@ -6001,7 +6284,7 @@ h3 {
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
-  padding: 0 14px 14px;
+  padding: 0 24px 24px;
 }
 
 .lc-timeout-modal-header {
@@ -6036,6 +6319,127 @@ h3 {
 
 .lc-timeout-action--ghost {
   background: var(--white);
+}
+
+/* Timer picker follows the same deliberate, blocking decision-dialog pattern as
+   the timeout prompt. The trigger itself stays icon-sized; its title provides the
+   lightweight hover tooltip, while a click opens this full modal. */
+.lc-timer-backdrop {
+  background: rgba(27, 35, 22, 0.52);
+}
+
+.lc-timer-modal {
+  top: 50%;
+  right: auto;
+  bottom: auto;
+  left: 50%;
+  width: 410px;
+  max-height: calc(100vh - 32px);
+  transform: translate(-50%, -50%);
+  border-radius: 8px;
+  box-shadow: 0 20px 56px rgba(20, 28, 16, 0.3);
+}
+
+.lc-timer-modal-header {
+  display: flex;
+  padding: 12px 14px;
+  background: rgba(233, 245, 219, 0.54);
+  border-bottom: 1px solid rgba(113, 131, 85, 0.22);
+}
+
+.lc-timer-modal-header h2,
+.lc-timer-modal-eyebrow,
+.lc-timer-modal-divider,
+.lc-timer-modal-presets {
+  display: none;
+}
+
+.lc-timer-modal-header .lc-kojo-close {
+  position: static;
+}
+
+.lc-timer-avatar {
+  width: 30px;
+  height: 30px;
+  color: var(--green-dark);
+  background: var(--green-lightest);
+}
+
+.lc-timer-modal-body {
+  display: grid;
+  gap: 14px;
+  padding: 16px 14px 2px;
+}
+
+.lc-timer-modal-copy {
+  margin: 0;
+  color: #596949;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.lc-timer-modal-field,
+.lc-timer-modal-input {
+  display: grid;
+  gap: 6px;
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.lc-timer-modal-field > span,
+.lc-timer-modal-input > span:first-child {
+  color: #516142;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lc-timer-modal-field select,
+.lc-timer-modal-input input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 38px 9px 11px;
+  border: 1px solid var(--lc-border);
+  border-radius: 8px;
+  background: #f8fbf4;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.lc-timer-modal-input {
+  position: relative;
+}
+
+.lc-timer-modal-input input {
+  min-height: 42px;
+}
+
+.lc-timer-modal-field select:focus,
+.lc-timer-modal-input:focus-within {
+  border-radius: 8px;
+  outline: 3px solid rgba(113, 131, 85, 0.2);
+  outline-offset: 1px;
+}
+
+.lc-timer-modal-unit {
+  right: 12px;
+  bottom: 12px;
+}
+
+.lc-timer-modal-actions {
+  padding: 14px;
+}
+
+@media (max-width: 520px) {
+  .lc-timer-modal {
+    width: calc(100vw - 32px);
+  }
 }
 
 .lc-kojo-modal-header {
@@ -10947,6 +11351,7 @@ h3 {
 
 .lc-notes-textarea:focus {
   border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.15);
 }
 
 .lc-notes-textarea::placeholder {
@@ -13095,75 +13500,6 @@ select.lc-custom-input {
   margin-top: 4px;
   font-size: 0.9rem;
   line-height: 1.5;
-}
-
-/* ── LeetCode: Browse all entry + combinable filter bar ───────────────────────
-   "Browse all" pools every topic into one filterable list. The filter bar (reused
-   by category views) wraps difficulty + status + topic in ONE chip system so the
-   whole control set reads as native to the roadmap surfaces. */
-.lc-browse-all {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  width: 100%;
-  margin: 0 auto 22px;
-  max-width: 760px;
-  padding: 15px 18px;
-  border: 1px solid color-mix(in srgb, var(--green-dark) 30%, white);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: var(--shadow-sm);
-  color: var(--ink);
-  cursor: pointer;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
-}
-
-.lc-browse-all:hover {
-  border-color: var(--green-dark);
-  box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
-}
-
-.lc-browse-all-icon {
-  display: inline-grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--green-dark) 12%, white);
-  color: var(--green-dark);
-  flex-shrink: 0;
-}
-
-.lc-browse-all-copy {
-  display: grid;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
-  text-align: left;
-}
-
-.lc-browse-all-copy strong {
-  font-family: var(--font-serif);
-  font-size: 1.02rem;
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.lc-browse-all-copy small {
-  color: var(--muted);
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.lc-browse-all > svg {
-  color: var(--green-dark);
-  flex-shrink: 0;
-  transition: transform var(--transition-fast);
-}
-
-.lc-browse-all:hover > svg {
-  transform: translateX(3px);
 }
 
 /* The filter bar is a soft panel matching the lc-node / lc-stat surfaces. */
@@ -18248,4 +18584,2403 @@ button.kojo-blueprint-head:hover {
   font-size: 0.8rem;
   font-weight: 600;
   pointer-events: none;
+}
+
+/* ── LeetCode dashboard: practice-rhythm heatmap (compact card, sits in top row) ── */
+.lc-cadence {
+  min-width: 0;
+  padding: 20px 22px;
+  border: 1px solid var(--lc-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--shadow-sm);
+}
+
+.lc-cadence-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.lc-cadence-head h2 {
+  margin: 0;
+  font-family: "Lora", Georgia, serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lc-cadence-sub {
+  font-size: 0.72rem;
+  color: var(--muted, #596949);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lc-cadence-grid {
+  display: grid;
+  grid-template-rows: repeat(7, 15px);
+  grid-auto-flow: column;
+  grid-auto-columns: 15px;
+  justify-items: start;
+  align-items: start;
+  gap: 3px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.lc-cadence-cell {
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+  background: #d7e8c2;
+  transition: transform 0.1s ease;
+}
+
+.lc-cadence-cell.is-active {
+  background: var(--green-dark);
+}
+
+.lc-cadence-cell.is-today {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 1px;
+}
+
+.lc-cadence-cell.is-future {
+  background: transparent;
+}
+
+.lc-cadence-grid .lc-cadence-cell:hover {
+  transform: scale(1.35);
+}
+
+.lc-cadence-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 0.7rem;
+  color: var(--muted, #596949);
+}
+
+.lc-cadence-legend .lc-cadence-cell:hover {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-cadence-cell {
+    transition: none;
+  }
+  .lc-cadence-grid .lc-cadence-cell:hover {
+    transform: none;
+  }
+}
+
+/* ── LeetCode dashboard: two-column rows (heatmap+daily practice, mastery+reminders) ── */
+.lc-dash-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+  align-items: stretch;
+}
+
+@media (max-width: 760px) {
+  .lc-dash-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lc-insight-card {
+  padding: 20px 22px;
+  border: 1px solid var(--lc-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--shadow-sm);
+}
+
+.lc-insight-title {
+  margin: 0 0 16px;
+  font-family: "Lora", Georgia, serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lc-mastery-list,
+.lc-focus-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lc-mastery-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 5px;
+}
+
+.lc-mastery-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lc-mastery-count {
+  font-size: 0.72rem;
+  color: var(--muted, #596949);
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-mastery-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: #e3eed3;
+  overflow: hidden;
+}
+
+.lc-mastery-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.lc-focus-sub {
+  margin: -8px 0 14px;
+  font-size: 0.72rem;
+  color: var(--muted, #596949);
+}
+
+/* Compact weak-topic chips, replacing the old oversized per-topic bordered rows. */
+.lc-focus-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.lc-focus-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--lc-border);
+  border-radius: 999px;
+  background: rgba(233, 245, 219, 0.6);
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.13s ease, border-color 0.13s ease;
+}
+
+.lc-focus-chip:hover {
+  background: var(--green-lightest);
+  border-color: var(--green-dark-mid);
+}
+
+.lc-focus-chip-count {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--muted, #596949);
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-focus-generate-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px;
+  margin-top: auto;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--green-dark), #536342);
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.13s ease;
+}
+
+.lc-focus-generate-btn:hover {
+  filter: brightness(1.06);
+}
+
+.lc-focus-card {
+  display: flex;
+  flex-direction: column;
+}
+
+/* "Coming up" reminders card: two full feature-preview cards (not thin nav links)
+   that stretch to fill the same height as the Topic Mastery card next to it. */
+.lc-reminders-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.lc-reminders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+}
+
+.lc-reminder-feature {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 8px;
+  width: 100%;
+  padding: 18px 20px;
+  border: 1px solid var(--lc-border);
+  border-radius: 12px;
+  background: rgba(247, 250, 242, 0.7);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.13s ease, border-color 0.13s ease, box-shadow 0.13s ease;
+}
+
+.lc-reminder-feature:hover {
+  background: var(--green-lightest);
+  border-color: var(--green-dark-mid);
+  box-shadow: var(--shadow-sm);
+}
+
+.lc-reminder-feature-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lc-reminder-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--green-lightest);
+  color: var(--green-dark);
+}
+
+.lc-reminder-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--green-dark);
+  background: #ffffff;
+  border: 1px solid var(--lc-border);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+
+.lc-reminder-feature-title {
+  font-family: "Lora", Georgia, serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.lc-reminder-feature-copy {
+  margin: 0;
+  flex: 1;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--muted, #596949);
+}
+
+.lc-reminder-feature-cta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--green-dark);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-mastery-bar > span {
+    transition: none;
+  }
+
+  .lc-toolbar-btn--timer-alert {
+    animation: none;
+  }
+
+  .lc-timer-ring-progress {
+    transition: none;
+  }
+}
+
+/* ── KojoCode hub shell + left rail (slice 3) ── */
+.lc-shell {
+  display: flex;
+  align-items: flex-start;
+  min-height: 100%;
+}
+
+.lc-shell-body {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Rail is pinned to the viewport height (not stretched to match the very tall
+   sibling content column, that bug detached the streak card to the page bottom)
+   and scrolls its own overflow independently of the page. */
+.lc-rail {
+  --lc-rail-w: 184px;
+  --lc-rail-w-collapsed: 60px;
+  position: sticky;
+  top: 0;
+  flex-shrink: 0;
+  width: var(--lc-rail-w);
+  height: 100vh;
+  max-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 18px 0;
+  background: #ffffff;
+  border-right: 1px solid var(--lc-border);
+  transition: width 0.16s ease;
+}
+
+.lc-rail[data-collapsed="true"] {
+  width: var(--lc-rail-w-collapsed);
+}
+
+.lc-rail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 0 14px;
+  margin-bottom: 22px;
+}
+
+.lc-rail-brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.lc-rail[data-collapsed="true"] .lc-rail-brand {
+  width: 0;
+  opacity: 0;
+}
+
+.lc-rail-brand-name {
+  font-family: "Lora", Georgia, serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--green-dark);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.lc-rail-brand-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--green-dark);
+  background: var(--green-lightest);
+  border: 1px solid var(--lc-border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.lc-rail-collapse-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--lc-border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--muted, #596949);
+  cursor: pointer;
+  transition: background 0.13s ease, color 0.13s ease;
+}
+
+.lc-rail-collapse-btn:hover {
+  background: var(--green-lightest);
+  color: var(--green-dark);
+}
+
+.lc-rail-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 10px;
+}
+
+.lc-rail-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted, #596949);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.13s ease, color 0.13s ease;
+}
+
+.lc-rail-item:hover {
+  background: #f0f7e6;
+  color: var(--ink);
+}
+
+/* Active state: a solid filled capsule instead of a flat highlighted row, so the
+   current section reads as one deliberate shape rather than a strip of tint. */
+.lc-rail-item.is-active {
+  background: var(--green-dark);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(113, 131, 85, 0.35);
+}
+
+.lc-rail-item.is-active:hover {
+  background: #5f7248;
+  color: #ffffff;
+}
+
+.lc-rail-item-icon {
+  display: flex;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.lc-rail-item.is-active .lc-rail-item-icon {
+  opacity: 1;
+}
+
+.lc-rail-item-label {
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.lc-rail[data-collapsed="true"] .lc-rail-item {
+  justify-content: center;
+  padding: 10px;
+}
+
+.lc-rail[data-collapsed="true"] .lc-rail-item-label {
+  display: none;
+}
+
+.lc-rail-streak {
+  margin: 14px 10px 0;
+  margin-top: auto;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 2px 8px;
+  background: var(--green-lightest);
+  border: 1px solid var(--lc-border);
+  border-radius: 12px;
+}
+
+.lc-rail-streak svg {
+  grid-row: 1 / span 2;
+  color: #d97706;
+}
+
+.lc-rail-streak strong {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-rail-streak small {
+  font-size: 0.68rem;
+  color: var(--muted, #596949);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.lc-rail[data-collapsed="true"] .lc-rail-streak {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  padding: 10px 4px;
+}
+
+.lc-rail[data-collapsed="true"] .lc-rail-streak svg {
+  grid-row: auto;
+}
+
+.lc-rail[data-collapsed="true"] .lc-rail-streak small {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .lc-shell {
+    flex-direction: column;
+  }
+  .lc-rail {
+    position: static;
+    flex-direction: row;
+    width: 100% !important;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    align-items: center;
+    padding: 10px 12px;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--lc-border);
+  }
+  .lc-rail-header {
+    margin-bottom: 0;
+    padding: 0 8px 0 4px;
+  }
+  .lc-rail[data-collapsed="true"] .lc-rail-brand {
+    width: auto;
+    opacity: 1;
+  }
+  .lc-rail-collapse-btn {
+    display: none;
+  }
+  .lc-rail-nav {
+    flex-direction: row;
+    gap: 4px;
+    padding: 0 8px;
+  }
+  .lc-rail-item {
+    padding: 8px 12px;
+    white-space: nowrap;
+  }
+  .lc-rail[data-collapsed="true"] .lc-rail-item-label {
+    display: inline;
+  }
+  .lc-rail-streak {
+    flex-shrink: 0;
+    margin: 0 0 0 8px;
+    padding: 6px 12px;
+    grid-template-columns: auto auto auto;
+  }
+  .lc-rail-streak svg {
+    grid-row: auto;
+  }
+  .lc-rail-streak small {
+    display: inline;
+    align-self: center;
+  }
+}
+
+/* ── KojoCode "coming soon" beta destinations ── */
+.lc-coming {
+  max-width: 640px;
+  margin: 40px auto;
+  padding: 32px 34px;
+  border: 1px solid var(--lc-border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--shadow-sm);
+}
+
+.lc-coming-badge {
+  display: inline-block;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--green-dark);
+  background: var(--green-lightest);
+  border: 1px solid var(--lc-border);
+  border-radius: 999px;
+  padding: 3px 12px;
+  margin-bottom: 16px;
+}
+
+.lc-coming-title {
+  margin: 0 0 8px;
+  font-family: "Lora", Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.lc-coming-sub {
+  margin: 0 0 18px;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--muted, #596949);
+}
+
+.lc-coming-points {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lc-coming-points li {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+/* ── Daily KojoCode dashboard section ────────────────────────────────────── */
+
+.lc-daily-section {
+  margin: 26px 0 14px;
+}
+
+.lc-daily-node {
+  --lc-accent: #0ea5e9;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 104px;
+  padding: 20px;
+  border: 1px solid color-mix(in srgb, var(--lc-accent) 34%, white);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.lc-daily-node:hover {
+  transform: translateY(-2px);
+  border-color: var(--lc-accent);
+  box-shadow: var(--shadow-md);
+}
+
+.lc-daily-node:has(.lc-daily-node-main:active) {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+.lc-daily-node-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lc-daily-node-main > .spin {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--lc-accent);
+}
+
+.lc-daily-node-main:focus-visible,
+.lc-daily-toggle:focus-visible {
+  outline: 2px solid var(--lc-accent);
+  outline-offset: 3px;
+}
+
+.lc-daily-node-main:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.lc-daily-node-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lc-daily-toggle {
+  align-self: center;
+  flex-shrink: 0;
+  padding: 6px 0 6px 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.lc-daily-toggle .toggle-switch-track {
+  width: 44px;
+  height: 26px;
+  border: 1px solid color-mix(in srgb, var(--green-dark) 24%, white);
+  background: rgba(113, 131, 85, 0.2);
+}
+
+.lc-daily-toggle.toggle-switch--on .toggle-switch-track {
+  border-color: var(--lc-accent);
+  background: var(--lc-accent);
+}
+
+.lc-daily-toggle .toggle-switch-thumb {
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+}
+
+.lc-daily-toggle.toggle-switch--on .toggle-switch-thumb {
+  transform: translateX(18px);
+}
+
+.lc-daily-toggle .toggle-switch-label {
+  min-width: 20px;
+  color: var(--ink);
+}
+
+.lc-daily-error {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  color: var(--error, #b91c1c);
+}
+
+.lc-daily-source-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+  color: var(--green-dark);
+}
+
+@media (max-width: 560px) {
+  .lc-daily-node {
+    align-items: flex-start;
+  }
+
+  .lc-daily-toggle {
+    padding-top: 11px;
+  }
+
+  .lc-daily-toggle .toggle-switch-label {
+    display: none;
+  }
+}
+
+.lc-daily-source-note svg {
+  color: #0369a1;
+}
+
+/* ── In-workspace 3-pass drill banner ────────────────────────────────────────
+   Shown at the top of the editor when the open problem is an active drill. States
+   the current pass rule in its escalation-ramp color. */
+.lc-pass-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--pass-color) 40%, white);
+  background: color-mix(in srgb, var(--pass-color) 8%, white);
+}
+
+.lc-pass-banner-rule {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--pass-color) 78%, black);
+}
+
+.lc-pass-banner-clear {
+  padding: 7px 14px;
+  border: 1px solid color-mix(in srgb, var(--pass-color) 45%, white);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: color-mix(in srgb, var(--pass-color) 78%, black);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-normal), border-color var(--transition-normal);
+}
+
+.lc-pass-banner-clear:hover {
+  background: color-mix(in srgb, var(--pass-color) 12%, white);
+  border-color: var(--pass-color);
+}
+
+.lc-pass-banner-clear:focus-visible {
+  outline: 2px solid var(--pass-color);
+  outline-offset: 2px;
+}
+
+/* ── Weak-Area Practice: builder -> stepped queue -> summary ──────────────────*/
+.lc-practice-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px 24px;
+  border: 1px solid var(--lc-border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-sm);
+}
+
+.lc-practice-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lc-practice-field-label {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  color: var(--muted, #596949);
+}
+
+/* Difficulty segmented control */
+.lc-practice-seg {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 3px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: 10px;
+  background: #fff;
+  gap: 2px;
+}
+
+.lc-practice-seg-btn {
+  padding: 7px 16px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--muted, #596949);
+  cursor: pointer;
+  transition: background var(--transition-normal), color var(--transition-normal);
+}
+
+.lc-practice-seg-btn:hover {
+  color: var(--ink);
+}
+
+.lc-practice-seg-btn.is-active {
+  background: var(--green-dark);
+  color: #fff;
+}
+
+.lc-practice-count {
+  width: 90px;
+  padding: 10px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+.lc-practice-start {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 11px 20px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+
+.lc-practice-note {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted, #596949);
+}
+
+/* Running queue */
+.lc-practice-run-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.lc-practice-progress {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--green-dark);
+}
+
+.lc-practice-clock {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-practice-finish {
+  margin-left: auto;
+  padding: 8px 16px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color var(--transition-normal), background var(--transition-normal);
+}
+
+.lc-practice-finish:hover {
+  border-color: var(--green-dark-mid);
+  background: var(--green-lightest);
+}
+
+.lc-practice-queue {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  counter-reset: none;
+}
+
+.lc-practice-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.lc-practice-step.is-done {
+  background: color-mix(in srgb, var(--green-dark) 5%, white);
+  border-color: color-mix(in srgb, var(--green-dark) 26%, white);
+}
+
+.lc-practice-step-num {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--muted, #596949);
+  white-space: nowrap;
+}
+
+.lc-practice-step-check {
+  display: inline-flex;
+  color: #b7c4a4;
+  flex-shrink: 0;
+}
+
+.lc-practice-step-check.is-done {
+  color: var(--green-dark);
+}
+
+.lc-practice-step-title {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-practice-step-title:hover {
+  color: var(--green-dark);
+  text-decoration: underline;
+}
+
+/* Summary */
+.lc-practice-summary {
+  padding: 24px;
+  border: 1px solid var(--lc-border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-sm);
+}
+
+.lc-practice-summary-eyebrow {
+  display: block;
+  margin-bottom: 16px;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--green-dark);
+}
+
+.lc-practice-summary-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.lc-practice-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  border: 1px solid var(--lc-border);
+  border-radius: 12px;
+  background: var(--green-lightest);
+}
+
+.lc-practice-tile strong {
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-practice-tile small {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  color: var(--muted, #596949);
+}
+
+.lc-practice-improved {
+  margin: 16px 0 0;
+  font-size: 0.88rem;
+  color: var(--ink);
+}
+
+.lc-practice-summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.lc-practice-summary-actions .button-primary {
+  min-height: 42px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+
+.lc-practice-secondary {
+  padding: 10px 18px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color var(--transition-normal), background var(--transition-normal);
+}
+
+.lc-practice-secondary:hover {
+  border-color: var(--green-dark-mid);
+  background: var(--green-lightest);
+}
+
+/* ── Add a problem to a category by LeetCode link ────────────────────────────*/
+.lc-add-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border: 1px solid var(--lc-border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--green-dark);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--transition-normal),
+    box-shadow var(--transition-normal),
+    background var(--transition-normal),
+    border-color var(--transition-normal);
+}
+
+.lc-add-link-btn:hover {
+  background: var(--green-lightest);
+  border-color: var(--green-dark-mid);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.lc-add-link-btn:active {
+  transform: scale(0.96);
+}
+
+.lc-add-link-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(20, 28, 14, 0.35);
+}
+
+.lc-add-link-modal {
+  width: min(460px, 100%);
+  padding: 22px 24px;
+  border: 1px solid var(--lc-border);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lc-add-link-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lc-add-link-head h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.lc-add-link-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--muted, #596949);
+  cursor: pointer;
+  transition: background var(--transition-normal), color var(--transition-normal);
+}
+
+.lc-add-link-close:hover {
+  background: var(--green-lightest);
+  color: var(--ink);
+}
+
+.lc-add-link-input {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+.lc-add-link-input:focus {
+  outline: none;
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.14);
+}
+
+.lc-add-link-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.lc-add-link-cancel {
+  padding: 10px 16px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color var(--transition-normal), background var(--transition-normal);
+}
+
+.lc-add-link-cancel:hover {
+  border-color: var(--green-dark-mid);
+  background: var(--green-lightest);
+}
+
+.lc-add-link-submit.lc-add-link-submit {
+  min-height: 42px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+
+/* ── Prep Banks + Drills screens ─────────────────────────────────────────── */
+
+.lc-bank-new {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.lc-bank-new input {
+  flex: 1;
+  min-width: 180px;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: 8px;
+  font-size: 0.86rem;
+}
+
+.lc-bank-new button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--green-dark, #1f4d2c);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.lc-bank-new button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.lc-bank-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lc-bank-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.lc-bank-card.is-active {
+  border-color: var(--green-dark, #1f4d2c);
+  background: color-mix(in srgb, var(--green-dark, #1f4d2c) 6%, white);
+}
+
+.lc-bank-card-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lc-bank-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lc-bank-card-actions button {
+  padding: 6px 12px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: 6px;
+  background: #fff;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+/* Icon button: quiet by default, turns red on hover/focus (no float). The always-on red
+   icon read as an error state; danger now only shows on intent. */
+.lc-bank-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #d8dfd0);
+  background: #fff;
+  color: var(--muted, #596949);
+  cursor: pointer;
+  transition:
+    color var(--transition-normal),
+    background var(--transition-normal),
+    border-color var(--transition-normal);
+}
+
+.lc-bank-delete:hover {
+  color: #dc2626;
+  border-color: color-mix(in srgb, #dc2626 40%, white);
+  background: color-mix(in srgb, #dc2626 8%, white);
+}
+
+.lc-bank-delete:focus-visible {
+  outline: 2px solid #dc2626;
+  outline-offset: 2px;
+}
+
+/* The opened bank sits in its own card surface so it reads as "the bank you opened",
+   not a loose page fragment below the gallery. */
+.lc-bank-detail {
+  margin-top: 24px;
+  padding: 22px 24px;
+  border: 1px solid var(--lc-border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-sm);
+}
+
+.lc-bank-detail textarea {
+  width: 100%;
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: 8px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.82rem;
+  resize: vertical;
+}
+
+.lc-bank-problem-list {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lc-bank-problem-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.lc-bank-problem-list li button {
+  display: inline-flex;
+  color: var(--muted, #596949);
+}
+
+/* ── Focus areas card (real weakness scoring) ────────────────────────────────
+   Topic in the human voice (serif), weakness score + meter in the machine voice
+   (mono), the meter running the same green -> amber -> red escalation ramp so the
+   hottest topic reads as "work on this now". */
+.lc-focus-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.lc-focus-head .lc-insight-title {
+  margin: 0;
+}
+
+.lc-focus-source {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  color: var(--muted, #596949);
+  white-space: nowrap;
+}
+
+.lc-focus-rows {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lc-focus-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "label score"
+    "meter meter";
+  align-items: center;
+  gap: 4px 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--lc-border);
+  border-radius: 10px;
+  background: rgba(233, 245, 219, 0.4);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.13s ease, border-color 0.13s ease;
+}
+
+.lc-focus-row:hover {
+  background: var(--green-lightest);
+  border-color: var(--green-dark-mid);
+}
+
+.lc-focus-row-label {
+  grid-area: label;
+  font-family: var(--font-serif);
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lc-focus-row-score {
+  grid-area: score;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--muted, #596949);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-focus-meter {
+  grid-area: meter;
+  height: 5px;
+  border-radius: 999px;
+  background: #e3eed3;
+  overflow: hidden;
+}
+
+.lc-focus-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+/* ── The pass rung: a compact P1 - P2 - P3 ladder on the escalation ramp ──────
+   Completed passes fill solid in their ramp color, the current pass glows, locked
+   passes stay muted. Machine voice throughout. */
+.lc-rung {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lc-rung-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.lc-rung-step.is-done {
+  background: var(--rung);
+  border-color: var(--rung);
+  color: #ffffff;
+}
+
+.lc-rung-step.is-current {
+  background: color-mix(in srgb, var(--rung) 16%, white);
+  border-color: var(--rung);
+  color: color-mix(in srgb, var(--rung) 72%, black);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--rung) 22%, transparent);
+}
+
+.lc-rung-step.is-locked {
+  background: #eef2e6;
+  border-color: var(--lc-border);
+  color: #a7b394;
+}
+
+/* ── 3-Pass Drills hub: due-today / upcoming split of drill cards ─────────────*/
+.lc-drill-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.lc-drill-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  font-family: var(--font-serif);
+  font-size: 1.02rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lc-drill-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--green-lightest);
+  border: 1px solid var(--lc-border);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--green-dark);
+}
+
+.lc-drill-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.lc-drill-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Red appears only for a drill due now, so it means "now". */
+.lc-drill-card.is-due {
+  border-color: color-mix(in srgb, #dc2626 45%, white);
+  box-shadow: 0 0 0 1px color-mix(in srgb, #dc2626 22%, transparent), var(--shadow-sm);
+}
+
+.lc-drill-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lc-drill-when {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--muted, #596949);
+  white-space: nowrap;
+}
+
+.lc-drill-card.is-due .lc-drill-when {
+  color: #dc2626;
+}
+
+.lc-drill-title {
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.lc-drill-title:hover {
+  color: var(--green-dark);
+  text-decoration: underline;
+}
+
+.lc-drill-rule {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.lc-drill-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.lc-drill-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--green-dark), #536342);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.13s ease;
+}
+
+.lc-drill-open:hover {
+  filter: brightness(1.06);
+}
+
+.lc-drill-advance {
+  padding: 8px 12px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.13s ease, background 0.13s ease;
+}
+
+.lc-drill-advance:hover {
+  border-color: var(--green-dark-mid);
+  background: var(--green-lightest);
+}
+
+/* ── Prep Banks gallery (deepened) ───────────────────────────────────────────*/
+
+/* Preset banks assembled from our own catalog: a quick-start row under the create form. */
+.lc-preset-row {
+  margin: 0 0 22px;
+}
+
+.lc-preset-label {
+  display: block;
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  color: var(--muted, #596949);
+}
+
+.lc-preset-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lc-preset-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border: 1px solid var(--lc-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--green-dark);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--transition-normal),
+    box-shadow var(--transition-normal),
+    background var(--transition-normal),
+    border-color var(--transition-normal);
+}
+
+.lc-preset-chip:hover:not(:disabled) {
+  background: var(--green-lightest);
+  border-color: var(--green-dark-mid);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.lc-preset-chip:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.lc-preset-chip svg {
+  color: var(--green-dark-mid);
+}
+
+.lc-preset-chip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.lc-preset-chip-name {
+  font-family: var(--font-serif);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.lc-preset-chip-count {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--muted, #596949);
+}
+
+.lc-bank-empty {
+  margin-top: 6px;
+}
+
+.lc-bank-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.lc-bank-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--transition-normal),
+    box-shadow var(--transition-normal),
+    border-color var(--transition-normal);
+}
+
+/* Adopt the app's global float: cards lift on hover. */
+.lc-bank-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.lc-bank-tile.is-active {
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--green-dark) 30%, transparent), var(--shadow-sm);
+}
+
+.lc-bank-tile.is-active:hover {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--green-dark) 30%, transparent), var(--shadow-lg);
+}
+
+.lc-bank-tile.is-open {
+  border-color: var(--green-dark-mid);
+}
+
+.lc-bank-tile-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lc-bank-tile-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.lc-bank-tile-name {
+  font-family: var(--font-serif);
+  font-size: 1.02rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-bank-tile-target {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--muted, #596949);
+}
+
+.lc-bank-tile-count {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--green-dark);
+}
+
+.lc-bank-active-tag {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--green-dark);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.lc-bank-tile-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--border, #d8dfd0) 70%, white);
+  padding-top: 10px;
+}
+
+.lc-bank-tile-actions button:not(.lc-bank-delete) {
+  padding: 7px 14px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--transition-normal),
+    box-shadow var(--transition-normal),
+    background var(--transition-normal),
+    border-color var(--transition-normal);
+}
+
+.lc-bank-tile-actions button:not(.lc-bank-delete):hover {
+  border-color: var(--green-dark-mid);
+  background: var(--green-lightest);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.lc-bank-tile-actions button:not(.lc-bank-delete):active {
+  transform: scale(0.96);
+}
+
+/* Active tiles have no "Set active" button, so anchor the row with a status note
+   instead of leaving a lone trash icon adrift. */
+.lc-bank-tile-feeds {
+  margin-right: auto;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--green-dark);
+}
+
+/* Completion ring: donut + centered count in the machine voice. */
+.lc-ring {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.lc-ring-track {
+  stroke: #e3eed3;
+}
+
+.lc-ring-fill {
+  stroke: var(--green-dark);
+  transition: stroke-dashoffset 0.4s ease;
+}
+
+.lc-ring-label {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Bank detail: header, feeds-daily callout, weak-area map, clickable problem rows. */
+.lc-bank-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.lc-bank-detail-name {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.lc-bank-detail-target {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted, #596949);
+}
+
+.lc-bank-detail-count {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  white-space: nowrap;
+}
+
+.lc-bank-feeds {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 12px 0 0;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, #0ea5e9 30%, white);
+  border-radius: 8px;
+  background: color-mix(in srgb, #0ea5e9 7%, white);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lc-bank-feeds svg {
+  color: #0369a1;
+}
+
+.lc-bank-feeds-set {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 9px 12px;
+  border: 1px dashed var(--green-dark-mid);
+  border-radius: 8px;
+  background: rgba(233, 245, 219, 0.5);
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--green-dark);
+  cursor: pointer;
+  transition: background 0.13s ease, border-color 0.13s ease;
+}
+
+.lc-bank-feeds-set:hover {
+  background: var(--green-lightest);
+  border-color: var(--green-dark);
+}
+
+.lc-bank-weakmap {
+  margin-top: 16px;
+  margin-bottom: 24px;
+}
+
+.lc-bank-weakmap-label {
+  display: block;
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  color: var(--muted, #596949);
+}
+
+.lc-bank-weakmap ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lc-bank-weakmap li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "topic count"
+    "bar bar";
+  align-items: center;
+  gap: 7px 10px;
+}
+
+.lc-bank-weakmap-topic {
+  grid-area: topic;
+  font-family: var(--font-serif);
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lc-bank-weakmap-count {
+  grid-area: count;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--muted, #596949);
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-bank-weakmap-bar {
+  grid-area: bar;
+  height: 5px;
+  border-radius: 999px;
+  background: #e3eed3;
+  overflow: hidden;
+}
+
+.lc-bank-weakmap-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.lc-bank-problem-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lc-bank-problem-check {
+  display: inline-flex;
+  color: #b7c4a4;
+  flex-shrink: 0;
+}
+
+.lc-bank-problem-check.is-done {
+  color: var(--green-dark);
+}
+
+.lc-bank-problem-open {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  font-family: var(--font-serif);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-bank-problem-open:hover {
+  color: var(--green-dark);
+  text-decoration: underline;
+}
+
+.lc-bank-problem-link {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.lc-bank-problem-link:hover {
+  text-decoration: underline;
+}
+
+.lc-bank-problem-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted, #596949);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    color var(--transition-normal),
+    background var(--transition-normal),
+    border-color var(--transition-normal);
+}
+
+.lc-bank-problem-remove:hover {
+  color: #dc2626;
+  background: color-mix(in srgb, #dc2626 8%, white);
+  border-color: color-mix(in srgb, #dc2626 30%, white);
+}
+
+.lc-bank-problem-remove:focus-visible {
+  outline: 2px solid #dc2626;
+  outline-offset: 2px;
+}
+
+.lc-bank-add-hint {
+  margin-top: 0;
+}
+
+.lc-bank-match-btn {
+  padding: 9px 16px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--green-dark, #1f4d2c);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition:
+    transform var(--transition-normal),
+    box-shadow var(--transition-normal),
+    background var(--transition-normal);
+}
+
+.lc-bank-match-btn:hover:not(:disabled) {
+  background: var(--green-dark-mid);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(113, 131, 85, 0.35);
+}
+
+.lc-bank-match-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.lc-bank-match-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Bank add-by-topic (primary) + paste (secondary) ─────────────────────────*/
+.lc-bank-add {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid color-mix(in srgb, var(--border, #d8dfd0) 70%, white);
+}
+
+.lc-bank-add-title {
+  display: block;
+  margin-bottom: 3px;
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lc-bank-add-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+/* Topic multi-select as a native <details> disclosure (no click-outside JS needed). */
+.lc-topic-picker {
+  position: relative;
+}
+
+.lc-topic-summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 210px;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+.lc-topic-summary::-webkit-details-marker {
+  display: none;
+}
+
+.lc-topic-summary:hover {
+  border-color: var(--green-dark-mid);
+}
+
+.lc-topic-picker[open] .lc-topic-summary {
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.14);
+}
+
+.lc-topic-summary svg {
+  color: var(--muted, #596949);
+  transition: transform 0.15s ease;
+}
+
+.lc-topic-picker[open] .lc-topic-summary svg {
+  transform: rotate(180deg);
+}
+
+.lc-topic-panel {
+  position: absolute;
+  z-index: 30;
+  margin-top: 6px;
+  width: 264px;
+  max-height: 264px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--lc-border);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lc-topic-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.lc-topic-option:hover {
+  background: var(--green-lightest);
+}
+
+.lc-topic-option input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--green-dark);
+  cursor: pointer;
+}
+
+.lc-topic-option-label {
+  flex: 1;
+  font-family: var(--font-serif);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lc-topic-option-count {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--muted, #596949);
+}
+
+.lc-bank-add-count {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lc-bank-add-count span {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  color: var(--muted, #596949);
+}
+
+.lc-bank-add-count input {
+  width: 78px;
+  padding: 10px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+/* Sized to sit level with the dropdown + count inputs (global .button is 48px tall). */
+.lc-bank-add-btn.lc-bank-add-btn {
+  min-height: 42px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.lc-bank-add-note {
+  margin: 12px 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--green-dark);
+}
+
+.lc-bank-add-paste {
+  margin-top: 18px;
+}
+
+.lc-bank-add-paste > summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--green-dark);
+}
+
+.lc-bank-add-paste > summary::-webkit-details-marker {
+  display: none;
+}
+
+.lc-bank-add-paste > summary::before {
+  content: "+ ";
+  font-family: var(--font-mono);
+}
+
+.lc-bank-add-paste[open] > summary::before {
+  content: "- ";
+}
+
+/* Topic-fill: two explicit choices, reuse (catalog, no AI) vs Create with Kojo (AI). */
+.lc-bank-add-actions,
+.lc-practice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lc-bank-kojo-btn {
+  background: var(--green-lightest);
+  border: 1px solid var(--green-dark);
+  color: var(--green-dark);
+}
+
+.lc-bank-kojo-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }

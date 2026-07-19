@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
+  ChevronRight,
   Circle,
   Eye,
   Code2,
@@ -36,7 +37,6 @@ import {
   X,
   type LucideIcon,
   Code,
-  Timer,
   Notebook,
   Pencil,
   Trash2,
@@ -45,6 +45,7 @@ import {
   ArchiveRestore,
 } from "lucide-react";
 import KojoMascot from "../components/KojoMascot";
+import { ToggleSwitch } from "../components/ToggleSwitch";
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MarkdownContent } from "../components/MarkdownContent";
@@ -53,6 +54,7 @@ import { ConfirmModal } from "../components/ConfirmModal";
 import CodingTabs from "../components/Tab";
 import { SlashCommandMenu, type CommandOption as SlashCommand } from "../components/SlashCommandMenu";
 import {
+  scopeKey,
   fetchLCNotes,
   fetchLCProgress,
   fetchLCWorkspace,
@@ -73,12 +75,35 @@ import {
   createLCStreakChallenge,
   completeLCStreakChallenge,
   fetchSlashCommands,
+  fetchLCDaily,
+  createLCDaily,
+  logLCStruggleEvent,
+  fetchLCWeakness,
+  fetchLCPrepBanks,
+  createLCPrepBank,
+  deleteLCPrepBank,
+  activateLCPrepBank,
+  addLCBankProblem,
+  bulkAddLCBankProblems,
+  removeLCBankProblem,
+  fetchLCDrills,
+  createLCDrill,
+  advanceLCDrill,
 } from "../lib/api";
 import { runPythonLeetCode, traceLeetCodeExecution, type RunnerResult, type TraceResult } from "../lib/pyodideRunner";
 import { sanitizeLeetCodeHtml } from "../lib/leetcodeHtml";
 import { ExecutionVisualizer } from "../components/ExecutionVisualizer";
 import { Link } from "react-router-dom";
-import type { LeetCodeProblemData, LCCustomProblem, LCCustomTestCase, LCGeneratedCustomProblem, LCStreakChallenge } from "../lib/types";
+import type {
+  LeetCodeProblemData,
+  LCCustomProblem,
+  LCCustomTestCase,
+  LCGeneratedCustomProblem,
+  LCStreakChallenge,
+  LCWeaknessTopic,
+  LCPrepBank,
+  LCDrillSchedule,
+} from "../lib/types";
 import { useSettings } from "../lib/useSettings";
 
 type Difficulty = "Easy" | "Medium" | "Hard" | "Reference" | "Unknown";
@@ -107,7 +132,10 @@ type View =
   | { type: "tree" }
   | { type: "browse" }
   | { type: "category"; categoryId: string }
-  | { type: "problem"; categoryId: string; problemSlug: string };
+  | { type: "problem"; categoryId: string; problemSlug: string }
+  | { type: "banks" }
+  | { type: "drills" }
+  | { type: "practice" };
 
 type CachedProblemState = {
   data?: LeetCodeProblemData;
@@ -462,6 +490,26 @@ function makeCustomSlug(): string {
   return `custom-${id}`;
 }
 
+// Pull the problem slug out of a LeetCode URL, or accept a bare slug ("two-sum"). Returns
+// null for anything that isn't a plausible LeetCode problem reference.
+function parseLeetCodeSlug(input: string): string | null {
+  const text = input.trim();
+  if (!text) return null;
+  const urlMatch = text.match(/leetcode\.com\/problems\/([a-z0-9-]+)/i);
+  if (urlMatch) return urlMatch[1].toLowerCase();
+  if (!text.includes(" ") && /^[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(text)) return text.toLowerCase();
+  return null;
+}
+
+// Convert LeetCode statement HTML into readable plain text for the stored description.
+// DOMParser is used (not innerHTML) so no scripts run and no remote resources load.
+function htmlToText(html: string): string {
+  if (!html) return "";
+  if (typeof DOMParser === "undefined") return html;
+  const parsed = new DOMParser().parseFromString(html, "text/html");
+  return (parsed.body.textContent || "").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 function customDifficulty(value: string): Difficulty {
   return value === "Easy" || value === "Medium" || value === "Hard" ? value : "Unknown";
 }
@@ -483,10 +531,14 @@ function splitTopics(topic: string | undefined): string[] {
 }
 
 // Turn a stored custom problem into the local Problem shape the views already render.
+// A problem added to a real category via the "add by link" flow stores that category's id
+// as its `topic`, so it renders inside that category (and counts toward its totals) instead
+// of the catch-all Custom bucket. Free-text / "unknown" topics stay in Custom.
 function customToProblem(cp: LCCustomProblem): Problem {
+  const category = CATEGORIES.find((item) => item.id === cp.topic);
   return {
-    categoryId: CUSTOM_CATEGORY_ID,
-    categoryLabel: CUSTOM_CATEGORY_LABEL,
+    categoryId: category ? category.id : CUSTOM_CATEGORY_ID,
+    categoryLabel: category ? category.label : CUSTOM_CATEGORY_LABEL,
     title: cp.title,
     difficulty: customDifficulty(cp.difficulty),
     slug: cp.slug,
@@ -775,6 +827,553 @@ function fillStreakGap(currentDates: string[]): string[] {
   return [...dateSet];
 }
 
+// Number of trailing weeks shown in the dashboard contribution heatmap. Columns are
+// weeks (most recent on the right), rows are weekdays (Sunday at the top), mirroring
+// the GitHub-style grid the redesign calls the "cadence strip".
+const HEATMAP_WEEKS = 20;
+
+type HeatCell = { key: string; active: boolean; isToday: boolean; future: boolean; label: string };
+
+function buildHeatmapCells(activityDates: string[]): HeatCell[] {
+  const active = new Set(activityDates);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  // Back up to the Sunday that starts the earliest visible week so column-major
+  // layout lands each weekday on a fixed row.
+  const start = new Date(today);
+  start.setDate(start.getDate() - ((HEATMAP_WEEKS - 1) * 7 + today.getDay()));
+  const key = todayKey();
+  const cells: HeatCell[] = [];
+  for (let i = 0; i < HEATMAP_WEEKS * 7; i += 1) {
+    const day = new Date(start);
+    day.setDate(start.getDate() + i);
+    if (day > today) {
+      cells.push({ key: `future-${i}`, active: false, isToday: false, future: true, label: "" });
+      continue;
+    }
+    const iso = day.toLocaleDateString("en-CA");
+    cells.push({
+      key: iso,
+      active: active.has(iso),
+      isToday: iso === key,
+      future: false,
+      label: day.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }),
+    });
+  }
+  return cells;
+}
+
+// The redesign's signature dashboard element: a contribution heatmap of the days the
+// user solved at least one problem. Data is day-level (activityDates has no per-day
+// count), so cells are solved / not-solved with today outlined.
+function ActivityHeatmap({ activityDates }: { activityDates: string[] }) {
+  const cells = useMemo(() => buildHeatmapCells(activityDates), [activityDates]);
+  const solvedDays = cells.filter((cell) => cell.active).length;
+  return (
+    <div className="lc-cadence" aria-label="Practice rhythm">
+      <div className="lc-cadence-head">
+        <h2>Practice rhythm</h2>
+        <span className="lc-cadence-sub">{HEATMAP_WEEKS}wk / {solvedDays} active</span>
+      </div>
+      <div className="lc-cadence-grid" role="img" aria-label={`${solvedDays} active days in the last ${HEATMAP_WEEKS} weeks`}>
+        {cells.map((cell) => (
+          <span
+            key={cell.key}
+            className={`lc-cadence-cell${cell.active ? " is-active" : ""}${cell.isToday ? " is-today" : ""}${cell.future ? " is-future" : ""}`}
+            style={{ width: 15, height: 15 }}
+            title={cell.future ? undefined : `${cell.label}${cell.active ? " - solved" : " - no activity"}`}
+          />
+        ))}
+      </div>
+      <div className="lc-cadence-legend">
+        <span>Less</span>
+        <span className="lc-cadence-cell" style={{ width: 15, height: 15 }} />
+        <span className="lc-cadence-cell is-active" style={{ width: 15, height: 15 }} />
+        <span>More</span>
+      </div>
+    </div>
+  );
+}
+
+// Persistent left rail for the KojoCode hub. Rendered on the dashboard and the
+// beta stub screens; the immersive problem editor stays full-screen without it.
+const RAIL_ITEMS: { key: string; label: string; icon: LucideIcon; view: View }[] = [
+  { key: "dashboard", label: "Dashboard", icon: Layers3, view: { type: "tree" } },
+  { key: "problems", label: "Problems", icon: Search, view: { type: "browse" } },
+  { key: "banks", label: "Prep Banks", icon: BookOpen, view: { type: "banks" } },
+  { key: "drills", label: "Drills", icon: Route, view: { type: "drills" } },
+  { key: "practice", label: "Practice", icon: Sparkles, view: { type: "practice" } },
+];
+
+const RAIL_COLLAPSE_KEY = "nosey_lc_rail_collapsed";
+// Daily KojoCode on/off toggle: per-user localStorage preference, matching the
+// existing convention (provider choice, fallback toggle, stats baseline).
+const DAILY_TOGGLE_KEY = "nosey_lc_daily_enabled";
+
+function LeftRail({
+  active,
+  streak,
+  onNavigate,
+}: {
+  active: string;
+  streak: number;
+  onNavigate: (view: View) => void;
+}) {
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(scopeKey(RAIL_COLLAPSE_KEY)) === "true";
+  });
+
+  useEffect(() => {
+    localStorage.setItem(scopeKey(RAIL_COLLAPSE_KEY), String(collapsed));
+  }, [collapsed]);
+
+  return (
+    <aside className="lc-rail" data-collapsed={collapsed} aria-label="KojoCode sections">
+      <div className="lc-rail-header">
+        <div className="lc-rail-brand">
+          <span className="lc-rail-brand-name">KojoCode</span>
+          <span className="lc-rail-brand-badge">Beta</span>
+        </div>
+        <button
+          type="button"
+          className="lc-rail-collapse-btn"
+          onClick={() => setCollapsed((current) => !current)}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-pressed={collapsed}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+        </button>
+      </div>
+      <nav className="lc-rail-nav">
+        {RAIL_ITEMS.map((item) => {
+          const Icon = item.icon;
+          const isActive = active === item.key;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              className={`lc-rail-item${isActive ? " is-active" : ""}`}
+              aria-current={isActive ? "page" : undefined}
+              title={collapsed ? item.label : undefined}
+              onClick={() => onNavigate(item.view)}
+            >
+              <span className="lc-rail-item-icon"><Icon size={18} /></span>
+              <span className="lc-rail-item-label">{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+      <div className="lc-rail-streak" title={collapsed ? `${streak} day streak` : undefined} aria-label={`${streak} day streak`}>
+        <Flame size={16} />
+        <strong>{streak}</strong>
+        <small className="lc-rail-item-label">day streak</small>
+      </div>
+    </aside>
+  );
+}
+
+// A literal countdown instrument: the ring drains as time passes instead of sitting
+// as inert digits, and its color runs calm -> warn -> alert with the same thresholds
+// the toolbar button and the modal use, so the three surfaces read as one system.
+function TimerRing({
+  fraction,
+  tone,
+  size = 30,
+  stroke = 3,
+}: {
+  fraction: number;
+  tone: "idle" | "calm" | "warn" | "alert";
+  size?: number;
+  stroke?: number;
+}) {
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - Math.max(0, Math.min(1, fraction)));
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className={`lc-timer-ring lc-timer-ring--${tone}`} aria-hidden="true">
+      <circle className="lc-timer-ring-track" cx={size / 2} cy={size / 2} r={radius} strokeWidth={stroke} fill="none" />
+      {tone !== "idle" ? (
+        <circle
+          className="lc-timer-ring-progress"
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          strokeWidth={stroke}
+          fill="none"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      ) : null}
+    </svg>
+  );
+}
+
+// Honest placeholder for the beta destinations whose backend (weakness scorer,
+// Daily KojoCode generator, banks, drill scheduler) lands in Phase 2.
+function ComingSoonScreen({
+  title,
+  subtitle,
+  points,
+}: {
+  title: string;
+  subtitle: string;
+  points: string[];
+}) {
+  return (
+    <div className="lc-coming">
+      <span className="lc-coming-badge">In progress / Beta</span>
+      <h1 className="lc-coming-title">{title}</h1>
+      <p className="lc-coming-sub">{subtitle}</p>
+      <ul className="lc-coming-points">
+        {points.map((point) => (
+          <li key={point}>{point}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+type TopicStat = { id: string; label: string; done: number; total: number; pct: number };
+
+function computeTopicStats(progress: Record<string, boolean>): TopicStat[] {
+  return CATEGORIES.map((category) => {
+    const total = category.problems.length;
+    const done = category.problems.filter((problem) => progress[problem.slug]).length;
+    return { id: category.id, label: category.label, done, total, pct: total ? done / total : 0 };
+  });
+}
+
+// Green when a topic is well covered, sage in the middle, warm amber when it needs
+// work. This is a completion proxy; the real per-topic weakness score (struggle
+// signals) lands with the Phase 2 backend.
+function masteryColor(pct: number): string {
+  if (pct >= 0.75) return "var(--green-dark)";
+  if (pct >= 0.45) return "#97a97c";
+  return "#c2681f";
+}
+
+function focusTopics(progress: Record<string, boolean>): TopicStat[] {
+  return computeTopicStats(progress)
+    .filter((topic) => topic.total > 0)
+    .sort((a, b) => a.pct - b.pct)
+    .slice(0, 4);
+}
+
+// ── 3-pass escalation ramp (the one bold move: green -> amber -> red) ──────────
+// Reuses the app's difficulty colors so "harder, fewer resources" reads instantly.
+// Red is reserved for Pass 3 / a running timer / a drill due now, so it means "now".
+const PASS_RAMP = ["#10b981", "#d97706", "#dc2626"] as const;
+// Pass 3 forces a technical-interview clock (todo-kojocode-rebuild 3h).
+const DRILL_PASS3_MINUTES = 35;
+const PASS_RULE = [
+  "resources allowed",
+  "no resources until you're stuck",
+  "no resources, timed off the head",
+] as const;
+
+// Weakness runs the same ramp, inverted: a hotter (redder) topic is one the struggle
+// signals flag hardest, so the eye lands on what needs work now.
+function weaknessColor(level: number): string {
+  if (level >= 4) return PASS_RAMP[2];
+  if (level === 3) return PASS_RAMP[1];
+  return "var(--green-dark)";
+}
+
+// The backend sends a category-id string (e.g. "trees"); resolve it to the catalog's
+// display label + id so a Focus row can open the right category.
+function resolveTopic(topic: string): { id: string; label: string } {
+  const cat = CATEGORIES.find(
+    (c) => c.id === topic || c.label.toLowerCase() === topic.toLowerCase(),
+  );
+  return { id: cat?.id ?? topic, label: cat?.label ?? topic };
+}
+
+function findProblemCategory(slug: string): string {
+  return ALL_PROBLEMS.find((problem) => problem.slug === slug)?.categoryId ?? CUSTOM_CATEGORY_ID;
+}
+
+// A completion ring: the fraction of a bank's problems solved, drawn as a small donut
+// with the count in the machine voice at its center. Reused across the bank gallery.
+function CompletionRing({ done, total, size = 46 }: { done: number; total: number; size?: number }) {
+  const stroke = 4;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const pct = total ? done / total : 0;
+  const offset = circumference * (1 - pct);
+  return (
+    <span className="lc-ring" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
+        <circle className="lc-ring-track" cx={size / 2} cy={size / 2} r={radius} strokeWidth={stroke} fill="none" />
+        <circle
+          className="lc-ring-fill"
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          strokeWidth={stroke}
+          fill="none"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </svg>
+      <span className="lc-ring-label">{done}/{total}</span>
+    </span>
+  );
+}
+
+// Shipped preset banks, assembled entirely from OUR catalog (no scraping, per the spec).
+// Each preset names catalog category ids; slugs are resolved at runtime so they are always
+// valid even as the catalog changes. `perCat` caps how many problems a spread pulls per
+// topic; omit it to take the whole category.
+const PRESET_DEFS: { key: string; name: string; target: string; ids: string[]; perCat?: number }[] = [
+  { key: "sampler", name: "Interview sampler", target: "blind-75 style", perCat: 2,
+    ids: ["arrays", "strings", "hash-table", "linked-list", "stack", "binary-search", "tree", "graph", "dp", "intervals"] },
+  { key: "trees-graphs", name: "Trees and graphs", target: "meta / onsite", ids: ["tree", "graph", "heap-priority-queue"] },
+  { key: "arrays-strings", name: "Arrays and strings", target: "phone screen", ids: ["arrays", "strings", "hash-table", "sliding-window"] },
+  { key: "dp", name: "DP and backtracking", target: "senior loop", ids: ["dp", "backtracking"] },
+];
+
+function buildPresetBanks(): { key: string; name: string; target: string; slugs: string[] }[] {
+  return PRESET_DEFS.map((def) => {
+    const seen = new Set<string>();
+    const slugs: string[] = [];
+    for (const id of def.ids) {
+      const cat = CATEGORIES.find((category) => category.id === id);
+      if (!cat) continue;
+      const picks = def.perCat ? cat.problems.slice(0, def.perCat) : cat.problems;
+      for (const problem of picks) {
+        if (!seen.has(problem.slug)) {
+          seen.add(problem.slug);
+          slugs.push(problem.slug);
+        }
+      }
+    }
+    return { key: def.key, name: def.name, target: def.target, slugs };
+  }).filter((preset) => preset.slugs.length > 0);
+}
+
+// mm:ss from a millisecond duration, for the practice elapsed clock (machine voice).
+function formatElapsed(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+// Pull up to `count` problem slugs from a set of catalog topics: unsolved first, spread
+// round-robin across topics for a balanced mix, filtered by difficulty and skipping a
+// skip-set. Shared by the bank topic-add and the Weak-Area Practice builder.
+function pickProblemsFromTopics(
+  topicIds: string[],
+  count: number,
+  opts: { progress: Record<string, boolean>; skip?: Set<string>; difficulty?: "any" | Difficulty },
+): string[] {
+  const skip = opts.skip ?? new Set<string>();
+  const difficulty = opts.difficulty ?? "any";
+  const pools = topicIds.map((topicId) => {
+    const category = CATEGORIES.find((c) => c.id === topicId);
+    return (category?.problems ?? [])
+      .filter((problem) => !skip.has(problem.slug))
+      .filter((problem) => (difficulty === "any" ? true : problem.difficulty === difficulty))
+      // unsolved (false=0) sorts before solved (true=1)
+      .sort((a, b) => Number(Boolean(opts.progress[a.slug])) - Number(Boolean(opts.progress[b.slug])));
+  });
+  const picked: string[] = [];
+  for (let depth = 0; picked.length < count; depth += 1) {
+    let advanced = false;
+    for (const pool of pools) {
+      if (picked.length >= count) break;
+      const problem = pool[depth];
+      if (problem && !picked.includes(problem.slug)) {
+        picked.push(problem.slug);
+        advanced = true;
+      }
+    }
+    if (!advanced) break;
+  }
+  return picked;
+}
+
+// The recurring structural device: a compact P1 - P2 - P3 ladder where completed passes
+// are filled along the escalation ramp, the current pass glows, and locked passes stay
+// muted. An earned sequence, not ornamental numbering. Shared by the Drills hub and,
+// later, the in-workspace pass banner.
+function PassRung({ current }: { current: number }) {
+  return (
+    <span className="lc-rung" role="img" aria-label={`Pass ${current} of 3`}>
+      {[1, 2, 3].map((pass) => {
+        const state = pass < current ? "done" : pass === current ? "current" : "locked";
+        return (
+          <span
+            key={pass}
+            className={`lc-rung-step is-${state}`}
+            style={{ "--rung": PASS_RAMP[pass - 1] } as CSSProperties}
+          >
+            P{pass}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+// Client-side stand-in for the real Daily KojoCode generator (Phase 2, backend
+// weakness scorer + LLM reskin). Until then: pick a random unsolved problem from the
+// user's current weakest topics so the "Generate today's question" button does
+// something real instead of sitting dead. Falls back to any unsolved problem
+// app-wide on cold start / once the weak topics themselves are fully cleared.
+function pickRandomWeakProblem(progress: Record<string, boolean>): { problem: Problem; categoryId: string } | null {
+  const weakIds = new Set(focusTopics(progress).map((topic) => topic.id));
+  const pool = ALL_PROBLEMS.filter((problem) => weakIds.has(problem.categoryId) && !progress[problem.slug]);
+  const fallbackPool = pool.length > 0 ? pool : ALL_PROBLEMS.filter((problem) => !progress[problem.slug]);
+  if (fallbackPool.length === 0) return null;
+  const pick = fallbackPool[Math.floor(Math.random() * fallbackPool.length)];
+  return { problem: pick, categoryId: pick.categoryId };
+}
+
+function TopicMasteryCard({ progress }: { progress: Record<string, boolean> }) {
+  const topics = useMemo(() => computeTopicStats(progress), [progress]);
+  return (
+    <div className="lc-insight-card">
+      <h2 className="lc-insight-title">Topic mastery</h2>
+      <ul className="lc-mastery-list">
+        {topics.map((topic) => (
+          <li key={topic.id} className="lc-mastery-row">
+            <div className="lc-mastery-head">
+              <span className="lc-mastery-label">{topic.label}</span>
+              <span className="lc-mastery-count">{topic.done}/{topic.total}</span>
+            </div>
+            <div className="lc-mastery-bar">
+              <span style={{ width: `${Math.round(topic.pct * 100)}%`, background: masteryColor(topic.pct) }} />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+type FocusRow = { id: string; label: string; score: string; fillPct: number; color: string };
+
+// The Focus areas card: names the topics that need the most work. When real struggle
+// signals exist (timers, hints, failed grades from the last 3 days) it ranks by those
+// and shows a weakness score on the hot green -> amber -> red ramp. Until signals
+// arrive it falls back to a calm completion proxy, and says so, rather than pretending
+// to score struggle or painting a brand-new account entirely red.
+function DailyPracticeCard({
+  progress,
+  weakness,
+  onOpenCategory,
+  onGenerate,
+}: {
+  progress: Record<string, boolean>;
+  weakness: LCWeaknessTopic[];
+  onOpenCategory: (categoryId: string) => void;
+  onGenerate: () => void;
+}) {
+  const bySignal = weakness.length > 0;
+  const rows = useMemo<FocusRow[]>(() => {
+    if (bySignal) {
+      return weakness.slice(0, 4).map((topic) => {
+        const resolved = resolveTopic(topic.topic);
+        return {
+          id: resolved.id,
+          label: resolved.label,
+          score: `weakness ${topic.level}`,
+          fillPct: (topic.level / 5) * 100,
+          color: weaknessColor(topic.level),
+        };
+      });
+    }
+    // Completion proxy: show progress in the calm mastery colors (never the pure red
+    // ramp, which is reserved for real struggle) so day one doesn't read as an alarm.
+    return focusTopics(progress).map((topic) => ({
+      id: topic.id,
+      label: topic.label,
+      score: `${topic.done}/${topic.total}`,
+      fillPct: topic.pct * 100,
+      color: masteryColor(topic.pct),
+    }));
+  }, [bySignal, weakness, progress]);
+
+  return (
+    <div className="lc-insight-card lc-focus-card">
+      <div className="lc-focus-head">
+        <h2 className="lc-insight-title">Focus areas</h2>
+        <span className="lc-focus-source">{bySignal ? "by struggle signal" : "by completion"}</span>
+      </div>
+      <p className="lc-focus-sub">
+        {bySignal
+          ? "Ranked by your last 3 days of timers, hints, and failed grades. Higher score, more to work on."
+          : "Ranked by completion for now. Struggle scoring kicks in once you drill and submit."}
+      </p>
+      <ul className="lc-focus-rows">
+        {rows.map((row) => (
+          <li key={row.id}>
+            <button type="button" className="lc-focus-row" onClick={() => onOpenCategory(row.id)} title={`Practice ${row.label}`}>
+              <span className="lc-focus-row-label">{row.label}</span>
+              <span className="lc-focus-row-score">{row.score}</span>
+              <span className="lc-focus-meter" aria-hidden="true">
+                <span style={{ width: `${row.fillPct}%`, background: row.color }} />
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button type="button" className="lc-focus-generate-btn" onClick={onGenerate}>
+        <Sparkles size={15} />
+        Generate today's question
+      </button>
+    </div>
+  );
+}
+
+function RemindersCard({ onNavigate }: { onNavigate: (view: View) => void }) {
+  return (
+    <div className="lc-insight-card lc-reminders-card">
+      <h2 className="lc-insight-title">Coming up</h2>
+      <div className="lc-reminders-list">
+        <button type="button" className="lc-reminder-feature" onClick={() => onNavigate({ type: "drills" })}>
+          <span className="lc-reminder-feature-top">
+            <span className="lc-reminder-icon"><Route size={20} /></span>
+            <span className="lc-reminder-badge">Beta</span>
+          </span>
+          <strong className="lc-reminder-feature-title">Drills</strong>
+          <p className="lc-reminder-feature-copy">
+            Struggled problems resurface three times with tightening constraints:
+            resources allowed, then no resources, then timed. Recall, not memorization.
+          </p>
+          <span className="lc-reminder-feature-cta">
+            Preview Drills
+            <ArrowRight size={14} />
+          </span>
+        </button>
+
+        <button type="button" className="lc-reminder-feature" onClick={() => onNavigate({ type: "banks" })}>
+          <span className="lc-reminder-feature-top">
+            <span className="lc-reminder-icon"><BookOpen size={20} /></span>
+            <span className="lc-reminder-badge">Beta</span>
+          </span>
+          <strong className="lc-reminder-feature-title">Prep Banks</strong>
+          <p className="lc-reminder-feature-copy">
+            Build a named, scoped problem set for a specific interview. Set one active
+            and it takes over your daily practice until you're done with it.
+          </p>
+          <span className="lc-reminder-feature-cta">
+            Preview Prep Banks
+            <ArrowRight size={14} />
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function LeetCodeMode() {
   const { generationProvider, betaMode } = useSettings();
   const [view, setView] = useState<View>({ type: "tree" });
@@ -806,6 +1405,9 @@ export default function LeetCodeMode() {
   const [gradeFeedback, setGradeFeedback] = useState<string | null>(null);
   const [timerMinutesInput, setTimerMinutesInput] = useState("25");
   const [timerRemainingSeconds, setTimerRemainingSeconds] = useState<number | null>(null);
+  // Total duration the current countdown started from, kept only to compute the ring's
+  // drained fraction (remaining / total) -- not itself a source of truth for anything else.
+  const [timerTotalSeconds, setTimerTotalSeconds] = useState<number | null>(null);
   const [timerPickerOpen, setTimerPickerOpen] = useState(false);
   const [timeoutModalOpen, setTimeoutModalOpen] = useState(false);
   const [timeoutModalMessage, setTimeoutModalMessage] = useState<string | null>(null);
@@ -831,14 +1433,89 @@ export default function LeetCodeMode() {
   const notesSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notesDragOffset = useRef<{ x: number; y: number } | null>(null);
   const [streakChallenge, setStreakChallenge] = useState<LCStreakChallenge | null>(null);
+  const [dailyEnabled, setDailyEnabled] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(scopeKey(DAILY_TOGGLE_KEY)) === "true";
+  });
+  const [dailyProblem, setDailyProblem] = useState<LCCustomProblem | null>(null);
+  const [dailyLoading, setDailyLoading] = useState(false);
+  const [dailyError, setDailyError] = useState<string | null>(null);
+  const [prepBanks, setPrepBanks] = useState<LCPrepBank[]>([]);
+  const [banksLoading, setBanksLoading] = useState(false);
+  const [selectedBankId, setSelectedBankId] = useState<number | null>(null);
+  const [newBankName, setNewBankName] = useState("");
+  const [newBankTarget, setNewBankTarget] = useState("");
+  const [bankMatchText, setBankMatchText] = useState("");
+  const [bankMatchUnmatched, setBankMatchUnmatched] = useState<string[]>([]);
+  // Topic-based add: companies interview by topic, so the primary add flow is "pick
+  // topics + how many problems", not a hand-typed problem list.
+  const [bankAddTopics, setBankAddTopics] = useState<Set<string>>(new Set());
+  const [bankAddCount, setBankAddCount] = useState(5);
+  const [bankAddNote, setBankAddNote] = useState<string | null>(null);
+  // "Create with Kojo" (AI) generates a fresh problem; the reuse path stays AI-free so a
+  // user who never wants AI can fill a bank / practice set entirely from the catalog.
+  const [bankKojoLoading, setBankKojoLoading] = useState(false);
+  const [practiceKojoLoading, setPracticeKojoLoading] = useState(false);
+  const [drills, setDrills] = useState<LCDrillSchedule[]>([]);
+  const [drillsLoading, setDrillsLoading] = useState(false);
+  const [drillAddText, setDrillAddText] = useState("");
+  // Add-a-problem-by-LeetCode-link modal, scoped to the category it was opened from.
+  const [addLinkCategoryId, setAddLinkCategoryId] = useState<string | null>(null);
+  const [addLinkUrl, setAddLinkUrl] = useState("");
+  const [addLinkLoading, setAddLinkLoading] = useState(false);
+  const [addLinkError, setAddLinkError] = useState<string | null>(null);
+  // Real per-topic struggle scores (last 3 days) from GET /leetcode/weakness. Empty on
+  // cold start; the Focus card falls back to a completion proxy until signals arrive.
+  const [weakness, setWeakness] = useState<LCWeaknessTopic[]>([]);
+  // Weak-Area Practice: a builder (topics + difficulty + count) that spins up a stepped
+  // queue of catalog problems, then a session summary. Topics default to the weakest by
+  // completion; the user adjusts. The session persists across opening/returning problems.
+  const [practiceTopics, setPracticeTopics] = useState<Set<string>>(
+    () => new Set(focusTopics(loadJson(getProgressKey(), {})).map((topic) => topic.id)),
+  );
+  const [practiceDifficulty, setPracticeDifficulty] = useState<"any" | "Easy" | "Medium" | "Hard">("any");
+  const [practiceCount, setPracticeCount] = useState(5);
+  const [practiceSession, setPracticeSession] = useState<{ slugs: string[]; startedAt: number; startedSolved: Set<string>; endedAt: number | null } | null>(null);
+  const [practiceEnded, setPracticeEnded] = useState(false);
+  const [practiceNote, setPracticeNote] = useState<string | null>(null);
+  // Bumped once a second while a session runs so the elapsed clock ticks live.
+  const [, setPracticeTick] = useState(0);
 
   // Full list (active + archived) backs deep-link lookups so an archived problem can
   // still be opened directly. The active/archived splits below back the list views.
   const allCustomProblemList = useMemo(() => customProblems.map(customToProblem), [customProblems]);
-  const activeCustomProblems = useMemo(() => customProblems.filter((cp) => !cp.is_archived), [customProblems]);
-  const archivedCustomProblems = useMemo(() => customProblems.filter((cp) => cp.is_archived), [customProblems]);
+  // Daily KojoCode problems are excluded from the user-authored Custom Questions list
+  // (they render in their own Daily KojoCode section instead), but stay reachable by
+  // direct slug via allCustomProblemList above so opening one from the dashboard works.
+  const activeCustomProblems = useMemo(
+    () => customProblems.filter((cp) => !cp.is_archived && cp.source !== "daily_kojo"),
+    [customProblems],
+  );
+  const archivedCustomProblems = useMemo(
+    () => customProblems.filter((cp) => cp.is_archived && cp.source !== "daily_kojo"),
+    [customProblems],
+  );
   const customProblemList = useMemo(() => activeCustomProblems.map(customToProblem), [activeCustomProblems]);
   const archivedProblemList = useMemo(() => archivedCustomProblems.map(customToProblem), [archivedCustomProblems]);
+
+  // Active customs that resolve to the catch-all Custom bucket (not added into a real
+  // category). Backs the Custom Questions category + its dashboard node, so a link-added
+  // problem shows only under its real topic, never doubled in Custom.
+  const customCategoryList = useMemo(
+    () => customProblemList.filter((problem) => problem.categoryId === CUSTOM_CATEGORY_ID),
+    [customProblemList],
+  );
+  // Problems added into a real category via "add by link", keyed by that category id.
+  const addedProblemsForCategory = useMemo(() => {
+    const byCategory = new Map<string, Problem[]>();
+    for (const problem of customProblemList) {
+      if (problem.categoryId === CUSTOM_CATEGORY_ID) continue;
+      const list = byCategory.get(problem.categoryId) ?? [];
+      list.push(problem);
+      byCategory.set(problem.categoryId, list);
+    }
+    return byCategory;
+  }, [customProblemList]);
 
   // "Browse all" pools every official problem (deduped by slug, so a problem listed in
   // two categories appears once) plus active custom problems, for cross-topic filtering.
@@ -856,11 +1533,27 @@ export default function LeetCodeMode() {
     return options;
   }, [customProblemList.length]);
 
+  // Shipped preset banks, resolved once from the catalog (stable for the session).
+  const presetBanks = useMemo(() => buildPresetBanks(), []);
+
+  // Catalog topics (with problem counts) for the bank's topic-based add dropdown.
+  const bankTopicOptions = useMemo(
+    () => CATEGORIES.filter((category) => category.problems.length > 0).map((category) => ({
+      id: category.id,
+      label: category.label,
+      count: category.problems.length,
+    })),
+    [],
+  );
+
+  // Resolve by slug across the catalog AND the custom list. A problem added to a real
+  // category by link carries that category id but a custom-* slug that only lives in the
+  // custom list, so a catalog-only lookup would miss it and blank the workspace.
   const currentProblem =
     view.type === "problem"
-      ? (view.categoryId === CUSTOM_CATEGORY_ID
-          ? allCustomProblemList.find((problem) => problem.slug === view.problemSlug) ?? null
-          : CATEGORIES.find((category) => category.id === view.categoryId)?.problems.find((problem) => problem.slug === view.problemSlug) ?? null)
+      ? (CATEGORIES.find((category) => category.id === view.categoryId)?.problems.find((problem) => problem.slug === view.problemSlug)
+          ?? allCustomProblemList.find((problem) => problem.slug === view.problemSlug)
+          ?? null)
       : null;
 
   const currentCustomProblem = currentProblem
@@ -881,6 +1574,11 @@ export default function LeetCodeMode() {
   const kojoShowsCommands = kojoOpen && kojoInput.trimStart().startsWith("/");
   const allKojoCommands = [...CHAT_COMMANDS, ...customSlashCommands];
   const timerButtonLabel = timerRemainingSeconds == null ? "Timer" : `${Math.floor(timerRemainingSeconds / 60)}:${String(timerRemainingSeconds % 60).padStart(2, "0")}`;
+  const timerFraction = timerTotalSeconds && timerRemainingSeconds != null ? timerRemainingSeconds / timerTotalSeconds : null;
+  // calm for most of the run, warn inside the last third, alert inside the last fifth --
+  // same thresholds drive the ring color, the toolbar pill, and the pulse animation.
+  const timerTone: "idle" | "calm" | "warn" | "alert" =
+    timerFraction == null ? "idle" : timerFraction <= 0.2 ? "alert" : timerFraction <= 0.34 ? "warn" : "calm";
 
   useEffect(() => {
     currentCodeRef.current = currentCode;
@@ -1007,6 +1705,39 @@ export default function LeetCodeMode() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [betaMode]);
 
+  useEffect(() => {
+    localStorage.setItem(scopeKey(DAILY_TOGGLE_KEY), String(dailyEnabled));
+  }, [dailyEnabled]);
+
+  // On mount (and whenever the toggle flips on): fetch today's Daily KojoCode problem
+  // if one already exists. No generation side effect, matches GET /leetcode/daily.
+  useEffect(() => {
+    if (isGuestSession() || !betaMode || !dailyEnabled) return;
+    fetchLCDaily()
+      .then((existing) => setDailyProblem(existing))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [betaMode, dailyEnabled]);
+
+  // On mount: fetch prep banks and open drills for beta users (both rail destinations).
+  useEffect(() => {
+    if (isGuestSession() || !betaMode) return;
+    setBanksLoading(true);
+    fetchLCPrepBanks()
+      .then(setPrepBanks)
+      .catch(() => {})
+      .finally(() => setBanksLoading(false));
+    setDrillsLoading(true);
+    fetchLCDrills()
+      .then(setDrills)
+      .catch(() => {})
+      .finally(() => setDrillsLoading(false));
+    fetchLCWeakness()
+      .then(setWeakness)
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [betaMode]);
+
   // On mount: fetch user-created slash commands from settings so they appear in the Kojo modal.
   useEffect(() => {
     if (isGuestSession()) return;
@@ -1105,19 +1836,43 @@ export default function LeetCodeMode() {
     void handleTimerExpired(currentProblem);
   }, [currentProblem?.slug, timerRemainingSeconds, timeoutModalOpen]);
 
+  // Pass 3 drills force a timer: auto-start it once when such a problem opens and no timer
+  // is running. Keyed on the opened slug + drills so it fires on open (or when a pass is
+  // advanced to 3 in place), not on every tick, so it never restarts after expiry or bail.
+  useEffect(() => {
+    if (!betaMode || view.type !== "problem") return;
+    const drill = drills.find((d) => d.problem_slug === view.problemSlug && !d.completed_at);
+    if ((drill?.current_pass ?? 1) >= 3 && timerRemainingSeconds == null) {
+      startTimer(DRILL_PASS3_MINUTES);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, drills, betaMode]);
+
+  // Tick the Weak-Area Practice elapsed clock once a second while a session is running.
+  useEffect(() => {
+    if (!practiceSession || practiceEnded) return;
+    const id = window.setInterval(() => setPracticeTick((tick) => tick + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [practiceSession, practiceEnded]);
+
   const stats = useMemo(() => {
-    const solved = UNIQUE_PROBLEMS.filter((problem) => progress[problem.slug]);
+    // Built-in catalog + problems the user added into a real category by link (custom-
+    // bucket problems stay out of the built-in totals, as before). Added slugs are
+    // custom-* so they never collide with catalog slugs.
+    const added = customProblemList.filter((problem) => problem.categoryId !== CUSTOM_CATEGORY_ID);
+    const pool = [...UNIQUE_PROBLEMS, ...added];
+    const solved = pool.filter((problem) => progress[problem.slug]);
     return {
-      total: UNIQUE_PROBLEMS.length,
+      total: pool.length,
       solved: solved.length,
-      percent: UNIQUE_PROBLEMS.length ? Math.round((solved.length / UNIQUE_PROBLEMS.length) * 100) : 0,
+      percent: pool.length ? Math.round((solved.length / pool.length) * 100) : 0,
       easy: solved.filter((problem) => problem.difficulty === "Easy").length,
       medium: solved.filter((problem) => problem.difficulty === "Medium").length,
       hard: solved.filter((problem) => problem.difficulty === "Hard").length,
       currentStreak: countStreak(activityDates),
       bestStreak: countBestStreak(activityDates),
     };
-  }, [activityDates, progress]);
+  }, [activityDates, progress, customProblemList]);
 
   // Show the streak rescue challenge at the bottom of the roadmap when:
   // - beta mode is on
@@ -1156,6 +1911,469 @@ export default function LeetCodeMode() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stats.currentStreak, stats.bestStreak, betaMode]);
+
+  // Looks a slug up across the official catalog + the user's own custom problems, for
+  // displaying a real title in the Prep Banks / Drills lists (which only store slugs).
+  function findProblemTitle(slug: string): string {
+    return (
+      UNIQUE_PROBLEMS.find((p) => p.slug === slug)?.title ??
+      customProblems.find((cp) => cp.slug === slug)?.title ??
+      slug
+    );
+  }
+
+  // Resolve a slug to a full Problem (catalog first, then the user's custom problems) so a
+  // bank row can show difficulty, a solved check, and a canonical LeetCode link.
+  function findProblem(slug: string): Problem | null {
+    return (
+      UNIQUE_PROBLEMS.find((p) => p.slug === slug) ??
+      allCustomProblemList.find((p) => p.slug === slug) ??
+      null
+    );
+  }
+
+  // Per-topic solved/total breakdown across a bank's problems: the bank's own weak-area
+  // map, mirroring the dashboard Focus card but scoped to the bank. Weakest topic first.
+  function bankTopicStats(slugs: string[]): TopicStat[] {
+    const byTopic = new Map<string, { label: string; done: number; total: number }>();
+    for (const slug of slugs) {
+      const problem = findProblem(slug);
+      const id = problem?.categoryId ?? CUSTOM_CATEGORY_ID;
+      const label =
+        problem?.categoryId === CUSTOM_CATEGORY_ID || !problem
+          ? CUSTOM_CATEGORY_LABEL
+          : CATEGORY_META[problem.categoryId]?.label ?? problem.categoryLabel;
+      const row = byTopic.get(id) ?? { label, done: 0, total: 0 };
+      row.total += 1;
+      if (progress[slug]) row.done += 1;
+      byTopic.set(id, row);
+    }
+    return Array.from(byTopic.entries())
+      .map(([id, row]) => ({ id, label: row.label, done: row.done, total: row.total, pct: row.total ? row.done / row.total : 0 }))
+      .sort((a, b) => a.pct - b.pct);
+  }
+
+  // Case-insensitive exact-title match against the catalog + the user's own custom
+  // problems. The backend owns no catalog (see KOJOCODE_BACKEND_IMPLEMENTATION.md), so
+  // this match happens client-side; only resolved slugs get sent to the bulk-add endpoint.
+  function matchPastedTitlesToSlugs(text: string): { matched: string[]; unmatched: string[] } {
+    const pool = [...UNIQUE_PROBLEMS, ...allCustomProblemList];
+    const byTitle = new Map(pool.map((p) => [p.title.trim().toLowerCase(), p.slug]));
+    const lines = text
+      .split(/[\n,]/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const matched: string[] = [];
+    const unmatched: string[] = [];
+    for (const line of lines) {
+      const slug = byTitle.get(line.toLowerCase());
+      if (slug) matched.push(slug);
+      else unmatched.push(line);
+    }
+    return { matched, unmatched };
+  }
+
+  // Daily KojoCode: reskins a random problem from the user's weakest recent topic (or a
+  // random topic on cold start) at the mapped difficulty (1-2 Easy, 3 Medium, 4-5 Hard,
+  // per todo-daily-kojocode.md). Re-pressing after today's problem exists just opens it.
+  async function handleGenerateDaily() {
+    if (dailyLoading) return;
+    if (dailyProblem) {
+      openProblem(CUSTOM_CATEGORY_ID, dailyProblem.slug);
+      return;
+    }
+    setDailyLoading(true);
+    setDailyError(null);
+    try {
+      const weakness = await fetchLCWeakness().catch(() => [] as LCWeaknessTopic[]);
+
+      let seed: Problem | undefined;
+      let topicLabel = "";
+      let targetDifficulty: "Easy" | "Medium" | "Hard" = "Medium";
+
+      // If a Prep Bank is active, the daily is drawn from that bank's weakest topics
+      // instead of the whole catalog (the bank overrides the daily source). The seed's own
+      // catalog topic + difficulty drive the reskin, keeping it on-scope for the interview.
+      const activeBank = prepBanks.find((bank) => bank.is_active);
+      if (activeBank && activeBank.problem_slugs.length) {
+        const weakestTopicId = bankTopicStats(activeBank.problem_slugs)[0]?.id;
+        const bankProblems = activeBank.problem_slugs
+          .map(findProblem)
+          .filter((problem): problem is Problem => Boolean(problem));
+        const weakPool = weakestTopicId
+          ? bankProblems.filter((problem) => problem.categoryId === weakestTopicId)
+          : [];
+        const pool = weakPool.length ? weakPool : bankProblems;
+        if (pool.length) {
+          seed = pool[Math.floor(Math.random() * pool.length)];
+          topicLabel = CATEGORY_META[seed.categoryId]?.label ?? seed.categoryLabel;
+          targetDifficulty =
+            seed.difficulty === "Easy" || seed.difficulty === "Hard" ? seed.difficulty : "Medium";
+        }
+      }
+
+      // Full-catalog fallback: no active bank (or none of its slugs resolved). Rank by the
+      // global weakness scorer, cold-start to a random topic.
+      if (!seed) {
+        const top = weakness[0];
+        targetDifficulty = !top || top.level <= 2 ? "Easy" : top.level === 3 ? "Medium" : "Hard";
+        const matchedCategory =
+          (top &&
+            CATEGORIES.find(
+              (c) => c.id === top.topic || c.label.toLowerCase() === top.topic.toLowerCase(),
+            )) ||
+          CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
+        const pool = matchedCategory.problems.length ? matchedCategory.problems : UNIQUE_PROBLEMS;
+        seed = pool[Math.floor(Math.random() * pool.length)];
+        topicLabel = matchedCategory.label;
+      }
+
+      const created = await createLCDaily(topicLabel, targetDifficulty, seed.slug, generationProvider);
+      setDailyProblem(created);
+      setCustomProblems((prev) => [...prev, created]);
+      openProblem(CUSTOM_CATEGORY_ID, created.slug);
+    } catch (error) {
+      setDailyError(error instanceof Error ? error.message : "Kojo couldn't generate today's problem.");
+    } finally {
+      setDailyLoading(false);
+    }
+  }
+
+  // ── Interview Prep Banks ────────────────────────────────────────────────────
+
+  async function handleCreateBank() {
+    const name = newBankName.trim();
+    if (!name || banksLoading) return;
+    setBanksLoading(true);
+    try {
+      const created = await createLCPrepBank(name, newBankTarget.trim());
+      setPrepBanks((prev) => [...prev, created]);
+      setNewBankName("");
+      setNewBankTarget("");
+      setSelectedBankId(created.id as number);
+    } catch {
+      // best-effort, the create button stays available to retry
+    } finally {
+      setBanksLoading(false);
+    }
+  }
+
+  // Create a bank pre-filled from a shipped preset: create it, then bulk-add the preset's
+  // catalog slugs. The bulk-add returns the updated bank (with problem_slugs), so we swap
+  // the freshly created row for it and open the detail.
+  async function handleCreateFromPreset(preset: { name: string; target: string; slugs: string[] }) {
+    if (banksLoading) return;
+    setBanksLoading(true);
+    try {
+      const created = await createLCPrepBank(preset.name, preset.target);
+      const filled = preset.slugs.length
+        ? await bulkAddLCBankProblems(created.id as number, preset.slugs).catch(() => created)
+        : created;
+      setPrepBanks((prev) => [...prev, filled]);
+      setSelectedBankId(filled.id as number);
+    } catch {
+      // best-effort, the preset stays available to retry
+    } finally {
+      setBanksLoading(false);
+    }
+  }
+
+  async function handleDeleteBank(bankId: number) {
+    await deleteLCPrepBank(bankId).catch(() => {});
+    setPrepBanks((prev) => prev.filter((bank) => bank.id !== bankId));
+    setSelectedBankId((current) => (current === bankId ? null : current));
+  }
+
+  async function handleActivateBank(bankId: number) {
+    const updated = await activateLCPrepBank(bankId).catch(() => null);
+    if (!updated) return;
+    setPrepBanks((prev) => prev.map((bank) => ({ ...bank, is_active: bank.id === bankId })));
+  }
+
+  async function handleMatchAndAddToBank(bankId: number) {
+    const { matched, unmatched } = matchPastedTitlesToSlugs(bankMatchText);
+    setBankMatchUnmatched(unmatched);
+    if (!matched.length) return;
+    const updated = await bulkAddLCBankProblems(bankId, matched).catch(() => null);
+    if (!updated) return;
+    setPrepBanks((prev) => prev.map((bank) => (bank.id === bankId ? updated : bank)));
+    setBankMatchText("");
+  }
+
+  function toggleBankAddTopic(topicId: string) {
+    setBankAddNote(null);
+    setBankAddTopics((prev) => {
+      const next = new Set(prev);
+      if (next.has(topicId)) next.delete(topicId);
+      else next.add(topicId);
+      return next;
+    });
+  }
+
+  // Pull `bankAddCount` problems from the selected topics into the bank: unsolved first,
+  // spread round-robin across topics for a balanced set, skipping anything already in the
+  // bank. This is the primary add flow, matching how companies scope by topic.
+  async function handleAddByTopic(bankId: number) {
+    const bank = prepBanks.find((b) => b.id === bankId);
+    if (!bank || bankAddTopics.size === 0) return;
+    const picked = pickProblemsFromTopics(Array.from(bankAddTopics), bankAddCount, {
+      progress,
+      skip: new Set(bank.problem_slugs),
+    });
+    if (!picked.length) {
+      setBankAddNote("No new problems left in those topics.");
+      return;
+    }
+    const updated = await bulkAddLCBankProblems(bankId, picked).catch(() => null);
+    if (!updated) return;
+    setPrepBanks((prev) => prev.map((b) => (b.id === bankId ? updated : b)));
+    setBankAddTopics(new Set());
+    setBankAddNote(`Added ${picked.length} problem${picked.length === 1 ? "" : "s"} from ${bankAddTopics.size} topic${bankAddTopics.size === 1 ? "" : "s"}.`);
+  }
+
+  // "Create with Kojo": generate ONE fresh problem (AI) from the selected topics and, for
+  // difficulty, an optional target. Reuses the existing custom-problem pipeline
+  // (generate -> persist -> sync) so there is no new endpoint. Returns the saved problem,
+  // or null on failure. The reuse flows (handleAddByTopic / startPracticeSession) never
+  // call this, so the no-AI path is fully AI-free.
+  async function createKojoProblemFromTopics(
+    topicIds: string[],
+    difficulty: "any" | "Easy" | "Medium" | "Hard",
+  ): Promise<LCCustomProblem | null> {
+    const labels = topicIds
+      .map((id) => CATEGORY_META[id]?.label ?? bankTopicOptions.find((t) => t.id === id)?.label ?? id)
+      .filter(Boolean);
+    const topicText = labels.length ? labels.join(", ") : "general coding interview";
+    const difficultyText = difficulty === "any" ? "" : ` The difficulty should be ${difficulty}.`;
+    const hint = `Create a brand new, original coding interview problem focused on these topics: ${topicText}.${difficultyText} Do not copy a well-known existing problem: invent a fresh scenario with a clear prompt, a function signature, and worked examples.`;
+    const generated: LCGeneratedCustomProblem = await generateLCCustomProblem("", hint, generationProvider);
+    const slug = makeCustomSlug();
+    const payload: Omit<LCCustomProblem, "slug"> = {
+      title: generated.title || "Kojo Problem",
+      topic: topicIds[0] ?? "unknown",
+      difficulty:
+        generated.difficulty === "Easy" || generated.difficulty === "Medium" || generated.difficulty === "Hard"
+          ? generated.difficulty
+          : difficulty === "any"
+            ? "unknown"
+            : difficulty,
+      description: generated.description,
+      url: "",
+      starter_code: generated.starter_code,
+      test_cases: generated.test_cases.map((tc) => ({
+        input_text: tc.input_text,
+        output_text: tc.output_text,
+        explanation_text: tc.explanation_text ?? null,
+      })),
+      is_archived: false,
+    };
+    const saved: LCCustomProblem = { slug, ...payload };
+    persistCustomProblems([...customProblems, saved]);
+    if (!isGuestSession()) {
+      await syncLCCustomProblem(slug, payload).catch(() => {});
+    }
+    return saved;
+  }
+
+  async function handleCreateWithKojoForBank(bankId: number) {
+    if (bankKojoLoading) return;
+    setBankAddNote(null);
+    setBankKojoLoading(true);
+    try {
+      const saved = await createKojoProblemFromTopics(Array.from(bankAddTopics), "any");
+      if (!saved) {
+        setBankAddNote("Kojo couldn't generate a problem. Try again.");
+        return;
+      }
+      const updated = await addLCBankProblem(bankId, saved.slug).catch(() => null);
+      if (updated) {
+        setPrepBanks((prev) => prev.map((b) => (b.id === bankId ? updated : b)));
+      } else {
+        // Guest or offline: reflect the add locally so the UI still updates.
+        setPrepBanks((prev) =>
+          prev.map((b) =>
+            b.id === bankId ? { ...b, problem_slugs: [...b.problem_slugs, saved.slug] } : b,
+          ),
+        );
+      }
+      setBankAddNote(`Kojo created "${saved.title}" and added it to this bank.`);
+    } catch (error) {
+      setBankAddNote(error instanceof Error ? error.message : "Kojo generation failed.");
+    } finally {
+      setBankKojoLoading(false);
+    }
+  }
+
+  async function handleRemoveBankProblem(bankId: number, slug: string) {
+    await removeLCBankProblem(bankId, slug).catch(() => {});
+    setPrepBanks((prev) =>
+      prev.map((bank) =>
+        bank.id === bankId ? { ...bank, problem_slugs: bank.problem_slugs.filter((s) => s !== slug) } : bank,
+      ),
+    );
+  }
+
+  // ── 3-Pass Drills ────────────────────────────────────────────────────────────
+
+  async function handleAddDrillManual() {
+    const { matched } = matchPastedTitlesToSlugs(drillAddText);
+    const slug = matched[0];
+    if (!slug) return;
+    const created = await createLCDrill(slug).catch(() => null);
+    if (!created) return;
+    setDrills((prev) => (prev.some((d) => d.problem_slug === slug) ? prev : [...prev, created]));
+    setDrillAddText("");
+  }
+
+  async function handleAdvanceDrill(slug: string) {
+    const updated = await advanceLCDrill(slug).catch(() => null);
+    if (!updated) return;
+    setDrills((prev) =>
+      updated.completed_at
+        ? prev.filter((d) => d.problem_slug !== slug)
+        : prev.map((d) => (d.problem_slug === slug ? updated : d)),
+    );
+  }
+
+  // ── Weak-Area Practice ───────────────────────────────────────────────────────
+
+  function togglePracticeTopic(topicId: string) {
+    setPracticeNote(null);
+    setPracticeTopics((prev) => {
+      const next = new Set(prev);
+      if (next.has(topicId)) next.delete(topicId);
+      else next.add(topicId);
+      return next;
+    });
+  }
+
+  function startPracticeSession() {
+    if (practiceTopics.size === 0) return;
+    const slugs = pickProblemsFromTopics(Array.from(practiceTopics), practiceCount, {
+      progress,
+      difficulty: practiceDifficulty,
+    });
+    if (!slugs.length) {
+      setPracticeNote("No problems match those topics and difficulty. Widen the filters.");
+      return;
+    }
+    setPracticeNote(null);
+    setPracticeEnded(false);
+    setPracticeSession({
+      slugs,
+      startedAt: Date.now(),
+      startedSolved: new Set(slugs.filter((slug) => progress[slug])),
+      endedAt: null,
+    });
+  }
+
+  // "Create with Kojo" for practice: generate one fresh problem (AI) from the selected
+  // topics + difficulty and start a one-problem session with it. The reuse path
+  // (startPracticeSession) stays catalog-only and AI-free.
+  async function startKojoPracticeSession() {
+    if (practiceKojoLoading || practiceTopics.size === 0) return;
+    setPracticeNote(null);
+    setPracticeKojoLoading(true);
+    try {
+      const saved = await createKojoProblemFromTopics(Array.from(practiceTopics), practiceDifficulty);
+      if (!saved) {
+        setPracticeNote("Kojo couldn't generate a problem. Try again.");
+        return;
+      }
+      setPracticeEnded(false);
+      setPracticeSession({
+        slugs: [saved.slug],
+        startedAt: Date.now(),
+        startedSolved: new Set(progress[saved.slug] ? [saved.slug] : []),
+        endedAt: null,
+      });
+    } catch (error) {
+      setPracticeNote(error instanceof Error ? error.message : "Kojo generation failed.");
+    } finally {
+      setPracticeKojoLoading(false);
+    }
+  }
+
+  function endPracticeSession() {
+    setPracticeSession((prev) => (prev ? { ...prev, endedAt: Date.now() } : prev));
+    setPracticeEnded(true);
+  }
+
+  function resetPracticeSession() {
+    setPracticeSession(null);
+    setPracticeEnded(false);
+    setPracticeNote(null);
+  }
+
+  // ── Add a problem to a category by LeetCode link ─────────────────────────────
+
+  function openAddLink(categoryId: string) {
+    setAddLinkCategoryId(categoryId);
+    setAddLinkUrl("");
+    setAddLinkError(null);
+  }
+
+  function closeAddLink() {
+    setAddLinkCategoryId(null);
+    setAddLinkUrl("");
+    setAddLinkError(null);
+  }
+
+  // Capture a real LeetCode problem into the current category: parse the slug, fetch the
+  // statement/starter/examples once, and save it as a custom-problem row tagged with the
+  // category id (so it renders + counts there). Reuses the whole custom-problem pipeline.
+  async function handleAddProblemFromLink() {
+    const categoryId = addLinkCategoryId;
+    if (!categoryId || addLinkLoading) return;
+    const slug = parseLeetCodeSlug(addLinkUrl);
+    if (!slug) {
+      setAddLinkError("Paste a LeetCode problem link, e.g. leetcode.com/problems/two-sum/");
+      return;
+    }
+    const canonicalUrl = `${LEETCODE_BASE_URL}/${slug}/`;
+    if (UNIQUE_PROBLEMS.some((problem) => problem.slug === slug)) {
+      setAddLinkError("That problem is already in the built-in catalog.");
+      return;
+    }
+    if (allCustomProblemList.some((problem) => problem.url === canonicalUrl)) {
+      setAddLinkError("You've already added that problem.");
+      return;
+    }
+    setAddLinkLoading(true);
+    setAddLinkError(null);
+    try {
+      const data = await fetchLeetCodeProblem(slug);
+      const customSlug = makeCustomSlug();
+      const payload: Omit<LCCustomProblem, "slug"> = {
+        title: data.title,
+        topic: categoryId,
+        difficulty:
+          data.difficulty === "Easy" || data.difficulty === "Medium" || data.difficulty === "Hard"
+            ? data.difficulty
+            : "unknown",
+        description: htmlToText(data.content_html),
+        url: canonicalUrl,
+        starter_code: data.python_snippet ?? "",
+        test_cases: data.examples.map((example) => ({
+          input_text: example.input_text,
+          output_text: example.output_text,
+          explanation_text: example.explanation_text ?? null,
+        })),
+        is_archived: false,
+        source: "user",
+      };
+      const saved: LCCustomProblem = { slug: customSlug, ...payload };
+      persistCustomProblems([...customProblems, saved]);
+      if (!isGuestSession()) {
+        await syncLCCustomProblem(customSlug, payload).catch(() => {});
+      }
+      closeAddLink();
+    } catch (error) {
+      setAddLinkError(error instanceof Error ? error.message : "Couldn't load that problem from LeetCode.");
+    } finally {
+      setAddLinkLoading(false);
+    }
+  }
 
   function pushProgressToDb(nextProgress: Record<string, boolean>, nextDates: string[]) {
     if (isGuestSession()) return;
@@ -1401,6 +2619,7 @@ export default function LeetCodeMode() {
   function resetTimerState() {
     timerExpiryHandledRef.current = false;
     setTimerRemainingSeconds(null);
+    setTimerTotalSeconds(null);
     closeTimerPicker();
     closeTimeoutModal();
   }
@@ -1411,7 +2630,9 @@ export default function LeetCodeMode() {
     timerExpiryHandledRef.current = false;
     closeTimerPicker();
     closeTimeoutModal();
-    setTimerRemainingSeconds(Math.round(minutes * 60));
+    const totalSeconds = Math.round(minutes * 60);
+    setTimerRemainingSeconds(totalSeconds);
+    setTimerTotalSeconds(totalSeconds);
   }
 
   function openTimerPicker() {
@@ -1538,6 +2759,7 @@ export default function LeetCodeMode() {
             codeToRun,
             testResultsSummary,
             result.ok,
+            customForGrade?.topic || problemAtRun.categoryId,
             generationProvider,
             customForGrade?.description || undefined,
           );
@@ -1559,28 +2781,15 @@ export default function LeetCodeMode() {
     }
   }
 
-  function renderTimerPreset(minutes: number) {
-    return (
-      <button
-        key={minutes}
-        type="button"
-        className="lc-timer-modal-preset"
-        onClick={() => {
-          setTimerMinutesInput(String(minutes));
-          startTimer(minutes);
-        }}
-      >
-        {minutes}m
-      </button>
-    );
-  }
-
   async function handleTimerExpired(problemAtTimeout: Problem) {
     if (runnerLoading || gradeLoading) {
       setTimeoutModalMessage("Time ran out while Kojo was still grading your current run. You can continue without the timer or clear the active tab.");
       setTimeoutModalOpen(true);
       return;
     }
+
+    const topicForEvent = customProblems.find((cp) => cp.slug === problemAtTimeout.slug)?.topic || problemAtTimeout.categoryId;
+    void logLCStruggleEvent(topicForEvent, "timer_expiry", problemAtTimeout.slug);
 
     const result = await runAndGradeCurrentCode(
       problemAtTimeout,
@@ -1762,6 +2971,9 @@ export default function LeetCodeMode() {
   async function handleKojoSend(messageOverride?: string) {
     const message = (messageOverride ?? kojoInput).trim();
     if (!currentProblem || !message || kojoLoading) return;
+    // Defense in depth: an open drill on Pass 2+ blocks assists even if the drawer is open.
+    const drill = drills.find((d) => d.problem_slug === currentProblem.slug && !d.completed_at);
+    if (betaMode && (drill?.current_pass ?? 1) >= 2) return;
     setKojoLoading(true);
     setKojoError(null);
     setKojoResponse(null);
@@ -1771,6 +2983,7 @@ export default function LeetCodeMode() {
         currentProblem.title,
         message,
         currentCode,
+        currentCustomProblem?.topic || currentProblem.categoryId,
         generationProvider,
         currentCustomProblem?.description || undefined,
       );
@@ -2147,11 +3360,13 @@ export default function LeetCodeMode() {
 
   if (view.type === "tree") {
     return (
-      <div className="page lc-page">
+      <div className="lc-shell">
+        <LeftRail active="dashboard" streak={stats.currentStreak} onNavigate={setView} />
+        <div className="page lc-page lc-shell-body">
         <header className="lc-hero">
           <div>
             <span className="eyebrow">Beta</span>
-            <h1>LeetCode roadmap</h1>
+            <h1>KojoCode</h1>
             <p className="muted">Official problems, a better practice surface, streaks, and Kojo as a coach instead of a code dump.</p>
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -2192,20 +3407,109 @@ export default function LeetCodeMode() {
             <small>best streak</small>
           </div>
           <div className="lc-stat-tile lc-stat-tile--split">
-            <small>Easy</small><span>{stats.easy}</span>
-            <small>Medium</small><span>{stats.medium}</span>
-            <small>Hard</small><span>{stats.hard}</span>
+            <small>Easy</small><span className="lc-split-val lc-split-val--easy">{stats.easy}</span>
+            <small>Medium</small><span className="lc-split-val lc-split-val--medium">{stats.medium}</span>
+            <small>Hard</small><span className="lc-split-val lc-split-val--hard">{stats.hard}</span>
           </div>
         </section>
 
-        <button type="button" className="lc-browse-all" onClick={() => setView({ type: "browse" })}>
-          <span className="lc-browse-all-icon"><Search size={18} /></span>
-          <span className="lc-browse-all-copy">
-            <strong>Browse all problems</strong>
-            <small>Filter across every topic by difficulty, status, and type</small>
-          </span>
-          <ArrowRight size={18} />
-        </button>
+        <div className="lc-dash-row">
+          <ActivityHeatmap activityDates={activityDates} />
+          <DailyPracticeCard
+            progress={progress}
+            weakness={weakness}
+            onOpenCategory={(categoryId) => setView({ type: "category", categoryId })}
+            onGenerate={() => {
+              const pick = pickRandomWeakProblem(progress);
+              if (pick) openProblem(pick.categoryId, pick.problem.slug);
+            }}
+          />
+        </div>
+
+        <div className="lc-dash-row">
+          <TopicMasteryCard progress={progress} />
+          <RemindersCard onNavigate={setView} />
+        </div>
+
+        <section className="lc-custom-section" aria-label="Custom questions">
+          {(() => {
+            const customDone = customCategoryList.filter((problem) => progress[problem.slug]).length;
+            const customPct = customCategoryList.length ? Math.round((customDone / customCategoryList.length) * 100) : 0;
+            return (
+              <div className="lc-custom-node" style={{ "--lc-accent": "#b45309" } as CSSProperties}>
+                <button
+                  type="button"
+                  className="lc-custom-node-main"
+                  onClick={() => setView({ type: "category", categoryId: CUSTOM_CATEGORY_ID })}
+                >
+                  <span className="lc-node-icon"><Code size={22} /></span>
+                  <span className="lc-node-copy">
+                    <strong>{CUSTOM_CATEGORY_LABEL}</strong>
+                    <small>
+                      {customCategoryList.length
+                        ? `${customDone}/${customCategoryList.length} complete`
+                        : "Add your own problems"}
+                    </small>
+                  </span>
+                  <span className="lc-node-progress"><span style={{ width: `${customPct}%` }} /></span>
+                </button>
+                <button type="button" className="lc-custom-add-btn" onClick={() => openCustomModal()}>
+                  <Plus size={16} />
+                  Add question
+                </button>
+              </div>
+            );
+          })()}
+        </section>
+
+        {betaMode ? (
+          <section className="lc-daily-section" aria-label="Daily KojoCode">
+            <div className="lc-daily-node" style={{ "--lc-accent": "#0ea5e9" } as CSSProperties}>
+              <button
+                type="button"
+                className="lc-daily-node-main"
+                onClick={() => void handleGenerateDaily()}
+                disabled={dailyLoading || !dailyEnabled}
+              >
+                <span className="lc-node-icon"><Sparkles size={22} /></span>
+                <span className="lc-node-copy">
+                  <span className="lc-daily-node-title">
+                    <strong>Daily KojoCode</strong>
+                    <span className="lc-streak-badge">Beta</span>
+                  </span>
+                  <small>
+                    {!dailyEnabled
+                      ? "Turn on to get a fresh problem targeting a weak topic each day"
+                      : dailyLoading
+                        ? "Generating today's problem..."
+                        : dailyProblem
+                          ? `Today's problem ready , ${dailyProblem.title}`
+                          : "Press to generate today's problem"}
+                  </small>
+                </span>
+                {dailyLoading ? <Loader2 size={18} className="spin" /> : null}
+              </button>
+              <ToggleSwitch
+                checked={dailyEnabled}
+                className="lc-daily-toggle"
+                title="Show a Daily KojoCode problem each day"
+                aria-label="Enable Daily KojoCode"
+                onClick={() => setDailyEnabled((enabled) => !enabled)}
+                label={dailyEnabled ? "On" : "Off"}
+              />
+            </div>
+            {(() => {
+              const activeBank = prepBanks.find((bank) => bank.is_active);
+              return activeBank ? (
+                <p className="lc-daily-source-note">
+                  <BookOpen size={13} />
+                  Today's problem is drawn from your active bank: <strong>{activeBank.name}</strong>
+                </p>
+              ) : null;
+            })()}
+            {dailyError ? <p className="lc-daily-error">{dailyError}</p> : null}
+          </section>
+        ) : null}
 
         <section className="lc-roadmap" aria-label="Skill tree">
           {CATEGORIES.map((category, index) => {
@@ -2230,37 +3534,6 @@ export default function LeetCodeMode() {
               </button>
             );
           })}
-        </section>
-
-        <section className="lc-custom-section" aria-label="Custom questions">
-          {(() => {
-            const customDone = customProblemList.filter((problem) => progress[problem.slug]).length;
-            const customPct = customProblemList.length ? Math.round((customDone / customProblemList.length) * 100) : 0;
-            return (
-              <div className="lc-custom-node" style={{ "--lc-accent": "#b45309" } as CSSProperties}>
-                <button
-                  type="button"
-                  className="lc-custom-node-main"
-                  onClick={() => setView({ type: "category", categoryId: CUSTOM_CATEGORY_ID })}
-                >
-                  <span className="lc-node-icon"><Code size={22} /></span>
-                  <span className="lc-node-copy">
-                    <strong>{CUSTOM_CATEGORY_LABEL}</strong>
-                    <small>
-                      {customProblemList.length
-                        ? `${customDone}/${customProblemList.length} complete`
-                        : "Add your own problems"}
-                    </small>
-                  </span>
-                  <span className="lc-node-progress"><span style={{ width: `${customPct}%` }} /></span>
-                </button>
-                <button type="button" className="lc-custom-add-btn" onClick={() => openCustomModal()}>
-                  <Plus size={16} />
-                  Add question
-                </button>
-              </div>
-            );
-          })()}
         </section>
 
         {showStreakChallenge ? (
@@ -2309,6 +3582,590 @@ export default function LeetCodeMode() {
 
         {customModalNode}
         {confirmDeleteNode}
+        </div>
+      </div>
+    );
+  }
+
+  if (view.type === "practice") {
+    const inSummary = Boolean(practiceSession && practiceEnded);
+    const inQueue = Boolean(practiceSession && !practiceEnded);
+    return (
+      <div className="lc-shell">
+        <LeftRail active="practice" streak={stats.currentStreak} onNavigate={setView} />
+        <div className="page page-narrow lc-page lc-shell-body">
+          <header className="lc-category-header">
+            <div className="lc-category-title-row" style={{ "--lc-accent": "#9333ea" } as CSSProperties}>
+              <span className="lc-node-icon"><Sparkles size={22} /></span>
+              <div>
+                <h1>Weak-Area Practice</h1>
+                <p className="muted">Pick the topics that need work, run a guided queue, finish on a session recap.</p>
+              </div>
+            </div>
+          </header>
+
+          {!practiceSession ? (
+            <div className="lc-practice-builder">
+              <div className="lc-practice-field">
+                <span className="lc-practice-field-label">Focus topics</span>
+                <details className="lc-topic-picker">
+                  <summary className="lc-topic-summary">
+                    <span>
+                      {practiceTopics.size
+                        ? `${practiceTopics.size} topic${practiceTopics.size === 1 ? "" : "s"} selected`
+                        : "Choose topics"}
+                    </span>
+                    <ChevronDown size={15} />
+                  </summary>
+                  <div className="lc-topic-panel">
+                    {bankTopicOptions.map((topic) => (
+                      <label key={topic.id} className="lc-topic-option">
+                        <input
+                          type="checkbox"
+                          checked={practiceTopics.has(topic.id)}
+                          onChange={() => togglePracticeTopic(topic.id)}
+                        />
+                        <span className="lc-topic-option-label">{topic.label}</span>
+                        <span className="lc-topic-option-count">{topic.count}</span>
+                      </label>
+                    ))}
+                  </div>
+                </details>
+              </div>
+
+              <div className="lc-practice-field">
+                <span className="lc-practice-field-label">Difficulty</span>
+                <div className="lc-practice-seg" role="group" aria-label="Difficulty">
+                  {(["any", "Easy", "Medium", "Hard"] as const).map((level) => (
+                    <button
+                      key={level}
+                      type="button"
+                      className={`lc-practice-seg-btn${practiceDifficulty === level ? " is-active" : ""}`}
+                      onClick={() => setPracticeDifficulty(level)}
+                    >
+                      {level}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="lc-practice-field">
+                <span className="lc-practice-field-label">How many</span>
+                <input
+                  type="number"
+                  className="lc-practice-count"
+                  min={1}
+                  max={30}
+                  value={practiceCount}
+                  onChange={(event) => setPracticeCount(Math.max(1, Math.min(30, Number(event.target.value) || 1)))}
+                />
+              </div>
+
+              <div className="lc-practice-actions">
+                <button
+                  type="button"
+                  className="button button-primary lc-practice-start"
+                  onClick={startPracticeSession}
+                  disabled={practiceTopics.size === 0 || practiceKojoLoading}
+                >
+                  <Plus size={16} />
+                  Continue from selection
+                </button>
+                <button
+                  type="button"
+                  className="button lc-practice-start lc-bank-kojo-btn"
+                  onClick={() => void startKojoPracticeSession()}
+                  disabled={practiceTopics.size === 0 || practiceKojoLoading}
+                >
+                  <Sparkles size={16} />
+                  {practiceKojoLoading ? "Creating..." : "Create with Kojo"}
+                </button>
+              </div>
+              <p className="muted small lc-practice-note">
+                Continue from selection uses our catalog only. Create with Kojo uses AI to generate a fresh problem.
+              </p>
+              {practiceNote ? <p className="lc-practice-note">{practiceNote}</p> : null}
+            </div>
+          ) : null}
+
+          {inQueue && practiceSession ? (
+            (() => {
+              const solved = practiceSession.slugs.filter((slug) => progress[slug]).length;
+              const elapsed = formatElapsed(Date.now() - practiceSession.startedAt);
+              return (
+                <div className="lc-practice-run">
+                  <div className="lc-practice-run-head">
+                    <span className="lc-practice-progress">{solved}/{practiceSession.slugs.length} solved</span>
+                    <span className="lc-practice-clock">{elapsed}</span>
+                    <button type="button" className="lc-practice-finish" onClick={endPracticeSession}>
+                      Finish session
+                    </button>
+                  </div>
+                  <ol className="lc-practice-queue">
+                    {practiceSession.slugs.map((slug, index) => {
+                      const problem = findProblem(slug);
+                      const isSolved = Boolean(progress[slug]);
+                      const difficulty = problem?.difficulty ?? "Unknown";
+                      return (
+                        <li key={slug} className={`lc-practice-step${isSolved ? " is-done" : ""}`}>
+                          <span className="lc-practice-step-num">step {String(index + 1).padStart(2, "0")}</span>
+                          <span className={`lc-practice-step-check${isSolved ? " is-done" : ""}`} aria-hidden="true">
+                            {isSolved ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+                          </span>
+                          <button
+                            type="button"
+                            className="lc-practice-step-title"
+                            onClick={() => openProblem(findProblemCategory(slug), slug)}
+                          >
+                            {findProblemTitle(slug)}
+                          </button>
+                          <span className={`lc-difficulty lc-difficulty--${difficultyClass(difficulty)}`}>{difficulty}</span>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </div>
+              );
+            })()
+          ) : null}
+
+          {inSummary && practiceSession ? (
+            (() => {
+              const total = practiceSession.slugs.length;
+              const solved = practiceSession.slugs.filter((slug) => progress[slug]).length;
+              const elapsed = formatElapsed((practiceSession.endedAt ?? Date.now()) - practiceSession.startedAt);
+              const improvedSlugs = practiceSession.slugs.filter(
+                (slug) => progress[slug] && !practiceSession.startedSolved.has(slug),
+              );
+              const improvedTopics = Array.from(
+                new Set(
+                  improvedSlugs.map((slug) => {
+                    const problem = findProblem(slug);
+                    return problem ? CATEGORY_META[problem.categoryId]?.label ?? problem.categoryLabel : CUSTOM_CATEGORY_LABEL;
+                  }),
+                ),
+              );
+              return (
+                <div className="lc-practice-summary">
+                  <span className="lc-practice-summary-eyebrow">session complete</span>
+                  <div className="lc-practice-summary-tiles">
+                    <div className="lc-practice-tile">
+                      <strong>{solved}/{total}</strong>
+                      <small>solved</small>
+                    </div>
+                    <div className="lc-practice-tile">
+                      <strong>{elapsed}</strong>
+                      <small>time</small>
+                    </div>
+                    <div className="lc-practice-tile">
+                      <strong>{improvedSlugs.length}</strong>
+                      <small>new this session</small>
+                    </div>
+                  </div>
+                  {improvedTopics.length ? (
+                    <p className="lc-practice-improved">Topics improved: {improvedTopics.join(", ")}</p>
+                  ) : (
+                    <p className="lc-practice-improved muted">No new solves logged this session. Keep at it.</p>
+                  )}
+                  <div className="lc-practice-summary-actions">
+                    <button type="button" className="button button-primary" onClick={resetPracticeSession}>
+                      New session
+                    </button>
+                    <button type="button" className="lc-practice-secondary" onClick={() => setView({ type: "tree" })}>
+                      Back to dashboard
+                    </button>
+                  </div>
+                </div>
+              );
+            })()
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  if (view.type === "banks") {
+    const selectedBank = prepBanks.find((bank) => bank.id === selectedBankId) ?? null;
+    return (
+      <div className="lc-shell">
+        <LeftRail active="banks" streak={stats.currentStreak} onNavigate={setView} />
+        <div className="page page-narrow lc-page lc-shell-body">
+          <header className="lc-category-header">
+            <div className="lc-category-title-row" style={{ "--lc-accent": "#0ea5e9" } as CSSProperties}>
+              <span className="lc-node-icon"><BookOpen size={22} /></span>
+              <div>
+                <h1>Interview Prep Banks</h1>
+                <p className="muted">Named problem sets for a specific interview. The active bank feeds Daily KojoCode.</p>
+              </div>
+            </div>
+          </header>
+
+          <div className="lc-bank-new">
+            <input
+              value={newBankName}
+              onChange={(event) => setNewBankName(event.target.value)}
+              placeholder="Bank name, e.g. Meta Onsite"
+            />
+            <input
+              value={newBankTarget}
+              onChange={(event) => setNewBankTarget(event.target.value)}
+              placeholder="Target (optional), e.g. meta / onsite"
+            />
+            <button type="button" onClick={() => void handleCreateBank()} disabled={!newBankName.trim() || banksLoading}>
+              <Plus size={16} />
+              New bank
+            </button>
+          </div>
+
+          {presetBanks.length > 0 ? (
+            <div className="lc-preset-row">
+              <span className="lc-preset-label">Or start from a preset</span>
+              <div className="lc-preset-chips">
+                {presetBanks.map((preset) => (
+                  <button
+                    key={preset.key}
+                    type="button"
+                    className="lc-preset-chip"
+                    onClick={() => void handleCreateFromPreset(preset)}
+                    disabled={banksLoading}
+                    title={`Create "${preset.name}" from our catalog`}
+                  >
+                    <Plus size={13} />
+                    <span className="lc-preset-chip-name">{preset.name}</span>
+                    <span className="lc-preset-chip-count">{preset.slugs.length}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {prepBanks.length === 0 && !banksLoading ? (
+            <div className="lc-empty lc-bank-empty">
+              <span className="lc-empty-icon"><BookOpen size={26} /></span>
+              <p className="lc-empty-title">No prep banks yet</p>
+              <small className="lc-empty-sub">Name one above, or start from a preset to build a scoped problem set.</small>
+            </div>
+          ) : (
+            <div className="lc-bank-gallery">
+              {prepBanks.map((bank) => {
+                const total = bank.problem_slugs.length;
+                const done = bank.problem_slugs.filter((slug) => progress[slug]).length;
+                const isSelected = bank.id === selectedBankId;
+                return (
+                  <article key={bank.id} className={`lc-bank-tile${bank.is_active ? " is-active" : ""}${isSelected ? " is-open" : ""}`}>
+                    <button
+                      type="button"
+                      className="lc-bank-tile-main"
+                      onClick={() => setSelectedBankId((current) => (current === bank.id ? null : (bank.id as number)))}
+                    >
+                      <CompletionRing done={done} total={total} />
+                      <span className="lc-bank-tile-copy">
+                        <span className="lc-bank-tile-name">{bank.name}</span>
+                        {bank.target ? <span className="lc-bank-tile-target">{bank.target}</span> : null}
+                        <span className="lc-bank-tile-count">{total} {total === 1 ? "problem" : "problems"}</span>
+                      </span>
+                      {bank.is_active ? <span className="lc-bank-active-tag">active</span> : null}
+                    </button>
+                    <div className="lc-bank-tile-actions">
+                      {bank.is_active ? (
+                        <span className="lc-bank-tile-feeds">feeds your daily</span>
+                      ) : (
+                        <button type="button" onClick={() => void handleActivateBank(bank.id as number)}>
+                          Set active
+                        </button>
+                      )}
+                      <button type="button" className="lc-bank-delete" onClick={() => void handleDeleteBank(bank.id as number)} aria-label={`Delete ${bank.name}`}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+
+          {selectedBank ? (
+            (() => {
+              const total = selectedBank.problem_slugs.length;
+              const done = selectedBank.problem_slugs.filter((slug) => progress[slug]).length;
+              const weakMap = bankTopicStats(selectedBank.problem_slugs).filter((topic) => topic.pct < 1).slice(0, 3);
+              return (
+                <div className="lc-bank-detail">
+                  <div className="lc-bank-detail-head">
+                    <div>
+                      <h2 className="lc-bank-detail-name">{selectedBank.name}</h2>
+                      {selectedBank.target ? <span className="lc-bank-detail-target">{selectedBank.target}</span> : null}
+                    </div>
+                    <span className="lc-bank-detail-count">{done}/{total} solved</span>
+                  </div>
+
+                  {selectedBank.is_active ? (
+                    <p className="lc-bank-feeds">
+                      <Sparkles size={14} />
+                      Today's KojoCode is coming from this bank.
+                    </p>
+                  ) : (
+                    <button type="button" className="lc-bank-feeds-set" onClick={() => void handleActivateBank(selectedBank.id as number)}>
+                      Set active to feed your daily from this bank
+                    </button>
+                  )}
+
+                  {weakMap.length > 0 ? (
+                    <div className="lc-bank-weakmap">
+                      <span className="lc-bank-weakmap-label">Weak areas in this bank</span>
+                      <ul>
+                        {weakMap.map((topic) => (
+                          <li key={topic.id}>
+                            <span className="lc-bank-weakmap-topic">{topic.label}</span>
+                            <span className="lc-bank-weakmap-count">{topic.done}/{topic.total}</span>
+                            <span className="lc-bank-weakmap-bar" aria-hidden="true">
+                              <span style={{ width: `${Math.round(topic.pct * 100)}%`, background: masteryColor(topic.pct) }} />
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  {total === 0 ? (
+                    <p className="muted">No problems in this bank yet. Paste some titles below.</p>
+                  ) : (
+                    <ul className="lc-bank-problem-list">
+                      {selectedBank.problem_slugs.map((slug) => {
+                        const problem = findProblem(slug);
+                        const solved = Boolean(progress[slug]);
+                        const difficulty = problem?.difficulty ?? "Unknown";
+                        return (
+                          <li key={slug} className="lc-bank-problem-row">
+                            <span className={`lc-bank-problem-check${solved ? " is-done" : ""}`} aria-hidden="true">
+                              {solved ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+                            </span>
+                            <button
+                              type="button"
+                              className="lc-bank-problem-open"
+                              onClick={() => openProblem(findProblemCategory(slug), slug)}
+                            >
+                              {findProblemTitle(slug)}
+                            </button>
+                            <span className={`lc-difficulty lc-difficulty--${difficultyClass(difficulty)}`}>{difficulty}</span>
+                            {problem?.isOfficial ? (
+                              <a className="lc-bank-problem-link" href={`${LEETCODE_BASE_URL}/${slug}/`} target="_blank" rel="noreferrer" title="Open on LeetCode">
+                                leetcode
+                              </a>
+                            ) : null}
+                            <button type="button" className="lc-bank-problem-remove" onClick={() => void handleRemoveBankProblem(selectedBank.id as number, slug)} aria-label="Remove from bank">
+                              <X size={14} />
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+
+                  <div className="lc-bank-add">
+                    <span className="lc-bank-add-title">Add problems by topic</span>
+                    <p className="muted small lc-bank-add-hint">
+                      Companies interview by topic. Pick your topics, then continue from our catalog, or have Kojo create a fresh problem. No AI is used unless you tap Create with Kojo.
+                    </p>
+                    <div className="lc-bank-add-controls">
+                      <details className="lc-topic-picker">
+                        <summary className="lc-topic-summary">
+                          <span>
+                            {bankAddTopics.size
+                              ? `${bankAddTopics.size} topic${bankAddTopics.size === 1 ? "" : "s"} selected`
+                              : "Choose topics"}
+                          </span>
+                          <ChevronDown size={15} />
+                        </summary>
+                        <div className="lc-topic-panel">
+                          {bankTopicOptions.map((topic) => (
+                            <label key={topic.id} className="lc-topic-option">
+                              <input
+                                type="checkbox"
+                                checked={bankAddTopics.has(topic.id)}
+                                onChange={() => toggleBankAddTopic(topic.id)}
+                              />
+                              <span className="lc-topic-option-label">{topic.label}</span>
+                              <span className="lc-topic-option-count">{topic.count}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </details>
+                      <label className="lc-bank-add-count">
+                        <span>Problems</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={50}
+                          value={bankAddCount}
+                          onChange={(event) => setBankAddCount(Math.max(1, Math.min(50, Number(event.target.value) || 1)))}
+                        />
+                      </label>
+                      <div className="lc-bank-add-actions">
+                        <button
+                          type="button"
+                          className="button button-primary lc-bank-add-btn"
+                          onClick={() => void handleAddByTopic(selectedBank.id as number)}
+                          disabled={bankAddTopics.size === 0 || bankKojoLoading}
+                        >
+                          <Plus size={16} />
+                          Continue from selection
+                        </button>
+                        <button
+                          type="button"
+                          className="button lc-bank-add-btn lc-bank-kojo-btn"
+                          onClick={() => void handleCreateWithKojoForBank(selectedBank.id as number)}
+                          disabled={bankAddTopics.size === 0 || bankKojoLoading}
+                        >
+                          <Sparkles size={16} />
+                          {bankKojoLoading ? "Creating..." : "Create with Kojo"}
+                        </button>
+                      </div>
+                    </div>
+                    {bankAddNote ? <p className="lc-bank-add-note">{bankAddNote}</p> : null}
+
+                    <details className="lc-bank-add-paste">
+                      <summary>Or paste specific problem titles</summary>
+                      <p className="muted small">One per line or comma-separated. Matched against our catalog, no scraping.</p>
+                      <textarea
+                        value={bankMatchText}
+                        onChange={(event) => setBankMatchText(event.target.value)}
+                        placeholder={"Two Sum\nValid Parentheses\n..."}
+                        rows={3}
+                      />
+                      <button
+                        type="button"
+                        className="lc-bank-match-btn"
+                        onClick={() => void handleMatchAndAddToBank(selectedBank.id as number)}
+                        disabled={!bankMatchText.trim()}
+                      >
+                        Match and add
+                      </button>
+                      {bankMatchUnmatched.length > 0 ? (
+                        <p className="lc-daily-error">No catalog match for: {bankMatchUnmatched.join(", ")}</p>
+                      ) : null}
+                    </details>
+                  </div>
+                </div>
+              );
+            })()
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  if (view.type === "drills") {
+    return (
+      <div className="lc-shell">
+        <LeftRail active="drills" streak={stats.currentStreak} onNavigate={setView} />
+        <div className="page page-narrow lc-page lc-shell-body">
+          <header className="lc-category-header">
+            <div className="lc-category-title-row" style={{ "--lc-accent": "#0ea5e9" } as CSSProperties}>
+              <span className="lc-node-icon"><Route size={22} /></span>
+              <div>
+                <h1>3-Pass Drills</h1>
+                <p className="muted">
+                  Pass 1 resources allowed, Pass 2 no resources until stuck, Pass 3 no resources and timed.
+                </p>
+              </div>
+            </div>
+          </header>
+
+          <div className="lc-bank-new">
+            <input
+              value={drillAddText}
+              onChange={(event) => setDrillAddText(event.target.value)}
+              placeholder="Problem title to drill, e.g. Two Sum"
+            />
+            <button type="button" onClick={() => void handleAddDrillManual()} disabled={!drillAddText.trim()}>
+              <Plus size={16} />
+              Drill this
+            </button>
+          </div>
+
+          {drills.length === 0 && !drillsLoading ? (
+            <p className="muted">No open drills. Struggling with a problem (a failed grade or a timer running out) adds one automatically.</p>
+          ) : (
+            (() => {
+              const now = Date.now();
+              const dueToday = drills
+                .filter((drill) => new Date(drill.next_due_at).getTime() <= now)
+                .sort((a, b) => a.current_pass - b.current_pass);
+              const upcoming = drills
+                .filter((drill) => new Date(drill.next_due_at).getTime() > now)
+                .sort((a, b) => new Date(a.next_due_at).getTime() - new Date(b.next_due_at).getTime());
+
+              const renderDrill = (drill: LCDrillSchedule, due: boolean) => {
+                const dueDate = new Date(drill.next_due_at);
+                const passColor = PASS_RAMP[Math.min(drill.current_pass, 3) - 1];
+                return (
+                  <div key={drill.problem_slug} className={`lc-drill-card${due ? " is-due" : ""}`}>
+                    <div className="lc-drill-card-head">
+                      <PassRung current={drill.current_pass} />
+                      <span className="lc-drill-when">
+                        {due ? "due now" : `due ${dueDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="lc-drill-title"
+                      onClick={() => openProblem(findProblemCategory(drill.problem_slug), drill.problem_slug)}
+                    >
+                      {findProblemTitle(drill.problem_slug)}
+                    </button>
+                    <p className="lc-drill-rule" style={{ color: passColor }}>
+                      Pass {drill.current_pass} // {PASS_RULE[Math.min(drill.current_pass, 3) - 1]}
+                    </p>
+                    <div className="lc-drill-actions">
+                      <button
+                        type="button"
+                        className="lc-drill-open"
+                        onClick={() => openProblem(findProblemCategory(drill.problem_slug), drill.problem_slug)}
+                      >
+                        Open
+                        <ArrowRight size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className="lc-drill-advance"
+                        onClick={() => void handleAdvanceDrill(drill.problem_slug)}
+                        title={drill.current_pass >= 3 ? "Clear this drill for good" : "Mark this pass cleared and schedule the next"}
+                      >
+                        {drill.current_pass >= 3 ? "Clear drill" : "Pass cleared"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              };
+
+              return (
+                <div className="lc-drill-sections">
+                  <section className="lc-drill-section">
+                    <h2 className="lc-drill-section-title">
+                      Due today
+                      <span className="lc-drill-count">{dueToday.length}</span>
+                    </h2>
+                    {dueToday.length === 0 ? (
+                      <p className="muted small">Nothing due. Come back when a drill resurfaces.</p>
+                    ) : (
+                      <div className="lc-drill-grid">{dueToday.map((drill) => renderDrill(drill, true))}</div>
+                    )}
+                  </section>
+                  {upcoming.length > 0 ? (
+                    <section className="lc-drill-section">
+                      <h2 className="lc-drill-section-title">
+                        Upcoming
+                        <span className="lc-drill-count">{upcoming.length}</span>
+                      </h2>
+                      <div className="lc-drill-grid">{upcoming.map((drill) => renderDrill(drill, false))}</div>
+                    </section>
+                  ) : null}
+                </div>
+              );
+            })()
+          )}
+        </div>
       </div>
     );
   }
@@ -2317,11 +4174,13 @@ export default function LeetCodeMode() {
     const visibleProblems = filterProblems(browseProblems, progress, filter, query, difficultyFilter, topicFilter);
     const solvedCount = browseProblems.filter((problem) => progress[problem.slug]).length;
     return (
-      <div className="page page-narrow lc-page">
+      <div className="lc-shell">
+      <LeftRail active="problems" streak={stats.currentStreak} onNavigate={setView} />
+      <div className="page page-narrow lc-page lc-shell-body">
         <header className="lc-category-header">
           <button type="button" className="lc-back-btn" onClick={() => setView({ type: "tree" })}>
             <ChevronLeft size={16} />
-            Roadmap
+            Dashboard
           </button>
           <div className="lc-category-title-row" style={{ "--lc-accent": "#16a34a" } as CSSProperties}>
             <span className="lc-node-icon"><Search size={22} /></span>
@@ -2367,25 +4226,28 @@ export default function LeetCodeMode() {
         {customModalNode}
         {confirmDeleteNode}
       </div>
+      </div>
     );
   }
 
   if (view.type === "category" && view.categoryId === CUSTOM_CATEGORY_ID) {
-    const visibleProblems = filterProblems(customProblemList, progress, filter, query, difficultyFilter);
-    const done = customProblemList.filter((problem) => progress[problem.slug]).length;
+    const visibleProblems = filterProblems(customCategoryList, progress, filter, query, difficultyFilter);
+    const done = customCategoryList.filter((problem) => progress[problem.slug]).length;
     const visibleArchived = filterProblems(archivedProblemList, progress, filter, query, difficultyFilter);
     return (
-      <div className="page page-narrow lc-page">
+      <div className="lc-shell">
+      <LeftRail active="problems" streak={stats.currentStreak} onNavigate={setView} />
+      <div className="page page-narrow lc-page lc-shell-body">
         <header className="lc-category-header">
           <button type="button" className="lc-back-btn" onClick={() => setView({ type: "tree" })}>
             <ChevronLeft size={16} />
-            Roadmap
+            Dashboard
           </button>
           <div className="lc-category-title-row" style={{ "--lc-accent": "#b45309" } as CSSProperties}>
             <span className="lc-node-icon"><Code size={22} /></span>
             <div>
               <h1>{CUSTOM_CATEGORY_LABEL}</h1>
-              <p className="muted">{done}/{customProblemList.length} complete</p>
+              <p className="muted">{done}/{customCategoryList.length} complete</p>
             </div>
           </div>
           <div className="lc-category-tools">
@@ -2401,7 +4263,7 @@ export default function LeetCodeMode() {
           {renderFilterBar(false)}
         </header>
 
-        {customProblemList.length === 0 ? (
+        {customCategoryList.length === 0 ? (
           <div className="lc-custom-empty">
             <p>
               {archivedProblemList.length > 0
@@ -2491,27 +4353,32 @@ export default function LeetCodeMode() {
         {customModalNode}
         {confirmDeleteNode}
       </div>
+      </div>
     );
   }
 
   if (view.type === "category") {
     const category = CATEGORIES.find((item) => item.id === view.categoryId) ?? CATEGORIES[0];
-    const visibleProblems = filterProblems(category.problems, progress, filter, query, difficultyFilter);
-    const done = category.problems.filter((problem) => progress[problem.slug]).length;
+    // Built-in catalog problems + any the user added to this category by LeetCode link.
+    const categoryProblems = [...category.problems, ...(addedProblemsForCategory.get(category.id) ?? [])];
+    const visibleProblems = filterProblems(categoryProblems, progress, filter, query, difficultyFilter);
+    const done = categoryProblems.filter((problem) => progress[problem.slug]).length;
     const Icon = category.icon;
 
     return (
-      <div className="page page-narrow lc-page">
+      <div className="lc-shell">
+      <LeftRail active="problems" streak={stats.currentStreak} onNavigate={setView} />
+      <div className="page page-narrow lc-page lc-shell-body">
         <header className="lc-category-header">
           <button type="button" className="lc-back-btn" onClick={() => setView({ type: "tree" })}>
             <ChevronLeft size={16} />
-            Roadmap
+            Dashboard
           </button>
           <div className="lc-category-title-row" style={{ "--lc-accent": category.accent } as CSSProperties}>
             <span className="lc-node-icon"><Icon size={22} /></span>
             <div>
               <h1>{category.label}</h1>
-              <p className="muted">{done}/{category.problems.length} complete</p>
+              <p className="muted">{done}/{categoryProblems.length} complete</p>
             </div>
           </div>
           <div className="lc-category-tools">
@@ -2519,6 +4386,15 @@ export default function LeetCodeMode() {
               <Search size={16} />
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search problems" />
             </div>
+            <button
+              type="button"
+              className="lc-add-link-btn"
+              onClick={() => openAddLink(category.id)}
+              title={`Add a problem to ${category.label} by LeetCode link`}
+              aria-label="Add a problem by LeetCode link"
+            >
+              <Plus size={18} />
+            </button>
           </div>
           {renderFilterBar(false)}
         </header>
@@ -2536,7 +4412,11 @@ export default function LeetCodeMode() {
                   </button>
                   <button type="button" className="lc-problem-title-btn" onClick={() => openProblem(category.id, problem.slug)}>
                     <span>{problem.title}</span>
-                    {!problem.isOfficial ? <small>Reference drill</small> : null}
+                    {problem.slug.startsWith("custom-") ? (
+                      <small>Added</small>
+                    ) : !problem.isOfficial ? (
+                      <small>Reference drill</small>
+                    ) : null}
                   </button>
                   {problem.isExtra ? <span className="lc-extra-pill">Extra</span> : null}
                   <span className={`lc-difficulty lc-difficulty--${difficultyClass(problem.difficulty)}`}>{problem.difficulty}</span>
@@ -2548,6 +4428,41 @@ export default function LeetCodeMode() {
             })}
           </div>
         )}
+        {addLinkCategoryId ? (
+          <div className="lc-add-link-overlay" role="dialog" aria-modal="true" aria-label="Add a problem by LeetCode link" onClick={closeAddLink}>
+            <div className="lc-add-link-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="lc-add-link-head">
+                <h2>Add a problem</h2>
+                <button type="button" className="lc-add-link-close" onClick={closeAddLink} aria-label="Close">
+                  <X size={16} />
+                </button>
+              </div>
+              <p className="muted small">Paste a LeetCode problem link. We fetch it once and add it to <strong>{category.label}</strong>, counting toward your totals.</p>
+              <input
+                className="lc-add-link-input"
+                value={addLinkUrl}
+                onChange={(event) => { setAddLinkUrl(event.target.value); setAddLinkError(null); }}
+                onKeyDown={(event) => { if (event.key === "Enter") void handleAddProblemFromLink(); }}
+                placeholder="https://leetcode.com/problems/two-sum/"
+                autoFocus
+              />
+              {addLinkError ? <p className="lc-daily-error">{addLinkError}</p> : null}
+              <div className="lc-add-link-actions">
+                <button type="button" className="lc-add-link-cancel" onClick={closeAddLink}>Cancel</button>
+                <button
+                  type="button"
+                  className="button button-primary lc-add-link-submit"
+                  onClick={() => void handleAddProblemFromLink()}
+                  disabled={addLinkLoading || !addLinkUrl.trim()}
+                >
+                  {addLinkLoading ? <Loader2 size={16} className="spin" /> : <Plus size={16} />}
+                  {addLinkLoading ? "Adding..." : "Add problem"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
       </div>
     );
   }
@@ -2560,7 +4475,10 @@ export default function LeetCodeMode() {
   const isCustomNav = currentProblem.categoryId === CUSTOM_CATEGORY_ID;
   const navProblems: Problem[] = isCustomNav
     ? customProblemList
-    : CATEGORIES.find((c) => c.id === currentProblem.categoryId)?.problems ?? [];
+    : [
+        ...(CATEGORIES.find((c) => c.id === currentProblem.categoryId)?.problems ?? []),
+        ...(addedProblemsForCategory.get(currentProblem.categoryId) ?? []),
+      ];
   const currentProblemIndexInCategory = navProblems.findIndex((p) => p.slug === currentProblem.slug);
   const nextProblemInCategory =
     currentProblemIndexInCategory >= 0 && currentProblemIndexInCategory < navProblems.length - 1
@@ -2586,6 +4504,17 @@ export default function LeetCodeMode() {
   const problemError = currentProblemState?.error;
   const runnable = isRunnable(currentProblemData);
   const officialExamples = currentProblemData?.examples ?? [];
+
+  // 3-pass drill enforcement: if this problem has an open drill row, its current pass
+  // gates the in-app assists. Pass 1 = unrestricted, Pass 2+ disables Ask Kojo + the
+  // solution reveal, Pass 3 also force-starts a timer. Honor system by design (the app
+  // controls only its own assists, per todo-kojocode-rebuild 3h). Beta-only, since drills
+  // are only loaded for beta users.
+  const activeDrill = drills.find((drill) => drill.problem_slug === currentProblem.slug && !drill.completed_at);
+  const activePass = activeDrill?.current_pass ?? 1;
+  const assistsLocked = betaMode && activePass >= 2;
+  const timerForced = betaMode && activePass >= 3;
+
   return (
     <div className="lc-editor-shell">
       <div className="lc-editor-topbar">
@@ -2598,44 +4527,90 @@ export default function LeetCodeMode() {
           <span className={`lc-difficulty lc-difficulty--${difficultyClass(currentProblem.difficulty)}`}>{currentProblem.difficulty}</span>
         </div>
         <div className="lc-editor-actions">
-          <button type="button" className="lc-toolbar-btn lc-toolbar-btn--timer" onClick={openTimerPicker} aria-label="Set timer">
-            <Timer size={16} />
-            <span className="lc-tb-label lc-tb-label--timer">{timerButtonLabel}</span>
-          </button>
-          {!isStreakChallengeProblem ? (
-            <a className="lc-toolbar-btn" href={`https://www.youtube.com/results?search_query=neetcode+${encodeURIComponent(currentProblem.title)}`} target="_blank" rel="noreferrer" aria-label="Search NeetCode on YouTube">
-              <Youtube size={16} />
-              <span className="lc-tb-label">NeetCode</span>
+          <div className="lc-toolbar-cluster" aria-label="Reference links">
+            {!isStreakChallengeProblem ? (
+              <a className="lc-toolbar-btn" href={`https://www.youtube.com/results?search_query=neetcode+${encodeURIComponent(currentProblem.title)}`} target="_blank" rel="noreferrer" aria-label="Search NeetCode on YouTube">
+                <Youtube size={16} />
+                <span className="lc-tb-label">NeetCode</span>
+              </a>
+            ) : null}
+            <a className="lc-toolbar-btn" href={currentProblem.url} target="_blank" rel="noreferrer" aria-label="Open on LeetCode">
+              <ExternalLink size={16} />
+              <span className="lc-tb-label">Open</span>
             </a>
-          ) : null}
-          <a className="lc-toolbar-btn" href={currentProblem.url} target="_blank" rel="noreferrer" aria-label="Open on LeetCode">
-            <ExternalLink size={16} />
-            <span className="lc-tb-label">Open</span>
-          </a>
-          <button type="button" className="lc-toolbar-btn" onClick={handleFormat} aria-label="Format code">
-            <WrapText size={16} />
-            <span className="lc-tb-label">Format</span>
-          </button>
-          <button type="button" className="lc-toolbar-btn" onClick={handleRunCode} disabled={!runnable || runnerLoading} aria-label="Run code">
-            {runnerLoading ? <Loader2 size={16} className="spin" /> : <Play size={16} />}
-            <span className="lc-tb-label">Run code</span>
-          </button>
-          <button type="button" className="lc-toolbar-btn" onClick={() => openNotes(currentProblem.slug)} aria-label="Open notes">
-            <Notebook size={16} />
-            <span className="lc-tb-label">Notes</span>
-          </button>
-          {!isStreakChallengeProblem ? (
-            <button type="button" className="lc-toolbar-btn lc-toolbar-btn--kojo" onClick={() => openKojo(currentProblem)} aria-label="Ask Kojo for a hint">
-              <Sparkles size={16} />
-              <span className="lc-tb-label">Ask Kojo</span>
+          </div>
+
+          <div className="lc-toolbar-cluster" data-cluster="run" aria-label="Run and submit">
+            <span className="lc-toolbar-cluster-label">Run / Submit</span>
+            <button type="button" className="lc-toolbar-btn" onClick={handleFormat} aria-label="Format code">
+              <WrapText size={16} />
+              <span className="lc-tb-label">Format</span>
             </button>
+            <button type="button" className="lc-toolbar-btn" onClick={handleRunCode} disabled={!runnable || runnerLoading} aria-label="Run code">
+              {runnerLoading ? <Loader2 size={16} className="spin" /> : <Play size={16} />}
+              <span className="lc-tb-label">Run code</span>
+            </button>
+            <button type="button" className={progress[currentProblem.slug] ? "lc-toolbar-btn lc-toolbar-btn--done" : "lc-toolbar-btn"} onClick={() => toggleProgress(currentProblem)} aria-label={progress[currentProblem.slug] ? "Mark incomplete" : "Mark done"}>
+              {progress[currentProblem.slug] ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+              <span className="lc-tb-label">{progress[currentProblem.slug] ? "Done" : "Mark done"}</span>
+            </button>
+          </div>
+
+          <div className="lc-toolbar-cluster" data-cluster="timer" aria-label="Timer">
+            <span className="lc-toolbar-cluster-label">Timer</span>
+            <button
+              type="button"
+              className={`lc-toolbar-btn lc-toolbar-btn--timer lc-toolbar-btn--timer-${timerTone}`}
+              onClick={openTimerPicker}
+              aria-label={timerRemainingSeconds == null ? "Set timer" : `${timerButtonLabel} remaining, click to change timer`}
+              title={timerRemainingSeconds == null ? "Set a problem timer" : `${timerButtonLabel} remaining — change timer`}
+            >
+              <TimerRing fraction={timerFraction ?? 1} tone={timerTone} size={18} stroke={2} />
+              <span className="lc-tb-label lc-tb-label--timer">{timerButtonLabel}</span>
+            </button>
+          </div>
+
+          <div className="lc-toolbar-cluster" data-cluster="notes" aria-label="Notes">
+            <span className="lc-toolbar-cluster-label">Notes</span>
+            <button type="button" className="lc-toolbar-btn" onClick={() => openNotes(currentProblem.slug)} aria-label="Open notes">
+              <Notebook size={16} />
+              <span className="lc-tb-label">Notes</span>
+            </button>
+          </div>
+
+          {!isStreakChallengeProblem ? (
+            <div className="lc-toolbar-cluster" data-cluster="kojo" aria-label="Ask Kojo">
+              <span className="lc-toolbar-cluster-label">Ask Kojo</span>
+              <button
+                type="button"
+                className="lc-toolbar-btn lc-toolbar-btn--kojo"
+                onClick={() => openKojo(currentProblem)}
+                disabled={assistsLocked}
+                aria-label="Ask Kojo for a hint"
+                title={assistsLocked ? `Locked on Pass ${activePass}: no resources` : "Ask Kojo for a hint"}
+              >
+                <Sparkles size={16} />
+                <span className="lc-tb-label">Ask Kojo</span>
+              </button>
+            </div>
           ) : null}
-          <button type="button" className={progress[currentProblem.slug] ? "lc-toolbar-btn lc-toolbar-btn--done" : "lc-toolbar-btn"} onClick={() => toggleProgress(currentProblem)} aria-label={progress[currentProblem.slug] ? "Mark incomplete" : "Mark done"}>
-            {progress[currentProblem.slug] ? <CheckCircle2 size={16} /> : <Circle size={16} />}
-            <span className="lc-tb-label">{progress[currentProblem.slug] ? "Done" : "Mark done"}</span>
-          </button>
         </div>
       </div>
+
+      {activeDrill ? (
+        <div className={`lc-pass-banner lc-pass-banner--p${activePass}`} style={{ "--pass-color": PASS_RAMP[Math.min(activePass, 3) - 1] } as CSSProperties}>
+          <PassRung current={activePass} />
+          <span className="lc-pass-banner-rule">Pass {activePass} // {PASS_RULE[Math.min(activePass, 3) - 1]}</span>
+          <button
+            type="button"
+            className="lc-pass-banner-clear"
+            onClick={() => void handleAdvanceDrill(currentProblem.slug)}
+            title={activePass >= 3 ? "Clear this drill for good" : "Mark this pass cleared and schedule the next"}
+          >
+            {activePass >= 3 ? "Clear drill" : "Pass cleared"}
+          </button>
+        </div>
+      ) : null}
 
       <div className="lc-mobile-pane-toggle" role="group" aria-label="Switch between problem and code">
         <button
@@ -2906,19 +4881,27 @@ export default function LeetCodeMode() {
               <button
                 type="button"
                 className="lc-solution-toggle"
-                onClick={() => hasAttempted && setSolutionOpen((prev) => !prev)}
-                disabled={!hasAttempted}
-                title={hasAttempted ? "Toggle NeetCode solution" : "Attempt the problem to unlock"}
+                onClick={() => hasAttempted && !assistsLocked && setSolutionOpen((prev) => !prev)}
+                disabled={!hasAttempted || assistsLocked}
+                title={
+                  assistsLocked
+                    ? `Locked on Pass ${activePass}: no solution reveal`
+                    : hasAttempted
+                      ? "Toggle NeetCode solution"
+                      : "Attempt the problem to unlock"
+                }
               >
                 <Youtube size={15} />
                 <span>NeetCode solution</span>
-                {!hasAttempted ? (
+                {assistsLocked ? (
+                  <small className="lc-solution-locked">Locked on Pass {activePass}</small>
+                ) : !hasAttempted ? (
                   <small className="lc-solution-locked">Attempt first to unlock</small>
                 ) : (
                   <ChevronDown size={14} className={solutionOpen ? "lc-solution-chevron lc-solution-chevron--open" : "lc-solution-chevron"} />
                 )}
               </button>
-              {solutionOpen && hasAttempted ? (
+              {solutionOpen && hasAttempted && !assistsLocked ? (
                 <div className="lc-solution-frame-wrap">
                   <iframe
                     src={`https://neetcode.io/solutions/${currentProblem.slug}`}
@@ -2977,8 +4960,8 @@ export default function LeetCodeMode() {
 
       {kojoOpen ? (
         <>
-          <div className="lc-kojo-backdrop" onClick={() => { setKojoOpen(false); setKojoResponse(null); }} />
-          <div className="lc-kojo-modal">
+          <div className="lc-kojo-backdrop lc-kojo-backdrop--drawer" onClick={() => { setKojoOpen(false); setKojoResponse(null); }} />
+          <div className="lc-kojo-modal lc-kojo-modal--drawer" role="complementary" aria-label="Ask Kojo">
             <div className="lc-kojo-modal-header">
               <div className="kojo-avatar"><KojoMascot state={kojoLoading ? "loading" : "idle"} /></div>
               <span><Sparkles size={13} className="kojo-title-icon" /> Ask Kojo for a hint</span>
@@ -3014,7 +4997,7 @@ export default function LeetCodeMode() {
               {kojoLoading ? (
                 <div className="kojo-thinking-mascot"><KojoMascot state="loading" /><span className="kojo-thinking-label">thinking…</span></div>
               ) : (
-                <button type="button" className="button button--primary lc-kojo-send" onClick={() => handleKojoSend()} disabled={!kojoInput.trim()}>
+                <button type="button" className="button button--primary lc-kojo-send" onClick={() => handleKojoSend()} disabled={!kojoInput.trim() || assistsLocked}>
                   <Send size={15} />
                   {kojoResponse ? "Ask again" : "Ask Kojo"}
                 </button>
@@ -3034,23 +5017,32 @@ export default function LeetCodeMode() {
 
       {timerPickerOpen ? (
         <>
-          <div className="lc-kojo-backdrop" onClick={closeTimerPicker} />
-          <div className="lc-kojo-modal lc-timer-modal">
+          <div className="lc-kojo-backdrop lc-timer-backdrop" />
+          <div className="lc-kojo-modal lc-timer-modal" role="dialog" aria-modal="true" aria-labelledby="timer-modal-title">
             <div className="lc-kojo-modal-header lc-timer-modal-header">
-              <div className="kojo-avatar lc-timer-avatar"><Timer size={16} /></div>
-              <span>Set timer</span>
+              <div className="kojo-avatar lc-timer-avatar"><TimerRing fraction={1} tone="idle" size={18} stroke={2} /></div>
+              <span id="timer-modal-title">Set a timer</span>
               <button type="button" className="lc-kojo-close" onClick={closeTimerPicker} aria-label="Close timer modal">
                 <X size={17} />
               </button>
             </div>
 
-            <div className="lc-timer-modal-body">
-              <div className="lc-timer-modal-presets" role="group" aria-label="Problem timer presets">
-                {TIMER_PRESETS.map(renderTimerPreset)}
-              </div>
-
+            <div className="lc-kojo-contract lc-timer-modal-body">
+              <p className="lc-timer-modal-copy">Choose a common interview duration, or enter exactly how much time you have.</p>
+              <label className="lc-timer-modal-field">
+                <span>Preset</span>
+                <select
+                  value={TIMER_PRESETS.includes(Number(timerMinutesInput)) ? timerMinutesInput : "custom"}
+                  onChange={(event) => {
+                    setTimerMinutesInput(event.target.value === "custom" ? "" : event.target.value);
+                  }}
+                >
+                  {TIMER_PRESETS.map((minutes) => <option key={minutes} value={minutes}>{minutes} minutes</option>)}
+                  <option value="custom">Custom duration</option>
+                </select>
+              </label>
               <label className="lc-timer-modal-input">
-                <span>Custom minutes</span>
+                <span>Custom duration</span>
                 <input
                   type="number"
                   min="1"
@@ -3063,16 +5055,18 @@ export default function LeetCodeMode() {
                       applyTimerFromInput();
                     }
                   }}
+                  aria-label="Custom minutes"
                 />
+                <span className="lc-timer-modal-unit">min</span>
               </label>
             </div>
 
-            <div className="lc-timer-modal-actions">
+            <div className="lc-timeout-actions lc-timer-modal-actions">
               <button type="button" className="button lc-timeout-action lc-timeout-action--ghost" onClick={closeTimerPicker}>
                 Cancel
               </button>
               <button type="button" className="button button--primary lc-timeout-action" onClick={applyTimerFromInput}>
-                Start timer
+                Set timer
               </button>
             </div>
           </div>

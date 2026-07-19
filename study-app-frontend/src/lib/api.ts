@@ -984,6 +984,7 @@ export async function gradeLeetCodeSubmission(
   userCode: string,
   testResults: string,
   allPassed: boolean,
+  topic: string,
   provider?: string,
   statement?: string,
 ): Promise<LeetCodeGradeResponse> {
@@ -993,6 +994,7 @@ export async function gradeLeetCodeSubmission(
     user_code: userCode,
     test_results: testResults,
     all_passed: allPassed,
+    topic,
   };
   if (provider) body.provider = provider;
   if (statement) body.statement = statement;
@@ -1047,6 +1049,7 @@ export async function fetchLeetCodeHint(
   title: string,
   message: string,
   userCode: string,
+  topic: string,
   provider?: string,
   statement?: string,
 ): Promise<LeetCodeHintResponse> {
@@ -1055,6 +1058,7 @@ export async function fetchLeetCodeHint(
     title,
     message,
     user_code: userCode,
+    topic,
   };
   if (provider) body.provider = provider;
   if (statement) body.statement = statement;
@@ -1379,6 +1383,126 @@ export async function createLCStreakChallenge(problemSlug?: string): Promise<imp
 
 export async function completeLCStreakChallenge(): Promise<void> {
   await request("/leetcode/streak-challenge/complete", { method: "POST" });
+}
+
+// ── Daily KojoCode (beta-only) ────────────────────────────────────────────────
+
+export async function fetchLCDaily(): Promise<LCCustomProblem | null> {
+  try {
+    return await request<LCCustomProblem | null>("/leetcode/daily");
+  } catch {
+    return null;
+  }
+}
+
+export async function createLCDaily(
+  topic: string,
+  targetDifficulty: string,
+  seedSlug: string,
+  provider?: string,
+): Promise<LCCustomProblem> {
+  const body: Record<string, unknown> = { topic, target_difficulty: targetDifficulty, seed_slug: seedSlug };
+  if (provider) body.provider = provider;
+  return request<LCCustomProblem>("/leetcode/daily", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+// ── Struggle events + weakness scorer (beta-only) ─────────────────────────────
+
+export async function logLCStruggleEvent(
+  topic: string,
+  eventType: "timer_expiry" = "timer_expiry",
+  problemSlug?: string,
+): Promise<void> {
+  try {
+    await request("/leetcode/struggle-event", {
+      method: "POST",
+      body: JSON.stringify({ topic, event_type: eventType, problem_slug: problemSlug ?? null }),
+    });
+  } catch {
+    // Best-effort signal, never blocks the timer-expiry flow it's fired from.
+  }
+}
+
+export async function fetchLCWeakness(): Promise<import("./types").LCWeaknessTopic[]> {
+  try {
+    const result = await request<import("./types").LCWeaknessResponse>("/leetcode/weakness");
+    return result.topics ?? [];
+  } catch {
+    return [];
+  }
+}
+
+// ── Interview Prep Banks (beta-only) ──────────────────────────────────────────
+
+export async function fetchLCPrepBanks(): Promise<import("./types").LCPrepBank[]> {
+  try {
+    return await request<import("./types").LCPrepBank[]>("/leetcode/banks");
+  } catch {
+    return [];
+  }
+}
+
+export async function createLCPrepBank(name: string, target = ""): Promise<import("./types").LCPrepBank> {
+  return request<import("./types").LCPrepBank>("/leetcode/banks", {
+    method: "POST",
+    body: JSON.stringify({ name, target }),
+  });
+}
+
+export async function deleteLCPrepBank(bankId: number): Promise<void> {
+  await request(`/leetcode/banks/${bankId}`, { method: "DELETE" });
+}
+
+export async function activateLCPrepBank(bankId: number): Promise<import("./types").LCPrepBank> {
+  return request<import("./types").LCPrepBank>(`/leetcode/banks/${bankId}/activate`, { method: "POST" });
+}
+
+export async function addLCBankProblem(
+  bankId: number,
+  problemSlug: string,
+): Promise<import("./types").LCPrepBank> {
+  return request<import("./types").LCPrepBank>(`/leetcode/banks/${bankId}/problems`, {
+    method: "POST",
+    body: JSON.stringify({ problem_slug: problemSlug }),
+  });
+}
+
+export async function bulkAddLCBankProblems(
+  bankId: number,
+  slugs: string[],
+): Promise<import("./types").LCPrepBank> {
+  return request<import("./types").LCPrepBank>(`/leetcode/banks/${bankId}/problems/bulk`, {
+    method: "POST",
+    body: JSON.stringify({ slugs }),
+  });
+}
+
+export async function removeLCBankProblem(bankId: number, slug: string): Promise<void> {
+  await request(`/leetcode/banks/${bankId}/problems/${slug}`, { method: "DELETE" });
+}
+
+// ── 3-Pass Drill schedule (beta-only) ─────────────────────────────────────────
+
+export async function fetchLCDrills(): Promise<import("./types").LCDrillSchedule[]> {
+  try {
+    return await request<import("./types").LCDrillSchedule[]>("/leetcode/drills");
+  } catch {
+    return [];
+  }
+}
+
+export async function createLCDrill(problemSlug: string): Promise<import("./types").LCDrillSchedule> {
+  return request<import("./types").LCDrillSchedule>("/leetcode/drills", {
+    method: "POST",
+    body: JSON.stringify({ problem_slug: problemSlug }),
+  });
+}
+
+export async function advanceLCDrill(slug: string): Promise<import("./types").LCDrillSchedule> {
+  return request<import("./types").LCDrillSchedule>(`/leetcode/drills/${slug}/advance`, { method: "POST" });
 }
 
 // ── Mock Interview ────────────────────────────────────────────────────────────

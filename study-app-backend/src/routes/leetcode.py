@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+import uuid
+from collections import Counter
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -10,15 +12,36 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_session
 from src.dependencies import get_current_user
-from src.models.lc_sync import LCActivityDate, LCCodeWorkspace, LCCustomProblem, LCProgress, LCProblemNote, LCStreakChallenge
+from src.models.lc_sync import (
+    LCActivityDate,
+    LCBankProblem,
+    LCCodeWorkspace,
+    LCCustomProblem,
+    LCDrillSchedule,
+    LCPrepBank,
+    LCProgress,
+    LCProblemNote,
+    LCStreakChallenge,
+    LCStruggleEvent,
+)
 from src.models.user import User
 from src.schemas.leetcode_schema import (
     LCCustomProblemListResponse,
     LCCustomProblemResponse,
+    LCBankAddProblemRequest,
+    LCBankBulkAddRequest,
     LCCustomProblemSyncRequest,
     LCCustomTestCase,
+    LCDailyProblemRequest,
+    LCDrillCreateRequest,
+    LCDrillScheduleResponse,
     LCGenerateCustomProblemRequest,
     LCGeneratedCustomProblem,
+    LCPrepBankCreateRequest,
+    LCPrepBankResponse,
+    LCStruggleEventRequest,
+    LCWeaknessResponse,
+    LCWeaknessTopic,
     LCNotesResponse,
     LCNotesSyncRequest,
     LCProgressResponse,
@@ -63,10 +86,11 @@ async def get_problem(
 @router.post("/hint", response_model=LeetCodeHintResponse)
 async def kojo_leetcode_hint(
     body: LeetCodeHintRequest,
+    session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> LeetCodeHintResponse:
     try:
-        return await LeetCodeService().hint(
+        result = await LeetCodeService().hint(
             title_slug=body.title_slug,
             title=body.title,
             user_message=body.message,
@@ -79,14 +103,28 @@ async def kojo_leetcode_hint(
     except LLMException as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    # Every hint call is a struggle signal, logged after the LLM call succeeds so a
+    # failed hint request doesn't pollute the weakness scorer.
+    session.add(
+        LCStruggleEvent(
+            user_id=user.id,
+            topic=body.topic,
+            event_type="hint_used",
+            problem_slug=body.title_slug,
+        )
+    )
+    await session.commit()
+    return result
+
 
 @router.post("/grade", response_model=LeetCodeGradeResponse)
 async def grade_leetcode_submission(
     body: LeetCodeGradeRequest,
+    session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> LeetCodeGradeResponse:
     try:
-        return await LeetCodeService().grade(
+        result = await LeetCodeService().grade(
             title_slug=body.title_slug,
             title=body.title,
             user_code=body.user_code,
@@ -99,6 +137,112 @@ async def grade_leetcode_submission(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except LLMException as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    # Only a failed grade is a struggle signal, not every grade call.
+    if not body.all_passed:
+        session.add(
+            LCStruggleEvent(
+                user_id=user.id,
+                topic=body.topic,
+                event_type="failed_grade",
+                problem_slug=body.title_slug,
+            )
+        )
+        await _maybe_auto_add_drill(session, user.id, body.title_slug)
+    await session.commit()
+    return result
+
+
+# ── Struggle events + weakness scorer ─────────────────────────────────────────
+
+_WEAKNESS_LOOKBACK_DAYS = 3
+# Simple bucketed struggle-event count -> weakness level. Thresholds are a starting
+# point, not tuned against real usage data yet; easy to adjust later.
+_WEAKNESS_LEVEL_BUCKETS = ((2, 2), (4, 3), (7, 4))
+
+
+def _weakness_level_for_count(count: int) -> int:
+    if count <= 0:
+        return 1
+    for ceiling, level in _WEAKNESS_LEVEL_BUCKETS:
+        if count <= ceiling:
+            return level
+    return 5
+
+
+async def _maybe_auto_add_drill(
+    session: AsyncSession, user_id: int, problem_slug: Optional[str]
+) -> None:
+    """A failed_grade or timer_expiry struggle signal auto-creates a drill row, unless
+    one already exists for this (user, problem) -- lc_drill_schedule has a hard
+    UniqueConstraint(user_id, problem_slug) (one row per problem per user, ever), so
+    this checks for ANY existing row, not just an open one, to respect that."""
+    if not problem_slug:
+        return
+    existing = (
+        await session.execute(
+            select(LCDrillSchedule).where(
+                LCDrillSchedule.user_id == user_id,
+                LCDrillSchedule.problem_slug == problem_slug,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing:
+        return
+    session.add(
+        LCDrillSchedule(
+            user_id=user_id,
+            problem_slug=problem_slug,
+            current_pass=1,
+            next_due_at=datetime.now(timezone.utc),
+            added_from="auto",
+        )
+    )
+
+
+@router.post("/struggle-event", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def log_struggle_event(
+    body: LCStruggleEventRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> Response:
+    session.add(
+        LCStruggleEvent(
+            user_id=user.id,
+            topic=body.topic,
+            event_type=body.event_type,
+            problem_slug=body.problem_slug,
+        )
+    )
+    if body.event_type == "timer_expiry":
+        await _maybe_auto_add_drill(session, user.id, body.problem_slug)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/weakness", response_model=LCWeaknessResponse)
+async def get_weakness(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LCWeaknessResponse:
+    since = datetime.now(timezone.utc) - timedelta(days=_WEAKNESS_LOOKBACK_DAYS)
+    topics = (
+        await session.execute(
+            select(LCStruggleEvent.topic).where(
+                LCStruggleEvent.user_id == user.id,
+                LCStruggleEvent.occurred_at >= since,
+            )
+        )
+    ).scalars().all()
+    if not topics:
+        return LCWeaknessResponse(topics=[])
+    counts = Counter(topics)
+    scored = [
+        LCWeaknessTopic(topic=topic, level=_weakness_level_for_count(count))
+        for topic, count in counts.items()
+    ]
+    scored.sort(key=lambda item: (-item.level, item.topic))
+    return LCWeaknessResponse(topics=scored)
 
 
 # ── Progress & activity sync ──────────────────────────────────────────────────
@@ -392,6 +536,85 @@ async def generate_custom_problem(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
+# ── Daily KojoCode (beta-only) ────────────────────────────────────────────────
+
+def _today_str() -> str:
+    # Server-side calendar day (UTC) that the create-or-return lock keys on. GET and
+    # POST use the same value, so a day's problem is consistent for both.
+    return datetime.now(timezone.utc).date().isoformat()
+
+
+async def _find_today_daily(session: AsyncSession, user_id: int) -> Optional[LCCustomProblem]:
+    return (
+        await session.execute(
+            select(LCCustomProblem).where(
+                LCCustomProblem.user_id == user_id,
+                LCCustomProblem.source == "daily_kojo",
+                LCCustomProblem.daily_date == _today_str(),
+            )
+        )
+    ).scalar_one_or_none()
+
+
+@router.get("/daily", response_model=Optional[LCCustomProblemResponse])
+async def get_daily_problem(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> Optional[LCCustomProblemResponse]:
+    row = await _find_today_daily(session, user.id)
+    if not row:
+        return None
+    return _serialize_custom_problem(row)
+
+
+@router.post("/daily", response_model=LCCustomProblemResponse, status_code=status.HTTP_201_CREATED)
+async def create_daily_problem(
+    body: LCDailyProblemRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LCCustomProblemResponse:
+    # Locked for the day: one Daily KojoCode problem per calendar day. A second press
+    # just re-opens today's, mirroring the LCStreakChallenge create-or-return pattern.
+    existing = await _find_today_daily(session, user.id)
+    if existing:
+        return _serialize_custom_problem(existing)
+
+    try:
+        generated = await LeetCodeService().generate_daily_problem(
+            topic=body.topic,
+            target_difficulty=body.normalized_difficulty(),
+            seed_slug=body.seed_slug,
+            provider=resolve_request_provider(user, body.provider),
+        )
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except LLMException as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    row = LCCustomProblem(
+        user_id=user.id,
+        # Reuses the custom-problem plumbing (progress/workspace/notes/run/grade all
+        # key on slug), so it must start with "custom-" like every other custom slug.
+        slug=f"custom-daily-{uuid.uuid4().hex}",
+        title=generated.title or "Daily KojoCode Problem",
+        # Topic and difficulty are authoritative from the client's request, not the LLM:
+        # the backend takes target_difficulty as given (see the KojoCode plan) and the
+        # client owns the topic taxonomy.
+        topic=(body.topic or "unknown").strip()[:120] or "unknown",
+        difficulty=body.normalized_difficulty(),
+        description=generated.description,
+        url="",
+        starter_code=generated.starter_code,
+        test_cases_json=json.dumps([case.model_dump() for case in generated.test_cases]),
+        source="daily_kojo",
+        daily_date=_today_str(),
+    )
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return _serialize_custom_problem(row)
+
+
 # ── Streak challenge (Save My Streak, beta-only) ──────────────────────────────
 
 def _serialize_streak_challenge(row: LCStreakChallenge) -> LCStreakChallengeResponse:
@@ -475,3 +698,265 @@ async def complete_streak_challenge(
     row.completed_at = datetime.now(timezone.utc)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ── Interview Prep Banks (beta-only) ──────────────────────────────────────────
+
+async def _bank_problem_slugs(session: AsyncSession, bank_id: int) -> list[str]:
+    rows = (
+        await session.execute(
+            select(LCBankProblem.problem_slug)
+            .where(LCBankProblem.bank_id == bank_id)
+            .order_by(LCBankProblem.added_at.asc())
+        )
+    ).scalars().all()
+    return list(rows)
+
+
+def _serialize_bank(row: LCPrepBank, problem_slugs: list[str]) -> LCPrepBankResponse:
+    return LCPrepBankResponse(
+        id=row.id,
+        name=row.name,
+        target=row.target,
+        is_active=row.is_active,
+        problem_slugs=problem_slugs,
+        created_at=row.created_at.isoformat(),
+    )
+
+
+async def _get_owned_bank(session: AsyncSession, user_id: int, bank_id: int) -> LCPrepBank:
+    row = (
+        await session.execute(
+            select(LCPrepBank).where(LCPrepBank.id == bank_id, LCPrepBank.user_id == user_id)
+        )
+    ).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Prep bank not found.")
+    return row
+
+
+@router.get("/banks", response_model=list[LCPrepBankResponse])
+async def list_prep_banks(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[LCPrepBankResponse]:
+    rows = (
+        await session.execute(
+            select(LCPrepBank).where(LCPrepBank.user_id == user.id).order_by(LCPrepBank.created_at.asc())
+        )
+    ).scalars().all()
+    return [_serialize_bank(row, await _bank_problem_slugs(session, row.id)) for row in rows]
+
+
+@router.post("/banks", response_model=LCPrepBankResponse, status_code=status.HTTP_201_CREATED)
+async def create_prep_bank(
+    body: LCPrepBankCreateRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LCPrepBankResponse:
+    row = LCPrepBank(user_id=user.id, name=body.name, target=body.target, is_active=False)
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return _serialize_bank(row, [])
+
+
+@router.delete("/banks/{bank_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def delete_prep_bank(
+    bank_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> Response:
+    row = await _get_owned_bank(session, user.id, bank_id)
+    await session.delete(row)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/banks/{bank_id}/activate", response_model=LCPrepBankResponse)
+async def activate_prep_bank(
+    bank_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LCPrepBankResponse:
+    row = await _get_owned_bank(session, user.id, bank_id)
+    # Only one active bank per user, enforced here (query-then-deactivate) rather than
+    # a DB constraint, mirroring how the one active streak challenge is enforced.
+    others = (
+        await session.execute(
+            select(LCPrepBank).where(
+                LCPrepBank.user_id == user.id,
+                LCPrepBank.id != bank_id,
+                LCPrepBank.is_active.is_(True),
+            )
+        )
+    ).scalars().all()
+    for other in others:
+        other.is_active = False
+    row.is_active = True
+    await session.commit()
+    await session.refresh(row)
+    return _serialize_bank(row, await _bank_problem_slugs(session, row.id))
+
+
+@router.post("/banks/{bank_id}/problems", response_model=LCPrepBankResponse, status_code=status.HTTP_201_CREATED)
+async def add_bank_problem(
+    bank_id: int,
+    body: LCBankAddProblemRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LCPrepBankResponse:
+    row = await _get_owned_bank(session, user.id, bank_id)
+    slug = body.problem_slug.strip()
+    existing = (
+        await session.execute(
+            select(LCBankProblem).where(
+                LCBankProblem.bank_id == bank_id,
+                LCBankProblem.problem_slug == slug,
+            )
+        )
+    ).scalar_one_or_none()
+    if not existing and slug:
+        session.add(LCBankProblem(bank_id=bank_id, problem_slug=slug))
+        await session.commit()
+    return _serialize_bank(row, await _bank_problem_slugs(session, bank_id))
+
+
+@router.post(
+    "/banks/{bank_id}/problems/bulk", response_model=LCPrepBankResponse, status_code=status.HTTP_201_CREATED
+)
+async def bulk_add_bank_problems(
+    bank_id: int,
+    body: LCBankBulkAddRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LCPrepBankResponse:
+    # Catalog-match import inverts direction: the frontend owns the catalog and
+    # resolves free-pasted text to slugs itself, then batch-adds here. The backend
+    # has no catalog to fuzzy-match against (see KOJOCODE_BACKEND_IMPLEMENTATION.md).
+    row = await _get_owned_bank(session, user.id, bank_id)
+    existing_slugs = set(await _bank_problem_slugs(session, bank_id))
+    for raw_slug in body.slugs:
+        slug = (raw_slug or "").strip()
+        if slug and slug not in existing_slugs:
+            session.add(LCBankProblem(bank_id=bank_id, problem_slug=slug))
+            existing_slugs.add(slug)
+    await session.commit()
+    return _serialize_bank(row, await _bank_problem_slugs(session, bank_id))
+
+
+@router.delete(
+    "/banks/{bank_id}/problems/{slug}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response
+)
+async def remove_bank_problem(
+    bank_id: int,
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> Response:
+    await _get_owned_bank(session, user.id, bank_id)
+    existing = (
+        await session.execute(
+            select(LCBankProblem).where(
+                LCBankProblem.bank_id == bank_id,
+                LCBankProblem.problem_slug == slug,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing:
+        await session.delete(existing)
+        await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ── 3-Pass Drill schedule (beta-only) ─────────────────────────────────────────
+
+# Expanding intervals: pass 1 -> 2 waits at least 24h, pass 2 -> 3 waits a few days
+# longer (72h), per the 3-Pass Spaced Repetition spec (todo-kojocode-rebuild.md 3h).
+_DRILL_PASS_INTERVALS = {1: timedelta(hours=24), 2: timedelta(hours=72)}
+
+
+def _serialize_drill(row: LCDrillSchedule) -> LCDrillScheduleResponse:
+    return LCDrillScheduleResponse(
+        id=row.id,
+        problem_slug=row.problem_slug,
+        current_pass=row.current_pass,
+        next_due_at=row.next_due_at.isoformat(),
+        added_from=row.added_from,
+        completed_at=row.completed_at.isoformat() if row.completed_at else None,
+    )
+
+
+@router.get("/drills", response_model=list[LCDrillScheduleResponse])
+async def list_drills(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[LCDrillScheduleResponse]:
+    rows = (
+        await session.execute(
+            select(LCDrillSchedule)
+            .where(LCDrillSchedule.user_id == user.id, LCDrillSchedule.completed_at.is_(None))
+            .order_by(LCDrillSchedule.next_due_at.asc())
+        )
+    ).scalars().all()
+    return [_serialize_drill(row) for row in rows]
+
+
+@router.post("/drills", response_model=LCDrillScheduleResponse, status_code=status.HTTP_201_CREATED)
+async def create_drill(
+    body: LCDrillCreateRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LCDrillScheduleResponse:
+    # Create-or-return: lc_drill_schedule has UniqueConstraint(user_id, problem_slug),
+    # one row per problem per user ever, so a repeat manual add just returns it.
+    existing = (
+        await session.execute(
+            select(LCDrillSchedule).where(
+                LCDrillSchedule.user_id == user.id,
+                LCDrillSchedule.problem_slug == body.problem_slug,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing:
+        return _serialize_drill(existing)
+    row = LCDrillSchedule(
+        user_id=user.id,
+        problem_slug=body.problem_slug,
+        current_pass=1,
+        next_due_at=datetime.now(timezone.utc),
+        added_from="manual",
+    )
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return _serialize_drill(row)
+
+
+@router.post("/drills/{slug}/advance", response_model=LCDrillScheduleResponse)
+async def advance_drill(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LCDrillScheduleResponse:
+    row = (
+        await session.execute(
+            select(LCDrillSchedule).where(
+                LCDrillSchedule.user_id == user.id,
+                LCDrillSchedule.problem_slug == slug,
+                LCDrillSchedule.completed_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="No open drill found for that problem.")
+
+    if row.current_pass >= 3:
+        row.completed_at = datetime.now(timezone.utc)
+    else:
+        row.next_due_at = datetime.now(timezone.utc) + _DRILL_PASS_INTERVALS[row.current_pass]
+        row.current_pass += 1
+
+    await session.commit()
+    await session.refresh(row)
+    return _serialize_drill(row)

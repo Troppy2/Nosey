@@ -1965,6 +1965,62 @@ CRITICAL rules for "test_cases" so they can actually run:
 
 Return only the JSON object."""
 
+    async def generate_daily_problem(
+        self,
+        topic: str,
+        target_difficulty: str,
+        seed_title: str,
+        seed_statement: str,
+        provider: Optional[str] = None,
+    ) -> dict[str, object]:
+        """Reskin a real seed problem (story, variable names, and numbers rewritten)
+        into a fresh problem on the same topic at the same difficulty, returned in the
+        exact JSON shape generate_custom_problem uses. Single JSON call with provider
+        fallback handled inside _complete_json (no per-provider loop here)."""
+        prompt = self._build_daily_problem_prompt(topic, target_difficulty, seed_title, seed_statement)
+        return await self._complete_json(prompt, provider=provider)
+
+    def _build_daily_problem_prompt(
+        self, topic: str, target_difficulty: str, seed_title: str, seed_statement: str
+    ) -> str:
+        topic_line = (topic or "").strip()[:200] or "general problem solving"
+        difficulty = (target_difficulty or "").strip().capitalize()
+        if difficulty not in ("Easy", "Medium", "Hard"):
+            difficulty = "Medium"
+        seed_title_line = (seed_title or "").strip()[:300] or "(untitled)"
+        seed_body = (seed_statement or "").strip()[:9000] or "(no statement available)"
+        return f"""You are generating today's "Daily KojoCode" practice problem for a student.
+
+Take the SEED PROBLEM below and RESKIN it: rewrite the story, the entity and variable
+names, and the concrete numbers so it reads as a genuinely different problem, while
+keeping the SAME underlying algorithm, data structures, input and output shape, and
+difficulty. The student should have to solve the same core challenge, not recognise a
+copy of the original. Do NOT restate the seed's story or reuse its title.
+
+TARGET TOPIC (the pattern to preserve): {topic_line}
+TARGET DIFFICULTY (keep the problem exactly at this level): {difficulty}
+
+SEED PROBLEM TITLE: {seed_title_line}
+
+SEED PROBLEM STATEMENT:
+{seed_body}
+
+Return a JSON object ONLY (no prose, no code fences) with EXACTLY these keys:
+- "title": a NEW short, descriptive problem title that does not reuse the seed's title (string).
+- "topic": the algorithmic pattern(s) the problem exercises, as a comma-separated string, consistent with the target topic above.
+- "difficulty": exactly "{difficulty}".
+- "description": a Markdown problem statement written like LeetCode: a clear introduction of the task, the constraints you can reasonably infer, followed by 2 to 3 worked examples each with an Input, an Output, and a short Explanation. Use the reskinned story and names, NOT the seed's.
+- "starter_code": clean, runnable Python. Define a sensibly named top-level function (e.g. `def some_name(args): ...`) or a `class Solution` method whose signature fits the reskinned problem, with an empty body the student can fill in.
+- "test_cases": an array of 3 to 5 objects, each with "input_text", "output_text", and "explanation_text".
+
+CRITICAL rules for "test_cases" so they can actually run:
+- "input_text" MUST be Python named arguments matching the starter_code signature exactly, comma separated, e.g. `nums = [2, 7, 11, 15], target = 9`. Use the real parameter names. Do not wrap it in a function call.
+- "output_text" MUST be a single Python literal that equals the expected return value, e.g. `[0, 1]` or `True` or `"abc"`.
+- Cover normal cases plus at least one edge case when applicable.
+- Every test case must be correct for the given starter_code.
+
+Return only the JSON object."""
+
     async def _with_retry(self, fn, label: str):
         """Retry a cloud LLM call on 429 with exponential backoff (max 3 attempts)."""
         delay = 1.0

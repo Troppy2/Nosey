@@ -38,6 +38,8 @@ class LeetCodeHintRequest(BaseModel):
     # For user-authored custom problems there is no official statement to fetch, so the
     # client passes the problem text directly and we skip the LeetCode GraphQL call.
     statement: str = Field(default="", max_length=20000)
+    # Category id string for struggle-event logging (client owns the topic taxonomy).
+    topic: str = Field(..., min_length=1, max_length=120)
 
 
 class LeetCodeHintResponse(BaseModel):
@@ -54,6 +56,8 @@ class LeetCodeGradeRequest(BaseModel):
     provider: Optional[str] = Field(default=None)
     # See LeetCodeHintRequest.statement: lets custom problems be graded without a fetch.
     statement: str = Field(default="", max_length=20000)
+    # Category id string for struggle-event logging (client owns the topic taxonomy).
+    topic: str = Field(..., min_length=1, max_length=120)
 
 
 class LeetCodeGradeResponse(BaseModel):
@@ -148,6 +152,24 @@ class LCGeneratedCustomProblem(BaseModel):
     test_cases: list[LCCustomTestCase] = Field(default_factory=list)
 
 
+# ── Daily KojoCode ────────────────────────────────────────────────────────────
+
+class LCDailyProblemRequest(BaseModel):
+    """Client sends the weak topic, the target difficulty, and a seed problem slug it
+    picked from the catalog it owns (the backend has no catalog to pick one itself).
+    The backend reskins that seed into today's problem. The generated problem is
+    returned as a normal LCCustomProblemResponse and locked to one per calendar day."""
+
+    topic: str = Field(..., min_length=1, max_length=120)
+    target_difficulty: str = Field(default="Medium", max_length=20)
+    seed_slug: str = Field(..., min_length=1, max_length=200)
+    provider: Optional[str] = Field(default=None)
+
+    def normalized_difficulty(self) -> str:
+        value = (self.target_difficulty or "").strip().capitalize()
+        return value if value in ("Easy", "Medium", "Hard") else "Medium"
+
+
 # ── Streak challenge (Save My Streak, beta-only) ──────────────────────────────
 
 class LCStreakChallengeCreateRequest(BaseModel):
@@ -163,3 +185,64 @@ class LCStreakChallengeResponse(BaseModel):
     expires_at: Optional[str] = None
     completed_at: Optional[str] = None
     created_at: str
+
+
+# ── Struggle events + weakness scorer ─────────────────────────────────────────
+
+class LCStruggleEventRequest(BaseModel):
+    """Fired by the client's existing timer-expiry modal (it already knows the
+    topic). hint_used and failed_grade events are inserted server-side by the hint
+    and grade routes instead, since those already carry title_slug + topic."""
+
+    topic: str = Field(..., min_length=1, max_length=120)
+    event_type: str = Field(default="timer_expiry", max_length=20)
+    # Lets the auto-add-drill hook (step 7) key a new drill row to a problem.
+    problem_slug: Optional[str] = Field(default=None, max_length=200)
+
+
+class LCWeaknessTopic(BaseModel):
+    topic: str
+    level: int
+
+
+class LCWeaknessResponse(BaseModel):
+    topics: list[LCWeaknessTopic] = Field(default_factory=list)
+
+
+# ── Interview Prep Banks ──────────────────────────────────────────────────────
+
+class LCPrepBankCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    target: str = Field(default="", max_length=200)
+
+
+class LCPrepBankResponse(BaseModel):
+    id: int
+    name: str
+    target: str
+    is_active: bool
+    problem_slugs: list[str] = Field(default_factory=list)
+    created_at: str
+
+
+class LCBankAddProblemRequest(BaseModel):
+    problem_slug: str = Field(..., min_length=1, max_length=200)
+
+
+class LCBankBulkAddRequest(BaseModel):
+    slugs: list[str] = Field(default_factory=list)
+
+
+# ── 3-Pass Drill schedule ──────────────────────────────────────────────────────
+
+class LCDrillCreateRequest(BaseModel):
+    problem_slug: str = Field(..., min_length=1, max_length=200)
+
+
+class LCDrillScheduleResponse(BaseModel):
+    id: int
+    problem_slug: str
+    current_pass: int
+    next_due_at: str
+    added_from: str
+    completed_at: Optional[str] = None
