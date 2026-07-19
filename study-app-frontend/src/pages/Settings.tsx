@@ -29,6 +29,7 @@ import { KOJO_CUSTOM_INSTRUCTION_MAX, useSettings } from "../lib/useSettings";
 import { useEffect, useRef, useState } from "react";
 import type { Folder, KojoClearedConversation, KojoMemory, SlashCommand } from "../lib/types";
 import SlashCommandManager from "../components/SlashCommandManager";
+import { ToggleSwitch } from "../components/ToggleSwitch";
 
 const GENERATION_PROVIDER_OPTIONS = [
   { value: "auto", label: "Auto" },
@@ -351,20 +352,11 @@ export default function Settings() {
             When disabled, you'll see an error and can try again once the AI is available.
           </p>
           <div className="settings-reset-row">
-            <button
-              type="button"
-              role="switch"
-              className={`settings-toggle-switch${questionFallbackEnabled ? " settings-toggle-switch--on" : ""}`}
+            <ToggleSwitch
+              checked={questionFallbackEnabled}
               onClick={handleToggleFallback}
-              aria-pressed={questionFallbackEnabled}
-            >
-              <span className="settings-toggle-track">
-                <span className="settings-toggle-thumb" />
-              </span>
-              <span className="settings-toggle-label">
-                {questionFallbackEnabled ? "Fallback on" : "Fallback off"}
-              </span>
-            </button>
+              label={questionFallbackEnabled ? "Fallback on" : "Fallback off"}
+            />
           </div>
         </CollapsibleSection>
 
