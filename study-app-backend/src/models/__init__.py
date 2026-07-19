@@ -8,7 +8,18 @@ from src.models.frq_answer import FRQAnswer
 from src.models.kojo_action_card import KojoActionCard
 from src.models.kojo_conversation import KojoConversation
 from src.models.kojo_message import KojoMessage
-from src.models.lc_sync import LCActivityDate, LCCodeWorkspace, LCProgress, LCStreakChallenge
+from src.models.lc_sync import (
+    LCActivityDate,
+    LCBankProblem,
+    LCCodeWorkspace,
+    LCCustomProblem,
+    LCDrillSchedule,
+    LCPrepBank,
+    LCProblemNote,
+    LCProgress,
+    LCStreakChallenge,
+    LCStruggleEvent,
+)
 from src.models.learning_module import LearningModule, LearningTrack
 from src.models.mcq_option import MCQOption
 from src.models.mock_interview import MockInterviewSession
@@ -35,9 +46,15 @@ __all__ = [
     "KojoConversation",
     "KojoMessage",
     "LCActivityDate",
+    "LCBankProblem",
     "LCCodeWorkspace",
+    "LCCustomProblem",
+    "LCDrillSchedule",
+    "LCPrepBank",
+    "LCProblemNote",
     "LCProgress",
     "LCStreakChallenge",
+    "LCStruggleEvent",
     "LearningModule",
     "LearningTrack",
     "MCQOption",

@@ -134,6 +134,40 @@ class LeetCodeService:
         except Exception as exc:
             raise LLMException("Kojo couldn't generate a problem from that code. Try again.") from exc
 
+        return self._normalize_generated_problem(data, fallback_code=code)
+
+    async def generate_daily_problem(
+        self,
+        topic: str,
+        target_difficulty: str,
+        seed_slug: str,
+        provider: Optional[str] = None,
+    ) -> LCGeneratedCustomProblem:
+        """Reskin a real seed problem into a fresh Daily KojoCode problem on the given
+        topic at the given difficulty. Fetches the seed's real statement first, then
+        makes a single LLM call. Fetch errors (bad slug) propagate as
+        ResourceNotFoundException so the route can map them to 404."""
+        seed = await self._fetch_problem(seed_slug)
+        seed_statement = self._html_to_text(seed.content_html)
+        try:
+            data = await LLMService().generate_daily_problem(
+                topic=topic,
+                target_difficulty=target_difficulty,
+                seed_title=seed.title,
+                seed_statement=seed_statement,
+                provider=provider,
+            )
+        except Exception as exc:
+            raise LLMException("Kojo couldn't generate today's problem. Try again.") from exc
+
+        return self._normalize_generated_problem(data, fallback_code="")
+
+    def _normalize_generated_problem(
+        self, data: dict[str, object], fallback_code: str = ""
+    ) -> LCGeneratedCustomProblem:
+        """Shared parser for a generated-problem JSON blob (custom or daily): clamp the
+        difficulty to the allowed set, keep only runnable test cases, and truncate all
+        text fields to their column limits."""
         difficulty = str(data.get("difficulty", "unknown") or "unknown").strip().capitalize()
         if difficulty not in ("Easy", "Medium", "Hard"):
             difficulty = "unknown"
@@ -162,7 +196,7 @@ class LeetCodeService:
             topic=str(data.get("topic", "unknown") or "unknown").strip()[:120] or "unknown",
             difficulty=difficulty,
             description=str(data.get("description", "") or "").strip()[:20000],
-            starter_code=str(data.get("starter_code", "") or code or "").strip()[:20000],
+            starter_code=str(data.get("starter_code", "") or fallback_code or "").strip()[:20000],
             test_cases=test_cases,
         )
 

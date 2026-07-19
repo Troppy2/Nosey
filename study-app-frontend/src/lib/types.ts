@@ -522,6 +522,10 @@ export type LCCustomProblem = {
   starter_code: string;
   test_cases: LCCustomTestCase[];
   is_archived?: boolean;
+  // "daily_kojo" marks a generated Daily KojoCode problem (source-filtered out of the
+  // Custom Questions list). Absent/"user" for an ordinary user-authored problem.
+  source?: "user" | "daily_kojo";
+  daily_date?: string | null;
 };
 
 // What the AI returns from /custom-problems/generate (no slug or url yet).
@@ -569,6 +573,39 @@ export type LCStreakChallenge = {
   expires_at: string | null;
   completed_at: string | null;
   created_at: string;
+};
+
+// ── Struggle events + weakness scorer (beta-only) ───────────────────────────
+
+export type LCWeaknessTopic = {
+  topic: string;
+  level: number;
+};
+
+export type LCWeaknessResponse = {
+  topics: LCWeaknessTopic[];
+};
+
+// ── Interview Prep Banks (beta-only) ────────────────────────────────────────
+
+export type LCPrepBank = {
+  id: ID;
+  name: string;
+  target: string;
+  is_active: boolean;
+  problem_slugs: string[];
+  created_at: string;
+};
+
+// ── 3-Pass Drill schedule (beta-only) ───────────────────────────────────────
+
+export type LCDrillSchedule = {
+  id: ID;
+  problem_slug: string;
+  current_pass: number;
+  next_due_at: string;
+  added_from: "auto" | "manual";
+  completed_at: string | null;
 };
 
 export type SlashCommandInput = {

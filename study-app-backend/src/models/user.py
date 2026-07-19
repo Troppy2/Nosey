@@ -12,7 +12,18 @@ if TYPE_CHECKING:
     from src.models.flashcard import Flashcard, FlashcardAttempt
     from src.models.folder import Folder
     from src.models.kojo_conversation import KojoConversation
-    from src.models.lc_sync import LCActivityDate, LCCodeWorkspace, LCCustomProblem, LCProgress, LCProblemNote, LCStreakChallenge
+    from src.models.lc_sync import (
+        LCActivityDate,
+        LCBankProblem,
+        LCCodeWorkspace,
+        LCCustomProblem,
+        LCDrillSchedule,
+        LCPrepBank,
+        LCProgress,
+        LCProblemNote,
+        LCStreakChallenge,
+        LCStruggleEvent,
+    )
     from src.models.mock_interview import MockInterviewSession
     from src.models.slash_command import SlashCommand
     from src.models.user_attempt import UserAttempt
@@ -65,6 +76,15 @@ class User(Base, TimestampMixin):
     )
     lc_streak_challenges: Mapped[list[LCStreakChallenge]] = relationship(
         "LCStreakChallenge", back_populates="user", cascade="all, delete-orphan"
+    )
+    lc_struggle_events: Mapped[list[LCStruggleEvent]] = relationship(
+        "LCStruggleEvent", back_populates="user", cascade="all, delete-orphan"
+    )
+    lc_prep_banks: Mapped[list[LCPrepBank]] = relationship(
+        "LCPrepBank", back_populates="user", cascade="all, delete-orphan"
+    )
+    lc_drill_schedule: Mapped[list[LCDrillSchedule]] = relationship(
+        "LCDrillSchedule", back_populates="user", cascade="all, delete-orphan"
     )
     mock_interview_sessions: Mapped[list[MockInterviewSession]] = relationship(
         "MockInterviewSession", back_populates="user", cascade="all, delete-orphan"

@@ -14,7 +14,7 @@ const BASE_NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, beta: false, guestHidden: false, tourId: undefined },
   { to: "/folders", label: "Folders", icon: FolderOpen, beta: false, guestHidden: false, tourId: "tour-nav-folders" },
   { to: "/flashcards", label: "Learning Modes", icon: Brain, beta: false, guestHidden: false, tourId: undefined },
-  { to: "/leetcode", label: "LeetCode mode", icon: Code2, beta: true, guestHidden: true, tourId: undefined },
+  { to: "/leetcode", label: "KojoCode", icon: Code2, beta: true, guestHidden: true, tourId: undefined },
   { to: "/kojo/chat", label: "Chat", icon: MessageCircle, beta: false, guestHidden: true, tourId: "tour-nav-kojo" },
   { to: "/settings", label: "Settings", icon: Settings, beta: false, guestHidden: false, tourId: undefined },
 ];
