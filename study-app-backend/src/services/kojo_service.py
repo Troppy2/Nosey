@@ -304,6 +304,7 @@ class KojoService:
         provider: Optional[str] = None,
         strictness: Optional[str] = "medium",
         custom_instruction: Optional[str] = None,
+        context: Optional[str] = None,
     ) -> KojoChatResponse:
         repo = KojoRepository(session)
         conversation = await repo.get_conversation_by_id(conversation_id, user_id)
@@ -314,7 +315,12 @@ class KojoService:
         session_files_content = "\n\n---\n\n".join(
             f"[Session upload: {f.file_name}]\n{f.content}" for f in session_files if f.content
         )
-        notes_context = session_files_content if session_files_content else _NO_NOTES
+        # `context` is caller-supplied per-turn grounding (e.g. a LeetCode problem
+        # statement + the student's current code, or the active test question). It
+        # is mixed into the prompt like notes but never persisted as a message.
+        task_context = f"[Current task context]\n{context.strip()}" if context and context.strip() else ""
+        context_parts = [part for part in (task_context, session_files_content) if part]
+        notes_context = "\n\n---\n\n".join(context_parts) if context_parts else _NO_NOTES
 
         user_memory = await _load_user_memory(user_id, session)
         await repo.add_message(conversation.id, "user", user_message)
@@ -362,6 +368,7 @@ class KojoService:
         strictness: Optional[str] = "medium",
         reasoning: bool = False,
         custom_instruction: Optional[str] = None,
+        context: Optional[str] = None,
     ):
         """Streaming variant of general_chat.
 
@@ -380,7 +387,9 @@ class KojoService:
         session_files_content = "\n\n---\n\n".join(
             f"[Session upload: {f.file_name}]\n{f.content}" for f in session_files if f.content
         )
-        notes_context = session_files_content if session_files_content else _NO_NOTES
+        task_context = f"[Current task context]\n{context.strip()}" if context and context.strip() else ""
+        context_parts = [part for part in (task_context, session_files_content) if part]
+        notes_context = "\n\n---\n\n".join(context_parts) if context_parts else _NO_NOTES
 
         user_memory = await _load_user_memory(user_id, session)
         await repo.add_message(conversation.id, "user", user_message)

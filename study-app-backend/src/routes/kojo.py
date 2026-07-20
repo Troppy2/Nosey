@@ -419,6 +419,7 @@ async def general_chat(
             provider=resolve_request_provider(user, body.provider),
             strictness=body.strictness,
             custom_instruction=body.custom_instruction,
+            context=body.context,
             session=session,
         )
     except ResourceNotFoundException as exc:
@@ -449,6 +450,7 @@ async def general_chat_stream(
                 strictness=body.strictness,
                 reasoning=bool(body.reasoning),
                 custom_instruction=body.custom_instruction,
+                context=body.context,
                 session=session,
             ):
                 yield _sse(event)
