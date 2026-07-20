@@ -8,13 +8,14 @@ import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { TextArea } from "../components/Field";
 import { InlineLoading, LoadingNotice } from "../components/Loaders";
+import { KojoHelpChat } from "../components/KojoHelpChat";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { MathInput } from "../components/MathInput";
 import type { ProgressStage } from "../components/Progress";
 import { ProgressOverlay, useStagedProgress } from "../components/Progress";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
 import { SkeletonQuestionCard } from "../components/Skeletons";
-import { API_BASE_URL, fetchTest, getDraftAttempt, kojoChat, saveDraftAttempt, scopeKey, submitAttempt } from "../lib/api";
+import { API_BASE_URL, fetchTest, getDraftAttempt, saveDraftAttempt, scopeKey, submitAttempt } from "../lib/api";
 import { applyTextHighlights, clearTextHighlights, getSelectionSignature, HIGHLIGHT_SUPPORTED } from "../lib/highlightRanges";
 import { useSettings } from "../lib/useSettings";
 import type { DraftAttemptAnswer, Question, SubmittedAnswer, TestTake } from "../lib/types";
@@ -66,10 +67,6 @@ export default function TakeTest() {
     localStorage.getItem(scopeKey(`nosey_learning_mode_${numericTestId}`)) === "true",
   );
   const [kojoOpen, setKojoOpen] = useState(false);
-  const [kojoInput, setKojoInput] = useState("");
-  const [kojoResponse, setKojoResponse] = useState<string | null>(null);
-  const [kojoLoading, setKojoLoading] = useState(false);
-  const [kojoError, setKojoError] = useState<string | null>(null);
 
   // Learning mode is only usable while beta mode is on and the test belongs to a folder.
   const learningActive = betaMode && learningMode && Boolean(test?.folder_id);
@@ -128,39 +125,11 @@ export default function TakeTest() {
     });
   }
 
-  function openKojo(prefill?: string) {
-    setKojoResponse(null);
-    setKojoError(null);
-    setKojoInput(prefill ?? "");
-    setKojoOpen(true);
-  }
-
-  async function handleKojoSend() {
-    const message = kojoInput.trim();
-    if (!test?.folder_id || !message || kojoLoading) return;
-    setKojoLoading(true);
-    setKojoError(null);
-    setKojoResponse(null);
-    try {
-      const currentQuestion = test.questions[index];
-      const prompt = [
-        "You are Kojo, a study companion helping a student during a practice test in Learning Mode.",
-        "Help the student understand the underlying concept and reason toward the answer.",
-        "Guide their thinking, do not just hand over the final answer to the test question.",
-        "",
-        currentQuestion ? `Question the student is working on:\n${currentQuestion.question_text}` : "",
-        "",
-        `Student's question:\n${message}`,
-      ]
-        .filter(Boolean)
-        .join("\n");
-      const result = await kojoChat(test.folder_id, prompt, generationProvider, kojoStrictness);
-      setKojoResponse(result.response);
-    } catch (err) {
-      setKojoError(err instanceof Error ? err.message : "Kojo failed to respond.");
-    } finally {
-      setKojoLoading(false);
-    }
+  // Ephemeral per-turn grounding sent to Kojo alongside each message (never
+  // shown as a chat bubble): the question the student is currently working on.
+  function buildTestKojoContext(): string {
+    const currentQuestion = test?.questions[index];
+    return currentQuestion ? `Question the student is working on:\n${currentQuestion.question_text}` : "";
   }
 
   useEffect(() => {
@@ -758,7 +727,7 @@ export default function TakeTest() {
               <Sparkles size={14} />
               Highlight any text to ask Kojo, grounded in your notes.
             </span>
-            <button type="button" className="learning-mode-ask-btn" onClick={() => openKojo()}>
+            <button type="button" className="learning-mode-ask-btn" onClick={() => setKojoOpen(true)}>
               <KojoMascot state="idle" />
               Ask Kojo
             </button>
@@ -940,48 +909,20 @@ export default function TakeTest() {
         </div>
       )}
 
-      {kojoOpen && (
-        <>
-          <div className="lc-kojo-backdrop" onClick={() => { setKojoOpen(false); setKojoResponse(null); }} />
-          <div className="lc-kojo-modal">
-            <div className="lc-kojo-modal-header">
-              <div className="kojo-avatar"><KojoMascot state={kojoLoading ? "loading" : "idle"} /></div>
-              <span><Sparkles size={13} className="kojo-title-icon" /> Ask Kojo</span>
-              <button type="button" className="lc-kojo-close" onClick={() => { setKojoOpen(false); setKojoResponse(null); }} aria-label="Close">
-                <X size={17} />
-              </button>
-            </div>
-
-            <div className="lc-kojo-contract">
-              <p>Kojo answers from your uploaded notes to help you understand the material. It guides your thinking instead of handing over the answer.</p>
-            </div>
-
-            <div className="lc-kojo-input-wrap">
-              <textarea
-                className="lc-kojo-input"
-                rows={5}
-                value={kojoInput}
-                onChange={(event) => setKojoInput(event.target.value)}
-                placeholder="Ask Kojo about this question or the concept behind it..."
-                disabled={kojoLoading}
-              />
-            </div>
-
-            {kojoResponse ? <div className="lc-kojo-response"><MarkdownContent content={kojoResponse} /></div> : null}
-            {kojoError ? <div className="kojo-error"><AlertCircle size={14} /><span>{kojoError}</span></div> : null}
-
-            <div className="lc-kojo-modal-footer">
-              {kojoLoading ? (
-                <div className="kojo-thinking-mascot"><KojoMascot state="loading" /><span className="kojo-thinking-label">thinking…</span></div>
-              ) : (
-                <button type="button" className="button button--primary lc-kojo-send" onClick={() => void handleKojoSend()} disabled={!kojoInput.trim()}>
-                  <Send size={15} />
-                  {kojoResponse ? "Ask again" : "Ask Kojo"}
-                </button>
-              )}
-            </div>
-          </div>
-        </>
+      {kojoOpen && test && (
+        <KojoHelpChat
+          storageKey={`test:${numericTestId}`}
+          subtitle={test.title}
+          onClose={() => setKojoOpen(false)}
+          buildContext={buildTestKojoContext}
+          customInstruction="You're helping a student during a practice test in Learning Mode. Help them understand the underlying concept and reason toward the answer. Guide their thinking, do not just hand over the final answer to the test question."
+          provider={generationProvider}
+          strictness={kojoStrictness}
+          contractNote="Kojo answers from your uploaded notes to help you understand the material. It guides your thinking instead of handing over the answer."
+          emptyTitle="Stuck on this question?"
+          emptySub="Ask Kojo about the concept behind it. I'll guide your thinking instead of handing over the answer."
+          suggestions={["Explain the concept this question is testing", "Give me a hint without the answer", "What should I review first?"]}
+        />
       )}
 
       {isSubmitting ? (

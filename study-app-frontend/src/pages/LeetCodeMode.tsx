@@ -28,7 +28,6 @@ import {
   Plus,
   Route,
   Search,
-  Send,
   ShieldAlert,
   Sparkles,
   Trophy,
@@ -45,14 +44,14 @@ import {
   ArchiveRestore,
 } from "lucide-react";
 import KojoMascot from "../components/KojoMascot";
-import { ToggleSwitch } from "../components/ToggleSwitch";
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { LoadingNotice } from "../components/Loaders";
 import { ConfirmModal } from "../components/ConfirmModal";
 import CodingTabs from "../components/Tab";
-import { SlashCommandMenu, type CommandOption as SlashCommand } from "../components/SlashCommandMenu";
+import { type CommandOption as SlashCommand } from "../components/SlashCommandMenu";
+import { KojoHelpChat } from "../components/KojoHelpChat";
 import {
   scopeKey,
   fetchLCNotes,
@@ -64,7 +63,6 @@ import {
   syncLCNotes,
   syncLCProgress,
   syncLCWorkspace,
-  fetchLeetCodeHint,
   fetchLeetCodeProblem,
   gradeLeetCodeSubmission,
   fetchLCCustomProblems,
@@ -906,27 +904,32 @@ const RAIL_ITEMS: { key: string; label: string; icon: LucideIcon; view: View }[]
 ];
 
 const RAIL_COLLAPSE_KEY = "nosey_lc_rail_collapsed";
-// Daily KojoCode on/off toggle: per-user localStorage preference, matching the
-// existing convention (provider choice, fallback toggle, stats baseline).
-const DAILY_TOGGLE_KEY = "nosey_lc_daily_enabled";
+// The problem editor renders the same rail but starts icon-only and remembers its own
+// preference, so collapsing it there never collapses the hub rail (and vice versa).
+const EDITOR_RAIL_COLLAPSE_KEY = "nosey_lc_rail_collapsed_editor";
 
 function LeftRail({
   active,
   streak,
   onNavigate,
+  storageKey = RAIL_COLLAPSE_KEY,
+  defaultCollapsed = false,
 }: {
   active: string;
   streak: number;
   onNavigate: (view: View) => void;
+  storageKey?: string;
+  defaultCollapsed?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem(scopeKey(RAIL_COLLAPSE_KEY)) === "true";
+    if (typeof window === "undefined") return defaultCollapsed;
+    const stored = localStorage.getItem(scopeKey(storageKey));
+    return stored === null ? defaultCollapsed : stored === "true";
   });
 
   useEffect(() => {
-    localStorage.setItem(scopeKey(RAIL_COLLAPSE_KEY), String(collapsed));
-  }, [collapsed]);
+    localStorage.setItem(scopeKey(storageKey), String(collapsed));
+  }, [storageKey, collapsed]);
 
   return (
     <aside className="lc-rail" data-collapsed={collapsed} aria-label="KojoCode sections">
@@ -1222,20 +1225,6 @@ function PassRung({ current }: { current: number }) {
   );
 }
 
-// Client-side stand-in for the real Daily KojoCode generator (Phase 2, backend
-// weakness scorer + LLM reskin). Until then: pick a random unsolved problem from the
-// user's current weakest topics so the "Generate today's question" button does
-// something real instead of sitting dead. Falls back to any unsolved problem
-// app-wide on cold start / once the weak topics themselves are fully cleared.
-function pickRandomWeakProblem(progress: Record<string, boolean>): { problem: Problem; categoryId: string } | null {
-  const weakIds = new Set(focusTopics(progress).map((topic) => topic.id));
-  const pool = ALL_PROBLEMS.filter((problem) => weakIds.has(problem.categoryId) && !progress[problem.slug]);
-  const fallbackPool = pool.length > 0 ? pool : ALL_PROBLEMS.filter((problem) => !progress[problem.slug]);
-  if (fallbackPool.length === 0) return null;
-  const pick = fallbackPool[Math.floor(Math.random() * fallbackPool.length)];
-  return { problem: pick, categoryId: pick.categoryId };
-}
-
 function TopicMasteryCard({ progress }: { progress: Record<string, boolean> }) {
   const topics = useMemo(() => computeTopicStats(progress), [progress]);
   return (
@@ -1265,15 +1254,30 @@ type FocusRow = { id: string; label: string; score: string; fillPct: number; col
 // and shows a weakness score on the hot green -> amber -> red ramp. Until signals
 // arrive it falls back to a calm completion proxy, and says so, rather than pretending
 // to score struggle or painting a brand-new account entirely red.
+// The "Generate today's question" control lives here (beta only). It drives the real Daily
+// KojoCode generation (handleGenerateDaily): before a problem exists it reads "Generate
+// today's question"; while generating it spins; once today's problem exists it becomes a
+// "Complete [title]" arrow that opens it. The same onGenerate handler serves all three since
+// handleGenerateDaily opens the existing problem when one is already present.
 function DailyPracticeCard({
   progress,
   weakness,
   onOpenCategory,
+  betaMode,
+  dailyProblem,
+  dailyLoading,
+  dailyError,
+  activeBankName,
   onGenerate,
 }: {
   progress: Record<string, boolean>;
   weakness: LCWeaknessTopic[];
   onOpenCategory: (categoryId: string) => void;
+  betaMode: boolean;
+  dailyProblem: LCCustomProblem | null;
+  dailyLoading: boolean;
+  dailyError: string | null;
+  activeBankName: string | null;
   onGenerate: () => void;
 }) {
   const bySignal = weakness.length > 0;
@@ -1325,10 +1329,33 @@ function DailyPracticeCard({
           </li>
         ))}
       </ul>
-      <button type="button" className="lc-focus-generate-btn" onClick={onGenerate}>
-        <Sparkles size={15} />
-        Generate today's question
-      </button>
+      {betaMode ? (
+        <>
+          {dailyProblem && !dailyLoading ? (
+            <button type="button" className="lc-focus-complete" onClick={onGenerate}>
+              <span className="lc-focus-complete-label">Complete "{dailyProblem.title}"</span>
+              <ArrowRight size={16} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="lc-focus-generate-btn"
+              onClick={onGenerate}
+              disabled={dailyLoading}
+            >
+              {dailyLoading ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />}
+              {dailyLoading ? "Generating today's problem..." : "Generate today's question"}
+            </button>
+          )}
+          {activeBankName ? (
+            <p className="lc-daily-source-note">
+              <BookOpen size={13} />
+              Today's problem is drawn from your active bank: <strong>{activeBankName}</strong>
+            </p>
+          ) : null}
+          {dailyError ? <p className="lc-daily-error">{dailyError}</p> : null}
+        </>
+      ) : null}
     </div>
   );
 }
@@ -1415,10 +1442,6 @@ export default function LeetCodeMode() {
   const [visualizerTrace, setVisualizerTrace] = useState<TraceResult | null>(null);
   const [visualizerLoading, setVisualizerLoading] = useState<string | null>(null);
   const [kojoOpen, setKojoOpen] = useState(false);
-  const [kojoInput, setKojoInput] = useState("");
-  const [kojoResponse, setKojoResponse] = useState<string | null>(null);
-  const [kojoLoading, setKojoLoading] = useState(false);
-  const [kojoError, setKojoError] = useState<string | null>(null);
   const [customSlashCommands, setCustomSlashCommands] = useState<SlashCommand[]>([]);
   const editorRef = useRef<any>(null);
   const currentCodeRef = useRef("");
@@ -1433,10 +1456,6 @@ export default function LeetCodeMode() {
   const notesSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notesDragOffset = useRef<{ x: number; y: number } | null>(null);
   const [streakChallenge, setStreakChallenge] = useState<LCStreakChallenge | null>(null);
-  const [dailyEnabled, setDailyEnabled] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem(scopeKey(DAILY_TOGGLE_KEY)) === "true";
-  });
   const [dailyProblem, setDailyProblem] = useState<LCCustomProblem | null>(null);
   const [dailyLoading, setDailyLoading] = useState(false);
   const [dailyError, setDailyError] = useState<string | null>(null);
@@ -1571,7 +1590,6 @@ export default function LeetCodeMode() {
   const currentCodeWorkspace = currentProblem ? codeWorkspaces[currentProblem.slug] ?? null : null;
   const currentCodeTab = currentCodeWorkspace?.tabs.find((tab) => tab.id === currentCodeWorkspace.activeTabId) ?? currentCodeWorkspace?.tabs[0] ?? null;
   const currentCode = currentCodeTab?.code ?? "";
-  const kojoShowsCommands = kojoOpen && kojoInput.trimStart().startsWith("/");
   const allKojoCommands = [...CHAT_COMMANDS, ...customSlashCommands];
   const timerButtonLabel = timerRemainingSeconds == null ? "Timer" : `${Math.floor(timerRemainingSeconds / 60)}:${String(timerRemainingSeconds % 60).padStart(2, "0")}`;
   const timerFraction = timerTotalSeconds && timerRemainingSeconds != null ? timerRemainingSeconds / timerTotalSeconds : null;
@@ -1705,19 +1723,16 @@ export default function LeetCodeMode() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [betaMode]);
 
+  // On mount (beta users): fetch today's Daily KojoCode problem if one already exists, so
+  // the Focus card shows the "Complete [title]" arrow instead of the generate button after a
+  // reload. No generation side effect, matches GET /leetcode/daily.
   useEffect(() => {
-    localStorage.setItem(scopeKey(DAILY_TOGGLE_KEY), String(dailyEnabled));
-  }, [dailyEnabled]);
-
-  // On mount (and whenever the toggle flips on): fetch today's Daily KojoCode problem
-  // if one already exists. No generation side effect, matches GET /leetcode/daily.
-  useEffect(() => {
-    if (isGuestSession() || !betaMode || !dailyEnabled) return;
+    if (isGuestSession() || !betaMode) return;
     fetchLCDaily()
       .then((existing) => setDailyProblem(existing))
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [betaMode, dailyEnabled]);
+  }, [betaMode]);
 
   // On mount: fetch prep banks and open drills for beta users (both rail destinations).
   useEffect(() => {
@@ -1774,7 +1789,9 @@ export default function LeetCodeMode() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Seed starter snippet after async fetch completes (first open when cache is cold)
+  // Seed starter snippet after async fetch completes (first open when cache is cold).
+  // Backfills every still-empty tab, not just tab 0, so a tab added before the fetch
+  // resolved is healed the same way instead of staying blank forever.
   useEffect(() => {
     if (!currentProblem || !currentProblemData?.python_snippet) return;
     const snippet = currentProblemData.python_snippet.trimEnd();
@@ -1782,11 +1799,10 @@ export default function LeetCodeMode() {
 
     setCodeWorkspaces((prev) => {
       const workspace = prev[currentProblem.slug] ?? loadCodeWorkspace(currentProblem.slug);
-      const firstTab = workspace.tabs[0];
-      if (!firstTab || firstTab.code.trim()) return prev;
+      if (!workspace.tabs.some((tab) => !tab.code.trim())) return prev;
       const nextWorkspace = {
         ...workspace,
-        tabs: workspace.tabs.map((tab, i) => (i === 0 ? { ...tab, code: snippet } : tab)),
+        tabs: workspace.tabs.map((tab) => (tab.code.trim() ? tab : { ...tab, code: snippet })),
       };
       saveCodeWorkspace(currentProblem.slug, nextWorkspace);
       return { ...prev, [currentProblem.slug]: nextWorkspace };
@@ -1856,11 +1872,10 @@ export default function LeetCodeMode() {
   }, [practiceSession, practiceEnded]);
 
   const stats = useMemo(() => {
-    // Built-in catalog + problems the user added into a real category by link (custom-
-    // bucket problems stay out of the built-in totals, as before). Added slugs are
-    // custom-* so they never collide with catalog slugs.
-    const added = customProblemList.filter((problem) => problem.categoryId !== CUSTOM_CATEGORY_ID);
-    const pool = [...UNIQUE_PROBLEMS, ...added];
+    // Built-in catalog + every active custom problem, including user-authored ones in the
+    // Custom Questions bucket. Custom slugs are custom-* so they never collide with catalog
+    // slugs, and the list is already filtered to active (non-archived, non-daily) problems.
+    const pool = [...UNIQUE_PROBLEMS, ...customProblemList];
     const solved = pool.filter((problem) => progress[problem.slug]);
     return {
       total: pool.length,
@@ -2874,7 +2889,10 @@ export default function LeetCodeMode() {
     const workspace = codeWorkspaces[slug] ?? loadCodeWorkspace(slug);
     if (workspace.tabs.length >= MAX_CODE_TABS) return;
 
-    const nextTab = { id: makeTabId(), name: `Tab ${workspace.tabs.length + 1}`, code: "" };
+    // Seed the new tab with the same starter snippet the first tab gets, so a fresh
+    // tab starts from the problem's function signature instead of a blank buffer.
+    const starter = currentProblemData?.python_snippet?.trimEnd() ?? "";
+    const nextTab = { id: makeTabId(), name: `Tab ${workspace.tabs.length + 1}`, code: starter };
     const nextWorkspace = { tabs: [...workspace.tabs, nextTab], activeTabId: nextTab.id };
     saveCodeWorkspace(slug, nextWorkspace);
     pushWorkspaceToDb(slug, nextWorkspace);
@@ -2956,43 +2974,21 @@ export default function LeetCodeMode() {
     });
   }
 
-  function openKojo(problem: Problem) {
-    setKojoOpen(true);
-    setKojoResponse(null);
-    setKojoError(null);
-    setKojoInput(`I'm stuck on ${problem.title}. Give me one hint without solving it for me.`);
-  }
-
-  function selectKojoCommand(command: SlashCommand) {
-    setKojoInput("");
-    void handleKojoSend(command.prompt);
-  }
-
-  async function handleKojoSend(messageOverride?: string) {
-    const message = (messageOverride ?? kojoInput).trim();
-    if (!currentProblem || !message || kojoLoading) return;
-    // Defense in depth: an open drill on Pass 2+ blocks assists even if the drawer is open.
-    const drill = drills.find((d) => d.problem_slug === currentProblem.slug && !d.completed_at);
-    if (betaMode && (drill?.current_pass ?? 1) >= 2) return;
-    setKojoLoading(true);
-    setKojoError(null);
-    setKojoResponse(null);
-    try {
-      const result = await fetchLeetCodeHint(
-        currentProblem.slug,
-        currentProblem.title,
-        message,
-        currentCode,
-        currentCustomProblem?.topic || currentProblem.categoryId,
-        generationProvider,
-        currentCustomProblem?.description || undefined,
-      );
-      setKojoResponse(result.response);
-    } catch (error) {
-      setKojoError(error instanceof Error ? error.message : "Kojo failed to respond.");
-    } finally {
-      setKojoLoading(false);
-    }
+  // Ephemeral per-turn grounding sent to Kojo alongside each message (never
+  // shown as a chat bubble): the problem statement plus the student's current
+  // code, so hints stay relevant as they edit. Clamped well under the
+  // backend's 8000-char cap on GeneralChatRequest.context.
+  function buildLeetCodeKojoContext(): string {
+    if (!currentProblem) return "";
+    const statement =
+      currentCustomProblem?.description ||
+      (currentProblemData?.content_html ? htmlToText(currentProblemData.content_html) : "");
+    const parts = [
+      `Problem: ${currentProblem.title}`,
+      statement ? `Statement:\n${statement.slice(0, 4000)}` : "",
+      currentCode ? `Student's current code:\n${currentCode.slice(0, 3500)}` : "",
+    ].filter(Boolean);
+    return parts.join("\n\n").slice(0, 7900);
   }
 
   function addCustomCase() {
@@ -3419,10 +3415,12 @@ export default function LeetCodeMode() {
             progress={progress}
             weakness={weakness}
             onOpenCategory={(categoryId) => setView({ type: "category", categoryId })}
-            onGenerate={() => {
-              const pick = pickRandomWeakProblem(progress);
-              if (pick) openProblem(pick.categoryId, pick.problem.slug);
-            }}
+            betaMode={betaMode}
+            dailyProblem={dailyProblem}
+            dailyLoading={dailyLoading}
+            dailyError={dailyError}
+            activeBankName={prepBanks.find((bank) => bank.is_active)?.name ?? null}
+            onGenerate={() => void handleGenerateDaily()}
           />
         </div>
 
@@ -3461,55 +3459,6 @@ export default function LeetCodeMode() {
             );
           })()}
         </section>
-
-        {betaMode ? (
-          <section className="lc-daily-section" aria-label="Daily KojoCode">
-            <div className="lc-daily-node" style={{ "--lc-accent": "#0ea5e9" } as CSSProperties}>
-              <button
-                type="button"
-                className="lc-daily-node-main"
-                onClick={() => void handleGenerateDaily()}
-                disabled={dailyLoading || !dailyEnabled}
-              >
-                <span className="lc-node-icon"><Sparkles size={22} /></span>
-                <span className="lc-node-copy">
-                  <span className="lc-daily-node-title">
-                    <strong>Daily KojoCode</strong>
-                    <span className="lc-streak-badge">Beta</span>
-                  </span>
-                  <small>
-                    {!dailyEnabled
-                      ? "Turn on to get a fresh problem targeting a weak topic each day"
-                      : dailyLoading
-                        ? "Generating today's problem..."
-                        : dailyProblem
-                          ? `Today's problem ready , ${dailyProblem.title}`
-                          : "Press to generate today's problem"}
-                  </small>
-                </span>
-                {dailyLoading ? <Loader2 size={18} className="spin" /> : null}
-              </button>
-              <ToggleSwitch
-                checked={dailyEnabled}
-                className="lc-daily-toggle"
-                title="Show a Daily KojoCode problem each day"
-                aria-label="Enable Daily KojoCode"
-                onClick={() => setDailyEnabled((enabled) => !enabled)}
-                label={dailyEnabled ? "On" : "Off"}
-              />
-            </div>
-            {(() => {
-              const activeBank = prepBanks.find((bank) => bank.is_active);
-              return activeBank ? (
-                <p className="lc-daily-source-note">
-                  <BookOpen size={13} />
-                  Today's problem is drawn from your active bank: <strong>{activeBank.name}</strong>
-                </p>
-              ) : null;
-            })()}
-            {dailyError ? <p className="lc-daily-error">{dailyError}</p> : null}
-          </section>
-        ) : null}
 
         <section className="lc-roadmap" aria-label="Skill tree">
           {CATEGORIES.map((category, index) => {
@@ -4516,7 +4465,19 @@ export default function LeetCodeMode() {
   const timerForced = betaMode && activePass >= 3;
 
   return (
-    <div className="lc-editor-shell">
+    <div className="lc-shell lc-shell--editor">
+      {/* key forces a remount when switching hub <-> editor: React would otherwise reuse
+          the hub rail's instance (same type + position), carrying its expanded state over
+          and persisting it under the editor's storage key before the initializer ran. */}
+      <LeftRail
+        key="editor-rail"
+        active=""
+        streak={stats.currentStreak}
+        onNavigate={setView}
+        storageKey={EDITOR_RAIL_COLLAPSE_KEY}
+        defaultCollapsed
+      />
+      <div className="lc-editor-shell">
       <div className="lc-editor-topbar">
         <button type="button" className="lc-back-btn" onClick={() => setView({ type: "category", categoryId: currentProblem.categoryId })} aria-label={`Back to ${currentProblem.categoryLabel}`}>
           <ChevronLeft size={16} />
@@ -4584,7 +4545,7 @@ export default function LeetCodeMode() {
               <button
                 type="button"
                 className="lc-toolbar-btn lc-toolbar-btn--kojo"
-                onClick={() => openKojo(currentProblem)}
+                onClick={() => setKojoOpen(true)}
                 disabled={assistsLocked}
                 aria-label="Ask Kojo for a hint"
                 title={assistsLocked ? `Locked on Pass ${activePass}: no resources` : "Ask Kojo for a hint"}
@@ -4958,53 +4919,23 @@ export default function LeetCodeMode() {
         </div>
       </div>
 
-      {kojoOpen ? (
-        <>
-          <div className="lc-kojo-backdrop lc-kojo-backdrop--drawer" onClick={() => { setKojoOpen(false); setKojoResponse(null); }} />
-          <div className="lc-kojo-modal lc-kojo-modal--drawer" role="complementary" aria-label="Ask Kojo">
-            <div className="lc-kojo-modal-header">
-              <div className="kojo-avatar"><KojoMascot state={kojoLoading ? "loading" : "idle"} /></div>
-              <span><Sparkles size={13} className="kojo-title-icon" /> Ask Kojo for a hint</span>
-              <button type="button" className="lc-kojo-close" onClick={() => { setKojoOpen(false); setKojoResponse(null); }} aria-label="Close">
-                <X size={17} />
-              </button>
-            </div>
-
-            <div className="lc-kojo-contract">
-              <p>Kojo can help with hints, debugging direction, edge cases, and complexity. It will not give you the full solution code here.</p>
-            </div>
-
-            <div className="lc-kojo-input-wrap">
-              <label className="lc-kojo-input-label" htmlFor="lc-kojo-textarea">Your question</label>
-              <textarea
-                id="lc-kojo-textarea"
-                className="lc-kojo-input"
-                rows={5}
-                value={kojoInput}
-                onChange={(event) => setKojoInput(event.target.value)}
-                placeholder="Ask for a hint or type / for commands"
-                disabled={kojoLoading}
-              />
-              {kojoShowsCommands ? (
-                <SlashCommandMenu commands={allKojoCommands} onSelect={selectKojoCommand} />
-              ) : null}
-            </div>
-
-            {kojoResponse ? <div className="lc-kojo-response"><MarkdownContent content={kojoResponse} /></div> : null}
-            {kojoError ? <div className="kojo-error"><AlertCircle size={14} /><span>{kojoError}</span></div> : null}
-
-            <div className="lc-kojo-modal-footer">
-              {kojoLoading ? (
-                <div className="kojo-thinking-mascot"><KojoMascot state="loading" /><span className="kojo-thinking-label">thinking…</span></div>
-              ) : (
-                <button type="button" className="button button--primary lc-kojo-send" onClick={() => handleKojoSend()} disabled={!kojoInput.trim() || assistsLocked}>
-                  <Send size={15} />
-                  {kojoResponse ? "Ask again" : "Ask Kojo"}
-                </button>
-              )}
-            </div>
-          </div>
-        </>
+      {kojoOpen && currentProblem ? (
+        <KojoHelpChat
+          storageKey={`lc:${currentProblem.slug}`}
+          subtitle={currentProblem.title}
+          onClose={() => setKojoOpen(false)}
+          buildContext={buildLeetCodeKojoContext}
+          customInstruction="Give hints, debugging direction, edge cases, and complexity guidance. Never give the full solution code."
+          provider={generationProvider}
+          initialDraft={`I'm stuck on ${currentProblem.title}. Give me one hint without solving it for me.`}
+          contractNote="Kojo can help with hints, debugging direction, edge cases, and complexity. It will not give you the full solution code here."
+          slashCommands={allKojoCommands}
+          disabled={assistsLocked}
+          disabledNote={assistsLocked ? `Locked on Pass ${activePass}: no assists` : undefined}
+          emptyTitle="Stuck on this one?"
+          emptySub="Ask for a hint, a debugging nudge, or talk through your approach. I won't hand you the full solution."
+          suggestions={["Give me one hint", "What edge cases am I missing?", "Help me debug my current code"]}
+        />
       ) : null}
 
       {visualizerTrace ? (
@@ -5147,6 +5078,7 @@ export default function LeetCodeMode() {
 
       {customModalNode}
       {confirmDeleteNode}
+      </div>
     </div>
   );
 }

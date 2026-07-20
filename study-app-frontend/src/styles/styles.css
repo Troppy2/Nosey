@@ -6049,6 +6049,11 @@ select[class*="lc-"]:focus-visible {
 .lc-editor-surface {
   min-height: 0;
   flex: 1;
+  /* Monaco's wrapper <section> uses height:100%, which resolves to auto (content
+     height, ~5px) whenever the shell is height:auto (<=1100px), collapsing the
+     editor to a sliver. Grid stretches the item geometrically, with no dependence
+     on percentage resolution, so the editor fills the surface at every width. */
+  display: grid;
 }
 
 .lc-kojo-backdrop {
@@ -18816,6 +18821,47 @@ button.kojo-blueprint-head:hover {
   filter: brightness(1.06);
 }
 
+.lc-focus-generate-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+  filter: none;
+}
+
+/* Shown in place of the generate button once today's Daily KojoCode problem exists:
+   a full-width "Complete [title]" arrow link that reopens today's problem. */
+.lc-focus-complete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 13px;
+  margin-top: auto;
+  border: 1px solid var(--green-dark);
+  border-radius: 10px;
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.13s ease, filter 0.13s ease;
+}
+
+.lc-focus-complete:hover {
+  filter: brightness(0.98);
+}
+
+.lc-focus-complete-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-focus-complete svg {
+  flex-shrink: 0;
+}
+
 .lc-focus-card {
   display: flex;
   flex-direction: column;
@@ -18937,6 +18983,39 @@ button.kojo-blueprint-head:hover {
   min-width: 0;
 }
 
+/* Problem editor wrapped in the shell so the rail stays reachable while coding.
+   The rail starts icon-only there (own storage key) to keep the editor immersive;
+   the editor shell becomes the flexible column beside it. */
+.lc-shell--editor {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.lc-shell--editor .lc-editor-shell {
+  flex: 1;
+  min-width: 0;
+  /* As a flex item the shell otherwise resolves to its content's min-content width
+     (wide pre/example blocks pushed it to ~512px on a 390px phone, overflowing the
+     viewport and clipping the editor). Hard-cap it to the wrapper. */
+  max-width: 100%;
+}
+
+/* Match the editor shell's <=1100px behavior (it drops the hard 100dvh and flows),
+   otherwise the wrapper's overflow:hidden clips the scrolling content. */
+@media (max-width: 1100px) {
+  .lc-shell--editor {
+    height: auto;
+    overflow: visible;
+  }
+}
+
+/* Single-pane mobile editor keeps its full width; the back button covers navigation. */
+@media (max-width: 900px) {
+  .lc-shell--editor .lc-rail {
+    display: none;
+  }
+}
+
 /* Rail is pinned to the viewport height (not stretched to match the very tall
    sibling content column, that bug detached the streak card to the page bottom)
    and scrolls its own overflow independently of the page. */
@@ -18954,7 +19033,8 @@ button.kojo-blueprint-head:hover {
   overflow-y: auto;
   padding: 18px 0;
   background: #ffffff;
-  border-right: 1px solid var(--lc-border);
+  /* Light green edge so the rail reads as clearly separated from the content column. */
+  border-right: 2px solid var(--green-light-mid);
   transition: width 0.16s ease;
 }
 
@@ -19249,109 +19329,9 @@ button.kojo-blueprint-head:hover {
   color: var(--ink);
 }
 
-/* ── Daily KojoCode dashboard section ────────────────────────────────────── */
-
-.lc-daily-section {
-  margin: 26px 0 14px;
-}
-
-.lc-daily-node {
-  --lc-accent: #0ea5e9;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-height: 104px;
-  padding: 20px;
-  border: 1px solid color-mix(in srgb, var(--lc-accent) 34%, white);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: var(--shadow-sm);
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
-}
-
-.lc-daily-node:hover {
-  transform: translateY(-2px);
-  border-color: var(--lc-accent);
-  box-shadow: var(--shadow-md);
-}
-
-.lc-daily-node:has(.lc-daily-node-main:active) {
-  transform: translateY(0);
-  box-shadow: var(--shadow-sm);
-}
-
-.lc-daily-node-main {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
-  padding: 0;
-  background: none;
-  border: none;
-  text-align: left;
-  cursor: pointer;
-}
-
-.lc-daily-node-main > .spin {
-  flex-shrink: 0;
-  margin-left: auto;
-  color: var(--lc-accent);
-}
-
-.lc-daily-node-main:focus-visible,
-.lc-daily-toggle:focus-visible {
-  outline: 2px solid var(--lc-accent);
-  outline-offset: 3px;
-}
-
-.lc-daily-node-main:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.lc-daily-node-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.lc-daily-toggle {
-  align-self: center;
-  flex-shrink: 0;
-  padding: 6px 0 6px 6px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.lc-daily-toggle .toggle-switch-track {
-  width: 44px;
-  height: 26px;
-  border: 1px solid color-mix(in srgb, var(--green-dark) 24%, white);
-  background: rgba(113, 131, 85, 0.2);
-}
-
-.lc-daily-toggle.toggle-switch--on .toggle-switch-track {
-  border-color: var(--lc-accent);
-  background: var(--lc-accent);
-}
-
-.lc-daily-toggle .toggle-switch-thumb {
-  top: 2px;
-  left: 2px;
-  width: 20px;
-  height: 20px;
-}
-
-.lc-daily-toggle.toggle-switch--on .toggle-switch-thumb {
-  transform: translateX(18px);
-}
-
-.lc-daily-toggle .toggle-switch-label {
-  min-width: 20px;
-  color: var(--ink);
-}
+/* ── Daily KojoCode: Focus-card error + active-bank source note ───────────────
+   The standalone Daily KojoCode section was folded into the Focus card's
+   "Generate today's question" control; only these two helpers survive. */
 
 .lc-daily-error {
   margin: 8px 0 0;
@@ -19366,20 +19346,6 @@ button.kojo-blueprint-head:hover {
   margin: 10px 0 0;
   font-size: 0.8rem;
   color: var(--green-dark);
-}
-
-@media (max-width: 560px) {
-  .lc-daily-node {
-    align-items: flex-start;
-  }
-
-  .lc-daily-toggle {
-    padding-top: 11px;
-  }
-
-  .lc-daily-toggle .toggle-switch-label {
-    display: none;
-  }
 }
 
 .lc-daily-source-note svg {

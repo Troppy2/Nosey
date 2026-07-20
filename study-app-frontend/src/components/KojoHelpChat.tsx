@@ -1,76 +1,120 @@
-import { AlertCircle, Maximize2, Minimize2, Send, Sparkles, Trash2, X } from "lucide-react";
+import { AlertCircle, Maximize2, Minimize2, Send, Sparkles, X } from "lucide-react";
 import KojoMascot from "./KojoMascot";
 import { useEffect, useRef, useState } from "react";
-import { clearKojoConversation, fetchKojoConversation, fetchProviderStatus, isGuestSession, kojoChat, kojoChatStream } from "../lib/api";
-import type { KojoMessage, ProviderStatus } from "../lib/types";
-import { useSettings } from "../lib/useSettings";
-import { FeatureSurvey } from "./FeatureSurvey";
+import {
+  createGeneralKojoConversation,
+  fetchKojoConversationById,
+  kojoChatGeneral,
+  kojoChatGeneralStream,
+  scopeKey,
+} from "../lib/api";
+import type { KojoMessage } from "../lib/types";
+import { formatTime } from "./KojoChat";
 import { MarkdownContent } from "./MarkdownContent";
-import { useLocation } from 'react-router-dom'
+import { SlashCommandMenu, type CommandOption } from "./SlashCommandMenu";
 
-interface KojoChatProps {
-  folderId: number;
-  folderName: string;
+export interface KojoHelpChatProps {
+  /** Stable per-context id (e.g. a problem slug or test id) used to look up
+   * the backing conversation. Scoped per user via scopeKey() before writing
+   * to localStorage. */
+  storageKey: string;
+  /** Header subtitle, e.g. the problem title or test name. */
+  subtitle: string;
   onClose: () => void;
+  /** Ephemeral per-turn grounding (problem statement + code, or the current
+   * test question) sent alongside each message but never persisted as a
+   * visible chat bubble. */
+  buildContext: () => string;
+  /** Standing instruction/guardrail, e.g. "give hints, never the full answer". */
+  customInstruction?: string;
+  strictness?: string;
+  provider?: string;
+  /** Prefilled composer text shown the first time this thread is opened empty. */
+  initialDraft?: string;
+  suggestions?: string[];
+  /** Optional banner shown under the header (LeetCode's hint-contract notice). */
+  contractNote?: string;
+  slashCommands?: CommandOption[];
+  disabled?: boolean;
+  disabledNote?: string;
+  emptyTitle?: string;
+  emptySub?: string;
 }
 
-const SUGGESTIONS = [
-  "Explain the main concepts in these notes",
-  "What should I focus on when studying?",
-  "Give me an example to understand a key idea",
-  "Quiz me on the most important terms",
+const DEFAULT_SUGGESTIONS = [
+  "Explain what this is really asking",
+  "Give me a hint without the full answer",
+  "What concept should I review first?",
 ];
 
-const PROVIDER_LABELS: Record<string, string> = {
-  auto: "Auto",
-  claude: "Claude (Anthropic)",
-  gemini: "Gemini (Google)",
-  groq: "Groq (cloud)",
-  ollama: "Ollama (local)",
-};
-
-export function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-}
-
-export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
+export function KojoHelpChat({
+  storageKey,
+  subtitle,
+  onClose,
+  buildContext,
+  customInstruction,
+  strictness,
+  provider,
+  initialDraft,
+  suggestions = DEFAULT_SUGGESTIONS,
+  contractNote,
+  slashCommands,
+  disabled = false,
+  disabledNote,
+  emptyTitle = "Hi, I'm Kojo",
+  emptySub = "Ask me anything about this. I'll guide your thinking instead of handing over the answer.",
+}: KojoHelpChatProps) {
+  const [conversationId, setConversationId] = useState<number | null>(null);
   const [messages, setMessages] = useState<KojoMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [confirmClear, setConfirmClear] = useState(false);
-  const [clearNotice, setClearNotice] = useState<string | null>(null);
-  const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
-  const { generationProvider, betaMode } = useSettings();
+  const [loadingThread, setLoadingThread] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  // Tracks whether the user actually sent a message this session, so the survey
-  // only fires after real interaction (not just opening an existing chat).
-  const hasInteractedRef = useRef(false);
-  const [closingSurvey, setClosingSurvey] = useState(false);
+  const threadKey = scopeKey(`nosey_kojo_thread_${storageKey}`);
 
-  // Route close attempts through the survey: if the user chatted, offer the
-  // survey first and defer the real close until it resolves.
-  function handleClose() {
-    if (hasInteractedRef.current && !isGuestSession()) {
-      setClosingSurvey(true);
-    } else {
-      onClose();
+  // Resolve (or create) the conversation backing this context. Only the
+  // conversation id pointer lives in localStorage; the messages themselves
+  // live server-side, so history survives navigating away and back.
+  useEffect(() => {
+    let cancelled = false;
+    async function loadOrCreate() {
+      setLoadingThread(true);
+      setError(null);
+      const savedId = Number(localStorage.getItem(threadKey) || "");
+      const existing = savedId ? await fetchKojoConversationById(savedId) : null;
+
+      if (existing) {
+        if (cancelled) return;
+        setConversationId(existing.id);
+        setMessages(existing.messages);
+        if (existing.messages.length === 0 && initialDraft) setInput(initialDraft);
+      } else {
+        try {
+          const summary = await createGeneralKojoConversation();
+          localStorage.setItem(threadKey, String(summary.id));
+          if (cancelled) return;
+          setConversationId(summary.id);
+          setMessages([]);
+          if (initialDraft) setInput(initialDraft);
+        } catch (err) {
+          if (!cancelled) setError(err instanceof Error ? err.message : "Could not start a Kojo chat.");
+        }
+      }
+      if (!cancelled) setLoadingThread(false);
     }
-  }
-
-
+    void loadOrCreate();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
 
   useEffect(() => {
-    fetchKojoConversation(folderId).then((conv) => {
-      if (conv) setMessages(conv.messages);
-    });
-    fetchProviderStatus().then(setProviderStatus).catch(() => { });
-    setConfirmClear(false);
-    setClearNotice(null);
-    inputRef.current?.focus();
-  }, [folderId]);
+    if (!loadingThread) inputRef.current?.focus();
+  }, [loadingThread]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -78,17 +122,22 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
 
   useEffect(() => {
     document.body.style.overflow = isFullscreen ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [isFullscreen]);
 
-  const isOllamaOffline = generationProvider === "ollama" && providerStatus !== null && !providerStatus.ollama;
-  const isOllamaModelMissing = generationProvider === "ollama" && providerStatus !== null && !!providerStatus.ollama && !providerStatus.ollama_model_available;
-  const hasProviderWarn = isOllamaOffline || isOllamaModelMissing;
+  const showsCommands = !!slashCommands?.length && input.trimStart().startsWith("/");
+  const inputDisabled = isLoading || disabled || loadingThread || conversationId == null;
+
+  function selectCommand(command: CommandOption) {
+    setInput("");
+    void handleSend(command.prompt);
+  }
 
   async function handleSend(text?: string) {
     const messageText = (text ?? input).trim();
-    if (!messageText || isLoading) return;
-    hasInteractedRef.current = true;
+    if (!messageText || isLoading || disabled || conversationId == null) return;
 
     const userMsg: KojoMessage = {
       id: Date.now(),
@@ -98,10 +147,11 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
     };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
-    setClearNotice(null);
     if (inputRef.current) inputRef.current.style.height = "auto";
     setIsLoading(true);
     setError(null);
+
+    const context = buildContext();
 
     // Streaming assistant bubble. The placeholder is inserted on the first
     // delta so the "thinking" indicator shows until real text arrives.
@@ -125,12 +175,14 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
     try {
       let result;
       try {
-        result = await kojoChatStream(folderId, messageText, onDelta, generationProvider);
+        result = await kojoChatGeneralStream(
+          conversationId, messageText, onDelta, provider, strictness, customInstruction, undefined, context,
+        );
       } catch (streamErr) {
         // If the stream failed before producing any text, fall back to the
         // non-streamed endpoint so a transient stream issue still answers.
         if (placed) throw streamErr;
-        result = await kojoChat(folderId, messageText, generationProvider);
+        result = await kojoChatGeneral(conversationId, messageText, provider, strictness, customInstruction, context);
       }
       const assistantMsg: KojoMessage = {
         id: result.message_id,
@@ -166,41 +218,13 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
     el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
   }
 
-  async function handleClearConversation() {
-    if (isLoading) return;
-    try {
-      setError(null);
-      await clearKojoConversation(folderId);
-      setMessages([]);
-      setConfirmClear(false);
-      setClearNotice("Chat cleared. You can restore it from Settings within 5 hours.");
-      inputRef.current?.focus();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to clear chat history.");
-    }
-  }
-
-  // The model indicator is only meaningful for users who can actually pick a
-  // model (admin/beta). Everyone else is pinned to the automatic chain
-  // server-side, so showing a provider name would be misleading; hide it.
-  const modelPicker = betaMode ? (
-    <div className="kojo-model-picker kojo-model-picker--locked" title={`Model: ${PROVIDER_LABELS[generationProvider] ?? generationProvider}`}>
-      <span className="kojo-model-btn kojo-model-btn--static">
-        {generationProvider in PROVIDER_LABELS ? generationProvider : "auto"}
-        {hasProviderWarn ? <span className="kojo-model-warn-dot" /> : null}
-      </span>
-    </div>
-  ) : null;
-
   return (
     <>
-      {!isFullscreen && (
-        <div className="kojo-backdrop" onClick={handleClose} aria-hidden="true" />
-      )}
+      {!isFullscreen && <div className="kojo-backdrop" onClick={onClose} aria-hidden="true" />}
       <div
         className={`kojo-panel${isFullscreen ? " kojo-panel--fullscreen" : ""}`}
         role="dialog"
-        aria-label="Kojo Study Companion"
+        aria-label="Ask Kojo"
       >
         {/* ── Header ── */}
         <div className="kojo-header">
@@ -213,21 +237,11 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
                 <Sparkles size={13} className="kojo-title-icon" />
                 Kojo
               </span>
-              <span className="kojo-header-sub">{folderName}</span>
+              <span className="kojo-header-sub">{subtitle}</span>
             </div>
           </div>
 
           <div className="kojo-header-actions">
-            <button
-              className="kojo-header-btn kojo-header-btn--danger"
-              onClick={() => setConfirmClear((c) => !c)}
-              type="button"
-              aria-label="Clear chat history"
-              title="Clear chat"
-              disabled={isLoading}
-            >
-              <Trash2 size={18} />
-            </button>
             <button
               className="kojo-header-btn"
               onClick={() => setIsFullscreen((f) => !f)}
@@ -237,63 +251,36 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
             >
               {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
             </button>
-            <button
-              className="kojo-header-btn"
-              onClick={handleClose}
-              type="button"
-              aria-label="Close Kojo"
-              title="Close"
-            >
+            <button className="kojo-header-btn" onClick={onClose} type="button" aria-label="Close Kojo" title="Close">
               <X size={18} />
             </button>
           </div>
         </div>
 
-        {/* ── Clear confirmation bar ── */}
-        {confirmClear && (
-          <div className="kojo-clear-inline" role="alert">
-            <span>Clear this chat? Restorable from Settings for 5 hours.</span>
-            <div className="kojo-clear-inline-actions">
-              <button
-                className="kojo-clear-inline-btn kojo-clear-inline-btn--confirm"
-                type="button"
-                onClick={handleClearConversation}
-                disabled={isLoading}
-              >
-                Clear
-              </button>
-              <button
-                className="kojo-clear-inline-btn"
-                type="button"
-                onClick={() => setConfirmClear(false)}
-              >
-                Cancel
-              </button>
-            </div>
+        {contractNote ? (
+          <div className="lc-kojo-contract">
+            <p>{contractNote}</p>
           </div>
-        )}
+        ) : null}
 
         {/* ── Messages ── */}
         <div className="kojo-messages">
           <div className="kojo-messages-inner">
-            {messages.length === 0 && !isLoading ? (
+            {!loadingThread && messages.length === 0 && !isLoading ? (
               <div className="kojo-empty">
                 <div className="kojo-empty-icon">
                   <KojoMascot state="idle" />
                 </div>
-                <p className="kojo-empty-title">Hi, I'm Kojo</p>
-                <p className="kojo-empty-sub">
-                  Your AI study companion for <strong>{folderName}</strong>.
-                  I can explain concepts, give examples, and help you work through ideas
-                  using your uploaded notes.
-                </p>
+                <p className="kojo-empty-title">{emptyTitle}</p>
+                <p className="kojo-empty-sub">{emptySub}</p>
                 <div className="kojo-suggestions">
-                  {SUGGESTIONS.map((s) => (
+                  {suggestions.map((s) => (
                     <button
                       key={s}
                       className="kojo-suggestion"
                       onClick={() => handleSend(s)}
                       type="button"
+                      disabled={disabled}
                     >
                       {s}
                     </button>
@@ -345,33 +332,30 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
               </div>
             )}
 
-            {clearNotice && <p className="kojo-notice">{clearNotice}</p>}
-
             <div ref={bottomRef} />
           </div>
         </div>
 
         {/* ── Input ── */}
         <div className="kojo-input-area">
-          <p className="kojo-input-label">Message Kojo</p>
+          <p className="kojo-input-label">{disabled && disabledNote ? disabledNote : "Message Kojo"}</p>
           <div className={isFullscreen ? "kojo-input-row" : undefined}>
-            {isFullscreen && modelPicker}
             <div className="kojo-input-wrap">
-              {!isFullscreen && modelPicker}
               <textarea
                 ref={inputRef}
                 className="kojo-input"
                 rows={1}
-                placeholder="Ask Kojo anything about your notes…"
+                placeholder={slashCommands?.length ? "Ask Kojo anything, or type / for commands" : "Ask Kojo anything…"}
                 value={input}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                disabled={isLoading}
+                disabled={inputDisabled}
               />
+              {showsCommands ? <SlashCommandMenu commands={slashCommands!} onSelect={selectCommand} /> : null}
               <button
                 className="kojo-send"
                 onClick={() => handleSend()}
-                disabled={!input.trim() || isLoading}
+                disabled={!input.trim() || inputDisabled}
                 type="button"
                 aria-label="Send"
               >
@@ -384,7 +368,6 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
           </div>
         </div>
       </div>
-      <FeatureSurvey feature="kojo" trigger={closingSurvey} onResolved={onClose} />
     </>
   );
 }

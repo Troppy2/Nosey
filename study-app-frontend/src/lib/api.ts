@@ -841,11 +841,13 @@ export async function kojoChatGeneralStream(
   strictness?: string,
   customInstruction?: string,
   signal?: AbortSignal,
+  context?: string,
 ): Promise<KojoChatResponse> {
   const body: Record<string, unknown> = { message };
   if (provider) body.provider = provider;
   if (strictness) body.strictness = strictness;
   if (customInstruction) body.custom_instruction = customInstruction;
+  if (context) body.context = context;
   if (typeof handlers === "object" && handlers.reasoning) body.reasoning = true;
   return consumeKojoStream(`/kojo/conversations/${conversationId}/chat/stream`, body, handlers, signal);
 }
@@ -944,11 +946,13 @@ export async function kojoChatGeneral(
   provider?: string,
   strictness?: string,
   customInstruction?: string,
+  context?: string,
 ): Promise<KojoChatResponse> {
   const body: Record<string, unknown> = { message };
   if (provider) body.provider = provider;
   if (strictness) body.strictness = strictness;
   if (customInstruction) body.custom_instruction = customInstruction;
+  if (context) body.context = context;
   return request<KojoChatResponse>(`/kojo/conversations/${conversationId}/chat`, {
     method: "POST",
     body: JSON.stringify(body),
