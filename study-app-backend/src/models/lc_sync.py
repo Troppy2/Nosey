@@ -166,6 +166,7 @@ class LCStruggleEvent(Base):
     problem catalog to derive it from)."""
 
     __tablename__ = "lc_struggle_events"
+    __table_args__ = (Index("ix_lc_struggle_events_user_occurred", "user_id", "occurred_at"),)
 
     id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(
@@ -258,3 +259,30 @@ class LCDrillSchedule(Base, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"LCDrillSchedule(user_id={self.user_id!r}, slug={self.problem_slug!r}, pass={self.current_pass!r})"
+
+
+class LCTestRun(Base):
+    """One code-run against a problem's test cases. The scorers read these directly:
+    the count per problem drives the weakness grace period, passed runs both reduce
+    weakness and feed the improvement pass-rate trend. topic and difficulty are
+    client-sent (the backend owns no catalog to derive them from)."""
+
+    __tablename__ = "lc_test_runs"
+    __table_args__ = (Index("ix_lc_test_runs_user_run_at", "user_id", "run_at"),)
+
+    id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        BIGINT_ID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    problem_slug: Mapped[str] = mapped_column(String(200), nullable=False)
+    topic: Mapped[str] = mapped_column(String(120), nullable=False)
+    difficulty: Mapped[str] = mapped_column(String(20), nullable=False, default="unknown")
+    passed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    run_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped[User] = relationship("User", back_populates="lc_test_runs")
+
+    def __repr__(self) -> str:
+        return f"LCTestRun(user_id={self.user_id!r}, slug={self.problem_slug!r}, passed={self.passed!r})"

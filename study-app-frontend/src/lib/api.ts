@@ -1430,13 +1430,33 @@ export async function logLCStruggleEvent(
   }
 }
 
-export async function fetchLCWeakness(): Promise<import("./types").LCWeaknessTopic[]> {
+export async function postLCTestRun(
+  problemSlug: string,
+  topic: string,
+  difficulty: string,
+  passed: boolean,
+): Promise<void> {
   try {
-    const result = await request<import("./types").LCWeaknessResponse>("/leetcode/weakness");
-    return result.topics ?? [];
+    await request("/leetcode/test-run", {
+      method: "POST",
+      body: JSON.stringify({ problem_slug: problemSlug, topic, difficulty, passed }),
+    });
   } catch {
-    return [];
+    // Best-effort signal, never blocks the run/grade flow it's fired from.
   }
+}
+
+export async function fetchLCScores(): Promise<import("./types").LCScoresResponse> {
+  try {
+    return await request<import("./types").LCScoresResponse>("/leetcode/weakness");
+  } catch {
+    return { weakness: { topics: [] }, improvement: { topics: [] } };
+  }
+}
+
+export async function fetchLCWeakness(): Promise<import("./types").LCWeaknessTopic[]> {
+  const result = await fetchLCScores();
+  return result.weakness.topics ?? [];
 }
 
 // ── Interview Prep Banks (beta-only) ──────────────────────────────────────────
@@ -1505,8 +1525,11 @@ export async function createLCDrill(problemSlug: string): Promise<import("./type
   });
 }
 
-export async function advanceLCDrill(slug: string): Promise<import("./types").LCDrillSchedule> {
-  return request<import("./types").LCDrillSchedule>(`/leetcode/drills/${slug}/advance`, { method: "POST" });
+export async function advanceLCDrill(slug: string, topic?: string): Promise<import("./types").LCDrillSchedule> {
+  return request<import("./types").LCDrillSchedule>(`/leetcode/drills/${slug}/advance`, {
+    method: "POST",
+    body: JSON.stringify({ topic: topic ?? null }),
+  });
 }
 
 // ── Mock Interview ────────────────────────────────────────────────────────────

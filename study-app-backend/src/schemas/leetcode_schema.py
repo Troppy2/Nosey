@@ -209,6 +209,35 @@ class LCWeaknessResponse(BaseModel):
     topics: list[LCWeaknessTopic] = Field(default_factory=list)
 
 
+class LCTestRunRequest(BaseModel):
+    """Logged each time the user runs their code against the test cases (client-side
+    pyodide run). topic + difficulty are client-supplied since the backend owns no
+    catalog to derive them from."""
+
+    problem_slug: str = Field(..., min_length=1, max_length=200)
+    topic: str = Field(..., min_length=1, max_length=120)
+    difficulty: str = Field(default="unknown", max_length=20)
+    passed: bool = Field(default=False)
+
+
+class LCImprovementTopic(BaseModel):
+    topic: str
+    score: int
+    reasons: list[str] = Field(default_factory=list)
+
+
+class LCImprovementResponse(BaseModel):
+    topics: list[LCImprovementTopic] = Field(default_factory=list)
+
+
+class LCScoresResponse(BaseModel):
+    """Weakness and improvement returned together so the frontend gets both in one
+    GET /leetcode/weakness call."""
+
+    weakness: LCWeaknessResponse = Field(default_factory=LCWeaknessResponse)
+    improvement: LCImprovementResponse = Field(default_factory=LCImprovementResponse)
+
+
 # ── Interview Prep Banks ──────────────────────────────────────────────────────
 
 class LCPrepBankCreateRequest(BaseModel):
@@ -237,6 +266,14 @@ class LCBankBulkAddRequest(BaseModel):
 
 class LCDrillCreateRequest(BaseModel):
     problem_slug: str = Field(..., min_length=1, max_length=200)
+
+
+class LCDrillAdvanceRequest(BaseModel):
+    """Optional topic so the advance can log a drill_advanced_2/3/completed struggle
+    event for the improvement/weakness scorers (lc_drill_schedule itself has no
+    topic column). Body-less POSTs still work; the event is just skipped."""
+
+    topic: Optional[str] = Field(default=None, max_length=120)
 
 
 class LCDrillScheduleResponse(BaseModel):
