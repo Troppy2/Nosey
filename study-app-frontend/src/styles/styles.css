@@ -3253,9 +3253,14 @@ h3 {
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.kojo-suggestion:hover {
+.kojo-suggestion:hover:not(:disabled) {
   border-color: var(--green-mid);
   box-shadow: 0 1px 6px rgba(113, 131, 85, 0.12);
+}
+
+.kojo-suggestion:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ── Individual message rows ── */
@@ -3534,6 +3539,7 @@ h3 {
 }
 
 .kojo-input-wrap {
+  position: relative;
   display: flex;
   align-items: flex-end;
   gap: 10px;
@@ -3544,6 +3550,98 @@ h3 {
   box-shadow: 0 2px 10px rgba(38, 48, 31, 0.12);
   transition: border-color 0.15s, box-shadow 0.15s;
   margin: 0 auto;
+}
+
+/* Slash-command dropdown: taken out of the input's flex flow so it floats
+   above the composer instead of squeezing in as a third flex item. */
+.kojo-slash-menu-anchor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 5;
+}
+
+.slash-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--white);
+  border: 1px solid var(--green-light-mid);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: var(--shadow-lg);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.slash-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  padding: 8px 10px;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.slash-menu-item:hover,
+.slash-menu-item--active {
+  background: var(--green-lightest);
+}
+
+.slash-menu-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  flex-shrink: 0;
+}
+
+.slash-menu-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.slash-menu-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.slash-menu-item-top strong {
+  font-weight: 600;
+  color: var(--green-dark);
+  font-size: 0.78rem;
+}
+
+.slash-menu-copy small {
+  font-size: 0.76rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.slash-menu-run {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--green-mid);
+  flex-shrink: 0;
 }
 
 .kojo-panel--fullscreen .kojo-input-wrap {
@@ -3681,12 +3779,19 @@ h3 {
 }
 
 .kojo-input-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   margin: 0 0 8px;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--green-dark-mid);
+}
+
+.kojo-input-label--locked {
+  color: var(--warning);
 }
 
 /* ── Model picker (replaces select) ── */
@@ -7269,7 +7374,9 @@ select[class*="lc-"]:focus-visible {
 }
 
 .lc-kojo-contract {
-  padding: 12px 14px 0;
+  padding: 10px 16px;
+  background: rgba(113, 131, 85, 0.06);
+  border-bottom: 1px solid var(--green-light-mid);
 }
 
 .lc-kojo-contract p {
@@ -20063,6 +20170,30 @@ button.kojo-blueprint-head:hover {
   height: 100%;
   border-radius: 999px;
   transition: width 0.3s ease;
+}
+
+/* ── Improvement chips: positive reinforcement, deliberately separate from the
+   weakness ramp above (green only, never the amber/red struggle colors). ────── */
+.lc-improvement-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 16px;
+}
+
+.lc-improvement-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--green-dark-mid);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 /* ── The pass rung: a compact P1 - P2 - P3 ladder on the escalation ramp ──────

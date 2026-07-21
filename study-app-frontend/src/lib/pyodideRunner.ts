@@ -180,12 +180,37 @@ def normalize_annotation(annotation):
         return " ".join(getattr(a, "__name__", str(a)) for a in args)
     return getattr(annotation, "__name__", str(annotation))
 
-def adapt_value(value, annotation_text):
-    lowered = annotation_text.lower()
-    if "treenode" in lowered and isinstance(value, list):
-        return build_tree(value)
-    if "listnode" in lowered and isinstance(value, list):
-        return build_list_node(value)
+def annotation_is_list(annotation):
+    # True when the parameter is a "list of" something, e.g.
+    # List[Optional[ListNode]] for merge-k-sorted-lists, so we build one node
+    # per element instead of wrongly folding the outer list into a single node.
+    try:
+        if get_origin(annotation) is list:
+            return True
+    except Exception:
+        pass
+    if isinstance(annotation, str):  # from __future__ annotations arrive as text
+        return annotation.strip().lower().startswith("list[")
+    return False
+
+def annotation_mentions(annotation, name):
+    # Structural check for whether an annotation references a class of the given
+    # name (e.g. "ListNode"), walking typing generics by identity. Text matching
+    # on a flattened annotation is unreliable: Optional[ListNode] renders
+    # differently across Python versions and can drop the inner class name.
+    if isinstance(annotation, type):
+        return annotation.__name__ == name
+    if isinstance(annotation, str):
+        return name.lower() in annotation.lower()
+    return any(annotation_mentions(arg, name) for arg in get_args(annotation))
+
+def adapt_value(value, annotation):
+    if isinstance(value, list):
+        is_list = annotation_is_list(annotation)
+        if annotation_mentions(annotation, "TreeNode"):
+            return [build_tree(v) for v in value] if is_list else build_tree(value)
+        if annotation_mentions(annotation, "ListNode"):
+            return [build_list_node(v) for v in value] if is_list else build_list_node(value)
     return value
 
 def serialize_value(value):
@@ -193,6 +218,8 @@ def serialize_value(value):
         return listnode_to_list(value)
     if isinstance(value, TreeNode):
         return tree_to_list(value)
+    if isinstance(value, list):
+        return [serialize_value(v) for v in value]
     return value
 
 def normalize_expected(text):
@@ -280,8 +307,7 @@ try:
             raise ValueError(f"Couldn't match the testcase input to the Python method signature for {case['label']}.")
         args = []
         for (name, value), parameter in zip(raw_args, parameters):
-            annotation_text = normalize_annotation(parameter.annotation)
-            args.append(adapt_value(value, annotation_text))
+            args.append(adapt_value(value, parameter.annotation))
         _sys.settrace(_make_timeout_tracer(_time.time() + _EXEC_TIMEOUT))
         try:
             actual = serialize_value(method(*args))
@@ -374,10 +400,25 @@ def _norm_ann(ann):
     if _args: return " ".join(getattr(_a, "__name__", str(_a)) for _a in _args)
     return getattr(ann, "__name__", str(ann))
 
+def _ann_is_list(ann):
+    try:
+        if get_origin(ann) is list: return True
+    except Exception:
+        pass
+    if isinstance(ann, str): return ann.strip().lower().startswith("list[")
+    return False
+
+def _ann_has(ann, name):
+    if isinstance(ann, type): return ann.__name__ == name
+    if isinstance(ann, str): return name.lower() in ann.lower()
+    return any(_ann_has(a, name) for a in get_args(ann))
+
 def _adapt(val, ann):
-    a = ann.lower()
-    if "treenode" in a and isinstance(val, list): return _bt(val)
-    if "listnode" in a and isinstance(val, list): return _bln(val)
+    if isinstance(val, list):
+        if _ann_has(ann, "TreeNode"):
+            return [_bt(v) for v in val] if _ann_is_list(ann) else _bt(val)
+        if _ann_has(ann, "ListNode"):
+            return [_bln(v) for v in val] if _ann_is_list(ann) else _bln(val)
     return val
 
 def _parse_args(text):
@@ -447,7 +488,7 @@ try:
     _sig = _inspect.signature(_meth)
     _params = list(_sig.parameters.values())
     _raw = _parse_args(_input_text)
-    _args = [_adapt(v, _norm_ann(p.annotation)) for (_, v), p in zip(_raw, _params)]
+    _args = [_adapt(v, p.annotation) for (_, v), p in zip(_raw, _params)]
     _sys.settrace(_tracer)
     try:
         _res = _meth(*_args)

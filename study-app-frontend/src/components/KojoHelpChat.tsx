@@ -1,4 +1,4 @@
-import { AlertCircle, Maximize2, Minimize2, Send, Sparkles, X } from "lucide-react";
+import { AlertCircle, Lock, Maximize2, Minimize2, Send, Sparkles, X } from "lucide-react";
 import KojoMascot from "./KojoMascot";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -338,7 +338,15 @@ export function KojoHelpChat({
 
         {/* ── Input ── */}
         <div className="kojo-input-area">
-          <p className="kojo-input-label">{disabled && disabledNote ? disabledNote : "Message Kojo"}</p>
+          <p className={`kojo-input-label${disabled && disabledNote ? " kojo-input-label--locked" : ""}`}>
+            {disabled && disabledNote ? (
+              <>
+                <Lock size={11} /> {disabledNote}
+              </>
+            ) : (
+              "Message Kojo"
+            )}
+          </p>
           <div className={isFullscreen ? "kojo-input-row" : undefined}>
             <div className="kojo-input-wrap">
               <textarea
@@ -351,7 +359,11 @@ export function KojoHelpChat({
                 onKeyDown={handleKeyDown}
                 disabled={inputDisabled}
               />
-              {showsCommands ? <SlashCommandMenu commands={slashCommands!} onSelect={selectCommand} /> : null}
+              {showsCommands ? (
+                <div className="kojo-slash-menu-anchor">
+                  <SlashCommandMenu commands={slashCommands!} onSelect={selectCommand} />
+                </div>
+              ) : null}
               <button
                 className="kojo-send"
                 onClick={() => handleSend()}

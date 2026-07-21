@@ -30,6 +30,7 @@ import {
   Search,
   ShieldAlert,
   Sparkles,
+  TrendingUp,
   Trophy,
   Users,
   WrapText,
@@ -77,6 +78,8 @@ import {
   createLCDaily,
   logLCStruggleEvent,
   fetchLCWeakness,
+  fetchLCScores,
+  postLCTestRun,
   fetchLCPrepBanks,
   createLCPrepBank,
   deleteLCPrepBank,
@@ -99,6 +102,7 @@ import type {
   LCGeneratedCustomProblem,
   LCStreakChallenge,
   LCWeaknessTopic,
+  LCImprovementTopic,
   LCPrepBank,
   LCDrillSchedule,
 } from "../lib/types";
@@ -1262,6 +1266,7 @@ type FocusRow = { id: string; label: string; score: string; fillPct: number; col
 function DailyPracticeCard({
   progress,
   weakness,
+  improvement,
   onOpenCategory,
   betaMode,
   dailyProblem,
@@ -1272,6 +1277,7 @@ function DailyPracticeCard({
 }: {
   progress: Record<string, boolean>;
   weakness: LCWeaknessTopic[];
+  improvement: LCImprovementTopic[];
   onOpenCategory: (categoryId: string) => void;
   betaMode: boolean;
   dailyProblem: LCCustomProblem | null;
@@ -1329,6 +1335,20 @@ function DailyPracticeCard({
           </li>
         ))}
       </ul>
+      {improvement.length > 0 ? (
+        <div className="lc-improvement-chips">
+          {improvement.slice(0, 3).map((topic) => {
+            const resolved = resolveTopic(topic.topic);
+            const reason = topic.reasons[0];
+            return (
+              <span key={topic.topic} className="lc-improvement-chip" title={reason}>
+                <TrendingUp size={13} />
+                Improving in {resolved.label}
+              </span>
+            );
+          })}
+        </div>
+      ) : null}
       {betaMode ? (
         <>
           {dailyProblem && !dailyLoading ? (
@@ -1486,6 +1506,9 @@ export default function LeetCodeMode() {
   // Real per-topic struggle scores (last 3 days) from GET /leetcode/weakness. Empty on
   // cold start; the Focus card falls back to a completion proxy until signals arrive.
   const [weakness, setWeakness] = useState<LCWeaknessTopic[]>([]);
+  // Topics the user is actively getting better at (last 7 days), from the same
+  // GET /leetcode/weakness call. Positive reinforcement, shown as chips on the Focus card.
+  const [improvement, setImprovement] = useState<LCImprovementTopic[]>([]);
   // Weak-Area Practice: a builder (topics + difficulty + count) that spins up a stepped
   // queue of catalog problems, then a session summary. Topics default to the weakest by
   // completion; the user adjusts. The session persists across opening/returning problems.
@@ -1747,8 +1770,11 @@ export default function LeetCodeMode() {
       .then(setDrills)
       .catch(() => {})
       .finally(() => setDrillsLoading(false));
-    fetchLCWeakness()
-      .then(setWeakness)
+    fetchLCScores()
+      .then((scores) => {
+        setWeakness(scores.weakness.topics);
+        setImprovement(scores.improvement.topics);
+      })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [betaMode]);
@@ -2240,8 +2266,16 @@ export default function LeetCodeMode() {
     setDrillAddText("");
   }
 
+  // Shared by drill advancement and timer-expiry struggle events: prefer a custom
+  // problem's own topic, else the catalog category the slug belongs to. (Grading
+  // resolves this itself since it already has the custom problem loaded for its
+  // description too.)
+  function resolveProblemTopic(slug: string): string {
+    return customProblems.find((cp) => cp.slug === slug)?.topic || findProblemCategory(slug);
+  }
+
   async function handleAdvanceDrill(slug: string) {
-    const updated = await advanceLCDrill(slug).catch(() => null);
+    const updated = await advanceLCDrill(slug, resolveProblemTopic(slug)).catch(() => null);
     if (!updated) return;
     setDrills((prev) =>
       updated.completed_at
@@ -2757,6 +2791,13 @@ export default function LeetCodeMode() {
       setRunnerResult(result);
 
       if (result.cases?.length) {
+        const customForGrade = customProblems.find((cp) => cp.slug === problemAtRun.slug);
+        void postLCTestRun(
+          problemAtRun.slug,
+          customForGrade?.topic || problemAtRun.categoryId,
+          problemAtRun.difficulty,
+          result.ok,
+        );
         setGradeLoading(true);
         const testResultsSummary = JSON.stringify(
           result.cases.map((c) => ({
@@ -2767,7 +2808,6 @@ export default function LeetCodeMode() {
           })),
         );
         try {
-          const customForGrade = customProblems.find((cp) => cp.slug === problemAtRun.slug);
           const grade = await gradeLeetCodeSubmission(
             problemAtRun.slug,
             problemAtRun.title,
@@ -2803,8 +2843,7 @@ export default function LeetCodeMode() {
       return;
     }
 
-    const topicForEvent = customProblems.find((cp) => cp.slug === problemAtTimeout.slug)?.topic || problemAtTimeout.categoryId;
-    void logLCStruggleEvent(topicForEvent, "timer_expiry", problemAtTimeout.slug);
+    void logLCStruggleEvent(resolveProblemTopic(problemAtTimeout.slug), "timer_expiry", problemAtTimeout.slug);
 
     const result = await runAndGradeCurrentCode(
       problemAtTimeout,
@@ -2865,22 +2904,25 @@ export default function LeetCodeMode() {
     setSolutionOpen(false);
     setRunnerResult(null);
     setGradeFeedback(null);
-    setKojoResponse(null);
-    setKojoError(null);
     resetTimerState();
   }
 
   function handleCodeChange(value: string) {
     if (!currentProblem) return;
     const slug = currentProblem.slug;
-    const workspace = codeWorkspaces[slug] ?? loadCodeWorkspace(slug);
-    const nextWorkspace = {
-      ...workspace,
-      tabs: workspace.tabs.map((tab) => (tab.id === workspace.activeTabId ? { ...tab, code: value } : tab)),
-    };
-    saveCodeWorkspace(slug, nextWorkspace);
-    schedulePushWorkspaceToDb(slug, nextWorkspace);
-    setCodeWorkspaces((prev) => ({ ...prev, [slug]: nextWorkspace }));
+    // Derive from the functional updater's `prev`, not the outer closure's
+    // `codeWorkspaces`, so rapid keystrokes never build a next-state off a
+    // workspace snapshot that's already stale by the time this runs.
+    setCodeWorkspaces((prev) => {
+      const workspace = prev[slug] ?? loadCodeWorkspace(slug);
+      const nextWorkspace = {
+        ...workspace,
+        tabs: workspace.tabs.map((tab) => (tab.id === workspace.activeTabId ? { ...tab, code: value } : tab)),
+      };
+      saveCodeWorkspace(slug, nextWorkspace);
+      schedulePushWorkspaceToDb(slug, nextWorkspace);
+      return { ...prev, [slug]: nextWorkspace };
+    });
   }
 
   function handleAddCodeTab() {
@@ -3414,6 +3456,7 @@ export default function LeetCodeMode() {
           <DailyPracticeCard
             progress={progress}
             weakness={weakness}
+            improvement={improvement}
             onOpenCategory={(categoryId) => setView({ type: "category", categoryId })}
             betaMode={betaMode}
             dailyProblem={dailyProblem}
@@ -4891,7 +4934,14 @@ export default function LeetCodeMode() {
             <Editor
               height="100%"
               defaultLanguage="python"
-              value={currentCode}
+              // Give each (problem, tab) its own Monaco model via `path`, and seed
+              // it with `defaultValue` instead of driving `value`. A controlled
+              // `value` prop makes @monaco-editor/react replace the whole document
+              // whenever the prop lags Monaco's live buffer by even one keystroke,
+              // which snaps the caret to the end of the file when typing fast.
+              // Uncontrolled-per-tab keeps the caret put; state still syncs via onChange.
+              path={`${currentProblem?.slug ?? "none"}:${currentCodeTab?.id ?? "none"}`}
+              defaultValue={currentCode}
               onChange={(value) => handleCodeChange(value ?? "")}
               onMount={handleMonacoMount}
               theme="vs-dark"
@@ -4933,7 +4983,7 @@ export default function LeetCodeMode() {
           disabled={assistsLocked}
           disabledNote={assistsLocked ? `Locked on Pass ${activePass}: no assists` : undefined}
           emptyTitle="Stuck on this one?"
-          emptySub="Ask for a hint, a debugging nudge, or talk through your approach. I won't hand you the full solution."
+          emptySub="Ask for a hint, a debugging nudge, or talk through your approach."
           suggestions={["Give me one hint", "What edge cases am I missing?", "Help me debug my current code"]}
         />
       ) : null}

@@ -586,6 +586,28 @@ export type LCWeaknessResponse = {
   topics: LCWeaknessTopic[];
 };
 
+export type LCTestRunRequest = {
+  problem_slug: string;
+  topic: string;
+  difficulty: string;
+  passed: boolean;
+};
+
+export type LCImprovementTopic = {
+  topic: string;
+  score: number;
+  reasons: string[];
+};
+
+export type LCImprovementResponse = {
+  topics: LCImprovementTopic[];
+};
+
+export type LCScoresResponse = {
+  weakness: LCWeaknessResponse;
+  improvement: LCImprovementResponse;
+};
+
 // ── Interview Prep Banks (beta-only) ────────────────────────────────────────
 
 export type LCPrepBank = {

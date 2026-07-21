@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import uuid
-from collections import Counter
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -23,6 +22,7 @@ from src.models.lc_sync import (
     LCProblemNote,
     LCStreakChallenge,
     LCStruggleEvent,
+    LCTestRun,
 )
 from src.models.user import User
 from src.schemas.leetcode_schema import (
@@ -33,15 +33,16 @@ from src.schemas.leetcode_schema import (
     LCCustomProblemSyncRequest,
     LCCustomTestCase,
     LCDailyProblemRequest,
+    LCDrillAdvanceRequest,
     LCDrillCreateRequest,
     LCDrillScheduleResponse,
     LCGenerateCustomProblemRequest,
     LCGeneratedCustomProblem,
     LCPrepBankCreateRequest,
     LCPrepBankResponse,
+    LCScoresResponse,
     LCStruggleEventRequest,
-    LCWeaknessResponse,
-    LCWeaknessTopic,
+    LCTestRunRequest,
     LCNotesResponse,
     LCNotesSyncRequest,
     LCProgressResponse,
@@ -58,6 +59,15 @@ from src.schemas.leetcode_schema import (
     LeetCodeProblemResponse,
 )
 from src.services.leetcode_service import LeetCodeService
+from src.services.scoring_service import (
+    EVENT_DRILL_ADVANCED_2,
+    EVENT_DRILL_ADVANCED_3,
+    EVENT_DRILL_COMPLETED,
+    EVENT_FAILED_GRADE,
+    EVENT_HINT_USED,
+    EVENT_TIMER_EXPIRY,
+    ScoringService,
+)
 from src.utils.exceptions import LLMException, ResourceNotFoundException
 from src.utils.provider_policy import resolve_request_provider
 
@@ -109,7 +119,7 @@ async def kojo_leetcode_hint(
         LCStruggleEvent(
             user_id=user.id,
             topic=body.topic,
-            event_type="hint_used",
+            event_type=EVENT_HINT_USED,
             problem_slug=body.title_slug,
         )
     )
@@ -144,7 +154,7 @@ async def grade_leetcode_submission(
             LCStruggleEvent(
                 user_id=user.id,
                 topic=body.topic,
-                event_type="failed_grade",
+                event_type=EVENT_FAILED_GRADE,
                 problem_slug=body.title_slug,
             )
         )
@@ -153,21 +163,9 @@ async def grade_leetcode_submission(
     return result
 
 
-# ── Struggle events + weakness scorer ─────────────────────────────────────────
-
-_WEAKNESS_LOOKBACK_DAYS = 3
-# Simple bucketed struggle-event count -> weakness level. Thresholds are a starting
-# point, not tuned against real usage data yet; easy to adjust later.
-_WEAKNESS_LEVEL_BUCKETS = ((2, 2), (4, 3), (7, 4))
-
-
-def _weakness_level_for_count(count: int) -> int:
-    if count <= 0:
-        return 1
-    for ceiling, level in _WEAKNESS_LEVEL_BUCKETS:
-        if count <= ceiling:
-            return level
-    return 5
+# ── Struggle events + weakness/improvement scorers ────────────────────────────
+# Scoring logic itself lives in ScoringService (services/scoring_service.py); this
+# section only owns event logging and the route wiring.
 
 
 async def _maybe_auto_add_drill(
@@ -214,35 +212,39 @@ async def log_struggle_event(
             problem_slug=body.problem_slug,
         )
     )
-    if body.event_type == "timer_expiry":
+    if body.event_type == EVENT_TIMER_EXPIRY:
         await _maybe_auto_add_drill(session, user.id, body.problem_slug)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/weakness", response_model=LCWeaknessResponse)
+@router.post("/test-run", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def log_test_run(
+    body: LCTestRunRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> Response:
+    """Logged each time the user runs their code (client-side pyodide run). Feeds the
+    weakness grace period + success reduction and the improvement pass-rate trend."""
+    session.add(
+        LCTestRun(
+            user_id=user.id,
+            problem_slug=body.problem_slug,
+            topic=body.topic,
+            difficulty=body.difficulty,
+            passed=body.passed,
+        )
+    )
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/weakness", response_model=LCScoresResponse)
 async def get_weakness(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
-) -> LCWeaknessResponse:
-    since = datetime.now(timezone.utc) - timedelta(days=_WEAKNESS_LOOKBACK_DAYS)
-    topics = (
-        await session.execute(
-            select(LCStruggleEvent.topic).where(
-                LCStruggleEvent.user_id == user.id,
-                LCStruggleEvent.occurred_at >= since,
-            )
-        )
-    ).scalars().all()
-    if not topics:
-        return LCWeaknessResponse(topics=[])
-    counts = Counter(topics)
-    scored = [
-        LCWeaknessTopic(topic=topic, level=_weakness_level_for_count(count))
-        for topic, count in counts.items()
-    ]
-    scored.sort(key=lambda item: (-item.level, item.topic))
-    return LCWeaknessResponse(topics=scored)
+) -> LCScoresResponse:
+    return await ScoringService().get_scores(session, user.id)
 
 
 # ── Progress & activity sync ──────────────────────────────────────────────────
@@ -874,6 +876,7 @@ async def remove_bank_problem(
 # Expanding intervals: pass 1 -> 2 waits at least 24h, pass 2 -> 3 waits a few days
 # longer (72h), per the 3-Pass Spaced Repetition spec (todo-kojocode-rebuild.md 3h).
 _DRILL_PASS_INTERVALS = {1: timedelta(hours=24), 2: timedelta(hours=72)}
+_DRILL_ADVANCE_EVENT_TYPES = {2: EVENT_DRILL_ADVANCED_2, 3: EVENT_DRILL_ADVANCED_3}
 
 
 def _serialize_drill(row: LCDrillSchedule) -> LCDrillScheduleResponse:
@@ -936,6 +939,7 @@ async def create_drill(
 @router.post("/drills/{slug}/advance", response_model=LCDrillScheduleResponse)
 async def advance_drill(
     slug: str,
+    body: Optional[LCDrillAdvanceRequest] = None,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> LCDrillScheduleResponse:
@@ -953,9 +957,24 @@ async def advance_drill(
 
     if row.current_pass >= 3:
         row.completed_at = datetime.now(timezone.utc)
+        event_type = EVENT_DRILL_COMPLETED
     else:
         row.next_due_at = datetime.now(timezone.utc) + _DRILL_PASS_INTERVALS[row.current_pass]
         row.current_pass += 1
+        event_type = _DRILL_ADVANCE_EVENT_TYPES[row.current_pass]
+
+    # Logged so the improvement scorer can see pass advancement and the weakness
+    # scorer can reset the topic on pass-3 completion (lc_drill_schedule itself has
+    # no topic column, so this is skipped when the caller doesn't send one).
+    if body and body.topic:
+        session.add(
+            LCStruggleEvent(
+                user_id=user.id,
+                topic=body.topic,
+                event_type=event_type,
+                problem_slug=slug,
+            )
+        )
 
     await session.commit()
     await session.refresh(row)

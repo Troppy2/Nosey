@@ -23,6 +23,7 @@ if TYPE_CHECKING:
         LCProblemNote,
         LCStreakChallenge,
         LCStruggleEvent,
+        LCTestRun,
     )
     from src.models.mock_interview import MockInterviewSession
     from src.models.slash_command import SlashCommand
@@ -85,6 +86,9 @@ class User(Base, TimestampMixin):
     )
     lc_drill_schedule: Mapped[list[LCDrillSchedule]] = relationship(
         "LCDrillSchedule", back_populates="user", cascade="all, delete-orphan"
+    )
+    lc_test_runs: Mapped[list[LCTestRun]] = relationship(
+        "LCTestRun", back_populates="user", cascade="all, delete-orphan"
     )
     mock_interview_sessions: Mapped[list[MockInterviewSession]] = relationship(
         "MockInterviewSession", back_populates="user", cascade="all, delete-orphan"
