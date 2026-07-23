@@ -18731,29 +18731,129 @@ button.kojo-blueprint-head:hover {
   white-space: nowrap;
 }
 
-.lc-cadence-grid {
+/* Stats board: today's tally sits above the calendar, GitHub-summary style. */
+.lc-cadence-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.lc-cadence-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  border: 1px solid var(--lc-border);
+  border-radius: 10px;
+  background: var(--green-lightest, #eef4e4);
+  min-width: 92px;
+}
+
+.lc-cadence-stat strong {
+  font-family: "Lora", Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--green-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-cadence-stat small {
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  color: var(--muted, #596949);
+}
+
+/* "Jump back in" shortcut to the last-opened problem, sitting alongside the stat
+   tiles. Reuses the old browse-all pill look: horizontal, icon-less, arrow on the
+   right that nudges on hover. */
+.lc-cadence-resume {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 160px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--green-dark) 30%, white);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.lc-cadence-resume:hover {
+  border-color: var(--green-dark);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.lc-cadence-resume-copy {
   display: grid;
-  grid-template-rows: repeat(7, 15px);
-  grid-auto-flow: column;
-  grid-auto-columns: 15px;
-  justify-items: start;
-  align-items: start;
-  gap: 3px;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.lc-cadence-resume-copy small {
+  font-size: 0.66rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted, #596949);
+}
+
+.lc-cadence-resume-copy strong {
+  font-family: "Lora", Georgia, serif;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-cadence-resume > svg {
+  color: var(--green-dark);
+  flex-shrink: 0;
+  transition: transform var(--transition-fast);
+}
+
+.lc-cadence-resume:hover > svg {
+  transform: translateX(3px);
+}
+
+/* Horizontal scroll wrapper so the fixed-size week columns never squash. */
+.lc-cadence-scroll {
   overflow-x: auto;
   padding-bottom: 4px;
 }
 
-.lc-cadence-cell {
-  width: 15px;
-  height: 15px;
-  border-radius: 3px;
-  background: #d7e8c2;
-  transition: transform 0.1s ease;
+.lc-cadence-grid {
+  display: grid;
+  grid-template-rows: repeat(7, 16px);
+  grid-auto-flow: column;
+  grid-auto-columns: 16px;
+  gap: 4px;
+  width: max-content;
 }
 
-.lc-cadence-cell.is-active {
-  background: var(--green-dark);
+.lc-cadence-cell {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  /* Level 0 = empty. Levels 1-4 ramp the brand green from pale to deep, matching
+     the GitHub contribution-graph intensity scale. */
+  background: var(--green-lightest, #e9f0dd);
+  box-shadow: inset 0 0 0 1px rgba(27, 55, 24, 0.04);
+  transition: outline-color 0.1s ease;
 }
+
+.lc-cadence-cell[data-level="1"] { background: #b7d89a; }
+.lc-cadence-cell[data-level="2"] { background: #7fb85f; }
+.lc-cadence-cell[data-level="3"] { background: #4f9636; }
+.lc-cadence-cell[data-level="4"] { background: var(--green-dark, #2f5e1f); }
 
 .lc-cadence-cell.is-today {
   outline: 2px solid var(--green-dark);
@@ -18762,32 +18862,34 @@ button.kojo-blueprint-head:hover {
 
 .lc-cadence-cell.is-future {
   background: transparent;
+  box-shadow: none;
 }
 
-.lc-cadence-grid .lc-cadence-cell:hover {
-  transform: scale(1.35);
+.lc-cadence-scroll .lc-cadence-cell:hover {
+  outline: 1px solid rgba(27, 55, 24, 0.35);
+  outline-offset: 1px;
 }
 
 .lc-cadence-legend {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 12px;
+  gap: 4px;
+  margin-top: 14px;
   font-size: 0.7rem;
   color: var(--muted, #596949);
 }
 
-.lc-cadence-legend .lc-cadence-cell:hover {
-  transform: none;
+.lc-cadence-legend .lc-cadence-cell {
+  width: 16px;
+  height: 16px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .lc-cadence-cell {
-    transition: none;
-  }
-  .lc-cadence-grid .lc-cadence-cell:hover {
-    transform: none;
-  }
+.lc-cadence-legend > span:first-child {
+  margin-right: 2px;
+}
+
+.lc-cadence-legend > span:last-child {
+  margin-left: 2px;
 }
 
 /* ── LeetCode dashboard: two-column rows (heatmap+daily practice, mastery+reminders) ── */
@@ -19062,6 +19164,53 @@ button.kojo-blueprint-head:hover {
   font-size: 0.78rem;
   font-weight: 700;
   color: var(--green-dark);
+}
+
+/* The "Coming up" cards for an active Prep Bank / practice set aren't a single big
+   click target like the preview cards (they hold a difficulty select + a button), so
+   they render as a div wrapper with a smaller real button for the CTA. */
+.lc-reminder-feature--active {
+  cursor: default;
+  border-color: var(--green-dark-mid);
+  background: var(--green-lightest);
+}
+
+.lc-reminder-badge--live {
+  color: #fff;
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+}
+
+.lc-reminder-feature-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+button.lc-reminder-feature-cta {
+  padding: 7px 12px;
+  border: 1px solid var(--green-dark);
+  border-radius: 8px;
+  background: var(--green-dark);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.13s ease;
+}
+
+button.lc-reminder-feature-cta:hover:not(:disabled) {
+  background: var(--green-darker, #4c5a3c);
+}
+
+button.lc-reminder-feature-cta:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.lc-reminder-feature-note {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--muted, #596949);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -20725,12 +20874,22 @@ button.kojo-blueprint-head:hover {
 
 .lc-bank-weakmap li {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
   grid-template-areas:
-    "topic count"
-    "bar bar";
+    "topic level count"
+    "bar bar bar";
   align-items: center;
   gap: 7px 10px;
+}
+
+.lc-bank-weakmap-level {
+  grid-area: level;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .lc-bank-weakmap-topic {
@@ -20902,13 +21061,13 @@ button.kojo-blueprint-head:hover {
   margin-top: 10px;
 }
 
-/* Topic multi-select as a native <details> disclosure (no click-outside JS needed). */
+/* Topic multi-select as a controlled button + panel that closes on outside click
+   (see TopicPicker in LeetCodeMode.tsx). */
 .lc-topic-picker {
   position: relative;
 }
 
 .lc-topic-summary {
-  list-style: none;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -20926,25 +21085,21 @@ button.kojo-blueprint-head:hover {
   transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
 }
 
-.lc-topic-summary::-webkit-details-marker {
-  display: none;
-}
-
 .lc-topic-summary:hover {
   border-color: var(--green-dark-mid);
 }
 
-.lc-topic-picker[open] .lc-topic-summary {
+.lc-topic-summary[aria-expanded="true"] {
   border-color: var(--green-dark);
   box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.14);
 }
 
-.lc-topic-summary svg {
+.lc-topic-chevron {
   color: var(--muted, #596949);
   transition: transform 0.15s ease;
 }
 
-.lc-topic-picker[open] .lc-topic-summary svg {
+.lc-topic-chevron--open {
   transform: rotate(180deg);
 }
 
@@ -21013,14 +21168,23 @@ button.kojo-blueprint-head:hover {
   color: var(--muted, #596949);
 }
 
-.lc-bank-add-count input {
-  width: 78px;
+.lc-bank-add-count input,
+.lc-bank-add-count select {
   padding: 10px;
   border: 1px solid var(--border, #d8dfd0);
   border-radius: 8px;
   font-family: var(--font-mono);
   font-size: 0.85rem;
   color: var(--ink);
+  background: #fff;
+}
+
+.lc-bank-add-count input {
+  width: 78px;
+}
+
+.lc-bank-add-count select {
+  cursor: pointer;
 }
 
 /* Sized to sit level with the dropdown + count inputs (global .button is 48px tall). */
@@ -21080,4 +21244,220 @@ button.kojo-blueprint-head:hover {
 .lc-bank-kojo-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+/* KojoCode settings cog (dashboard hero) + its modal. Sensitivity presets and the
+   "Clear weakness signals" action live here. Every element gets its own class so
+   nothing relies on element selectors inside the container. */
+.lc-cog-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--lc-border);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.lc-cog-btn:hover {
+  transform: translateY(-1px);
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+}
+
+.lc-settings-modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 401;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 400px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 20px;
+  border: 1px solid rgba(113, 131, 85, 0.28);
+  border-radius: 10px;
+  background: var(--white);
+  box-shadow: var(--shadow-lg);
+}
+
+.lc-settings-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.lc-settings-modal-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-serif);
+  font-size: 1.02rem;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.lc-settings-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted, #596949);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.lc-settings-close:hover {
+  background: var(--green-lightest);
+  color: var(--ink);
+}
+
+.lc-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(113, 131, 85, 0.16);
+}
+
+.lc-settings-label {
+  font-size: 0.9rem;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.lc-settings-help {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  color: var(--muted, #596949);
+}
+
+.lc-settings-segmented {
+  display: flex;
+  gap: 6px;
+}
+
+.lc-settings-seg-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1.5px solid rgba(113, 131, 85, 0.22);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.84rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+}
+
+.lc-settings-seg-btn:hover {
+  border-color: rgba(113, 131, 85, 0.5);
+  background: rgba(113, 131, 85, 0.05);
+}
+
+.lc-settings-seg-btn--active {
+  border-color: var(--green-dark);
+  background: rgba(113, 131, 85, 0.1);
+  color: var(--green-dark);
+}
+
+.lc-settings-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  align-self: flex-start;
+  padding: 8px 14px;
+  border: 1.5px solid rgba(220, 38, 38, 0.4);
+  border-radius: 9px;
+  background: transparent;
+  color: #b91c1c;
+  font-size: 0.84rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.lc-settings-clear-btn:hover {
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.06);
+}
+
+/* Post-problem "how hard did that feel?" self-report. Reuses the survey-card shell
+   (.modal-backdrop / .survey-card); these classes style the difficulty buttons. */
+.lc-difficulty-card {
+  text-align: center;
+}
+
+.lc-difficulty-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin: 18px 0 6px;
+}
+
+.lc-difficulty-btn {
+  padding: 14px 12px;
+  border: 1.5px solid rgba(113, 131, 85, 0.28);
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.lc-difficulty-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.lc-difficulty-btn--easy:hover {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.lc-difficulty-btn--medium:hover {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+}
+
+.lc-difficulty-btn--hard:hover {
+  border-color: #d97706;
+  background: rgba(217, 119, 6, 0.08);
+}
+
+.lc-difficulty-btn--brutal:hover {
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.lc-difficulty-skip {
+  margin-top: 6px;
+  border: none;
+  background: transparent;
+  color: var(--muted, #596949);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 10px;
+}
+
+.lc-difficulty-skip:hover {
+  color: var(--ink);
+  text-decoration: underline;
 }

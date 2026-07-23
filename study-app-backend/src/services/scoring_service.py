@@ -36,6 +36,15 @@ EVENT_TIMER_EXPIRY = "timer_expiry"
 EVENT_DRILL_ADVANCED_2 = "drill_advanced_2"
 EVENT_DRILL_ADVANCED_3 = "drill_advanced_3"
 EVENT_DRILL_COMPLETED = "drill_completed"
+# Self-report / give-up signals. These fire at the moment of completion (the user
+# just marked done, or is about to), so they must NOT be cancellable by that solve
+# and they skip the exploration grace period -- an explicit "I couldn't do this" or
+# "that felt brutal" is a deliberate judgment, not a barely-attempted problem.
+EVENT_SOLUTION_VIEWED = "solution_viewed"
+EVENT_SELF_RATED_EASY = "self_rated_easy"
+EVENT_SELF_RATED_MEDIUM = "self_rated_medium"
+EVENT_SELF_RATED_HARD = "self_rated_hard"
+EVENT_SELF_RATED_BRUTAL = "self_rated_brutal"
 
 # ── Weakness ────────────────────────────────────────────────────────────────
 
@@ -48,8 +57,38 @@ GRACE_RUN_COUNT = 2
 EXPLORATORY_HINT_WEIGHT = 0.3
 STRUGGLE_EVENT_WEIGHT = 1.0
 SUCCESS_REDUCTION = 0.5
+# Silent struggle: a failed test run (grinding a problem with no hint/grade) adds a
+# little weight so topics the user quietly wrestles with still surface. Capped per
+# problem so one long grind can't dominate a topic. Scaled by sensitivity below.
+FAILED_RUN_WEIGHT = 0.25
+FAILED_RUN_CAP_PER_SLUG = 1.0
+# Give-up / self-report weights. Viewing the solution and rating a problem hard are
+# strong "I don't have this yet" signals; brutal is stronger than hard. Rating a
+# problem easy is a self-reported win that trims the topic like a solve does.
+SOLUTION_VIEW_WEIGHT = 1.0
+SELF_RATED_HARD_WEIGHT = 1.0
+SELF_RATED_BRUTAL_WEIGHT = 1.75
+SELF_RATED_EASY_REDUCTION = 0.5
+# Event types that skip the grace period and are non-cancellable by a later solve
+# (they fire at completion, so a cancellable weight would be refunded immediately).
+_SELF_REPORT_EVENTS = frozenset(
+    {
+        EVENT_SOLUTION_VIEWED,
+        EVENT_SELF_RATED_EASY,
+        EVENT_SELF_RATED_MEDIUM,
+        EVENT_SELF_RATED_HARD,
+        EVENT_SELF_RATED_BRUTAL,
+    }
+)
+# Sensitivity multiplier applied to the final per-topic score before bucketing, and
+# to the failed-run weight. Low needs sustained struggle to flag; High surfaces
+# marginal topics fast. User-tunable from the KojoCode cog.
+_SENSITIVITY_MULTIPLIER = {"low": 0.6, "medium": 1.0, "high": 1.6}
+# Below this adjusted score a topic is not shown at all (lets Low hide marginal
+# topics; High still surfaces them because the multiplier lifts them over the line).
+MIN_VISIBLE_SCORE = 0.75
 # Bucketed score -> level 1-5. Starting thresholds, not tuned against real usage
-# data yet; easy to adjust later.
+# data yet; easy to adjust later. Same for the sensitivity/failed-run constants above.
 _WEAKNESS_LEVEL_BUCKETS = ((2, 2), (4, 3), (7, 4))
 
 # ── Improvement ─────────────────────────────────────────────────────────────
@@ -69,8 +108,19 @@ def _weakness_level_for_score(score: float) -> int:
     return 5
 
 
+def _sensitivity_multiplier(sensitivity: str | None) -> float:
+    return _SENSITIVITY_MULTIPLIER.get((sensitivity or "medium").lower(), 1.0)
+
+
 class ScoringService:
-    async def get_scores(self, session: AsyncSession, user_id: int) -> LCScoresResponse:
+    async def get_scores(
+        self,
+        session: AsyncSession,
+        user_id: int,
+        sensitivity: str = "medium",
+        slug_scope: set[str] | None = None,
+        reset_at: datetime | None = None,
+    ) -> LCScoresResponse:
         now = datetime.now(timezone.utc)
         since = now - timedelta(days=IMPROVEMENT_LOOKBACK_DAYS)
 
@@ -94,20 +144,41 @@ class ScoringService:
             )
         ).all()
 
-        weakness = await self._score_weakness(session, user_id, now, events, runs)
+        # Bank scope (A4): restrict weakness to the bank's own problem slugs. Events
+        # without a slug can't be attributed to a bank, so they drop out of scope.
+        if slug_scope is not None:
+            weakness_events = [e for e in events if e.problem_slug in slug_scope]
+            weakness_runs = [r for r in runs if r.problem_slug in slug_scope]
+        else:
+            weakness_events = events
+            weakness_runs = runs
+
+        weakness = await self._score_weakness(
+            session, user_id, now, weakness_events, weakness_runs, sensitivity, reset_at
+        )
+        # Improvement stays global (bank scope and reset are weakness-only concerns).
         improvement = self._score_improvement(now, events, runs)
         return LCScoresResponse(weakness=weakness, improvement=improvement)
 
-    async def _score_weakness(self, session, user_id, now, events, runs) -> LCWeaknessResponse:
+    async def _score_weakness(
+        self, session, user_id, now, events, runs, sensitivity="medium", reset_at=None
+    ) -> LCWeaknessResponse:
         weakness_since = now - timedelta(days=WEAKNESS_LOOKBACK_DAYS)
+        # Clear weakness signals (Part E): ignore everything before the reset marker.
+        if reset_at is not None and reset_at > weakness_since:
+            weakness_since = reset_at
         window_events = [e for e in events if e.occurred_at >= weakness_since]
-        if not window_events:
+        window_failed_runs = [r for r in runs if not r.passed and r.run_at >= weakness_since]
+        if not window_events and not window_failed_runs:
             return LCWeaknessResponse(topics=[])
         passed_runs = [r for r in runs if r.passed and r.run_at >= weakness_since]
+        mult = _sensitivity_multiplier(sensitivity)
 
-        # Grace period lookup: total runs ever for each slug referenced this window.
+        # Grace period lookup: total runs ever for each slug referenced this window
+        # (struggle events, passed runs, and failed runs all reference slugs).
         slugs = {slug for _topic, _event_type, slug, _occurred_at in window_events if slug}
         slugs.update(slug for _topic, slug, *_rest in passed_runs if slug)
+        slugs.update(r.problem_slug for r in window_failed_runs if r.problem_slug)
         attempts_by_slug: dict[str, int] = {}
         if slugs:
             rows = (
@@ -126,29 +197,78 @@ class ScoringService:
                 return True
             return attempts_by_slug.get(slug, 0) >= GRACE_RUN_COUNT
 
-        # Merge struggle events and passed runs into one chronological timeline so
-        # the exploratory-hint and drill-reset rules see events in the order they
-        # actually happened.
-        timeline = [
-            (occurred_at, "event", event_type, topic, slug)
-            for topic, event_type, slug, occurred_at in window_events
-        ] + [(run_at, "success", None, topic, slug) for topic, slug, _passed, _difficulty, run_at in passed_runs]
+        # Merge struggle events, passed runs, and failed runs into one chronological
+        # timeline so the exploratory-hint, solve-cancel, and drill-reset rules see
+        # events in the order they actually happened.
+        timeline = (
+            [
+                (occurred_at, "event", event_type, topic, slug)
+                for topic, event_type, slug, occurred_at in window_events
+            ]
+            + [(run_at, "success", None, topic, slug) for topic, slug, _passed, _difficulty, run_at in passed_runs]
+            + [(r.run_at, "failed", None, r.topic, r.problem_slug) for r in window_failed_runs]
+        )
         timeline.sort(key=lambda item: item[0])
 
         scores: dict[str, float] = defaultdict(float)
         failed_seen: set[str] = set()  # problem_slugs with a failed_grade seen so far
+        # Weight this window contributed per (topic, slug), so solving a problem can
+        # cancel the struggle it caused (fixes topics staying "weak" after you grind
+        # them out with hints and eventually pass).
+        slug_weight: dict[tuple[str, str], float] = defaultdict(float)
+        # Cumulative silent-struggle weight already added per slug, to enforce the cap.
+        failed_run_added: dict[str, float] = defaultdict(float)
 
         for _ts, kind, event_type, topic, slug in timeline:
-            if not past_grace(slug):
+            # Self-report / give-up events bypass the grace period; everything else
+            # must clear it (barely-attempted problems don't count).
+            if event_type not in _SELF_REPORT_EVENTS and not past_grace(slug):
                 continue
 
             if kind == "success":
-                scores[topic] = max(0.0, scores[topic] - SUCCESS_REDUCTION)
+                # A pass refunds the struggle this problem caused, plus a small bonus,
+                # so repeated solving of a topic trends it toward mastery.
+                refund = SUCCESS_REDUCTION
+                if slug:
+                    refund += slug_weight.pop((topic, slug), 0.0)
+                scores[topic] = max(0.0, scores[topic] - refund)
+                continue
+
+            if kind == "failed":
+                # Silent struggle: grinding a problem without asking for help. Capped
+                # per slug so one long grind can't dominate a topic.
+                if not slug:
+                    continue
+                room = FAILED_RUN_CAP_PER_SLUG - failed_run_added[slug]
+                add = min(FAILED_RUN_WEIGHT, room)
+                if add <= 0:
+                    continue
+                failed_run_added[slug] += add
+                scores[topic] += add
+                slug_weight[(topic, slug)] += add
                 continue
 
             if event_type == EVENT_DRILL_COMPLETED:
                 scores[topic] = 0.0
                 continue
+
+            # Self-report / give-up signals: non-cancellable (not added to
+            # slug_weight), so the solve that fires alongside them can't refund them.
+            if event_type == EVENT_SELF_RATED_EASY:
+                scores[topic] = max(0.0, scores[topic] - SELF_RATED_EASY_REDUCTION)
+                continue
+            if event_type == EVENT_SELF_RATED_MEDIUM:
+                continue  # logged for data, carries no weight either way
+            if event_type == EVENT_SOLUTION_VIEWED:
+                scores[topic] += SOLUTION_VIEW_WEIGHT
+                continue
+            if event_type == EVENT_SELF_RATED_HARD:
+                scores[topic] += SELF_RATED_HARD_WEIGHT
+                continue
+            if event_type == EVENT_SELF_RATED_BRUTAL:
+                scores[topic] += SELF_RATED_BRUTAL_WEIGHT
+                continue
+
             if event_type == EVENT_HINT_USED:
                 weight = EXPLORATORY_HINT_WEIGHT if slug not in failed_seen else STRUGGLE_EVENT_WEIGHT
             elif event_type == EVENT_FAILED_GRADE:
@@ -162,12 +282,17 @@ class ScoringService:
                 # weakness weight.
                 continue
             scores[topic] += weight
+            if slug:
+                slug_weight[(topic, slug)] += weight
 
-        scored = [
-            LCWeaknessTopic(topic=topic, level=_weakness_level_for_score(score))
-            for topic, score in scores.items()
-            if score > 0
-        ]
+        # Sensitivity scales the final score; MIN_VISIBLE hides marginal topics (so a
+        # topic driven only by a little silent struggle stays hidden at Low but
+        # surfaces at High). Level is bucketed off the adjusted score.
+        scored = []
+        for topic, score in scores.items():
+            adjusted = score * mult
+            if adjusted >= MIN_VISIBLE_SCORE:
+                scored.append(LCWeaknessTopic(topic=topic, level=_weakness_level_for_score(adjusted)))
         scored.sort(key=lambda item: (-item.level, item.topic))
         return LCWeaknessResponse(topics=scored)
 

@@ -1275,6 +1275,8 @@ export async function resolveKojoActionCard(
 export type LCProgressData = {
   progress: Record<string, boolean>;
   activity_dates: string[];
+  // Per-day solved tally keyed by YYYY-MM-DD. Optional so older payloads still parse.
+  activity_counts?: Record<string, number>;
 };
 
 export async function fetchLCProgress(): Promise<LCProgressData> {
@@ -1415,9 +1417,17 @@ export async function createLCDaily(
 
 // ── Struggle events + weakness scorer (beta-only) ─────────────────────────────
 
+export type LCStruggleEventType =
+  | "timer_expiry"
+  | "solution_viewed"
+  | "self_rated_easy"
+  | "self_rated_medium"
+  | "self_rated_hard"
+  | "self_rated_brutal";
+
 export async function logLCStruggleEvent(
   topic: string,
-  eventType: "timer_expiry" = "timer_expiry",
+  eventType: LCStruggleEventType = "timer_expiry",
   problemSlug?: string,
 ): Promise<void> {
   try {
@@ -1426,7 +1436,7 @@ export async function logLCStruggleEvent(
       body: JSON.stringify({ topic, event_type: eventType, problem_slug: problemSlug ?? null }),
     });
   } catch {
-    // Best-effort signal, never blocks the timer-expiry flow it's fired from.
+    // Best-effort signal, never blocks the flow it's fired from.
   }
 }
 
@@ -1446,16 +1456,31 @@ export async function postLCTestRun(
   }
 }
 
-export async function fetchLCScores(): Promise<import("./types").LCScoresResponse> {
+export async function fetchLCScores(
+  sensitivity?: string,
+  bankId?: number,
+  resetAt?: string,
+): Promise<import("./types").LCScoresResponse> {
+  const params = new URLSearchParams();
+  if (sensitivity) params.set("sensitivity", sensitivity);
+  if (typeof bankId === "number") params.set("bank_id", String(bankId));
+  if (resetAt) params.set("reset_at", resetAt);
+  const query = params.toString();
   try {
-    return await request<import("./types").LCScoresResponse>("/leetcode/weakness");
+    return await request<import("./types").LCScoresResponse>(
+      `/leetcode/weakness${query ? `?${query}` : ""}`,
+    );
   } catch {
     return { weakness: { topics: [] }, improvement: { topics: [] } };
   }
 }
 
-export async function fetchLCWeakness(): Promise<import("./types").LCWeaknessTopic[]> {
-  const result = await fetchLCScores();
+export async function fetchLCWeakness(
+  sensitivity?: string,
+  bankId?: number,
+  resetAt?: string,
+): Promise<import("./types").LCWeaknessTopic[]> {
+  const result = await fetchLCScores(sensitivity, bankId, resetAt);
   return result.weakness.topics ?? [];
 }
 

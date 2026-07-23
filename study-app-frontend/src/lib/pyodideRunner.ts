@@ -166,9 +166,26 @@ def tree_to_list(root):
         out.pop()
     return out
 
+_JSON_NAME_CONSTS = {"null": None, "true": True, "false": False}
+
+class _JsonLiteralNames(ast.NodeTransformer):
+    # Test-case inputs follow the LeetCode/JSON convention (null/true/false),
+    # which ast.literal_eval rejects because they parse as Name nodes rather
+    # than constants. Rewrite those names to their Python constants so tree and
+    # graph inputs like [3,9,20,null,null,15,7] evaluate instead of blowing up.
+    def visit_Name(self, node):
+        if node.id in _JSON_NAME_CONSTS:
+            return ast.copy_location(ast.Constant(_JSON_NAME_CONSTS[node.id]), node)
+        return node
+
+def literal_eval_json(node):
+    node = _JsonLiteralNames().visit(node)
+    ast.fix_missing_locations(node)
+    return ast.literal_eval(node)
+
 def parse_named_args(text):
     call = ast.parse(f"f({text})", mode="eval").body
-    return [(kw.arg or "", ast.literal_eval(kw.value)) for kw in call.keywords]
+    return [(kw.arg or "", literal_eval_json(kw.value)) for kw in call.keywords]
 
 def normalize_annotation(annotation):
     if annotation is inspect._empty:
@@ -421,9 +438,25 @@ def _adapt(val, ann):
             return [_bln(v) for v in val] if _ann_is_list(ann) else _bln(val)
     return val
 
+_JSON_NAME_CONSTS = {"null": None, "true": True, "false": False}
+
+class _JsonLiteralNames(_ast.NodeTransformer):
+    # LeetCode/JSON style null/true/false parse as Name nodes, which
+    # literal_eval rejects; rewrite them to Python constants first so tree and
+    # graph inputs like [3,9,20,null,null,15,7] evaluate.
+    def visit_Name(self, node):
+        if node.id in _JSON_NAME_CONSTS:
+            return _ast.copy_location(_ast.Constant(_JSON_NAME_CONSTS[node.id]), node)
+        return node
+
+def _literal_eval_json(node):
+    node = _JsonLiteralNames().visit(node)
+    _ast.fix_missing_locations(node)
+    return _ast.literal_eval(node)
+
 def _parse_args(text):
     call = _ast.parse("f(" + text + ")", mode="eval").body
-    return [(kw.arg or "", _ast.literal_eval(kw.value)) for kw in call.keywords]
+    return [(kw.arg or "", _literal_eval_json(kw.value)) for kw in call.keywords]
 
 _MAX_STEPS = 500
 _TRACE_TIMEOUT = 5.0

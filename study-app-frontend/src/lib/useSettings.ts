@@ -6,6 +6,8 @@ export const SETTINGS_KEYS = {
   generationProvider: "nosey_generation_provider",
   kojoStrictness: "nosey_kojo_strictness",
   kojoCustomInstruction: "nosey_kojo_custom_instruction",
+  weaknessSensitivity: "nosey_lc_weakness_sensitivity",
+  difficultyPrompt: "nosey_lc_difficulty_prompt",
 } as const;
 
 // Kojo custom instructions are capped so they can't crowd out the notes context
@@ -74,6 +76,15 @@ export function useSettings() {
   const [kojoCustomInstruction, setKojoCustomInstructionState] = useState(() =>
     readStringSetting(SETTINGS_KEYS.kojoCustomInstruction, ""),
   );
+  // How aggressively KojoCode flags weak topics (low | medium | high). Read by the
+  // weakness fetches and set from the KojoCode dashboard cog.
+  const [weaknessSensitivity, setWeaknessSensitivityState] = useState(() =>
+    readStringSetting(SETTINGS_KEYS.weaknessSensitivity, "medium"),
+  );
+  // Whether to ask "how hard did that feel?" after finishing a KojoCode problem.
+  const [difficultyPromptEnabled, setDifficultyPromptEnabledState] = useState(() =>
+    readBooleanSetting(SETTINGS_KEYS.difficultyPrompt, true),
+  );
   const [betaMode, setBetaModeState] = useState(deriveBetaAccess);
 
   // Sync state when another instance of useSettings writes a setting.
@@ -90,6 +101,12 @@ export function useSettings() {
       }
       if (e.key === scopeKey(SETTINGS_KEYS.kojoCustomInstruction) && e.newValue !== null) {
         setKojoCustomInstructionState(e.newValue);
+      }
+      if (e.key === scopeKey(SETTINGS_KEYS.weaknessSensitivity) && e.newValue !== null) {
+        setWeaknessSensitivityState(e.newValue);
+      }
+      if (e.key === scopeKey(SETTINGS_KEYS.difficultyPrompt) && e.newValue !== null) {
+        setDifficultyPromptEnabledState(e.newValue !== "false");
       }
       // Beta access follows the stored user record (admin-granted). Re-derive
       // when it changes in another tab (login/logout or an admin grant picked
@@ -123,6 +140,16 @@ export function useSettings() {
     writeSetting(scopeKey(SETTINGS_KEYS.kojoCustomInstruction), clamped);
   }
 
+  function setWeaknessSensitivity(value: string) {
+    setWeaknessSensitivityState(value);
+    writeSetting(scopeKey(SETTINGS_KEYS.weaknessSensitivity), value);
+  }
+
+  function setDifficultyPromptEnabled(value: boolean) {
+    setDifficultyPromptEnabledState(value);
+    writeSetting(scopeKey(SETTINGS_KEYS.difficultyPrompt), String(value));
+  }
+
   return {
     questionFallbackEnabled,
     setQuestionFallbackEnabled,
@@ -132,6 +159,10 @@ export function useSettings() {
     setKojoStrictness,
     kojoCustomInstruction,
     setKojoCustomInstruction,
+    weaknessSensitivity,
+    setWeaknessSensitivity,
+    difficultyPromptEnabled,
+    setDifficultyPromptEnabled,
     betaMode,
   };
 }
