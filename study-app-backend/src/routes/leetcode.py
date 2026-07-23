@@ -65,8 +65,27 @@ from src.services.scoring_service import (
     EVENT_DRILL_COMPLETED,
     EVENT_FAILED_GRADE,
     EVENT_HINT_USED,
+    EVENT_SELF_RATED_BRUTAL,
+    EVENT_SELF_RATED_EASY,
+    EVENT_SELF_RATED_HARD,
+    EVENT_SELF_RATED_MEDIUM,
+    EVENT_SOLUTION_VIEWED,
     EVENT_TIMER_EXPIRY,
     ScoringService,
+)
+
+# Struggle-event types the client is allowed to POST directly. hint_used and
+# failed_grade are inserted server-side by the hint/grade routes, so they are not
+# in this set; anything outside it is rejected to keep the scorer's data clean.
+_CLIENT_STRUGGLE_EVENTS = frozenset(
+    {
+        EVENT_TIMER_EXPIRY,
+        EVENT_SOLUTION_VIEWED,
+        EVENT_SELF_RATED_EASY,
+        EVENT_SELF_RATED_MEDIUM,
+        EVENT_SELF_RATED_HARD,
+        EVENT_SELF_RATED_BRUTAL,
+    }
 )
 from src.utils.exceptions import LLMException, ResourceNotFoundException
 from src.utils.provider_policy import resolve_request_provider
@@ -204,6 +223,8 @@ async def log_struggle_event(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> Response:
+    if body.event_type not in _CLIENT_STRUGGLE_EVENTS:
+        raise HTTPException(status_code=400, detail="Unknown struggle event type.")
     session.add(
         LCStruggleEvent(
             user_id=user.id,
@@ -241,10 +262,25 @@ async def log_test_run(
 
 @router.get("/weakness", response_model=LCScoresResponse)
 async def get_weakness(
+    sensitivity: str = "medium",
+    bank_id: Optional[int] = None,
+    reset_at: Optional[datetime] = None,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> LCScoresResponse:
-    return await ScoringService().get_scores(session, user.id)
+    # How aggressively weakness is flagged, set from the KojoCode cog. Unknown values
+    # fall back to the neutral tuning rather than erroring.
+    if sensitivity not in ("low", "medium", "high"):
+        sensitivity = "medium"
+    # Bank scope: restrict weakness to that bank's own problems (global vs bank are
+    # treated separately). The bank must belong to the caller.
+    slug_scope: Optional[set[str]] = None
+    if bank_id is not None:
+        await _get_owned_bank(session, user.id, bank_id)
+        slug_scope = set(await _bank_problem_slugs(session, bank_id))
+    return await ScoringService().get_scores(
+        session, user.id, sensitivity=sensitivity, slug_scope=slug_scope, reset_at=reset_at
+    )
 
 
 # ── Progress & activity sync ──────────────────────────────────────────────────
@@ -263,6 +299,7 @@ async def get_lc_progress(
     return LCProgressResponse(
         progress={row.problem_slug: row.done for row in progress_rows},
         activity_dates=[row.activity_date for row in date_rows],
+        activity_counts={row.activity_date: row.count for row in date_rows},
     )
 
 
@@ -285,14 +322,21 @@ async def sync_lc_progress(
             session.add(LCProgress(user_id=user.id, problem_slug=slug, done=done))
 
     existing_dates = {
-        row.activity_date
+        row.activity_date: row
         for row in (
             await session.execute(select(LCActivityDate).where(LCActivityDate.user_id == user.id))
         ).scalars().all()
     }
+    # Merge counts monotonically (max): the client sends the full per-day tally, and
+    # taking the max means a stale device can never ratchet a day's count back down.
+    # Dates without a supplied count default to 1 (one known solve).
     for date_str in body.activity_dates:
-        if date_str not in existing_dates:
-            session.add(LCActivityDate(user_id=user.id, activity_date=date_str))
+        incoming = max(1, body.activity_counts.get(date_str, 1))
+        row = existing_dates.get(date_str)
+        if row is None:
+            session.add(LCActivityDate(user_id=user.id, activity_date=date_str, count=incoming))
+        elif incoming > row.count:
+            row.count = incoming
 
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

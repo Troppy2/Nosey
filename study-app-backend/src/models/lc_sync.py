@@ -49,11 +49,14 @@ class LCActivityDate(Base):
         BIGINT_ID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     activity_date: Mapped[str] = mapped_column(String(10), nullable=False)  # YYYY-MM-DD
+    # Number of problems solved on this date. The row's existence still means "active
+    # that day" (streaks and the heatmap read that), count is the per-day tally on top.
+    count: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 
     user: Mapped[User] = relationship("User", back_populates="lc_activity_dates")
 
     def __repr__(self) -> str:
-        return f"LCActivityDate(user_id={self.user_id!r}, date={self.activity_date!r})"
+        return f"LCActivityDate(user_id={self.user_id!r}, date={self.activity_date!r}, count={self.count!r})"
 
 
 class LCCodeWorkspace(Base, TimestampMixin):

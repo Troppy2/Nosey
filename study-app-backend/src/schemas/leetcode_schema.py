@@ -70,11 +70,15 @@ class LeetCodeGradeResponse(BaseModel):
 class LCProgressResponse(BaseModel):
     progress: dict[str, bool]
     activity_dates: list[str]
+    # Per-day solved tally keyed by YYYY-MM-DD. Every date in activity_dates has an
+    # entry here (at least 1); clients that ignore it still get the day-level list.
+    activity_counts: dict[str, int] = Field(default_factory=dict)
 
 
 class LCProgressSyncRequest(BaseModel):
     progress: dict[str, bool] = Field(default_factory=dict)
     activity_dates: list[str] = Field(default_factory=list)
+    activity_counts: dict[str, int] = Field(default_factory=dict)
 
 
 class LCWorkspaceResponse(BaseModel):
