@@ -7,6 +7,8 @@ import {
   Braces,
   Calculator,
   CheckCircle2,
+  XCircle,
+  Gauge,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -68,6 +70,7 @@ import {
   syncLCWorkspace,
   fetchLeetCodeProblem,
   gradeLeetCodeSubmission,
+  checkLeetCodeComplexity,
   fetchLCCustomProblems,
   syncLCCustomProblem,
   deleteLCCustomProblem,
@@ -100,6 +103,7 @@ import { ExecutionVisualizer } from "../components/ExecutionVisualizer";
 import { Link } from "react-router-dom";
 import type {
   LeetCodeProblemData,
+  LeetCodeComplexityCheckResponse,
   LCCustomProblem,
   LCCustomTestCase,
   LCGeneratedCustomProblem,
@@ -221,6 +225,38 @@ function clearGradeFeedback(slug: string) {
     localStorage.removeItem(getGradeFeedbackKey(slug));
   } catch {
     /* ignore */
+  }
+}
+
+// The user's complexity self-assessment (their claims + reasoning) and Kojo's verdict,
+// persisted per problem AND per drill pass. Keying by pass means a 3-pass drill forces a
+// fresh answer each pass instead of carrying the previous pass's work over.
+type ComplexityDraft = {
+  timeClaim: string;
+  timeWhy: string;
+  spaceClaim: string;
+  spaceWhy: string;
+  result: LeetCodeComplexityCheckResponse | null;
+};
+
+function getComplexityKey(slug: string, pass: number): string {
+  return `${getUserStoragePrefix()}:nosey_lc_complexity:${slug}:pass${pass}`;
+}
+
+function loadComplexityDraft(slug: string, pass: number): ComplexityDraft | null {
+  try {
+    const raw = localStorage.getItem(getComplexityKey(slug, pass));
+    return raw ? (JSON.parse(raw) as ComplexityDraft) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveComplexityDraft(slug: string, pass: number, draft: ComplexityDraft) {
+  try {
+    localStorage.setItem(getComplexityKey(slug, pass), JSON.stringify(draft));
+  } catch {
+    /* ignore quota/availability errors */
   }
 }
 
@@ -1902,6 +1938,15 @@ export default function LeetCodeMode() {
   const [runnerResult, setRunnerResult] = useState<RunnerResult | null>(null);
   const [gradeLoading, setGradeLoading] = useState(false);
   const [gradeFeedback, setGradeFeedback] = useState<string | null>(null);
+  // Complexity self-assessment: the user states and justifies the time/space Big-O of
+  // their own solution, and Kojo grades it. Only shown once the run passes.
+  const [complexityOpen, setComplexityOpen] = useState(false);
+  const [complexityTimeClaim, setComplexityTimeClaim] = useState("");
+  const [complexityTimeWhy, setComplexityTimeWhy] = useState("");
+  const [complexitySpaceClaim, setComplexitySpaceClaim] = useState("");
+  const [complexitySpaceWhy, setComplexitySpaceWhy] = useState("");
+  const [complexityLoading, setComplexityLoading] = useState(false);
+  const [complexityResult, setComplexityResult] = useState<LeetCodeComplexityCheckResponse | null>(null);
   const [timerMinutesInput, setTimerMinutesInput] = useState("25");
   const [timerRemainingSeconds, setTimerRemainingSeconds] = useState<number | null>(null);
   // Total duration the current countdown started from, kept only to compute the ring's
@@ -2108,6 +2153,25 @@ export default function LeetCodeMode() {
   useEffect(() => {
     currentProblemDataRef.current = currentProblemData;
   }, [currentProblemData]);
+
+  // Restore the complexity self-assessment for the open problem + its current drill pass.
+  // Re-runs when the problem changes or a drill advances a pass, so each pass starts blank
+  // (its key has no saved draft) and re-answering is forced.
+  const currentComplexityPass =
+    currentProblem
+      ? drills.find((d) => d.problem_slug === currentProblem.slug && !d.completed_at)?.current_pass ?? 1
+      : 1;
+  useEffect(() => {
+    if (!currentProblem) return;
+    const draft = loadComplexityDraft(currentProblem.slug, currentComplexityPass);
+    setComplexityTimeClaim(draft?.timeClaim ?? "");
+    setComplexityTimeWhy(draft?.timeWhy ?? "");
+    setComplexitySpaceClaim(draft?.spaceClaim ?? "");
+    setComplexitySpaceWhy(draft?.spaceWhy ?? "");
+    setComplexityResult(draft?.result ?? null);
+    setComplexityOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentProblem?.slug, currentComplexityPass]);
 
   // Flush any pending debounced workspace sync on unmount, page hide, or tab close
   useEffect(() => {
@@ -2872,6 +2936,40 @@ export default function LeetCodeMode() {
     return customProblems.find((cp) => cp.slug === slug)?.topic || findProblemCategory(slug);
   }
 
+  async function handleComplexitySubmit() {
+    if (!currentProblem || complexityLoading) return;
+    const slug = currentProblem.slug;
+    const pass = currentComplexityPass;
+    const customForGrade = customProblems.find((cp) => cp.slug === slug);
+    setComplexityLoading(true);
+    try {
+      const result = await checkLeetCodeComplexity(
+        slug,
+        currentProblem.title,
+        currentCodeRef.current,
+        complexityTimeClaim,
+        complexityTimeWhy,
+        complexitySpaceClaim,
+        complexitySpaceWhy,
+        customForGrade?.topic || currentProblem.categoryId,
+        generationProvider,
+        customForGrade?.description || undefined,
+      );
+      setComplexityResult(result);
+      saveComplexityDraft(slug, pass, {
+        timeClaim: complexityTimeClaim,
+        timeWhy: complexityTimeWhy,
+        spaceClaim: complexitySpaceClaim,
+        spaceWhy: complexitySpaceWhy,
+        result,
+      });
+    } catch {
+      // best-effort , keep the user's inputs so they can retry
+    } finally {
+      setComplexityLoading(false);
+    }
+  }
+
   async function handleAdvanceDrill(slug: string) {
     const updated = await advanceLCDrill(slug, resolveProblemTopic(slug)).catch(() => null);
     if (!updated) return;
@@ -3512,6 +3610,9 @@ export default function LeetCodeMode() {
     // drop it and the saved copy now, and let this run generate a fresh grade.
     setGradeFeedback(null);
     clearGradeFeedback(problemAtRun.slug);
+    // The complexity verdict was graded against the previous code, so it's stale too.
+    // Drop the verdict but keep the user's typed claims so they don't have to retype.
+    setComplexityResult(null);
     try {
       const result = await runPythonLeetCode(codeToRun, [...officialCases, ...validCustomCases]);
       setRunnerResult(result);
@@ -5910,6 +6011,122 @@ export default function LeetCodeMode() {
                     allow="autoplay; encrypted-media"
                     allowFullScreen
                   />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {runnerResult?.ok ? (
+            <div className="lc-complexity-panel">
+              <button
+                type="button"
+                className="lc-complexity-toggle"
+                onClick={() => setComplexityOpen((open) => !open)}
+                title="Assess the time and space complexity of your solution"
+              >
+                <Gauge size={15} />
+                <span>Complexity check</span>
+                {complexityResult ? (
+                  <small className="lc-complexity-done">
+                    {complexityResult.time_correct && complexityResult.space_correct ? "Both correct" : "Reviewed"}
+                  </small>
+                ) : null}
+                <ChevronDown
+                  size={14}
+                  className={complexityOpen ? "lc-complexity-chevron lc-complexity-chevron--open" : "lc-complexity-chevron"}
+                />
+              </button>
+              {complexityOpen ? (
+                <div className="lc-complexity-body">
+                  <p className="lc-complexity-intro">
+                    Before Kojo weighs in, state the time and space complexity of your solution and explain why. An interviewer will ask you to defend it.
+                  </p>
+
+                  <div className="lc-complexity-field">
+                    <label className="lc-complexity-label">Time complexity</label>
+                    <input
+                      className="lc-complexity-claim"
+                      placeholder="O(?)"
+                      value={complexityTimeClaim}
+                      onChange={(event) => setComplexityTimeClaim(event.target.value)}
+                    />
+                    <textarea
+                      className="lc-complexity-why"
+                      placeholder="Why? Walk through your reasoning."
+                      rows={3}
+                      value={complexityTimeWhy}
+                      onChange={(event) => setComplexityTimeWhy(event.target.value)}
+                    />
+                  </div>
+
+                  <div className="lc-complexity-field">
+                    <label className="lc-complexity-label">Space complexity</label>
+                    <input
+                      className="lc-complexity-claim"
+                      placeholder="O(?)"
+                      value={complexitySpaceClaim}
+                      onChange={(event) => setComplexitySpaceClaim(event.target.value)}
+                    />
+                    <textarea
+                      className="lc-complexity-why"
+                      placeholder="Why? Walk through your reasoning."
+                      rows={3}
+                      value={complexitySpaceWhy}
+                      onChange={(event) => setComplexitySpaceWhy(event.target.value)}
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    className="lc-complexity-submit"
+                    onClick={() => void handleComplexitySubmit()}
+                    disabled={complexityLoading || !complexityTimeClaim.trim() || !complexitySpaceClaim.trim()}
+                  >
+                    {complexityLoading ? (
+                      <>
+                        <Loader2 size={15} className="lc-complexity-spin" /> Kojo is checking
+                      </>
+                    ) : complexityResult ? (
+                      "Re-check"
+                    ) : (
+                      "Submit for review"
+                    )}
+                  </button>
+
+                  {complexityResult ? (
+                    <div className="lc-complexity-result">
+                      <div className="lc-complexity-verdicts">
+                        <div
+                          className={`lc-complexity-verdict ${complexityResult.time_correct ? "lc-complexity-verdict--ok" : "lc-complexity-verdict--bad"}`}
+                        >
+                          {complexityResult.time_correct ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
+                          <span className="lc-complexity-verdict-label">Time</span>
+                          <span className="lc-complexity-verdict-value">{complexityResult.actual_time_complexity || "?"}</span>
+                        </div>
+                        <div
+                          className={`lc-complexity-verdict ${complexityResult.space_correct ? "lc-complexity-verdict--ok" : "lc-complexity-verdict--bad"}`}
+                        >
+                          {complexityResult.space_correct ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
+                          <span className="lc-complexity-verdict-label">Space</span>
+                          <span className="lc-complexity-verdict-value">{complexityResult.actual_space_complexity || "?"}</span>
+                        </div>
+                      </div>
+
+                      <div className="lc-complexity-confidence">
+                        <Gauge size={14} />
+                        <span>Kojo's confidence in this grade: {Math.round(complexityResult.confidence * 100)}%</span>
+                      </div>
+
+                      {complexityResult.flagged_uncertain ? (
+                        <div className="lc-complexity-uncertain">
+                          <AlertCircle size={14} />
+                          <span>Kojo is not fully sure here. Double-check this analysis yourself.</span>
+                        </div>
+                      ) : null}
+
+                      <MarkdownContent content={complexityResult.feedback} />
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>

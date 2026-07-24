@@ -30,6 +30,7 @@ import type {
   LearningModule,
   LearningTrack,
   QuizAttemptResult,
+  LeetCodeComplexityCheckResponse,
   LeetCodeGradeResponse,
   LeetCodeHintResponse,
   LeetCodeProblemData,
@@ -1003,6 +1004,36 @@ export async function gradeLeetCodeSubmission(
   if (provider) body.provider = provider;
   if (statement) body.statement = statement;
   return request<LeetCodeGradeResponse>("/leetcode/grade", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function checkLeetCodeComplexity(
+  titleSlug: string,
+  title: string,
+  userCode: string,
+  timeClaim: string,
+  timeReasoning: string,
+  spaceClaim: string,
+  spaceReasoning: string,
+  topic: string,
+  provider?: string,
+  statement?: string,
+): Promise<LeetCodeComplexityCheckResponse> {
+  const body: Record<string, unknown> = {
+    title_slug: titleSlug,
+    title,
+    user_code: userCode,
+    time_claim: timeClaim,
+    time_reasoning: timeReasoning,
+    space_claim: spaceClaim,
+    space_reasoning: spaceReasoning,
+    topic,
+  };
+  if (provider) body.provider = provider;
+  if (statement) body.statement = statement;
+  return request<LeetCodeComplexityCheckResponse>("/leetcode/complexity-check", {
     method: "POST",
     body: JSON.stringify(body),
   });

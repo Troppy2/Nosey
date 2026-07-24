@@ -65,6 +65,31 @@ class LeetCodeGradeResponse(BaseModel):
     flagged_uncertain: bool = False
 
 
+class LeetCodeComplexityCheckRequest(BaseModel):
+    title_slug: str = Field(..., min_length=1)
+    title: str = Field(..., min_length=1)
+    user_code: str = Field(default="", max_length=20000)
+    time_claim: str = Field(default="", max_length=200)
+    time_reasoning: str = Field(default="", max_length=4000)
+    space_claim: str = Field(default="", max_length=200)
+    space_reasoning: str = Field(default="", max_length=4000)
+    provider: Optional[str] = Field(default=None)
+    # See LeetCodeHintRequest.statement: lets custom problems be graded without a fetch.
+    statement: str = Field(default="", max_length=20000)
+    # Category id string for weakness-signal logging (client owns the topic taxonomy).
+    topic: str = Field(..., min_length=1, max_length=120)
+
+
+class LeetCodeComplexityCheckResponse(BaseModel):
+    actual_time_complexity: str
+    actual_space_complexity: str
+    time_correct: bool
+    space_correct: bool
+    feedback: str
+    confidence: float = 0.0
+    flagged_uncertain: bool = False
+
+
 # ── LeetCode sync (progress / activity / workspace) ──────────────────────────
 
 class LCProgressResponse(BaseModel):

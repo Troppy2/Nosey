@@ -21442,3 +21442,227 @@ button.lc-reminder-feature-cta:disabled {
   color: var(--ink);
   text-decoration: underline;
 }
+
+/* ── Complexity self-assessment panel ──────────────────────────────
+   Matches the NeetCode solution reveal (.lc-solution-*): a top-bordered
+   collapsible panel at the bottom of the problem pane. */
+.lc-complexity-panel {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(113, 131, 85, 0.18);
+  padding-bottom: 20px;
+}
+
+.lc-complexity-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  background: none;
+  border: 1px solid rgba(113, 131, 85, 0.22);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.lc-complexity-toggle:hover {
+  background: rgba(113, 131, 85, 0.07);
+}
+
+.lc-complexity-done {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #596949;
+  font-family: "JetBrains Mono", monospace;
+  flex-shrink: 0;
+}
+
+.lc-complexity-chevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: transform 0.18s;
+}
+
+/* When a done tag is present it already claims the auto margin, so the chevron
+   sits right after it rather than pushing to the far edge. */
+.lc-complexity-done + .lc-complexity-chevron {
+  margin-left: 6px;
+}
+
+.lc-complexity-chevron--open {
+  transform: rotate(180deg);
+}
+
+.lc-complexity-body {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lc-complexity-intro {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--muted, #596949);
+}
+
+.lc-complexity-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lc-complexity-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #596949;
+}
+
+.lc-complexity-claim {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid rgba(113, 131, 85, 0.28);
+  border-radius: 7px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.85rem;
+  color: var(--ink);
+  background: #fff;
+}
+
+.lc-complexity-why {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(113, 131, 85, 0.22);
+  border-radius: 7px;
+  font-family: inherit;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--ink);
+  background: #fff;
+  resize: vertical;
+}
+
+.lc-complexity-claim:focus,
+.lc-complexity-why:focus {
+  outline: none;
+  border-color: var(--green-dark, #718355);
+  box-shadow: 0 0 0 2px rgba(113, 131, 85, 0.15);
+}
+
+.lc-complexity-submit {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--green-dark, #718355);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s;
+}
+
+.lc-complexity-submit:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.lc-complexity-submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.lc-complexity-spin {
+  animation: lc-complexity-spin 0.9s linear infinite;
+}
+
+@keyframes lc-complexity-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.lc-complexity-result {
+  margin-top: 2px;
+  border: 1px solid rgba(113, 131, 85, 0.22);
+  border-radius: 10px;
+  background: rgba(249, 251, 245, 0.7);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 0.85rem;
+}
+
+.lc-complexity-verdicts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lc-complexity-verdict {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  flex: 1 1 140px;
+}
+
+.lc-complexity-verdict--ok {
+  background: rgba(16, 185, 129, 0.1);
+  color: #0f7a5a;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.lc-complexity-verdict--bad {
+  background: rgba(220, 38, 38, 0.08);
+  color: #b91c1c;
+  border: 1px solid rgba(220, 38, 38, 0.25);
+}
+
+.lc-complexity-verdict-label {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.72rem;
+}
+
+.lc-complexity-verdict-value {
+  margin-left: auto;
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 600;
+}
+
+.lc-complexity-confidence {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: #596949;
+  font-family: "JetBrains Mono", monospace;
+}
+
+.lc-complexity-uncertain {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(217, 119, 6, 0.1);
+  border: 1px solid rgba(217, 119, 6, 0.28);
+  color: #b45309;
+  font-size: 0.8rem;
+}

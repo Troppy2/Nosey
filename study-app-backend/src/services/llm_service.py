@@ -88,6 +88,30 @@ class ObjectiveExplanation:
 
 
 @dataclass(frozen=True)
+class ComplexityGrade:
+    """Result of grading a student's self-assessed time/space complexity.
+
+    The student states their claimed Big-O for time and space plus a written
+    justification; Kojo independently derives the true complexity and judges each
+    claim. feedback is the clean visible Markdown; reasoning is the private working.
+    confidence is Kojo's confidence in its OWN grading (low when unsure), and
+    flagged_uncertain marks a verdict the student should double-check. weakness_severity
+    ("none" | "minor" | "major") is how far off the student was, used to log a small
+    weakness signal. On LLM failure, flagged_uncertain is True, confidence 0.0, and
+    weakness_severity "none" (never penalise on a failed grade).
+    """
+    actual_time_complexity: str
+    actual_space_complexity: str
+    time_correct: bool
+    space_correct: bool
+    feedback: str
+    reasoning: Optional[str]
+    confidence: float = 0.0
+    flagged_uncertain: bool = False
+    weakness_severity: str = "none"
+
+
+@dataclass(frozen=True)
 class _ExtractedTerm:
     term: str
     definition: str
@@ -1660,6 +1684,107 @@ Return JSON only:
         except Exception as exc:
             logger.warning("LLM objective explanation failed: %s", exc)
             return ObjectiveExplanation(feedback="", reasoning=None)
+
+    async def grade_complexity_answer(
+        self,
+        title: str,
+        statement: str,
+        user_code: str,
+        time_claim: str,
+        time_reasoning: str,
+        space_claim: str,
+        space_reasoning: str,
+        provider: Optional[str] = None,
+    ) -> ComplexityGrade:
+        """Grade a student's self-assessed time and space complexity.
+
+        Kojo independently derives the true complexity of the student's code, then
+        judges the student's claim + justification for each dimension. Uses the JSON
+        path (larger model, structured output) and forces a private step-by-step
+        derivation to reduce hallucinated Big-O. When unsure, it lowers confidence and
+        flags uncertain rather than asserting. On failure it returns a safe,
+        non-penalising fallback. One LLM call, no provider loop.
+        """
+        condensed_statement = statement[:6000]
+        prompt = f"""You are Kojo, a CS interview coach grading a student's own analysis of their solution's complexity for the problem "{title}".
+
+PROBLEM STATEMENT:
+{condensed_statement}
+
+STUDENT'S CODE:
+```python
+{user_code.strip() or "# No code"}
+```
+
+STUDENT'S CLAIMED TIME COMPLEXITY: {time_claim.strip() or "(not given)"}
+STUDENT'S TIME REASONING: {time_reasoning.strip() or "(not given)"}
+
+STUDENT'S CLAIMED SPACE COMPLEXITY: {space_claim.strip() or "(not given)"}
+STUDENT'S SPACE REASONING: {space_reasoning.strip() or "(not given)"}
+
+YOUR TASK:
+1. Independently derive the ACTUAL time and space complexity of the student's code, working
+   through it step by step. Do this derivation in the "reasoning" field only.
+2. Judge whether the student's claimed time complexity is correct, and whether their claimed
+   space complexity is correct. Judge the Big-O they stated; a sound justification with the
+   right Big-O is correct, and the right Big-O with weak justification is still essentially correct.
+3. Only mark a claim wrong when you are confident it is wrong. If your own derivation is
+   uncertain (unusual code, ambiguous problem), set "flagged_uncertain" to true and lower
+   "confidence" rather than asserting a Big-O you are unsure about.
+4. Judge how far off the student was overall for "weakness_severity":
+   - "none": both claims correct, or off by a trivial amount.
+   - "minor": close but not right (e.g. right family, ignored a log factor, one dimension slightly off).
+   - "major": substantially wrong (e.g. claimed O(n) for an O(n^2) solution, or wrong on both).
+
+"confidence" is YOUR confidence in your own grading (0.0 to 1.0), not the student's.
+
+Put your private derivation and any self-correction in "reasoning" only. "feedback" must be the
+clean final explanation the student reads: state the true time and space complexity, why, and
+where the student was right or wrong, with NO "wait", "let me reconsider", "actually", or "oh".
+Use Markdown.
+
+Return JSON only with these exact keys:
+{{
+  "reasoning": "your private step-by-step derivation (may be messy)",
+  "actual_time_complexity": "e.g. O(n log n)",
+  "actual_space_complexity": "e.g. O(n)",
+  "time_correct": true or false,
+  "space_correct": true or false,
+  "feedback": "clean markdown explanation for the student",
+  "confidence": 0.0 to 1.0,
+  "flagged_uncertain": true or false,
+  "weakness_severity": "none" or "minor" or "major"
+}}
+"""
+        try:
+            data = await self._complete_json(prompt, provider=provider)
+            severity = str(data.get("weakness_severity", "none")).strip().lower()
+            if severity not in ("none", "minor", "major"):
+                severity = "none"
+            return ComplexityGrade(
+                actual_time_complexity=str(data.get("actual_time_complexity", "")).strip()[:200],
+                actual_space_complexity=str(data.get("actual_space_complexity", "")).strip()[:200],
+                time_correct=bool(data.get("time_correct", False)),
+                space_correct=bool(data.get("space_correct", False)),
+                feedback=str(data.get("feedback", "")).strip()[:4000],
+                reasoning=str(data.get("reasoning", "")).strip() or None,
+                confidence=max(0.0, min(1.0, float(data.get("confidence", 0.0)))),
+                flagged_uncertain=bool(data.get("flagged_uncertain", False)),
+                weakness_severity=severity,
+            )
+        except Exception as exc:
+            logger.warning("LLM complexity grading failed: %s", exc)
+            return ComplexityGrade(
+                actual_time_complexity="",
+                actual_space_complexity="",
+                time_correct=False,
+                space_correct=False,
+                feedback="Kojo could not analyze the complexity this time. Please try again.",
+                reasoning=None,
+                confidence=0.0,
+                flagged_uncertain=True,
+                weakness_severity="none",
+            )
 
     async def generate_flashcards(
         self,
