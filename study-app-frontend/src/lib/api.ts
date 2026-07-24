@@ -1277,6 +1277,9 @@ export type LCProgressData = {
   activity_dates: string[];
   // Per-day solved tally keyed by YYYY-MM-DD. Optional so older payloads still parse.
   activity_counts?: Record<string, number>;
+  // First-solve timestamp (ISO) per problem slug. Only present for problems solved
+  // after the solved_at migration; server-set, never sent by the client on PUT.
+  solved_at?: Record<string, string>;
 };
 
 export async function fetchLCProgress(): Promise<LCProgressData> {
@@ -1554,6 +1557,14 @@ export async function advanceLCDrill(slug: string, topic?: string): Promise<impo
   return request<import("./types").LCDrillSchedule>(`/leetcode/drills/${slug}/advance`, {
     method: "POST",
     body: JSON.stringify({ topic: topic ?? null }),
+  });
+}
+
+// Re-run a cleared drill from pass 1 (offered right after a pass-3 clear). Resets the
+// existing row server-side rather than adding a second.
+export async function restartLCDrill(slug: string): Promise<import("./types").LCDrillSchedule> {
+  return request<import("./types").LCDrillSchedule>(`/leetcode/drills/${slug}/restart`, {
+    method: "POST",
   });
 }
 

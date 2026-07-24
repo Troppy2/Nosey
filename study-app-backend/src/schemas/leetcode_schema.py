@@ -73,6 +73,9 @@ class LCProgressResponse(BaseModel):
     # Per-day solved tally keyed by YYYY-MM-DD. Every date in activity_dates has an
     # entry here (at least 1); clients that ignore it still get the day-level list.
     activity_counts: dict[str, int] = Field(default_factory=dict)
+    # First-solve timestamp (ISO) per problem slug. Only present for problems solved
+    # after the solved_at migration; older solves are omitted (no recorded time).
+    solved_at: dict[str, str] = Field(default_factory=dict)
 
 
 class LCProgressSyncRequest(BaseModel):

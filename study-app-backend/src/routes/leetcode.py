@@ -300,6 +300,11 @@ async def get_lc_progress(
         progress={row.problem_slug: row.done for row in progress_rows},
         activity_dates=[row.activity_date for row in date_rows],
         activity_counts={row.activity_date: row.count for row in date_rows},
+        solved_at={
+            row.problem_slug: row.solved_at.isoformat()
+            for row in progress_rows
+            if row.solved_at
+        },
     )
 
 
@@ -315,11 +320,24 @@ async def sync_lc_progress(
             await session.execute(select(LCProgress).where(LCProgress.user_id == user.id))
         ).scalars().all()
     }
+    now = datetime.now(timezone.utc)
     for slug, done in body.progress.items():
         if slug in existing_progress:
-            existing_progress[slug].done = done
+            row = existing_progress[slug]
+            # Stamp the first-solve time on the done->true transition; keep it across
+            # later un-toggles so the completed-questions history is stable.
+            if done and row.solved_at is None:
+                row.solved_at = now
+            row.done = done
         else:
-            session.add(LCProgress(user_id=user.id, problem_slug=slug, done=done))
+            session.add(
+                LCProgress(
+                    user_id=user.id,
+                    problem_slug=slug,
+                    done=done,
+                    solved_at=now if done else None,
+                )
+            )
 
     existing_dates = {
         row.activity_date: row
@@ -1020,6 +1038,34 @@ async def advance_drill(
             )
         )
 
+    await session.commit()
+    await session.refresh(row)
+    return _serialize_drill(row)
+
+
+@router.post("/drills/{slug}/restart", response_model=LCDrillScheduleResponse)
+async def restart_drill(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LCDrillScheduleResponse:
+    # Re-run a drill from pass 1. Reuses the single existing row (honors the
+    # UniqueConstraint(user_id, problem_slug)) rather than adding a second. The
+    # frontend only offers this right after a pass-3 clear, so no state guard here.
+    row = (
+        await session.execute(
+            select(LCDrillSchedule).where(
+                LCDrillSchedule.user_id == user.id,
+                LCDrillSchedule.problem_slug == slug,
+            )
+        )
+    ).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="No drill found for that problem.")
+
+    row.current_pass = 1
+    row.completed_at = None
+    row.next_due_at = datetime.now(timezone.utc)
     await session.commit()
     await session.refresh(row)
     return _serialize_drill(row)

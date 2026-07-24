@@ -1,4 +1,4 @@
-import { ArrowLeft, FolderOpen } from "lucide-react";
+import { ArrowLeft, FolderOpen, GraduationCap, Layers, Puzzle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Card } from "../components/Card";
@@ -113,6 +113,7 @@ export default function LearningModes() {
         <ModeCard
           to={`/flashcards/${selectedFolderId}/review`}
           disabled={!hasCards}
+          icon={<Layers size={26} />}
           accent="var(--green-dark)"
           title="Flashcards"
           blurb="Flip through your cards one at a time and rate how well you knew each one."
@@ -122,6 +123,7 @@ export default function LearningModes() {
           <ModeCard
             to={`/flashcards/${selectedFolderId}/matching`}
             disabled={!hasCards}
+            icon={<Puzzle size={26} />}
             accent="var(--warning)"
             title="Matching"
             blurb="Race the clock to pair every term with its definition across timed rounds."
@@ -132,6 +134,7 @@ export default function LearningModes() {
           <ModeCard
             to={`/flashcards/${selectedFolderId}/modules`}
             disabled={false}
+            icon={<GraduationCap size={26} />}
             accent="var(--info)"
             title="Learning Modules"
             blurb="AI-written lessons from your notes, read aloud, each followed by a short quiz."
@@ -152,6 +155,7 @@ export default function LearningModes() {
 function ModeCard({
   to,
   disabled,
+  icon,
   accent,
   title,
   blurb,
@@ -159,6 +163,7 @@ function ModeCard({
 }: {
   to: string;
   disabled: boolean;
+  icon: React.ReactNode;
   accent: string;
   title: string;
   blurb: string;
@@ -166,6 +171,9 @@ function ModeCard({
 }) {
   const inner = (
     <>
+      <span className="mode-card-icon" style={{ color: accent, background: `${accent}1a` }}>
+        {icon}
+      </span>
       <div className="mode-card-body">
         <span className="mode-card-meta">{meta}</span>
         <h2>{title}</h2>

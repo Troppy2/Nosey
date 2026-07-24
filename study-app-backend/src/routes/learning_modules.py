@@ -299,6 +299,11 @@ async def create_learning_track(
         session.add(track)
         await session.commit()
 
+        # Load the (empty) modules collection inside an await so the sync
+        # _track_to_response below does not fire an async-unsafe lazy load,
+        # which intermittently raised MissingGreenlet after commit.
+        await session.refresh(track, attribute_names=["modules"])
+
         _spawn_track_generation(
             _generate_track_background(
                 track_id=track.id,

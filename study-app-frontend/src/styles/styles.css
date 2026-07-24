@@ -6018,6 +6018,25 @@ select[class*="lc-"]:focus-visible {
   flex-shrink: 0;
 }
 
+/* A tab locked while a 3-Pass Drill is open: preserved but not viewable/deletable. */
+.lc-coding-tab--locked {
+  opacity: 0.6;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.55);
+  cursor: not-allowed;
+}
+
+.lc-coding-tab--locked:hover {
+  transform: none;
+  border-color: var(--lc-border);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.lc-coding-tab-lock {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
 .closeTab {
   display: inline-flex;
   align-items: center;
@@ -6271,11 +6290,6 @@ select[class*="lc-"]:focus-visible {
   text-transform: uppercase;
 }
 
-.lc-timer-avatar {
-  color: var(--green-lightest);
-  background: var(--green-dark);
-}
-
 .lc-timer-modal-body {
   display: grid;
   gap: 18px;
@@ -6436,120 +6450,6 @@ select[class*="lc-"]:focus-visible {
    lightweight hover tooltip, while a click opens this full modal. */
 .lc-timer-backdrop {
   background: rgba(27, 35, 22, 0.52);
-}
-
-.lc-timer-modal {
-  top: 50%;
-  right: auto;
-  bottom: auto;
-  left: 50%;
-  width: 410px;
-  max-height: calc(100vh - 32px);
-  transform: translate(-50%, -50%);
-  border-radius: 8px;
-  box-shadow: 0 20px 56px rgba(20, 28, 16, 0.3);
-}
-
-.lc-timer-modal-header {
-  display: flex;
-  padding: 12px 14px;
-  background: rgba(233, 245, 219, 0.54);
-  border-bottom: 1px solid rgba(113, 131, 85, 0.22);
-}
-
-.lc-timer-modal-header h2,
-.lc-timer-modal-eyebrow,
-.lc-timer-modal-divider,
-.lc-timer-modal-presets {
-  display: none;
-}
-
-.lc-timer-modal-header .lc-kojo-close {
-  position: static;
-}
-
-.lc-timer-avatar {
-  width: 30px;
-  height: 30px;
-  color: var(--green-dark);
-  background: var(--green-lightest);
-}
-
-.lc-timer-modal-body {
-  display: grid;
-  gap: 14px;
-  padding: 16px 14px 2px;
-}
-
-.lc-timer-modal-copy {
-  margin: 0;
-  color: #596949;
-  font-size: 0.84rem;
-  line-height: 1.5;
-}
-
-.lc-timer-modal-field,
-.lc-timer-modal-input {
-  display: grid;
-  gap: 6px;
-  min-height: auto;
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.lc-timer-modal-field > span,
-.lc-timer-modal-input > span:first-child {
-  color: #516142;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.lc-timer-modal-field select,
-.lc-timer-modal-input input {
-  box-sizing: border-box;
-  width: 100%;
-  min-height: 42px;
-  padding: 9px 38px 9px 11px;
-  border: 1px solid var(--lc-border);
-  border-radius: 8px;
-  background: #f8fbf4;
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.9rem;
-  font-weight: 700;
-}
-
-.lc-timer-modal-input {
-  position: relative;
-}
-
-.lc-timer-modal-input input {
-  min-height: 42px;
-}
-
-.lc-timer-modal-field select:focus,
-.lc-timer-modal-input:focus-within {
-  border-radius: 8px;
-  outline: 3px solid rgba(113, 131, 85, 0.2);
-  outline-offset: 1px;
-}
-
-.lc-timer-modal-unit {
-  right: 12px;
-  bottom: 12px;
-}
-
-.lc-timer-modal-actions {
-  padding: 14px;
-}
-
-@media (max-width: 520px) {
-  .lc-timer-modal {
-    width: calc(100vw - 32px);
-  }
 }
 
 .lc-kojo-modal-header {
@@ -20092,11 +19992,25 @@ button.lc-reminder-feature-cta:disabled {
   padding: 0 16px;
   border: 1px solid transparent;
   border-radius: 8px;
-  background: var(--green-dark, #1f4d2c);
+  background: var(--green-dark);
   color: #fff;
   font-weight: 700;
   font-size: 0.85rem;
   white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+/* Darken to the codebase's deeper green (the dark end of the green-dark gradient) on
+   hover and press, so a click reads as landing. Same hue, no lift. */
+.lc-bank-new button:hover:not(:disabled),
+.lc-bank-new button:active:not(:disabled) {
+  background: #536342;
+}
+
+.lc-bank-new button:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
 }
 
 .lc-bank-new button:disabled {
@@ -21394,6 +21308,73 @@ button.lc-reminder-feature-cta:disabled {
 .lc-settings-clear-btn:hover {
   border-color: #dc2626;
   background: rgba(220, 38, 38, 0.06);
+}
+
+/* Completed-questions history in the settings modal: a collapsible section (chevron
+   toggle) whose list scrolls inside so a long history never blows out the modal. */
+.lc-completed-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.lc-completed-chevron {
+  flex-shrink: 0;
+  color: var(--muted, #6b7280);
+  transition: transform 0.18s ease;
+}
+
+.lc-completed-chevron--open {
+  transform: rotate(180deg);
+}
+
+.lc-completed-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 168px;
+  overflow-y: auto;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: 8px;
+}
+
+.lc-completed-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.lc-completed-item:last-child {
+  border-bottom: none;
+}
+
+.lc-completed-title {
+  font-family: var(--font-serif, "Lora", serif);
+  font-size: 0.8rem;
+  line-height: 1.3;
+  color: var(--ink, #1f2a1f);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-completed-time {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  color: var(--muted, #6b7280);
+  white-space: nowrap;
 }
 
 /* Post-problem "how hard did that feel?" self-report. Reuses the survey-card shell

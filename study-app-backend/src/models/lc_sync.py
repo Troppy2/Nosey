@@ -33,6 +33,9 @@ class LCProgress(Base, TimestampMixin):
     )
     problem_slug: Mapped[str] = mapped_column(String(200), nullable=False)
     done: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # When the problem was first completed (done flipped to true). Kept across
+    # un-toggles so the completed-questions history keeps the original solve time.
+    solved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped[User] = relationship("User", back_populates="lc_progress")
 
