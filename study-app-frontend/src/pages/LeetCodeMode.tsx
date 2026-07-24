@@ -92,6 +92,7 @@ import {
   fetchLCDrills,
   createLCDrill,
   advanceLCDrill,
+  restartLCDrill,
 } from "../lib/api";
 import { runPythonLeetCode, traceLeetCodeExecution, type RunnerResult, type TraceResult } from "../lib/pyodideRunner";
 import { sanitizeLeetCodeHtml } from "../lib/leetcodeHtml";
@@ -157,6 +158,10 @@ type CodeTab = {
   id: string;
   name: string;
   code: string;
+  // When set, this tab is the fresh attempt for pass N of the problem's 3-Pass Drill.
+  // While that drill is open, every OTHER tab is locked (not viewable/deletable) so the
+  // user can't peek at their previous solution. Rides along in workspace_json.
+  drillPass?: number;
 };
 
 type CodeWorkspace = {
@@ -187,6 +192,36 @@ function getPracticeSessionKey(): string {
 
 function getLastProblemKey(): string {
   return `${getUserStoragePrefix()}:nosey_lc_last_problem`;
+}
+
+// Kojo's last grade feedback, persisted per problem so it survives leaving and
+// re-opening the problem. A new run overwrites it; nothing else clears it.
+function getGradeFeedbackKey(slug: string): string {
+  return `${getUserStoragePrefix()}:nosey_lc_grade_feedback:${slug}`;
+}
+
+function loadGradeFeedback(slug: string): string | null {
+  try {
+    return localStorage.getItem(getGradeFeedbackKey(slug));
+  } catch {
+    return null;
+  }
+}
+
+function saveGradeFeedback(slug: string, feedback: string) {
+  try {
+    localStorage.setItem(getGradeFeedbackKey(slug), feedback);
+  } catch {
+    /* ignore quota/availability errors */
+  }
+}
+
+function clearGradeFeedback(slug: string) {
+  try {
+    localStorage.removeItem(getGradeFeedbackKey(slug));
+  } catch {
+    /* ignore */
+  }
 }
 
 // Ring buffer of recently generated daily seed slugs, so the daily doesn't reskin
@@ -308,6 +343,13 @@ const CODE_TAB_ID_KEY = "nosey_lc_tab_id";
 const CODE_WORKSPACE_KEY_PREFIX = "nosey_lc_code_tabs";
 const CODE_KEY_PREFIX = "nosey_lc_code";
 const TIMER_PRESETS = [15, 25, 45];
+// Captions encode what each preset is actually for (a warm-up rep vs. a full mock
+// interview clock), not just a restatement of the number above them.
+const TIMER_PRESET_CAPTIONS: Record<number, string> = {
+  15: "Quick rep",
+  25: "Standard",
+  45: "Deep dive",
+};
 const NOTES_KEY_PREFIX = "nosey_lc_notes";
 
 const CHAT_COMMANDS: SlashCommand[] = [
@@ -804,7 +846,14 @@ function normalizeCodeWorkspace(value: unknown): CodeWorkspace | null {
   const tabs = Array.isArray(rawWorkspace.tabs)
     ? rawWorkspace.tabs
       .filter((tab): tab is CodeTab => Boolean(tab) && typeof tab.id === "string" && typeof tab.name === "string" && typeof tab.code === "string")
-      .map((tab) => ({ id: tab.id, name: tab.name, code: tab.code }))
+      .map((tab) => ({
+        id: tab.id,
+        name: tab.name,
+        code: tab.code,
+        // Preserve the drill-pass marker so re-opening a drilled problem finds its
+        // existing pass tabs instead of spawning duplicates.
+        ...(typeof tab.drillPass === "number" ? { drillPass: tab.drillPass } : {}),
+      }))
     : [];
 
   if (!tabs.length) return null;
@@ -1902,6 +1951,13 @@ export default function LeetCodeMode() {
   const [drills, setDrills] = useState<LCDrillSchedule[]>([]);
   const [drillsLoading, setDrillsLoading] = useState(false);
   const [drillAddText, setDrillAddText] = useState("");
+  // "Add this problem to your 3-Pass Drill?" prompt: slug awaiting a yes/no (null = closed).
+  const [drillPromptSlug, setDrillPromptSlug] = useState<string | null>(null);
+  // Set when a completion should offer the drill prompt but the difficulty survey is
+  // showing first; the drill prompt opens once the difficulty modal closes.
+  const [pendingDrillPromptSlug, setPendingDrillPromptSlug] = useState<string | null>(null);
+  // "Drill cleared, run it again?" prompt: slug of the just-cleared drill (null = closed).
+  const [drillAgainSlug, setDrillAgainSlug] = useState<string | null>(null);
   // Add-a-problem-by-LeetCode-link modal, scoped to the category it was opened from.
   const [addLinkCategoryId, setAddLinkCategoryId] = useState<string | null>(null);
   const [addLinkUrl, setAddLinkUrl] = useState("");
@@ -1918,6 +1974,11 @@ export default function LeetCodeMode() {
   const [clearWeaknessConfirm, setClearWeaknessConfirm] = useState(false);
   // "How hard did that feel?" prompt: the slug awaiting a rating (null = closed).
   const [difficultyPromptSlug, setDifficultyPromptSlug] = useState<string | null>(null);
+  // First-solve timestamp per slug (ISO), from the server (solved_at). Powers the
+  // completed-questions history in the settings modal. Server-authoritative.
+  const [solvedAt, setSolvedAt] = useState<Record<string, string>>({});
+  // Completed-questions history section in the settings modal is collapsed by default.
+  const [completedOpen, setCompletedOpen] = useState(false);
   // Slugs whose solution reveal has already been logged this session (dedupe).
   const solutionViewedLoggedRef = useRef<Set<string>>(new Set());
   // Bank-scoped weakness for the currently selected bank detail (worst-first). Fetched
@@ -2135,7 +2196,8 @@ export default function LeetCodeMode() {
   useEffect(() => {
     if (isGuestSession()) return;
     fetchLCProgress()
-      .then(({ progress: dbProgress, activity_dates: dbDates, activity_counts: dbCounts }) => {
+      .then(({ progress: dbProgress, activity_dates: dbDates, activity_counts: dbCounts, solved_at: dbSolvedAt }) => {
+        if (dbSolvedAt) setSolvedAt(dbSolvedAt);
         setProgress((localProgress) => {
           const merged: Record<string, boolean> = { ...localProgress };
           for (const [slug, done] of Object.entries(dbProgress)) {
@@ -2339,6 +2401,34 @@ export default function LeetCodeMode() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, drills, betaMode]);
+
+  // 3-Pass Drill tab lock: while a problem has an open drill, each pass is solved in a FRESH
+  // tab and the user's earlier tabs (their previous solution + earlier passes) are locked from
+  // view so they can't peek at an old answer. This effect makes sure the current pass's tab
+  // exists and is the active one. Keyed on the opened slug + drills + loaded problem data (for
+  // the starter snippet), so it fires on open and when a pass advances in place. Drill tabs are
+  // app-created, so they deliberately bypass MAX_CODE_TABS.
+  useEffect(() => {
+    if (!betaMode || view.type !== "problem") return;
+    const slug = view.problemSlug;
+    const drill = drills.find((d) => d.problem_slug === slug && !d.completed_at);
+    if (!drill) return;
+    const pass = drill.current_pass;
+    const starter = currentProblemData?.python_snippet?.trimEnd() ?? "";
+    setCodeWorkspaces((prev) => {
+      const workspace = prev[slug] ?? loadCodeWorkspace(slug);
+      const existing = workspace.tabs.find((tab) => tab.drillPass === pass);
+      // Already set up and focused: return the same reference so React skips a re-render.
+      if (existing && workspace.activeTabId === existing.id) return prev;
+      const drillTab = existing ?? { id: makeTabId(), name: `Pass ${pass}`, code: starter, drillPass: pass };
+      const tabs = existing ? workspace.tabs : [...workspace.tabs, drillTab];
+      const next = { tabs, activeTabId: drillTab.id };
+      saveCodeWorkspace(slug, next);
+      schedulePushWorkspaceToDb(slug, next);
+      return { ...prev, [slug]: next };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, drills, betaMode, currentProblemData]);
 
   // Tick the Weak-Area Practice elapsed clock once a second while a session is running.
   useEffect(() => {
@@ -2790,6 +2880,32 @@ export default function LeetCodeMode() {
         ? prev.filter((d) => d.problem_slug !== slug)
         : prev.map((d) => (d.problem_slug === slug ? updated : d)),
     );
+    // Pass 3 cleared: offer to run the whole cycle again. Fires from both the manual
+    // "Clear drill" button and the auto-advance-on-solve path below.
+    if (updated.completed_at) setDrillAgainSlug(slug);
+  }
+
+  // Bug 2: advance a due drill automatically when the user actually solves it (all
+  // tests pass), so they no longer have to click "Pass cleared" by hand. Only fires
+  // when the drill is due; solving ahead of the scheduled gap leaves the manual button
+  // as the escape hatch. Advancing pushes next_due_at into the future, so a second
+  // passing run in the same session won't double-advance.
+  async function maybeAutoAdvanceDrill(slug: string) {
+    const drill = drills.find((d) => d.problem_slug === slug);
+    if (!drill) return;
+    if (new Date(drill.next_due_at).getTime() > Date.now()) return;
+    await handleAdvanceDrill(slug);
+  }
+
+  async function handleRestartDrill(slug: string) {
+    setDrillAgainSlug(null);
+    const restarted = await restartLCDrill(slug).catch(() => null);
+    if (!restarted) return;
+    setDrills((prev) =>
+      prev.some((d) => d.problem_slug === slug)
+        ? prev.map((d) => (d.problem_slug === slug ? restarted : d))
+        : [...prev, restarted],
+    );
   }
 
   // ── Weak-Area Practice ───────────────────────────────────────────────────────
@@ -2973,27 +3089,68 @@ export default function LeetCodeMode() {
     return nextCounts;
   }
 
-  // After finishing a problem, ask how hard it felt (once per problem). The rating
-  // becomes a weakness signal, which is how we catch a topic the user quietly
-  // struggled with but never asked for a hint on.
-  function maybePromptDifficulty(problem: Problem) {
-    if (!difficultyPromptEnabled || !betaMode || isGuestSession()) return;
-    if (loadDifficultySurveyed().has(problem.slug)) return;
-    setDifficultyPromptSlug(problem.slug);
-  }
-
   function handleDifficultyRating(rating: "easy" | "medium" | "hard" | "brutal") {
     const slug = difficultyPromptSlug;
     setDifficultyPromptSlug(null);
     if (!slug) return;
     markDifficultySurveyed(slug);
     void logLCStruggleEvent(resolveProblemTopic(slug), `self_rated_${rating}`, slug);
+    runPendingDrillPrompt(slug);
   }
 
   function dismissDifficultyPrompt() {
     const slug = difficultyPromptSlug;
     setDifficultyPromptSlug(null);
     if (slug) markDifficultySurveyed(slug); // asked once, don't nag on re-mark
+    if (slug) runPendingDrillPrompt(slug);
+  }
+
+  // ── Add-to-drill prompt on completion ────────────────────────────────────────
+
+  // Called on every done-transition. Sequences the two completion modals so they
+  // never overlap: if the difficulty survey will show, it goes first and the drill
+  // prompt is deferred (pendingDrillPromptSlug) until it closes; otherwise the drill
+  // prompt opens straight away.
+  function onProblemCompleted(problem: Problem) {
+    // Optimistically stamp the solve time so the completed-questions history reflects
+    // it immediately, without waiting for the next progress fetch. Server is the
+    // source of truth for the first-solve time; keep an existing stamp if present.
+    setSolvedAt((prev) => (prev[problem.slug] ? prev : { ...prev, [problem.slug]: new Date().toISOString() }));
+
+    const willAskDifficulty =
+      difficultyPromptEnabled &&
+      betaMode &&
+      !isGuestSession() &&
+      !loadDifficultySurveyed().has(problem.slug);
+    if (willAskDifficulty) {
+      setPendingDrillPromptSlug(problem.slug);
+      setDifficultyPromptSlug(problem.slug);
+    } else {
+      maybePromptAddDrill(problem.slug);
+    }
+  }
+
+  function runPendingDrillPrompt(slug: string) {
+    if (pendingDrillPromptSlug !== slug) return;
+    setPendingDrillPromptSlug(null);
+    maybePromptAddDrill(slug);
+  }
+
+  function maybePromptAddDrill(slug: string) {
+    if (!betaMode || isGuestSession()) return;
+    // Already an open drill, nothing to add. (A previously-cleared drill can only be
+    // re-run via the "Drill again?" prompt, not from here.)
+    if (drills.some((d) => d.problem_slug === slug)) return;
+    setDrillPromptSlug(slug);
+  }
+
+  async function handleAddDrillFromCompletion(slug: string) {
+    setDrillPromptSlug(null);
+    const created = await createLCDrill(slug).catch(() => null);
+    // Skip already-completed rows (create-or-return): re-drilling those is only offered
+    // right after a fresh clear, so we don't resurface them here.
+    if (!created || created.completed_at) return;
+    setDrills((prev) => (prev.some((d) => d.problem_slug === slug) ? prev : [...prev, created]));
   }
 
   function toggleProgress(problem: Problem) {
@@ -3004,7 +3161,7 @@ export default function LeetCodeMode() {
     const nextDates = nextDone ? recordSolvedToday() : activityDates;
     const nextCounts = nextDone ? bumpTodayCount() : solvedDayCounts;
     pushProgressToDb(next, nextDates, nextCounts);
-    if (nextDone) maybePromptDifficulty(problem);
+    if (nextDone) onProblemCompleted(problem);
   }
 
   function markProblemDone(problem: Problem) {
@@ -3028,7 +3185,7 @@ export default function LeetCodeMode() {
       const nextDates = recordSolvedToday();
       pushProgressToDb(next, nextDates, nextCounts);
     }
-    maybePromptDifficulty(problem);
+    onProblemCompleted(problem);
   }
 
   // ── Custom problem handlers ─────────────────────────────────────────────────
@@ -3245,6 +3402,23 @@ export default function LeetCodeMode() {
     setTimerMinutesInput(String(Math.round(parsed)));
   }
 
+  function renderTimerPreset(minutes: number) {
+    return (
+      <button
+        key={minutes}
+        type="button"
+        className="lc-timer-modal-preset"
+        onClick={() => {
+          setTimerMinutesInput(String(minutes));
+          startTimer(minutes);
+        }}
+      >
+        <span className="lc-timer-modal-preset-value">{minutes}</span>
+        <span className="lc-timer-modal-preset-caption">{TIMER_PRESET_CAPTIONS[minutes] ?? "min"}</span>
+      </button>
+    );
+  }
+
   function getNotesKey(problemSlug: string) {
     return `${NOTES_KEY_PREFIX}:${getUserStoragePrefix()}:${problemSlug}`;
   }
@@ -3334,7 +3508,10 @@ export default function LeetCodeMode() {
 
     setRunnerLoading(true);
     setRunnerResult(null);
+    // The code (and its test cases) may have changed, so the old feedback is stale:
+    // drop it and the saved copy now, and let this run generate a fresh grade.
     setGradeFeedback(null);
+    clearGradeFeedback(problemAtRun.slug);
     try {
       const result = await runPythonLeetCode(codeToRun, [...officialCases, ...validCustomCases]);
       setRunnerResult(result);
@@ -3368,6 +3545,7 @@ export default function LeetCodeMode() {
             customForGrade?.description || undefined,
           );
           setGradeFeedback(grade.feedback);
+          saveGradeFeedback(problemAtRun.slug, grade.feedback);
         } catch {
           // grading is best-effort , don't block the run result
         } finally {
@@ -3377,6 +3555,7 @@ export default function LeetCodeMode() {
 
       if (result.ok) {
         markProblemDone(problemAtRun);
+        void maybeAutoAdvanceDrill(problemAtRun.slug);
       }
 
       return result;
@@ -3455,7 +3634,9 @@ export default function LeetCodeMode() {
     setKojoOpen(false);
     setSolutionOpen(false);
     setRunnerResult(null);
-    setGradeFeedback(null);
+    // Restore Kojo's last feedback for this problem (persisted per slug) so it survives
+    // leaving and coming back. A new run overwrites it.
+    setGradeFeedback(loadGradeFeedback(problemSlug));
     resetTimerState();
   }
 
@@ -3493,10 +3674,22 @@ export default function LeetCodeMode() {
     setCodeWorkspaces((prev) => ({ ...prev, [slug]: nextWorkspace }));
   }
 
+  // A tab is locked when its problem has an open drill and the tab is not the current pass's
+  // fresh attempt tab. Locked tabs can't be viewed (selected) or deleted, so the user can't
+  // reach a previous solution while drilling. Non-beta / no open drill => never locked.
+  function isTabLockedForDrill(slug: string, tab: CodeTab): boolean {
+    if (!betaMode) return false;
+    const drill = drills.find((d) => d.problem_slug === slug && !d.completed_at);
+    if (!drill) return false;
+    return tab.drillPass !== drill.current_pass;
+  }
+
   function handleDeleteCodeTab(tabId: string) {
     if (!currentProblem) return;
     const slug = currentProblem.slug;
     const workspace = codeWorkspaces[slug] ?? loadCodeWorkspace(slug);
+    const target = workspace.tabs.find((tab) => tab.id === tabId);
+    if (target && isTabLockedForDrill(slug, target)) return;
 
     let nextWorkspace: CodeWorkspace;
     if (workspace.tabs.length <= 1) {
@@ -3521,6 +3714,8 @@ export default function LeetCodeMode() {
     const slug = currentProblem.slug;
     const workspace = codeWorkspaces[slug] ?? loadCodeWorkspace(slug);
     if (workspace.activeTabId === tabId) return;
+    const target = workspace.tabs.find((tab) => tab.id === tabId);
+    if (target && isTabLockedForDrill(slug, target)) return;
     const nextWorkspace = { ...workspace, activeTabId: tabId };
     saveCodeWorkspace(slug, nextWorkspace);
     pushWorkspaceToDb(slug, nextWorkspace);
@@ -3642,6 +3837,29 @@ export default function LeetCodeMode() {
 
   // KojoCode settings cog: weakness sensitivity + clear weakness signals. Rendered on
   // the dashboard where the cog lives.
+  // Previously completed problems for the settings-modal history. Newest first;
+  // problems solved before the solved_at migration have no timestamp and sort last.
+  const completedQuestions = useMemo(() => {
+    return Object.keys(progress)
+      .filter((slug) => progress[slug])
+      .map((slug) => ({ slug, title: findProblemTitle(slug), solvedAt: solvedAt[slug] }))
+      .sort((a, b) => {
+        if (a.solvedAt && b.solvedAt) return b.solvedAt.localeCompare(a.solvedAt);
+        if (a.solvedAt) return -1;
+        if (b.solvedAt) return 1;
+        return a.title.localeCompare(b.title);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progress, solvedAt, customProblems]);
+
+  function formatSolvedAt(iso?: string): string {
+    if (!iso) return "-";
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return "-";
+    return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+      + ", " + date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  }
+
   const settingsModalNode = settingsOpen ? (
     <>
       <div className="lc-kojo-backdrop" onClick={() => setSettingsOpen(false)} />
@@ -3705,6 +3923,38 @@ export default function LeetCodeMode() {
             Clear weakness signals
           </button>
         </div>
+
+        <div className="lc-settings-section">
+          <button
+            type="button"
+            className="lc-completed-toggle"
+            aria-expanded={completedOpen}
+            onClick={() => setCompletedOpen((prev) => !prev)}
+          >
+            <span className="lc-settings-label">
+              Completed questions
+              {completedQuestions.length > 0 ? ` (${completedQuestions.length})` : ""}
+            </span>
+            <ChevronDown
+              size={16}
+              className={completedOpen ? "lc-completed-chevron lc-completed-chevron--open" : "lc-completed-chevron"}
+            />
+          </button>
+          {completedOpen ? (
+            completedQuestions.length === 0 ? (
+              <p className="muted small">No completed questions yet.</p>
+            ) : (
+              <ul className="lc-completed-list">
+                {completedQuestions.map((item) => (
+                  <li key={item.slug} className="lc-completed-item">
+                    <span className="lc-completed-title">{item.title}</span>
+                    <span className="lc-completed-time">{formatSolvedAt(item.solvedAt)}</span>
+                  </li>
+                ))}
+              </ul>
+            )
+          ) : null}
+        </div>
       </div>
       {clearWeaknessConfirm ? (
         <ConfirmModal
@@ -3758,6 +4008,38 @@ export default function LeetCodeMode() {
       </div>
     </div>
   ) : null;
+
+  // "Add this problem to your 3-Pass Drill?" prompt, offered when a problem is marked
+  // done and it is not already an open drill.
+  const drillPromptModalNode = drillPromptSlug ? (
+    <ConfirmModal
+      title="Add to your 3-Pass Drill?"
+      message="Nosey will resurface this problem up to three times with tightening constraints, so it sticks. You can find it under 3-Pass Drills."
+      confirmLabel="Add drill"
+      onConfirm={() => void handleAddDrillFromCompletion(drillPromptSlug)}
+      onCancel={() => setDrillPromptSlug(null)}
+    />
+  ) : null;
+
+  // "Drill cleared, run it again?" prompt, offered right after clearing pass 3.
+  const drillAgainModalNode = drillAgainSlug ? (
+    <ConfirmModal
+      title="Drill cleared. Run it again?"
+      message="Nice work clearing all three passes. Drilling again restarts the cycle from pass 1, due now."
+      confirmLabel="Drill again"
+      onConfirm={() => void handleRestartDrill(drillAgainSlug)}
+      onCancel={() => setDrillAgainSlug(null)}
+    />
+  ) : null;
+
+  // Completion prompts shown across every view (list toggle, editor run/grade).
+  const completionModalsNode = (
+    <>
+      {difficultyModalNode}
+      {drillPromptModalNode}
+      {drillAgainModalNode}
+    </>
+  );
 
   // Rendered in every view (tree, custom category, problem) so "Add question" works everywhere.
   const customModalNode = customModalOpen ? (
@@ -4273,7 +4555,7 @@ export default function LeetCodeMode() {
         {customModalNode}
         {confirmDeleteNode}
         {settingsModalNode}
-        {difficultyModalNode}
+        {completionModalsNode}
         </div>
       </div>
     );
@@ -4906,7 +5188,7 @@ export default function LeetCodeMode() {
         )}
         {customModalNode}
         {confirmDeleteNode}
-        {difficultyModalNode}
+        {completionModalsNode}
       </div>
       </div>
     );
@@ -5034,7 +5316,7 @@ export default function LeetCodeMode() {
         ) : null}
         {customModalNode}
         {confirmDeleteNode}
-        {difficultyModalNode}
+        {completionModalsNode}
       </div>
       </div>
     );
@@ -5197,6 +5479,10 @@ export default function LeetCodeMode() {
   const activePass = activeDrill?.current_pass ?? 1;
   const assistsLocked = betaMode && activePass >= 2;
   const timerForced = betaMode && activePass >= 3;
+  // While a drill is open, only the current pass's tab is usable; every other tab (the user's
+  // previous solution + earlier-pass attempts) is locked from view/delete. Locking itself is
+  // computed by the component-scope isTabLockedForDrill (also used by the tab handlers).
+  const drillActive = betaMode && Boolean(activeDrill);
 
   return (
     <div className="lc-shell lc-shell--editor">
@@ -5258,7 +5544,7 @@ export default function LeetCodeMode() {
               className={`lc-toolbar-btn lc-toolbar-btn--timer lc-toolbar-btn--timer-${timerTone}`}
               onClick={openTimerPicker}
               aria-label={timerRemainingSeconds == null ? "Set timer" : `${timerButtonLabel} remaining, click to change timer`}
-              title={timerRemainingSeconds == null ? "Set a problem timer" : `${timerButtonLabel} remaining — change timer`}
+              title={timerRemainingSeconds == null ? "Set a problem timer" : `${timerButtonLabel} remaining, click to change timer`}
             >
               <TimerRing fraction={timerFraction ?? 1} tone={timerTone} size={18} stroke={2} />
               <span className="lc-tb-label lc-tb-label--timer">{timerButtonLabel}</span>
@@ -5632,12 +5918,12 @@ export default function LeetCodeMode() {
 
         <div className="lc-editor-pane">
           <CodingTabs
-            tabs={(currentCodeWorkspace?.tabs ?? []).map((tab) => ({ id: tab.id, name: tab.name }))}
+            tabs={(currentCodeWorkspace?.tabs ?? []).map((tab) => ({ id: tab.id, name: tab.name, locked: isTabLockedForDrill(currentProblem.slug, tab) }))}
             activeTabId={currentCodeWorkspace?.activeTabId ?? ""}
             onSelectTab={handleSelectCodeTab}
             onAddTab={handleAddCodeTab}
             onDeleteTab={handleDeleteCodeTab}
-            canAddTab={(currentCodeWorkspace?.tabs?.length ?? 0) < MAX_CODE_TABS}
+            canAddTab={!drillActive && (currentCodeWorkspace?.tabs?.length ?? 0) < MAX_CODE_TABS}
           />
 
           <div className="lc-editor-surface">
@@ -5708,32 +5994,26 @@ export default function LeetCodeMode() {
 
       {timerPickerOpen ? (
         <>
-          <div className="lc-kojo-backdrop lc-timer-backdrop" />
+          <div className="lc-kojo-backdrop lc-timer-backdrop" onClick={closeTimerPicker} />
           <div className="lc-kojo-modal lc-timer-modal" role="dialog" aria-modal="true" aria-labelledby="timer-modal-title">
-            <div className="lc-kojo-modal-header lc-timer-modal-header">
-              <div className="kojo-avatar lc-timer-avatar"><TimerRing fraction={1} tone="idle" size={18} stroke={2} /></div>
-              <span id="timer-modal-title">Set a timer</span>
+            <div className="lc-timer-modal-header">
+              <span className="lc-timer-modal-eyebrow">Interview clock</span>
+              <h2 id="timer-modal-title">How long do you have?</h2>
               <button type="button" className="lc-kojo-close" onClick={closeTimerPicker} aria-label="Close timer modal">
                 <X size={17} />
               </button>
             </div>
 
-            <div className="lc-kojo-contract lc-timer-modal-body">
-              <p className="lc-timer-modal-copy">Choose a common interview duration, or enter exactly how much time you have.</p>
-              <label className="lc-timer-modal-field">
-                <span>Preset</span>
-                <select
-                  value={TIMER_PRESETS.includes(Number(timerMinutesInput)) ? timerMinutesInput : "custom"}
-                  onChange={(event) => {
-                    setTimerMinutesInput(event.target.value === "custom" ? "" : event.target.value);
-                  }}
-                >
-                  {TIMER_PRESETS.map((minutes) => <option key={minutes} value={minutes}>{minutes} minutes</option>)}
-                  <option value="custom">Custom duration</option>
-                </select>
-              </label>
+            <div className="lc-timer-modal-body">
+              <div className="lc-timer-modal-presets" role="group" aria-label="Problem timer presets">
+                {TIMER_PRESETS.map(renderTimerPreset)}
+              </div>
+
+              <div className="lc-timer-modal-divider">
+                <span>or set your own</span>
+              </div>
+
               <label className="lc-timer-modal-input">
-                <span>Custom duration</span>
                 <input
                   type="number"
                   min="1"
@@ -5752,12 +6032,12 @@ export default function LeetCodeMode() {
               </label>
             </div>
 
-            <div className="lc-timeout-actions lc-timer-modal-actions">
+            <div className="lc-timer-modal-actions">
               <button type="button" className="button lc-timeout-action lc-timeout-action--ghost" onClick={closeTimerPicker}>
                 Cancel
               </button>
               <button type="button" className="button button--primary lc-timeout-action" onClick={applyTimerFromInput}>
-                Set timer
+                Start timer
               </button>
             </div>
           </div>
@@ -5838,7 +6118,7 @@ export default function LeetCodeMode() {
 
       {customModalNode}
       {confirmDeleteNode}
-      {difficultyModalNode}
+      {completionModalsNode}
       </div>
     </div>
   );
