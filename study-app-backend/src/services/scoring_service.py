@@ -45,6 +45,11 @@ EVENT_SELF_RATED_EASY = "self_rated_easy"
 EVENT_SELF_RATED_MEDIUM = "self_rated_medium"
 EVENT_SELF_RATED_HARD = "self_rated_hard"
 EVENT_SELF_RATED_BRUTAL = "self_rated_brutal"
+# Complexity self-assessment miss: the user solved the problem but got the time/space
+# complexity analysis wrong. A light signal, graded by how far off they were (minor vs
+# major), logged at the moment they submit the self-assessment (post-pass).
+EVENT_COMPLEXITY_MISS_MINOR = "complexity_miss_minor"
+EVENT_COMPLEXITY_MISS_MAJOR = "complexity_miss_major"
 
 # ── Weakness ────────────────────────────────────────────────────────────────
 
@@ -69,6 +74,12 @@ SOLUTION_VIEW_WEIGHT = 1.0
 SELF_RATED_HARD_WEIGHT = 1.0
 SELF_RATED_BRUTAL_WEIGHT = 1.75
 SELF_RATED_EASY_REDUCTION = 0.5
+# Complexity-miss weights. Small on purpose: getting Big-O wrong on a solved problem is
+# a nudge, not a real block, so one miss never jumps a level; it takes several to move a
+# bucket. minor = close (right family / dropped a log factor), major = far off. Not tuned
+# against real usage yet, easy to adjust like the other constants here.
+COMPLEXITY_MISS_MINOR_WEIGHT = 0.2
+COMPLEXITY_MISS_MAJOR_WEIGHT = 0.5
 # Event types that skip the grace period and are non-cancellable by a later solve
 # (they fire at completion, so a cancellable weight would be refunded immediately).
 _SELF_REPORT_EVENTS = frozenset(
@@ -78,6 +89,8 @@ _SELF_REPORT_EVENTS = frozenset(
         EVENT_SELF_RATED_MEDIUM,
         EVENT_SELF_RATED_HARD,
         EVENT_SELF_RATED_BRUTAL,
+        EVENT_COMPLEXITY_MISS_MINOR,
+        EVENT_COMPLEXITY_MISS_MAJOR,
     }
 )
 # Sensitivity multiplier applied to the final per-topic score before bucketing, and
@@ -267,6 +280,12 @@ class ScoringService:
                 continue
             if event_type == EVENT_SELF_RATED_BRUTAL:
                 scores[topic] += SELF_RATED_BRUTAL_WEIGHT
+                continue
+            if event_type == EVENT_COMPLEXITY_MISS_MINOR:
+                scores[topic] += COMPLEXITY_MISS_MINOR_WEIGHT
+                continue
+            if event_type == EVENT_COMPLEXITY_MISS_MAJOR:
+                scores[topic] += COMPLEXITY_MISS_MAJOR_WEIGHT
                 continue
 
             if event_type == EVENT_HINT_USED:

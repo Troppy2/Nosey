@@ -52,6 +52,8 @@ from src.schemas.leetcode_schema import (
     LCWorkspaceResponse,
     LCWorkspacesResponse,
     LCWorkspaceSyncRequest,
+    LeetCodeComplexityCheckRequest,
+    LeetCodeComplexityCheckResponse,
     LeetCodeGradeRequest,
     LeetCodeGradeResponse,
     LeetCodeHintRequest,
@@ -60,6 +62,8 @@ from src.schemas.leetcode_schema import (
 )
 from src.services.leetcode_service import LeetCodeService
 from src.services.scoring_service import (
+    EVENT_COMPLEXITY_MISS_MAJOR,
+    EVENT_COMPLEXITY_MISS_MINOR,
     EVENT_DRILL_ADVANCED_2,
     EVENT_DRILL_ADVANCED_3,
     EVENT_DRILL_COMPLETED,
@@ -179,6 +183,49 @@ async def grade_leetcode_submission(
         )
         await _maybe_auto_add_drill(session, user.id, body.title_slug)
     await session.commit()
+    return result
+
+
+@router.post("/complexity-check", response_model=LeetCodeComplexityCheckResponse)
+async def check_leetcode_complexity(
+    body: LeetCodeComplexityCheckRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LeetCodeComplexityCheckResponse:
+    try:
+        result, severity = await LeetCodeService().grade_complexity(
+            title_slug=body.title_slug,
+            title=body.title,
+            user_code=body.user_code,
+            time_claim=body.time_claim,
+            time_reasoning=body.time_reasoning,
+            space_claim=body.space_claim,
+            space_reasoning=body.space_reasoning,
+            provider=resolve_request_provider(user, body.provider),
+            statement=body.statement,
+        )
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except LLMException as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    # A wrong complexity answer is a small weakness signal, graded by how far off the
+    # user was. It is intentionally NOT wired to _maybe_auto_add_drill: getting Big-O
+    # wrong on a solved problem is a nudge, not a reason to resurface the whole problem.
+    miss_event = {
+        "minor": EVENT_COMPLEXITY_MISS_MINOR,
+        "major": EVENT_COMPLEXITY_MISS_MAJOR,
+    }.get(severity)
+    if miss_event is not None:
+        session.add(
+            LCStruggleEvent(
+                user_id=user.id,
+                topic=body.topic,
+                event_type=miss_event,
+                problem_slug=body.title_slug,
+            )
+        )
+        await session.commit()
     return result
 
 

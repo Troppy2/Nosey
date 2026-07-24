@@ -11,6 +11,7 @@ import httpx
 from src.schemas.leetcode_schema import (
     LCCustomTestCase,
     LCGeneratedCustomProblem,
+    LeetCodeComplexityCheckResponse,
     LeetCodeExample,
     LeetCodeGradeResponse,
     LeetCodeHintResponse,
@@ -120,6 +121,56 @@ class LeetCodeService:
             raise LLMException("Kojo failed to grade the submission. Try again.") from exc
 
         return LeetCodeGradeResponse(feedback=response, flagged_uncertain=False)
+
+    async def grade_complexity(
+        self,
+        title_slug: str,
+        title: str,
+        user_code: str,
+        time_claim: str,
+        time_reasoning: str,
+        space_claim: str,
+        space_reasoning: str,
+        provider: Optional[str] = None,
+        statement: str = "",
+    ) -> tuple[LeetCodeComplexityCheckResponse, str]:
+        """Grade the student's self-assessed complexity.
+
+        Returns the response plus the LLM's weakness_severity ("none" | "minor" |
+        "major") so the route can log a small weakness signal without exposing that
+        internal field to the client.
+        """
+        if statement.strip():
+            statement_text = self._html_to_text(statement)
+        else:
+            problem = await self._fetch_problem(title_slug)
+            title = title or problem.title
+            statement_text = self._html_to_text(problem.content_html)
+
+        try:
+            grade = await LLMService().grade_complexity_answer(
+                title=title or "this problem",
+                statement=statement_text,
+                user_code=user_code,
+                time_claim=time_claim,
+                time_reasoning=time_reasoning,
+                space_claim=space_claim,
+                space_reasoning=space_reasoning,
+                provider=provider,
+            )
+        except Exception as exc:
+            raise LLMException("Kojo failed to analyze the complexity. Try again.") from exc
+
+        response = LeetCodeComplexityCheckResponse(
+            actual_time_complexity=grade.actual_time_complexity,
+            actual_space_complexity=grade.actual_space_complexity,
+            time_correct=grade.time_correct,
+            space_correct=grade.space_correct,
+            feedback=grade.feedback,
+            confidence=grade.confidence,
+            flagged_uncertain=grade.flagged_uncertain,
+        )
+        return response, grade.weakness_severity
 
     async def generate_custom_problem(
         self,
@@ -396,11 +447,12 @@ TEST RESULTS ({verdict}):
 
 YOUR TASK — grade this submission and give actionable coaching feedback:
 
-1. **Correctness** (1–2 sentences): Are the results correct? What passed/failed and why?
-2. **What's wrong** (if any tests failed): Point to the specific bug or logic error in their code. Be precise — line numbers or variable names if possible.
-3. **How to fix it** (if any tests failed): Give a concrete hint about what to change — but do NOT rewrite the whole solution for them.
-4. **Optimality** (always): Even if all tests passed, comment on time and space complexity. Is this the most efficient approach? What would the optimal solution's complexity be? Suggest the direction if there's a better approach.
-5. **One encouragement** (1 sentence): End with something genuinely encouraging.
+1. **Correctness** (1-2 sentences): Are the results correct? What passed/failed and why?
+2. **What's wrong** (if any tests failed): Point to the specific bug or logic error in their code. Be precise, line numbers or variable names if possible.
+3. **How to fix it** (if any tests failed): Give a concrete hint about what to change, but do NOT rewrite the whole solution for them.
+4. **One encouragement** (1 sentence): End with something genuinely encouraging.
+
+Do NOT state the time or space complexity of the solution, and do NOT tell them what the optimal complexity would be. The student assesses complexity themselves in a separate step, so revealing it here would defeat that exercise.
 
 Keep the response concise and structured. Use markdown formatting.
 

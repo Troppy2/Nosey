@@ -543,6 +543,16 @@ export type LeetCodeGradeResponse = {
   flagged_uncertain: boolean;
 };
 
+export type LeetCodeComplexityCheckResponse = {
+  actual_time_complexity: string;
+  actual_space_complexity: string;
+  time_correct: boolean;
+  space_correct: boolean;
+  feedback: string;
+  confidence: number;
+  flagged_uncertain: boolean;
+};
+
 export type ProviderStatus = {
   gemini: boolean;
   groq: boolean;
