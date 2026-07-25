@@ -47,9 +47,10 @@ EVENT_SELF_RATED_HARD = "self_rated_hard"
 EVENT_SELF_RATED_BRUTAL = "self_rated_brutal"
 # Complexity self-assessment miss: the user solved the problem but got the time/space
 # complexity analysis wrong. A light signal, graded by how far off they were (minor vs
-# major), logged at the moment they submit the self-assessment (post-pass).
-EVENT_COMPLEXITY_MISS_MINOR = "complexity_miss_minor"
-EVENT_COMPLEXITY_MISS_MAJOR = "complexity_miss_major"
+# major), logged at the moment they submit the self-assessment (post-pass). Values kept
+# <= 20 chars to fit lc_struggle_events.event_type VARCHAR(20).
+EVENT_COMPLEXITY_MISS_MINOR = "cplx_miss_minor"
+EVENT_COMPLEXITY_MISS_MAJOR = "cplx_miss_major"
 
 # ── Weakness ────────────────────────────────────────────────────────────────
 
