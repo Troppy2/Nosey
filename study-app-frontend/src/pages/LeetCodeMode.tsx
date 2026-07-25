@@ -6167,10 +6167,17 @@ export default function LeetCodeMode() {
                 fontSize: 14,
                 fontFamily: "Menlo, Consolas, 'Cascadia Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
                 minimap: { enabled: false },
-                quickSuggestions: false,
+                // Word-based completion only (finishing identifiers the user already typed).
+                // Monaco ships no Python language service, so this is the ONLY completion
+                // source available here: it can never suggest an algorithm, library method, or
+                // solution, just the user's own variable/function names + keywords. Kept ON for
+                // normal practice (spares retyping, matches CoderPad/CodeSignal), but forced OFF
+                // whenever a 3-pass drill is active so drills stay bare mock-interview realism.
+                // IntelliSense-style helpers (parameter hints, trigger-char popups) stay off.
+                quickSuggestions: !drillActive,
                 suggestOnTriggerCharacters: false,
                 parameterHints: { enabled: false },
-                wordBasedSuggestions: "off",
+                wordBasedSuggestions: drillActive ? "off" : "currentDocument",
                 tabSize: 4,
                 scrollBeyondLastLine: false,
                 lineNumbers: "on",
