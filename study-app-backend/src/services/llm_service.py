@@ -14,6 +14,12 @@ import httpx
 
 from src.config import settings
 from src.schemas.attempt_schema import FRQGrade
+from src.services.lc_taxonomy import (
+    ALL_SUBTOPICS,
+    SUBTOPICS_BY_TOPIC,
+    canonical_subtopic,
+    canonical_topic,
+)
 from src.services.rag_service import HybridRAGService
 from src.utils.logger import get_logger
 from src.utils.latex_utils import normalize_latex
@@ -2065,6 +2071,8 @@ Return JSON only with these exact keys:
     def _build_custom_problem_prompt(self, code: str, hint: str) -> str:
         code_block = (code or "").strip()[:12000] or "# (no code provided)"
         hint_line = (hint or "").strip()[:2000] or "(none given)"
+        # Topic is inferred by the model here, so it gets the full subtopic menu.
+        subtopic_menu = ", ".join(f'"{s}"' for s in ALL_SUBTOPICS)
         return f"""You are building a LeetCode-style practice problem from a student's own code.
 
 STUDENT CODE (the source of truth for the function signature and behavior):
@@ -2077,6 +2085,7 @@ STUDENT HINT ABOUT WHAT IT DOES: {hint_line}
 Infer what the code is supposed to do, then return a JSON object ONLY (no prose, no code fences) with EXACTLY these keys:
 - "title": a short, descriptive problem title (string).
 - "topic": the algorithmic pattern(s) or data structure(s) the problem exercises, as a comma-separated string. If the problem genuinely combines multiple patterns, list all that clearly apply (most central first), up to 3, e.g. "Sliding Window, Hash Map" or "Stack, Strings". If it is really only one, return just that one. Prefer the specific technique over a broad bucket (e.g. "Two Pointers" rather than "Arrays", "Stack" rather than "Strings"). Draw from, ideally: "Arrays", "Strings", "Hash Map", "Two Pointers", "Sliding Window", "Prefix Sum", "Stack", "Queue", "Linked List", "Binary Search", "Sorting", "Recursion", "Backtracking", "Trees", "Binary Search Tree", "Trie", "Heap", "Graphs", "Dynamic Programming", "Greedy", "Intervals", "Matrix", "Bit Manipulation", "Math". If none of these clearly fit, use the closest specific pattern name. Only use "unknown" if you genuinely cannot tell.
+- "subtopic": the single most central FINER technique the problem drills, as a short string. Pick EXACTLY ONE, and pick it from this fixed list so labels stay consistent: {subtopic_menu}. Choose the one that best matches the core challenge (e.g. a graph problem solved by breadth-first traversal is "BFS", not "DFS"). If none fit, use "".
 - "difficulty": exactly one of "Easy", "Medium", "Hard". If you genuinely cannot tell, use "unknown".
 - "description": a Markdown problem statement written like LeetCode: a clear introduction of the task, the constraints you can reasonably infer, followed by 2 to 3 worked examples each with an Input, an Output, and a short Explanation that walks through the reasoning.
 - "starter_code": clean, runnable Python based on the student's code. Keep the SAME function name and parameter names the student used. It may be a top-level function (e.g. `def two_sum(nums, target): ...`) or a `class Solution` method. Do NOT change the signature.
@@ -2096,17 +2105,24 @@ Return only the JSON object."""
         target_difficulty: str,
         seed_title: str,
         seed_statement: str,
+        subtopic: Optional[str] = None,
         provider: Optional[str] = None,
     ) -> dict[str, object]:
         """Reskin a real seed problem (story, variable names, and numbers rewritten)
-        into a fresh problem on the same topic at the same difficulty, returned in the
-        exact JSON shape generate_custom_problem uses. Single JSON call with provider
-        fallback handled inside _complete_json (no per-provider loop here)."""
-        prompt = self._build_daily_problem_prompt(topic, target_difficulty, seed_title, seed_statement)
+        into a fresh problem on the same topic (and, when given, the same weak
+        subtopic) at the same difficulty, returned in the exact JSON shape
+        generate_custom_problem uses. Single JSON call with provider fallback handled
+        inside _complete_json (no per-provider loop here)."""
+        prompt = self._build_daily_problem_prompt(topic, target_difficulty, seed_title, seed_statement, subtopic)
         return await self._complete_json(prompt, provider=provider)
 
     def _build_daily_problem_prompt(
-        self, topic: str, target_difficulty: str, seed_title: str, seed_statement: str
+        self,
+        topic: str,
+        target_difficulty: str,
+        seed_title: str,
+        seed_statement: str,
+        subtopic: Optional[str] = None,
     ) -> str:
         topic_line = (topic or "").strip()[:200] or "general problem solving"
         difficulty = (target_difficulty or "").strip().capitalize()
@@ -2114,6 +2130,10 @@ Return only the JSON object."""
             difficulty = "Medium"
         seed_title_line = (seed_title or "").strip()[:300] or "(untitled)"
         seed_body = (seed_statement or "").strip()[:9000] or "(no statement available)"
+        # When targeting a weak subtopic, tell the model to preserve that exact
+        # technique so the drilled skill matches the weakness that triggered it.
+        subtopic_clean = (subtopic or "").strip()[:120]
+        subtopic_line = subtopic_clean or "(none: keep the seed's technique)"
         return f"""You are generating today's "Daily KojoCode" practice problem for a student.
 
 Take the SEED PROBLEM below and RESKIN it: rewrite the story, the entity and variable
@@ -2123,6 +2143,7 @@ difficulty. The student should have to solve the same core challenge, not recogn
 copy of the original. Do NOT restate the seed's story or reuse its title.
 
 TARGET TOPIC (the pattern to preserve): {topic_line}
+TARGET SUBTOPIC (the finer technique to preserve): {subtopic_line}
 TARGET DIFFICULTY (keep the problem exactly at this level): {difficulty}
 
 SEED PROBLEM TITLE: {seed_title_line}
@@ -2133,6 +2154,7 @@ SEED PROBLEM STATEMENT:
 Return a JSON object ONLY (no prose, no code fences) with EXACTLY these keys:
 - "title": a NEW short, descriptive problem title that does not reuse the seed's title (string).
 - "topic": the algorithmic pattern(s) the problem exercises, as a comma-separated string, consistent with the target topic above.
+- "subtopic": the single finer technique the problem drills. If a TARGET SUBTOPIC was given above, return exactly that so the drilled skill matches it; otherwise infer the most central one. Use "" only if none applies.
 - "difficulty": exactly "{difficulty}".
 - "description": a Markdown problem statement written like LeetCode: a clear introduction of the task, the constraints you can reasonably infer, followed by 2 to 3 worked examples each with an Input, an Output, and a short Explanation. Use the reskinned story and names, NOT the seed's.
 - "starter_code": clean, runnable Python. Define a sensibly named top-level function (e.g. `def some_name(args): ...`) or a `class Solution` method whose signature fits the reskinned problem, with an empty body the student can fill in.
@@ -2143,6 +2165,96 @@ CRITICAL rules for "test_cases" so they can actually run:
 - "output_text" MUST be a single Python literal that equals the expected return value, e.g. `[0, 1]` or `True` or `"abc"`.
 - Cover normal cases plus at least one edge case when applicable.
 - Every test case must be correct for the given starter_code.
+
+Return only the JSON object."""
+
+    # Backfill batch size: how many stored custom problems are classified per LLM
+    # call. Kept small so each call's JSON stays well within the token budget and one
+    # bad problem can't blow up a huge batch. One _complete_json call per batch (its
+    # own provider fallback), never a per-provider loop.
+    _CLASSIFY_BATCH_SIZE = 6
+
+    async def classify_custom_problems(
+        self,
+        problems: list[dict[str, str]],
+        provider: Optional[str] = None,
+    ) -> dict[str, dict[str, str]]:
+        """Classify-only: read stored custom problems and return {slug: {topic,
+        subtopic}} drawn from the curated taxonomy, WITHOUT regenerating any problem
+        text. Batched to cap API usage; batches run sequentially so a big backfill
+        doesn't fan out into a burst of concurrent calls."""
+        result: dict[str, dict[str, str]] = {}
+        for start in range(0, len(problems), self._CLASSIFY_BATCH_SIZE):
+            batch = problems[start : start + self._CLASSIFY_BATCH_SIZE]
+            prompt = self._build_classify_prompt(batch)
+            data = await self._complete_json(prompt, provider=provider)
+            for item in self._extract_classify_items(data):
+                slug = str(item.get("slug", "") or "").strip()
+                if not slug:
+                    continue
+                # Snap to the real catalog: only a valid category id survives as the
+                # topic, and only a subtopic that belongs to that topic survives. This
+                # is what stops the backfill writing invented topics -- the prompt asks
+                # for catalog values but the model can't be trusted to obey, so it's
+                # enforced here against lc_taxonomy.
+                topic = canonical_topic(str(item.get("topic", "") or ""))
+                subtopic = canonical_subtopic(topic, str(item.get("subtopic", "") or ""))
+                if not topic and not subtopic:
+                    continue
+                result[slug] = {"topic": topic or "", "subtopic": subtopic or ""}
+        return result
+
+    @staticmethod
+    def _extract_classify_items(data: object) -> list[dict]:
+        """_complete_json may return the array directly or wrap it (e.g. {"problems": [...]})."""
+        if isinstance(data, list):
+            return [item for item in data if isinstance(item, dict)]
+        if isinstance(data, dict):
+            for value in data.values():
+                if isinstance(value, list):
+                    return [item for item in value if isinstance(item, dict)]
+        return []
+
+    def _build_classify_prompt(self, batch: list[dict[str, str]]) -> str:
+        taxonomy_lines = "\n".join(
+            f"- {topic}: {', '.join(subs)}" for topic, subs in SUBTOPICS_BY_TOPIC.items()
+        )
+        problem_blocks = []
+        for item in batch:
+            slug = str(item.get("slug", "") or "").strip()
+            title = str(item.get("title", "") or "").strip()[:300]
+            description = str(item.get("description", "") or "").strip()[:2500]
+            starter = str(item.get("starter_code", "") or "").strip()[:2000]
+            problem_blocks.append(
+                f"SLUG: {slug}\nTITLE: {title}\nDESCRIPTION:\n{description or '(none)'}\n"
+                f"STARTER CODE:\n```python\n{starter or '# (none)'}\n```"
+            )
+        problems_text = "\n\n---\n\n".join(problem_blocks)
+        topic_ids = ", ".join(f'"{t}"' for t in SUBTOPICS_BY_TOPIC)
+        return f"""You are labeling LeetCode-style practice problems with a topic and a finer subtopic.
+
+Use ONLY this fixed taxonomy (these are the ONLY valid topic ids, on the left; each topic's
+allowed subtopics are on the right). Do NOT invent new topics or subtopics:
+{taxonomy_lines}
+
+The "topic" you return MUST be one of these exact ids, copied verbatim (do not rephrase,
+pluralize, or expand into a label): {topic_ids}.
+The "subtopic" MUST be one of the strings listed under the topic you picked, copied verbatim.
+
+For EACH problem below, pick the single best topic id and the single best subtopic from that
+topic's list, based on the core algorithm the problem drills (e.g. a graph problem solved by
+breadth-first traversal is topic "graph", subtopic "Breadth-First Search").
+
+PROBLEMS:
+{problems_text}
+
+Return a JSON OBJECT ONLY (no prose, no code fences) with a single key "results" whose value is
+an array with one object per problem, each having EXACTLY:
+- "slug": the problem's SLUG, copied exactly.
+- "topic": one of the exact topic ids above. Use "unknown" only if truly none fit.
+- "subtopic": one subtopic (verbatim) from that topic's list. Use "" only if truly none fit.
+
+Example shape: {{"results": [{{"slug": "custom-abc", "topic": "graph", "subtopic": "Breadth-First Search"}}]}}
 
 Return only the JSON object."""
 

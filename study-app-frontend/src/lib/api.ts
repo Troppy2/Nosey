@@ -992,6 +992,7 @@ export async function gradeLeetCodeSubmission(
   topic: string,
   provider?: string,
   statement?: string,
+  subtopic?: string | null,
 ): Promise<LeetCodeGradeResponse> {
   const body: Record<string, unknown> = {
     title_slug: titleSlug,
@@ -1003,6 +1004,7 @@ export async function gradeLeetCodeSubmission(
   };
   if (provider) body.provider = provider;
   if (statement) body.statement = statement;
+  if (subtopic) body.subtopic = subtopic;
   return request<LeetCodeGradeResponse>("/leetcode/grade", {
     method: "POST",
     body: JSON.stringify(body),
@@ -1020,6 +1022,7 @@ export async function checkLeetCodeComplexity(
   topic: string,
   provider?: string,
   statement?: string,
+  subtopic?: string | null,
 ): Promise<LeetCodeComplexityCheckResponse> {
   const body: Record<string, unknown> = {
     title_slug: titleSlug,
@@ -1033,6 +1036,7 @@ export async function checkLeetCodeComplexity(
   };
   if (provider) body.provider = provider;
   if (statement) body.statement = statement;
+  if (subtopic) body.subtopic = subtopic;
   return request<LeetCodeComplexityCheckResponse>("/leetcode/complexity-check", {
     method: "POST",
     body: JSON.stringify(body),
@@ -1087,6 +1091,7 @@ export async function fetchLeetCodeHint(
   topic: string,
   provider?: string,
   statement?: string,
+  subtopic?: string | null,
 ): Promise<LeetCodeHintResponse> {
   const body: Record<string, unknown> = {
     title_slug: titleSlug,
@@ -1097,6 +1102,7 @@ export async function fetchLeetCodeHint(
   };
   if (provider) body.provider = provider;
   if (statement) body.statement = statement;
+  if (subtopic) body.subtopic = subtopic;
   return request<LeetCodeHintResponse>("/leetcode/hint", {
     method: "POST",
     body: JSON.stringify(body),
@@ -1400,6 +1406,14 @@ export async function generateLCCustomProblem(
   });
 }
 
+// One-time "Regenerate topics" backfill (beta): classify every custom problem that
+// is missing a subtopic, setting only topic + subtopic. Returns how many were updated.
+export async function reclassifyLCCustomProblems(): Promise<{ updated: number }> {
+  return request<{ updated: number }>("/leetcode/custom-problems/reclassify", {
+    method: "POST",
+  });
+}
+
 // ── Streak challenge (Save My Streak, beta-only) ─────────────────────────────
 
 export async function fetchLCStreakChallenge(): Promise<import("./types").LCStreakChallenge | null> {
@@ -1440,9 +1454,11 @@ export async function createLCDaily(
   targetDifficulty: string,
   seedSlug: string,
   provider?: string,
+  subtopic?: string | null,
 ): Promise<LCCustomProblem> {
   const body: Record<string, unknown> = { topic, target_difficulty: targetDifficulty, seed_slug: seedSlug };
   if (provider) body.provider = provider;
+  if (subtopic) body.subtopic = subtopic;
   return request<LCCustomProblem>("/leetcode/daily", {
     method: "POST",
     body: JSON.stringify(body),
@@ -1463,11 +1479,17 @@ export async function logLCStruggleEvent(
   topic: string,
   eventType: LCStruggleEventType = "timer_expiry",
   problemSlug?: string,
+  subtopic?: string | null,
 ): Promise<void> {
   try {
     await request("/leetcode/struggle-event", {
       method: "POST",
-      body: JSON.stringify({ topic, event_type: eventType, problem_slug: problemSlug ?? null }),
+      body: JSON.stringify({
+        topic,
+        subtopic: subtopic ?? null,
+        event_type: eventType,
+        problem_slug: problemSlug ?? null,
+      }),
     });
   } catch {
     // Best-effort signal, never blocks the flow it's fired from.
@@ -1479,11 +1501,12 @@ export async function postLCTestRun(
   topic: string,
   difficulty: string,
   passed: boolean,
+  subtopic?: string | null,
 ): Promise<void> {
   try {
     await request("/leetcode/test-run", {
       method: "POST",
-      body: JSON.stringify({ problem_slug: problemSlug, topic, difficulty, passed }),
+      body: JSON.stringify({ problem_slug: problemSlug, topic, subtopic: subtopic ?? null, difficulty, passed }),
     });
   } catch {
     // Best-effort signal, never blocks the run/grade flow it's fired from.
@@ -1584,10 +1607,14 @@ export async function createLCDrill(problemSlug: string): Promise<import("./type
   });
 }
 
-export async function advanceLCDrill(slug: string, topic?: string): Promise<import("./types").LCDrillSchedule> {
+export async function advanceLCDrill(
+  slug: string,
+  topic?: string,
+  subtopic?: string | null,
+): Promise<import("./types").LCDrillSchedule> {
   return request<import("./types").LCDrillSchedule>(`/leetcode/drills/${slug}/advance`, {
     method: "POST",
-    body: JSON.stringify({ topic: topic ?? null }),
+    body: JSON.stringify({ topic: topic ?? null, subtopic: subtopic ?? null }),
   });
 }
 

@@ -142,6 +142,7 @@ class ScoringService:
             await session.execute(
                 select(
                     LCStruggleEvent.topic,
+                    LCStruggleEvent.subtopic,
                     LCStruggleEvent.event_type,
                     LCStruggleEvent.problem_slug,
                     LCStruggleEvent.occurred_at,
@@ -152,7 +153,14 @@ class ScoringService:
         ).all()
         runs = (
             await session.execute(
-                select(LCTestRun.topic, LCTestRun.problem_slug, LCTestRun.passed, LCTestRun.difficulty, LCTestRun.run_at)
+                select(
+                    LCTestRun.topic,
+                    LCTestRun.subtopic,
+                    LCTestRun.problem_slug,
+                    LCTestRun.passed,
+                    LCTestRun.difficulty,
+                    LCTestRun.run_at,
+                )
                 .where(LCTestRun.user_id == user_id, LCTestRun.run_at >= since)
                 .order_by(LCTestRun.run_at.asc())
             )
@@ -190,8 +198,8 @@ class ScoringService:
 
         # Grace period lookup: total runs ever for each slug referenced this window
         # (struggle events, passed runs, and failed runs all reference slugs).
-        slugs = {slug for _topic, _event_type, slug, _occurred_at in window_events if slug}
-        slugs.update(slug for _topic, slug, *_rest in passed_runs if slug)
+        slugs = {e.problem_slug for e in window_events if e.problem_slug}
+        slugs.update(r.problem_slug for r in passed_runs if r.problem_slug)
         slugs.update(r.problem_slug for r in window_failed_runs if r.problem_slug)
         attempts_by_slug: dict[str, int] = {}
         if slugs:
@@ -213,27 +221,35 @@ class ScoringService:
 
         # Merge struggle events, passed runs, and failed runs into one chronological
         # timeline so the exploratory-hint, solve-cancel, and drill-reset rules see
-        # events in the order they actually happened.
+        # events in the order they actually happened. Each entry carries both the topic
+        # and the finer subtopic so scoring keys on the (topic, subtopic) pair.
+        def _sub(value) -> str:
+            return (value or "").strip()
+
         timeline = (
             [
-                (occurred_at, "event", event_type, topic, slug)
-                for topic, event_type, slug, occurred_at in window_events
+                (e.occurred_at, "event", e.event_type, e.topic, _sub(e.subtopic), e.problem_slug)
+                for e in window_events
             ]
-            + [(run_at, "success", None, topic, slug) for topic, slug, _passed, _difficulty, run_at in passed_runs]
-            + [(r.run_at, "failed", None, r.topic, r.problem_slug) for r in window_failed_runs]
+            + [(r.run_at, "success", None, r.topic, _sub(r.subtopic), r.problem_slug) for r in passed_runs]
+            + [(r.run_at, "failed", None, r.topic, _sub(r.subtopic), r.problem_slug) for r in window_failed_runs]
         )
         timeline.sort(key=lambda item: item[0])
 
-        scores: dict[str, float] = defaultdict(float)
+        # Scored at (topic, subtopic) granularity. An empty subtopic -> the pair
+        # (topic, "") -- i.e. exactly the old topic-only behavior, so untagged rows and
+        # older clients degrade cleanly.
+        scores: dict[tuple[str, str], float] = defaultdict(float)
         failed_seen: set[str] = set()  # problem_slugs with a failed_grade seen so far
-        # Weight this window contributed per (topic, slug), so solving a problem can
+        # Weight this window contributed per (key, slug), so solving a problem can
         # cancel the struggle it caused (fixes topics staying "weak" after you grind
         # them out with hints and eventually pass).
-        slug_weight: dict[tuple[str, str], float] = defaultdict(float)
+        slug_weight: dict[tuple[tuple[str, str], str], float] = defaultdict(float)
         # Cumulative silent-struggle weight already added per slug, to enforce the cap.
         failed_run_added: dict[str, float] = defaultdict(float)
 
-        for _ts, kind, event_type, topic, slug in timeline:
+        for _ts, kind, event_type, topic, subtopic, slug in timeline:
+            key = (topic, subtopic)
             # Self-report / give-up events bypass the grace period; everything else
             # must clear it (barely-attempted problems don't count).
             if event_type not in _SELF_REPORT_EVENTS and not past_grace(slug):
@@ -244,8 +260,8 @@ class ScoringService:
                 # so repeated solving of a topic trends it toward mastery.
                 refund = SUCCESS_REDUCTION
                 if slug:
-                    refund += slug_weight.pop((topic, slug), 0.0)
-                scores[topic] = max(0.0, scores[topic] - refund)
+                    refund += slug_weight.pop((key, slug), 0.0)
+                scores[key] = max(0.0, scores[key] - refund)
                 continue
 
             if kind == "failed":
@@ -258,35 +274,35 @@ class ScoringService:
                 if add <= 0:
                     continue
                 failed_run_added[slug] += add
-                scores[topic] += add
-                slug_weight[(topic, slug)] += add
+                scores[key] += add
+                slug_weight[(key, slug)] += add
                 continue
 
             if event_type == EVENT_DRILL_COMPLETED:
-                scores[topic] = 0.0
+                scores[key] = 0.0
                 continue
 
             # Self-report / give-up signals: non-cancellable (not added to
             # slug_weight), so the solve that fires alongside them can't refund them.
             if event_type == EVENT_SELF_RATED_EASY:
-                scores[topic] = max(0.0, scores[topic] - SELF_RATED_EASY_REDUCTION)
+                scores[key] = max(0.0, scores[key] - SELF_RATED_EASY_REDUCTION)
                 continue
             if event_type == EVENT_SELF_RATED_MEDIUM:
                 continue  # logged for data, carries no weight either way
             if event_type == EVENT_SOLUTION_VIEWED:
-                scores[topic] += SOLUTION_VIEW_WEIGHT
+                scores[key] += SOLUTION_VIEW_WEIGHT
                 continue
             if event_type == EVENT_SELF_RATED_HARD:
-                scores[topic] += SELF_RATED_HARD_WEIGHT
+                scores[key] += SELF_RATED_HARD_WEIGHT
                 continue
             if event_type == EVENT_SELF_RATED_BRUTAL:
-                scores[topic] += SELF_RATED_BRUTAL_WEIGHT
+                scores[key] += SELF_RATED_BRUTAL_WEIGHT
                 continue
             if event_type == EVENT_COMPLEXITY_MISS_MINOR:
-                scores[topic] += COMPLEXITY_MISS_MINOR_WEIGHT
+                scores[key] += COMPLEXITY_MISS_MINOR_WEIGHT
                 continue
             if event_type == EVENT_COMPLEXITY_MISS_MAJOR:
-                scores[topic] += COMPLEXITY_MISS_MAJOR_WEIGHT
+                scores[key] += COMPLEXITY_MISS_MAJOR_WEIGHT
                 continue
 
             if event_type == EVENT_HINT_USED:
@@ -301,19 +317,35 @@ class ScoringService:
                 # drill_advanced_2 / drill_advanced_3: improvement signals only, no
                 # weakness weight.
                 continue
-            scores[topic] += weight
+            scores[key] += weight
             if slug:
-                slug_weight[(topic, slug)] += weight
+                slug_weight[(key, slug)] += weight
 
         # Sensitivity scales the final score; MIN_VISIBLE hides marginal topics (so a
         # topic driven only by a little silent struggle stays hidden at Low but
         # surfaces at High). Level is bucketed off the adjusted score.
-        scored = []
-        for topic, score in scores.items():
+        #
+        # Two-level output (backward compatible): emit a per-subtopic row for each
+        # tagged (topic, subtopic) pair AND a topic-level rollup row (subtopic=None)
+        # whose score is the max over that topic's pairs. Untagged signals only feed
+        # the rollup, so they still surface exactly as a topic-level row like before.
+        scored: list[LCWeaknessTopic] = []
+        topic_best: dict[str, float] = defaultdict(float)
+        for (topic, subtopic), score in scores.items():
             adjusted = score * mult
+            if adjusted > topic_best[topic]:
+                topic_best[topic] = adjusted
+            if subtopic and adjusted >= MIN_VISIBLE_SCORE:
+                scored.append(
+                    LCWeaknessTopic(topic=topic, subtopic=subtopic, level=_weakness_level_for_score(adjusted))
+                )
+        for topic, adjusted in topic_best.items():
             if adjusted >= MIN_VISIBLE_SCORE:
-                scored.append(LCWeaknessTopic(topic=topic, level=_weakness_level_for_score(adjusted)))
-        scored.sort(key=lambda item: (-item.level, item.topic))
+                scored.append(
+                    LCWeaknessTopic(topic=topic, subtopic=None, level=_weakness_level_for_score(adjusted))
+                )
+        # Rollup rows first within a level, then by topic, then subtopic name.
+        scored.sort(key=lambda item: (-item.level, item.topic, item.subtopic or ""))
         return LCWeaknessResponse(topics=scored)
 
     def _score_improvement(self, now, events, runs) -> LCImprovementResponse:
@@ -326,7 +358,9 @@ class ScoringService:
             runs_by_topic[row.topic].append(row)
         hints_by_topic: dict[str, list] = defaultdict(list)
         drill_event_types_by_topic: dict[str, set[str]] = defaultdict(set)
-        for topic, event_type, _slug, occurred_at in events:
+        # Improvement stays topic-level for now (subtopic ignored here); the extra
+        # subtopic column in each event tuple is unpacked and dropped.
+        for topic, _subtopic, event_type, _slug, occurred_at in events:
             if event_type == EVENT_HINT_USED:
                 hints_by_topic[topic].append(occurred_at)
             elif event_type in (EVENT_DRILL_ADVANCED_2, EVENT_DRILL_ADVANCED_3):
