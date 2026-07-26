@@ -21612,76 +21612,190 @@ button.lc-reminder-feature-cta:disabled {
   }
 }
 
+/* Complexity self-assessment result: a two-row grading card (Time / Space). Each row
+   is scannable at a glance via a status rail; a correct row collapses to one confident
+   Big-O line, a wrong row shows a "you said -> correct" diff. Encouraging amber for
+   "not quite" rather than alarm red, since this is a learning moment. */
 .lc-complexity-result {
   margin-top: 2px;
-  border: 1px solid rgba(113, 131, 85, 0.22);
-  border-radius: 10px;
-  background: rgba(249, 251, 245, 0.7);
-  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  font-size: 0.85rem;
+  gap: 13px;
 }
 
-.lc-complexity-verdicts {
+.lc-cx-cards {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
 }
 
-.lc-complexity-verdict {
+.lc-cx-card {
+  position: relative;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px 13px 11px 15px;
+  overflow: hidden;
+}
+
+.lc-cx-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+}
+
+.lc-cx-card--ok {
+  border-color: #bcd9b4;
+  background: #eef6ea;
+}
+
+.lc-cx-card--ok::before {
+  background: #3f7d4e;
+}
+
+.lc-cx-card--off {
+  border-color: #f0d3a6;
+  background: #fdf3e7;
+}
+
+.lc-cx-card--off::before {
+  background: #c2600c;
+}
+
+.lc-cx-card-top {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  font-size: 0.82rem;
-  flex: 1 1 140px;
+  gap: 8px;
+  margin-bottom: 7px;
 }
 
-.lc-complexity-verdict--ok {
-  background: rgba(16, 185, 129, 0.1);
-  color: #0f7a5a;
-  border: 1px solid rgba(16, 185, 129, 0.3);
-}
-
-.lc-complexity-verdict--bad {
-  background: rgba(220, 38, 38, 0.08);
-  color: #b91c1c;
-  border: 1px solid rgba(220, 38, 38, 0.25);
-}
-
-.lc-complexity-verdict-label {
-  font-weight: 700;
+.lc-cx-metric {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  color: #5b6a49;
+}
+
+.lc-cx-status {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.lc-cx-card--ok .lc-cx-status {
+  color: #3f7d4e;
+}
+
+.lc-cx-card--off .lc-cx-status {
+  color: #c2600c;
+}
+
+/* Correct: the single confident Big-O answer is the hero */
+.lc-cx-answer {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+/* Wrong: your answer struck through, the correct one below it */
+.lc-cx-diff {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  align-items: baseline;
+}
+
+.lc-cx-diff-key {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #6f7d5b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.lc-cx-diff-val {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.lc-cx-diff-val--said {
+  color: #c2600c;
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  text-decoration-color: rgba(194, 96, 12, 0.5);
+}
+
+.lc-cx-diff-val--right {
+  color: var(--ink);
+}
+
+/* Confidence: a quiet meter, never louder than the verdict */
+.lc-cx-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: #5b6a49;
+}
+
+.lc-cx-meter {
+  flex: 0 0 66px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(113, 131, 85, 0.2);
+  overflow: hidden;
+}
+
+.lc-cx-meter > span {
+  display: block;
+  height: 100%;
+  background: var(--green-dark);
+  border-radius: 3px;
+}
+
+.lc-cx-meta-label {
+  font-family: "JetBrains Mono", monospace;
   font-size: 0.72rem;
 }
 
-.lc-complexity-verdict-value {
-  margin-left: auto;
-  font-family: "JetBrains Mono", monospace;
-  font-weight: 600;
+.lc-cx-uncertain {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: #fdf3e7;
+  border: 1px solid #f0d3a6;
+  color: #a4560a;
+  font-size: 0.78rem;
+  line-height: 1.4;
 }
 
-.lc-complexity-confidence {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.8rem;
-  color: #596949;
-  font-family: "JetBrains Mono", monospace;
+.lc-cx-uncertain svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
 }
 
-.lc-complexity-uncertain {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 10px;
-  border-radius: 8px;
-  background: rgba(217, 119, 6, 0.1);
-  border: 1px solid rgba(217, 119, 6, 0.28);
-  color: #b45309;
-  font-size: 0.8rem;
+.lc-cx-divider {
+  height: 1px;
+  background: rgba(113, 131, 85, 0.18);
+  border: 0;
+  margin: 1px 0;
+  width: 100%;
+}
+
+.lc-cx-feedback {
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: #313d27;
 }
