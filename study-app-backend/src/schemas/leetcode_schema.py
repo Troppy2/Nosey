@@ -40,6 +40,8 @@ class LeetCodeHintRequest(BaseModel):
     statement: str = Field(default="", max_length=20000)
     # Category id string for struggle-event logging (client owns the topic taxonomy).
     topic: str = Field(..., min_length=1, max_length=120)
+    # Finer technique under the topic (e.g. "BFS"), for subtopic-level weakness.
+    subtopic: Optional[str] = Field(default=None, max_length=120)
 
 
 class LeetCodeHintResponse(BaseModel):
@@ -58,6 +60,8 @@ class LeetCodeGradeRequest(BaseModel):
     statement: str = Field(default="", max_length=20000)
     # Category id string for struggle-event logging (client owns the topic taxonomy).
     topic: str = Field(..., min_length=1, max_length=120)
+    # Finer technique under the topic (e.g. "BFS"), for subtopic-level weakness.
+    subtopic: Optional[str] = Field(default=None, max_length=120)
 
 
 class LeetCodeGradeResponse(BaseModel):
@@ -78,6 +82,8 @@ class LeetCodeComplexityCheckRequest(BaseModel):
     statement: str = Field(default="", max_length=20000)
     # Category id string for weakness-signal logging (client owns the topic taxonomy).
     topic: str = Field(..., min_length=1, max_length=120)
+    # Finer technique under the topic (e.g. "BFS"), for subtopic-level weakness.
+    subtopic: Optional[str] = Field(default=None, max_length=120)
 
 
 class LeetCodeComplexityCheckResponse(BaseModel):
@@ -142,6 +148,8 @@ class LCCustomTestCase(BaseModel):
 class LCCustomProblemBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=300)
     topic: str = Field(default="unknown", max_length=120)
+    # Finer technique(s) under the topic, comma-separated (e.g. "BFS"). Optional.
+    subtopic: Optional[str] = Field(default=None, max_length=120)
     difficulty: str = Field(default="unknown", max_length=20)
     description: str = Field(default="", max_length=20000)
     url: str = Field(default="", max_length=2000)
@@ -165,6 +173,13 @@ class LCCustomProblemListResponse(BaseModel):
     problems: list[LCCustomProblemResponse] = Field(default_factory=list)
 
 
+class LCReclassifyResponse(BaseModel):
+    """Result of the one-time "Regenerate topics" backfill: how many stored custom
+    problems had their topic + subtopic (re)classified."""
+
+    updated: int = 0
+
+
 class LCGenerateCustomProblemRequest(BaseModel):
     """The user pastes a function (or any code) and optionally a short hint of intent.
     The AI fills in the rest: title, topic, difficulty, a written walkthrough, worked
@@ -178,6 +193,7 @@ class LCGenerateCustomProblemRequest(BaseModel):
 class LCGeneratedCustomProblem(BaseModel):
     title: str = ""
     topic: str = "unknown"
+    subtopic: Optional[str] = None
     difficulty: str = "unknown"
     description: str = ""
     starter_code: str = ""
@@ -193,6 +209,8 @@ class LCDailyProblemRequest(BaseModel):
     returned as a normal LCCustomProblemResponse and locked to one per calendar day."""
 
     topic: str = Field(..., min_length=1, max_length=120)
+    # The weak subtopic being targeted (e.g. "BFS"); the reskin preserves it.
+    subtopic: Optional[str] = Field(default=None, max_length=120)
     target_difficulty: str = Field(default="Medium", max_length=20)
     seed_slug: str = Field(..., min_length=1, max_length=200)
     provider: Optional[str] = Field(default=None)
@@ -227,6 +245,8 @@ class LCStruggleEventRequest(BaseModel):
     and grade routes instead, since those already carry title_slug + topic."""
 
     topic: str = Field(..., min_length=1, max_length=120)
+    # Finer technique under the topic (e.g. "BFS"), for subtopic-level weakness.
+    subtopic: Optional[str] = Field(default=None, max_length=120)
     event_type: str = Field(default="timer_expiry", max_length=20)
     # Lets the auto-add-drill hook (step 7) key a new drill row to a problem.
     problem_slug: Optional[str] = Field(default=None, max_length=200)
@@ -234,6 +254,8 @@ class LCStruggleEventRequest(BaseModel):
 
 class LCWeaknessTopic(BaseModel):
     topic: str
+    # None on a topic-level rollup row; set on a per-subtopic row (e.g. "BFS").
+    subtopic: Optional[str] = None
     level: int
 
 
@@ -248,6 +270,8 @@ class LCTestRunRequest(BaseModel):
 
     problem_slug: str = Field(..., min_length=1, max_length=200)
     topic: str = Field(..., min_length=1, max_length=120)
+    # Finer technique under the topic (e.g. "BFS"), for subtopic-level weakness.
+    subtopic: Optional[str] = Field(default=None, max_length=120)
     difficulty: str = Field(default="unknown", max_length=20)
     passed: bool = Field(default=False)
 
@@ -306,6 +330,8 @@ class LCDrillAdvanceRequest(BaseModel):
     topic column). Body-less POSTs still work; the event is just skipped."""
 
     topic: Optional[str] = Field(default=None, max_length=120)
+    # Finer technique under the topic (e.g. "BFS"), logged on the drill struggle event.
+    subtopic: Optional[str] = Field(default=None, max_length=120)
 
 
 class LCDrillScheduleResponse(BaseModel):

@@ -48,6 +48,7 @@ from src.schemas.leetcode_schema import (
     LCNotesSyncRequest,
     LCProgressResponse,
     LCProgressSyncRequest,
+    LCReclassifyResponse,
     LCStreakChallengeCreateRequest,
     LCStreakChallengeResponse,
     LCWorkspaceResponse,
@@ -61,6 +62,7 @@ from src.schemas.leetcode_schema import (
     LeetCodeHintResponse,
     LeetCodeProblemResponse,
 )
+from src.services.lc_taxonomy import TOPIC_IDS
 from src.services.leetcode_service import LeetCodeService
 from src.services.scoring_service import (
     EVENT_COMPLEXITY_MISS_MAJOR,
@@ -143,6 +145,7 @@ async def kojo_leetcode_hint(
         LCStruggleEvent(
             user_id=user.id,
             topic=body.topic,
+            subtopic=body.subtopic,
             event_type=EVENT_HINT_USED,
             problem_slug=body.title_slug,
         )
@@ -178,6 +181,7 @@ async def grade_leetcode_submission(
             LCStruggleEvent(
                 user_id=user.id,
                 topic=body.topic,
+                subtopic=body.subtopic,
                 event_type=EVENT_FAILED_GRADE,
                 problem_slug=body.title_slug,
             )
@@ -222,6 +226,7 @@ async def check_leetcode_complexity(
             LCStruggleEvent(
                 user_id=user.id,
                 topic=body.topic,
+                subtopic=body.subtopic,
                 event_type=miss_event,
                 problem_slug=body.title_slug,
             )
@@ -277,6 +282,7 @@ async def log_struggle_event(
         LCStruggleEvent(
             user_id=user.id,
             topic=body.topic,
+            subtopic=body.subtopic,
             event_type=body.event_type,
             problem_slug=body.problem_slug,
         )
@@ -300,6 +306,7 @@ async def log_test_run(
             user_id=user.id,
             problem_slug=body.problem_slug,
             topic=body.topic,
+            subtopic=body.subtopic,
             difficulty=body.difficulty,
             passed=body.passed,
         )
@@ -536,6 +543,7 @@ def _serialize_custom_problem(row: LCCustomProblem) -> LCCustomProblemResponse:
         slug=row.slug,
         title=row.title,
         topic=row.topic,
+        subtopic=row.subtopic,
         difficulty=row.difficulty,
         description=row.description,
         url=row.url,
@@ -585,6 +593,7 @@ async def upsert_custom_problem(
     if row:
         row.title = body.title
         row.topic = body.topic or "unknown"
+        row.subtopic = (body.subtopic or "").strip() or None
         row.difficulty = body.normalized_difficulty()
         row.description = body.description
         row.url = body.url
@@ -597,6 +606,7 @@ async def upsert_custom_problem(
             slug=slug,
             title=body.title,
             topic=body.topic or "unknown",
+            subtopic=(body.subtopic or "").strip() or None,
             difficulty=body.normalized_difficulty(),
             description=body.description,
             url=body.url,
@@ -648,6 +658,70 @@ async def generate_custom_problem(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
+@router.post("/custom-problems/reclassify", response_model=LCReclassifyResponse)
+async def reclassify_custom_problems(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LCReclassifyResponse:
+    """One-time "Regenerate topics" backfill (beta-gated in the UI): classify every
+    active custom problem that either is missing a subtopic OR carries a topic that
+    isn't a real catalog category, setting ONLY topic + subtopic (statements and test
+    cases are never touched). Re-processing off-catalog topics lets the button correct
+    rows an earlier, looser run mislabeled. Problems already tagged with a valid
+    catalog topic AND a subtopic are skipped, so re-running is a cheap no-op."""
+    rows = (
+        await session.execute(
+            select(LCCustomProblem).where(
+                LCCustomProblem.user_id == user.id,
+                LCCustomProblem.is_archived.is_(False),
+                (LCCustomProblem.subtopic.is_(None))
+                | (LCCustomProblem.subtopic == "")
+                | (~LCCustomProblem.topic.in_(TOPIC_IDS)),
+            )
+        )
+    ).scalars().all()
+    if not rows:
+        return LCReclassifyResponse(updated=0)
+
+    payload = [
+        {
+            "slug": row.slug,
+            "title": row.title,
+            "description": row.description,
+            "starter_code": row.starter_code,
+        }
+        for row in rows
+    ]
+    try:
+        classified = await LeetCodeService().classify_custom_problems(
+            payload, provider=resolve_request_provider(user, None)
+        )
+    except LLMException as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    updated = 0
+    for row in rows:
+        result = classified.get(row.slug)
+        if not result:
+            continue
+        # classify_custom_problems already snapped these to the catalog (invalid values
+        # come back empty), so only non-empty values are ever written. Never wipe a
+        # good existing label with a blank the model failed to produce.
+        topic = (result.get("topic") or "").strip()
+        subtopic = (result.get("subtopic") or "").strip()
+        changed = False
+        if topic and topic != row.topic:
+            row.topic = topic[:120]
+            changed = True
+        if subtopic and subtopic != (row.subtopic or ""):
+            row.subtopic = subtopic[:120]
+            changed = True
+        if changed:
+            updated += 1
+    await session.commit()
+    return LCReclassifyResponse(updated=updated)
+
+
 # ── Daily KojoCode (beta-only) ────────────────────────────────────────────────
 
 def _today_str() -> str:
@@ -694,6 +768,7 @@ async def create_daily_problem(
     try:
         generated = await LeetCodeService().generate_daily_problem(
             topic=body.topic,
+            subtopic=body.subtopic,
             target_difficulty=body.normalized_difficulty(),
             seed_slug=body.seed_slug,
             provider=resolve_request_provider(user, body.provider),
@@ -713,6 +788,7 @@ async def create_daily_problem(
         # the backend takes target_difficulty as given (see the KojoCode plan) and the
         # client owns the topic taxonomy.
         topic=(body.topic or "unknown").strip()[:120] or "unknown",
+        subtopic=(body.subtopic or "").strip()[:120] or None,
         difficulty=body.normalized_difficulty(),
         description=generated.description,
         url="",
@@ -1092,6 +1168,7 @@ async def advance_drill(
             LCStruggleEvent(
                 user_id=user.id,
                 topic=body.topic,
+                subtopic=body.subtopic,
                 event_type=event_type,
                 problem_slug=slug,
             )
