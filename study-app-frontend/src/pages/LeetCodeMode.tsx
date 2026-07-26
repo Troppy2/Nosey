@@ -6275,36 +6275,66 @@ export default function LeetCodeMode() {
 
                   {complexityResult ? (
                     <div className="lc-complexity-result">
-                      <div className="lc-complexity-verdicts">
-                        <div
-                          className={`lc-complexity-verdict ${complexityResult.time_correct ? "lc-complexity-verdict--ok" : "lc-complexity-verdict--bad"}`}
-                        >
-                          {complexityResult.time_correct ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
-                          <span className="lc-complexity-verdict-label">Time</span>
-                          <span className="lc-complexity-verdict-value">{complexityResult.actual_time_complexity || "?"}</span>
-                        </div>
-                        <div
-                          className={`lc-complexity-verdict ${complexityResult.space_correct ? "lc-complexity-verdict--ok" : "lc-complexity-verdict--bad"}`}
-                        >
-                          {complexityResult.space_correct ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
-                          <span className="lc-complexity-verdict-label">Space</span>
-                          <span className="lc-complexity-verdict-value">{complexityResult.actual_space_complexity || "?"}</span>
-                        </div>
+                      <div className="lc-cx-cards">
+                        {([
+                          {
+                            metric: "Time",
+                            correct: complexityResult.time_correct,
+                            said: complexityTimeClaim.trim(),
+                            actual: complexityResult.actual_time_complexity,
+                          },
+                          {
+                            metric: "Space",
+                            correct: complexityResult.space_correct,
+                            said: complexitySpaceClaim.trim(),
+                            actual: complexityResult.actual_space_complexity,
+                          },
+                        ] as const).map((row) => (
+                          <div
+                            key={row.metric}
+                            className={`lc-cx-card ${row.correct ? "lc-cx-card--ok" : "lc-cx-card--off"}`}
+                          >
+                            <div className="lc-cx-card-top">
+                              <span className="lc-cx-metric">{row.metric}</span>
+                              <span className="lc-cx-status">
+                                {row.correct ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
+                                {row.correct ? "Correct" : "Not quite"}
+                              </span>
+                            </div>
+                            {row.correct ? (
+                              <div className="lc-cx-answer">{row.actual || "?"}</div>
+                            ) : (
+                              <div className="lc-cx-diff">
+                                <span className="lc-cx-diff-key">You said</span>
+                                <span className="lc-cx-diff-val lc-cx-diff-val--said">{row.said || "—"}</span>
+                                <span className="lc-cx-diff-key">Correct</span>
+                                <span className="lc-cx-diff-val lc-cx-diff-val--right">{row.actual || "?"}</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
 
-                      <div className="lc-complexity-confidence">
-                        <Gauge size={14} />
-                        <span>Kojo's confidence in this grade: {Math.round(complexityResult.confidence * 100)}%</span>
+                      <div className="lc-cx-meta">
+                        <span className="lc-cx-meter" aria-hidden="true">
+                          <span style={{ width: `${Math.round(complexityResult.confidence * 100)}%` }} />
+                        </span>
+                        <span className="lc-cx-meta-label">
+                          Kojo is {Math.round(complexityResult.confidence * 100)}% sure of this grade
+                        </span>
                       </div>
 
                       {complexityResult.flagged_uncertain ? (
-                        <div className="lc-complexity-uncertain">
-                          <AlertCircle size={14} />
-                          <span>Kojo is not fully sure here. Double-check this analysis yourself.</span>
+                        <div className="lc-cx-uncertain">
+                          <AlertCircle size={15} />
+                          <span>Kojo isn't fully sure of this grade. Double-check the analysis against your own reasoning.</span>
                         </div>
                       ) : null}
 
-                      <MarkdownContent content={complexityResult.feedback} />
+                      <hr className="lc-cx-divider" />
+                      <div className="lc-cx-feedback">
+                        <MarkdownContent content={complexityResult.feedback} />
+                      </div>
                     </div>
                   ) : null}
                 </div>

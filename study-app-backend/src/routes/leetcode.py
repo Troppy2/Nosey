@@ -7,6 +7,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_session
@@ -797,7 +798,18 @@ async def create_daily_problem(
         daily_date=_today_str(),
     )
     session.add(row)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        # Concurrent create-or-return race: a second POST for the same calendar day
+        # (e.g. a double-fired request) slips past the _find_today_daily check above and
+        # then trips the partial unique index (uq_lc_custom_daily_per_user). Treat it as
+        # create-or-return: roll back and hand back the row the other request created.
+        await session.rollback()
+        existing = await _find_today_daily(session, user.id)
+        if existing:
+            return _serialize_custom_problem(existing)
+        raise
     await session.refresh(row)
     return _serialize_custom_problem(row)
 
