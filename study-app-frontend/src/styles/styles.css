@@ -12937,6 +12937,25 @@ select[class*="lc-"]:focus-visible {
   box-shadow: none;
 }
 
+/* Secondary variant: the beta-only "Regenerate topics" backfill button. De-emphasized
+   next to the primary Add-question button (outlined, not filled). */
+.lc-custom-add-btn--secondary {
+  background: transparent;
+  color: var(--lc-custom-accent);
+  border-color: var(--lc-custom-accent);
+  box-shadow: none;
+}
+
+.lc-custom-add-btn--secondary:hover {
+  filter: none;
+  background: color-mix(in srgb, var(--lc-custom-accent) 10%, transparent);
+  box-shadow: none;
+}
+
+.lc-reclassify-msg {
+  margin: 6px 0 0;
+}
+
 /* In the modal footer, match the ghost Cancel button's height */
 .lc-custom-modal-save {
   min-height: 48px;

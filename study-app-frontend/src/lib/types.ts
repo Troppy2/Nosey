@@ -516,6 +516,9 @@ export type LCCustomProblem = {
   slug: string;
   title: string;
   topic: string;
+  // Finer technique(s) under the topic (e.g. "BFS"), comma-separated like topic.
+  // Null/absent for problems predating the taxonomy (backfilled by "Regenerate topics").
+  subtopic?: string | null;
   difficulty: LCCustomDifficulty;
   description: string;
   url: string;
@@ -532,6 +535,7 @@ export type LCCustomProblem = {
 export type LCGeneratedCustomProblem = {
   title: string;
   topic: string;
+  subtopic?: string | null;
   difficulty: LCCustomDifficulty;
   description: string;
   starter_code: string;
@@ -589,6 +593,8 @@ export type LCStreakChallenge = {
 
 export type LCWeaknessTopic = {
   topic: string;
+  // null on a topic-level rollup row; set on a per-subtopic row (e.g. "BFS").
+  subtopic?: string | null;
   level: number;
 };
 
@@ -599,6 +605,7 @@ export type LCWeaknessResponse = {
 export type LCTestRunRequest = {
   problem_slug: string;
   topic: string;
+  subtopic?: string | null;
   difficulty: string;
   passed: boolean;
 };

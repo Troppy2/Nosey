@@ -75,6 +75,7 @@ import {
   syncLCCustomProblem,
   deleteLCCustomProblem,
   generateLCCustomProblem,
+  reclassifyLCCustomProblems,
   fetchLCStreakChallenge,
   createLCStreakChallenge,
   completeLCStreakChallenge,
@@ -127,6 +128,9 @@ type Problem = {
   url: string;
   isExtra: boolean;
   isOfficial: boolean;
+  // Finer techniques this problem drills (e.g. ["BFS"]). Empty when untagged; the
+  // subtopic-aware pickers fall back to the topic-only pool in that case.
+  subtopics: string[];
 };
 
 type Category = {
@@ -340,6 +344,14 @@ function difficultyForLevel(level: number): "Easy" | "Medium" | "Hard" {
   return "Hard";
 }
 
+// Prefer the finer per-subtopic weakness rows for daily/drill targeting (so practice
+// drills the exact technique the user is weak at); fall back to the topic-level
+// rollup rows when nothing is tagged at the subtopic level yet.
+function preferSubtopicTargets(topics: LCWeaknessTopic[]): LCWeaknessTopic[] {
+  const subs = topics.filter((t) => t.subtopic);
+  return subs.length ? subs : topics.filter((t) => !t.subtopic);
+}
+
 // Rotate the daily across the top few weak topics (weighted by level) instead of
 // always the single worst one, so it doesn't hammer the same topic day after day.
 function pickWeightedTopic(topics: LCWeaknessTopic[], n: number): LCWeaknessTopic | undefined {
@@ -354,14 +366,29 @@ function pickWeightedTopic(topics: LCWeaknessTopic[], n: number): LCWeaknessTopi
   return pool[pool.length - 1];
 }
 
+// True when a problem is tagged with the given subtopic (case-insensitive).
+function problemHasSubtopic(problem: Problem, subtopic: string): boolean {
+  const target = subtopic.trim().toLowerCase();
+  if (!target) return false;
+  return problem.subtopics.some((s) => s.toLowerCase() === target);
+}
+
 // Pick a seed from a pool, preferring unsolved problems the daily hasn't reskinned
-// recently, so the concrete problem varies even within one topic.
+// recently, so the concrete problem varies even within one topic. When a weak
+// subtopic is given, narrow the pool to problems drilling that exact technique so the
+// generated problem targets the real gap; if none are tagged, fall back to the whole
+// pool rather than dead-ending.
 function chooseDailySeed(
   pool: Problem[],
   recent: string[],
   progress: Record<string, boolean>,
+  subtopic?: string | null,
 ): Problem | undefined {
   if (!pool.length) return undefined;
+  if (subtopic) {
+    const matched = pool.filter((p) => problemHasSubtopic(p, subtopic));
+    if (matched.length) pool = matched;
+  }
   const unsolved = pool.filter((p) => !progress[p.slug]);
   const unsolvedFresh = unsolved.filter((p) => !recent.includes(p.slug));
   const fresh = pool.filter((p) => !recent.includes(p.slug));
@@ -417,6 +444,64 @@ const CATEGORY_META: Record<string, Omit<Category, "problems">> = {
   intervals: { id: "intervals", label: "Intervals", icon: PanelRightOpen, accent: "#b45309" },
   extra: { id: "extra", label: "Extra", icon: Trophy, accent: "#db2777" },
 };
+
+// Curated two-level taxonomy: category id -> the finer subtopics (techniques) under
+// it, drawn from LeetCode's tag set. Used to author official-problem subtopics, to
+// constrain the AI's labels, and to render the subtopic picker. Keep in sync with the
+// backend copy in study-app-backend/src/services/lc_taxonomy.py.
+const SUBTOPICS_BY_TOPIC: Record<string, string[]> = {
+  arrays: [
+    "Two Pointers", "Prefix Sum", "Sliding Window", "Sorting", "Matrix",
+    "Counting Sort", "Radix Sort", "Merge Sort", "Quickselect",
+  ],
+  strings: [
+    "Two Pointers", "String Matching", "Sliding Window", "Rolling Hash",
+    "Hash Function", "Trie", "Suffix Array", "KMP Algorithm",
+  ],
+  "hash-table": ["Counting", "Bucket Sort", "Rolling Hash", "Hash Function", "Ordered Set", "Ordered Map", "Design"],
+  "linked-list": ["Doubly-Linked List", "Two Pointers", "Recursion"],
+  stack: ["Monotonic Stack", "Queue", "Design"],
+  "heap-priority-queue": ["Sorting", "Simulation", "Greedy", "Merge Sort"],
+  tree: [
+    "Binary Tree", "Binary Search Tree", "Depth-First Search", "Breadth-First Search",
+    "Tree Multi-set", "Euler Tour Technique", "Union Find", "Divide and Conquer",
+  ],
+  "binary-search": ["Two Pointers", "Divide and Conquer", "Interactive"],
+  "sliding-window": ["Two Pointers", "Array", "String", "Hash Table"],
+  dp: ["Memoization", "Bitmask", "Divide and Conquer", "Bit Manipulation", "Combinatorics"],
+  backtracking: ["Depth-First Search", "Recursion"],
+  graph: [
+    "Depth-First Search", "Breadth-First Search", "Shortest Path", "Union Find",
+    "Topological Sort", "Minimum Spanning Tree", "Eulerian Circuit", "Bipartite Graph",
+    "Strongly Connected Component", "Tarjan's Algorithm", "Dijkstra's Algorithm",
+  ],
+  design: ["Data Stream", "Object-Oriented Programming", "Concurrency"],
+  advanced: ["Trie", "Segment Tree", "Binary Indexed Tree", "Union Find", "Suffix Array", "Line Sweep"],
+  math: [
+    "Geometry", "Combinatorics", "Number Theory", "Game Theory",
+    "Probability and Statistics", "Randomized", "Brainteaser",
+  ],
+  "bit-manipulation": ["Bitmask"],
+  intervals: ["Array", "Line Sweep", "Ordered Set"],
+  extra: ["Greedy", "Matrix", "Simulation", "Recursion", "Brainteaser", "Shell", "Database"],
+};
+
+// The 6th "|"-separated field of a PROBLEM_ROWS line is a comma-separated subtopic
+// list; parse it into trimmed, non-empty labels. Reuses the same shape splitTopics
+// produces so official and custom problems carry subtopics identically.
+function parseRowSubtopics(field: string | undefined): string[] {
+  if (!field) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of field.split(",")) {
+    const name = part.trim();
+    const key = name.toLowerCase();
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  return out;
+}
 
 const PROBLEM_ROWS = `
 Arrays|Two Sum|Easy|two-sum|
@@ -632,7 +717,7 @@ function toId(label: string) {
 function buildCategories(): Category[] {
   const grouped = new Map<string, Problem[]>();
   PROBLEM_ROWS.trim().split("\n").forEach((line) => {
-    const [categoryLabel, title, difficulty, slug, extra] = line.split("|");
+    const [categoryLabel, title, difficulty, slug, extra, subtopics] = line.split("|");
     const categoryId = toId(categoryLabel);
     const isOfficial = Boolean(slug);
     const problem: Problem = {
@@ -644,6 +729,7 @@ function buildCategories(): Category[] {
       url: isOfficial ? `${LEETCODE_BASE_URL}/${slug}/` : "https://leetcode.com/tag/shortest-path/",
       isExtra: extra === "extra",
       isOfficial,
+      subtopics: parseRowSubtopics(subtopics),
     };
     grouped.set(categoryId, [...(grouped.get(categoryId) ?? []), problem]);
   });
@@ -794,6 +880,7 @@ function customToProblem(cp: LCCustomProblem): Problem {
     url: cp.url || "https://leetcode.com/problemset/",
     isExtra: false,
     isOfficial: false,
+    subtopics: splitTopics(cp.subtopic ?? undefined),
   };
 }
 
@@ -821,6 +908,9 @@ function customToProblemData(cp: LCCustomProblem): LeetCodeProblemData {
 type CustomFormState = {
   title: string;
   topic: string;
+  // Finer technique (e.g. "BFS"); carried so an AI-generated problem's subtopic
+  // persists on save and feeds subtopic-level weakness. Blank means untagged.
+  subtopic: string;
   difficulty: LCCustomProblem["difficulty"];
   description: string;
   url: string;
@@ -831,6 +921,7 @@ type CustomFormState = {
 const EMPTY_CUSTOM_FORM: CustomFormState = {
   title: "",
   topic: "unknown",
+  subtopic: "",
   difficulty: "unknown",
   description: "",
   url: "",
@@ -1644,11 +1735,16 @@ function DailyPracticeCard({
   const bySignal = weakness.length > 0;
   const rows = useMemo<FocusRow[]>(() => {
     if (bySignal) {
-      return weakness.slice(0, 4).map((topic) => {
+      // Prefer the finer per-subtopic rows: for any topic that has a subtopic row,
+      // drop its topic-level rollup so the list shows the specific technique (e.g.
+      // "Graph · BFS") rather than both it and the parent bucket.
+      const topicsWithSub = new Set(weakness.filter((t) => t.subtopic).map((t) => t.topic));
+      const ranked = weakness.filter((t) => t.subtopic || !topicsWithSub.has(t.topic));
+      return ranked.slice(0, 4).map((topic) => {
         const resolved = resolveTopic(topic.topic);
         return {
           id: resolved.id,
-          label: resolved.label,
+          label: topic.subtopic ? `${resolved.label} · ${topic.subtopic}` : resolved.label,
           score: `weakness ${topic.level}`,
           fillPct: (topic.level / 5) * 100,
           color: weaknessColor(topic.level),
@@ -1679,7 +1775,7 @@ function DailyPracticeCard({
       </p>
       <ul className="lc-focus-rows">
         {rows.map((row) => (
-          <li key={row.id}>
+          <li key={row.label}>
             <button type="button" className="lc-focus-row" onClick={() => onOpenCategory(row.id)} title={`Practice ${row.label}`}>
               <span className="lc-focus-row-label">{row.label}</span>
               <span className="lc-focus-row-score">{row.score}</span>
@@ -1914,6 +2010,10 @@ export default function LeetCodeMode() {
   const [customForm, setCustomForm] = useState<CustomFormState>(EMPTY_CUSTOM_FORM);
   const [customSaving, setCustomSaving] = useState(false);
   const [customError, setCustomError] = useState<string | null>(null);
+  // One-time "Regenerate topics" backfill (beta): classifies existing custom problems
+  // that predate the subtopic taxonomy. null status = idle.
+  const [reclassifying, setReclassifying] = useState(false);
+  const [reclassifyMsg, setReclassifyMsg] = useState<string | null>(null);
   const [pendingDeleteSlug, setPendingDeleteSlug] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [aiCode, setAiCode] = useState("");
@@ -2640,6 +2740,7 @@ export default function LeetCodeMode() {
 
       let seed: Problem | undefined;
       let topicLabel = "";
+      let targetSubtopic: string | null = null;
       let targetDifficulty: "Easy" | "Medium" | "Hard" = "Medium";
 
       // If a Prep Bank is active, the daily targets that bank's own weak areas
@@ -2661,9 +2762,10 @@ export default function LeetCodeMode() {
         // only on cold start (no bank signals yet).
         const bankTopicIds = new Set(bankProblems.map((p) => p.categoryId));
         const weakTopic = pickWeightedTopic(
-          bankScores.filter((t) => bankTopicIds.has(resolveTopic(t.topic).id)),
+          preferSubtopicTargets(bankScores.filter((t) => bankTopicIds.has(resolveTopic(t.topic).id))),
           3,
         );
+        targetSubtopic = weakTopic?.subtopic ?? null;
         const chosenTopicId = weakTopic
           ? resolveTopic(weakTopic.topic).id
           : bankTopicStats(activeBank.problem_slugs)[0]?.id;
@@ -2671,7 +2773,7 @@ export default function LeetCodeMode() {
           ? bankProblems.filter((problem) => problem.categoryId === chosenTopicId)
           : [];
         const pool = topicPool.length ? topicPool : bankProblems;
-        seed = chooseDailySeed(pool, recent, progress);
+        seed = chooseDailySeed(pool, recent, progress, targetSubtopic);
         if (seed) {
           topicLabel = CATEGORY_META[seed.categoryId]?.label ?? seed.categoryLabel;
           targetDifficulty = weakTopic
@@ -2685,7 +2787,8 @@ export default function LeetCodeMode() {
       // Full-catalog path: no active bank (or none of its slugs resolved). Rotate
       // across the top few globally weak topics; cold-start to a random topic.
       if (!seed) {
-        const weakTopic = pickWeightedTopic(weakness, 3);
+        const weakTopic = pickWeightedTopic(preferSubtopicTargets(weakness), 3);
+        targetSubtopic = weakTopic?.subtopic ?? null;
         targetDifficulty = weakTopic ? difficultyForLevel(weakTopic.level) : "Easy";
         const matchedCategory =
           (weakTopic &&
@@ -2696,13 +2799,13 @@ export default function LeetCodeMode() {
             )) ||
           CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
         const pool = matchedCategory.problems.length ? matchedCategory.problems : UNIQUE_PROBLEMS;
-        seed = chooseDailySeed(pool, recent, progress);
+        seed = chooseDailySeed(pool, recent, progress, targetSubtopic);
         topicLabel = matchedCategory.label;
       }
 
       if (!seed) throw new Error("Kojo couldn't find a problem to base today's question on.");
 
-      const created = await createLCDaily(topicLabel, targetDifficulty, seed.slug, generationProvider);
+      const created = await createLCDaily(topicLabel, targetDifficulty, seed.slug, generationProvider, targetSubtopic);
       pushRecentDailySeed(seed.slug);
       setDailyProblem(created);
       setCustomProblems((prev) => [...prev, created]);
@@ -2854,6 +2957,7 @@ export default function LeetCodeMode() {
     const payload: Omit<LCCustomProblem, "slug"> = {
       title: generated.title || "Kojo Problem",
       topic: topicIds[0] ?? "unknown",
+      subtopic: generated.subtopic ?? null,
       difficulty:
         generated.difficulty === "Easy" || generated.difficulty === "Medium" || generated.difficulty === "Hard"
           ? generated.difficulty
@@ -2936,6 +3040,15 @@ export default function LeetCodeMode() {
     return customProblems.find((cp) => cp.slug === slug)?.topic || findProblemCategory(slug);
   }
 
+  // The finer technique a slug drills, for subtopic-level weakness signals: a custom
+  // problem's own subtopic, else the catalog problem's first tagged subtopic. Null when
+  // untagged, in which case the signal degrades to pure topic-level scoring server-side.
+  function resolveProblemSubtopic(slug: string): string | null {
+    const custom = customProblems.find((cp) => cp.slug === slug);
+    if (custom) return splitTopics(custom.subtopic ?? undefined)[0] ?? null;
+    return findProblem(slug)?.subtopics[0] ?? null;
+  }
+
   async function handleComplexitySubmit() {
     if (!currentProblem || complexityLoading) return;
     const slug = currentProblem.slug;
@@ -2954,6 +3067,7 @@ export default function LeetCodeMode() {
         customForGrade?.topic || currentProblem.categoryId,
         generationProvider,
         customForGrade?.description || undefined,
+        resolveProblemSubtopic(slug),
       );
       setComplexityResult(result);
       saveComplexityDraft(slug, pass, {
@@ -2971,7 +3085,7 @@ export default function LeetCodeMode() {
   }
 
   async function handleAdvanceDrill(slug: string) {
-    const updated = await advanceLCDrill(slug, resolveProblemTopic(slug)).catch(() => null);
+    const updated = await advanceLCDrill(slug, resolveProblemTopic(slug), resolveProblemSubtopic(slug)).catch(() => null);
     if (!updated) return;
     setDrills((prev) =>
       updated.completed_at
@@ -3192,7 +3306,7 @@ export default function LeetCodeMode() {
     setDifficultyPromptSlug(null);
     if (!slug) return;
     markDifficultySurveyed(slug);
-    void logLCStruggleEvent(resolveProblemTopic(slug), `self_rated_${rating}`, slug);
+    void logLCStruggleEvent(resolveProblemTopic(slug), `self_rated_${rating}`, slug, resolveProblemSubtopic(slug));
     runPendingDrillPrompt(slug);
   }
 
@@ -3297,6 +3411,7 @@ export default function LeetCodeMode() {
       setCustomForm({
         title: existing.title,
         topic: existing.topic || "unknown",
+        subtopic: existing.subtopic ?? "",
         difficulty: existing.difficulty || "unknown",
         description: existing.description,
         url: existing.url,
@@ -3342,6 +3457,7 @@ export default function LeetCodeMode() {
       setCustomForm((prev) => ({
         title: generated.title || prev.title,
         topic: generated.topic || prev.topic || "unknown",
+        subtopic: generated.subtopic || prev.subtopic || "",
         difficulty: generated.difficulty || prev.difficulty || "unknown",
         description: generated.description || prev.description,
         url: prev.url,
@@ -3357,6 +3473,33 @@ export default function LeetCodeMode() {
 
   function updateCustomForm<K extends keyof CustomFormState>(field: K, value: CustomFormState[K]) {
     setCustomForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  // One-time backfill: ask the backend to classify every custom problem missing a
+  // subtopic (topic + subtopic only, statements/tests untouched), then re-pull the
+  // list so the new labels show. Idempotent server-side, so re-pressing is safe.
+  async function handleReclassifyTopics() {
+    if (reclassifying || isGuestSession()) return;
+    setReclassifying(true);
+    setReclassifyMsg(null);
+    try {
+      const { updated } = await reclassifyLCCustomProblems();
+      try {
+        const refreshed = await fetchLCCustomProblems();
+        persistCustomProblems(refreshed);
+      } catch {
+        // list refresh is best-effort; the backfill still applied server-side
+      }
+      setReclassifyMsg(
+        updated > 0
+          ? `Updated ${updated} problem${updated === 1 ? "" : "s"} with topics and subtopics.`
+          : "All custom problems already have subtopics.",
+      );
+    } catch {
+      setReclassifyMsg("Couldn't regenerate topics right now. Try again in a moment.");
+    } finally {
+      setReclassifying(false);
+    }
   }
 
   function addFormTestCase() {
@@ -3395,6 +3538,7 @@ export default function LeetCodeMode() {
     const payload: Omit<LCCustomProblem, "slug"> = {
       title,
       topic: customForm.topic.trim() || "unknown",
+      subtopic: customForm.subtopic.trim() || null,
       difficulty: customForm.difficulty || "unknown",
       description: customForm.description,
       url: customForm.url.trim(),
@@ -3624,6 +3768,7 @@ export default function LeetCodeMode() {
           customForGrade?.topic || problemAtRun.categoryId,
           problemAtRun.difficulty,
           result.ok,
+          resolveProblemSubtopic(problemAtRun.slug),
         );
         setGradeLoading(true);
         const testResultsSummary = JSON.stringify(
@@ -3644,6 +3789,7 @@ export default function LeetCodeMode() {
             customForGrade?.topic || problemAtRun.categoryId,
             generationProvider,
             customForGrade?.description || undefined,
+            resolveProblemSubtopic(problemAtRun.slug),
           );
           setGradeFeedback(grade.feedback);
           saveGradeFeedback(problemAtRun.slug, grade.feedback);
@@ -3672,7 +3818,7 @@ export default function LeetCodeMode() {
       return;
     }
 
-    void logLCStruggleEvent(resolveProblemTopic(problemAtTimeout.slug), "timer_expiry", problemAtTimeout.slug);
+    void logLCStruggleEvent(resolveProblemTopic(problemAtTimeout.slug), "timer_expiry", problemAtTimeout.slug, resolveProblemSubtopic(problemAtTimeout.slug));
 
     const result = await runAndGradeCurrentCode(
       problemAtTimeout,
@@ -4219,6 +4365,22 @@ export default function LeetCodeMode() {
               </select>
             </label>
           </div>
+
+          <label className="lc-custom-field">
+            <span>Subtopic <small className="muted">(finer technique, e.g. BFS)</small></span>
+            <input
+              className="lc-custom-input"
+              value={customForm.subtopic}
+              onChange={(event) => updateCustomForm("subtopic", event.target.value)}
+              placeholder="Optional"
+              list="lc-subtopic-suggestions"
+            />
+            <datalist id="lc-subtopic-suggestions">
+              {(SUBTOPICS_BY_TOPIC[toId(customForm.topic)] ?? []).map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
+          </label>
 
           <label className="lc-custom-field">
             <span>LeetCode URL <small className="muted">(optional)</small></span>
@@ -4943,9 +5105,13 @@ export default function LeetCodeMode() {
               const done = selectedBank.problem_slugs.filter((slug) => progress[slug]).length;
               // Show ALL of the bank's topics (not just the top few). Order by
               // bank-scoped struggle when signals exist, else by completion.
-              const bankLevelByTopic = new Map(
-                bankWeakness.map((topic) => [resolveTopic(topic.topic).id, topic.level]),
-              );
+              // Category heat is topic-level: take the strongest signal per topic id
+              // across its rollup + subtopic rows (they share an id, so max, not last).
+              const bankLevelByTopic = new Map<string, number>();
+              for (const topic of bankWeakness) {
+                const id = resolveTopic(topic.topic).id;
+                bankLevelByTopic.set(id, Math.max(bankLevelByTopic.get(id) ?? 0, topic.level));
+              }
               const weakMap = [...bankTopicStats(selectedBank.problem_slugs)].sort((a, b) => {
                 const la = bankLevelByTopic.get(a.id) ?? 0;
                 const lb = bankLevelByTopic.get(b.id) ?? 0;
@@ -5320,11 +5486,24 @@ export default function LeetCodeMode() {
               <Search size={16} />
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search problems" />
             </div>
+            {betaMode && !isGuestSession() && (
+              <button
+                type="button"
+                className="lc-custom-add-btn lc-custom-add-btn--secondary"
+                onClick={() => void handleReclassifyTopics()}
+                disabled={reclassifying}
+                title="Classify your existing custom problems with topics and subtopics"
+              >
+                <Sparkles size={16} />
+                {reclassifying ? "Regenerating..." : "Regenerate topics"}
+              </button>
+            )}
             <button type="button" className="lc-custom-add-btn" onClick={() => openCustomModal()}>
               <Plus size={16} />
               Add question
             </button>
           </div>
+          {reclassifyMsg && <p className="lc-reclassify-msg small muted">{reclassifyMsg}</p>}
           {renderFilterBar(false)}
         </header>
 
@@ -5980,6 +6159,7 @@ export default function LeetCodeMode() {
                       resolveProblemTopic(currentProblem.slug),
                       "solution_viewed",
                       currentProblem.slug,
+                      resolveProblemSubtopic(currentProblem.slug),
                     );
                   }
                 }}

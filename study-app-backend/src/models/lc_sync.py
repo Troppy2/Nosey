@@ -123,6 +123,10 @@ class LCCustomProblem(Base, TimestampMixin):
     slug: Mapped[str] = mapped_column(String(200), nullable=False)
     title: Mapped[str] = mapped_column(String(300), nullable=False)
     topic: Mapped[str] = mapped_column(String(120), nullable=False, default="unknown")
+    # Finer technique(s) under the topic (e.g. "BFS" for a graph problem), comma-
+    # separated like topic. Nullable: predates the taxonomy for older rows, backfilled
+    # by the classify-only "Regenerate topics" pass. See services/lc_taxonomy.py.
+    subtopic: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     difficulty: Mapped[str] = mapped_column(String(20), nullable=False, default="unknown")
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     url: Mapped[str] = mapped_column(Text, nullable=False, default="")
@@ -179,6 +183,9 @@ class LCStruggleEvent(Base):
         BIGINT_ID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     topic: Mapped[str] = mapped_column(String(120), nullable=False)
+    # Finer technique under the topic (e.g. "BFS"). Nullable so old rows and clients
+    # that don't send it degrade to pure topic-level scoring. See services/lc_taxonomy.py.
+    subtopic: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     # timer_expiry | hint_used | failed_grade
     event_type: Mapped[str] = mapped_column(String(20), nullable=False)
     # Nullable: only needed so the failed_grade/timer_expiry auto-add-drill hook
@@ -282,6 +289,9 @@ class LCTestRun(Base):
     )
     problem_slug: Mapped[str] = mapped_column(String(200), nullable=False)
     topic: Mapped[str] = mapped_column(String(120), nullable=False)
+    # Finer technique under the topic (e.g. "BFS"). Nullable so old rows and clients
+    # that don't send it degrade to pure topic-level scoring. See services/lc_taxonomy.py.
+    subtopic: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     difficulty: Mapped[str] = mapped_column(String(20), nullable=False, default="unknown")
     passed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     run_at: Mapped[datetime] = mapped_column(

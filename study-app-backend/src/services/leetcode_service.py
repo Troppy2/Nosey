@@ -192,17 +192,20 @@ class LeetCodeService:
         topic: str,
         target_difficulty: str,
         seed_slug: str,
+        subtopic: Optional[str] = None,
         provider: Optional[str] = None,
     ) -> LCGeneratedCustomProblem:
         """Reskin a real seed problem into a fresh Daily KojoCode problem on the given
-        topic at the given difficulty. Fetches the seed's real statement first, then
-        makes a single LLM call. Fetch errors (bad slug) propagate as
-        ResourceNotFoundException so the route can map them to 404."""
+        topic (and, when targeting a weak area, subtopic) at the given difficulty.
+        Fetches the seed's real statement first, then makes a single LLM call. Fetch
+        errors (bad slug) propagate as ResourceNotFoundException so the route can map
+        them to 404."""
         seed = await self._fetch_problem(seed_slug)
         seed_statement = self._html_to_text(seed.content_html)
         try:
             data = await LLMService().generate_daily_problem(
                 topic=topic,
+                subtopic=subtopic,
                 target_difficulty=target_difficulty,
                 seed_title=seed.title,
                 seed_statement=seed_statement,
@@ -212,6 +215,23 @@ class LeetCodeService:
             raise LLMException("Kojo couldn't generate today's problem. Try again.") from exc
 
         return self._normalize_generated_problem(data, fallback_code="")
+
+    async def classify_custom_problems(
+        self,
+        problems: list[dict[str, str]],
+        provider: Optional[str] = None,
+    ) -> dict[str, dict[str, str]]:
+        """Classify-only backfill for the "Regenerate topics" button. Given stored
+        custom problems (each {slug, title, description, starter_code}), return
+        {slug: {topic, subtopic}} WITHOUT touching their statements or test cases.
+        Batched by the LLM layer; a slug missing from the result just keeps its
+        existing labels."""
+        if not problems:
+            return {}
+        try:
+            return await LLMService().classify_custom_problems(problems, provider=provider)
+        except Exception as exc:
+            raise LLMException("Kojo couldn't regenerate topics right now. Try again.") from exc
 
     def _normalize_generated_problem(
         self, data: dict[str, object], fallback_code: str = ""
@@ -242,9 +262,11 @@ class LeetCodeService:
                     )
                 )
 
+        subtopic_raw = str(data.get("subtopic", "") or "").strip()[:120]
         return LCGeneratedCustomProblem(
             title=str(data.get("title", "") or "").strip()[:300],
             topic=str(data.get("topic", "unknown") or "unknown").strip()[:120] or "unknown",
+            subtopic=subtopic_raw or None,
             difficulty=difficulty,
             description=str(data.get("description", "") or "").strip()[:20000],
             starter_code=str(data.get("starter_code", "") or fallback_code or "").strip()[:20000],
