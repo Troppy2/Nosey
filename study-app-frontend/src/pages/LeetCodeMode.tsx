@@ -52,6 +52,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { LoadingNotice } from "../components/Loaders";
+import { SkeletonList } from "../components/Skeletons";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { ToggleSwitch } from "../components/ToggleSwitch";
 import CodingTabs from "../components/Tab";
@@ -1528,6 +1529,43 @@ const PASS_RULE = [
   "no resources, timed off the head",
 ] as const;
 
+// Interviewer persona for the "Ask Kojo" hint chat: how much Kojo helps while you
+// solve. The mode id rides to the backend (interviewer_mode) where it becomes an
+// authoritative prompt block; the copy below drives the settings picker and the
+// chat's contract banner + empty state so the UI matches Kojo's actual behavior.
+type InterviewerMode = "startup" | "local" | "bigtech";
+const INTERVIEWER_MODES: { id: InterviewerMode; label: string }[] = [
+  { id: "startup", label: "Startup" },
+  { id: "local", label: "Local" },
+  { id: "bigtech", label: "Big Tech" },
+];
+const INTERVIEWER_COPY: Record<
+  InterviewerMode,
+  { blurb: string; contract: string; emptySub: string; suggestions: string[] }
+> = {
+  startup: {
+    blurb: "Collaborative. Kojo clarifies the problem, suggests the fitting pattern, and talks through the approach, but never writes the solution for you.",
+    contract: "Startup interviewer: Kojo gives generous hints, edge cases, and approach direction. It will not write the full solution code.",
+    emptySub: "Ask for a hint, the right pattern, or talk through your approach. I'll get you unstuck.",
+    suggestions: ["Give me a hint", "What pattern fits here?", "Help me debug my current code"],
+  },
+  local: {
+    blurb: "Balanced. One hint at a time and probing questions. Kojo points you toward the idea but won't hand over the approach or code.",
+    contract: "Local interviewer: Kojo gives one nudge at a time and asks probing questions. No full approach, no solution code.",
+    emptySub: "Ask a focused question and I'll nudge you toward the idea, one step at a time.",
+    suggestions: ["Give me one hint", "What edge cases am I missing?", "Am I on the right track?"],
+  },
+  bigtech: {
+    blurb: "Rigorous. Mostly Socratic, minimal nudges. Kojo expects you to drive and will not reveal the approach, complexity, or code.",
+    contract: "Big Tech interviewer: expect Socratic questions and minimal hints. Kojo will not reveal the approach, complexity, or solution code.",
+    emptySub: "I'll mostly answer with questions. Tell me your current thinking and I'll probe it.",
+    suggestions: ["Ask me a guiding question", "Is my approach reasonable?", "What should I consider next?"],
+  },
+};
+function resolveInterviewerMode(mode: string): InterviewerMode {
+  return mode === "startup" || mode === "local" || mode === "bigtech" ? mode : "bigtech";
+}
+
 // Weakness runs the same ramp, inverted: a hotter (redder) topic is one the struggle
 // signals flag hardest, so the eye lands on what needs work now.
 function weaknessColor(level: number): string {
@@ -2002,6 +2040,8 @@ export default function LeetCodeMode() {
     setWeaknessSensitivity,
     difficultyPromptEnabled,
     setDifficultyPromptEnabled,
+    interviewerMode,
+    setInterviewerMode,
   } = useSettings();
   const [view, setView] = useState<View>({ type: "tree" });
   const [customProblems, setCustomProblems] = useState<LCCustomProblem[]>(() => loadCustomProblems());
@@ -2096,6 +2136,19 @@ export default function LeetCodeMode() {
   const [drills, setDrills] = useState<LCDrillSchedule[]>([]);
   const [drillsLoading, setDrillsLoading] = useState(false);
   const [drillAddText, setDrillAddText] = useState("");
+  // Per-action pending flags so every network-bound button in Drills and Prep
+  // Banks shows feedback while it runs, matching the Loader2-spin pattern used
+  // across the rest of this file. Keyed states (slug / bank id) so only the
+  // clicked row spins, not the whole list.
+  const [advancingDrill, setAdvancingDrill] = useState<string | null>(null);
+  const [drillAdding, setDrillAdding] = useState(false);
+  // Shared by both drill ConfirmModals: only one is ever open at a time.
+  const [drillModalBusy, setDrillModalBusy] = useState(false);
+  const [activatingBankId, setActivatingBankId] = useState<number | null>(null);
+  const [deletingBankId, setDeletingBankId] = useState<number | null>(null);
+  const [removingBankSlug, setRemovingBankSlug] = useState<string | null>(null);
+  const [bankTopicAdding, setBankTopicAdding] = useState(false);
+  const [bankMatching, setBankMatching] = useState(false);
   // "Add this problem to your 3-Pass Drill?" prompt: slug awaiting a yes/no (null = closed).
   const [drillPromptSlug, setDrillPromptSlug] = useState<string | null>(null);
   // Set when a completion should offer the drill prompt but the difficulty survey is
@@ -2884,25 +2937,43 @@ export default function LeetCodeMode() {
   }
 
   async function handleDeleteBank(bankId: number) {
-    await deleteLCPrepBank(bankId).catch(() => {});
-    setPrepBanks((prev) => prev.filter((bank) => bank.id !== bankId));
-    setSelectedBankId((current) => (current === bankId ? null : current));
+    if (deletingBankId) return;
+    setDeletingBankId(bankId);
+    try {
+      await deleteLCPrepBank(bankId).catch(() => {});
+      setPrepBanks((prev) => prev.filter((bank) => bank.id !== bankId));
+      setSelectedBankId((current) => (current === bankId ? null : current));
+    } finally {
+      setDeletingBankId(null);
+    }
   }
 
   async function handleActivateBank(bankId: number) {
-    const updated = await activateLCPrepBank(bankId).catch(() => null);
-    if (!updated) return;
-    setPrepBanks((prev) => prev.map((bank) => ({ ...bank, is_active: bank.id === bankId })));
+    if (activatingBankId) return;
+    setActivatingBankId(bankId);
+    try {
+      const updated = await activateLCPrepBank(bankId).catch(() => null);
+      if (!updated) return;
+      setPrepBanks((prev) => prev.map((bank) => ({ ...bank, is_active: bank.id === bankId })));
+    } finally {
+      setActivatingBankId(null);
+    }
   }
 
   async function handleMatchAndAddToBank(bankId: number) {
+    if (bankMatching) return;
     const { matched, unmatched } = matchPastedTitlesToSlugs(bankMatchText);
     setBankMatchUnmatched(unmatched);
     if (!matched.length) return;
-    const updated = await bulkAddLCBankProblems(bankId, matched).catch(() => null);
-    if (!updated) return;
-    setPrepBanks((prev) => prev.map((bank) => (bank.id === bankId ? updated : bank)));
-    setBankMatchText("");
+    setBankMatching(true);
+    try {
+      const updated = await bulkAddLCBankProblems(bankId, matched).catch(() => null);
+      if (!updated) return;
+      setPrepBanks((prev) => prev.map((bank) => (bank.id === bankId ? updated : bank)));
+      setBankMatchText("");
+    } finally {
+      setBankMatching(false);
+    }
   }
 
   function toggleBankAddTopic(topicId: string) {
@@ -2920,7 +2991,7 @@ export default function LeetCodeMode() {
   // bank. This is the primary add flow, matching how companies scope by topic.
   async function handleAddByTopic(bankId: number) {
     const bank = prepBanks.find((b) => b.id === bankId);
-    if (!bank || bankAddTopics.size === 0) return;
+    if (!bank || bankAddTopics.size === 0 || bankTopicAdding) return;
     const picked = pickProblemsFromTopics(Array.from(bankAddTopics), bankAddCount, {
       progress,
       skip: new Set(bank.problem_slugs),
@@ -2930,11 +3001,16 @@ export default function LeetCodeMode() {
       setBankAddNote("No new problems left in those topics and difficulty.");
       return;
     }
-    const updated = await bulkAddLCBankProblems(bankId, picked).catch(() => null);
-    if (!updated) return;
-    setPrepBanks((prev) => prev.map((b) => (b.id === bankId ? updated : b)));
-    setBankAddTopics(new Set());
-    setBankAddNote(`Added ${picked.length} problem${picked.length === 1 ? "" : "s"} from ${bankAddTopics.size} topic${bankAddTopics.size === 1 ? "" : "s"}.`);
+    setBankTopicAdding(true);
+    try {
+      const updated = await bulkAddLCBankProblems(bankId, picked).catch(() => null);
+      if (!updated) return;
+      setPrepBanks((prev) => prev.map((b) => (b.id === bankId ? updated : b)));
+      setBankAddTopics(new Set());
+      setBankAddNote(`Added ${picked.length} problem${picked.length === 1 ? "" : "s"} from ${bankAddTopics.size} topic${bankAddTopics.size === 1 ? "" : "s"}.`);
+    } finally {
+      setBankTopicAdding(false);
+    }
   }
 
   // "Create with Kojo": generate ONE fresh problem (AI) from the selected topics and, for
@@ -3012,24 +3088,36 @@ export default function LeetCodeMode() {
   }
 
   async function handleRemoveBankProblem(bankId: number, slug: string) {
-    await removeLCBankProblem(bankId, slug).catch(() => {});
-    setPrepBanks((prev) =>
-      prev.map((bank) =>
-        bank.id === bankId ? { ...bank, problem_slugs: bank.problem_slugs.filter((s) => s !== slug) } : bank,
-      ),
-    );
+    if (removingBankSlug) return;
+    setRemovingBankSlug(slug);
+    try {
+      await removeLCBankProblem(bankId, slug).catch(() => {});
+      setPrepBanks((prev) =>
+        prev.map((bank) =>
+          bank.id === bankId ? { ...bank, problem_slugs: bank.problem_slugs.filter((s) => s !== slug) } : bank,
+        ),
+      );
+    } finally {
+      setRemovingBankSlug(null);
+    }
   }
 
   // ── 3-Pass Drills ────────────────────────────────────────────────────────────
 
   async function handleAddDrillManual() {
+    if (drillAdding) return;
     const { matched } = matchPastedTitlesToSlugs(drillAddText);
     const slug = matched[0];
     if (!slug) return;
-    const created = await createLCDrill(slug).catch(() => null);
-    if (!created) return;
-    setDrills((prev) => (prev.some((d) => d.problem_slug === slug) ? prev : [...prev, created]));
-    setDrillAddText("");
+    setDrillAdding(true);
+    try {
+      const created = await createLCDrill(slug).catch(() => null);
+      if (!created) return;
+      setDrills((prev) => (prev.some((d) => d.problem_slug === slug) ? prev : [...prev, created]));
+      setDrillAddText("");
+    } finally {
+      setDrillAdding(false);
+    }
   }
 
   // Shared by drill advancement and timer-expiry struggle events: prefer a custom
@@ -3085,16 +3173,22 @@ export default function LeetCodeMode() {
   }
 
   async function handleAdvanceDrill(slug: string) {
-    const updated = await advanceLCDrill(slug, resolveProblemTopic(slug), resolveProblemSubtopic(slug)).catch(() => null);
-    if (!updated) return;
-    setDrills((prev) =>
-      updated.completed_at
-        ? prev.filter((d) => d.problem_slug !== slug)
-        : prev.map((d) => (d.problem_slug === slug ? updated : d)),
-    );
-    // Pass 3 cleared: offer to run the whole cycle again. Fires from both the manual
-    // "Clear drill" button and the auto-advance-on-solve path below.
-    if (updated.completed_at) setDrillAgainSlug(slug);
+    if (advancingDrill) return;
+    setAdvancingDrill(slug);
+    try {
+      const updated = await advanceLCDrill(slug, resolveProblemTopic(slug), resolveProblemSubtopic(slug)).catch(() => null);
+      if (!updated) return;
+      setDrills((prev) =>
+        updated.completed_at
+          ? prev.filter((d) => d.problem_slug !== slug)
+          : prev.map((d) => (d.problem_slug === slug ? updated : d)),
+      );
+      // Pass 3 cleared: offer to run the whole cycle again. Fires from both the manual
+      // "Clear drill" button and the auto-advance-on-solve path below.
+      if (updated.completed_at) setDrillAgainSlug(slug);
+    } finally {
+      setAdvancingDrill(null);
+    }
   }
 
   // Bug 2: advance a due drill automatically when the user actually solves it (all
@@ -3110,14 +3204,20 @@ export default function LeetCodeMode() {
   }
 
   async function handleRestartDrill(slug: string) {
-    setDrillAgainSlug(null);
-    const restarted = await restartLCDrill(slug).catch(() => null);
-    if (!restarted) return;
-    setDrills((prev) =>
-      prev.some((d) => d.problem_slug === slug)
-        ? prev.map((d) => (d.problem_slug === slug ? restarted : d))
-        : [...prev, restarted],
-    );
+    if (drillModalBusy) return;
+    setDrillModalBusy(true);
+    try {
+      const restarted = await restartLCDrill(slug).catch(() => null);
+      if (!restarted) return;
+      setDrills((prev) =>
+        prev.some((d) => d.problem_slug === slug)
+          ? prev.map((d) => (d.problem_slug === slug ? restarted : d))
+          : [...prev, restarted],
+      );
+    } finally {
+      setDrillModalBusy(false);
+      setDrillAgainSlug(null);
+    }
   }
 
   // ── Weak-Area Practice ───────────────────────────────────────────────────────
@@ -3357,12 +3457,18 @@ export default function LeetCodeMode() {
   }
 
   async function handleAddDrillFromCompletion(slug: string) {
-    setDrillPromptSlug(null);
-    const created = await createLCDrill(slug).catch(() => null);
-    // Skip already-completed rows (create-or-return): re-drilling those is only offered
-    // right after a fresh clear, so we don't resurface them here.
-    if (!created || created.completed_at) return;
-    setDrills((prev) => (prev.some((d) => d.problem_slug === slug) ? prev : [...prev, created]));
+    if (drillModalBusy) return;
+    setDrillModalBusy(true);
+    try {
+      const created = await createLCDrill(slug).catch(() => null);
+      // Skip already-completed rows (create-or-return): re-drilling those is only offered
+      // right after a fresh clear, so we don't resurface them here.
+      if (!created || created.completed_at) return;
+      setDrills((prev) => (prev.some((d) => d.problem_slug === slug) ? prev : [...prev, created]));
+    } finally {
+      setDrillModalBusy(false);
+      setDrillPromptSlug(null);
+    }
   }
 
   function toggleProgress(problem: Problem) {
@@ -4127,6 +4233,25 @@ export default function LeetCodeMode() {
         </div>
 
         <div className="lc-settings-section">
+          <span className="lc-settings-label">Interviewer style</span>
+          <p className="lc-settings-help">How much Kojo helps when you ask for a hint, like a real interviewer.</p>
+          <div className="lc-settings-segmented" role="group" aria-label="Interviewer style">
+            {INTERVIEWER_MODES.map((mode) => (
+              <button
+                key={mode.id}
+                type="button"
+                className={`lc-settings-seg-btn${resolveInterviewerMode(interviewerMode) === mode.id ? " lc-settings-seg-btn--active" : ""}`}
+                aria-pressed={resolveInterviewerMode(interviewerMode) === mode.id}
+                onClick={() => setInterviewerMode(mode.id)}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+          <p className="lc-settings-mode-blurb">{INTERVIEWER_COPY[resolveInterviewerMode(interviewerMode)].blurb}</p>
+        </div>
+
+        <div className="lc-settings-section">
           <span className="lc-settings-label">Weakness sensitivity</span>
           <p className="lc-settings-help">How aggressively KojoCode flags weak topics.</p>
           <div className="lc-settings-segmented" role="group" aria-label="Weakness sensitivity">
@@ -4263,6 +4388,8 @@ export default function LeetCodeMode() {
       title="Add to your 3-Pass Drill?"
       message="Nosey will resurface this problem up to three times with tightening constraints, so it sticks. You can find it under 3-Pass Drills."
       confirmLabel="Add drill"
+      busy={drillModalBusy}
+      busyLabel="Adding drill"
       onConfirm={() => void handleAddDrillFromCompletion(drillPromptSlug)}
       onCancel={() => setDrillPromptSlug(null)}
     />
@@ -4274,6 +4401,8 @@ export default function LeetCodeMode() {
       title="Drill cleared. Run it again?"
       message="Nice work clearing all three passes. Drilling again restarts the cycle from pass 1, due now."
       confirmLabel="Drill again"
+      busy={drillModalBusy}
+      busyLabel="Restarting"
       onConfirm={() => void handleRestartDrill(drillAgainSlug)}
       onCancel={() => setDrillAgainSlug(null)}
     />
@@ -5054,7 +5183,9 @@ export default function LeetCodeMode() {
             </div>
           ) : null}
 
-          {prepBanks.length === 0 && !banksLoading ? (
+          {banksLoading && prepBanks.length === 0 ? (
+            <SkeletonList rows={3} label="Loading your prep banks" />
+          ) : prepBanks.length === 0 ? (
             <div className="lc-empty lc-bank-empty">
               <span className="lc-empty-icon"><BookOpen size={26} /></span>
               <p className="lc-empty-title">No prep banks yet</p>
@@ -5085,12 +5216,12 @@ export default function LeetCodeMode() {
                       {bank.is_active ? (
                         <span className="lc-bank-tile-feeds">feeds your daily KojoCode</span>
                       ) : (
-                        <button type="button" onClick={() => void handleActivateBank(bank.id as number)}>
-                          Set active
+                        <button type="button" onClick={() => void handleActivateBank(bank.id as number)} disabled={activatingBankId === bank.id}>
+                          {activatingBankId === bank.id ? <><Loader2 size={13} className="spin" /> Setting active…</> : "Set active"}
                         </button>
                       )}
-                      <button type="button" className="lc-bank-delete" onClick={() => void handleDeleteBank(bank.id as number)} aria-label={`Delete ${bank.name}`}>
-                        <Trash2 size={14} />
+                      <button type="button" className="lc-bank-delete" onClick={() => void handleDeleteBank(bank.id as number)} disabled={deletingBankId === bank.id} aria-label={`Delete ${bank.name}`}>
+                        {deletingBankId === bank.id ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} />}
                       </button>
                     </div>
                   </article>
@@ -5134,8 +5265,8 @@ export default function LeetCodeMode() {
                       Today's KojoCode is coming from this bank.
                     </p>
                   ) : (
-                    <button type="button" className="lc-bank-feeds-set" onClick={() => void handleActivateBank(selectedBank.id as number)}>
-                      Set active to feed your daily from this bank
+                    <button type="button" className="lc-bank-feeds-set" onClick={() => void handleActivateBank(selectedBank.id as number)} disabled={activatingBankId === selectedBank.id}>
+                      {activatingBankId === selectedBank.id ? <><Loader2 size={14} className="spin" /> Setting active…</> : "Set active to feed your daily from this bank"}
                     </button>
                   )}
 
@@ -5193,8 +5324,8 @@ export default function LeetCodeMode() {
                                 leetcode
                               </a>
                             ) : null}
-                            <button type="button" className="lc-bank-problem-remove" onClick={() => void handleRemoveBankProblem(selectedBank.id as number, slug)} aria-label="Remove from bank">
-                              <X size={14} />
+                            <button type="button" className="lc-bank-problem-remove" onClick={() => void handleRemoveBankProblem(selectedBank.id as number, slug)} disabled={removingBankSlug === slug} aria-label="Remove from bank">
+                              {removingBankSlug === slug ? <Loader2 size={14} className="spin" /> : <X size={14} />}
                             </button>
                           </li>
                         );
@@ -5236,10 +5367,10 @@ export default function LeetCodeMode() {
                           type="button"
                           className="button button-primary lc-bank-add-btn"
                           onClick={() => void handleAddByTopic(selectedBank.id as number)}
-                          disabled={bankAddTopics.size === 0 || bankKojoLoading}
+                          disabled={bankAddTopics.size === 0 || bankKojoLoading || bankTopicAdding}
                         >
-                          <Plus size={16} />
-                          Continue from selection
+                          {bankTopicAdding ? <Loader2 size={16} className="spin" /> : <Plus size={16} />}
+                          {bankTopicAdding ? "Adding…" : "Continue from selection"}
                         </button>
                         <button
                           type="button"
@@ -5267,9 +5398,9 @@ export default function LeetCodeMode() {
                         type="button"
                         className="lc-bank-match-btn"
                         onClick={() => void handleMatchAndAddToBank(selectedBank.id as number)}
-                        disabled={!bankMatchText.trim()}
+                        disabled={!bankMatchText.trim() || bankMatching}
                       >
-                        Match and add
+                        {bankMatching ? <><Loader2 size={14} className="spin" /> Adding…</> : "Match and add"}
                       </button>
                       {bankMatchUnmatched.length > 0 ? (
                         <p className="lc-daily-error">No catalog match for: {bankMatchUnmatched.join(", ")}</p>
@@ -5308,13 +5439,15 @@ export default function LeetCodeMode() {
               onChange={(event) => setDrillAddText(event.target.value)}
               placeholder="Problem title to drill, e.g. Two Sum"
             />
-            <button type="button" onClick={() => void handleAddDrillManual()} disabled={!drillAddText.trim()}>
-              <Plus size={16} />
-              Drill this
+            <button type="button" onClick={() => void handleAddDrillManual()} disabled={!drillAddText.trim() || drillAdding}>
+              {drillAdding ? <Loader2 size={16} className="spin" /> : <Plus size={16} />}
+              {drillAdding ? "Adding…" : "Drill this"}
             </button>
           </div>
 
-          {drills.length === 0 && !drillsLoading ? (
+          {drillsLoading && drills.length === 0 ? (
+            <SkeletonList rows={3} label="Loading your drills" />
+          ) : drills.length === 0 ? (
             <p className="muted">No open drills. Struggling with a problem (a failed grade or a timer running out) adds one automatically.</p>
           ) : (
             (() => {
@@ -5360,8 +5493,10 @@ export default function LeetCodeMode() {
                         type="button"
                         className="lc-drill-advance"
                         onClick={() => void handleAdvanceDrill(drill.problem_slug)}
+                        disabled={advancingDrill === drill.problem_slug}
                         title={drill.current_pass >= 3 ? "Clear this drill for good" : "Mark this pass cleared and schedule the next"}
                       >
+                        {advancingDrill === drill.problem_slug ? <Loader2 size={13} className="spin" /> : null}
                         {drill.current_pass >= 3 ? "Clear drill" : "Pass cleared"}
                       </button>
                     </div>
@@ -5866,8 +6001,10 @@ export default function LeetCodeMode() {
             type="button"
             className="lc-pass-banner-clear"
             onClick={() => void handleAdvanceDrill(currentProblem.slug)}
+            disabled={advancingDrill === currentProblem.slug}
             title={activePass >= 3 ? "Clear this drill for good" : "Mark this pass cleared and schedule the next"}
           >
+            {advancingDrill === currentProblem.slug ? <Loader2 size={13} className="spin" /> : null}
             {activePass >= 3 ? "Clear drill" : "Pass cleared"}
           </button>
         </div>
@@ -6406,15 +6543,16 @@ export default function LeetCodeMode() {
           onClose={() => setKojoOpen(false)}
           buildContext={buildLeetCodeKojoContext}
           customInstruction="Give hints, debugging direction, edge cases, and complexity guidance. Never give the full solution code."
+          interviewerMode={resolveInterviewerMode(interviewerMode)}
           provider={generationProvider}
           initialDraft={`I'm stuck on ${currentProblem.title}. Give me one hint without solving it for me.`}
-          contractNote="Kojo can help with hints, debugging direction, edge cases, and complexity. It will not give you the full solution code here."
+          contractNote={INTERVIEWER_COPY[resolveInterviewerMode(interviewerMode)].contract}
           slashCommands={allKojoCommands}
           disabled={assistsLocked}
           disabledNote={assistsLocked ? `Locked on Pass ${activePass}: no assists` : undefined}
           emptyTitle="Stuck on this one?"
-          emptySub="Ask for a hint, a debugging nudge, or talk through your approach."
-          suggestions={["Give me one hint", "What edge cases am I missing?", "Help me debug my current code"]}
+          emptySub={INTERVIEWER_COPY[resolveInterviewerMode(interviewerMode)].emptySub}
+          suggestions={INTERVIEWER_COPY[resolveInterviewerMode(interviewerMode)].suggestions}
         />
       ) : null}
 

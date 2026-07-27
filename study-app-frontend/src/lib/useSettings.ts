@@ -8,6 +8,7 @@ export const SETTINGS_KEYS = {
   kojoCustomInstruction: "nosey_kojo_custom_instruction",
   weaknessSensitivity: "nosey_lc_weakness_sensitivity",
   difficultyPrompt: "nosey_lc_difficulty_prompt",
+  interviewerMode: "nosey_lc_interviewer_mode",
 } as const;
 
 // Kojo custom instructions are capped so they can't crowd out the notes context
@@ -85,6 +86,12 @@ export function useSettings() {
   const [difficultyPromptEnabled, setDifficultyPromptEnabledState] = useState(() =>
     readBooleanSetting(SETTINGS_KEYS.difficultyPrompt, true),
   );
+  // How much the "Ask Kojo" hint chat helps while solving, framed as an interviewer
+  // persona (startup | local | bigtech). Defaults to bigtech (strictest) so Kojo does
+  // not hand over the solution unless the user deliberately loosens it.
+  const [interviewerMode, setInterviewerModeState] = useState(() =>
+    readStringSetting(SETTINGS_KEYS.interviewerMode, "bigtech"),
+  );
   const [betaMode, setBetaModeState] = useState(deriveBetaAccess);
 
   // Sync state when another instance of useSettings writes a setting.
@@ -107,6 +114,9 @@ export function useSettings() {
       }
       if (e.key === scopeKey(SETTINGS_KEYS.difficultyPrompt) && e.newValue !== null) {
         setDifficultyPromptEnabledState(e.newValue !== "false");
+      }
+      if (e.key === scopeKey(SETTINGS_KEYS.interviewerMode) && e.newValue !== null) {
+        setInterviewerModeState(e.newValue);
       }
       // Beta access follows the stored user record (admin-granted). Re-derive
       // when it changes in another tab (login/logout or an admin grant picked
@@ -150,6 +160,11 @@ export function useSettings() {
     writeSetting(scopeKey(SETTINGS_KEYS.difficultyPrompt), String(value));
   }
 
+  function setInterviewerMode(value: string) {
+    setInterviewerModeState(value);
+    writeSetting(scopeKey(SETTINGS_KEYS.interviewerMode), value);
+  }
+
   return {
     questionFallbackEnabled,
     setQuestionFallbackEnabled,
@@ -163,6 +178,8 @@ export function useSettings() {
     setWeaknessSensitivity,
     difficultyPromptEnabled,
     setDifficultyPromptEnabled,
+    interviewerMode,
+    setInterviewerMode,
     betaMode,
   };
 }

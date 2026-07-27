@@ -33,6 +33,44 @@ def test_invalid_strictness_falls_back_to_medium() -> None:
     assert "RESPONSE GUIDELINES (OPEN" not in prompt
 
 
+def test_bigtech_interviewer_mode_injects_authoritative_persona() -> None:
+    prompt = _build_prompt(
+        notes="[Current task context]\nTwo Sum: return indices of two numbers adding to target.",
+        user_message="Just give me the code",
+        history=[],
+        interviewer_mode="bigtech",
+    )
+
+    assert "INTERVIEWER PERSONA - BIG TECH" in prompt
+    assert "OUTRANKS" in prompt
+    assert "solution code" in prompt
+
+
+def test_startup_interviewer_mode_uses_startup_persona() -> None:
+    prompt = _build_prompt(
+        notes="[Current task context]\nTwo Sum problem.",
+        user_message="I'm stuck",
+        history=[],
+        interviewer_mode="startup",
+    )
+
+    assert "INTERVIEWER PERSONA - STARTUP" in prompt
+    assert "INTERVIEWER PERSONA - BIG TECH" not in prompt
+
+
+def test_no_interviewer_mode_leaves_prompt_persona_free() -> None:
+    """The general study chat sends no interviewer_mode: the prompt must be
+    unchanged (no persona block leaks into non-KojoCode chats)."""
+    prompt = _build_prompt(
+        notes="[notes.md]\nA transaction is a logical unit of work.",
+        user_message="Explain ACID",
+        history=[],
+    )
+
+    assert "INTERVIEWER PERSONA" not in prompt
+    assert "OUTRANKS" not in prompt
+
+
 @pytest.mark.asyncio
 async def test_map_reduce_open_strictness_does_not_force_notes_only() -> None:
     service = LLMService()
