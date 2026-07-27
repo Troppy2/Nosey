@@ -3205,6 +3205,18 @@ h3 {
   text-align: center;
 }
 
+/* Shown in the message column while the conversation thread is being resolved
+   or created, so the drawer reads as "opening" instead of blank. */
+.kojo-thread-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 12px;
+  color: #596949;
+  font-size: 0.875rem;
+}
+
 .kojo-empty-icon {
   width: 56px;
   height: 56px;
@@ -20970,6 +20982,32 @@ button.lc-reminder-feature-cta:disabled {
   cursor: not-allowed;
 }
 
+/* ── KojoCode action-button loading states ───────────────────────────────────
+   Drill and prep-bank buttons gained an inline Loader2 spinner while their
+   network call runs. The text-only ones need to lay the spinner out inline, and
+   every one needs a disabled look so a click that is already running reads as
+   busy rather than dead. */
+.lc-drill-advance,
+.lc-pass-banner-clear,
+.lc-bank-tile-actions button:not(.lc-bank-delete),
+.lc-bank-feeds-set,
+.lc-bank-match-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.lc-drill-advance:disabled,
+.lc-pass-banner-clear:disabled,
+.lc-bank-tile-actions button:disabled,
+.lc-bank-feeds-set:disabled,
+.lc-bank-delete:disabled,
+.lc-bank-problem-remove:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* ── Bank add-by-topic (primary) + paste (secondary) ─────────────────────────*/
 .lc-bank-add {
   margin-top: 22px;
@@ -21215,11 +21253,20 @@ button.lc-reminder-feature-cta:disabled {
   max-width: calc(100vw - 32px);
   max-height: calc(100vh - 48px);
   overflow-y: auto;
+  /* Keep the modal scrollable when its content is tall (long completed list),
+     but hide the scrollbar chrome so it reads clean. Firefox + legacy IE. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   padding: 20px;
   border: 1px solid rgba(113, 131, 85, 0.28);
   border-radius: 10px;
   background: var(--white);
   box-shadow: var(--shadow-lg);
+}
+
+/* WebKit/Blink (Chrome, Safari, Edge): hide the scrollbar track/thumb. */
+.lc-settings-modal::-webkit-scrollbar {
+  display: none;
 }
 
 .lc-settings-modal-header {
@@ -21276,6 +21323,14 @@ button.lc-reminder-feature-cta:disabled {
   margin: 0 0 6px;
   font-size: 0.78rem;
   color: var(--muted, #596949);
+}
+
+/* One-line description of the active interviewer style, under its segmented picker. */
+.lc-settings-mode-blurb {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--green-dark-mid, #596949);
 }
 
 .lc-settings-segmented {

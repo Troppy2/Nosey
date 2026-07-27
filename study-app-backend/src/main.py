@@ -21,9 +21,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
 from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from src.config import settings
 from src.limiter import limiter
@@ -33,28 +32,42 @@ from src.utils.validators import MAX_UPLOAD_TOTAL_SIZE_BYTES
 _MAX_REQUEST_BODY_BYTES = MAX_UPLOAD_TOTAL_SIZE_BYTES
 
 
-class ContentSizeLimitMiddleware(BaseHTTPMiddleware):
+class ContentSizeLimitMiddleware:
     """Reject requests whose Content-Length exceeds the upload cap before reading the body.
 
     Browsers always send Content-Length for multipart file uploads, so this
     prevents large PDFs from being buffered into memory and crashing the server.
     Returns 413 with a JSON detail field so the frontend error display works.
+
+    Implemented as pure ASGI (not BaseHTTPMiddleware) on purpose: BaseHTTPMiddleware
+    re-wraps every response in a StreamingResponse, which turns a client disconnect on a
+    slow endpoint (e.g. the long LLM daily generation) into a noisy LocalProtocolError
+    traceback. Pure ASGI passes the downstream send through untouched, so a disconnect is
+    a quiet no-op instead.
     """
 
-    async def dispatch(self, request: Request, call_next):
-        content_length = request.headers.get("content-length")
-        if content_length is not None:
-            try:
-                declared_size = int(content_length)
-            except ValueError:
-                declared_size = 0
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http":
+            declared_size = 0
+            for name, value in scope.get("headers", []):
+                if name == b"content-length":
+                    try:
+                        declared_size = int(value)
+                    except ValueError:
+                        declared_size = 0
+                    break
             if declared_size > _MAX_REQUEST_BODY_BYTES:
                 limit_mb = _MAX_REQUEST_BODY_BYTES // (1024 * 1024)
-                return JSONResponse(
+                response = JSONResponse(
                     status_code=413,
                     content={"detail": f"Upload too large. Maximum total size is {limit_mb} MB."},
                 )
-        return await call_next(request)
+                await response(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
 
 
 app = FastAPI(title="Study App", version="0.1.0")
