@@ -105,6 +105,7 @@ class GeneralChatRequest(BaseModel):
     reasoning: Optional[bool] = Field(default=False, description="Stream a visible reasoning pass before the answer (streaming endpoints only)")
     custom_instruction: Optional[str] = Field(default=None, max_length=500, description="User's standing instruction for how Kojo should behave in chat")
     context: Optional[str] = Field(default=None, max_length=8000, description="Ephemeral per-turn grounding (e.g. the current problem statement and code, or test question) mixed into the prompt but never persisted as a visible message")
+    interviewer_mode: Optional[str] = Field(default=None, description="KojoCode interviewer persona controlling how much Kojo helps: 'startup' | 'local' | 'bigtech'. Absent for the general study chat.")
 
 
 class RegenerateRequest(BaseModel):

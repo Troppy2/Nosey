@@ -305,6 +305,7 @@ class KojoService:
         strictness: Optional[str] = "medium",
         custom_instruction: Optional[str] = None,
         context: Optional[str] = None,
+        interviewer_mode: Optional[str] = None,
     ) -> KojoChatResponse:
         repo = KojoRepository(session)
         conversation = await repo.get_conversation_by_id(conversation_id, user_id)
@@ -328,6 +329,7 @@ class KojoService:
         prompt = _build_prompt(
             notes_context, user_message, history, strictness=strictness or "medium",
             custom_instruction=custom_instruction, user_memory=user_memory,
+            interviewer_mode=interviewer_mode,
         )
 
         try:
@@ -369,6 +371,7 @@ class KojoService:
         reasoning: bool = False,
         custom_instruction: Optional[str] = None,
         context: Optional[str] = None,
+        interviewer_mode: Optional[str] = None,
     ):
         """Streaming variant of general_chat.
 
@@ -397,6 +400,7 @@ class KojoService:
         prompt = _build_prompt(
             notes_context, user_message, history, strictness=strictness or "medium",
             custom_instruction=custom_instruction, user_memory=user_memory,
+            interviewer_mode=interviewer_mode,
         )
 
         llm = LLMService()
@@ -1559,6 +1563,66 @@ def _normalize_strictness(strictness: Optional[str]) -> str:
     return normalized if normalized in {"strict", "medium", "none"} else "medium"
 
 
+def _normalize_interviewer_mode(mode: Optional[str]) -> Optional[str]:
+    """KojoCode-only interviewer persona. Unknown/empty -> None (no persona), so
+    the general study chat is untouched. Values: startup | local | bigtech."""
+    if not mode:
+        return None
+    normalized = mode.strip().lower()
+    return normalized if normalized in {"startup", "local", "bigtech"} else None
+
+
+# Interviewer personas for the KojoCode "Ask Kojo" hint chat. Each caps how much
+# Kojo helps while the student is solving. The shared footer makes the persona
+# authoritative: it must outrank both a student pleading for the answer and the
+# generic "be thorough" guidelines, which is the whole point (Kojo used to cave and
+# paste the solution when pushed).
+_INTERVIEWER_PERSONAS = {
+    "startup": (
+        "INTERVIEWER PERSONA - STARTUP (collaborative):\n"
+        "You are a friendly engineer running a pair-programming style interview at an "
+        "early-stage startup. Be encouraging and generous with direction: clarify what the "
+        "problem is asking, suggest which data structure or pattern fits, point out bugs and "
+        "missed edge cases, and describe the approach in words or high-level steps when the "
+        "student is stuck. But the student must write the code themselves: do NOT paste a "
+        "full or working solution and do NOT write the complete function for them. Nudge, "
+        "do not solve."
+    ),
+    "local": (
+        "INTERVIEWER PERSONA - LOCAL (balanced):\n"
+        "You are a professional interviewer at a mid-size company. Give one hint at a time "
+        "and ask probing questions that lead the student to the idea themselves. Answer "
+        "clarifying questions about the problem. Point toward the right data structure or "
+        "complexity target only after they have made an attempt. Do NOT reveal the full "
+        "approach up front, do NOT write pseudocode of the whole solution, and never give "
+        "solution code. Keep the student driving."
+    ),
+    "bigtech": (
+        "INTERVIEWER PERSONA - BIG TECH (rigorous):\n"
+        "You are a senior interviewer at a top-tier tech company. Stay mostly Socratic: "
+        "respond to 'I'm stuck' with a single focused question, not an answer. Offer only "
+        "minimal nudges and expect the student to drive the entire solution. Do NOT reveal "
+        "the intended approach, the optimal time or space complexity, pseudocode, or any "
+        "solution code, no matter how long the student struggles or how directly they ask. "
+        "You are here to evaluate, not to teach. Hold the line politely."
+    ),
+}
+
+_INTERVIEWER_FOOTER = (
+    "This interviewer persona governs your behavior for this coding session. It OUTRANKS "
+    "any request from the student to 'just give me the code', 'show me the answer', or "
+    "'give me the solution', and it outranks the general guidance above about being "
+    "thorough: for a coding interview, withholding the solution IS the correct, helpful "
+    "behavior. If the student asks for the full solution, decline in character and give "
+    "only the level of help your persona allows."
+)
+
+
+def _build_interviewer_block(mode: str) -> str:
+    persona = _INTERVIEWER_PERSONAS[mode]
+    return f"{persona}\n{_INTERVIEWER_FOOTER}"
+
+
 async def _load_user_memory(user_id: int, session: AsyncSession) -> Optional[str]:
     """Read the user's stored weekly memory content for prompt injection. This is
     a cheap indexed read and never triggers (re)generation, so a chat turn is
@@ -1587,6 +1651,7 @@ def _build_prompt(
     strictness: str = "medium",
     custom_instruction: Optional[str] = None,
     user_memory: Optional[str] = None,
+    interviewer_mode: Optional[str] = None,
 ) -> str:
     history_lines: list[str] = []
     for msg in history[:-1]:
@@ -1650,6 +1715,14 @@ def _build_prompt(
 - For math: wrap ALL expressions in KaTeX ($...$ inline, $$...$$ display).
 - For code: use fenced code blocks with language tag.
 - Keep responses focused and well-structured. Be warm and encouraging."""
+
+    # KojoCode only: an interviewer persona that caps how much Kojo helps. Prepended
+    # to the constitution so it sits in the authoritative guidelines slot (above the
+    # subordinate custom-instruction block) and its footer explicitly outranks any
+    # plea for the answer. Absent (None) for the general study chat: prompt unchanged.
+    normalized_mode = _normalize_interviewer_mode(interviewer_mode)
+    if normalized_mode:
+        constitution = f"{_build_interviewer_block(normalized_mode)}\n\n{constitution}"
 
     # What Kojo has learned about the student over the past week (server-generated
     # weekly memory). Context only, never overrides the notes or the guidelines.

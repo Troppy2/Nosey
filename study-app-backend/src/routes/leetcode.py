@@ -800,16 +800,16 @@ async def create_daily_problem(
     session.add(row)
     try:
         await session.commit()
-    except IntegrityError:
-        # Concurrent create-or-return race: a second POST for the same calendar day
-        # (e.g. a double-fired request) slips past the _find_today_daily check above and
-        # then trips the partial unique index (uq_lc_custom_daily_per_user). Treat it as
-        # create-or-return: roll back and hand back the row the other request created.
+    except IntegrityError as exc:
+        # A double-fired POST for the same day slips past the _find_today_daily check
+        # above and trips the one-per-day unique index. Roll back and return the row the
+        # other request already created, so the second press just re-opens today's.
         await session.rollback()
         existing = await _find_today_daily(session, user.id)
-        if existing:
-            return _serialize_custom_problem(existing)
-        raise
+        if existing is None:
+            raise HTTPException(status_code=503, detail="Couldn't save today's problem. Try again.") from exc
+        return _serialize_custom_problem(existing)
+
     await session.refresh(row)
     return _serialize_custom_problem(row)
 
