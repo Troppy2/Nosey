@@ -7,6 +7,10 @@ type ConfirmModalProps = {
   message: React.ReactNode;
   confirmLabel?: string;
   danger?: boolean;
+  /** When set, both buttons lock and the confirm button shows a spinner. */
+  busy?: boolean;
+  /** Active-voice label shown beside the spinner while busy, e.g. "Adding". */
+  busyLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -16,25 +20,29 @@ export function ConfirmModal({
   message,
   confirmLabel = "Confirm",
   danger = false,
+  busy = false,
+  busyLabel = "Working",
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onCancel();
+      if (e.key === "Escape" && !busy) onCancel();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onCancel]);
+  }, [onCancel, busy]);
 
   return (
-    <div className="modal-backdrop" onMouseDown={onCancel}>
+    <div className="modal-backdrop" onMouseDown={busy ? undefined : onCancel}>
       <div className="modal-card" role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>
         <h2>{title}</h2>
         <p className="muted">{message}</p>
         <div className="button-row">
-          <Button variant="secondary" onClick={onCancel}>Cancel</Button>
-          <Button variant={danger ? "danger" : "primary"} onClick={onConfirm}>{confirmLabel}</Button>
+          <Button variant="secondary" onClick={onCancel} disabled={busy}>Cancel</Button>
+          <Button variant={danger ? "danger" : "primary"} onClick={onConfirm} disabled={busy}>
+            {busy ? <InlineLoading label={busyLabel} /> : confirmLabel}
+          </Button>
         </div>
       </div>
     </div>

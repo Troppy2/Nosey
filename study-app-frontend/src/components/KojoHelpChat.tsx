@@ -28,6 +28,9 @@ export interface KojoHelpChatProps {
   /** Standing instruction/guardrail, e.g. "give hints, never the full answer". */
   customInstruction?: string;
   strictness?: string;
+  /** KojoCode interviewer persona (startup | local | bigtech) sent per turn to
+   * cap how much Kojo helps. Omit for non-KojoCode uses. */
+  interviewerMode?: string;
   provider?: string;
   /** Prefilled composer text shown the first time this thread is opened empty. */
   initialDraft?: string;
@@ -54,6 +57,7 @@ export function KojoHelpChat({
   buildContext,
   customInstruction,
   strictness,
+  interviewerMode,
   provider,
   initialDraft,
   suggestions = DEFAULT_SUGGESTIONS,
@@ -176,13 +180,13 @@ export function KojoHelpChat({
       let result;
       try {
         result = await kojoChatGeneralStream(
-          conversationId, messageText, onDelta, provider, strictness, customInstruction, undefined, context,
+          conversationId, messageText, onDelta, provider, strictness, customInstruction, undefined, context, interviewerMode,
         );
       } catch (streamErr) {
         // If the stream failed before producing any text, fall back to the
         // non-streamed endpoint so a transient stream issue still answers.
         if (placed) throw streamErr;
-        result = await kojoChatGeneral(conversationId, messageText, provider, strictness, customInstruction, context);
+        result = await kojoChatGeneral(conversationId, messageText, provider, strictness, customInstruction, context, interviewerMode);
       }
       const assistantMsg: KojoMessage = {
         id: result.message_id,
@@ -266,7 +270,12 @@ export function KojoHelpChat({
         {/* ── Messages ── */}
         <div className="kojo-messages">
           <div className="kojo-messages-inner">
-            {!loadingThread && messages.length === 0 && !isLoading ? (
+            {loadingThread ? (
+              <div className="kojo-thread-loading" role="status">
+                <span className="loader" aria-hidden="true" />
+                <span>Opening this chat</span>
+              </div>
+            ) : messages.length === 0 && !isLoading ? (
               <div className="kojo-empty">
                 <div className="kojo-empty-icon">
                   <KojoMascot state="idle" />
