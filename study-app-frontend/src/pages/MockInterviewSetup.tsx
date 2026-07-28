@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   Briefcase,
   ChevronRight,
   Clock,
@@ -14,7 +15,11 @@ import {
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createMockInterviewSession } from "../lib/api";
-import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
+import {
+  COMPANY_OPTIONS,
+  type CompanyKey,
+  type InterviewLevel,
+} from "../data/mockInterviewProblems";
 import {
   clearActiveMockSession,
   clearMockProgress,
@@ -55,6 +60,15 @@ const STAGE_OPTIONS = [
   },
 ];
 
+// Target seniority. Drives the difficulty mix of Stage 1 problems and how strict
+// the AI interviewer is across every stage. Internship is the default.
+const LEVEL_OPTIONS: { key: InterviewLevel; label: string; description: string }[] = [
+  { key: "intern", label: "Internship", description: "Easier problems, an encouraging interviewer" },
+  { key: "junior", label: "Junior / New Grad", description: "Standard new-grad bar" },
+  { key: "mid", label: "Mid-Level", description: "Probing follow-ups, near-optimal expected" },
+  { key: "senior", label: "Senior", description: "Hard problems, deep and rigorous" },
+];
+
 const COMPANY_BRAND: Record<CompanyKey, { color: string; initial: string }> = {
   google: { color: "#4285F4", initial: "G" },
   meta: { color: "#7B68EE", initial: "M" },
@@ -68,6 +82,7 @@ const COMPANY_BRAND: Record<CompanyKey, { color: string; initial: string }> = {
 export default function MockInterviewSetup() {
   const navigate = useNavigate();
   const [selectedCompany, setSelectedCompany] = useState<CompanyKey>("google");
+  const [selectedLevel, setSelectedLevel] = useState<InterviewLevel>("intern");
   const [selectedStages, setSelectedStages] = useState<string[]>([
     "resume",
     "stage1",
@@ -99,7 +114,7 @@ export default function MockInterviewSetup() {
     }
     navigate(resumeRouteFor(progress), {
       state: {
-        session: { id: progress.sessionId, company: progress.company },
+        session: { id: progress.sessionId, company: progress.company, level: progress.level },
         selectedStages: progress.selectedStages,
       },
     });
@@ -119,7 +134,7 @@ export default function MockInterviewSetup() {
     setError(null);
     setStarting(true);
     try {
-      const session = await createMockInterviewSession(selectedCompany, selectedStages);
+      const session = await createMockInterviewSession(selectedCompany, selectedStages, selectedLevel);
       const firstStage = selectedStages.includes("resume")
         ? "resume"
         : selectedStages.includes("stage1")
@@ -131,6 +146,7 @@ export default function MockInterviewSetup() {
       saveMockProgress({
         sessionId: session.id,
         company: selectedCompany,
+        level: selectedLevel,
         selectedStages,
         updatedAt: Date.now(),
       });
@@ -150,6 +166,9 @@ export default function MockInterviewSetup() {
 
   return (
     <div className="page page-narrow">
+      <button className="mock-back-link" onClick={() => navigate("/leetcode")}>
+        <ArrowLeft size={16} /> KojoCode
+      </button>
       <div className="mock-setup-hero">
         <div className="mock-setup-hero-top">
           <div>
@@ -248,6 +267,26 @@ export default function MockInterviewSetup() {
               </button>
             );
           })}
+        </div>
+      </section>
+
+      {/* Level selector */}
+      <section className="card mock-setup-section">
+        <h2 className="eyebrow">Choose Level</h2>
+        <p className="muted small" style={{ marginTop: -4, marginBottom: 10 }}>
+          Sets the difficulty of Stage 1 problems and how strict the interviewer is. Defaults to internship.
+        </p>
+        <div className="mock-level-grid">
+          {LEVEL_OPTIONS.map((opt) => (
+            <button
+              key={opt.key}
+              className={`mock-level-btn${selectedLevel === opt.key ? " selected" : ""}`}
+              onClick={() => setSelectedLevel(opt.key)}
+            >
+              <span className="mock-level-label">{opt.label}</span>
+              <span className="mock-level-desc">{opt.description}</span>
+            </button>
+          ))}
         </div>
       </section>
 

@@ -32,6 +32,7 @@ import {
   COMPANY_OPTIONS,
   pickProblems,
   type CompanyKey,
+  type InterviewLevel,
   type InterviewProblem,
 } from "../data/mockInterviewProblems";
 import type { LeetCodeProblemData, MockInterviewSession } from "../lib/types";
@@ -97,6 +98,7 @@ export default function MockInterviewStage1() {
 
   const company = (locationState?.session?.company ?? stored?.company ?? "random") as CompanyKey;
   const companyLabel = COMPANY_OPTIONS.find((c) => c.key === company)?.label ?? company;
+  const level = (locationState?.session?.level ?? stored?.level ?? "intern") as InterviewLevel;
   const selectedStages = locationState?.selectedStages ?? stored?.selectedStages ?? [
     "stage1",
     "stage2",
@@ -108,7 +110,7 @@ export default function MockInterviewStage1() {
   // Problems are chosen once and then frozen in localStorage so a refresh never
   // re-rolls the assessment.
   const [problems] = useState<InterviewProblem[]>(
-    () => stored?.stage1?.problems ?? pickProblems(company, 3),
+    () => stored?.stage1?.problems ?? pickProblems(company, 3, level),
   );
 
   const [questions, setQuestions] = useState<Stage1QuestionProgress[]>(() => {
@@ -170,6 +172,7 @@ export default function MockInterviewStage1() {
         ...(prev ?? {}),
         sessionId: numericSessionId,
         company,
+        level,
         selectedStages,
         updatedAt: Date.now(),
         stage1: {
@@ -360,9 +363,10 @@ export default function MockInterviewStage1() {
       // Persist the graded results so the results page survives a refresh.
       const prev = loadMockProgress(numericSessionId);
       saveMockProgress({
-        ...(prev ?? { sessionId: numericSessionId, company, selectedStages, updatedAt: Date.now() }),
+        ...(prev ?? { sessionId: numericSessionId, company, level, selectedStages, updatedAt: Date.now() }),
         sessionId: numericSessionId,
         company,
+        level,
         selectedStages,
         updatedAt: Date.now(),
         stage1: {

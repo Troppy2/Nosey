@@ -8,7 +8,7 @@
 // offer a "Resume" entry point.
 
 import { scopeKey } from "./api";
-import type { CompanyKey, InterviewProblem } from "../data/mockInterviewProblems";
+import type { CompanyKey, InterviewLevel, InterviewProblem } from "../data/mockInterviewProblems";
 import type {
   CodingProblemInfo,
   InterviewChatMessage,
@@ -58,16 +58,19 @@ export type Stage2Progress = {
   code: string;
   codeFeedback: string | null;
   submitted: boolean;
+  coveredGoals?: string[];
 };
 
 export type Stage3Progress = {
   messages: InterviewChatMessage[];
   isDone: boolean;
+  coveredGoals?: string[];
 };
 
 export type MockProgress = {
   sessionId: number;
   company: CompanyKey;
+  level?: InterviewLevel;
   selectedStages: string[];
   updatedAt: number;
   resume?: ResumeProgress;
@@ -79,6 +82,7 @@ export type MockProgress = {
 export type ActiveMockPointer = {
   sessionId: number;
   company: CompanyKey;
+  level?: InterviewLevel;
   selectedStages: string[];
   updatedAt: number;
 };
@@ -108,6 +112,7 @@ export function saveMockProgress(progress: MockProgress): void {
     const pointer: ActiveMockPointer = {
       sessionId: record.sessionId,
       company: record.company,
+      level: record.level,
       selectedStages: record.selectedStages,
       updatedAt: record.updatedAt,
     };

@@ -21854,3 +21854,150 @@ button.lc-reminder-feature-cta:disabled {
   line-height: 1.55;
   color: #313d27;
 }
+
+/* Mock Interview: level selector (setup) */
+.mock-level-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.mock-level-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 12px 14px;
+  border: 2px solid var(--green-light-mid);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--transition-normal), background var(--transition-normal), box-shadow var(--transition-normal), transform var(--transition-normal);
+}
+.mock-level-btn:hover {
+  border-color: var(--green-mid);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+.mock-level-btn.selected {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+  box-shadow: 0 0 0 3px rgba(113,131,85,0.2), var(--shadow-md);
+  transform: translateY(-1px);
+}
+.mock-level-label {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+.mock-level-desc {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+/* Mock Interview: per-stage goal progress pill (Stage 2 + Stage 3 topbar) */
+.mock-goal-progress {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light-mid);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  vertical-align: middle;
+}
+
+/* ── KojoCode subtopics: nested topic picker + browse filter chips/tags ─────── */
+
+/* The topic row is now a container: a clickable label (checkbox + name) that flexes
+   to fill, the count, and an expand toggle when the topic has subtopics. */
+.lc-topic-option-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.lc-topic-option-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.lc-topic-expand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted, #596949);
+  cursor: pointer;
+}
+
+.lc-topic-expand:hover {
+  background: var(--green-lightest);
+  color: var(--green-dark);
+}
+
+.lc-subtopic-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0 0 4px 26px;
+  padding-left: 8px;
+  border-left: 1px solid var(--lc-border);
+}
+
+.lc-subtopic-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.lc-subtopic-option:hover {
+  background: var(--green-lightest);
+}
+
+.lc-subtopic-option input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--green-dark);
+  cursor: pointer;
+}
+
+/* Browse: subtopic filter chips sit as a lighter tier under the topic chips. */
+.lc-filter-chip--subtopic {
+  font-size: 0.72rem;
+}
+
+/* Browse: small technique tags under each problem title. */
+.lc-subtopic-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.lc-subtopic-tag {
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}

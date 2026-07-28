@@ -29,6 +29,10 @@ export default function MockInterviewStage3() {
   const [sending, setSending] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [isDone, setIsDone] = useState(() => stored?.stage3?.isDone ?? false);
+  const [coveredGoals, setCoveredGoals] = useState<string[]>(() => stored?.stage3?.coveredGoals ?? []);
+
+  // Stage 3 covers 5 behavioral questions; this drives a small progress indicator.
+  const totalGoals = 5;
 
   const threadRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -48,11 +52,11 @@ export default function MockInterviewStage3() {
       company,
       selectedStages,
       updatedAt: Date.now(),
-      stage3: { messages, isDone },
+      stage3: { messages, isDone, coveredGoals },
     };
     saveMockProgress(progress);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages, isDone]);
+  }, [messages, isDone, coveredGoals]);
 
   useEffect(() => {
     if (!initializing) {
@@ -62,9 +66,10 @@ export default function MockInterviewStage3() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await sendStage3Message(numericSessionId, null, []);
+        const res = await sendStage3Message(numericSessionId, null, [], []);
         if (cancelled) return;
         setMessages([{ role: "interviewer", content: res.reply }]);
+        if (res.covered_goals) setCoveredGoals(res.covered_goals);
         if (res.is_done) setIsDone(true);
       } catch (e: unknown) {
         if (!cancelled) setInitError(e instanceof Error ? e.message : "Failed to start interview.");
@@ -93,8 +98,9 @@ export default function MockInterviewStage3() {
     scrollToBottom();
 
     try {
-      const res = await sendStage3Message(numericSessionId, text, messages);
+      const res = await sendStage3Message(numericSessionId, text, messages, coveredGoals);
       setMessages([...nextHistory, { role: "interviewer", content: res.reply }]);
+      if (res.covered_goals) setCoveredGoals(res.covered_goals);
       if (res.is_done) setIsDone(true);
     } catch {
       setMessages([
@@ -166,7 +172,12 @@ export default function MockInterviewStage3() {
           <div className="mock-interviewer-avatar">BQ</div>
           <div>
             <div className="mock-interviewer-name">{companyLabel} Interviewer</div>
-            <div className="mock-stage-breadcrumb">Stage 3: Behavioral Interview</div>
+            <div className="mock-stage-breadcrumb">
+              Stage 3: Behavioral Interview
+              <span className="mock-goal-progress" title="Questions covered">
+                {Math.min(coveredGoals.length, totalGoals)} of {totalGoals} covered
+              </span>
+            </div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
