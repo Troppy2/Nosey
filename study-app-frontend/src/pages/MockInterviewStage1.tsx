@@ -26,6 +26,7 @@ import {
   loadMockProgress,
   saveMockProgress,
   type MockProgress,
+  type MockCompany,
   type Stage1QuestionProgress,
 } from "../lib/mockInterview";
 import {
@@ -97,7 +98,7 @@ export default function MockInterviewStage1() {
     [numericSessionId],
   );
 
-  const rawCompany = locationState?.session?.company ?? stored?.company ?? "random";
+  const rawCompany = (locationState?.session?.company ?? stored?.company ?? "random") as MockCompany;
   const isCustom = rawCompany === "custom";
   const company = (isCustom ? "random" : rawCompany) as CompanyKey;
   const customConfig = locationState?.session?.custom_config ?? stored?.customConfig ?? null;
