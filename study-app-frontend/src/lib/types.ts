@@ -660,10 +660,36 @@ export type SlashCommandInput = {
 
 export type MockInterviewLevel = "intern" | "junior" | "mid" | "senior";
 
+export type MockCustomProblemRef = {
+  slug: string;
+  title: string;
+  difficulty: string;
+};
+
+export type MockCustomConfig = {
+  role_focus: string;
+  culture: string;
+  topics: string[];
+  subtopics: string[];
+  difficulties: string[];
+  problems: MockCustomProblemRef[];
+};
+
+export type JDParseResponse = {
+  company_name: string;
+  role_focus: string;
+  culture: string;
+  seniority: MockInterviewLevel;
+  suggested_topics: string[];
+};
+
 export type MockInterviewSession = {
   id: ID;
   company: string;
   level?: MockInterviewLevel;
+  custom_company?: string | null;
+  jd_text?: string | null;
+  custom_config?: MockCustomConfig | null;
   stages_config: string;
   status: string;
   resume_screen?: string | null;

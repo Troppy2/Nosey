@@ -15,6 +15,9 @@ from src.schemas.mock_interview_schema import (
     FinishRequest,
     FinishResponse,
     InterviewChatMessage,
+    JDParseRequest,
+    JDParseResponse,
+    MockCustomConfig,
     MockInterviewCreateRequest,
     MockInterviewSessionResponse,
     ResumeScreenResult,
@@ -28,6 +31,8 @@ from src.schemas.mock_interview_schema import (
     Stage3MessageRequest,
     Stage3MessageResponse,
 )
+from src.schemas.mock_interview_schema import _normalize_level
+from src.services import lc_taxonomy
 from src.limiter import limiter
 from src.services.file_service import FileService
 from src.services.leetcode_service import LeetCodeService
@@ -131,6 +136,39 @@ def _merge_covered_goals(prior: list[str], reported, valid_goals: list[str]) -> 
     return [g for g in valid_goals if g in covered]
 
 
+def _custom_config(row: MockInterviewSession) -> Optional[MockCustomConfig]:
+    """Parse the stored custom-company JSON config, or None for built-in companies."""
+    if row.company != "custom" or not row.custom_config:
+        return None
+    try:
+        return MockCustomConfig.model_validate_json(row.custom_config)
+    except Exception:
+        return None
+
+
+def _company_label(row: MockInterviewSession) -> str:
+    """Display name: the pasted company for custom sessions, else the built-in label."""
+    if row.company == "custom":
+        return (row.custom_company or "the company").strip() or "the company"
+    return _COMPANY_LABELS.get(row.company, row.company.title())
+
+
+def _role_focus(row: MockInterviewSession) -> str:
+    """What the company weighs (resume screen). JD-derived for custom sessions."""
+    cfg = _custom_config(row)
+    if cfg and cfg.role_focus.strip():
+        return cfg.role_focus.strip()
+    return _COMPANY_ROLE_FOCUS.get(row.company, "strong CS fundamentals and engineering impact")
+
+
+def _culture_hint(row: MockInterviewSession) -> str:
+    """Company culture (behavioral). JD-derived for custom sessions."""
+    cfg = _custom_config(row)
+    if cfg and cfg.culture.strip():
+        return cfg.culture.strip()
+    return _COMPANY_CULTURE.get(row.company, "performance, teamwork, and impact")
+
+
 def _candidate_name(user: User) -> str:
     if user.full_name:
         return user.full_name.split()[0]
@@ -171,10 +209,21 @@ async def create_session(
     if not stages:
         stages = ["resume", "stage1", "stage2", "stage3"]
 
+    company = body.company.lower()
+    custom_company = None
+    custom_config_json = None
+    if company == "custom":
+        custom_company = (body.custom_company or "").strip() or "the company"
+        if body.custom_config is not None:
+            custom_config_json = body.custom_config.model_dump_json()
+
     session = MockInterviewSession(
         user_id=user.id,
-        company=body.company.lower(),
+        company=company,
         level=body.level,
+        custom_company=custom_company,
+        jd_text=(body.jd_text or None) if company == "custom" else None,
+        custom_config=custom_config_json,
         stages_config=json.dumps(stages),
         status=STATUS_PENDING,
     )
@@ -194,6 +243,67 @@ async def get_session_route(
 ) -> MockInterviewSessionResponse:
     row = await _load_session(session_id, user, db)
     return _to_response(row)
+
+
+# ── Parse a job description into a prefilled custom-company config ─────────────
+
+@router.post("/parse-jd", response_model=JDParseResponse)
+@limiter.limit("5/minute")
+async def parse_job_description(
+    request: Request,
+    response: Response,
+    body: JDParseRequest,
+    user: User = Depends(get_current_user),
+) -> JDParseResponse:
+    # Constrain the model to real catalog topics: prefer the ids the client sent
+    # (its live taxonomy), fall back to the backend's canonical set.
+    menu = [t for t in body.available_topics if lc_taxonomy.canonical_topic(t)]
+    menu_ids = sorted({lc_taxonomy.canonical_topic(t) for t in menu}) if menu else sorted(lc_taxonomy.TOPIC_IDS)
+
+    jd = body.jd_text.strip()[:12000]
+    prompt = (
+        "You are a technical recruiter turning a software engineering job description into a "
+        "mock-interview plan. Read the JD and infer what this company would test.\n\n"
+        f"ALLOWED TOPIC IDS (choose suggested_topics ONLY from this exact list): {menu_ids}\n\n"
+        "RESPOND WITH ONLY RAW JSON, no markdown fences, no extra text, in exactly this shape:\n"
+        "{\n"
+        '  "company_name": "the hiring company, or \\"the company\\" if not stated",\n'
+        '  "role_focus": "one sentence on what this role/company weighs technically",\n'
+        '  "culture": "one short phrase capturing the company values / culture",\n'
+        '  "seniority": "one of: intern, junior, mid, senior",\n'
+        '  "suggested_topics": ["3 to 6 topic ids from the allowed list most likely to be tested"]\n'
+        "}\n\n"
+        "Base seniority on the JD's titling and years of experience (intern/new-grad -> intern or "
+        "junior, 3+ years -> mid, staff/lead/principal -> senior). Do not invent topic ids.\n\n"
+        f"JOB DESCRIPTION:\n{jd}\n\nYour JSON response:"
+    )
+
+    try:
+        llm = LLMService()
+        raw = await llm.call_kojo(prompt, provider=resolve_request_provider(user, body.provider))
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+        parsed = json.loads(raw)
+    except (json.JSONDecodeError, LLMException) as exc:
+        raise HTTPException(status_code=503, detail=f"Failed to read the job description: {exc}") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Failed to read the job description: {exc}") from exc
+
+    allowed = set(menu_ids)
+    topics: list[str] = []
+    for t in parsed.get("suggested_topics", []) if isinstance(parsed.get("suggested_topics"), list) else []:
+        canon = lc_taxonomy.canonical_topic(str(t))
+        if canon and canon in allowed and canon not in topics:
+            topics.append(canon)
+
+    return JDParseResponse(
+        company_name=str(parsed.get("company_name", "")).strip()[:120] or "the company",
+        role_focus=str(parsed.get("role_focus", "")).strip()[:600],
+        culture=str(parsed.get("culture", "")).strip()[:600],
+        seniority=_normalize_level(str(parsed.get("seniority", "intern"))),
+        suggested_topics=topics[:6],
+    )
 
 
 # ── Resume Screen: simulated ATS evaluation ───────────────────────────────────
@@ -231,8 +341,8 @@ async def screen_resume(
     user: User = Depends(get_current_user),
 ) -> ResumeScreenResult:
     row = await _load_session(session_id, user, db)
-    company_label = _COMPANY_LABELS.get(row.company, row.company.title())
-    role_focus = _COMPANY_ROLE_FOCUS.get(row.company, "strong CS fundamentals and engineering impact")
+    company_label = _company_label(row)
+    role_focus = _role_focus(row)
     level_cfg = _level_config(row)
 
     # Resume text comes either from an uploaded file (PDF/DOCX/...) or pasted
@@ -438,7 +548,7 @@ async def submit_stage2(
 
     coding_slug = body.problem_slug or "unknown"
     coding_title = body.problem_title or "the coding problem"
-    company_label = _COMPANY_LABELS.get(row.company, row.company.title())
+    company_label = _company_label(row)
     candidate = _candidate_name(user)
     level_cfg = _level_config(row)
 
@@ -479,7 +589,7 @@ async def stage2_message(
     user: User = Depends(get_current_user),
 ) -> Stage2MessageResponse:
     row = await _load_session(session_id, user, db)
-    company_label = _COMPANY_LABELS.get(row.company, row.company.title())
+    company_label = _company_label(row)
     candidate = _candidate_name(user)
     level_cfg = _level_config(row)
 
@@ -490,7 +600,31 @@ async def stage2_message(
         for m in body.history
     )
 
+    # For a custom company the candidate chose the difficulties (and maybe specific
+    # problems / focus topics); those override the level-derived difficulty for the
+    # coding problem the interviewer presents.
+    cfg = _custom_config(row)
     coding_difficulty = level_cfg["coding_difficulty"]
+    custom_focus = ""
+    if cfg:
+        if cfg.difficulties:
+            coding_difficulty = "/".join(cfg.difficulties)
+        if cfg.problems:
+            picks = ", ".join(f"{p.title or p.slug} ({p.slug})" for p in cfg.problems[:6])
+            custom_focus = (
+                f"\nWhen you present the coding problem, choose ONE from the candidate's target "
+                f"problem set: {picks}. Use its real title and slug.\n"
+            )
+        elif cfg.topics:
+            custom_focus = (
+                f"\nFocus the technical and coding questions on these topics this company tests: "
+                f"{', '.join(cfg.topics)}.\n"
+            )
+        if cfg.subtopics:
+            custom_focus += (
+                f"Emphasize these specific techniques where they fit naturally: "
+                f"{', '.join(cfg.subtopics)}.\n"
+            )
 
     # Goal tracking: the client echoes back the goals covered so far. We tell the
     # model which goal to focus on next so it does not loop or wander.
@@ -514,7 +648,8 @@ async def stage2_message(
     system_prompt = (
         f"You are a {level_cfg['role']} at {company_label} conducting a 45-minute technical phone "
         f"screen with {candidate} for a {level_cfg['label']} role.\n"
-        f"Calibrate difficulty and expectations to a {level_cfg['label']} candidate: {level_cfg['rigor']}\n\n"
+        f"Calibrate difficulty and expectations to a {level_cfg['label']} candidate: {level_cfg['rigor']}\n"
+        f"{custom_focus}"
         "RESPOND WITH ONLY RAW JSON, no markdown fences, no extra text:\n"
         '{"reply": "...", "coding_problem": null, "covered_goals": ["..."], "is_done": false}\n\n'
         "YOUR INTERVIEW GOALS, IN ORDER (cover each ONE at a time):\n"
@@ -613,9 +748,9 @@ async def stage3_message(
 ) -> Stage3MessageResponse:
     row = await _load_session(session_id, user, db)
     provider = resolve_request_provider(user, body.provider)
-    company_label = _COMPANY_LABELS.get(row.company, row.company.title())
+    company_label = _company_label(row)
     candidate = _candidate_name(user)
-    culture_hint = _COMPANY_CULTURE.get(row.company, "performance, teamwork, and impact")
+    culture_hint = _culture_hint(row)
     level_cfg = _level_config(row)
 
     turn_count = sum(1 for m in body.history if m.role == "user")
@@ -753,7 +888,7 @@ async def finish_interview(
     user: User = Depends(get_current_user),
 ) -> FinishResponse:
     row = await _load_session(session_id, user, db)
-    company_label = _COMPANY_LABELS.get(row.company, row.company.title())
+    company_label = _company_label(row)
     level_cfg = _level_config(row)
 
     stage1_verdict = _stage1_overall_verdict(row.stage1_results)
@@ -838,6 +973,9 @@ def _to_response(row: MockInterviewSession) -> MockInterviewSessionResponse:
         id=row.id,
         company=row.company,
         level=row.level,
+        custom_company=row.custom_company,
+        jd_text=row.jd_text,
+        custom_config=_custom_config(row),
         stages_config=row.stages_config,
         status=row.status,
         resume_screen=row.resume_screen,

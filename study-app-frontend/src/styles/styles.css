@@ -21911,6 +21911,100 @@ button.lc-reminder-feature-cta:disabled {
   vertical-align: middle;
 }
 
+/* Mock Interview: back-to-KojoCode link at the top of the setup page */
+.mock-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 4px 4px 4px 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--green-dark);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.mock-back-link:hover {
+  color: var(--ink);
+}
+
+/* Mock Interview: custom-company (job description) config panel */
+.mock-custom-panel {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--green-light-mid);
+}
+.mock-custom-label {
+  display: block;
+  margin: 14px 0 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.mock-custom-input,
+.mock-custom-textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 0.9rem;
+  color: var(--ink);
+  font-family: inherit;
+}
+.mock-custom-textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+.mock-custom-input:focus,
+.mock-custom-textarea:focus {
+  outline: none;
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.18);
+}
+.mock-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.mock-chip {
+  padding: 6px 12px;
+  border: 1.5px solid var(--green-light-mid);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  font-size: 0.83rem;
+  font-weight: 500;
+  color: var(--ink);
+  transition: border-color var(--transition-normal), background var(--transition-normal);
+}
+.mock-chip:hover {
+  border-color: var(--green-mid);
+}
+.mock-chip.selected {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-weight: 600;
+}
+.mock-chip-sm {
+  padding: 4px 10px;
+  font-size: 0.76rem;
+}
+.mock-subtopic-group {
+  margin-bottom: 10px;
+}
+.mock-subtopic-group-label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
 /* ── KojoCode subtopics: nested topic picker + browse filter chips/tags ─────── */
 
 /* The topic row is now a container: a clickable label (checkbox + name) that flexes

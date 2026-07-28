@@ -23,6 +23,15 @@ class MockInterviewSession(Base, TimestampMixin):
     # Target seniority level: intern | junior | mid | senior. Drives coding
     # difficulty distribution and interviewer rigor. Defaults to intern.
     level: Mapped[str] = mapped_column(String(16), nullable=False, default="intern", server_default="intern")
+
+    # Custom company (company == "custom"): the interview is built from a pasted job
+    # description instead of a hardcoded FAANG profile. custom_company is the display
+    # name, jd_text the raw description, and custom_config a JSON blob of
+    # {role_focus, culture, topics: [...], difficulties: [...], problems: [{slug,title,difficulty}]}.
+    # All null for the built-in companies.
+    custom_company: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    jd_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    custom_config: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # JSON array of stage keys, e.g. ["stage1", "stage2", "stage3"]
     stages_config: Mapped[str] = mapped_column(Text, nullable=False, default='["stage1","stage2","stage3"]')
     # Lifecycle (forward-only): pending, stage1_complete, stage2, stage2_complete,
