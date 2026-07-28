@@ -64,7 +64,11 @@ export default function MockInterviewStage2() {
   const [codeFeedback, setCodeFeedback] = useState<string | null>(() => stored?.stage2?.codeFeedback ?? null);
   const [codeError, setCodeError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(() => stored?.stage2?.submitted ?? false);
+  const [coveredGoals, setCoveredGoals] = useState<string[]>(() => stored?.stage2?.coveredGoals ?? []);
   const [ttsEnabled, setTtsEnabled] = useState(false);
+
+  // Stage 2 covers 5 interview goals; this drives a small progress indicator.
+  const totalGoals = 5;
 
   const threadRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -85,11 +89,11 @@ export default function MockInterviewStage2() {
       company,
       selectedStages,
       updatedAt: Date.now(),
-      stage2: { messages, codingProblem, code, codeFeedback, submitted },
+      stage2: { messages, codingProblem, code, codeFeedback, submitted, coveredGoals },
     };
     saveMockProgress(progress);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages, codingProblem, code, codeFeedback, submitted]);
+  }, [messages, codingProblem, code, codeFeedback, submitted, coveredGoals]);
 
   // Start the interview only if there is no saved conversation.
   useEffect(() => {
@@ -100,9 +104,10 @@ export default function MockInterviewStage2() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await sendStage2Message(numericSessionId, null, []);
+        const res = await sendStage2Message(numericSessionId, null, [], []);
         if (cancelled) return;
         setMessages([{ role: "interviewer", content: res.reply }]);
+        if (res.covered_goals) setCoveredGoals(res.covered_goals);
         if (ttsEnabled) speak(res.reply);
         if (res.coding_problem) setCodingProblem(res.coding_problem);
       } catch (e: unknown) {
@@ -133,9 +138,10 @@ export default function MockInterviewStage2() {
     scrollToBottom();
 
     try {
-      const res = await sendStage2Message(numericSessionId, text, messages);
+      const res = await sendStage2Message(numericSessionId, text, messages, coveredGoals);
       const aiMsg: InterviewChatMessage = { role: "interviewer", content: res.reply };
       setMessages([...nextHistory, aiMsg]);
+      if (res.covered_goals) setCoveredGoals(res.covered_goals);
       if (ttsEnabled) speak(res.reply);
       if (res.coding_problem && !codingProblem) {
         setCodingProblem(res.coding_problem);
@@ -239,7 +245,12 @@ export default function MockInterviewStage2() {
           <div className="mock-interviewer-avatar">AI</div>
           <div>
             <div className="mock-interviewer-name">{companyLabel} Interviewer</div>
-            <div className="mock-stage-breadcrumb">Stage 2: Technical Interview</div>
+            <div className="mock-stage-breadcrumb">
+              Stage 2: Technical Interview
+              <span className="mock-goal-progress" title="Interview progress">
+                {Math.min(coveredGoals.length, totalGoals)} of {totalGoals} covered
+              </span>
+            </div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

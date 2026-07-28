@@ -658,9 +658,12 @@ export type SlashCommandInput = {
 
 // ── Mock Interview ────────────────────────────────────────────────────────────
 
+export type MockInterviewLevel = "intern" | "junior" | "mid" | "senior";
+
 export type MockInterviewSession = {
   id: ID;
   company: string;
+  level?: MockInterviewLevel;
   stages_config: string;
   status: string;
   resume_screen?: string | null;
@@ -715,11 +718,13 @@ export type Stage2MessageResponse = {
   reply: string;
   coding_problem?: CodingProblemInfo | null;
   is_done: boolean;
+  covered_goals?: string[];
 };
 
 export type Stage3MessageResponse = {
   reply: string;
   is_done: boolean;
+  covered_goals?: string[];
 };
 
 export type MockInterviewFinishResponse = {

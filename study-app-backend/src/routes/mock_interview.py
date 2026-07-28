@@ -59,6 +59,77 @@ _COMPANY_LABELS = {
     "random": "a top-tier tech company",
 }
 
+# Target seniority level drives coding difficulty distribution and how strict the
+# interviewer is. The LeetCode problem bank is shared across levels; only the
+# difficulty mix and the interviewer's expectations change. Read from one place so
+# every prompt builder stays consistent.
+_LEVEL_CONFIG = {
+    "intern": {
+        "label": "internship",
+        "role": "software engineering intern",
+        "coding_difficulty": "Easy/Medium",
+        "rigor": (
+            "Be encouraging and supportive. Value correct, clear thinking over optimal "
+            "complexity. It is fine if the candidate needs hints; guide them. Do not expect "
+            "a perfect big-O answer."
+        ),
+    },
+    "junior": {
+        "label": "new-grad / junior",
+        "role": "junior software engineer",
+        "coding_difficulty": "Medium",
+        "rigor": (
+            "Hold a standard new-grad bar. Expect a working solution and a basic complexity "
+            "analysis. Offer a hint if they stall, but expect them to drive."
+        ),
+    },
+    "mid": {
+        "label": "mid-level",
+        "role": "mid-level software engineer",
+        "coding_difficulty": "Medium/Hard",
+        "rigor": (
+            "Be probing. Expect a near-optimal solution, explicit edge-case handling, and a "
+            "tradeoff discussion. Push back on vague reasoning."
+        ),
+    },
+    "senior": {
+        "label": "senior",
+        "role": "senior software engineer",
+        "coding_difficulty": "Hard",
+        "rigor": (
+            "Be rigorous. Expect optimal time and space complexity, robustness and scale "
+            "reasoning, and crisp communication. Probe deeply and do not accept hand-waving."
+        ),
+    },
+}
+
+
+def _level_config(row: MockInterviewSession) -> dict:
+    """Resolve the level config for a session, defaulting to intern."""
+    return _LEVEL_CONFIG.get(getattr(row, "level", "intern") or "intern", _LEVEL_CONFIG["intern"])
+
+
+# Ordered interview goals for the conversational stages. The LLM is told to cover
+# these one at a time and report which it has covered; the server enforces
+# advancement and a hard turn cap so the interviewer cannot ramble indefinitely.
+_STAGE2_GOALS = ["background", "concept_q1", "concept_q2", "coding_problem", "coding_discussion"]
+_STAGE3_GOALS = ["behavioral_q1", "behavioral_q2", "behavioral_q3", "behavioral_q4", "behavioral_q5"]
+
+# Hard turn caps (counted by user turns) so the stage always terminates even if the
+# model never reports full goal coverage.
+_STAGE2_TURN_CAP = 10
+_STAGE3_TURN_CAP = 7
+
+
+def _merge_covered_goals(prior: list[str], reported, valid_goals: list[str]) -> list[str]:
+    """Union previously-covered goals with the model's new report, dropping any
+    goal name that is not part of the known list (guards against hallucinated goals).
+    Returned in canonical goal order."""
+    covered = set(g for g in (prior or []) if g in valid_goals)
+    if isinstance(reported, list):
+        covered.update(g for g in reported if isinstance(g, str) and g in valid_goals)
+    return [g for g in valid_goals if g in covered]
+
 
 def _candidate_name(user: User) -> str:
     if user.full_name:
@@ -103,6 +174,7 @@ async def create_session(
     session = MockInterviewSession(
         user_id=user.id,
         company=body.company.lower(),
+        level=body.level,
         stages_config=json.dumps(stages),
         status=STATUS_PENDING,
     )
@@ -161,6 +233,7 @@ async def screen_resume(
     row = await _load_session(session_id, user, db)
     company_label = _COMPANY_LABELS.get(row.company, row.company.title())
     role_focus = _COMPANY_ROLE_FOCUS.get(row.company, "strong CS fundamentals and engineering impact")
+    level_cfg = _level_config(row)
 
     # Resume text comes either from an uploaded file (PDF/DOCX/...) or pasted
     # text/LaTeX. Files take priority when both are present.
@@ -187,8 +260,9 @@ async def screen_resume(
 
     prompt = (
         "You are an Applicant Tracking System (ATS) combined with a technical recruiter doing the "
-        f"first resume screen for a software engineering role at {company_label}. "
+        f"first resume screen for a {level_cfg['role']} ({level_cfg['label']}) role at {company_label}. "
         f"This company weighs: {role_focus}.\n\n"
+        f"Calibrate expectations to a {level_cfg['label']} candidate: {level_cfg['rigor']}\n\n"
         "Evaluate the resume below the way an ATS plus a recruiter would: keyword and skills match for "
         "the role, parse-ability and formatting, relevance and depth of experience, signal of impact "
         "(metrics, scope), and overall whether this candidate would clear the screen and be sent an "
@@ -366,11 +440,14 @@ async def submit_stage2(
     coding_title = body.problem_title or "the coding problem"
     company_label = _COMPANY_LABELS.get(row.company, row.company.title())
     candidate = _candidate_name(user)
+    level_cfg = _level_config(row)
 
     prompt = (
-        f"You are a senior {company_label} interviewer reviewing {candidate}'s solution.\n"
+        f"You are a {level_cfg['role']} interviewer at {company_label} reviewing {candidate}'s solution "
+        f"for a {level_cfg['label']} candidate.\n"
         f"Problem: {coding_title} ({coding_slug})\n\n"
         f"{candidate}'s code:\n```python\n{body.code}\n```\n\n"
+        f"Calibrate your expectations to a {level_cfg['label']} candidate: {level_cfg['rigor']}\n"
         f"Provide brief interview-style feedback (3-4 sentences) addressed directly to {candidate}: "
         "correctness, approach quality, time/space complexity, and one improvement suggestion. "
         "Be professional and constructive."
@@ -404,6 +481,7 @@ async def stage2_message(
     row = await _load_session(session_id, user, db)
     company_label = _COMPANY_LABELS.get(row.company, row.company.title())
     candidate = _candidate_name(user)
+    level_cfg = _level_config(row)
 
     turn_count = sum(1 for m in body.history if m.role == "user")
 
@@ -412,26 +490,57 @@ async def stage2_message(
         for m in body.history
     )
 
-    coding_difficulty = "Medium/Hard" if row.company in ("google", "meta") else "Medium"
+    coding_difficulty = level_cfg["coding_difficulty"]
+
+    # Goal tracking: the client echoes back the goals covered so far. We tell the
+    # model which goal to focus on next so it does not loop or wander.
+    covered = _merge_covered_goals(body.covered_goals, [], _STAGE2_GOALS)
+    remaining = [g for g in _STAGE2_GOALS if g not in covered]
+    current_goal = remaining[0] if remaining else "coding_discussion"
+    # Once the candidate has been talking for a while without reaching the coding
+    # problem, force it so the interviewer stops chatting and gets to the code.
+    force_coding = "coding_problem" not in covered and turn_count >= 4
+
+    goal_descriptions = {
+        "background": f"greet warmly and ask about {candidate}'s background (role, relevant experience, why {company_label})",
+        "concept_q1": "ask ONE technical conceptual question (time complexity, data structure tradeoffs, or algorithm design)",
+        "concept_q2": "ask a SECOND, different technical conceptual question",
+        "coding_problem": f"present ONE {coding_difficulty} LeetCode problem by filling the coding_problem field",
+        "coding_discussion": "discuss the coding problem and answer clarifying questions without giving away the full solution",
+    }
+    if force_coding:
+        current_goal = "coding_problem"
 
     system_prompt = (
-        f"You are a senior software engineer at {company_label} conducting a 45-minute technical phone screen with {candidate}.\n\n"
+        f"You are a {level_cfg['role']} at {company_label} conducting a 45-minute technical phone "
+        f"screen with {candidate} for a {level_cfg['label']} role.\n"
+        f"Calibrate difficulty and expectations to a {level_cfg['label']} candidate: {level_cfg['rigor']}\n\n"
         "RESPOND WITH ONLY RAW JSON, no markdown fences, no extra text:\n"
-        '{"reply": "...", "coding_problem": null, "is_done": false}\n\n'
-        f"CURRENT USER TURN: {turn_count + 1}\n\n"
-        "INTERVIEW PHASES (follow strictly based on turn count):\n"
-        f"- Turns 1 to 3: Warm greeting, ask about {candidate}'s background (current role, relevant experience, why {company_label})\n"
-        "- Turns 4 to 5: Ask 2 technical conceptual questions (time complexity, data structure tradeoffs, algorithm design)\n"
-        f"- Turn 6: Present ONE {coding_difficulty} LeetCode problem by filling the coding_problem field:\n"
-        '  {"title":"Two Sum","slug":"two-sum","difficulty":"Medium","prompt":"Given an array..."}\n'
-        "- Turns 7+: Discuss the problem and answer clarifying questions without giving away the full solution. coding_problem MUST be null.\n\n"
+        '{"reply": "...", "coding_problem": null, "covered_goals": ["..."], "is_done": false}\n\n'
+        "YOUR INTERVIEW GOALS, IN ORDER (cover each ONE at a time):\n"
+        + "".join(f"- {g}: {goal_descriptions[g]}\n" for g in _STAGE2_GOALS)
+        + "\n"
+        f"GOALS ALREADY COVERED: {covered or ['(none yet)']}\n"
+        f"YOUR SINGLE GOAL FOR THIS TURN: {current_goal} ({goal_descriptions[current_goal]})\n\n"
         "RULES:\n"
+        "- Address ONLY the current goal this turn. Once the candidate has answered it, add it to "
+        "covered_goals and move to the next goal. Do NOT re-ask a goal that is already covered.\n"
+        "- Ask a follow-up ONLY to clarify an incomplete or unclear answer. If the candidate asks YOU "
+        "a question, answer it briefly, then return to the current goal. Never invent new goals.\n"
+        "- When the current goal is coding_problem, fill the coding_problem field like:\n"
+        f'  {{"title":"Two Sum","slug":"two-sum","difficulty":"{coding_difficulty.split("/")[0]}","prompt":"Given an array..."}}\n'
+        "  and include \"coding_problem\" in covered_goals. In all other turns coding_problem MUST be null.\n"
+        "- covered_goals: list every goal covered so far (including ones from earlier turns).\n"
         "- reply: 2 to 4 sentences max. Be direct and conversational.\n"
         f"- Use {candidate}'s name occasionally (not every message).\n"
-        "- coding_problem must appear ONCE only (null in all other turns).\n"
         "- The candidate submits their code with a separate button, so always keep is_done false.\n"
         "- Return ONLY raw JSON.\n"
     )
+    if force_coding:
+        system_prompt += (
+            "\nIMPORTANT: The background and concept questions have taken long enough. Present the "
+            "coding problem THIS turn regardless of what else is pending.\n"
+        )
 
     if body.message is None:
         full_prompt = system_prompt + "\nConversation so far:\n(none)\n\nBegin the interview now."
@@ -451,7 +560,7 @@ async def stage2_message(
         parsed = json.loads(raw)
     except Exception:
         fallback = raw if isinstance(raw, str) and raw else "I see, thanks for sharing that. Let's continue."
-        return Stage2MessageResponse(reply=fallback[:600])
+        return Stage2MessageResponse(reply=fallback[:600], covered_goals=covered)
 
     coding_problem = None
     if parsed.get("coding_problem"):
@@ -459,9 +568,15 @@ async def stage2_message(
         coding_problem = CodingProblemInfo(
             title=cp.get("title", "Coding Problem"),
             slug=cp.get("slug", "problem"),
-            difficulty=cp.get("difficulty", "Medium"),
+            difficulty=cp.get("difficulty", coding_difficulty.split("/")[0]),
             prompt=cp.get("prompt", ""),
         )
+
+    # Merge the model's report with what was already covered. If a coding problem
+    # was presented this turn, count that goal as covered regardless of the report.
+    updated_covered = _merge_covered_goals(covered, parsed.get("covered_goals"), _STAGE2_GOALS)
+    if coding_problem is not None and "coding_problem" not in updated_covered:
+        updated_covered = _merge_covered_goals(updated_covered, ["coding_problem"], _STAGE2_GOALS)
 
     row.status = STATUS_STAGE2
     await db.commit()
@@ -470,6 +585,7 @@ async def stage2_message(
         reply=parsed.get("reply", ""),
         coding_problem=coding_problem,
         is_done=False,
+        covered_goals=updated_covered,
     )
 
 
@@ -500,6 +616,7 @@ async def stage3_message(
     company_label = _COMPANY_LABELS.get(row.company, row.company.title())
     candidate = _candidate_name(user)
     culture_hint = _COMPANY_CULTURE.get(row.company, "performance, teamwork, and impact")
+    level_cfg = _level_config(row)
 
     turn_count = sum(1 for m in body.history if m.role == "user")
 
@@ -508,23 +625,34 @@ async def stage3_message(
         for m in body.history
     )
 
+    # Goal tracking: five behavioral questions, one per goal. The client echoes the
+    # goals covered so far; the server enforces advancement and a hard turn cap.
+    covered = _merge_covered_goals(body.covered_goals, [], _STAGE3_GOALS)
+    remaining = [g for g in _STAGE3_GOALS if g not in covered]
+    question_number = len(covered) + 1  # the behavioral question to ask this turn
+
     system_prompt = (
-        f"You are a hiring manager at {company_label} conducting a 30-minute behavioral interview with {candidate}.\n"
-        f"Company culture: {culture_hint}\n\n"
+        f"You are a hiring manager at {company_label} conducting a 30-minute behavioral interview with "
+        f"{candidate} for a {level_cfg['label']} role.\n"
+        f"Company culture: {culture_hint}\n"
+        f"Calibrate depth to a {level_cfg['label']} candidate: {level_cfg['rigor']}\n\n"
         "RESPOND WITH ONLY RAW JSON, no markdown, no extra text:\n"
-        '{"reply": "...", "is_done": false}\n\n'
-        f"USER TURNS SO FAR: {turn_count}\n\n"
-        "INTERVIEW FLOW:\n"
-        f"- If turn_count == 0: Warm greeting plus ask the FIRST behavioral STAR question tailored to {company_label}\n"
-        "- After each answer: 1 sentence acknowledgment, then ask the NEXT question (one at a time)\n"
-        f"- Cover 5 behavioral questions total focused on {company_label}'s culture above\n"
-        "- After 5 user answers are given and acknowledged: wrap up warmly, set is_done: true\n\n"
+        '{"reply": "...", "covered_goals": ["..."], "is_done": false}\n\n'
+        f"YOUR GOALS: ask exactly 5 behavioral STAR questions, one per turn, tracked as "
+        f"{_STAGE3_GOALS}.\n"
+        f"GOALS ALREADY COVERED: {covered or ['(none yet)']}\n"
+        f"THIS TURN: ask behavioral question number {question_number} of 5, tailored to "
+        f"{company_label}'s culture above (or wrap up if all 5 are already covered).\n\n"
         "RULES:\n"
-        "- reply: 2 to 3 sentences max\n"
-        "- Ask ONE question per turn\n"
-        f"- Use {candidate}'s name occasionally\n"
-        "- Be warm but professional\n"
-        "- Return ONLY raw JSON\n"
+        "- Give a 1 sentence acknowledgment of the previous answer, then ask the NEXT uncovered "
+        "question. Ask ONE question per turn. Do NOT re-ask a question already covered.\n"
+        "- Ask a follow-up ONLY to clarify an unclear answer. If the candidate asks YOU a question, "
+        "answer briefly, then continue with the current question. Never add questions beyond the 5.\n"
+        "- covered_goals: list every behavioral question slot answered so far (from the list above).\n"
+        "- After all 5 answers are given and acknowledged: wrap up warmly and set is_done: true.\n"
+        "- reply: 2 to 3 sentences max. Ask ONE question per turn.\n"
+        f"- Use {candidate}'s name occasionally. Be warm but professional.\n"
+        "- Return ONLY raw JSON.\n"
     )
 
     if body.message is None:
@@ -545,9 +673,21 @@ async def stage3_message(
         parsed = json.loads(raw)
     except Exception:
         fallback = raw if isinstance(raw, str) and raw else "Thank you for sharing. Could you tell me more?"
-        return Stage3MessageResponse(reply=fallback[:600])
+        return Stage3MessageResponse(reply=fallback[:600], covered_goals=covered)
 
+    # Merge coverage. A user answer this turn advances one behavioral goal even if the
+    # model forgets to report it, so coverage cannot stall.
+    updated_covered = _merge_covered_goals(covered, parsed.get("covered_goals"), _STAGE3_GOALS)
+    if body.message is not None and len(updated_covered) <= len(covered):
+        next_goal = next((g for g in _STAGE3_GOALS if g not in updated_covered), None)
+        if next_goal:
+            updated_covered = _merge_covered_goals(updated_covered, [next_goal], _STAGE3_GOALS)
+
+    # The stage ends when the model says so, when all 5 questions are covered, or when
+    # the hard turn cap is hit, so the interviewer can never ramble past the budget.
     is_done = bool(parsed.get("is_done", False))
+    if len(updated_covered) >= len(_STAGE3_GOALS) or turn_count + 1 >= _STAGE3_TURN_CAP:
+        is_done = True
 
     if is_done and body.message is not None:
         # Save conversation as stage3 feedback for the final summary
@@ -566,6 +706,7 @@ async def stage3_message(
     return Stage3MessageResponse(
         reply=parsed.get("reply", ""),
         is_done=is_done,
+        covered_goals=updated_covered,
     )
 
 
@@ -613,6 +754,7 @@ async def finish_interview(
 ) -> FinishResponse:
     row = await _load_session(session_id, user, db)
     company_label = _COMPANY_LABELS.get(row.company, row.company.title())
+    level_cfg = _level_config(row)
 
     stage1_verdict = _stage1_overall_verdict(row.stage1_results)
     stage2_verdict = _stage2_overall_verdict(row.stage2_submission)
@@ -637,15 +779,17 @@ async def finish_interview(
     stage3_summary = _summarize_stage3(row.stage3_answers)
 
     prompt = (
-        f"You are a senior recruiter at {company_label} writing a debrief after a full mock interview loop.\n\n"
+        f"You are a senior recruiter at {company_label} writing a debrief after a full mock interview "
+        f"loop for a {level_cfg['label']} candidate.\n"
+        f"Judge against the {level_cfg['label']} bar: {level_cfg['rigor']}\n\n"
         f"Resume Screen (ATS):\n{resume_summary}\n\n"
         f"Stage 1 (Online Assessment):\n{stage1_summary}\n\n"
         f"Stage 2 (Technical Interview):\n{stage2_summary}\n\n"
         f"Stage 3 (Behavioral):\n{stage3_summary}\n\n"
         "Write a concise debrief (3-4 sentences): overall strengths, areas to improve, "
         "and end with a hiring recommendation from: STRONG HIRE / HIRE / BORDERLINE / NO HIRE. "
-        "Base the recommendation on the interview performance (Stages 1 to 3); mention the resume "
-        "screen only as context. Be direct and professional."
+        f"Base the recommendation on the interview performance (Stages 1 to 3) against the "
+        f"{level_cfg['label']} bar; mention the resume screen only as context. Be direct and professional."
     )
 
     try:
@@ -693,6 +837,7 @@ def _to_response(row: MockInterviewSession) -> MockInterviewSessionResponse:
     return MockInterviewSessionResponse(
         id=row.id,
         company=row.company,
+        level=row.level,
         stages_config=row.stages_config,
         status=row.status,
         resume_screen=row.resume_screen,
