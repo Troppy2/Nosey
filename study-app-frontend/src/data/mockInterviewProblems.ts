@@ -7,6 +7,10 @@ export interface InterviewProblem {
 
 export type CompanyKey = "google" | "meta" | "amazon" | "apple" | "microsoft" | "netflix" | "random";
 
+// Target seniority level. The problem bank is shared across levels; only the
+// difficulty distribution served for Stage 1 changes.
+export type InterviewLevel = "intern" | "junior" | "mid" | "senior";
+
 // Source: github.com/liquidslr/interview-company-wise-problems , sorted by interview frequency
 // Top ~40 problems per company; database-only problems excluded
 
@@ -440,12 +444,29 @@ function shuffled<T>(arr: T[]): T[] {
   return a;
 }
 
-export function pickProblems(company: CompanyKey, count = 3): InterviewProblem[] {
+// Preference order over difficulty tiers per level. The list is a fallback chain:
+// problems are drawn from the shared pool following this order, so a level that
+// prefers Easy still falls back to Medium/Hard when the pool lacks easy problems.
+const LEVEL_DIFFICULTY_ORDER: Record<InterviewLevel, InterviewProblem["difficulty"][]> = {
+  intern: ["Easy", "Medium", "Hard"],
+  junior: ["Medium", "Easy", "Hard"],
+  mid: ["Medium", "Hard", "Easy"],
+  senior: ["Hard", "Medium", "Easy"],
+};
+
+export function pickProblems(
+  company: CompanyKey,
+  count = 3,
+  level: InterviewLevel = "intern",
+): InterviewProblem[] {
   const pool = PROBLEM_POOLS[company] ?? PROBLEM_POOLS.random;
-  const hard = pool.filter((p) => p.difficulty === "Hard");
-  const medium = pool.filter((p) => p.difficulty === "Medium");
-  const easy = pool.filter((p) => p.difficulty === "Easy");
-  const candidates = [...shuffled(hard), ...shuffled(medium), ...shuffled(easy)];
+  const byTier: Record<InterviewProblem["difficulty"], InterviewProblem[]> = {
+    Easy: shuffled(pool.filter((p) => p.difficulty === "Easy")),
+    Medium: shuffled(pool.filter((p) => p.difficulty === "Medium")),
+    Hard: shuffled(pool.filter((p) => p.difficulty === "Hard")),
+  };
+  const order = LEVEL_DIFFICULTY_ORDER[level] ?? LEVEL_DIFFICULTY_ORDER.intern;
+  const candidates = order.flatMap((tier) => byTier[tier]);
   return candidates.slice(0, count);
 }
 

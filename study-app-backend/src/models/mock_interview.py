@@ -20,6 +20,9 @@ class MockInterviewSession(Base, TimestampMixin):
     )
 
     company: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Target seniority level: intern | junior | mid | senior. Drives coding
+    # difficulty distribution and interviewer rigor. Defaults to intern.
+    level: Mapped[str] = mapped_column(String(16), nullable=False, default="intern", server_default="intern")
     # JSON array of stage keys, e.g. ["stage1", "stage2", "stage3"]
     stages_config: Mapped[str] = mapped_column(Text, nullable=False, default='["stage1","stage2","stage3"]')
     # Lifecycle (forward-only): pending, stage1_complete, stage2, stage2_complete,
