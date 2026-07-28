@@ -35,8 +35,10 @@ import type {
   LeetCodeHintResponse,
   LeetCodeProblemData,
   KojoRestoreResponse,
+  MockCustomConfig,
   MockInterviewSession,
   MockInterviewFinishResponse,
+  JDParseResponse,
   ResumeScreenResult,
   Stage1GradeResponse,
   Stage2MessageResponse,
@@ -1323,8 +1325,12 @@ export type LCProgressData = {
   solved_at?: Record<string, string>;
 };
 
-export async function fetchLCProgress(): Promise<LCProgressData> {
-  return request<LCProgressData>("/leetcode/progress");
+export async function fetchLCProgress(tzOffset?: number): Promise<LCProgressData> {
+  // Pass the client's timezone offset (Date.getTimezoneOffset(), minutes behind
+  // UTC) so the server buckets the derived activity_counts into the same local
+  // calendar days the heatmap renders.
+  const query = tzOffset === undefined ? "" : `?tz_offset=${tzOffset}`;
+  return request<LCProgressData>(`/leetcode/progress${query}`);
 }
 
 export async function syncLCProgress(data: LCProgressData): Promise<void> {
@@ -1636,10 +1642,22 @@ export async function createMockInterviewSession(
   company: string,
   stages: string[],
   level: string = "intern",
+  custom?: { custom_company: string; jd_text: string; custom_config: MockCustomConfig },
 ): Promise<MockInterviewSession> {
   return request<MockInterviewSession>("/mock-interview", {
     method: "POST",
-    body: JSON.stringify({ company, stages, level }),
+    body: JSON.stringify({ company, stages, level, ...(custom ?? {}) }),
+  });
+}
+
+export async function parseJobDescription(
+  jdText: string,
+  availableTopics: string[],
+  provider?: string,
+): Promise<JDParseResponse> {
+  return request<JDParseResponse>("/mock-interview/parse-jd", {
+    method: "POST",
+    body: JSON.stringify({ jd_text: jdText, available_topics: availableTopics, provider }),
   });
 }
 

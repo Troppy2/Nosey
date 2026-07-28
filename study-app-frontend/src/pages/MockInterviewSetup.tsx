@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   Briefcase,
+  Building2,
   ChevronRight,
   Clock,
   Code2,
@@ -9,17 +10,25 @@ import {
   MessageSquare,
   Play,
   Shuffle,
+  Sparkles,
   Users,
   X,
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createMockInterviewSession } from "../lib/api";
+import { createMockInterviewSession, parseJobDescription } from "../lib/api";
 import {
   COMPANY_OPTIONS,
   type CompanyKey,
   type InterviewLevel,
 } from "../data/mockInterviewProblems";
+import {
+  TAXONOMY_TOPICS,
+  resolvePastedProblems,
+  subtopicsForTopics,
+  type TaxonomyDifficulty,
+} from "../data/leetcodeTaxonomy";
+import type { MockCustomConfig } from "../lib/types";
 import {
   clearActiveMockSession,
   clearMockProgress,
@@ -27,7 +36,10 @@ import {
   loadMockProgress,
   resumeRouteFor,
   saveMockProgress,
+  type MockCompany,
 } from "../lib/mockInterview";
+
+const DIFFICULTY_OPTIONS: TaxonomyDifficulty[] = ["Easy", "Medium", "Hard"];
 
 const STAGE_OPTIONS = [
   {
@@ -81,8 +93,21 @@ const COMPANY_BRAND: Record<CompanyKey, { color: string; initial: string }> = {
 
 export default function MockInterviewSetup() {
   const navigate = useNavigate();
-  const [selectedCompany, setSelectedCompany] = useState<CompanyKey>("google");
+  const [selectedCompany, setSelectedCompany] = useState<MockCompany>("google");
   const [selectedLevel, setSelectedLevel] = useState<InterviewLevel>("intern");
+
+  // Custom-company (job description) state.
+  const [customName, setCustomName] = useState("");
+  const [jdText, setJdText] = useState("");
+  const [customRoleFocus, setCustomRoleFocus] = useState("");
+  const [customCulture, setCustomCulture] = useState("");
+  const [selectedDifficulties, setSelectedDifficulties] = useState<TaxonomyDifficulty[]>(["Easy", "Medium"]);
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+  const [selectedSubtopics, setSelectedSubtopics] = useState<string[]>([]);
+  const [pastedProblems, setPastedProblems] = useState("");
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+
   const [selectedStages, setSelectedStages] = useState<string[]>([
     "resume",
     "stage1",
@@ -95,13 +120,60 @@ export default function MockInterviewSetup() {
   // Offer to resume an interview that was left in progress.
   const [active, setActive] = useState(() => getActiveMockSession());
   const activeCompanyLabel = active
-    ? COMPANY_OPTIONS.find((c) => c.key === active.company)?.label ?? active.company
+    ? active.company === "custom"
+      ? active.customCompany ?? "Custom"
+      : COMPANY_OPTIONS.find((c) => c.key === active.company)?.label ?? active.company
     : "";
 
   function toggleStage(key: string) {
     setSelectedStages((prev) =>
       prev.includes(key) ? prev.filter((s) => s !== key) : [...prev, key],
     );
+  }
+
+  function toggleDifficulty(d: TaxonomyDifficulty) {
+    setSelectedDifficulties((prev) =>
+      prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d],
+    );
+  }
+
+  function toggleTopic(id: string) {
+    const isRemoving = selectedTopics.includes(id);
+    const nextTopics = isRemoving ? selectedTopics.filter((x) => x !== id) : [...selectedTopics, id];
+    setSelectedTopics(nextTopics);
+    if (isRemoving) {
+      // Keep only subtopics still covered by a topic that remains selected.
+      const stillAvailable = new Set(subtopicsForTopics(nextTopics).map((s) => s.label));
+      setSelectedSubtopics((subs) => subs.filter((s) => stillAvailable.has(s)));
+    }
+  }
+
+  function toggleSubtopic(label: string) {
+    setSelectedSubtopics((prev) =>
+      prev.includes(label) ? prev.filter((x) => x !== label) : [...prev, label],
+    );
+  }
+
+  async function handleAnalyzeJd() {
+    const jd = jdText.trim();
+    if (jd.length < 20) {
+      setAnalyzeError("Paste a job description first (a sentence or two minimum).");
+      return;
+    }
+    setAnalyzeError(null);
+    setAnalyzing(true);
+    try {
+      const result = await parseJobDescription(jd, TAXONOMY_TOPICS.map((t) => t.id));
+      if (result.company_name && !customName.trim()) setCustomName(result.company_name);
+      setCustomRoleFocus(result.role_focus);
+      setCustomCulture(result.culture);
+      if (result.seniority) setSelectedLevel(result.seniority);
+      if (result.suggested_topics.length > 0) setSelectedTopics(result.suggested_topics);
+    } catch (e: unknown) {
+      setAnalyzeError(e instanceof Error ? e.message : "Could not analyze the job description.");
+    } finally {
+      setAnalyzing(false);
+    }
   }
 
   function handleResume() {
@@ -114,7 +186,13 @@ export default function MockInterviewSetup() {
     }
     navigate(resumeRouteFor(progress), {
       state: {
-        session: { id: progress.sessionId, company: progress.company, level: progress.level },
+        session: {
+          id: progress.sessionId,
+          company: progress.company,
+          level: progress.level,
+          custom_company: progress.customCompany,
+          custom_config: progress.customConfig,
+        },
         selectedStages: progress.selectedStages,
       },
     });
@@ -131,10 +209,43 @@ export default function MockInterviewSetup() {
       setError("Select at least one stage.");
       return;
     }
+
+    // Build the custom-company config from the JD panel, if that path is selected.
+    let customCompany: string | undefined;
+    let customConfig: MockCustomConfig | undefined;
+    if (selectedCompany === "custom") {
+      const name = customName.trim();
+      const problems = resolvePastedProblems(pastedProblems);
+      if (!name) {
+        setError("Give the company a name (or paste and analyze a job description).");
+        return;
+      }
+      if (problems.length === 0 && selectedTopics.length === 0) {
+        setError("Pick at least one topic, or paste some specific problems.");
+        return;
+      }
+      customCompany = name;
+      customConfig = {
+        role_focus: customRoleFocus,
+        culture: customCulture,
+        topics: selectedTopics,
+        subtopics: selectedSubtopics,
+        difficulties: selectedDifficulties,
+        problems: problems.map((p) => ({ slug: p.slug, title: p.title, difficulty: p.difficulty })),
+      };
+    }
+
     setError(null);
     setStarting(true);
     try {
-      const session = await createMockInterviewSession(selectedCompany, selectedStages, selectedLevel);
+      const session = await createMockInterviewSession(
+        selectedCompany,
+        selectedStages,
+        selectedLevel,
+        customCompany && customConfig
+          ? { custom_company: customCompany, jd_text: jdText.trim(), custom_config: customConfig }
+          : undefined,
+      );
       const firstStage = selectedStages.includes("resume")
         ? "resume"
         : selectedStages.includes("stage1")
@@ -147,6 +258,8 @@ export default function MockInterviewSetup() {
         sessionId: session.id,
         company: selectedCompany,
         level: selectedLevel,
+        customCompany,
+        customConfig,
         selectedStages,
         updatedAt: Date.now(),
       });
@@ -267,7 +380,132 @@ export default function MockInterviewSetup() {
               </button>
             );
           })}
+          <button
+            className={`mock-company-btn${selectedCompany === "custom" ? " selected" : ""}`}
+            onClick={() => setSelectedCompany("custom")}
+          >
+            <div className="mock-company-avatar" style={{ background: "#4b5563" }}>
+              <Building2 size={18} color="#fff" />
+            </div>
+            <span className="mock-company-label">Custom (JD)</span>
+          </button>
         </div>
+
+        {selectedCompany === "custom" && (
+          <div className="mock-custom-panel">
+            <p className="muted small" style={{ marginTop: 4 }}>
+              Paste a job description and Nosey builds a mock interview for that company. Pick the
+              difficulties and topics it tends to ask, or paste specific problems.
+            </p>
+
+            <label className="mock-custom-label" htmlFor="mock-custom-name">Company name</label>
+            <input
+              id="mock-custom-name"
+              className="mock-custom-input"
+              placeholder="e.g. Stripe"
+              value={customName}
+              onChange={(e) => setCustomName(e.target.value)}
+            />
+
+            <label className="mock-custom-label" htmlFor="mock-jd">Job description</label>
+            <textarea
+              id="mock-jd"
+              className="mock-custom-textarea"
+              placeholder="Paste the full job description here..."
+              rows={6}
+              value={jdText}
+              onChange={(e) => setJdText(e.target.value)}
+            />
+            <div className="button-row" style={{ marginTop: 8 }}>
+              <button
+                className="button button-secondary"
+                onClick={handleAnalyzeJd}
+                disabled={analyzing}
+              >
+                {analyzing ? <Loader2 size={14} className="spin" /> : <Sparkles size={14} />}
+                {analyzing ? "Analyzing" : "Analyze job description"}
+              </button>
+              {customRoleFocus && !analyzing && (
+                <span className="muted small" style={{ alignSelf: "center" }}>
+                  Read as: {customRoleFocus}
+                </span>
+              )}
+            </div>
+            {analyzeError && <p className="small" style={{ color: "var(--error)" }}>{analyzeError}</p>}
+
+            <label className="mock-custom-label">Difficulty</label>
+            <div className="mock-chip-row">
+              {DIFFICULTY_OPTIONS.map((d) => (
+                <button
+                  key={d}
+                  className={`mock-chip${selectedDifficulties.includes(d) ? " selected" : ""}`}
+                  onClick={() => toggleDifficulty(d)}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+
+            <label className="mock-custom-label">
+              Topics usually asked {selectedTopics.length > 0 ? `(${selectedTopics.length})` : ""}
+            </label>
+            <div className="mock-chip-row">
+              {TAXONOMY_TOPICS.map((t) => (
+                <button
+                  key={t.id}
+                  className={`mock-chip${selectedTopics.includes(t.id) ? " selected" : ""}`}
+                  onClick={() => toggleTopic(t.id)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {selectedTopics.length > 0 && (
+              <>
+                <label className="mock-custom-label">
+                  Specific techniques {selectedSubtopics.length > 0 ? `(${selectedSubtopics.length})` : "(optional)"}
+                </label>
+                {selectedTopics.map((topicId) => {
+                  const subs = subtopicsForTopics([topicId]);
+                  if (subs.length === 0) return null;
+                  const topicLabel = TAXONOMY_TOPICS.find((t) => t.id === topicId)?.label ?? topicId;
+                  return (
+                    <div key={topicId} className="mock-subtopic-group">
+                      <span className="mock-subtopic-group-label">{topicLabel}</span>
+                      <div className="mock-chip-row">
+                        {subs.map((s) => (
+                          <button
+                            key={`${topicId}-${s.label}`}
+                            className={`mock-chip mock-chip-sm${selectedSubtopics.includes(s.label) ? " selected" : ""}`}
+                            onClick={() => toggleSubtopic(s.label)}
+                          >
+                            {s.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+
+            <label className="mock-custom-label" htmlFor="mock-paste-problems">
+              Or paste specific problems (optional, one per line)
+            </label>
+            <textarea
+              id="mock-paste-problems"
+              className="mock-custom-textarea"
+              placeholder={"two-sum\nhttps://leetcode.com/problems/valid-anagram/\nMerge Intervals"}
+              rows={3}
+              value={pastedProblems}
+              onChange={(e) => setPastedProblems(e.target.value)}
+            />
+            <p className="muted small" style={{ marginTop: 4 }}>
+              Pasted problems take priority over the topic selection for Stage 1.
+            </p>
+          </div>
+        )}
       </section>
 
       {/* Level selector */}

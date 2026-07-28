@@ -19,8 +19,12 @@ export default function MockInterviewStage3() {
     [numericSessionId],
   );
 
-  const company = (state?.session?.company ?? stored?.company ?? "random") as CompanyKey;
-  const companyLabel = COMPANY_OPTIONS.find((c) => c.key === company)?.label ?? company;
+  const rawCompany = state?.session?.company ?? stored?.company ?? "random";
+  const company = (rawCompany === "custom" ? "random" : rawCompany) as CompanyKey;
+  const companyLabel =
+    rawCompany === "custom"
+      ? state?.session?.custom_company ?? stored?.customCompany ?? "Custom"
+      : COMPANY_OPTIONS.find((c) => c.key === company)?.label ?? company;
   const selectedStages = state?.selectedStages ?? stored?.selectedStages ?? ["stage3"];
 
   const [messages, setMessages] = useState<InterviewChatMessage[]>(() => stored?.stage3?.messages ?? []);
@@ -47,9 +51,9 @@ export default function MockInterviewStage3() {
     if (!Number.isFinite(numericSessionId)) return;
     const prev = loadMockProgress(numericSessionId);
     const progress: MockProgress = {
-      ...(prev ?? { sessionId: numericSessionId, company, selectedStages, updatedAt: Date.now() }),
+      ...(prev ?? { sessionId: numericSessionId, company: rawCompany, selectedStages, updatedAt: Date.now() }),
       sessionId: numericSessionId,
-      company,
+      company: rawCompany,
       selectedStages,
       updatedAt: Date.now(),
       stage3: { messages, isDone, coveredGoals },
