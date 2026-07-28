@@ -76,6 +76,8 @@ import {
   syncLCCustomProblem,
   deleteLCCustomProblem,
   generateLCCustomProblem,
+  fetchKojoCodeSolution,
+  streamLCCustomProblems,
   reclassifyLCCustomProblems,
   fetchLCStreakChallenge,
   createLCStreakChallenge,
@@ -98,6 +100,7 @@ import {
   createLCDrill,
   advanceLCDrill,
   restartLCDrill,
+  deleteLCDrill,
 } from "../lib/api";
 import { runPythonLeetCode, traceLeetCodeExecution, type RunnerResult, type TraceResult } from "../lib/pyodideRunner";
 import { sanitizeLeetCodeHtml } from "../lib/leetcodeHtml";
@@ -110,6 +113,7 @@ import type {
   LCCustomProblem,
   LCCustomTestCase,
   LCGeneratedCustomProblem,
+  KojoCodeSolution,
   LCStreakChallenge,
   LCWeaknessTopic,
   LCImprovementTopic,
@@ -204,6 +208,44 @@ function getLastProblemKey(): string {
   return `${getUserStoragePrefix()}:nosey_lc_last_problem`;
 }
 
+// Slugs the user has ever run code against. Persisted so the KojoCode solution stays
+// unlocked once attempted, instead of re-locking on every code edit / problem switch
+// (runnerResult, which drives hasAttempted, resets in both cases).
+function getAttemptedKey(): string {
+  return `${getUserStoragePrefix()}:nosey_lc_attempted`;
+}
+
+// Prep-bank "Add problems by topic" selections (topics, subtopics, difficulty, and the
+// two counts), persisted PER BANK so each bank's pickers reopen where the user left them.
+function getBankAddPrefsKey(bankId: number): string {
+  return `${getUserStoragePrefix()}:nosey_lc_bank_add_prefs:${bankId}`;
+}
+
+type BankAddPrefs = {
+  topics: string[];
+  subtopics: string[];
+  difficulty: "any" | "Easy" | "Medium" | "Hard";
+  count: number;
+  kojoCount: number;
+};
+
+function loadBankAddPrefs(bankId: number): Partial<BankAddPrefs> {
+  try {
+    const raw = localStorage.getItem(getBankAddPrefsKey(bankId));
+    return raw ? (JSON.parse(raw) as Partial<BankAddPrefs>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveBankAddPrefs(bankId: number, prefs: BankAddPrefs): void {
+  try {
+    localStorage.setItem(getBankAddPrefsKey(bankId), JSON.stringify(prefs));
+  } catch {
+    // best-effort , a full/blocked localStorage just means prefs won't persist
+  }
+}
+
 // Kojo's last grade feedback, persisted per problem so it survives leaving and
 // re-opening the problem. A new run overwrites it; nothing else clears it.
 function getGradeFeedbackKey(slug: string): string {
@@ -284,6 +326,13 @@ function getDifficultySurveyedKey(): string {
   return `${getUserStoragePrefix()}:nosey_lc_difficulty_surveyed`;
 }
 
+// Slugs the "Add to 3-Pass Drill?" prompt has already offered (on completion OR after a
+// struggle), so a failed grade / timer expiry asks at most once per problem instead of
+// silently adding it or nagging on every failed run.
+function getDrillPromptedKey(): string {
+  return `${getUserStoragePrefix()}:nosey_lc_drill_prompted`;
+}
+
 const RECENT_DAILY_SEEDS_MAX = 8;
 
 // Reads the weakness-reset marker as an ISO string for the API, or undefined if the
@@ -334,6 +383,26 @@ function markDifficultySurveyed(slug: string): void {
     const next = loadDifficultySurveyed();
     next.add(slug);
     localStorage.setItem(getDifficultySurveyedKey(), JSON.stringify([...next]));
+  } catch {
+    // best-effort
+  }
+}
+
+function loadDrillPrompted(): Set<string> {
+  try {
+    const raw = localStorage.getItem(getDrillPromptedKey());
+    const parsed = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(parsed) ? parsed.filter((s): s is string => typeof s === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function markDrillPrompted(slug: string): void {
+  try {
+    const next = loadDrillPrompted();
+    next.add(slug);
+    localStorage.setItem(getDrillPromptedKey(), JSON.stringify([...next]));
   } catch {
     // best-effort
   }
@@ -1070,6 +1139,25 @@ const RAIL_COLLAPSE_KEY = "nosey_lc_rail_collapsed";
 // The problem editor renders the same rail but starts icon-only and remembers its own
 // preference, so collapsing it there never collapses the hub rail (and vice versa).
 const EDITOR_RAIL_COLLAPSE_KEY = "nosey_lc_rail_collapsed_editor";
+// Sentinel key for visualizerLoading when tracing the KojoCode model solution's own
+// code (rather than a per-test-case "Visualize" button, which keys on its input text).
+const SOLUTION_VIZ_KEY = "__kojocode_solution__";
+
+// Build the commented solution source for the KojoCode solution reveal. The model
+// returns clean code plus a list of {code, comment} annotations; we weave each comment
+// in as a Python comment on the line above its code (indented to match), so the result
+// reads as one naturally commented solution and renders through the shared KojoCode
+// code block (MarkdownContent ```python fence). Falls back to the raw solution code.
+function buildCommentedSolution(sol: KojoCodeSolution): string {
+  if (!sol.code_comments || sol.code_comments.length === 0) return sol.solution_code;
+  const out: string[] = [];
+  for (const line of sol.code_comments) {
+    const indent = line.code.match(/^\s*/)?.[0] ?? "";
+    if (line.comment.trim()) out.push(`${indent}# ${line.comment.trim()}`);
+    out.push(line.code);
+  }
+  return out.join("\n");
+}
 
 function LeftRail({
   active,
@@ -1946,7 +2034,25 @@ export default function LeetCodeMode() {
   const [timerPickerOpen, setTimerPickerOpen] = useState(false);
   const [timeoutModalOpen, setTimeoutModalOpen] = useState(false);
   const [timeoutModalMessage, setTimeoutModalMessage] = useState<string | null>(null);
+  // Slug whose "Time's up" modal is open on a FAILED attempt; the "Add to 3-Pass Drill?"
+  // prompt is offered when that modal closes (so the two modals never stack).
+  const [timeoutDrillSlug, setTimeoutDrillSlug] = useState<string | null>(null);
   const [solutionOpen, setSolutionOpen] = useState(false);
+  // Slugs the user has run code against at least once, loaded from localStorage. Keeps
+  // the KojoCode solution unlocked across code edits / problem switches (see getAttemptedKey).
+  const [attemptedSlugs, setAttemptedSlugs] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem(getAttemptedKey());
+      return new Set<string>(raw ? JSON.parse(raw) : []);
+    } catch {
+      return new Set<string>();
+    }
+  });
+  // KojoCode solution (custom problems only): lazily fetched + cached model solution.
+  const [kojoSolutionOpen, setKojoSolutionOpen] = useState(false);
+  const [kojoSolution, setKojoSolution] = useState<KojoCodeSolution | null>(null);
+  const [kojoSolutionLoading, setKojoSolutionLoading] = useState(false);
+  const [kojoSolutionError, setKojoSolutionError] = useState<string | null>(null);
   const [visualizerTrace, setVisualizerTrace] = useState<TraceResult | null>(null);
   const [visualizerLoading, setVisualizerLoading] = useState<string | null>(null);
   const [kojoOpen, setKojoOpen] = useState(false);
@@ -1976,6 +2082,8 @@ export default function LeetCodeMode() {
   const [bankMatchUnmatched, setBankMatchUnmatched] = useState<string[]>([]);
   // Topic-based add: companies interview by topic, so the primary add flow is "pick
   // topics + how many problems", not a hand-typed problem list.
+  // Bank add-by-topic pickers. Loaded per-bank from storage when a bank is opened
+  // (see the selectedBankId effect + saveBankAddPrefs), so each bank keeps its own picks.
   const [bankAddTopics, setBankAddTopics] = useState<Set<string>>(new Set());
   // Composite `${topicId}::${subtopic}` keys narrowing the bank add pool (see subtopicKey).
   const [bankAddSubtopics, setBankAddSubtopics] = useState<Set<string>>(new Set());
@@ -1986,6 +2094,12 @@ export default function LeetCodeMode() {
   // user who never wants AI can fill a bank / practice set entirely from the catalog.
   const [bankKojoLoading, setBankKojoLoading] = useState(false);
   const [practiceKojoLoading, setPracticeKojoLoading] = useState(false);
+  // Separate, smaller batch size for AI generation (distinct from the catalog counts)
+  // to protect quota/latency. Progress strings drive the button label while running.
+  const [bankKojoCount, setBankKojoCount] = useState(3);
+  const [practiceKojoCount, setPracticeKojoCount] = useState(3);
+  const [bankKojoProgress, setBankKojoProgress] = useState<string | null>(null);
+  const [practiceKojoProgress, setPracticeKojoProgress] = useState<string | null>(null);
   const [drills, setDrills] = useState<LCDrillSchedule[]>([]);
   const [drillsLoading, setDrillsLoading] = useState(false);
   const [drillAddText, setDrillAddText] = useState("");
@@ -2009,6 +2123,8 @@ export default function LeetCodeMode() {
   const [pendingDrillPromptSlug, setPendingDrillPromptSlug] = useState<string | null>(null);
   // "Drill cleared, run it again?" prompt: slug of the just-cleared drill (null = closed).
   const [drillAgainSlug, setDrillAgainSlug] = useState<string | null>(null);
+  // "Remove from 3-Pass Drill?" confirm: slug pending removal (null = closed).
+  const [drillRemoveSlug, setDrillRemoveSlug] = useState<string | null>(null);
   // Add-a-problem-by-LeetCode-link modal, scoped to the category it was opened from.
   const [addLinkCategoryId, setAddLinkCategoryId] = useState<string | null>(null);
   const [addLinkUrl, setAddLinkUrl] = useState("");
@@ -2157,6 +2273,45 @@ export default function LeetCodeMode() {
   useEffect(() => {
     currentCodeRef.current = currentCode;
   }, [currentCode]);
+
+  // Load the opened bank's saved add-by-topic pickers (each bank keeps its own).
+  // Runs when the selected bank changes; clears back to defaults when none is open.
+  useEffect(() => {
+    if (selectedBankId == null) {
+      setBankAddTopics(new Set());
+      setBankAddSubtopics(new Set());
+      setBankAddCount(5);
+      setBankAddDifficulty("any");
+      setBankKojoCount(3);
+      return;
+    }
+    const prefs = loadBankAddPrefs(selectedBankId);
+    setBankAddTopics(new Set(prefs.topics ?? []));
+    setBankAddSubtopics(new Set(prefs.subtopics ?? []));
+    setBankAddCount(prefs.count ?? 5);
+    setBankAddDifficulty(prefs.difficulty ?? "any");
+    setBankKojoCount(Math.max(1, Math.min(6, prefs.kojoCount ?? 3)));
+  }, [selectedBankId]);
+
+  // Persist the current bank's pickers so they reopen where the user left them. Skips
+  // the render where the bank just switched (the load effect owns that render and the
+  // picker state is still the previous bank's), so we never write stale picks to the
+  // new bank's key.
+  const savedBankRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (selectedBankId == null) return;
+    if (savedBankRef.current !== selectedBankId) {
+      savedBankRef.current = selectedBankId;
+      return;
+    }
+    saveBankAddPrefs(selectedBankId, {
+      topics: [...bankAddTopics],
+      subtopics: [...bankAddSubtopics],
+      difficulty: bankAddDifficulty,
+      count: bankAddCount,
+      kojoCount: bankKojoCount,
+    });
+  }, [selectedBankId, bankAddTopics, bankAddSubtopics, bankAddDifficulty, bankAddCount, bankKojoCount]);
 
   useEffect(() => {
     currentProblemDataRef.current = currentProblemData;
@@ -2887,22 +3042,15 @@ export default function LeetCodeMode() {
     }
   }
 
-  // "Create with Kojo": generate ONE fresh problem (AI) from the selected topics and, for
-  // difficulty, an optional target. Reuses the existing custom-problem pipeline
-  // (generate -> persist -> sync) so there is no new endpoint. Returns the saved problem,
-  // or null on failure. The reuse flows (handleAddByTopic / startPracticeSession) never
-  // call this, so the no-AI path is fully AI-free.
-  async function createKojoProblemFromTopics(
+  // Turn one streamed generated problem into a saved custom-problem record. The stored
+  // `topic` is the first selected topic id (so it groups under that category); the
+  // descriptive pattern tags Kojo inferred are kept in `subtopic`. Syncs to the server
+  // best-effort (skipped for guests). Persisting to local state is the caller's job.
+  function kojoGeneratedToSaved(
+    generated: LCGeneratedCustomProblem,
     topicIds: string[],
     difficulty: "any" | "Easy" | "Medium" | "Hard",
-  ): Promise<LCCustomProblem | null> {
-    const labels = topicIds
-      .map((id) => CATEGORY_META[id]?.label ?? bankTopicOptions.find((t) => t.id === id)?.label ?? id)
-      .filter(Boolean);
-    const topicText = labels.length ? labels.join(", ") : "general coding interview";
-    const difficultyText = difficulty === "any" ? "" : ` The difficulty should be ${difficulty}.`;
-    const hint = `Create a brand new, original coding interview problem focused on these topics: ${topicText}.${difficultyText} Do not copy a well-known existing problem: invent a fresh scenario with a clear prompt, a function signature, and worked examples.`;
-    const generated: LCGeneratedCustomProblem = await generateLCCustomProblem("", hint, generationProvider);
+  ): LCCustomProblem {
     const slug = makeCustomSlug();
     const payload: Omit<LCCustomProblem, "slug"> = {
       title: generated.title || "Kojo Problem",
@@ -2924,40 +3072,96 @@ export default function LeetCodeMode() {
       })),
       is_archived: false,
     };
-    const saved: LCCustomProblem = { slug, ...payload };
-    persistCustomProblems([...customProblems, saved]);
     if (!isGuestSession()) {
-      await syncLCCustomProblem(slug, payload).catch(() => {});
+      void syncLCCustomProblem(slug, payload).catch(() => {});
     }
-    return saved;
+    return { slug, ...payload };
+  }
+
+  // "Create with Kojo": generate `count` fresh problems in ONE streaming backend call.
+  // Each problem is persisted and handed to onSaved the moment it streams in, so the
+  // bank / practice set fills live. Whatever streamed before an error is kept (partial
+  // success). This is one LLM call server-side (no provider loop).
+  async function streamKojoProblems(
+    topicIds: string[],
+    difficulty: "any" | "Easy" | "Medium" | "Hard",
+    count: number,
+    onSaved: (saved: LCCustomProblem) => void,
+    onProgress: (done: number) => void,
+  ): Promise<{ saved: LCCustomProblem[]; error: string | null }> {
+    const labels = topicIds
+      .map((id) => CATEGORY_META[id]?.label ?? bankTopicOptions.find((t) => t.id === id)?.label ?? id)
+      .filter(Boolean);
+    const saved: LCCustomProblem[] = [];
+    let error: string | null = null;
+    try {
+      await streamLCCustomProblems(
+        labels,
+        difficulty,
+        count,
+        (generated) => {
+          const record = kojoGeneratedToSaved(generated, topicIds, difficulty);
+          saved.push(record);
+          // customProblems is the stable base at call start; we only ever append during
+          // this run, so [...base, ...saved] stays correct across streamed problems.
+          persistCustomProblems([...customProblems, ...saved]);
+          onProgress(saved.length);
+          onSaved(record);
+        },
+        generationProvider,
+      );
+    } catch (err) {
+      error = err instanceof Error ? err.message : "Kojo generation failed.";
+    }
+    return { saved, error };
   }
 
   async function handleCreateWithKojoForBank(bankId: number) {
     if (bankKojoLoading) return;
     setBankAddNote(null);
     setBankKojoLoading(true);
+    setBankKojoProgress(`0/${bankKojoCount}`);
     try {
-      const saved = await createKojoProblemFromTopics(Array.from(bankAddTopics), bankAddDifficulty);
-      if (!saved) {
-        setBankAddNote("Kojo couldn't generate a problem. Try again.");
+      // Add each streamed problem to the bank's slug list optimistically so it shows up
+      // live, then persist the whole set to the server once at the end (bulk add avoids a
+      // race between concurrent per-problem add calls each returning the full bank).
+      const { saved, error } = await streamKojoProblems(
+        Array.from(bankAddTopics),
+        bankAddDifficulty,
+        bankKojoCount,
+        (record) => {
+          setPrepBanks((prev) =>
+            prev.map((b) =>
+              b.id === bankId ? { ...b, problem_slugs: [...b.problem_slugs, record.slug] } : b,
+            ),
+          );
+        },
+        (done) => setBankKojoProgress(`${done}/${bankKojoCount}`),
+      );
+      if (!saved.length) {
+        setBankAddNote(error ?? "Kojo couldn't generate any problems. Try again.");
         return;
       }
-      const updated = await addLCBankProblem(bankId, saved.slug).catch(() => null);
-      if (updated) {
-        setPrepBanks((prev) => prev.map((b) => (b.id === bankId ? updated : b)));
-      } else {
-        // Guest or offline: reflect the add locally so the UI still updates.
-        setPrepBanks((prev) =>
-          prev.map((b) =>
-            b.id === bankId ? { ...b, problem_slugs: [...b.problem_slugs, saved.slug] } : b,
-          ),
-        );
-      }
-      setBankAddNote(`Kojo created "${saved.title}" and added it to this bank.`);
-    } catch (error) {
-      setBankAddNote(error instanceof Error ? error.message : "Kojo generation failed.");
+      // Persist to the server, then adopt its bank but UNION in the slugs we just created.
+      // The server response is authoritative for everything else, yet must never be able
+      // to drop the problems we know we added (guards against a stale/slug-less response
+      // overwriting the optimistic list, which made Kojo problems vanish from the bank).
+      const newSlugs = saved.map((s) => s.slug);
+      const updated = await bulkAddLCBankProblems(bankId, newSlugs).catch(() => null);
+      setPrepBanks((prev) =>
+        prev.map((b) => {
+          if (b.id !== bankId) return b;
+          const authoritative = updated ?? b;
+          const merged = [...authoritative.problem_slugs];
+          for (const slug of newSlugs) if (!merged.includes(slug)) merged.push(slug);
+          return { ...authoritative, problem_slugs: merged };
+        }),
+      );
+      const errNote = error ? ` (stopped early: ${error})` : "";
+      setBankAddNote(`Kojo created ${saved.length} problem${saved.length === 1 ? "" : "s"} and added ${saved.length === 1 ? "it" : "them"} to this bank${errNote}.`);
     } finally {
       setBankKojoLoading(false);
+      setBankKojoProgress(null);
     }
   }
 
@@ -3082,6 +3286,18 @@ export default function LeetCodeMode() {
     await handleAdvanceDrill(slug);
   }
 
+  async function handleRemoveDrill(slug: string) {
+    if (drillModalBusy) return;
+    setDrillModalBusy(true);
+    try {
+      await deleteLCDrill(slug).catch(() => {});
+      setDrills((prev) => prev.filter((d) => d.problem_slug !== slug));
+    } finally {
+      setDrillModalBusy(false);
+      setDrillRemoveSlug(null);
+    }
+  }
+
   async function handleRestartDrill(slug: string) {
     if (drillModalBusy) return;
     setDrillModalBusy(true);
@@ -3152,30 +3368,45 @@ export default function LeetCodeMode() {
     });
   }
 
-  // "Create with Kojo" for practice: generate one fresh problem (AI) from the selected
-  // topics + difficulty and start a one-problem session with it. The reuse path
+  // "Create with Kojo" for practice: generate a batch of fresh problems in ONE streaming
+  // call and grow the session live as each problem streams in. The reuse path
   // (startPracticeSession) stays catalog-only and AI-free.
   async function startKojoPracticeSession() {
     if (practiceKojoLoading || practiceTopics.size === 0) return;
     setPracticeNote(null);
     setPracticeKojoLoading(true);
+    setPracticeKojoProgress(`0/${practiceKojoCount}`);
     try {
-      const saved = await createKojoProblemFromTopics(Array.from(practiceTopics), practiceDifficulty);
-      if (!saved) {
-        setPracticeNote("Kojo couldn't generate a problem. Try again.");
+      const { saved, error } = await streamKojoProblems(
+        Array.from(practiceTopics),
+        practiceDifficulty,
+        practiceKojoCount,
+        (record) => {
+          // Append each streamed problem to the running session so the queue fills live.
+          setPracticeEnded(false);
+          setPracticeSession((prev) => {
+            const startedSolved = new Set(prev?.startedSolved ?? []);
+            if (progress[record.slug]) startedSolved.add(record.slug);
+            return {
+              slugs: [...(prev?.slugs ?? []), record.slug],
+              startedAt: prev?.startedAt ?? Date.now(),
+              startedSolved,
+              endedAt: null,
+            };
+          });
+        },
+        (done) => setPracticeKojoProgress(`${done}/${practiceKojoCount}`),
+      );
+      if (!saved.length) {
+        setPracticeNote(error ?? "Kojo couldn't generate any problems. Try again.");
         return;
       }
-      setPracticeEnded(false);
-      setPracticeSession({
-        slugs: [saved.slug],
-        startedAt: Date.now(),
-        startedSolved: new Set(progress[saved.slug] ? [saved.slug] : []),
-        endedAt: null,
-      });
-    } catch (error) {
-      setPracticeNote(error instanceof Error ? error.message : "Kojo generation failed.");
+      if (error) {
+        setPracticeNote(`Kojo created ${saved.length} of ${practiceKojoCount}, then stopped: ${error}`);
+      }
     } finally {
       setPracticeKojoLoading(false);
+      setPracticeKojoProgress(null);
     }
   }
 
@@ -3372,6 +3603,10 @@ export default function LeetCodeMode() {
     // Already an open drill, nothing to add. (A previously-cleared drill can only be
     // re-run via the "Drill again?" prompt, not from here.)
     if (drills.some((d) => d.problem_slug === slug)) return;
+    // Ask at most once per problem (covers completion + struggle prompts), so a failed
+    // grade / timer expiry never nags and never adds silently.
+    if (loadDrillPrompted().has(slug)) return;
+    markDrillPrompted(slug);
     setDrillPromptSlug(slug);
   }
 
@@ -3642,6 +3877,12 @@ export default function LeetCodeMode() {
   function closeTimeoutModal() {
     setTimeoutModalOpen(false);
     setTimeoutModalMessage(null);
+    // Failed timer run: offer the drill now that the "Time's up" modal is dismissed.
+    if (timeoutDrillSlug) {
+      const slug = timeoutDrillSlug;
+      setTimeoutDrillSlug(null);
+      maybePromptAddDrill(slug);
+    }
   }
 
   function resetTimerState() {
@@ -3763,6 +4004,9 @@ export default function LeetCodeMode() {
     codeToRun: string,
     problemDataAtRun: LeetCodeProblemData | undefined,
     customCasesAtRun: CustomCase[],
+    // Timer-expiry runs pass false: they show the "Time's up" modal and defer the
+    // "Add to 3-Pass Drill?" prompt until that modal closes, so two modals never stack.
+    promptDrillOnFail = true,
   ) {
     if (!problemDataAtRun || !isRunnable(problemDataAtRun)) return null;
 
@@ -3791,6 +4035,17 @@ export default function LeetCodeMode() {
     try {
       const result = await runPythonLeetCode(codeToRun, [...officialCases, ...validCustomCases]);
       setRunnerResult(result);
+      // Persist that this problem has been attempted, so its KojoCode solution stays
+      // unlocked even after the user edits code or navigates away and back.
+      if (!attemptedSlugs.has(problemAtRun.slug)) {
+        const next = new Set(attemptedSlugs).add(problemAtRun.slug);
+        setAttemptedSlugs(next);
+        try {
+          localStorage.setItem(getAttemptedKey(), JSON.stringify([...next]));
+        } catch {
+          /* storage unavailable, unlock just won't persist this session */
+        }
+      }
 
       if (result.cases?.length) {
         const customForGrade = customProblems.find((cp) => cp.slug === problemAtRun.slug);
@@ -3834,6 +4089,10 @@ export default function LeetCodeMode() {
       if (result.ok) {
         markProblemDone(problemAtRun);
         void maybeAutoAdvanceDrill(problemAtRun.slug);
+      } else if (promptDrillOnFail && result.cases?.length) {
+        // A failed grade used to silently add a drill; now it just OFFERS one (once per
+        // problem). The timer path defers this to its own modal close (see below).
+        maybePromptAddDrill(problemAtRun.slug);
       }
 
       return result;
@@ -3856,6 +4115,7 @@ export default function LeetCodeMode() {
       currentCodeRef.current,
       currentProblemDataRef.current,
       currentCustomCasesRef.current,
+      false, // defer the drill prompt until the "Time's up" modal closes
     );
 
     if (result?.ok) {
@@ -3864,6 +4124,7 @@ export default function LeetCodeMode() {
     }
 
     setTimeoutModalMessage("Time's up. Kojo graded your attempt and it still needs more work.");
+    setTimeoutDrillSlug(problemAtTimeout.slug);
     setTimeoutModalOpen(true);
   }
 
@@ -3911,6 +4172,9 @@ export default function LeetCodeMode() {
     setMobilePane("problem");
     setKojoOpen(false);
     setSolutionOpen(false);
+    setKojoSolutionOpen(false);
+    setKojoSolution(null);
+    setKojoSolutionError(null);
     setRunnerResult(null);
     // Restore Kojo's last feedback for this problem (persisted per slug) so it survives
     // leaving and coming back. A new run overwrites it.
@@ -4083,6 +4347,60 @@ export default function LeetCodeMode() {
     setVisualizerLoading(inputText);
     try {
       const trace = await traceLeetCodeExecution(currentCode, inputText);
+      setVisualizerTrace(trace);
+    } finally {
+      setVisualizerLoading(null);
+    }
+  }
+
+  // Toggle the KojoCode solution panel (custom problems only). On the first open we
+  // log the "I couldn't solve it" weakness signal once, then lazily fetch the cached
+  // model solution (the backend generates it once and caches it).
+  async function openKojoSolution() {
+    if (!currentProblem || !currentCustomProblem) return;
+    const opening = !kojoSolutionOpen;
+    setKojoSolutionOpen(opening);
+    if (!opening) return;
+
+    if (
+      betaMode &&
+      !isGuestSession() &&
+      !solutionViewedLoggedRef.current.has(currentProblem.slug)
+    ) {
+      solutionViewedLoggedRef.current.add(currentProblem.slug);
+      void logLCStruggleEvent(
+        resolveProblemTopic(currentProblem.slug),
+        "solution_viewed",
+        currentProblem.slug,
+        resolveProblemSubtopic(currentProblem.slug),
+      );
+    }
+
+    if (!kojoSolution && !kojoSolutionLoading) {
+      setKojoSolutionLoading(true);
+      setKojoSolutionError(null);
+      try {
+        const result = await fetchKojoCodeSolution(currentProblem.slug, generationProvider);
+        setKojoSolution(result);
+      } catch (err) {
+        setKojoSolutionError(
+          err instanceof Error ? err.message : "Kojo couldn't load the solution. Try again.",
+        );
+      } finally {
+        setKojoSolutionLoading(false);
+      }
+    }
+  }
+
+  // Step through the model solution's own code (not the user's editor code) in the
+  // shared ExecutionVisualizer, using the problem's first runnable test case as input.
+  async function handleVisualizeSolution() {
+    if (!currentCustomProblem || !kojoSolution?.solution_code.trim() || visualizerLoading) return;
+    const firstCase = currentCustomProblem.test_cases.find((tc) => tc.input_text.trim());
+    if (!firstCase) return;
+    setVisualizerLoading(SOLUTION_VIZ_KEY);
+    try {
+      const trace = await traceLeetCodeExecution(kojoSolution.solution_code, firstCase.input_text);
       setVisualizerTrace(trace);
     } finally {
       setVisualizerLoading(null);
@@ -4333,12 +4651,26 @@ export default function LeetCodeMode() {
     />
   ) : null;
 
+  // "Remove from 3-Pass Drill?" confirm, opened by the X on a drill card.
+  const drillRemoveModalNode = drillRemoveSlug ? (
+    <ConfirmModal
+      title="Remove from your 3-Pass Drill?"
+      message="This takes the problem out of your drill schedule. It stays in your catalog, and you can drill it again later."
+      confirmLabel="Remove"
+      busy={drillModalBusy}
+      busyLabel="Removing"
+      onConfirm={() => void handleRemoveDrill(drillRemoveSlug)}
+      onCancel={() => setDrillRemoveSlug(null)}
+    />
+  ) : null;
+
   // Completion prompts shown across every view (list toggle, editor run/grade).
   const completionModalsNode = (
     <>
       {difficultyModalNode}
       {drillPromptModalNode}
       {drillAgainModalNode}
+      {drillRemoveModalNode}
     </>
   );
 
@@ -4989,6 +5321,18 @@ export default function LeetCodeMode() {
                 />
               </div>
 
+              <div className="lc-practice-field">
+                <span className="lc-practice-field-label">How many with Kojo</span>
+                <input
+                  type="number"
+                  className="lc-practice-count"
+                  min={1}
+                  max={6}
+                  value={practiceKojoCount}
+                  onChange={(event) => setPracticeKojoCount(Math.max(1, Math.min(6, Number(event.target.value) || 1)))}
+                />
+              </div>
+
               <div className="lc-practice-actions">
                 <button
                   type="button"
@@ -5006,11 +5350,11 @@ export default function LeetCodeMode() {
                   disabled={practiceTopics.size === 0 || practiceKojoLoading}
                 >
                   <Sparkles size={16} />
-                  {practiceKojoLoading ? "Creating..." : "Create with Kojo"}
+                  {practiceKojoLoading ? `Creating ${practiceKojoProgress ?? ""}...` : "Create with Kojo"}
                 </button>
               </div>
               <p className="muted small lc-practice-note">
-                Continue from selection uses our catalog only. Create with Kojo uses AI to generate a fresh problem.
+                Continue from selection uses our catalog only. Create with Kojo uses AI to generate a batch of fresh problems.
               </p>
               {practiceNote ? <p className="lc-practice-note">{practiceNote}</p> : null}
             </div>
@@ -5320,7 +5664,7 @@ export default function LeetCodeMode() {
                   <div className="lc-bank-add">
                     <span className="lc-bank-add-title">Add problems by topic</span>
                     <p className="muted small lc-bank-add-hint">
-                      Companies interview by topic. Pick your topics, then continue from our catalog, or have Kojo create a fresh problem. No AI is used unless you tap Create with Kojo.
+                      Companies interview by topic. Pick your topics, then continue from our catalog, or have Kojo create a batch of fresh problems. No AI is used unless you tap Create with Kojo.
                     </p>
                     <div className="lc-bank-add-controls">
                       <TopicPicker
@@ -5353,6 +5697,16 @@ export default function LeetCodeMode() {
                           onChange={(event) => setBankAddCount(Math.max(1, Math.min(50, Number(event.target.value) || 1)))}
                         />
                       </label>
+                      <label className="lc-bank-add-count">
+                        <span>With Kojo</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={6}
+                          value={bankKojoCount}
+                          onChange={(event) => setBankKojoCount(Math.max(1, Math.min(6, Number(event.target.value) || 1)))}
+                        />
+                      </label>
                       <div className="lc-bank-add-actions">
                         <button
                           type="button"
@@ -5370,7 +5724,7 @@ export default function LeetCodeMode() {
                           disabled={bankAddTopics.size === 0 || bankKojoLoading}
                         >
                           <Sparkles size={16} />
-                          {bankKojoLoading ? "Creating..." : "Create with Kojo"}
+                          {bankKojoLoading ? `Creating ${bankKojoProgress ?? ""}...` : "Create with Kojo"}
                         </button>
                       </div>
                     </div>
@@ -5439,7 +5793,7 @@ export default function LeetCodeMode() {
           {drillsLoading && drills.length === 0 ? (
             <SkeletonList rows={3} label="Loading your drills" />
           ) : drills.length === 0 ? (
-            <p className="muted">No open drills. Struggling with a problem (a failed grade or a timer running out) adds one automatically.</p>
+            <p className="muted">No open drills. Solve a problem, or struggle with one (a failed grade or a timer running out), and Nosey will ask if you want to drill it.</p>
           ) : (
             (() => {
               const now = Date.now();
@@ -5460,6 +5814,15 @@ export default function LeetCodeMode() {
                       <span className="lc-drill-when">
                         {due ? "due now" : `due ${dueDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`}
                       </span>
+                      <button
+                        type="button"
+                        className="lc-drill-remove"
+                        onClick={() => setDrillRemoveSlug(drill.problem_slug)}
+                        aria-label="Remove from 3-Pass Drill"
+                        title="Remove from 3-Pass Drill"
+                      >
+                        <X size={14} />
+                      </button>
                     </div>
                     <button
                       type="button"
@@ -5522,6 +5885,7 @@ export default function LeetCodeMode() {
             })()
           )}
         </div>
+        {completionModalsNode}
       </div>
     );
   }
@@ -6329,6 +6693,114 @@ export default function LeetCodeMode() {
                 </div>
               ) : null}
             </div>
+          ) : null}
+
+          {isCustomProblem && !isStreakChallengeProblem ? (
+            (() => {
+              // Custom problems have no NeetCode page, so Kojo writes the model solution.
+              // Unlocks on Pass 1 only, once the user has attempted (run) it. attemptedSlugs
+              // persists that attempt so it stays unlocked across code edits / revisits, not
+              // just while the current runnerResult is live.
+              const problemAttempted = hasAttempted || attemptedSlugs.has(currentProblem.slug);
+              const kojoSolutionUnlocked = problemAttempted && activePass === 1;
+              const solutionVizCase = currentCustomProblem?.test_cases.find((tc) => tc.input_text.trim());
+              return (
+                <div className="lc-solution-panel lc-kojocode-panel">
+                  <button
+                    type="button"
+                    className="lc-solution-toggle"
+                    onClick={() => {
+                      if (!kojoSolutionUnlocked) return;
+                      void openKojoSolution();
+                    }}
+                    disabled={!kojoSolutionUnlocked}
+                    title={
+                      activePass > 1
+                        ? `Locked on Pass ${activePass}: no solution reveal`
+                        : problemAttempted
+                          ? "Toggle KojoCode solution"
+                          : "Attempt the problem to unlock"
+                    }
+                  >
+                    <Sparkles size={15} />
+                    <span>KojoCode solution</span>
+                    {activePass > 1 ? (
+                      <small className="lc-solution-locked">Locked on Pass {activePass}</small>
+                    ) : !problemAttempted ? (
+                      <small className="lc-solution-locked">Attempt first to unlock</small>
+                    ) : (
+                      <ChevronDown size={14} className={kojoSolutionOpen ? "lc-solution-chevron lc-solution-chevron--open" : "lc-solution-chevron"} />
+                    )}
+                  </button>
+                  {kojoSolutionOpen && kojoSolutionUnlocked ? (
+                    <div className="lc-kojocode-body">
+                      {kojoSolutionLoading ? (
+                        <div className="lc-kojocode-loading">
+                          <Loader2 size={16} className="spin" />
+                          <span>Kojo is writing the solution...</span>
+                        </div>
+                      ) : kojoSolutionError ? (
+                        <div className="lc-kojocode-error">
+                          <span>{kojoSolutionError}</span>
+                          <button type="button" className="lc-inline-btn" onClick={() => void openKojoSolution()}>
+                            Retry
+                          </button>
+                        </div>
+                      ) : kojoSolution ? (
+                        <>
+                          {kojoSolution.title ? (
+                            <div className="lc-kojocode-approach-title">{kojoSolution.title}</div>
+                          ) : null}
+
+                          <section className="lc-kojocode-section">
+                            <h4 className="lc-kojocode-heading">Optimal approach</h4>
+                            <MarkdownContent content={kojoSolution.approach_summary} />
+                          </section>
+
+                          {kojoSolution.solution_code.trim() && solutionVizCase ? (
+                            <section className="lc-kojocode-section">
+                              <div className="lc-kojocode-viz-row">
+                                <h4 className="lc-kojocode-heading">Walkthrough</h4>
+                                <button
+                                  type="button"
+                                  className="lc-visualize-btn"
+                                  onClick={() => void handleVisualizeSolution()}
+                                  disabled={visualizerLoading === SOLUTION_VIZ_KEY}
+                                  title="Step through the solution code"
+                                >
+                                  {visualizerLoading === SOLUTION_VIZ_KEY ? <Loader2 size={12} className="spin" /> : <Eye size={12} />}
+                                  <span>Visualize solution</span>
+                                </button>
+                              </div>
+                              <p className="lc-kojocode-viz-hint small muted">
+                                Steps through the solution on the first example: {solutionVizCase.input_text}
+                              </p>
+                            </section>
+                          ) : null}
+
+                          <section className="lc-kojocode-section">
+                            <h4 className="lc-kojocode-heading">Solution</h4>
+                            <MarkdownContent
+                              content={"```python\n" + buildCommentedSolution(kojoSolution) + "\n```"}
+                              enableCodeCopy
+                            />
+                          </section>
+
+                          <section className="lc-kojocode-section">
+                            <h4 className="lc-kojocode-heading">Complexity</h4>
+                            <div className="lc-kojocode-complexity-row">
+                              <span className="pill">Time: {kojoSolution.time_complexity || "-"}</span>
+                              <span className="pill">Space: {kojoSolution.space_complexity || "-"}</span>
+                            </div>
+                            <MarkdownContent content={kojoSolution.complexity_explanation} />
+                          </section>
+                        </>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })()
           ) : null}
 
           {runnerResult?.ok ? (

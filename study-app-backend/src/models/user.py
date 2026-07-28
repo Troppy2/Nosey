@@ -21,6 +21,7 @@ if TYPE_CHECKING:
         LCPrepBank,
         LCProgress,
         LCProblemNote,
+        LCSolutionArticle,
         LCStreakChallenge,
         LCStruggleEvent,
         LCTestRun,
@@ -89,6 +90,9 @@ class User(Base, TimestampMixin):
     )
     lc_test_runs: Mapped[list[LCTestRun]] = relationship(
         "LCTestRun", back_populates="user", cascade="all, delete-orphan"
+    )
+    lc_solution_articles: Mapped[list[LCSolutionArticle]] = relationship(
+        "LCSolutionArticle", back_populates="user", cascade="all, delete-orphan"
     )
     mock_interview_sessions: Mapped[list[MockInterviewSession]] = relationship(
         "MockInterviewSession", back_populates="user", cascade="all, delete-orphan"

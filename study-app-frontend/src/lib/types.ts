@@ -542,6 +542,27 @@ export type LCGeneratedCustomProblem = {
   test_cases: LCCustomTestCase[];
 };
 
+// One annotated line of a KojoCode solution: the exact source line plus a plain-
+// English explanation of what it does.
+export type KojoCodeSolutionComment = {
+  code: string;
+  comment: string;
+};
+
+// The cached KojoCode solution for a custom problem (optimal approach only). Built
+// lazily on first reveal and stored server-side, so re-opens are a cache hit.
+export type KojoCodeSolution = {
+  slug: string;
+  approach_rank: number;
+  title: string;
+  approach_summary: string;
+  solution_code: string;
+  code_comments: KojoCodeSolutionComment[];
+  time_complexity: string;
+  space_complexity: string;
+  complexity_explanation: string;
+};
+
 export type LeetCodeGradeResponse = {
   feedback: string;
   flagged_uncertain: boolean;
