@@ -30,6 +30,7 @@ import {
 } from "../lib/mockInterview";
 import {
   COMPANY_OPTIONS,
+  pickCustomProblems,
   pickProblems,
   type CompanyKey,
   type InterviewLevel,
@@ -96,8 +97,15 @@ export default function MockInterviewStage1() {
     [numericSessionId],
   );
 
-  const company = (locationState?.session?.company ?? stored?.company ?? "random") as CompanyKey;
-  const companyLabel = COMPANY_OPTIONS.find((c) => c.key === company)?.label ?? company;
+  const rawCompany = locationState?.session?.company ?? stored?.company ?? "random";
+  const isCustom = rawCompany === "custom";
+  const company = (isCustom ? "random" : rawCompany) as CompanyKey;
+  const customConfig = locationState?.session?.custom_config ?? stored?.customConfig ?? null;
+  const customCompanyName =
+    locationState?.session?.custom_company ?? stored?.customCompany ?? "Custom";
+  const companyLabel = isCustom
+    ? customCompanyName
+    : COMPANY_OPTIONS.find((c) => c.key === company)?.label ?? company;
   const level = (locationState?.session?.level ?? stored?.level ?? "intern") as InterviewLevel;
   const selectedStages = locationState?.selectedStages ?? stored?.selectedStages ?? [
     "stage1",
@@ -108,9 +116,12 @@ export default function MockInterviewStage1() {
   const missingContext = !locationState?.session && !stored;
 
   // Problems are chosen once and then frozen in localStorage so a refresh never
-  // re-rolls the assessment.
+  // re-rolls the assessment. Custom companies source problems from the chosen
+  // topics/difficulties (or pasted problems); built-in companies use their pool.
   const [problems] = useState<InterviewProblem[]>(
-    () => stored?.stage1?.problems ?? pickProblems(company, 3, level),
+    () =>
+      stored?.stage1?.problems ??
+      (isCustom ? pickCustomProblems(customConfig, 3, level) : pickProblems(company, 3, level)),
   );
 
   const [questions, setQuestions] = useState<Stage1QuestionProgress[]>(() => {
@@ -171,8 +182,10 @@ export default function MockInterviewStage1() {
       const progress: MockProgress = {
         ...(prev ?? {}),
         sessionId: numericSessionId,
-        company,
+        company: rawCompany,
         level,
+        customCompany: isCustom ? customCompanyName : undefined,
+        customConfig: isCustom ? customConfig ?? undefined : undefined,
         selectedStages,
         updatedAt: Date.now(),
         stage1: {
@@ -363,10 +376,12 @@ export default function MockInterviewStage1() {
       // Persist the graded results so the results page survives a refresh.
       const prev = loadMockProgress(numericSessionId);
       saveMockProgress({
-        ...(prev ?? { sessionId: numericSessionId, company, level, selectedStages, updatedAt: Date.now() }),
+        ...(prev ?? { sessionId: numericSessionId, company: rawCompany, level, selectedStages, updatedAt: Date.now() }),
         sessionId: numericSessionId,
-        company,
+        company: rawCompany,
         level,
+        customCompany: isCustom ? customCompanyName : undefined,
+        customConfig: isCustom ? customConfig ?? undefined : undefined,
         selectedStages,
         updatedAt: Date.now(),
         stage1: {
