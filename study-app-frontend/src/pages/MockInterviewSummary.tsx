@@ -55,8 +55,12 @@ export default function MockInterviewSummary() {
     () => (Number.isFinite(numericSessionId) ? loadMockProgress(numericSessionId) : null),
     [numericSessionId],
   );
-  const company = (state?.session?.company ?? stored?.company ?? "random") as CompanyKey;
-  const companyLabel = COMPANY_OPTIONS.find((c) => c.key === company)?.label ?? company;
+  const rawCompany = state?.session?.company ?? stored?.company ?? "random";
+  const company = (rawCompany === "custom" ? "random" : rawCompany) as CompanyKey;
+  const companyLabel =
+    rawCompany === "custom"
+      ? state?.session?.custom_company ?? stored?.customCompany ?? "Custom"
+      : COMPANY_OPTIONS.find((c) => c.key === company)?.label ?? company;
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);

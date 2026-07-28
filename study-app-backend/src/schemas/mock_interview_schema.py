@@ -15,10 +15,33 @@ def _normalize_level(value: str | None) -> str:
     return normalized if normalized in VALID_LEVELS else "intern"
 
 
+class CustomProblemRef(BaseModel):
+    """A single coding problem chosen for a custom-company interview: either drawn
+    from the topic taxonomy or pasted by the user (slug from a URL / slugified title)."""
+    slug: str = Field(..., min_length=1, max_length=200)
+    title: str = Field(default="", max_length=200)
+    difficulty: str = Field(default="Medium", max_length=16)
+
+
+class MockCustomConfig(BaseModel):
+    """JD-derived configuration for a custom-company interview. Persisted as JSON on
+    the session and used to source Stage 1/2 problems and flavor the LLM prompts."""
+    role_focus: str = Field(default="", max_length=600)
+    culture: str = Field(default="", max_length=600)
+    topics: list[str] = Field(default_factory=list)
+    subtopics: list[str] = Field(default_factory=list)
+    difficulties: list[str] = Field(default_factory=list)
+    problems: list[CustomProblemRef] = Field(default_factory=list)
+
+
 class MockInterviewCreateRequest(BaseModel):
     company: str = Field(..., min_length=1, max_length=64)
     stages: list[str] = Field(default=["stage1", "stage2", "stage3"])
     level: str = Field(default="intern", max_length=16)
+    # Present only when company == "custom".
+    custom_company: Optional[str] = Field(default=None, max_length=120)
+    jd_text: Optional[str] = Field(default=None, max_length=20000)
+    custom_config: Optional[MockCustomConfig] = Field(default=None)
 
     @field_validator("level")
     @classmethod
@@ -30,6 +53,9 @@ class MockInterviewSessionResponse(BaseModel):
     id: int
     company: str
     level: str = "intern"
+    custom_company: Optional[str] = None
+    jd_text: Optional[str] = None
+    custom_config: Optional[MockCustomConfig] = None
     stages_config: str
     status: str
     resume_screen: Optional[str] = None
@@ -155,3 +181,22 @@ class FinishResponse(BaseModel):
     stage2_verdict: Optional[str] = None
     stage3_verdict: Optional[str] = None
     hiring_recommendation: str
+
+
+# Job-description parsing (custom company). Single LLM call turns a pasted JD into a
+# prefilled interview config the user can then edit before starting.
+class JDParseRequest(BaseModel):
+    jd_text: str = Field(..., min_length=20, max_length=20000)
+    # The topic ids available in the frontend taxonomy, so the model maps suggestions
+    # onto real catalog topics rather than inventing labels. Optional: the backend also
+    # snaps returned topics via lc_taxonomy.canonical_topic.
+    available_topics: list[str] = Field(default_factory=list)
+    provider: Optional[str] = Field(default=None)
+
+
+class JDParseResponse(BaseModel):
+    company_name: str = ""
+    role_focus: str = ""
+    culture: str = ""
+    seniority: str = "intern"        # one of intern | junior | mid | senior
+    suggested_topics: list[str] = Field(default_factory=list)  # canonical taxonomy ids

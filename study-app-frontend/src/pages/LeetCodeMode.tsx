@@ -101,6 +101,7 @@ import {
 } from "../lib/api";
 import { runPythonLeetCode, traceLeetCodeExecution, type RunnerResult, type TraceResult } from "../lib/pyodideRunner";
 import { sanitizeLeetCodeHtml } from "../lib/leetcodeHtml";
+import { PROBLEM_ROWS as TAXONOMY_PROBLEM_ROWS, SUBTOPICS_BY_TOPIC } from "../data/leetcodeTaxonomy";
 import { ExecutionVisualizer } from "../components/ExecutionVisualizer";
 import { Link } from "react-router-dom";
 import type {
@@ -446,46 +447,8 @@ const CATEGORY_META: Record<string, Omit<Category, "problems">> = {
   extra: { id: "extra", label: "Extra", icon: Trophy, accent: "#db2777" },
 };
 
-// Curated two-level taxonomy: category id -> the finer subtopics (techniques) under
-// it, drawn from LeetCode's tag set. Used to author official-problem subtopics, to
-// constrain the AI's labels, and to render the subtopic picker. Keep in sync with the
-// backend copy in study-app-backend/src/services/lc_taxonomy.py.
-const SUBTOPICS_BY_TOPIC: Record<string, string[]> = {
-  arrays: [
-    "Two Pointers", "Prefix Sum", "Sliding Window", "Sorting", "Matrix",
-    "Counting Sort", "Radix Sort", "Merge Sort", "Quickselect",
-  ],
-  strings: [
-    "Two Pointers", "String Matching", "Sliding Window", "Rolling Hash",
-    "Hash Function", "Trie", "Suffix Array", "KMP Algorithm",
-  ],
-  "hash-table": ["Counting", "Bucket Sort", "Rolling Hash", "Hash Function", "Ordered Set", "Ordered Map", "Design"],
-  "linked-list": ["Doubly-Linked List", "Two Pointers", "Recursion"],
-  stack: ["Monotonic Stack", "Queue", "Design"],
-  "heap-priority-queue": ["Sorting", "Simulation", "Greedy", "Merge Sort"],
-  tree: [
-    "Binary Tree", "Binary Search Tree", "Depth-First Search", "Breadth-First Search",
-    "Tree Multi-set", "Euler Tour Technique", "Union Find", "Divide and Conquer",
-  ],
-  "binary-search": ["Two Pointers", "Divide and Conquer", "Interactive"],
-  "sliding-window": ["Two Pointers", "Array", "String", "Hash Table"],
-  dp: ["Memoization", "Bitmask", "Divide and Conquer", "Bit Manipulation", "Combinatorics"],
-  backtracking: ["Depth-First Search", "Recursion"],
-  graph: [
-    "Depth-First Search", "Breadth-First Search", "Shortest Path", "Union Find",
-    "Topological Sort", "Minimum Spanning Tree", "Eulerian Circuit", "Bipartite Graph",
-    "Strongly Connected Component", "Tarjan's Algorithm", "Dijkstra's Algorithm",
-  ],
-  design: ["Data Stream", "Object-Oriented Programming", "Concurrency"],
-  advanced: ["Trie", "Segment Tree", "Binary Indexed Tree", "Union Find", "Suffix Array", "Line Sweep"],
-  math: [
-    "Geometry", "Combinatorics", "Number Theory", "Game Theory",
-    "Probability and Statistics", "Randomized", "Brainteaser",
-  ],
-  "bit-manipulation": ["Bitmask"],
-  intervals: ["Array", "Line Sweep", "Ordered Set"],
-  extra: ["Greedy", "Matrix", "Simulation", "Recursion", "Brainteaser", "Shell", "Database"],
-};
+// SUBTOPICS_BY_TOPIC now lives in the shared taxonomy module (imported at the top),
+// so KojoCode and the Mock Interview custom flow share one copy.
 
 // The 6th "|"-separated field of a PROBLEM_ROWS line is a comma-separated subtopic
 // list; parse it into trimmed, non-empty labels. Reuses the same shape splitTopics
@@ -504,212 +467,10 @@ function parseRowSubtopics(field: string | undefined): string[] {
   return out;
 }
 
-const PROBLEM_ROWS = `
-Arrays|Two Sum|Easy|two-sum|
-Arrays|Two Sum II - Input Array Is Sorted|Medium|two-sum-ii-input-array-is-sorted|
-Arrays|Best Time to Buy and Sell Stock|Easy|best-time-to-buy-and-sell-stock|
-Arrays|Maximum Subarray|Medium|maximum-subarray|
-Arrays|Maximum Product Subarray|Medium|maximum-product-subarray|
-Arrays|Container With Most Water|Medium|container-with-most-water|
-Arrays|Trapping Rain Water|Hard|trapping-rain-water|
-Arrays|Move Zeroes|Easy|move-zeroes|
-Arrays|Find All Numbers Disappeared in an Array|Easy|find-all-numbers-disappeared-in-an-array|
-Arrays|Plus One|Easy|plus-one|
-Arrays|Rotate Array|Medium|rotate-array|
-Arrays|Intersection of Two Arrays II|Easy|intersection-of-two-arrays-ii|
-Arrays|3Sum|Medium|3sum|
-Arrays|4Sum|Medium|4sum|
-Arrays|Subarray Sum Equals K|Medium|subarray-sum-equals-k|
-Arrays|Maximum Subarray Min-Product|Medium|maximum-subarray-min-product|extra
-Strings|Valid Anagram|Easy|valid-anagram|
-Strings|Valid Palindrome|Easy|valid-palindrome|
-Strings|Valid Palindrome II|Easy|valid-palindrome-ii|
-Strings|Longest Substring Without Repeating Characters|Medium|longest-substring-without-repeating-characters|
-Strings|Longest Repeating Character Replacement|Medium|longest-repeating-character-replacement|
-Strings|Permutation in String|Medium|permutation-in-string|
-Strings|Minimum Window Substring|Hard|minimum-window-substring|
-Strings|Reverse String|Easy|reverse-string|
-Strings|Group Anagrams|Medium|group-anagrams|
-Strings|Word Pattern|Easy|word-pattern|
-Strings|Find the Index of the First Occurrence in a String|Easy|find-the-index-of-the-first-occurrence-in-a-string|
-Strings|Find All Anagrams in a String|Medium|find-all-anagrams-in-a-string|
-Strings|Encode and Decode Strings|Medium|encode-and-decode-strings|
-Strings|Decode String|Medium|decode-string|
-Strings|Decode Ways|Medium|decode-ways|
-Strings|Interleaving String|Medium|interleaving-string|
-Strings|Longest Palindromic Substring|Medium|longest-palindromic-substring|
-Strings|Palindromic Substrings|Medium|palindromic-substrings|
-Strings|Partition Labels|Medium|partition-labels|
-Strings|Letter Combinations of a Phone Number|Medium|letter-combinations-of-a-phone-number|
-Strings|Regular Expression Matching|Hard|regular-expression-matching|
-Strings|Reverse Integer|Medium|reverse-integer|
-Strings|Multiply Strings|Medium|multiply-strings|
-Strings|Remove All Adjacent Duplicates in String II|Medium|remove-all-adjacent-duplicates-in-string-ii|
-Strings|Longest Happy String|Medium|longest-happy-string|extra
-Hash Table|Contains Duplicate|Easy|contains-duplicate|
-Hash Table|Top K Frequent Elements|Medium|top-k-frequent-elements|
-Hash Table|Valid Sudoku|Medium|valid-sudoku|
-Hash Table|Happy Number|Easy|happy-number|
-Hash Table|Number of 1 Bits|Easy|number-of-1-bits|
-Hash Table|Counting Bits|Easy|counting-bits|
-Hash Table|Single Number|Easy|single-number|
-Hash Table|Design Add and Search Words Data Structure|Medium|design-add-and-search-words-data-structure|
-Hash Table|Find the Duplicate Number|Medium|find-the-duplicate-number|
-Hash Table|Intersection of Two Arrays|Easy|intersection-of-two-arrays|
-Hash Table|First Missing Positive|Hard|first-missing-positive|
-Linked List|Reverse Linked List|Easy|reverse-linked-list|
-Linked List|Reverse Linked List II|Medium|reverse-linked-list-ii|
-Linked List|Merge Two Sorted Lists|Easy|merge-two-sorted-lists|
-Linked List|Linked List Cycle|Easy|linked-list-cycle|
-Linked List|Reorder List|Medium|reorder-list|
-Linked List|Remove Nth Node From End of List|Medium|remove-nth-node-from-end-of-list|
-Linked List|Add Two Numbers|Medium|add-two-numbers|
-Linked List|Copy List with Random Pointer|Medium|copy-list-with-random-pointer|
-Linked List|Merge k Sorted Lists|Hard|merge-k-sorted-lists|
-Linked List|Reverse Nodes in k-Group|Hard|reverse-nodes-in-k-group|
-Linked List|Remove Linked List Elements|Easy|remove-linked-list-elements|
-Stack|Valid Parentheses|Easy|valid-parentheses|
-Stack|Min Stack|Medium|min-stack|
-Stack|Evaluate Reverse Polish Notation|Medium|evaluate-reverse-polish-notation|
-Stack|Daily Temperatures|Medium|daily-temperatures|
-Stack|Largest Rectangle in Histogram|Hard|largest-rectangle-in-histogram|
-Stack|Asteroid Collision|Medium|asteroid-collision|
-Stack|Next Greater Element I|Easy|next-greater-element-i|
-Heap / Priority Queue|Kth Largest Element in a Stream|Easy|kth-largest-element-in-a-stream|
-Heap / Priority Queue|Last Stone Weight|Easy|last-stone-weight|
-Heap / Priority Queue|K Closest Points to Origin|Medium|k-closest-points-to-origin|
-Heap / Priority Queue|Kth Largest Element in an Array|Medium|kth-largest-element-in-an-array|
-Heap / Priority Queue|Task Scheduler|Medium|task-scheduler|
-Heap / Priority Queue|Find Median from Data Stream|Hard|find-median-from-data-stream|
-Heap / Priority Queue|Car Fleet|Medium|car-fleet|
-Heap / Priority Queue|Maximum Frequency Stack|Hard|maximum-frequency-stack|extra
-Heap / Priority Queue|Process Tasks Using Servers|Medium|process-tasks-using-servers|extra
-Tree|Invert Binary Tree|Easy|invert-binary-tree|
-Tree|Maximum Depth of Binary Tree|Easy|maximum-depth-of-binary-tree|
-Tree|Diameter of Binary Tree|Easy|diameter-of-binary-tree|
-Tree|Balanced Binary Tree|Easy|balanced-binary-tree|
-Tree|Same Tree|Easy|same-tree|
-Tree|Subtree of Another Tree|Easy|subtree-of-another-tree|
-Tree|Lowest Common Ancestor of a Binary Search Tree|Medium|lowest-common-ancestor-of-a-binary-search-tree|
-Tree|Binary Tree Level Order Traversal|Medium|binary-tree-level-order-traversal|
-Tree|Binary Tree Right Side View|Medium|binary-tree-right-side-view|
-Tree|Count Good Nodes in Binary Tree|Medium|count-good-nodes-in-binary-tree|
-Tree|Validate Binary Search Tree|Medium|validate-binary-search-tree|
-Tree|Kth Smallest Element in a BST|Medium|kth-smallest-element-in-a-bst|
-Tree|Construct Binary Tree from Preorder and Inorder Traversal|Medium|construct-binary-tree-from-preorder-and-inorder-traversal|
-Tree|Binary Tree Maximum Path Sum|Hard|binary-tree-maximum-path-sum|
-Tree|Serialize and Deserialize Binary Tree|Hard|serialize-and-deserialize-binary-tree|
-Tree|Flatten Binary Tree to Linked List|Medium|flatten-binary-tree-to-linked-list|extra
-Binary Search|Binary Search|Easy|binary-search|
-Binary Search|Search a 2D Matrix|Medium|search-a-2d-matrix|
-Binary Search|Koko Eating Bananas|Medium|koko-eating-bananas|
-Binary Search|Find Minimum in Rotated Sorted Array|Medium|find-minimum-in-rotated-sorted-array|
-Binary Search|Search in Rotated Sorted Array|Medium|search-in-rotated-sorted-array|
-Binary Search|Median of Two Sorted Arrays|Hard|median-of-two-sorted-arrays|
-Binary Search|Find First and Last Position of Element in Sorted Array|Medium|find-first-and-last-position-of-element-in-sorted-array|
-Binary Search|Minimum Size Subarray Sum|Medium|minimum-size-subarray-sum|
-Binary Search|Kth Smallest Element in a Sorted Matrix|Medium|kth-smallest-element-in-a-sorted-matrix|extra
-Sliding Window|Sliding Window Maximum|Hard|sliding-window-maximum|
-Sliding Window|Find K Closest Elements|Medium|find-k-closest-elements|
-Sliding Window|Maximum Points You Can Obtain from Cards|Medium|maximum-points-you-can-obtain-from-cards|
-Sliding Window|Continuous Subarray Sum|Medium|continuous-subarray-sum|
-Sliding Window|Frequency of the Most Frequent Element|Medium|frequency-of-the-most-frequent-element|extra
-DP|Climbing Stairs|Easy|climbing-stairs|
-DP|Min Cost Climbing Stairs|Easy|min-cost-climbing-stairs|
-DP|House Robber|Medium|house-robber|
-DP|House Robber II|Medium|house-robber-ii|
-DP|Coin Change|Medium|coin-change|
-DP|Longest Increasing Subsequence|Medium|longest-increasing-subsequence|
-DP|Word Break|Medium|word-break|
-DP|Partition Equal Subset Sum|Medium|partition-equal-subset-sum|
-DP|Unique Paths|Medium|unique-paths|
-DP|Longest Common Subsequence|Medium|longest-common-subsequence|
-DP|Best Time to Buy and Sell Stock with Cooldown|Medium|best-time-to-buy-and-sell-stock-with-cooldown|
-DP|Coin Change II|Medium|coin-change-ii|
-DP|Target Sum|Medium|target-sum|
-DP|Longest Increasing Path in a Matrix|Hard|longest-increasing-path-in-a-matrix|
-DP|Distinct Subsequences|Hard|distinct-subsequences|
-DP|Edit Distance|Medium|edit-distance|
-DP|Burst Balloons|Hard|burst-balloons|
-DP|Maximum Alternating Subsequence Sum|Medium|maximum-alternating-subsequence-sum|extra
-DP|Integer Break|Medium|integer-break|extra
-Backtracking|Subsets|Medium|subsets|
-Backtracking|Combination Sum|Medium|combination-sum|
-Backtracking|Combination Sum II|Medium|combination-sum-ii|
-Backtracking|Permutations|Medium|permutations|
-Backtracking|Subsets II|Medium|subsets-ii|
-Backtracking|Generate Parentheses|Medium|generate-parentheses|
-Backtracking|Word Search|Medium|word-search|
-Backtracking|Palindrome Partitioning|Medium|palindrome-partitioning|
-Backtracking|N-Queens|Hard|n-queens|
-Backtracking|Restore IP Addresses|Medium|restore-ip-addresses|
-Graph|Number of Islands|Medium|number-of-islands|
-Graph|Max Area of Island|Medium|max-area-of-island|
-Graph|Clone Graph|Medium|clone-graph|
-Graph|Walls and Gates|Medium|walls-and-gates|
-Graph|Rotting Oranges|Medium|rotting-oranges|
-Graph|Pacific Atlantic Water Flow|Medium|pacific-atlantic-water-flow|
-Graph|Surrounded Regions|Medium|surrounded-regions|
-Graph|Course Schedule|Medium|course-schedule|
-Graph|Course Schedule II|Medium|course-schedule-ii|
-Graph|Graph Valid Tree|Medium|graph-valid-tree|
-Graph|Number of Connected Components in an Undirected Graph|Medium|number-of-connected-components-in-an-undirected-graph|
-Graph|Redundant Connection|Medium|redundant-connection|
-Graph|Word Ladder|Hard|word-ladder|
-Graph|Network Delay Time|Medium|network-delay-time|
-Graph|Reconstruct Itinerary|Hard|reconstruct-itinerary|
-Graph|Min Cost to Connect All Points|Medium|min-cost-to-connect-all-points|
-Graph|Swim in Rising Water|Hard|swim-in-rising-water|
-Graph|Alien Dictionary|Hard|alien-dictionary|
-Graph|Cheapest Flights Within K Stops|Medium|cheapest-flights-within-k-stops|
-Graph|Dijkstra Algorithm|Reference||extra
-Design|LRU Cache|Medium|lru-cache|
-Design|Design Twitter|Medium|design-twitter|
-Design|Design Circular Queue|Medium|design-circular-queue|
-Design|Seat Reservation Manager|Medium|seat-reservation-manager|
-Design|Time Based Key-Value Store|Medium|time-based-key-value-store|
-Advanced|Implement Trie (Prefix Tree)|Medium|implement-trie-prefix-tree|
-Advanced|Word Search II|Hard|word-search-ii|
-Math|Rotate Image|Medium|rotate-image|
-Math|Spiral Matrix|Medium|spiral-matrix|
-Math|Set Matrix Zeroes|Medium|set-matrix-zeroes|
-Math|Pow(x, n)|Medium|powx-n|
-Math|Multiply Strings|Medium|multiply-strings|
-Math|Detect Squares|Medium|detect-squares|
-Bit Manipulation|Single Number|Easy|single-number|
-Bit Manipulation|Number of 1 Bits|Easy|number-of-1-bits|
-Bit Manipulation|Counting Bits|Easy|counting-bits|
-Bit Manipulation|Reverse Bits|Easy|reverse-bits|
-Bit Manipulation|Missing Number|Easy|missing-number|
-Bit Manipulation|Sum of Two Integers|Medium|sum-of-two-integers|
-Bit Manipulation|Reverse Integer|Medium|reverse-integer|
-Intervals|Insert Interval|Medium|insert-interval|
-Intervals|Merge Intervals|Medium|merge-intervals|
-Intervals|Non-overlapping Intervals|Medium|non-overlapping-intervals|
-Intervals|Meeting Rooms|Easy|meeting-rooms|
-Intervals|Meeting Rooms II|Medium|meeting-rooms-ii|
-Intervals|Minimum Interval to Include Each Query|Hard|minimum-interval-to-include-each-query|
-Extra|4Sum|Medium|4sum|
-Extra|Maximum Subarray Min-Product|Medium|maximum-subarray-min-product|
-Extra|Longest Happy String|Medium|longest-happy-string|
-Extra|Restore IP Addresses|Medium|restore-ip-addresses|
-Extra|Bellman-Ford Algorithm|Reference||
-Extra|Flatten Binary Tree to Linked List|Medium|flatten-binary-tree-to-linked-list|
-Extra|Seat Reservation Manager|Medium|seat-reservation-manager|
-Extra|Integer Break|Medium|integer-break|
-Extra|Maximum Alternating Subsequence Sum|Medium|maximum-alternating-subsequence-sum|
-Extra|Process Tasks Using Servers|Medium|process-tasks-using-servers|
-Extra|Frequency of the Most Frequent Element|Medium|frequency-of-the-most-frequent-element|
-Extra|Maximum Points You Can Obtain from Cards|Medium|maximum-points-you-can-obtain-from-cards|
-Extra|Continuous Subarray Sum|Medium|continuous-subarray-sum|
-Extra|Minimum Size Subarray Sum|Medium|minimum-size-subarray-sum|
-Extra|Find K Closest Elements|Medium|find-k-closest-elements|
-Extra|Kth Smallest Element in a Sorted Matrix|Medium|kth-smallest-element-in-a-sorted-matrix|
-Extra|Find First and Last Position of Element in Sorted Array|Medium|find-first-and-last-position-of-element-in-sorted-array|
-Extra|Asteroid Collision|Medium|asteroid-collision|
-Extra|Next Greater Element I|Easy|next-greater-element-i|
-Extra|Maximum Frequency Stack|Hard|maximum-frequency-stack|
-`;
+// PROBLEM_ROWS now lives in the shared taxonomy module (single source of truth,
+// also used by the Mock Interview custom-company flow). Kept as a local alias so
+// buildCategories below is unchanged.
+const PROBLEM_ROWS = TAXONOMY_PROBLEM_ROWS;
 
 function toId(label: string) {
   return label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -1112,15 +873,20 @@ function filterProblems(
   query: string,
   difficulties?: Set<Difficulty>,
   topics?: Set<string>,
+  subtopics?: Set<string>,
 ) {
   const normalizedQuery = query.trim().toLowerCase();
+  // Subtopic chips are matched case-insensitively by label (a problem keeps the whole
+  // set of techniques it drills, so any overlap with the selected labels is a hit).
+  const wantedSubs = subtopics && subtopics.size ? new Set(Array.from(subtopics, (s) => s.toLowerCase())) : null;
   return problems.filter((problem) => {
     const done = Boolean(progress[problem.slug]);
     const matchesFilter = filter === "all" || (filter === "done" ? done : !done);
     const matchesQuery = !normalizedQuery || problem.title.toLowerCase().includes(normalizedQuery);
     const matchesDifficulty = !difficulties || difficulties.size === 0 || difficulties.has(problem.difficulty);
     const matchesTopic = !topics || topics.size === 0 || topics.has(problem.categoryId);
-    return matchesFilter && matchesQuery && matchesDifficulty && matchesTopic;
+    const matchesSubtopic = !wantedSubs || problem.subtopics.some((s) => wantedSubs.has(s.toLowerCase()));
+    return matchesFilter && matchesQuery && matchesDifficulty && matchesTopic && matchesSubtopic;
   });
 }
 
@@ -1412,20 +1178,45 @@ function TimerRing({
   );
 }
 
+// A stable composite key for a (topic, subtopic) pair, since a subtopic label (e.g.
+// "Two Pointers") can appear under more than one topic and must be disambiguated.
+function subtopicKey(topicId: string, subtopic: string): string {
+  return `${topicId}::${subtopic}`;
+}
+
+// The subtopic labels selected under one topic, pulled out of a composite-key set.
+function selectedSubsForTopic(topicId: string, keys: Set<string>): string[] {
+  const prefix = `${topicId}::`;
+  return Array.from(keys)
+    .filter((key) => key.startsWith(prefix))
+    .map((key) => key.slice(prefix.length));
+}
+
 // Topic multi-select used by the practice builder and the bank "add by topic" flow.
 // A controlled button + panel (not a native <details>) so it closes on outside click,
-// matching the KojoMode attach-menu pattern.
+// matching the KojoMode attach-menu pattern. When subtopic props are supplied each
+// topic row expands to reveal its techniques as sub-checkboxes, narrowing the picked
+// pool to those subtopics. Checking a subtopic implies its parent topic (the caller's
+// toggle handler adds the topic), so the pool always includes it.
 function TopicPicker({
   options,
   selected,
   onToggle,
+  subtopicsByTopic,
+  selectedSubtopics,
+  onToggleSubtopic,
 }: {
   options: { id: string; label: string; count: number }[];
   selected: Set<string>;
   onToggle: (id: string) => void;
+  subtopicsByTopic?: Record<string, string[]>;
+  selectedSubtopics?: Set<string>;
+  onToggleSubtopic?: (topicId: string, subtopic: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
+  const nested = Boolean(subtopicsByTopic && onToggleSubtopic);
 
   useEffect(() => {
     if (!open) return;
@@ -1438,6 +1229,20 @@ function TopicPicker({
     return () => document.removeEventListener("mousedown", onClick);
   }, [open]);
 
+  function toggleExpanded(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const subCount = selectedSubtopics?.size ?? 0;
+  const summary = selected.size
+    ? `${selected.size} topic${selected.size === 1 ? "" : "s"}${subCount ? `, ${subCount} subtopic${subCount === 1 ? "" : "s"}` : ""} selected`
+    : "Choose topics";
+
   return (
     <div className="lc-topic-picker" ref={containerRef}>
       <button
@@ -1446,20 +1251,54 @@ function TopicPicker({
         aria-expanded={open}
         onClick={() => setOpen((prev) => !prev)}
       >
-        <span>
-          {selected.size ? `${selected.size} topic${selected.size === 1 ? "" : "s"} selected` : "Choose topics"}
-        </span>
+        <span>{summary}</span>
         <ChevronDown size={15} className={open ? "lc-topic-chevron lc-topic-chevron--open" : "lc-topic-chevron"} />
       </button>
       {open ? (
         <div className="lc-topic-panel">
-          {options.map((topic) => (
-            <label key={topic.id} className="lc-topic-option">
-              <input type="checkbox" checked={selected.has(topic.id)} onChange={() => onToggle(topic.id)} />
-              <span className="lc-topic-option-label">{topic.label}</span>
-              <span className="lc-topic-option-count">{topic.count}</span>
-            </label>
-          ))}
+          {options.map((topic) => {
+            const subs = nested ? subtopicsByTopic?.[topic.id] ?? [] : [];
+            const isExpanded = expanded.has(topic.id);
+            return (
+              <div key={topic.id} className="lc-topic-option-group">
+                <div className="lc-topic-option">
+                  <label className="lc-topic-option-main">
+                    <input type="checkbox" checked={selected.has(topic.id)} onChange={() => onToggle(topic.id)} />
+                    <span className="lc-topic-option-label">{topic.label}</span>
+                  </label>
+                  <span className="lc-topic-option-count">{topic.count}</span>
+                  {subs.length > 0 ? (
+                    <button
+                      type="button"
+                      className="lc-topic-expand"
+                      aria-expanded={isExpanded}
+                      aria-label={isExpanded ? `Hide ${topic.label} subtopics` : `Show ${topic.label} subtopics`}
+                      onClick={() => toggleExpanded(topic.id)}
+                    >
+                      <ChevronDown size={14} className={isExpanded ? "lc-topic-chevron lc-topic-chevron--open" : "lc-topic-chevron"} />
+                    </button>
+                  ) : null}
+                </div>
+                {isExpanded && subs.length > 0 ? (
+                  <div className="lc-subtopic-list">
+                    {subs.map((sub) => {
+                      const key = subtopicKey(topic.id, sub);
+                      return (
+                        <label key={key} className="lc-subtopic-option">
+                          <input
+                            type="checkbox"
+                            checked={selectedSubtopics?.has(key) ?? false}
+                            onChange={() => onToggleSubtopic?.(topic.id, sub)}
+                          />
+                          <span>{sub}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       ) : null}
     </div>
@@ -1662,15 +1501,24 @@ function formatElapsed(ms: number): string {
 function pickProblemsFromTopics(
   topicIds: string[],
   count: number,
-  opts: { progress: Record<string, boolean>; skip?: Set<string>; difficulty?: "any" | Difficulty },
+  opts: {
+    progress: Record<string, boolean>;
+    skip?: Set<string>;
+    difficulty?: "any" | Difficulty;
+    // Composite `${topicId}::${subtopic}` keys (see subtopicKey). When a topic has any
+    // selected here, its pool is narrowed to problems drilling those techniques.
+    subtopics?: Set<string>;
+  },
 ): string[] {
   const skip = opts.skip ?? new Set<string>();
   const difficulty = opts.difficulty ?? "any";
   const pools = topicIds.map((topicId) => {
     const category = CATEGORIES.find((c) => c.id === topicId);
+    const wantedSubs = opts.subtopics ? selectedSubsForTopic(topicId, opts.subtopics) : [];
     return (category?.problems ?? [])
       .filter((problem) => !skip.has(problem.slug))
       .filter((problem) => (difficulty === "any" ? true : problem.difficulty === difficulty))
+      .filter((problem) => wantedSubs.length === 0 || wantedSubs.some((sub) => problemHasSubtopic(problem, sub)))
       // unsolved (false=0) sorts before solved (true=1)
       .sort((a, b) => Number(Boolean(opts.progress[a.slug])) - Number(Boolean(opts.progress[b.slug])));
   });
@@ -2070,6 +1918,9 @@ export default function LeetCodeMode() {
   const [filter, setFilter] = useState<Filter>("all");
   const [difficultyFilter, setDifficultyFilter] = useState<Set<Difficulty>>(new Set());
   const [topicFilter, setTopicFilter] = useState<Set<string>>(new Set());
+  // Browse subtopic filter: a set of subtopic labels drawn from the currently selected
+  // topics. Pruned whenever the topic selection changes (see toggleTopic/clearFilters).
+  const [subtopicFilter, setSubtopicFilter] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
   const [codeWorkspaces, setCodeWorkspaces] = useState<Record<string, CodeWorkspace>>({});
   const [problemStates, setProblemStates] = useState<Record<string, CachedProblemState>>({});
@@ -2126,6 +1977,8 @@ export default function LeetCodeMode() {
   // Topic-based add: companies interview by topic, so the primary add flow is "pick
   // topics + how many problems", not a hand-typed problem list.
   const [bankAddTopics, setBankAddTopics] = useState<Set<string>>(new Set());
+  // Composite `${topicId}::${subtopic}` keys narrowing the bank add pool (see subtopicKey).
+  const [bankAddSubtopics, setBankAddSubtopics] = useState<Set<string>>(new Set());
   const [bankAddCount, setBankAddCount] = useState(5);
   const [bankAddDifficulty, setBankAddDifficulty] = useState<"any" | "Easy" | "Medium" | "Hard">("any");
   const [bankAddNote, setBankAddNote] = useState<string | null>(null);
@@ -2187,6 +2040,8 @@ export default function LeetCodeMode() {
   // them. The session persists across opening/returning problems, and across page
   // refreshes via localStorage (see loadPracticeSession/savePracticeSession).
   const [practiceTopics, setPracticeTopics] = useState<Set<string>>(() => new Set());
+  // Composite `${topicId}::${subtopic}` keys narrowing the practice pool (see subtopicKey).
+  const [practiceSubtopics, setPracticeSubtopics] = useState<Set<string>>(() => new Set());
   const [practiceDifficulty, setPracticeDifficulty] = useState<"any" | "Easy" | "Medium" | "Hard">("any");
   const [practiceCount, setPracticeCount] = useState(5);
   const [practiceInit] = useState(() => loadPracticeSession());
@@ -2412,7 +2267,7 @@ export default function LeetCodeMode() {
   // On mount: fetch DB progress/dates, merge with localStorage, push merged result back
   useEffect(() => {
     if (isGuestSession()) return;
-    fetchLCProgress()
+    fetchLCProgress(new Date().getTimezoneOffset())
       .then(({ progress: dbProgress, activity_dates: dbDates, activity_counts: dbCounts, solved_at: dbSolvedAt }) => {
         if (dbSolvedAt) setSolvedAt(dbSolvedAt);
         setProgress((localProgress) => {
@@ -2428,16 +2283,11 @@ export default function LeetCodeMode() {
           saveActivityDates(merged);
           return merged;
         });
-        setSolvedDayCounts((localCounts) => {
-          // Backend is authoritative; take the higher of local and server per day so a
-          // just-solved optimistic bump survives until the server confirms it.
-          const merged = { ...localCounts };
-          for (const [date, count] of Object.entries(dbCounts ?? {})) {
-            merged[date] = Math.max(merged[date] ?? 0, count);
-          }
-          saveActivityCounts(merged);
-          return merged;
-        });
+        // The count is derived and enforced server-side now, so trust it outright
+        // rather than max-merging with a possibly-inflated stale local value.
+        const serverCounts = dbCounts ?? {};
+        setSolvedDayCounts(serverCounts);
+        saveActivityCounts(serverCounts);
       })
       .catch(() => { });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2980,10 +2830,32 @@ export default function LeetCodeMode() {
     setBankAddNote(null);
     setBankAddTopics((prev) => {
       const next = new Set(prev);
-      if (next.has(topicId)) next.delete(topicId);
-      else next.add(topicId);
+      if (next.has(topicId)) {
+        next.delete(topicId);
+        // Drop this topic's subtopic selections so a hidden subtopic can't keep narrowing.
+        setBankAddSubtopics((subs) => {
+          const prefix = `${topicId}::`;
+          const kept = new Set(Array.from(subs).filter((k) => !k.startsWith(prefix)));
+          return kept.size === subs.size ? subs : kept;
+        });
+      } else {
+        next.add(topicId);
+      }
       return next;
     });
+  }
+
+  // Toggling a subtopic implies its parent topic (so its pool is included in the pick).
+  function toggleBankAddSubtopic(topicId: string, subtopic: string) {
+    setBankAddNote(null);
+    const key = subtopicKey(topicId, subtopic);
+    setBankAddSubtopics((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+    setBankAddTopics((prev) => (prev.has(topicId) ? prev : new Set(prev).add(topicId)));
   }
 
   // Pull `bankAddCount` problems from the selected topics into the bank: unsolved first,
@@ -2996,6 +2868,7 @@ export default function LeetCodeMode() {
       progress,
       skip: new Set(bank.problem_slugs),
       difficulty: bankAddDifficulty,
+      subtopics: bankAddSubtopics,
     });
     if (!picked.length) {
       setBankAddNote("No new problems left in those topics and difficulty.");
@@ -3007,6 +2880,7 @@ export default function LeetCodeMode() {
       if (!updated) return;
       setPrepBanks((prev) => prev.map((b) => (b.id === bankId ? updated : b)));
       setBankAddTopics(new Set());
+      setBankAddSubtopics(new Set());
       setBankAddNote(`Added ${picked.length} problem${picked.length === 1 ? "" : "s"} from ${bankAddTopics.size} topic${bankAddTopics.size === 1 ? "" : "s"}.`);
     } finally {
       setBankTopicAdding(false);
@@ -3184,8 +3058,13 @@ export default function LeetCodeMode() {
           : prev.map((d) => (d.problem_slug === slug ? updated : d)),
       );
       // Pass 3 cleared: offer to run the whole cycle again. Fires from both the manual
-      // "Clear drill" button and the auto-advance-on-solve path below.
-      if (updated.completed_at) setDrillAgainSlug(slug);
+      // "Clear drill" button and the auto-advance-on-solve path below. The clear logs
+      // a server-side drill_completed event, which is what actually adds +1 to the
+      // day's count, so pull the fresh server tally.
+      if (updated.completed_at) {
+        setDrillAgainSlug(slug);
+        void refreshServerCounts();
+      }
     } finally {
       setAdvancingDrill(null);
     }
@@ -3226,10 +3105,30 @@ export default function LeetCodeMode() {
     setPracticeNote(null);
     setPracticeTopics((prev) => {
       const next = new Set(prev);
-      if (next.has(topicId)) next.delete(topicId);
-      else next.add(topicId);
+      if (next.has(topicId)) {
+        next.delete(topicId);
+        setPracticeSubtopics((subs) => {
+          const prefix = `${topicId}::`;
+          const kept = new Set(Array.from(subs).filter((k) => !k.startsWith(prefix)));
+          return kept.size === subs.size ? subs : kept;
+        });
+      } else {
+        next.add(topicId);
+      }
       return next;
     });
+  }
+
+  function togglePracticeSubtopic(topicId: string, subtopic: string) {
+    setPracticeNote(null);
+    const key = subtopicKey(topicId, subtopic);
+    setPracticeSubtopics((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+    setPracticeTopics((prev) => (prev.has(topicId) ? prev : new Set(prev).add(topicId)));
   }
 
   function startPracticeSession() {
@@ -3237,6 +3136,7 @@ export default function LeetCodeMode() {
     const slugs = pickProblemsFromTopics(Array.from(practiceTopics), practiceCount, {
       progress,
       difficulty: practiceDifficulty,
+      subtopics: practiceSubtopics,
     });
     if (!slugs.length) {
       setPracticeNote("No problems match those topics and difficulty. Widen the filters.");
@@ -3364,9 +3264,27 @@ export default function LeetCodeMode() {
     nextProgress: Record<string, boolean>,
     nextDates: string[],
     nextCounts: Record<string, number>,
-  ) {
+  ): Promise<void> {
+    if (isGuestSession()) return Promise.resolve();
+    // activity_counts is still sent for backward compatibility but the server now
+    // ignores it and derives the tally itself; refreshServerCounts pulls the truth.
+    return syncLCProgress({ progress: nextProgress, activity_dates: nextDates, activity_counts: nextCounts }).catch(() => { });
+  }
+
+  // Pull the server-derived solved count (and first-solve stamps) back into local
+  // state after a mutation. The daily tally is authoritative on the backend, so
+  // this replaces any optimistic local value. No-op for guests (no server state).
+  async function refreshServerCounts() {
     if (isGuestSession()) return;
-    syncLCProgress({ progress: nextProgress, activity_dates: nextDates, activity_counts: nextCounts }).catch(() => { });
+    try {
+      const { activity_counts, solved_at } = await fetchLCProgress(new Date().getTimezoneOffset());
+      if (solved_at) setSolvedAt(solved_at);
+      const counts = activity_counts ?? {};
+      setSolvedDayCounts(counts);
+      saveActivityCounts(counts);
+    } catch {
+      // best-effort; the next mount fetch reconciles
+    }
   }
 
   function pushWorkspaceToDb(problemSlug: string, workspace: CodeWorkspace) {
@@ -3391,8 +3309,9 @@ export default function LeetCodeMode() {
     return nextDates;
   }
 
-  // Optimistically add one to today's solved tally (never decremented, matching how
-  // activityDates only ever grows), persist it, and return the new map to sync.
+  // Add one to today's solved tally. For logged-in users this is only an optimistic
+  // UI nudge (refreshServerCounts replaces it with the server-derived value); for
+  // guests, who have no server-side derivation, it is their actual count.
   function bumpTodayCount(): Record<string, number> {
     const key = todayKey();
     const nextCounts = { ...solvedDayCounts, [key]: (solvedDayCounts[key] ?? 0) + 1 };
@@ -3477,8 +3396,11 @@ export default function LeetCodeMode() {
     setProgress(next);
     saveProgress(next);
     const nextDates = nextDone ? recordSolvedToday() : activityDates;
-    const nextCounts = nextDone ? bumpTodayCount() : solvedDayCounts;
-    pushProgressToDb(next, nextDates, nextCounts);
+    // Only a first-ever solve optimistically bumps the count; re-checking an
+    // already-solved problem must not. The server is authoritative regardless.
+    const isNewSolve = nextDone && !solvedAt[problem.slug];
+    const nextCounts = isNewSolve ? bumpTodayCount() : solvedDayCounts;
+    pushProgressToDb(next, nextDates, nextCounts).then(refreshServerCounts);
     if (nextDone) onProblemCompleted(problem);
   }
 
@@ -3487,7 +3409,10 @@ export default function LeetCodeMode() {
     const next = { ...progress, [problem.slug]: true };
     setProgress(next);
     saveProgress(next);
-    const nextCounts = bumpTodayCount();
+    // Only a first-ever solve optimistically bumps the count; re-solving an
+    // already-solved problem (e.g. a drill re-run) must not. Drill clears are
+    // counted server-side from the drill_completed event, not here.
+    const nextCounts = solvedAt[problem.slug] ? solvedDayCounts : bumpTodayCount();
 
     // If this is the streak challenge problem, bridge the activity gap so the streak
     // is restored to continuity before adding today.
@@ -3495,13 +3420,13 @@ export default function LeetCodeMode() {
       const bridgedDates = fillStreakGap(activityDates);
       setActivityDates(bridgedDates);
       saveActivityDates(bridgedDates);
-      pushProgressToDb(next, bridgedDates, nextCounts);
+      pushProgressToDb(next, bridgedDates, nextCounts).then(refreshServerCounts);
       completeLCStreakChallenge()
         .then(() => setStreakChallenge((prev) => prev ? { ...prev, completed_at: new Date().toISOString() } : prev))
         .catch(() => {});
     } else {
       const nextDates = recordSolvedToday();
-      pushProgressToDb(next, nextDates, nextCounts);
+      pushProgressToDb(next, nextDates, nextCounts).then(refreshServerCounts);
     }
     onProblemCompleted(problem);
   }
@@ -4624,10 +4549,34 @@ export default function LeetCodeMode() {
   }
 
   function toggleTopic(id: string) {
+    let removed = false;
     setTopicFilter((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+        removed = true;
+      } else {
+        next.add(id);
+      }
+      // Prune any selected subtopics that no longer belong to a selected topic, so a
+      // stale chip can't keep filtering after its topic is deselected.
+      const stillAvailable = new Set(
+        Array.from(next).flatMap((topicId) => SUBTOPICS_BY_TOPIC[topicId] ?? []),
+      );
+      setSubtopicFilter((prevSubs) => {
+        if (!removed || prevSubs.size === 0) return prevSubs;
+        const nextSubs = new Set(Array.from(prevSubs).filter((s) => stillAvailable.has(s)));
+        return nextSubs.size === prevSubs.size ? prevSubs : nextSubs;
+      });
+      return next;
+    });
+  }
+
+  function toggleSubtopic(label: string) {
+    setSubtopicFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
       return next;
     });
   }
@@ -4635,7 +4584,10 @@ export default function LeetCodeMode() {
   function clearFilters(includeTopic: boolean) {
     setFilter("all");
     setDifficultyFilter(new Set());
-    if (includeTopic) setTopicFilter(new Set());
+    if (includeTopic) {
+      setTopicFilter(new Set());
+      setSubtopicFilter(new Set());
+    }
   }
 
   // Status options share the chip idiom with difficulty/topic (single-select), each with
@@ -4650,8 +4602,15 @@ export default function LeetCodeMode() {
   // view only); category views pass false since they are already scoped to one topic.
   // Every dimension uses one unified chip system so the bar reads as a single control set.
   function renderFilterBar(showTopic: boolean) {
+    // Subtopics available to filter on = the union of the selected topics' techniques.
+    // Only shown once at least one topic is picked (keeps the bar from listing ~50 chips).
+    const subtopicOptions = showTopic
+      ? Array.from(new Set(Array.from(topicFilter).flatMap((topicId) => SUBTOPICS_BY_TOPIC[topicId] ?? [])))
+      : [];
     const anyActive =
-      filter !== "all" || difficultyFilter.size > 0 || (showTopic && topicFilter.size > 0);
+      filter !== "all" ||
+      difficultyFilter.size > 0 ||
+      (showTopic && (topicFilter.size > 0 || subtopicFilter.size > 0));
     return (
       <div className="lc-filter-bar">
         <div className="lc-filter-group">
@@ -4708,6 +4667,24 @@ export default function LeetCodeMode() {
                   onClick={() => toggleTopic(topic.id)}
                 >
                   {topic.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {showTopic && subtopicOptions.length > 0 ? (
+          <div className="lc-filter-group lc-filter-group--topic">
+            <span className="lc-filter-label">Subtopic</span>
+            <div className="lc-filter-chips">
+              {subtopicOptions.map((sub) => (
+                <button
+                  key={sub}
+                  type="button"
+                  className={`lc-filter-chip lc-filter-chip--subtopic${subtopicFilter.has(sub) ? " lc-filter-chip--active" : ""}`}
+                  aria-pressed={subtopicFilter.has(sub)}
+                  onClick={() => toggleSubtopic(sub)}
+                >
+                  {sub}
                 </button>
               ))}
             </div>
@@ -4974,7 +4951,14 @@ export default function LeetCodeMode() {
             <div className="lc-practice-builder">
               <div className="lc-practice-field">
                 <span className="lc-practice-field-label">Focus topics</span>
-                <TopicPicker options={bankTopicOptions} selected={practiceTopics} onToggle={togglePracticeTopic} />
+                <TopicPicker
+                  options={bankTopicOptions}
+                  selected={practiceTopics}
+                  onToggle={togglePracticeTopic}
+                  subtopicsByTopic={SUBTOPICS_BY_TOPIC}
+                  selectedSubtopics={practiceSubtopics}
+                  onToggleSubtopic={togglePracticeSubtopic}
+                />
               </div>
 
               <div className="lc-practice-field">
@@ -5339,7 +5323,14 @@ export default function LeetCodeMode() {
                       Companies interview by topic. Pick your topics, then continue from our catalog, or have Kojo create a fresh problem. No AI is used unless you tap Create with Kojo.
                     </p>
                     <div className="lc-bank-add-controls">
-                      <TopicPicker options={bankTopicOptions} selected={bankAddTopics} onToggle={toggleBankAddTopic} />
+                      <TopicPicker
+                        options={bankTopicOptions}
+                        selected={bankAddTopics}
+                        onToggle={toggleBankAddTopic}
+                        subtopicsByTopic={SUBTOPICS_BY_TOPIC}
+                        selectedSubtopics={bankAddSubtopics}
+                        onToggleSubtopic={toggleBankAddSubtopic}
+                      />
                       <label className="lc-bank-add-count">
                         <span>Difficulty</span>
                         <select
@@ -5536,7 +5527,7 @@ export default function LeetCodeMode() {
   }
 
   if (view.type === "browse") {
-    const visibleProblems = filterProblems(browseProblems, progress, filter, query, difficultyFilter, topicFilter);
+    const visibleProblems = filterProblems(browseProblems, progress, filter, query, difficultyFilter, topicFilter, subtopicFilter);
     const solvedCount = browseProblems.filter((problem) => progress[problem.slug]).length;
     return (
       <div className="lc-shell">
@@ -5581,6 +5572,13 @@ export default function LeetCodeMode() {
                   <button type="button" className="lc-problem-title-btn" onClick={() => openProblem(problem.categoryId, problem.slug)}>
                     <span>{problem.title}</span>
                     <small>{topicLabel}</small>
+                    {problem.subtopics.length > 0 ? (
+                      <span className="lc-subtopic-tags">
+                        {problem.subtopics.map((sub) => (
+                          <span key={sub} className="lc-subtopic-tag">{sub}</span>
+                        ))}
+                      </span>
+                    ) : null}
                   </button>
                   <span className={`lc-difficulty lc-difficulty--${difficultyClass(problem.difficulty)}`}>{problem.difficulty}</span>
                 </div>

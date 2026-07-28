@@ -12,9 +12,14 @@ import type { CompanyKey, InterviewLevel, InterviewProblem } from "../data/mockI
 import type {
   CodingProblemInfo,
   InterviewChatMessage,
+  MockCustomConfig,
   ResumeScreenResult,
   Stage1QuestionResult,
 } from "./types";
+
+// A company selection is one of the built-in keys or "custom" (built from a job
+// description). Kept as a union so localStorage snapshots survive both.
+export type MockCompany = CompanyKey | "custom";
 
 export type MockStageKey = "resume" | "stage1" | "stage2" | "stage3" | "summary";
 
@@ -69,8 +74,10 @@ export type Stage3Progress = {
 
 export type MockProgress = {
   sessionId: number;
-  company: CompanyKey;
+  company: MockCompany;
   level?: InterviewLevel;
+  customCompany?: string;
+  customConfig?: MockCustomConfig;
   selectedStages: string[];
   updatedAt: number;
   resume?: ResumeProgress;
@@ -81,8 +88,9 @@ export type MockProgress = {
 
 export type ActiveMockPointer = {
   sessionId: number;
-  company: CompanyKey;
+  company: MockCompany;
   level?: InterviewLevel;
+  customCompany?: string;
   selectedStages: string[];
   updatedAt: number;
 };
@@ -113,6 +121,7 @@ export function saveMockProgress(progress: MockProgress): void {
       sessionId: record.sessionId,
       company: record.company,
       level: record.level,
+      customCompany: record.customCompany,
       selectedStages: record.selectedStages,
       updatedAt: record.updatedAt,
     };

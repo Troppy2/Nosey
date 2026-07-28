@@ -41,8 +41,12 @@ export default function MockInterviewResume() {
     [numericSessionId],
   );
 
-  const company = (state?.session?.company ?? stored?.company ?? "random") as CompanyKey;
-  const companyLabel = COMPANY_OPTIONS.find((c) => c.key === company)?.label ?? company;
+  const rawCompany = state?.session?.company ?? stored?.company ?? "random";
+  const company = (rawCompany === "custom" ? "random" : rawCompany) as CompanyKey;
+  const companyLabel =
+    rawCompany === "custom"
+      ? state?.session?.custom_company ?? stored?.customCompany ?? "Custom"
+      : COMPANY_OPTIONS.find((c) => c.key === company)?.label ?? company;
   const selectedStages = state?.selectedStages ?? stored?.selectedStages ?? [
     "resume",
     "stage1",
@@ -80,9 +84,9 @@ export default function MockInterviewResume() {
     const prev = loadMockProgress(numericSessionId);
     const base = prev?.resume ?? { inputText: "", fileName: null, result: null, completed: false };
     saveMockProgress({
-      ...(prev ?? { sessionId: numericSessionId, company, selectedStages, updatedAt: Date.now() }),
+      ...(prev ?? { sessionId: numericSessionId, company: rawCompany, selectedStages, updatedAt: Date.now() }),
       sessionId: numericSessionId,
-      company,
+      company: rawCompany,
       selectedStages,
       updatedAt: Date.now(),
       resume: { ...base, ...partial, completed: completed ?? base.completed },

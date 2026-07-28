@@ -1,3 +1,9 @@
+import type { MockCustomConfig } from "../lib/types";
+import {
+  selectTaxonomyProblems,
+  type TaxonomyDifficulty,
+} from "./leetcodeTaxonomy";
+
 export interface InterviewProblem {
   slug: string;
   title: string;
@@ -453,6 +459,35 @@ const LEVEL_DIFFICULTY_ORDER: Record<InterviewLevel, InterviewProblem["difficult
   mid: ["Medium", "Hard", "Easy"],
   senior: ["Hard", "Medium", "Easy"],
 };
+
+// Custom-company (job-description) interview: source Stage 1 problems from the shared
+// taxonomy by the user's chosen topics x difficulties, or use the specific problems they
+// pasted. Falls back to the level-weighted "random" pool if nothing usable was chosen.
+export function pickCustomProblems(
+  config: MockCustomConfig | null | undefined,
+  count = 3,
+  level: InterviewLevel = "intern",
+): InterviewProblem[] {
+  if (config && config.problems.length > 0) {
+    return config.problems.slice(0, count).map((p) => ({
+      slug: p.slug,
+      title: p.title || p.slug,
+      difficulty: (["Easy", "Medium", "Hard"].includes(p.difficulty) ? p.difficulty : "Medium") as InterviewProblem["difficulty"],
+      topics: [],
+    }));
+  }
+  const difficulties = (config?.difficulties ?? []).filter((d): d is TaxonomyDifficulty =>
+    d === "Easy" || d === "Medium" || d === "Hard",
+  );
+  const picked = selectTaxonomyProblems(config?.topics ?? [], difficulties, count);
+  if (picked.length === 0) return pickProblems("random", count, level);
+  return picked.map((p) => ({
+    slug: p.slug,
+    title: p.title,
+    difficulty: p.difficulty,
+    topics: p.topicLabel ? [p.topicLabel] : [],
+  }));
+}
 
 export function pickProblems(
   company: CompanyKey,
