@@ -5,7 +5,7 @@ import { LoadingNotice } from "../components/Loaders";
 import { sendStage3Message } from "../lib/api";
 import type { InterviewChatMessage, MockInterviewSession } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
-import { loadMockProgress, saveMockProgress, type MockProgress } from "../lib/mockInterview";
+import { loadMockProgress, saveMockProgress, type MockProgress, type MockCompany } from "../lib/mockInterview";
 
 export default function MockInterviewStage3() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -19,7 +19,7 @@ export default function MockInterviewStage3() {
     [numericSessionId],
   );
 
-  const rawCompany = state?.session?.company ?? stored?.company ?? "random";
+  const rawCompany = (state?.session?.company ?? stored?.company ?? "random") as MockCompany;
   const company = (rawCompany === "custom" ? "random" : rawCompany) as CompanyKey;
   const companyLabel =
     rawCompany === "custom"
