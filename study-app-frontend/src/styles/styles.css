@@ -22095,3 +22095,127 @@ button.lc-reminder-feature-cta:disabled {
   line-height: 1;
   white-space: nowrap;
 }
+
+/* ── KojoCode solution (custom-problem model solution reveal) ── */
+.lc-kojocode-body {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(113, 131, 85, 0.18);
+  border-radius: 10px;
+  background: rgba(113, 131, 85, 0.04);
+}
+
+.lc-kojocode-loading,
+.lc-kojocode-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+.lc-kojocode-error {
+  justify-content: space-between;
+}
+
+.lc-inline-btn {
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  background: rgba(113, 131, 85, 0.1);
+  border: 1px solid rgba(113, 131, 85, 0.28);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.lc-inline-btn:hover {
+  background: rgba(113, 131, 85, 0.2);
+}
+
+.lc-kojocode-approach-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--green-dark);
+  margin-bottom: 10px;
+}
+
+.lc-kojocode-section {
+  margin-top: 18px;
+}
+
+.lc-kojocode-section:first-of-type {
+  margin-top: 0;
+}
+
+.lc-kojocode-heading {
+  margin: 0 0 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted, #888);
+}
+
+.lc-kojocode-viz-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lc-kojocode-viz-row .lc-kojocode-heading {
+  margin-bottom: 0;
+}
+
+.lc-kojocode-viz-hint {
+  margin: 6px 0 0;
+  word-break: break-word;
+}
+
+/* The solution code renders through the shared KojoCode code block (MarkdownContent
+   .kojo-code-block). Its default is the DARK block; the Kojo chat menu uses the LIGHT
+   variant defined by `.chat-mode-shell .kojo-code-block` (--k-hover bg / --k-ink text).
+   The KojoCode editor is not inside .chat-mode-shell, so mirror those resolved token
+   values here to get the same light chat-style block. */
+.lc-kojocode-body .kojo-code-block {
+  background: rgba(113, 131, 85, 0.1);
+  color: var(--ink);
+}
+
+.lc-kojocode-complexity-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+/* Remove-from-drill X on each 3-Pass Drill card (mirrors .lc-bank-problem-remove). */
+.lc-drill-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted, #596949);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    color var(--transition-normal),
+    background var(--transition-normal),
+    border-color var(--transition-normal);
+}
+
+.lc-drill-remove:hover {
+  color: #dc2626;
+  background: color-mix(in srgb, #dc2626 8%, white);
+  border-color: color-mix(in srgb, #dc2626 30%, white);
+}
+
+.lc-drill-remove:focus-visible {
+  outline: 2px solid #dc2626;
+  outline-offset: 2px;
+}

@@ -190,6 +190,17 @@ class LCGenerateCustomProblemRequest(BaseModel):
     provider: Optional[str] = Field(default=None)
 
 
+class LCGenerateCustomProblemsStreamRequest(BaseModel):
+    """Streaming batch: the client sends the resolved topic labels, a difficulty, and how
+    many problems to generate. The backend makes ONE streaming LLM call and streams each
+    finished problem back as an SSE event. Count is capped server-side."""
+
+    topics: list[str] = Field(default_factory=list, max_length=20)
+    difficulty: str = Field(default="any", max_length=20)
+    count: int = Field(default=3, ge=1, le=6)
+    provider: Optional[str] = Field(default=None)
+
+
 class LCGeneratedCustomProblem(BaseModel):
     title: str = ""
     topic: str = "unknown"
@@ -198,6 +209,36 @@ class LCGeneratedCustomProblem(BaseModel):
     description: str = ""
     starter_code: str = ""
     test_cases: list[LCCustomTestCase] = Field(default_factory=list)
+
+
+# ── KojoCode solution (custom-problem solution reveal) ────────────────────────
+
+class LCSolutionCodeComment(BaseModel):
+    """One annotated line of the solution: the exact source line and a plain-English
+    explanation of what it does."""
+
+    code: str = Field(default="", max_length=600)
+    comment: str = Field(default="", max_length=1000)
+
+
+class LCSolutionArticleRequest(BaseModel):
+    provider: Optional[str] = Field(default=None)
+
+
+class LCSolutionArticleResponse(BaseModel):
+    """The cached KojoCode solution for a custom problem: optimal-approach write-up,
+    runnable solution code (traceable by the client visualizer), per-line comments,
+    and a complexity analysis."""
+
+    slug: str
+    approach_rank: int = 1
+    title: str = ""
+    approach_summary: str = ""
+    solution_code: str = ""
+    code_comments: list[LCSolutionCodeComment] = Field(default_factory=list)
+    time_complexity: str = ""
+    space_complexity: str = ""
+    complexity_explanation: str = ""
 
 
 # ── Daily KojoCode ────────────────────────────────────────────────────────────

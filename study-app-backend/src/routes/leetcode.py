@@ -6,6 +6,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.responses import StreamingResponse
+from typing import AsyncIterator
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +23,7 @@ from src.models.lc_sync import (
     LCPrepBank,
     LCProgress,
     LCProblemNote,
+    LCSolutionArticle,
     LCStreakChallenge,
     LCStruggleEvent,
     LCTestRun,
@@ -38,6 +41,7 @@ from src.schemas.leetcode_schema import (
     LCDrillCreateRequest,
     LCDrillScheduleResponse,
     LCGenerateCustomProblemRequest,
+    LCGenerateCustomProblemsStreamRequest,
     LCGeneratedCustomProblem,
     LCPrepBankCreateRequest,
     LCPrepBankResponse,
@@ -49,6 +53,9 @@ from src.schemas.leetcode_schema import (
     LCProgressResponse,
     LCProgressSyncRequest,
     LCReclassifyResponse,
+    LCSolutionArticleRequest,
+    LCSolutionArticleResponse,
+    LCSolutionCodeComment,
     LCStreakChallengeCreateRequest,
     LCStreakChallengeResponse,
     LCWorkspaceResponse,
@@ -95,7 +102,10 @@ _CLIENT_STRUGGLE_EVENTS = frozenset(
     }
 )
 from src.utils.exceptions import LLMException, ResourceNotFoundException
+from src.utils.logger import get_logger
 from src.utils.provider_policy import resolve_request_provider
+
+logger = get_logger(__name__)
 
 # Last-resort fallback only. The client normally picks the rescue problem (a random
 # unsolved Medium/Hard from the verified + custom catalog) and sends it on create.
@@ -186,7 +196,6 @@ async def grade_leetcode_submission(
                 problem_slug=body.title_slug,
             )
         )
-        await _maybe_auto_add_drill(session, user.id, body.title_slug)
     await session.commit()
     return result
 
@@ -240,36 +249,6 @@ async def check_leetcode_complexity(
 # section only owns event logging and the route wiring.
 
 
-async def _maybe_auto_add_drill(
-    session: AsyncSession, user_id: int, problem_slug: Optional[str]
-) -> None:
-    """A failed_grade or timer_expiry struggle signal auto-creates a drill row, unless
-    one already exists for this (user, problem) -- lc_drill_schedule has a hard
-    UniqueConstraint(user_id, problem_slug) (one row per problem per user, ever), so
-    this checks for ANY existing row, not just an open one, to respect that."""
-    if not problem_slug:
-        return
-    existing = (
-        await session.execute(
-            select(LCDrillSchedule).where(
-                LCDrillSchedule.user_id == user_id,
-                LCDrillSchedule.problem_slug == problem_slug,
-            )
-        )
-    ).scalar_one_or_none()
-    if existing:
-        return
-    session.add(
-        LCDrillSchedule(
-            user_id=user_id,
-            problem_slug=problem_slug,
-            current_pass=1,
-            next_due_at=datetime.now(timezone.utc),
-            added_from="auto",
-        )
-    )
-
-
 @router.post("/struggle-event", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
 async def log_struggle_event(
     body: LCStruggleEventRequest,
@@ -287,8 +266,6 @@ async def log_struggle_event(
             problem_slug=body.problem_slug,
         )
     )
-    if body.event_type == EVENT_TIMER_EXPIRY:
-        await _maybe_auto_add_drill(session, user.id, body.problem_slug)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -641,6 +618,111 @@ async def delete_custom_problem(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+def _serialize_solution_article(row: LCSolutionArticle) -> LCSolutionArticleResponse:
+    try:
+        raw_comments = json.loads(row.code_comments_json or "[]")
+    except Exception:
+        raw_comments = []
+    comments = [
+        LCSolutionCodeComment(
+            code=str(item.get("code", "") or ""),
+            comment=str(item.get("comment", "") or ""),
+        )
+        for item in raw_comments
+        if isinstance(item, dict)
+    ]
+    return LCSolutionArticleResponse(
+        slug=row.problem_slug,
+        approach_rank=row.approach_rank,
+        title=row.title,
+        approach_summary=row.approach_summary,
+        solution_code=row.solution_code,
+        code_comments=comments,
+        time_complexity=row.time_complexity,
+        space_complexity=row.space_complexity,
+        complexity_explanation=row.complexity_explanation,
+    )
+
+
+@router.post("/custom-problems/{slug}/solution", response_model=LCSolutionArticleResponse)
+async def get_custom_problem_solution(
+    slug: str,
+    body: LCSolutionArticleRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LCSolutionArticleResponse:
+    """Return the KojoCode solution (optimal approach) for a custom problem. Cached: if
+    an article row already exists it is returned with no LLM call; otherwise it is
+    generated once, persisted, and returned so it is never rebuilt."""
+    _validate_custom_slug(slug)
+
+    existing = (
+        await session.execute(
+            select(LCSolutionArticle).where(
+                LCSolutionArticle.user_id == user.id,
+                LCSolutionArticle.problem_slug == slug,
+                LCSolutionArticle.approach_rank == 1,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing:
+        return _serialize_solution_article(existing)
+
+    problem = (
+        await session.execute(
+            select(LCCustomProblem).where(
+                LCCustomProblem.user_id == user.id,
+                LCCustomProblem.slug == slug,
+            )
+        )
+    ).scalar_one_or_none()
+    if problem is None:
+        raise HTTPException(status_code=404, detail="Custom problem not found.")
+
+    try:
+        article = await LeetCodeService().generate_solution_article(
+            title=problem.title,
+            statement=problem.description,
+            starter_code=problem.starter_code,
+            provider=resolve_request_provider(user, body.provider),
+        )
+    except LLMException as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    row = LCSolutionArticle(
+        user_id=user.id,
+        problem_slug=slug,
+        approach_rank=1,
+        title=str(article.get("title", "")),
+        approach_summary=str(article.get("approach_summary", "")),
+        solution_code=str(article.get("solution_code", "")),
+        code_comments_json=json.dumps(article.get("code_comments", [])),
+        time_complexity=str(article.get("time_complexity", "")),
+        space_complexity=str(article.get("space_complexity", "")),
+        complexity_explanation=str(article.get("complexity_explanation", "")),
+    )
+    session.add(row)
+    try:
+        await session.commit()
+    except IntegrityError:
+        # A concurrent request generated the same article first; return that one.
+        await session.rollback()
+        existing = (
+            await session.execute(
+                select(LCSolutionArticle).where(
+                    LCSolutionArticle.user_id == user.id,
+                    LCSolutionArticle.problem_slug == slug,
+                    LCSolutionArticle.approach_rank == 1,
+                )
+            )
+        ).scalar_one_or_none()
+        if existing:
+            return _serialize_solution_article(existing)
+        raise
+    await session.refresh(row)
+    return _serialize_solution_article(row)
+
+
 @router.post("/custom-problems/generate", response_model=LCGeneratedCustomProblem)
 async def generate_custom_problem(
     body: LCGenerateCustomProblemRequest,
@@ -656,6 +738,50 @@ async def generate_custom_problem(
         )
     except LLMException as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+def _sse(event: dict) -> str:
+    return f"data: {json.dumps(event)}\n\n"
+
+
+_SSE_HEADERS = {
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",  # disable proxy buffering so problems flush immediately
+}
+
+
+@router.post("/custom-problems/generate-stream")
+async def generate_custom_problems_stream(
+    body: LCGenerateCustomProblemsStreamRequest,
+    user: User = Depends(get_current_user),
+) -> StreamingResponse:
+    """Generate up to 6 fresh problems in ONE streaming LLM call, emitting each problem
+    as an SSE event the moment it finishes streaming so the UI can render them live.
+    Errors are emitted as an "error" event (the stream itself stays 200), matching the
+    Kojo chat stream contract."""
+    topics_text = ", ".join(t.strip() for t in body.topics if t.strip()) or "general coding interview"
+    provider = resolve_request_provider(user, body.provider)
+
+    async def event_stream() -> AsyncIterator[str]:
+        emitted = 0
+        try:
+            async for problem in LeetCodeService().stream_custom_problems(
+                topics_text=topics_text,
+                difficulty=body.difficulty,
+                count=body.count,
+                provider=provider,
+            ):
+                emitted += 1
+                yield _sse({"type": "problem", "problem": problem.model_dump()})
+            yield _sse({"type": "done", "count": emitted})
+        except LLMException as exc:
+            yield _sse({"type": "error", "message": str(exc)})
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Custom-problems stream unexpected error: %s", exc)
+            yield _sse({"type": "error", "message": "Kojo failed to generate problems. Try again."})
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream", headers=_SSE_HEADERS)
 
 
 @router.post("/custom-problems/reclassify", response_model=LCReclassifyResponse)
@@ -1205,3 +1331,25 @@ async def restart_drill(
     await session.commit()
     await session.refresh(row)
     return _serialize_drill(row)
+
+
+@router.delete("/drills/{slug}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def delete_drill(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> Response:
+    """Remove a problem from the 3-Pass Drill entirely (any pass, open or completed).
+    Idempotent: deleting a drill that isn't there still returns 204."""
+    row = (
+        await session.execute(
+            select(LCDrillSchedule).where(
+                LCDrillSchedule.user_id == user.id,
+                LCDrillSchedule.problem_slug == slug,
+            )
+        )
+    ).scalar_one_or_none()
+    if row is not None:
+        await session.delete(row)
+        await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

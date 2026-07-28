@@ -17,6 +17,7 @@ from src.models.lc_sync import (
     LCPrepBank,
     LCProblemNote,
     LCProgress,
+    LCSolutionArticle,
     LCStreakChallenge,
     LCStruggleEvent,
 )
@@ -53,6 +54,7 @@ __all__ = [
     "LCPrepBank",
     "LCProblemNote",
     "LCProgress",
+    "LCSolutionArticle",
     "LCStreakChallenge",
     "LCStruggleEvent",
     "LearningModule",
