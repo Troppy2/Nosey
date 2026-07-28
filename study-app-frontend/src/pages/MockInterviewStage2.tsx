@@ -17,7 +17,7 @@ import { LoadingNotice } from "../components/Loaders";
 import { sendStage2Message, submitStage2 } from "../lib/api";
 import type { CodingProblemInfo, InterviewChatMessage, MockInterviewSession } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
-import { loadMockProgress, saveMockProgress, type MockProgress } from "../lib/mockInterview";
+import { loadMockProgress, saveMockProgress, type MockProgress, type MockCompany } from "../lib/mockInterview";
 
 function speak(text: string) {
   if (!window.speechSynthesis) return;
@@ -46,7 +46,7 @@ export default function MockInterviewStage2() {
     [numericSessionId],
   );
 
-  const rawCompany = state?.session?.company ?? stored?.company ?? "random";
+  const rawCompany = (state?.session?.company ?? stored?.company ?? "random") as MockCompany;
   const company = (rawCompany === "custom" ? "random" : rawCompany) as CompanyKey;
   const companyLabel =
     rawCompany === "custom"

@@ -16,7 +16,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { screenResume } from "../lib/api";
 import type { MockInterviewSession, ResumeScreenResult } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
-import { loadMockProgress, saveMockProgress, type MockProgress } from "../lib/mockInterview";
+import { loadMockProgress, saveMockProgress, type MockProgress, type MockCompany } from "../lib/mockInterview";
 
 const ACCEPT = ".pdf,.docx,.doc,.txt,.md,.tex";
 
@@ -41,7 +41,7 @@ export default function MockInterviewResume() {
     [numericSessionId],
   );
 
-  const rawCompany = state?.session?.company ?? stored?.company ?? "random";
+  const rawCompany = (state?.session?.company ?? stored?.company ?? "random") as MockCompany;
   const company = (rawCompany === "custom" ? "random" : rawCompany) as CompanyKey;
   const companyLabel =
     rawCompany === "custom"
