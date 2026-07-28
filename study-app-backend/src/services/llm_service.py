@@ -162,10 +162,13 @@ class _StreamingQuestionExtractor:
     the stream keeps going.
     """
 
-    def __init__(self, loads: Any) -> None:
+    def __init__(self, loads: Any, sections: tuple[str, ...] = ("mcq", "frq")) -> None:
         # loads: callable(str) -> dict, e.g. LLMService._loads_json, so streamed
         # elements get the same LaTeX-backslash repair as batch responses.
+        # sections: the top-level array keys to emit elements from. Defaults to the
+        # test-generation shape; the custom-problem stream passes ("problems",).
         self._loads = loads
+        self._sections = sections
         self._buffer = ""
         self._pos = 0
         self._stack: list[str] = []
@@ -174,7 +177,7 @@ class _StreamingQuestionExtractor:
         self._string_start = -1
         self._last_string = ""
         self._pending_key: Optional[str] = None
-        self._section: Optional[str] = None  # "mcq" | "frq" while inside that array
+        self._section: Optional[str] = None  # active section key while inside that array
         self._section_depth = 0  # stack depth of the active section array
         self._element_start = -1
 
@@ -217,7 +220,7 @@ class _StreamingQuestionExtractor:
                 if (
                     len(self._stack) == 2
                     and self._stack[0] == "{"
-                    and self._pending_key in ("mcq", "frq")
+                    and self._pending_key in self._sections
                 ):
                     self._section = self._pending_key
                     self._section_depth = len(self._stack)
@@ -2088,16 +2091,135 @@ Infer what the code is supposed to do, then return a JSON object ONLY (no prose,
 - "subtopic": the single most central FINER technique the problem drills, as a short string. Pick EXACTLY ONE, and pick it from this fixed list so labels stay consistent: {subtopic_menu}. Choose the one that best matches the core challenge (e.g. a graph problem solved by breadth-first traversal is "BFS", not "DFS"). If none fit, use "".
 - "difficulty": exactly one of "Easy", "Medium", "Hard". If you genuinely cannot tell, use "unknown".
 - "description": a Markdown problem statement written like LeetCode: a clear introduction of the task, the constraints you can reasonably infer, followed by 2 to 3 worked examples each with an Input, an Output, and a short Explanation that walks through the reasoning.
-- "starter_code": clean, runnable Python based on the student's code. Keep the SAME function name and parameter names the student used. It may be a top-level function (e.g. `def two_sum(nums, target): ...`) or a `class Solution` method. Do NOT change the signature.
+- "starter_code": clean, runnable Python written in LeetCode style. It MUST be a `class Solution:` with a single method (e.g. `class Solution:\n    def two_sum(self, nums, target):\n        ...`). Keep the SAME method name and parameter names the student used (wrap their bare function as the method body's signature). Do NOT return a bare top-level function.
 - "test_cases": an array of 3 to 5 objects, each with "input_text", "output_text", and "explanation_text".
 
 CRITICAL rules for "test_cases" so they can actually run:
-- "input_text" MUST be Python named arguments matching the starter_code signature exactly, comma separated, e.g. `nums = [2, 7, 11, 15], target = 9`. Use the real parameter names. Do not wrap it in a function call.
+- "input_text" MUST be Python named arguments matching the Solution method's parameters exactly (excluding self), comma separated, e.g. `nums = [2, 7, 11, 15], target = 9`. Use the real parameter names. Do not wrap it in a function call.
 - "output_text" MUST be a single Python literal that equals the expected return value, e.g. `[0, 1]` or `True` or `"abc"`.
 - Cover normal cases plus at least one edge case (empty input, single element, or a no-solution case) when applicable.
 - Every test case must be correct for the given starter_code.
 
 Return only the JSON object."""
+
+    async def generate_solution_article(
+        self,
+        title: str,
+        statement: str,
+        starter_code: str,
+        provider: Optional[str] = None,
+    ) -> dict[str, object]:
+        """Write the optimal-approach "KojoCode solution" for a custom problem as JSON:
+        a prose approach summary, clean runnable solution_code (so the client visualizer
+        can trace it), per-line comments explaining the code, and a time/space complexity
+        analysis with reasoning. Single JSON call with provider fallback handled inside
+        _complete_json (no per-provider loop here)."""
+        prompt = self._build_solution_article_prompt(title, statement, starter_code)
+        return await self._complete_json(prompt, provider=provider)
+
+    def _build_solution_article_prompt(self, title: str, statement: str, starter_code: str) -> str:
+        title_line = (title or "").strip()[:300] or "this problem"
+        statement_body = (statement or "").strip()[:12000] or "(no statement provided)"
+        starter_block = (starter_code or "").strip()[:8000] or "# (no starter code provided)"
+        return f"""You are Kojo, a coding-interview coach writing the model solution for a practice problem.
+
+PROBLEM TITLE: {title_line}
+
+PROBLEM STATEMENT:
+{statement_body}
+
+STARTER CODE (match this Solution class and method name/parameters exactly):
+```python
+{starter_block}
+```
+
+Write the SINGLE most optimal solution (best time, then best space). Do not present multiple approaches.
+
+Return a JSON object ONLY (no prose, no code fences) with EXACTLY these keys:
+- "title": a short label for the approach (string), e.g. "Hash map one-pass".
+- "approach_summary": a short Markdown explanation (3 to 6 sentences) of the optimal idea and WHY it works. No code blocks here.
+- "solution_code": the complete, runnable optimal solution as a `class Solution:` with the SAME method name and parameter names as the starter code. Clean idiomatic Python with NO inline comments (comments go in "code_comments"). Do NOT return a bare top-level function.
+- "code_comments": an array of objects, in top-to-bottom order, each {{"code": "<one exact source line from solution_code, verbatim including its indentation>", "comment": "<a short plain-English explanation of what that line does and why>"}}. Include every meaningful line of solution_code (you may skip blank lines and the bare `class`/`def` header lines if they need no comment). The "code" strings MUST match lines in solution_code exactly.
+- "time_complexity": Big-O time as a short string, e.g. "O(n)".
+- "space_complexity": Big-O space as a short string, e.g. "O(1)".
+- "complexity_explanation": a short Markdown explanation of WHY the time and space bounds are what they are (what dominates, what the extra space is used for). No code blocks.
+
+Return only the JSON object."""
+
+    def _build_custom_problems_batch_prompt(self, topics_text: str, difficulty: str, count: int) -> str:
+        """One prompt asking for a JSON ARRAY of fresh, original problems on the given
+        topics. Streamed and parsed incrementally (see stream_custom_problems), so each
+        problem object must be self-contained and valid on its own."""
+        difficulty_line = (
+            "" if difficulty == "any" else f" Every problem's difficulty should be {difficulty}."
+        )
+        subtopic_menu = ", ".join(f'"{s}"' for s in ALL_SUBTOPICS)
+        return f"""You are an interview coach creating {count} brand new, original coding interview problems focused on these topics: {topics_text}.{difficulty_line}
+
+Do NOT copy well-known existing problems: invent fresh, distinct scenarios. The {count} problems must be different from one another (different scenarios, not variations of one idea).
+
+Return a JSON object ONLY (no prose, no code fences) with EXACTLY this shape:
+{{"problems": [ <problem>, <problem>, ... ]}} with exactly {count} problem objects.
+
+Each <problem> object must have EXACTLY these keys:
+- "title": a short, descriptive problem title (string).
+- "topic": the algorithmic pattern(s) or data structure(s) the problem exercises, as a comma-separated string (most central first, up to 3). Prefer the specific technique over a broad bucket (e.g. "Two Pointers" rather than "Arrays"). Draw from the given topics where they fit.
+- "subtopic": the single most central FINER technique, EXACTLY ONE from this fixed list so labels stay consistent: {subtopic_menu}. If none fit, use "".
+- "difficulty": exactly one of "Easy", "Medium", "Hard".
+- "description": a Markdown problem statement written like LeetCode: a clear introduction of the task, the constraints, then 2 to 3 worked examples each with an Input, an Output, and a short Explanation.
+- "starter_code": clean, runnable Python in LeetCode style. It MUST be a `class Solution:` with a single method (e.g. `class Solution:\n    def method_name(self, args):\n        ...`). Do NOT return a bare top-level function.
+- "test_cases": an array of 3 to 5 objects, each with "input_text", "output_text", and "explanation_text".
+
+CRITICAL rules for "test_cases" so they can actually run:
+- "input_text" MUST be Python named arguments matching the Solution method's parameters exactly (excluding self), comma separated, e.g. `nums = [2, 7, 11, 15], target = 9`. Do not wrap it in a function call.
+- "output_text" MUST be a single Python literal that equals the expected return value, e.g. `[0, 1]` or `True` or `"abc"`.
+- Cover normal cases plus at least one edge case when applicable.
+- Every test case must be correct for that problem's starter_code.
+
+Return only the JSON object."""
+
+    async def stream_custom_problems(
+        self,
+        topics_text: str,
+        difficulty: str,
+        count: int,
+        provider: Optional[str] = None,
+    ) -> AsyncIterator[dict[str, object]]:
+        """Generate `count` fresh problems in ONE streaming LLM call, yielding each
+        problem dict the moment its JSON object closes (so the UI can render problems
+        as they are written). Falls back to a single parse of the full accumulated text
+        if the incremental scanner never emitted anything, so the call is never wasted.
+        Single resolved provider (no per-provider loop), matching the test-stream design.
+        """
+        from src.utils.exceptions import LLMException
+
+        count = max(1, min(6, count))
+        candidates = await self._candidate_providers(provider)
+        if not candidates:
+            raise LLMException(
+                "No AI provider is available. Add an API key in Settings or start Ollama."
+            )
+        target = candidates[0]
+        prompt = self._build_custom_problems_batch_prompt(topics_text, difficulty, count)
+        extractor = _StreamingQuestionExtractor(self._loads_json, sections=("problems",))
+        yielded = 0
+        async for chunk in self._stream_llm_text(target, prompt):
+            for _section, raw_item in extractor.feed(chunk):
+                if isinstance(raw_item, dict):
+                    yielded += 1
+                    yield raw_item
+
+        if yielded == 0 and extractor.full_text.strip():
+            try:
+                data = self._loads_json(extractor.full_text)
+            except Exception:
+                logger.warning("Custom-problems stream produced no parseable problems")
+                return
+            raw_list = data.get("problems", []) if isinstance(data, dict) else []
+            if isinstance(raw_list, list):
+                for raw_item in raw_list:
+                    if isinstance(raw_item, dict):
+                        yield raw_item
 
     async def generate_daily_problem(
         self,
@@ -2157,11 +2279,11 @@ Return a JSON object ONLY (no prose, no code fences) with EXACTLY these keys:
 - "subtopic": the single finer technique the problem drills. If a TARGET SUBTOPIC was given above, return exactly that so the drilled skill matches it; otherwise infer the most central one. Use "" only if none applies.
 - "difficulty": exactly "{difficulty}".
 - "description": a Markdown problem statement written like LeetCode: a clear introduction of the task, the constraints you can reasonably infer, followed by 2 to 3 worked examples each with an Input, an Output, and a short Explanation. Use the reskinned story and names, NOT the seed's.
-- "starter_code": clean, runnable Python. Define a sensibly named top-level function (e.g. `def some_name(args): ...`) or a `class Solution` method whose signature fits the reskinned problem, with an empty body the student can fill in.
+- "starter_code": clean, runnable Python in LeetCode style. It MUST be a `class Solution:` with a single sensibly named method whose signature fits the reskinned problem, with an empty body the student can fill in. Do NOT return a bare top-level function.
 - "test_cases": an array of 3 to 5 objects, each with "input_text", "output_text", and "explanation_text".
 
 CRITICAL rules for "test_cases" so they can actually run:
-- "input_text" MUST be Python named arguments matching the starter_code signature exactly, comma separated, e.g. `nums = [2, 7, 11, 15], target = 9`. Use the real parameter names. Do not wrap it in a function call.
+- "input_text" MUST be Python named arguments matching the Solution method's parameters exactly (excluding self), comma separated, e.g. `nums = [2, 7, 11, 15], target = 9`. Use the real parameter names. Do not wrap it in a function call.
 - "output_text" MUST be a single Python literal that equals the expected return value, e.g. `[0, 1]` or `True` or `"abc"`.
 - Cover normal cases plus at least one edge case when applicable.
 - Every test case must be correct for the given starter_code.

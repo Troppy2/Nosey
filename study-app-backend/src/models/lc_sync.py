@@ -302,3 +302,41 @@ class LCTestRun(Base):
 
     def __repr__(self) -> str:
         return f"LCTestRun(user_id={self.user_id!r}, slug={self.problem_slug!r}, passed={self.passed!r})"
+
+
+class LCSolutionArticle(Base, TimestampMixin):
+    """A cached KojoCode solution write-up for a custom problem. Built lazily by an
+    LLM the first time the user opens the solution reveal, then kept forever so it
+    is never regenerated (saving tokens). approach_rank 1 is the optimal approach
+    (the only one prebuilt); ranks 2/3 are reserved for alternate approaches the
+    user can request later. Keyed per user because custom-* slugs are per user."""
+
+    __tablename__ = "lc_solution_articles"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "problem_slug", "approach_rank", name="uq_lc_solution_user_problem_rank"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        BIGINT_ID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    problem_slug: Mapped[str] = mapped_column(String(200), nullable=False)
+    # 1 = optimal (the only rank generated up front). 2/3 reserved for alternates.
+    approach_rank: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    title: Mapped[str] = mapped_column(String(300), nullable=False, default="")
+    # Short prose explaining the optimal approach.
+    approach_summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # Runnable `class Solution` Python so the client visualizer can trace it.
+    solution_code: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # JSON array of {line, comment} annotations keyed to solution_code lines.
+    code_comments_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    time_complexity: Mapped[str] = mapped_column(String(60), nullable=False, default="")
+    space_complexity: Mapped[str] = mapped_column(String(60), nullable=False, default="")
+    complexity_explanation: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    user: Mapped[User] = relationship("User", back_populates="lc_solution_articles")
+
+    def __repr__(self) -> str:
+        return f"LCSolutionArticle(user_id={self.user_id!r}, slug={self.problem_slug!r}, rank={self.approach_rank!r})"

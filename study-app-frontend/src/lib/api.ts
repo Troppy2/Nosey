@@ -1416,6 +1416,103 @@ export async function generateLCCustomProblem(
   });
 }
 
+// Fetch (and lazily generate + cache) the KojoCode solution for a custom problem.
+// First call generates + stores it server-side; later calls are a cheap cache hit.
+export async function fetchKojoCodeSolution(
+  slug: string,
+  provider?: string,
+): Promise<import("./types").KojoCodeSolution> {
+  return request<import("./types").KojoCodeSolution>(
+    `/leetcode/custom-problems/${slug}/solution`,
+    {
+      method: "POST",
+      body: JSON.stringify({ provider }),
+    },
+  );
+}
+
+// Stream a batch of fresh custom problems from ONE backend LLM call. onProblem fires
+// for each problem the moment it finishes streaming, so the UI can add them live.
+// Resolves with the total once the server emits "done"; rejects on an "error" event or
+// transport failure. Uses fetch + a manual SSE reader (EventSource can't send auth),
+// mirroring consumeKojoStream.
+export async function streamLCCustomProblems(
+  topics: string[],
+  difficulty: string,
+  count: number,
+  onProblem: (problem: LCGeneratedCustomProblem) => void,
+  provider?: string,
+  signal?: AbortSignal,
+): Promise<{ count: number }> {
+  const token = localStorage.getItem(TOKEN_KEY);
+  const headers = new Headers({ "Content-Type": "application/json" });
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  const response = await fetch(`${API_BASE_URL}/leetcode/custom-problems/generate-stream`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ topics, difficulty, count, provider }),
+    signal,
+  });
+
+  if (!response.ok || !response.body) {
+    if (response.status === 401 && token && token !== GUEST_TOKEN) {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
+      window.location.href = "/";
+    }
+    let message = `Request failed: ${response.status}`;
+    try {
+      const errBody = await response.json();
+      if (errBody?.detail !== undefined) message = formatApiErrorDetail(errBody.detail);
+    } catch { /* ignore */ }
+    throw new Error(message);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let total = 0;
+  let done = false;
+
+  const handleEvent = (raw: string) => {
+    const line = raw.split("\n").find((l) => l.startsWith("data:"));
+    if (!line) return;
+    const payload = line.slice(line.indexOf(":") + 1).trim();
+    if (!payload) return;
+    let event: Record<string, unknown>;
+    try {
+      event = JSON.parse(payload);
+    } catch {
+      return;
+    }
+    if (event.type === "problem") {
+      onProblem(event.problem as LCGeneratedCustomProblem);
+    } else if (event.type === "done") {
+      total = Number(event.count ?? 0);
+      done = true;
+    } else if (event.type === "error") {
+      throw new Error(String(event.message ?? "Kojo failed to generate problems. Try again."));
+    }
+  };
+
+  for (;;) {
+    const { value, done: streamDone } = await reader.read();
+    if (streamDone) break;
+    buffer += decoder.decode(value, { stream: true });
+    let sep: number;
+    while ((sep = buffer.indexOf("\n\n")) !== -1) {
+      const raw = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      handleEvent(raw);
+    }
+  }
+  if (buffer.trim()) handleEvent(buffer);
+
+  if (!done) throw new Error("Kojo stream ended before completing. Try again.");
+  return { count: total };
+}
+
 // One-time "Regenerate topics" backfill (beta): classify every custom problem that
 // is missing a subtopic, setting only topic + subtopic. Returns how many were updated.
 export async function reclassifyLCCustomProblems(): Promise<{ updated: number }> {
@@ -1634,6 +1731,11 @@ export async function restartLCDrill(slug: string): Promise<import("./types").LC
   return request<import("./types").LCDrillSchedule>(`/leetcode/drills/${slug}/restart`, {
     method: "POST",
   });
+}
+
+// Remove a problem from the 3-Pass Drill entirely (any pass). Idempotent server-side.
+export async function deleteLCDrill(slug: string): Promise<void> {
+  await request(`/leetcode/drills/${slug}`, { method: "DELETE" });
 }
 
 // ── Mock Interview ────────────────────────────────────────────────────────────

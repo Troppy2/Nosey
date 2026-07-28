@@ -4,7 +4,7 @@ import json
 import re
 from dataclasses import dataclass
 from html import unescape
-from typing import Optional
+from typing import AsyncIterator, Optional
 
 import httpx
 
@@ -187,6 +187,54 @@ class LeetCodeService:
 
         return self._normalize_generated_problem(data, fallback_code=code)
 
+    async def generate_solution_article(
+        self,
+        title: str,
+        statement: str,
+        starter_code: str,
+        provider: Optional[str] = None,
+    ) -> dict[str, object]:
+        """Generate the optimal-approach KojoCode solution for a custom problem. Returns
+        a normalized dict (summary, runnable solution_code, per-line code_comments,
+        complexity + reasoning) ready to persist. `statement` may be Markdown or HTML;
+        it is passed through to the model as-is. Single LLM call (fallback handled inside
+        LLMService), no per-provider loop here."""
+        try:
+            data = await LLMService().generate_solution_article(
+                title=title, statement=statement, starter_code=starter_code, provider=provider
+            )
+        except Exception as exc:
+            raise LLMException("Kojo couldn't write a solution for this problem. Try again.") from exc
+
+        return self._normalize_solution_article(data, fallback_code=starter_code)
+
+    def _normalize_solution_article(
+        self, data: dict[str, object], fallback_code: str = ""
+    ) -> dict[str, object]:
+        """Parse a generated solution-article JSON blob: keep only well-formed comment
+        pairs and truncate every text field to its column limit."""
+        raw_comments = data.get("code_comments")
+        comments: list[dict[str, str]] = []
+        if isinstance(raw_comments, list):
+            for item in raw_comments:
+                if not isinstance(item, dict):
+                    continue
+                code_line = str(item.get("code", "") or "")[:600]
+                comment = str(item.get("comment", "") or "").strip()[:1000]
+                if not code_line.strip() and not comment:
+                    continue
+                comments.append({"code": code_line, "comment": comment})
+
+        return {
+            "title": str(data.get("title", "") or "").strip()[:300],
+            "approach_summary": str(data.get("approach_summary", "") or "").strip()[:8000],
+            "solution_code": str(data.get("solution_code", "") or fallback_code or "").strip()[:20000],
+            "code_comments": comments,
+            "time_complexity": str(data.get("time_complexity", "") or "").strip()[:60],
+            "space_complexity": str(data.get("space_complexity", "") or "").strip()[:60],
+            "complexity_explanation": str(data.get("complexity_explanation", "") or "").strip()[:8000],
+        }
+
     async def generate_daily_problem(
         self,
         topic: str,
@@ -215,6 +263,27 @@ class LeetCodeService:
             raise LLMException("Kojo couldn't generate today's problem. Try again.") from exc
 
         return self._normalize_generated_problem(data, fallback_code="")
+
+    async def stream_custom_problems(
+        self,
+        topics_text: str,
+        difficulty: str,
+        count: int,
+        provider: Optional[str] = None,
+    ) -> AsyncIterator[LCGeneratedCustomProblem]:
+        """Generate `count` fresh problems in one streaming LLM call, yielding each as a
+        fully normalized LCGeneratedCustomProblem the moment it finishes streaming (same
+        clamping/truncation as the single-problem path). The route turns each into an SSE
+        event. LLM failures propagate as LLMException for the route to surface."""
+        try:
+            async for data in LLMService().stream_custom_problems(
+                topics_text=topics_text, difficulty=difficulty, count=count, provider=provider
+            ):
+                yield self._normalize_generated_problem(data)
+        except LLMException:
+            raise
+        except Exception as exc:
+            raise LLMException("Kojo couldn't generate problems right now. Try again.") from exc
 
     async def classify_custom_problems(
         self,
