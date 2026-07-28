@@ -1635,10 +1635,11 @@ export async function restartLCDrill(slug: string): Promise<import("./types").LC
 export async function createMockInterviewSession(
   company: string,
   stages: string[],
+  level: string = "intern",
 ): Promise<MockInterviewSession> {
   return request<MockInterviewSession>("/mock-interview", {
     method: "POST",
-    body: JSON.stringify({ company, stages }),
+    body: JSON.stringify({ company, stages, level }),
   });
 }
 
@@ -1710,11 +1711,12 @@ export async function sendStage2Message(
   sessionId: number,
   message: string | null,
   history: InterviewChatMessage[],
+  coveredGoals: string[] = [],
   provider?: string,
 ): Promise<Stage2MessageResponse> {
   return request<Stage2MessageResponse>(`/mock-interview/${sessionId}/stage2/message`, {
     method: "POST",
-    body: JSON.stringify({ message, history, provider }),
+    body: JSON.stringify({ message, history, covered_goals: coveredGoals, provider }),
   });
 }
 
@@ -1722,11 +1724,12 @@ export async function sendStage3Message(
   sessionId: number,
   message: string | null,
   history: InterviewChatMessage[],
+  coveredGoals: string[] = [],
   provider?: string,
 ): Promise<Stage3MessageResponse> {
   return request<Stage3MessageResponse>(`/mock-interview/${sessionId}/stage3/message`, {
     method: "POST",
-    body: JSON.stringify({ message, history, provider }),
+    body: JSON.stringify({ message, history, covered_goals: coveredGoals, provider }),
   });
 }
 

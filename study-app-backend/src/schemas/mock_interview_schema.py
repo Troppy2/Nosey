@@ -1,17 +1,35 @@
 from __future__ import annotations
 
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+VALID_LEVELS = {"intern", "junior", "mid", "senior"}
+
+
+def _normalize_level(value: str | None) -> str:
+    """Restrict to the four known levels, defaulting anything else to intern."""
+    if not value:
+        return "intern"
+    normalized = value.strip().lower()
+    return normalized if normalized in VALID_LEVELS else "intern"
 
 
 class MockInterviewCreateRequest(BaseModel):
     company: str = Field(..., min_length=1, max_length=64)
     stages: list[str] = Field(default=["stage1", "stage2", "stage3"])
+    level: str = Field(default="intern", max_length=16)
+
+    @field_validator("level")
+    @classmethod
+    def _validate_level(cls, value: str) -> str:
+        return _normalize_level(value)
 
 
 class MockInterviewSessionResponse(BaseModel):
     id: int
     company: str
+    level: str = "intern"
     stages_config: str
     status: str
     resume_screen: Optional[str] = None
@@ -100,23 +118,29 @@ class Stage2MessageRequest(BaseModel):
     message: Optional[str] = Field(default=None, max_length=3000)
     history: list[InterviewChatMessage] = Field(default=[])
     provider: Optional[str] = Field(default=None)
+    # Running set of interview goals already covered, echoed back by the client
+    # each turn so the server can track coverage without server-side state.
+    covered_goals: list[str] = Field(default_factory=list)
 
 
 class Stage2MessageResponse(BaseModel):
     reply: str
     coding_problem: Optional[CodingProblemInfo] = None
     is_done: bool = False
+    covered_goals: list[str] = Field(default_factory=list)
 
 
 class Stage3MessageRequest(BaseModel):
     message: Optional[str] = Field(default=None, max_length=3000)
     history: list[InterviewChatMessage] = Field(default=[])
     provider: Optional[str] = Field(default=None)
+    covered_goals: list[str] = Field(default_factory=list)
 
 
 class Stage3MessageResponse(BaseModel):
     reply: str
     is_done: bool = False
+    covered_goals: list[str] = Field(default_factory=list)
 
 
 # Final summary
