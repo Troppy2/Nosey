@@ -608,7 +608,7 @@ function saveCustomProblems(problems: LCCustomProblem[]) {
   localStorage.setItem(getCustomProblemsKey(), JSON.stringify(problems));
 }
 
-type PracticeSession = { slugs: string[]; startedAt: number; startedSolved: Set<string>; endedAt: number | null };
+type PracticeSession = { slugs: string[]; startedAt: number; startedSolved: Set<string>; endedAt: number | null; disableKojo: boolean };
 
 type StoredPracticeSession = {
   slugs: string[];
@@ -616,6 +616,7 @@ type StoredPracticeSession = {
   startedSolved: string[];
   endedAt: number | null;
   ended: boolean;
+  disableKojo: boolean;
 };
 
 // Practice sets persist to localStorage so a refresh doesn't wipe an in-progress
@@ -629,6 +630,7 @@ function loadPracticeSession(): { session: PracticeSession | null; ended: boolea
       startedAt: raw.startedAt,
       startedSolved: new Set(raw.startedSolved ?? []),
       endedAt: raw.endedAt ?? null,
+      disableKojo: Boolean(raw.disableKojo),
     },
     ended: Boolean(raw.ended),
   };
@@ -645,6 +647,7 @@ function savePracticeSession(session: PracticeSession | null, ended: boolean) {
     startedSolved: Array.from(session.startedSolved),
     endedAt: session.endedAt,
     ended,
+    disableKojo: session.disableKojo,
   };
   localStorage.setItem(getPracticeSessionKey(), JSON.stringify(stored));
 }
@@ -2160,6 +2163,9 @@ export default function LeetCodeMode() {
   const [practiceSubtopics, setPracticeSubtopics] = useState<Set<string>>(() => new Set());
   const [practiceDifficulty, setPracticeDifficulty] = useState<"any" | "Easy" | "Medium" | "Hard">("any");
   const [practiceCount, setPracticeCount] = useState(5);
+  // Opt-in "no hints" mode for a practice session: greys out the Ask Kojo button
+  // for problems in the session's queue (see practiceHintsOff in the editor).
+  const [practiceDisableKojo, setPracticeDisableKojo] = useState(false);
   const [practiceInit] = useState(() => loadPracticeSession());
   const [practiceSession, setPracticeSession] = useState<PracticeSession | null>(() => practiceInit.session);
   const [practiceEnded, setPracticeEnded] = useState(() => practiceInit.ended);
@@ -3365,6 +3371,7 @@ export default function LeetCodeMode() {
       startedAt: Date.now(),
       startedSolved: new Set(slugs.filter((slug) => progress[slug])),
       endedAt: null,
+      disableKojo: practiceDisableKojo,
     });
   }
 
@@ -3392,6 +3399,7 @@ export default function LeetCodeMode() {
               startedAt: prev?.startedAt ?? Date.now(),
               startedSolved,
               endedAt: null,
+              disableKojo: prev?.disableKojo ?? practiceDisableKojo,
             };
           });
         },
@@ -5333,6 +5341,19 @@ export default function LeetCodeMode() {
                 />
               </div>
 
+              <div className="lc-practice-field">
+                <span className="lc-practice-field-label">Ask Kojo hints</span>
+                <ToggleSwitch
+                  className="lc-practice-toggle"
+                  checked={!practiceDisableKojo}
+                  label={practiceDisableKojo ? "Off (no hints)" : "On"}
+                  onClick={() => setPracticeDisableKojo((prev) => !prev)}
+                />
+                <p className="muted small">
+                  Turn off to grey out the Ask Kojo button for every problem in this session, so you practice without hints.
+                </p>
+              </div>
+
               <div className="lc-practice-actions">
                 <button
                   type="button"
@@ -6256,6 +6277,16 @@ export default function LeetCodeMode() {
   const activePass = activeDrill?.current_pass ?? 1;
   const assistsLocked = betaMode && activePass >= 2;
   const timerForced = betaMode && activePass >= 3;
+  // Weak-Area Practice "no hints" mode: greys out ONLY the Ask Kojo button (not the
+  // solution reveal) when the open problem is part of a running practice session that
+  // opted out of hints. Kept separate from assistsLocked, which also gates the reveal.
+  const practiceHintsOff = Boolean(
+    practiceSession &&
+      !practiceEnded &&
+      practiceSession.disableKojo &&
+      practiceSession.slugs.includes(currentProblem.slug),
+  );
+  const kojoButtonLocked = assistsLocked || practiceHintsOff;
   // While a drill is open, only the current pass's tab is usable; every other tab (the user's
   // previous solution + earlier-pass attempts) is locked from view/delete. Locking itself is
   // computed by the component-scope isTabLockedForDrill (also used by the tab handlers).
@@ -6343,9 +6374,15 @@ export default function LeetCodeMode() {
                 type="button"
                 className="lc-toolbar-btn lc-toolbar-btn--kojo"
                 onClick={() => setKojoOpen(true)}
-                disabled={assistsLocked}
+                disabled={kojoButtonLocked}
                 aria-label="Ask Kojo for a hint"
-                title={assistsLocked ? `Locked on Pass ${activePass}: no resources` : "Ask Kojo for a hint"}
+                title={
+                  assistsLocked
+                    ? `Locked on Pass ${activePass}: no resources`
+                    : practiceHintsOff
+                      ? "Hints off for this practice session"
+                      : "Ask Kojo for a hint"
+                }
               >
                 <Sparkles size={16} />
                 <span className="lc-tb-label">Ask Kojo</span>
