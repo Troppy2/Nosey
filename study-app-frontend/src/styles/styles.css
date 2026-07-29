@@ -19652,6 +19652,39 @@ button.lc-reminder-feature-cta:disabled {
   color: var(--ink);
 }
 
+/* Ask Kojo hints toggle: shrink the shared switch and align its label to the
+   builder's compact type scale so it reads as part of the same control set. */
+.lc-practice-toggle {
+  align-self: flex-start;
+  gap: 10px;
+  padding: 2px 0;
+}
+
+.lc-practice-toggle .toggle-switch-track {
+  width: 42px;
+  height: 22px;
+  border-radius: 11px;
+}
+
+.lc-practice-toggle .toggle-switch-thumb {
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+}
+
+.lc-practice-toggle.toggle-switch--on .toggle-switch-thumb {
+  transform: translateX(20px);
+}
+
+.lc-practice-toggle .toggle-switch-label {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+}
+
 .lc-practice-start {
   align-self: flex-start;
   min-height: 44px;
