@@ -2869,7 +2869,14 @@ export default function LeetCodeMode() {
 
       if (!seed) throw new Error("Kojo couldn't find a problem to base today's question on.");
 
-      const created = await createLCDaily(topicLabel, targetDifficulty, seed.slug, generationProvider, targetSubtopic);
+      const created = await createLCDaily(
+        topicLabel,
+        targetDifficulty,
+        seed.slug,
+        seed.title,
+        generationProvider,
+        targetSubtopic,
+      );
       pushRecentDailySeed(seed.slug);
       setDailyProblem(created);
       setCustomProblems((prev) => [...prev, created]);

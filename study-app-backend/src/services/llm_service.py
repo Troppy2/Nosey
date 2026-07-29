@@ -2226,7 +2226,7 @@ Return only the JSON object."""
         topic: str,
         target_difficulty: str,
         seed_title: str,
-        seed_statement: str,
+        seed_statement: str = "",
         subtopic: Optional[str] = None,
         provider: Optional[str] = None,
     ) -> dict[str, object]:
@@ -2234,7 +2234,11 @@ Return only the JSON object."""
         into a fresh problem on the same topic (and, when given, the same weak
         subtopic) at the same difficulty, returned in the exact JSON shape
         generate_custom_problem uses. Single JSON call with provider fallback handled
-        inside _complete_json (no per-provider loop here)."""
+        inside _complete_json (no per-provider loop here).
+
+        seed_statement is optional. The normal path passes only a seed_title drawn from
+        the KojoCode catalog and lets the model work from its own knowledge of that
+        well-known problem, because no statement text is stored anywhere in the app."""
         prompt = self._build_daily_problem_prompt(topic, target_difficulty, seed_title, seed_statement, subtopic)
         return await self._complete_json(prompt, provider=provider)
 
@@ -2243,19 +2247,42 @@ Return only the JSON object."""
         topic: str,
         target_difficulty: str,
         seed_title: str,
-        seed_statement: str,
+        seed_statement: str = "",
         subtopic: Optional[str] = None,
     ) -> str:
         topic_line = (topic or "").strip()[:200] or "general problem solving"
         difficulty = (target_difficulty or "").strip().capitalize()
         if difficulty not in ("Easy", "Medium", "Hard"):
             difficulty = "Medium"
-        seed_title_line = (seed_title or "").strip()[:300] or "(untitled)"
-        seed_body = (seed_statement or "").strip()[:9000] or "(no statement available)"
+        seed_title_line = (seed_title or "").strip()[:300]
+        seed_body = (seed_statement or "").strip()[:9000]
         # When targeting a weak subtopic, tell the model to preserve that exact
         # technique so the drilled skill matches the weakness that triggered it.
         subtopic_clean = (subtopic or "").strip()[:120]
         subtopic_line = subtopic_clean or "(none: keep the seed's technique)"
+
+        # Three seed modes, strongest grounding first. The normal path is title-only:
+        # the app stores no problem statements, and fetching them from LeetCode is not
+        # reliable from a datacenter IP (see GH #75), so the model is asked to recall
+        # the named problem instead. Title-less is the last resort and still produces a
+        # usable problem from topic + subtopic + difficulty alone.
+        if seed_body and seed_title_line:
+            seed_block = f"""SEED PROBLEM TITLE: {seed_title_line}
+
+SEED PROBLEM STATEMENT:
+{seed_body}"""
+        elif seed_title_line:
+            seed_block = f"""SEED PROBLEM TITLE: {seed_title_line}
+
+The seed's statement is not provided. Recall the well-known interview problem with that
+title and reskin THAT. If you do not confidently recognise it, ignore the title entirely
+and invent a fresh problem that drills the target topic, subtopic, and difficulty below.
+Never guess at a half-remembered problem: a clean invented problem is strictly better
+than a garbled recollection."""
+        else:
+            seed_block = """No seed problem was supplied. Invent a fresh problem that drills the target topic,
+subtopic, and difficulty below."""
+
         return f"""You are generating today's "Daily KojoCode" practice problem for a student.
 
 Take the SEED PROBLEM below and RESKIN it: rewrite the story, the entity and variable
@@ -2268,10 +2295,7 @@ TARGET TOPIC (the pattern to preserve): {topic_line}
 TARGET SUBTOPIC (the finer technique to preserve): {subtopic_line}
 TARGET DIFFICULTY (keep the problem exactly at this level): {difficulty}
 
-SEED PROBLEM TITLE: {seed_title_line}
-
-SEED PROBLEM STATEMENT:
-{seed_body}
+{seed_block}
 
 Return a JSON object ONLY (no prose, no code fences) with EXACTLY these keys:
 - "title": a NEW short, descriptive problem title that does not reuse the seed's title (string).

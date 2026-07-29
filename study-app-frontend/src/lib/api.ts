@@ -1560,10 +1560,19 @@ export async function createLCDaily(
   topic: string,
   targetDifficulty: string,
   seedSlug: string,
+  seedTitle: string,
   provider?: string,
   subtopic?: string | null,
 ): Promise<LCCustomProblem> {
-  const body: Record<string, unknown> = { topic, target_difficulty: targetDifficulty, seed_slug: seedSlug };
+  // seed_title is what the backend actually reskins from: it stores no problem
+  // statements and can't fetch them from LeetCode in prod, so it works from the model's
+  // knowledge of the named catalog problem. seed_slug is still sent for logging/parity.
+  const body: Record<string, unknown> = {
+    topic,
+    target_difficulty: targetDifficulty,
+    seed_slug: seedSlug,
+    seed_title: seedTitle,
+  };
   if (provider) body.provider = provider;
   if (subtopic) body.subtopic = subtopic;
   return request<LCCustomProblem>("/leetcode/daily", {

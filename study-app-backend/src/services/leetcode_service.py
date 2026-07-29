@@ -260,28 +260,41 @@ class LeetCodeService:
             "complexity_explanation": str(data.get("complexity_explanation", "") or "").strip()[:8000],
         }
 
+    @staticmethod
+    def _title_from_slug(slug: str) -> str:
+        """Best-effort "course-schedule-ii" -> "Course Schedule Ii". Only used when a
+        client sends a seed_slug without a seed_title (older frontend builds). Rough but
+        close enough for the model to recognise the problem it names."""
+        return " ".join(part.capitalize() for part in (slug or "").split("-") if part)
+
     async def generate_daily_problem(
         self,
         topic: str,
         target_difficulty: str,
-        seed_slug: str,
+        seed_slug: str = "",
+        seed_title: str = "",
         subtopic: Optional[str] = None,
         provider: Optional[str] = None,
     ) -> LCGeneratedCustomProblem:
-        """Reskin a real seed problem into a fresh Daily KojoCode problem on the given
-        topic (and, when targeting a weak area, subtopic) at the given difficulty.
-        Fetches the seed's real statement first, then makes a single LLM call. Fetch
-        errors (bad slug) propagate as ResourceNotFoundException so the route can map
-        them to 404."""
-        seed = await self._fetch_problem(seed_slug)
-        seed_statement = self._html_to_text(seed.content_html)
+        """Reskin a seed problem into a fresh Daily KojoCode problem on the given topic
+        (and, when targeting a weak area, subtopic) at the given difficulty.
+
+        Seeds from the KojoCode catalog by TITLE only, with NO network call. The app
+        stores no problem statements (the catalog is metadata only and prep banks hold
+        bare slugs), and the previous approach of fetching the statement from LeetCode's
+        GraphQL API is not usable from prod: Cloudflare blocks datacenter IPs and the
+        block surfaced as a 404 on every daily generation (GH #75). The model is asked to
+        recall the named problem instead, and to invent a fresh one if it does not
+        recognise the title, so this path cannot fail on an external dependency.
+
+        This no longer raises ResourceNotFoundException, so a daily can no longer 404."""
+        title = (seed_title or "").strip() or self._title_from_slug(seed_slug)
         try:
             data = await LLMService().generate_daily_problem(
                 topic=topic,
                 subtopic=subtopic,
                 target_difficulty=target_difficulty,
-                seed_title=seed.title,
-                seed_statement=seed_statement,
+                seed_title=title,
                 provider=provider,
             )
         except Exception as exc:
