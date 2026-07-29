@@ -26,6 +26,11 @@ logger = get_logger(__name__)
 
 _LEETCODE_GRAPHQL_URL = "https://leetcode.com/graphql"
 _REQUEST_TIMEOUT_SECONDS = 30
+# Shorter budget for the Daily KojoCode seed fetch specifically. That fetch is optional
+# (failure just falls back to a title-only reskin), and it runs BEFORE a slow LLM call, so
+# a full 30s of doomed waiting would be added to every daily whenever LeetCode is
+# unreachable. Bounding it keeps the fallback fast instead of merely correct.
+_SEED_FETCH_TIMEOUT_SECONDS = 8
 
 # LeetCode's public GraphQL endpoint sits behind Cloudflare, which blocks requests that
 # look automated. From a residential IP a bare request succeeds, but from a datacenter IP
@@ -279,22 +284,45 @@ class LeetCodeService:
         """Reskin a seed problem into a fresh Daily KojoCode problem on the given topic
         (and, when targeting a weak area, subtopic) at the given difficulty.
 
-        Seeds from the KojoCode catalog by TITLE only, with NO network call. The app
-        stores no problem statements (the catalog is metadata only and prep banks hold
-        bare slugs), and the previous approach of fetching the statement from LeetCode's
-        GraphQL API is not usable from prod: Cloudflare blocks datacenter IPs and the
-        block surfaced as a 404 on every daily generation (GH #75). The model is asked to
-        recall the named problem instead, and to invent a fresh one if it does not
-        recognise the title, so this path cannot fail on an external dependency.
+        PREFERRED path: fetch the real LeetCode statement for seed_slug and reskin that,
+        which is the best grounding available.
 
-        This no longer raises ResourceNotFoundException, so a daily can no longer 404."""
+        FALLBACK path: if that fetch fails for any reason, reskin from the catalog TITLE
+        alone and let the model work from its knowledge of the named problem. This matters
+        because the fetch is unreliable from prod: Cloudflare blocks datacenter IPs and the
+        block used to surface as a 404 on every daily generation (GH #75). The app stores
+        no statements of its own (the catalog is metadata only, prep banks hold bare
+        slugs), so the title is the strongest seed available without the network.
+
+        The fallback swallows ALL fetch errors, so a daily is never blocked by LeetCode
+        being unreachable and this method can no longer raise ResourceNotFoundException."""
         title = (seed_title or "").strip() or self._title_from_slug(seed_slug)
+        seed_statement = ""
+        if seed_slug:
+            try:
+                seed = await self._fetch_problem(seed_slug, timeout=_SEED_FETCH_TIMEOUT_SECONDS)
+                seed_statement = self._html_to_text(seed.content_html)
+                # The real title beats the catalog's, which beats one derived from a slug.
+                title = seed.title or title
+            except Exception as exc:  # noqa: BLE001 - the seed is optional by design
+                # Covers the Cloudflare block, a bad slug, and any timeout or transport
+                # error alike: all of them just mean "reskin from the title instead".
+                logger.info(
+                    "Daily seed fetch failed for %s (%s: %s). Falling back to title-only "
+                    "reskin of %r.",
+                    seed_slug,
+                    type(exc).__name__,
+                    exc,
+                    title,
+                )
+
         try:
             data = await LLMService().generate_daily_problem(
                 topic=topic,
                 subtopic=subtopic,
                 target_difficulty=target_difficulty,
                 seed_title=title,
+                seed_statement=seed_statement,
                 provider=provider,
             )
         except Exception as exc:
@@ -380,7 +408,9 @@ class LeetCodeService:
             test_cases=test_cases,
         )
 
-    async def _fetch_problem(self, title_slug: str) -> _FetchedProblem:
+    async def _fetch_problem(
+        self, title_slug: str, timeout: float = _REQUEST_TIMEOUT_SECONDS
+    ) -> _FetchedProblem:
         payload = {
             "query": (
                 "query questionData($titleSlug: String!) { "
@@ -400,7 +430,7 @@ class LeetCodeService:
             "referer": f"https://leetcode.com/problems/{title_slug}/",
         }
 
-        async with httpx.AsyncClient(timeout=_REQUEST_TIMEOUT_SECONDS, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
             response = await client.post(_LEETCODE_GRAPHQL_URL, headers=headers, json=payload)
             response.raise_for_status()
             try:
