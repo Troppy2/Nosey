@@ -20,9 +20,34 @@ from src.schemas.leetcode_schema import (
 )
 from src.services.llm_service import LLMService
 from src.utils.exceptions import LLMException, ResourceNotFoundException
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 _LEETCODE_GRAPHQL_URL = "https://leetcode.com/graphql"
 _REQUEST_TIMEOUT_SECONDS = 30
+
+# LeetCode's public GraphQL endpoint sits behind Cloudflare, which blocks requests that
+# look automated. From a residential IP a bare request succeeds, but from a datacenter IP
+# (Render, and any cloud host) it is served a challenge instead: the HTTP status is still
+# 200, but the payload carries no "question" object, so the fetch surfaces as a 404 on a
+# perfectly valid slug. Presenting browser-like headers is what gets the request through.
+#
+# This is best-effort and inherently fragile. Cloudflare can tighten at any time and these
+# headers stop being enough, at which point every LeetCode fetch 404s again from prod.
+# See the tracking issue linked in session-notes for the durable fix (seed-free daily
+# generation, or a graceful fallback when the seed fetch fails).
+_LEETCODE_BROWSER_HEADERS = {
+    "content-type": "application/json",
+    "user-agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    ),
+    "referer": "https://leetcode.com/problemset/",
+    "origin": "https://leetcode.com",
+    "accept": "application/json",
+    "accept-language": "en-US,en;q=0.9",
+}
 
 
 @dataclass(frozen=True)
@@ -355,17 +380,40 @@ class LeetCodeService:
             "variables": {"titleSlug": title_slug},
         }
 
-        async with httpx.AsyncClient(timeout=_REQUEST_TIMEOUT_SECONDS) as client:
-            response = await client.post(
-                _LEETCODE_GRAPHQL_URL,
-                headers={"content-type": "application/json"},
-                json=payload,
-            )
+        # A per-problem referer is more convincing to Cloudflare than a generic one, since
+        # it matches what a browser sitting on that problem's page would actually send.
+        headers = {
+            **_LEETCODE_BROWSER_HEADERS,
+            "referer": f"https://leetcode.com/problems/{title_slug}/",
+        }
+
+        async with httpx.AsyncClient(timeout=_REQUEST_TIMEOUT_SECONDS, follow_redirects=True) as client:
+            response = await client.post(_LEETCODE_GRAPHQL_URL, headers=headers, json=payload)
             response.raise_for_status()
-            data = response.json()
+            try:
+                data = response.json()
+            except ValueError:
+                # A Cloudflare challenge comes back as HTML with a 200, so the decode fails
+                # here rather than at raise_for_status. Log a snippet: this is the signal
+                # that the browser headers above have stopped being enough.
+                logger.warning(
+                    "LeetCode fetch for %s returned non-JSON (likely a Cloudflare block). "
+                    "content-type=%s body[:200]=%r",
+                    title_slug,
+                    response.headers.get("content-type"),
+                    response.text[:200],
+                )
+                raise ResourceNotFoundException("LeetCode problem")
 
         question = (data.get("data") or {}).get("question")
         if not question:
+            # Distinguishes a genuinely bad slug from a block that returned valid JSON with
+            # a null question. Without this the two are indistinguishable in prod logs.
+            logger.warning(
+                "LeetCode fetch for %s returned no question object. errors=%r",
+                title_slug,
+                data.get("errors"),
+            )
             raise ResourceNotFoundException("LeetCode problem")
 
         topic_tags = [
