@@ -599,7 +599,7 @@ export default function MockInterviewSetup() {
                 {analyzing ? "Analyzing" : "Analyze job description"}
               </button>
               <button
-                className="button button-ghost"
+                className="button button-secondary"
                 onClick={() => void handleSaveJd()}
                 disabled={savingJd || jdText.trim().length < 20}
                 title={

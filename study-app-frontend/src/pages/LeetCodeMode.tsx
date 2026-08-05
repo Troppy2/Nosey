@@ -6005,7 +6005,15 @@ export default function LeetCodeMode() {
           {drillsLoading && drills.length === 0 ? (
             <SkeletonList rows={3} label="Loading your drills" />
           ) : drills.length === 0 ? (
-            <p className="muted">No open drills. Solve a problem, or struggle with one (a failed grade or a timer running out), and Nosey will ask if you want to drill it.</p>
+            <div className="lc-empty">
+              <span className="lc-empty-icon"><Route size={26} /></span>
+              <p className="lc-empty-title">No open drills yet</p>
+              <small className="lc-empty-sub">
+                Add one above, or struggle with a problem (a failed grade or a timer running out) and
+                Nosey will offer to drill it. Once you have drills, you can filter them by pass,
+                difficulty, and topic.
+              </small>
+            </div>
           ) : (
             (() => {
               const now = Date.now();
@@ -6149,6 +6157,17 @@ export default function LeetCodeMode() {
               <Shuffle size={16} />
               Random
             </button>
+            {/* The realism toggle lives behind this cog, so it has to be reachable from
+                the views you actually browse from, not just the dashboard. */}
+            <button
+              type="button"
+              className="lc-cog-btn"
+              onClick={() => setSettingsOpen(true)}
+              aria-label="KojoCode settings"
+              title="KojoCode settings"
+            >
+              <Settings size={16} />
+            </button>
           </div>
           {renderFilterBar(true)}
         </header>
@@ -6188,6 +6207,7 @@ export default function LeetCodeMode() {
         {customModalNode}
         {confirmDeleteNode}
         {completionModalsNode}
+        {settingsModalNode}
       </div>
       </div>
     );
@@ -6613,6 +6633,22 @@ export default function LeetCodeMode() {
               </button>
             </div>
           ) : null}
+
+          {/* Interview realism hides the starter code, so the way back has to be here in
+              the editor too, not only on the dashboard. */}
+          <div className="lc-toolbar-cluster" aria-label="KojoCode settings">
+            <span className="lc-toolbar-cluster-label">Settings</span>
+            <button
+              type="button"
+              className="lc-toolbar-btn"
+              onClick={() => setSettingsOpen(true)}
+              aria-label="KojoCode settings"
+              title="KojoCode settings"
+            >
+              <Settings size={16} />
+              <span className="lc-tb-label">Settings</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -7424,6 +7460,7 @@ export default function LeetCodeMode() {
       {customModalNode}
       {confirmDeleteNode}
       {completionModalsNode}
+      {settingsModalNode}
       </div>
     </div>
   );
