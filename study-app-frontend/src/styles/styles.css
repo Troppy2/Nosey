@@ -7074,6 +7074,43 @@ select[class*="lc-"]:focus-visible {
   color: #b91c1c;
 }
 
+/* Statement loading skeleton. The heading + difficulty already render from
+   client-side data, so only the fetched body is a placeholder. Reuses the app's
+   existing skeleton shimmer (sel-kojo-shimmer) and sage gradient so it matches the
+   rest of the product rather than introducing a third skeleton style. */
+.lc-statement-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 10px 0 14px;
+}
+
+.lc-statement-skeleton .lc-skeleton-line {
+  height: 13px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #e4ecda 25%, #eff5e8 50%, #e4ecda 75%);
+  background-size: 600px 100%;
+  animation: sel-kojo-shimmer 1.4s infinite linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-statement-skeleton .lc-skeleton-line {
+    animation: none;
+  }
+}
+
+.lc-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .lc-topic-tags {
   display: flex;
   flex-wrap: wrap;
