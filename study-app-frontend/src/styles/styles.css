@@ -13752,6 +13752,22 @@ select.lc-custom-input {
   transform: translateY(-1px);
 }
 
+/* Section-level empty: a lighter, calmer counterpart to .lc-empty for empties
+   that sit inside an otherwise-populated view (a drill column, a bank detail
+   panel). Shares the dashed-border language without the icon/serif/reset weight. */
+.lc-inline-empty {
+  margin: 4px 0;
+  padding: 20px 18px;
+  border: 1px dashed color-mix(in srgb, var(--green-dark) 22%, white);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.4);
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+}
+
 /* ── Streaming test generation ─────────────────────────────────────────────── */
 /* Full-screen state shown before the first streamed question lands. */
 .test-generating-splash {
