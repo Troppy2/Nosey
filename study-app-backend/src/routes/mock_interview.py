@@ -1,5 +1,6 @@
 import asyncio
 import json
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
@@ -20,6 +21,9 @@ from src.schemas.mock_interview_schema import (
     MockCustomConfig,
     MockInterviewCreateRequest,
     MockInterviewSessionResponse,
+    MockProgressSyncRequest,
+    ResumeGrillMessageRequest,
+    ResumeGrillMessageResponse,
     ResumeScreenResult,
     Stage1GradeRequest,
     Stage1GradeResponse,
@@ -119,11 +123,15 @@ def _level_config(row: MockInterviewSession) -> dict:
 # advancement and a hard turn cap so the interviewer cannot ramble indefinitely.
 _STAGE2_GOALS = ["background", "concept_q1", "concept_q2", "coding_problem", "coding_discussion"]
 _STAGE3_GOALS = ["behavioral_q1", "behavioral_q2", "behavioral_q3", "behavioral_q4", "behavioral_q5"]
+# Resume deep dive: the recruiter/HM grill that follows the ATS scan. Each goal is one
+# probe into what the candidate actually claims on their resume.
+_RESUME_GOALS = ["project_deep_dive", "impact_metrics", "tech_choice", "ownership", "gap_probe"]
 
 # Hard turn caps (counted by user turns) so the stage always terminates even if the
 # model never reports full goal coverage.
 _STAGE2_TURN_CAP = 10
 _STAGE3_TURN_CAP = 7
+_RESUME_TURN_CAP = 7
 
 
 def _merge_covered_goals(prior: list[str], reported, valid_goals: list[str]) -> list[str]:
@@ -233,6 +241,33 @@ async def create_session(
     return _to_response(session)
 
 
+# ── Resume the newest unfinished run ──────────────────────────────────────────
+# Declared before GET /{session_id}: FastAPI matches in declaration order, and the
+# int path converter on that route would reject "active" with a 422 instead of
+# falling through to here.
+
+@router.get("/active", response_model=Optional[MockInterviewSessionResponse])
+async def get_active_session(
+    db: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> Optional[MockInterviewSessionResponse]:
+    """The most recently synced run that is not finished, so a device with no local
+    snapshot (a fresh browser, cleared storage) can still offer Resume."""
+    row = (
+        await db.execute(
+            select(MockInterviewSession)
+            .where(
+                MockInterviewSession.user_id == user.id,
+                MockInterviewSession.status != STATUS_COMPLETE,
+                MockInterviewSession.progress_json.is_not(None),
+            )
+            .order_by(MockInterviewSession.progress_updated_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    return _to_response(row) if row else None
+
+
 # ── Get session ───────────────────────────────────────────────────────────────
 
 @router.get("/{session_id}", response_model=MockInterviewSessionResponse)
@@ -243,6 +278,25 @@ async def get_session_route(
 ) -> MockInterviewSessionResponse:
     row = await _load_session(session_id, user, db)
     return _to_response(row)
+
+
+# ── Sync the client's run snapshot ────────────────────────────────────────────
+
+@router.put("/{session_id}/progress", status_code=status.HTTP_204_NO_CONTENT)
+async def sync_progress(
+    session_id: int,
+    body: MockProgressSyncRequest,
+    db: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> Response:
+    """Store the client's whole run snapshot. Last write wins: the client already
+    resolves local vs server by timestamp when it hydrates, so the server does not
+    need to merge, it just has to keep the latest push."""
+    row = await _load_session(session_id, user, db)
+    row.progress_json = body.progress_json
+    row.progress_updated_at = datetime.utcnow()
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # ── Parse a job description into a prefilled custom-company config ─────────────
@@ -348,7 +402,9 @@ async def screen_resume(
     # Resume text comes either from an uploaded file (PDF/DOCX/...) or pasted
     # text/LaTeX. Files take priority when both are present.
     text = ""
+    file_name: Optional[str] = None
     if resume_file is not None and resume_file.filename:
+        file_name = resume_file.filename[:255]
         try:
             text, _ = await FileService().extract_from_file(resume_file)
         except ValidationException as exc:
@@ -431,11 +487,172 @@ async def screen_resume(
     )
 
     row.resume_screen = json.dumps(result.model_dump())
+    # Keep the parsed resume server side: a resumed session (possibly on another
+    # device, where the uploaded file is long gone) still has it, and the resume
+    # grill round quotes from it. Same 12000 char bound the prompt uses.
+    row.resume_text = text
+    if file_name:
+        row.resume_file_name = file_name
     if row.status == STATUS_PENDING:
         row.status = STATUS_RESUME_COMPLETE
     await db.commit()
 
     return result
+
+
+# ── Resume grill: recruiter deep dive on what the resume claims ───────────────
+
+@router.post("/{session_id}/resume/grill/message", response_model=ResumeGrillMessageResponse)
+@limiter.limit("5/minute")
+async def resume_grill_message(
+    request: Request,
+    response: Response,
+    session_id: int,
+    body: ResumeGrillMessageRequest,
+    db: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> ResumeGrillMessageResponse:
+    """Conversational follow-up to the ATS scan: the interviewer picks real lines out of
+    the candidate's resume and pushes on them. Same contract as the Stage 2/3 chats
+    (client echoes history and covered goals, server enforces advancement and a cap)."""
+    row = await _load_session(session_id, user, db)
+    provider = resolve_request_provider(user, body.provider)
+    company_label = _company_label(row)
+    candidate = _candidate_name(user)
+    role_focus = _role_focus(row)
+    level_cfg = _level_config(row)
+
+    resume_text = (row.resume_text or "").strip()
+    if not resume_text:
+        # Nothing to grill on. End the round cleanly rather than inventing a resume.
+        return ResumeGrillMessageResponse(
+            reply=(
+                "Run the resume scan first and I will dig into your projects and experience "
+                "from there."
+            ),
+            is_done=True,
+            covered_goals=[],
+        )
+
+    turn_count = sum(1 for m in body.history if m.role == "user")
+
+    history_text = "\n".join(
+        f"{'You (Interviewer)' if m.role == 'interviewer' else candidate}: {m.content}"
+        for m in body.history
+    )
+
+    covered = _merge_covered_goals(body.covered_goals, [], _RESUME_GOALS)
+    question_number = len(covered) + 1
+
+    system_prompt = (
+        f"You are a hiring manager at {company_label} running a 20-minute resume deep dive with "
+        f"{candidate} for a {level_cfg['label']} role, right after the resume passed the screen.\n"
+        f"This company weighs: {role_focus}\n"
+        f"Calibrate depth to a {level_cfg['label']} candidate: {level_cfg['rigor']}\n\n"
+        "RESPOND WITH ONLY RAW JSON, no markdown, no extra text:\n"
+        '{"reply": "...", "covered_goals": ["..."], "is_done": false}\n\n'
+        f"YOUR GOALS: ask exactly 5 questions, one per turn, tracked as {_RESUME_GOALS}.\n"
+        "  project_deep_dive: pick ONE specific project or role from the resume and ask how it worked.\n"
+        "  impact_metrics: push on a number or claim of impact they wrote. Where did it come from?\n"
+        "  tech_choice: ask why they chose a specific technology or approach named on the resume.\n"
+        "  ownership: find out what THEY personally built versus what the team did.\n"
+        "  gap_probe: probe the weakest or vaguest item on the resume for this role.\n"
+        f"GOALS ALREADY COVERED: {covered or ['(none yet)']}\n"
+        f"THIS TURN: ask question number {question_number} of 5 (or wrap up if all 5 are covered).\n\n"
+        "RULES:\n"
+        "- Quote or name something real from the resume below in every question. Never invent "
+        "experience the resume does not mention.\n"
+        "- One sentence acknowledging the previous answer, then the NEXT uncovered question. ONE "
+        "question per turn. Do NOT re-ask a covered goal.\n"
+        "- Follow up only to clarify a vague answer. If they ask you something, answer briefly and "
+        "return to your question.\n"
+        "- covered_goals: every goal slot answered so far, from the list above.\n"
+        "- After all 5 are answered and acknowledged: wrap up and set is_done: true.\n"
+        "- reply: 2 to 3 sentences max. Be direct and professional, not hostile.\n"
+        "- Return ONLY raw JSON.\n\n"
+        f"THE CANDIDATE'S RESUME:\n{resume_text[:8000]}\n"
+    )
+
+    if body.message is None:
+        full_prompt = system_prompt + "\nConversation so far:\n(none)\n\nOpen the deep dive now."
+    else:
+        full_prompt = (
+            system_prompt
+            + f"\nConversation so far:\n{history_text}\n\n"
+            + f"{candidate}: {body.message}\n\nYour JSON response:"
+        )
+
+    raw = ""
+    try:
+        llm = LLMService()
+        raw = await llm.call_kojo(full_prompt, provider=provider)
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+        parsed = json.loads(raw)
+    except Exception:
+        fallback = raw if isinstance(raw, str) and raw else "Tell me more about that project."
+        return ResumeGrillMessageResponse(reply=fallback[:600], covered_goals=covered)
+
+    # A user answer advances one goal even if the model forgets to report it, so
+    # coverage cannot stall (same guard as Stage 3).
+    updated_covered = _merge_covered_goals(covered, parsed.get("covered_goals"), _RESUME_GOALS)
+    if body.message is not None and len(updated_covered) <= len(covered):
+        next_goal = next((g for g in _RESUME_GOALS if g not in updated_covered), None)
+        if next_goal:
+            updated_covered = _merge_covered_goals(updated_covered, [next_goal], _RESUME_GOALS)
+
+    is_done = bool(parsed.get("is_done", False))
+    if len(updated_covered) >= len(_RESUME_GOALS) or turn_count + 1 >= _RESUME_TURN_CAP:
+        is_done = True
+
+    if is_done and body.message is not None:
+        await _save_resume_grill_feedback(
+            row=row,
+            history=body.history + [InterviewChatMessage(role="user", content=body.message)],
+            company_label=company_label,
+            candidate=candidate,
+            db=db,
+            provider=provider,
+        )
+
+    return ResumeGrillMessageResponse(
+        reply=parsed.get("reply", ""),
+        is_done=is_done,
+        covered_goals=updated_covered,
+    )
+
+
+async def _save_resume_grill_feedback(
+    row: MockInterviewSession,
+    history: list[InterviewChatMessage],
+    company_label: str,
+    candidate: str,
+    db: AsyncSession,
+    provider: Optional[str],
+) -> None:
+    """Condense the deep-dive transcript into one verdict the final debrief can use."""
+    qa_text = "\n\n".join(
+        f"{'Interviewer' if m.role == 'interviewer' else candidate}: {m.content}"
+        for m in history
+    )
+    eval_prompt = (
+        f"You are a {company_label} hiring manager reviewing a resume deep-dive transcript.\n\n"
+        f"{qa_text}\n\n"
+        f"In 2 to 3 sentences, evaluate how well {candidate} defended their resume: depth of "
+        "ownership, whether their claims held up under questioning, and how clearly they "
+        "communicated. Be direct and professional."
+    )
+    try:
+        llm = LLMService()
+        feedback = await llm.call_kojo(eval_prompt, provider=provider)
+    except Exception:
+        feedback = "Resume deep dive evaluation unavailable."
+
+    row.resume_grill = json.dumps({"feedback": feedback.strip()})
+    if row.status == STATUS_PENDING:
+        row.status = STATUS_RESUME_COMPLETE
+    await db.commit()
 
 
 # ── Stage 1: grade submissions ────────────────────────────────────────────────
@@ -909,6 +1126,7 @@ async def finish_interview(
         )
 
     resume_summary = _summarize_resume(row.resume_screen)
+    resume_grill_summary = _summarize_resume_grill(row.resume_grill)
     stage1_summary = _summarize_stage1(row.stage1_results)
     stage2_summary = _summarize_stage2(row.stage2_submission)
     stage3_summary = _summarize_stage3(row.stage3_answers)
@@ -918,6 +1136,7 @@ async def finish_interview(
         f"loop for a {level_cfg['label']} candidate.\n"
         f"Judge against the {level_cfg['label']} bar: {level_cfg['rigor']}\n\n"
         f"Resume Screen (ATS):\n{resume_summary}\n\n"
+        f"Resume Deep Dive:\n{resume_grill_summary}\n\n"
         f"Stage 1 (Online Assessment):\n{stage1_summary}\n\n"
         f"Stage 2 (Technical Interview):\n{stage2_summary}\n\n"
         f"Stage 3 (Behavioral):\n{stage3_summary}\n\n"
@@ -985,6 +1204,11 @@ def _to_response(row: MockInterviewSession) -> MockInterviewSessionResponse:
         stage3_script=row.stage3_script,
         stage3_answers=row.stage3_answers,
         overall_feedback=row.overall_feedback,
+        progress_json=row.progress_json,
+        progress_updated_at=row.progress_updated_at.isoformat() if row.progress_updated_at else None,
+        resume_file_name=row.resume_file_name,
+        resume_grill=row.resume_grill,
+        created_at=row.created_at.isoformat() if row.created_at else None,
     )
 
 
@@ -998,6 +1222,16 @@ def _summarize_resume(resume_screen_json: Optional[str]) -> str:
         return f"ATS score {score}/100, {passes} the screen. {data.get('summary', '')[:200]}"
     except Exception:
         return "Resume Screen result unavailable."
+
+
+def _summarize_resume_grill(resume_grill_json: Optional[str]) -> str:
+    if not resume_grill_json:
+        return "Resume deep dive was skipped or not completed."
+    try:
+        data = json.loads(resume_grill_json)
+        return data.get("feedback", "No feedback recorded.")
+    except Exception:
+        return "Resume deep dive feedback unavailable."
 
 
 def _resume_overall_verdict(resume_screen_json: Optional[str]) -> Optional[str]:

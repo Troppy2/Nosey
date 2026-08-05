@@ -65,6 +65,20 @@ class MockInterviewSessionResponse(BaseModel):
     stage3_script: Optional[str] = None
     stage3_answers: Optional[str] = None
     overall_feedback: Optional[str] = None
+    # Cloud-synced run snapshot. The client hydrates from this when it is newer than
+    # its own localStorage copy, which is what makes a run resumable anywhere.
+    progress_json: Optional[str] = None
+    progress_updated_at: Optional[str] = None
+    resume_file_name: Optional[str] = None
+    resume_grill: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+class MockProgressSyncRequest(BaseModel):
+    """One push of the client's whole run snapshot. Sent debounced, last write wins.
+    The cap is generous (a snapshot carries three OA solutions plus two chat
+    transcripts) but bounded so a runaway client cannot fill the column."""
+    progress_json: str = Field(..., max_length=400_000)
 
 
 # Resume Screen (optional first stage): simulated ATS evaluation.
@@ -152,6 +166,21 @@ class Stage2MessageRequest(BaseModel):
 class Stage2MessageResponse(BaseModel):
     reply: str
     coding_problem: Optional[CodingProblemInfo] = None
+    is_done: bool = False
+    covered_goals: list[str] = Field(default_factory=list)
+
+
+# Resume deep dive (the grill that follows the ATS scan). Same contract as the
+# Stage 2/3 chats: the client carries the transcript and the covered goals.
+class ResumeGrillMessageRequest(BaseModel):
+    message: Optional[str] = Field(default=None, max_length=3000)
+    history: list[InterviewChatMessage] = Field(default=[])
+    provider: Optional[str] = Field(default=None)
+    covered_goals: list[str] = Field(default_factory=list)
+
+
+class ResumeGrillMessageResponse(BaseModel):
+    reply: str
     is_done: bool = False
     covered_goals: list[str] = Field(default_factory=list)
 

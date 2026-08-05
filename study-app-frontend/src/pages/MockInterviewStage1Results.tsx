@@ -1,8 +1,8 @@
 import { CheckCircle2, ChevronRight, Clock, Minus, XCircle } from "lucide-react";
-import { useMemo } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type { MockInterviewSession, Stage1GradeResponse, Stage1QuestionResult } from "../lib/types";
-import { loadMockProgress } from "../lib/mockInterview";
+import type { MockProgress } from "../lib/mockInterview";
+import { MockProgressGate } from "../components/MockProgressGate";
 
 function formatMs(ms: number): string {
   const totalSec = Math.round(ms / 1000);
@@ -44,6 +44,18 @@ function overallVerdict(results: Stage1QuestionResult[]): string {
 
 export default function MockInterviewStage1Results() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  return (
+    <MockProgressGate
+      sessionId={Number(sessionId)}
+      label="Loading your results"
+      render={(stored) => <Stage1ResultsView stored={stored} />}
+    />
+  );
+}
+
+// Prefers navigation state, falls back to the persisted snapshot on refresh.
+function Stage1ResultsView({ stored }: { stored: MockProgress | null }) {
+  const { sessionId } = useParams<{ sessionId: string }>();
   const numericSessionId = Number(sessionId);
   const navigate = useNavigate();
   const location = useLocation();
@@ -52,12 +64,6 @@ export default function MockInterviewStage1Results() {
     session?: MockInterviewSession;
     selectedStages?: string[];
   } | null;
-
-  // Prefer navigation state, fall back to the persisted snapshot on refresh.
-  const stored = useMemo(
-    () => (Number.isFinite(numericSessionId) ? loadMockProgress(numericSessionId) : null),
-    [numericSessionId],
-  );
 
   const results = state?.gradeResponse?.results ?? stored?.stage1?.results ?? null;
   const selectedStages = state?.selectedStages ?? stored?.selectedStages ?? ["stage1"];

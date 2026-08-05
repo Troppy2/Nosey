@@ -49,6 +49,8 @@ import type {
   QuestionUpdate,
   ResumableTestInfo,
   ReviewSummaryResponse,
+  SavedJDParsed,
+  SavedJobDescription,
   SlashCommand,
   SlashCommandInput,
   SubmittedAnswer,
@@ -1772,12 +1774,66 @@ export async function parseJobDescription(
   });
 }
 
+// ── Saved job descriptions ────────────────────────────────────────────────────
+// A JD pasted once and reused: the raw text plus the parsed analysis live on the
+// user's account, so picking a saved JD prefills the setup panel with no LLM call.
+
+export async function listJobDescriptions(): Promise<SavedJobDescription[]> {
+  return request<SavedJobDescription[]>("/job-descriptions");
+}
+
+export async function saveJobDescription(body: {
+  name: string;
+  company_name?: string | null;
+  jd_text: string;
+  parsed?: SavedJDParsed | null;
+}): Promise<SavedJobDescription> {
+  return request<SavedJobDescription>("/job-descriptions", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateJobDescription(
+  jdId: number,
+  body: {
+    name?: string;
+    company_name?: string | null;
+    jd_text?: string;
+    parsed?: SavedJDParsed | null;
+  },
+): Promise<SavedJobDescription> {
+  return request<SavedJobDescription>(`/job-descriptions/${jdId}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteJobDescription(jdId: number): Promise<void> {
+  await request<void>(`/job-descriptions/${jdId}`, { method: "DELETE" });
+}
+
 export async function getMockInterviewSession(sessionId: number): Promise<MockInterviewSession> {
   return request<MockInterviewSession>(`/mock-interview/${sessionId}`);
 }
 
 export async function listMockInterviewSessions(): Promise<MockInterviewSession[]> {
   return request<MockInterviewSession[]>("/mock-interview");
+}
+
+// Push the client's whole run snapshot. Called debounced from mockInterview.ts, so a
+// refresh, a cleared cache, or a different device can pick the run back up.
+export async function syncMockProgress(sessionId: number, progressJson: string): Promise<void> {
+  await request<void>(`/mock-interview/${sessionId}/progress`, {
+    method: "PUT",
+    body: JSON.stringify({ progress_json: progressJson }),
+  });
+}
+
+// The newest unfinished run for this user, or null. Used when the device has no local
+// snapshot to offer a Resume from.
+export async function fetchActiveMockSession(): Promise<MockInterviewSession | null> {
+  return request<MockInterviewSession | null>("/mock-interview/active");
 }
 
 export async function screenResume(
@@ -1806,6 +1862,24 @@ export type Stage1SubmissionItem = {
   tests_passed: number;
   tests_total: number;
 };
+
+// Resume deep dive: the interviewer grills the candidate on their own resume after the
+// ATS scan. Same call shape as the Stage 2/3 chats, the client carries the transcript.
+export async function sendResumeGrillMessage(
+  sessionId: number,
+  message: string | null,
+  history: InterviewChatMessage[],
+  coveredGoals: string[] = [],
+  provider?: string,
+): Promise<{ reply: string; is_done: boolean; covered_goals: string[] }> {
+  return request<{ reply: string; is_done: boolean; covered_goals: string[] }>(
+    `/mock-interview/${sessionId}/resume/grill/message`,
+    {
+      method: "POST",
+      body: JSON.stringify({ message, history, covered_goals: coveredGoals, provider }),
+    },
+  );
+}
 
 export async function gradeStage1(
   sessionId: number,

@@ -1,23 +1,30 @@
 import { AlertCircle, ChevronRight, Loader2, LogOut, MessageSquare, Send } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { LoadingNotice } from "../components/Loaders";
 import { sendStage3Message } from "../lib/api";
 import type { InterviewChatMessage, MockInterviewSession } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
 import { loadMockProgress, saveMockProgress, type MockProgress, type MockCompany } from "../lib/mockInterview";
+import { MockProgressGate } from "../components/MockProgressGate";
 
 export default function MockInterviewStage3() {
+  const { sessionId } = useParams<{ sessionId: string }>();
+  return (
+    <MockProgressGate
+      sessionId={Number(sessionId)}
+      label="Loading your interview"
+      render={(stored) => <Stage3Runner stored={stored} />}
+    />
+  );
+}
+
+function Stage3Runner({ stored }: { stored: MockProgress | null }) {
   const { sessionId } = useParams<{ sessionId: string }>();
   const numericSessionId = Number(sessionId);
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as { session?: MockInterviewSession; selectedStages?: string[] } | null;
-
-  const stored = useMemo<MockProgress | null>(
-    () => (Number.isFinite(numericSessionId) ? loadMockProgress(numericSessionId) : null),
-    [numericSessionId],
-  );
 
   const rawCompany = (state?.session?.company ?? stored?.company ?? "random") as MockCompany;
   const company = (rawCompany === "custom" ? "random" : rawCompany) as CompanyKey;

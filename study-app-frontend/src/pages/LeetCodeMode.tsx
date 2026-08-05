@@ -32,6 +32,7 @@ import {
   Search,
   Settings,
   ShieldAlert,
+  Shuffle,
   Sparkles,
   TrendingUp,
   Trophy,
@@ -994,6 +995,14 @@ function pickStreakChallengeSlug(pool: Problem[], progress: Record<string, boole
   const midHard = pool.filter(isMidOrHard);
   if (midHard.length > 0) return randomFrom(midHard).slug;
   return STREAK_CHALLENGE_FALLBACK_SLUG;
+}
+
+// Random pick for the "Random" shortcut, restricted to problems the user has not
+// completed. Returns null when the pool is exhausted so the button can disable itself
+// instead of silently re-opening something already done.
+function pickRandomUnsolved(pool: Problem[], progress: Record<string, boolean>): Problem | null {
+  const unsolved = pool.filter((problem) => !progress[problem.slug]);
+  return unsolved.length > 0 ? randomFrom(unsolved) : null;
 }
 
 function fillStreakGap(currentDates: string[]): string[] {
@@ -1981,6 +1990,8 @@ export default function LeetCodeMode() {
     setDifficultyPromptEnabled,
     interviewerMode,
     setInterviewerMode,
+    interviewRealism,
+    setInterviewRealism,
   } = useSettings();
   const [view, setView] = useState<View>({ type: "tree" });
   const [customProblems, setCustomProblems] = useState<LCCustomProblem[]>(() => loadCustomProblems());
@@ -2106,6 +2117,12 @@ export default function LeetCodeMode() {
   const [drills, setDrills] = useState<LCDrillSchedule[]>([]);
   const [drillsLoading, setDrillsLoading] = useState(false);
   const [drillAddText, setDrillAddText] = useState("");
+  // Drill filters are deliberately separate from the browse/category filter state: that
+  // set is shared across those two views, and reusing it here would leak a filter set in
+  // one place into the other. Empty set on a dimension means "no constraint".
+  const [drillPassFilter, setDrillPassFilter] = useState<Set<number>>(new Set());
+  const [drillDifficultyFilter, setDrillDifficultyFilter] = useState<Set<Difficulty>>(new Set());
+  const [drillTopicFilter, setDrillTopicFilter] = useState<Set<string>>(new Set());
   // Per-action pending flags so every network-bound button in Drills and Prep
   // Banks shows feedback while it runs, matching the Loader2-spin pattern used
   // across the rest of this file. Keyed states (slug / bank id) so only the
@@ -2557,8 +2574,10 @@ export default function LeetCodeMode() {
 
   // Seed starter snippet after async fetch completes (first open when cache is cold).
   // Backfills every still-empty tab, not just tab 0, so a tab added before the fetch
-  // resolved is healed the same way instead of staying blank forever.
+  // resolved is healed the same way instead of staying blank forever. Interview realism
+  // suppresses the seed entirely; turning it back off backfills the empty tabs.
   useEffect(() => {
+    if (interviewRealism) return;
     if (!currentProblem || !currentProblemData?.python_snippet) return;
     const snippet = currentProblemData.python_snippet.trimEnd();
     if (!snippet) return;
@@ -2573,7 +2592,7 @@ export default function LeetCodeMode() {
       saveCodeWorkspace(currentProblem.slug, nextWorkspace);
       return { ...prev, [currentProblem.slug]: nextWorkspace };
     });
-  }, [currentProblemData?.python_snippet, currentProblem?.slug]);
+  }, [currentProblemData?.python_snippet, currentProblem?.slug, interviewRealism]);
 
   useEffect(() => {
     currentCustomCasesRef.current = currentCustomCases;
@@ -2642,7 +2661,7 @@ export default function LeetCodeMode() {
     const drill = drills.find((d) => d.problem_slug === slug && !d.completed_at);
     if (!drill) return;
     const pass = drill.current_pass;
-    const starter = currentProblemData?.python_snippet?.trimEnd() ?? "";
+    const starter = interviewRealism ? "" : currentProblemData?.python_snippet?.trimEnd() ?? "";
     setCodeWorkspaces((prev) => {
       const workspace = prev[slug] ?? loadCodeWorkspace(slug);
       const existing = workspace.tabs.find((tab) => tab.drillPass === pass);
@@ -4145,7 +4164,8 @@ export default function LeetCodeMode() {
 
   function openProblem(categoryId: string, problemSlug: string) {
     const cached = problemStates[problemSlug]?.data;
-    const initialCode = cached?.python_snippet?.trimEnd() ?? "";
+    // Interview realism opens a blank editor: no function signature to work backwards from.
+    const initialCode = interviewRealism ? "" : cached?.python_snippet?.trimEnd() ?? "";
     const workspace = loadCodeWorkspace(problemSlug);
     const hasLocalCode = workspace.tabs.some((tab) => tab.code.trim());
 
@@ -4215,6 +4235,14 @@ export default function LeetCodeMode() {
     });
   }
 
+  // "Random" shortcut: jump straight into an unsolved problem, no browsing. Callers pass
+  // the pool they want drawn from (the filtered browse list, or everything).
+  function openRandomUnsolved(pool: Problem[]) {
+    const pick = pickRandomUnsolved(pool, progress);
+    if (!pick) return;
+    openProblem(pick.categoryId, pick.slug);
+  }
+
   function handleAddCodeTab() {
     if (!currentProblem) return;
     const slug = currentProblem.slug;
@@ -4223,7 +4251,8 @@ export default function LeetCodeMode() {
 
     // Seed the new tab with the same starter snippet the first tab gets, so a fresh
     // tab starts from the problem's function signature instead of a blank buffer.
-    const starter = currentProblemData?.python_snippet?.trimEnd() ?? "";
+    // Interview realism keeps it blank, matching what tab 1 was given.
+    const starter = interviewRealism ? "" : currentProblemData?.python_snippet?.trimEnd() ?? "";
     const nextTab = { id: makeTabId(), name: `Tab ${workspace.tabs.length + 1}`, code: starter };
     const nextWorkspace = { tabs: [...workspace.tabs, nextTab], activeTabId: nextTab.id };
     saveCodeWorkspace(slug, nextWorkspace);
@@ -4507,6 +4536,19 @@ export default function LeetCodeMode() {
             ))}
           </div>
           <p className="lc-settings-mode-blurb">{INTERVIEWER_COPY[resolveInterviewerMode(interviewerMode)].blurb}</p>
+        </div>
+
+        <div className="lc-settings-section">
+          <span className="lc-settings-label">Interview realism</span>
+          <p className="lc-settings-help">
+            Hide the giveaways a real interview never hands you: topic tags, technique chips, and
+            the starter code. You get the statement and a blank editor.
+          </p>
+          <ToggleSwitch
+            checked={interviewRealism}
+            label={interviewRealism ? "On" : "Off"}
+            onClick={() => setInterviewRealism(!interviewRealism)}
+          />
         </div>
 
         <div className="lc-settings-section">
@@ -5049,6 +5091,132 @@ export default function LeetCodeMode() {
     );
   }
 
+  function toggleDrillFilter<T>(setter: (updater: (prev: Set<T>) => Set<T>) => void, value: T) {
+    setter((prev) => {
+      const next = new Set(prev);
+      if (next.has(value)) next.delete(value);
+      else next.add(value);
+      return next;
+    });
+  }
+
+  function clearDrillFilters() {
+    setDrillPassFilter(new Set());
+    setDrillDifficultyFilter(new Set());
+    setDrillTopicFilter(new Set());
+  }
+
+  const drillFiltersActive =
+    drillPassFilter.size > 0 || drillDifficultyFilter.size > 0 || drillTopicFilter.size > 0;
+
+  // A drill only stores a slug, so difficulty and topic are resolved from the catalog (or
+  // the user's custom problems) via the existing findProblem. A slug we cannot resolve has
+  // no metadata to match on, so it shows while unfiltered and drops out once a filter is on.
+  function drillMatchesFilters(drill: LCDrillSchedule): boolean {
+    if (!drillFiltersActive) return true;
+    if (drillPassFilter.size > 0 && !drillPassFilter.has(drill.current_pass)) return false;
+    const problem = findProblem(drill.problem_slug);
+    if (drillDifficultyFilter.size > 0) {
+      if (!problem || !drillDifficultyFilter.has(problem.difficulty)) return false;
+    }
+    if (drillTopicFilter.size > 0) {
+      if (!problem || !drillTopicFilter.has(problem.categoryId)) return false;
+    }
+    return true;
+  }
+
+  // Filter bar for the drills hub. Same chip idiom as browse, its own state. Topic chips
+  // list only the topics actually present among the user's open drills, so the bar stays
+  // short instead of listing the whole taxonomy.
+  function renderDrillFilterBar() {
+    const drillTopics: { id: string; label: string }[] = [];
+    const seen = new Set<string>();
+    for (const drill of drills) {
+      const problem = findProblem(drill.problem_slug);
+      if (!problem || seen.has(problem.categoryId)) continue;
+      seen.add(problem.categoryId);
+      drillTopics.push({
+        id: problem.categoryId,
+        label:
+          problem.categoryId === CUSTOM_CATEGORY_ID
+            ? CUSTOM_CATEGORY_LABEL
+            : CATEGORY_META[problem.categoryId]?.label ?? problem.categoryLabel,
+      });
+    }
+    return (
+      <div className="lc-filter-bar">
+        <div className="lc-filter-group">
+          <span className="lc-filter-label">Pass</span>
+          <div className="lc-filter-chips" role="group" aria-label="Pass filter">
+            {[1, 2, 3].map((pass) => {
+              const active = drillPassFilter.has(pass);
+              return (
+                <button
+                  key={pass}
+                  type="button"
+                  className={`lc-filter-chip${active ? " lc-filter-chip--active" : ""}`}
+                  aria-pressed={active}
+                  onClick={() => toggleDrillFilter(setDrillPassFilter, pass)}
+                  style={active ? { borderColor: PASS_RAMP[pass - 1], color: PASS_RAMP[pass - 1] } : undefined}
+                >
+                  <span className="lc-diff-dot" style={{ background: PASS_RAMP[pass - 1] }} />
+                  Pass {pass}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="lc-filter-group">
+          <span className="lc-filter-label">Difficulty</span>
+          <div className="lc-filter-chips">
+            {(["Easy", "Medium", "Hard"] as Difficulty[]).map((value) => {
+              const active = drillDifficultyFilter.has(value);
+              const tone = value.toLowerCase();
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  className={`lc-filter-chip${active ? ` lc-filter-chip--active lc-filter-chip--${tone}` : ""}`}
+                  aria-pressed={active}
+                  onClick={() => toggleDrillFilter(setDrillDifficultyFilter, value)}
+                >
+                  <span className={`lc-diff-dot lc-diff-dot--${tone}`} />
+                  {value}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        {drillTopics.length > 0 ? (
+          <div className="lc-filter-group lc-filter-group--topic">
+            <span className="lc-filter-label">Topic</span>
+            <div className="lc-filter-chips">
+              {drillTopics.map((topic) => (
+                <button
+                  key={topic.id}
+                  type="button"
+                  className={`lc-filter-chip${drillTopicFilter.has(topic.id) ? " lc-filter-chip--active" : ""}`}
+                  aria-pressed={drillTopicFilter.has(topic.id)}
+                  onClick={() => toggleDrillFilter(setDrillTopicFilter, topic.id)}
+                >
+                  {topic.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {drillFiltersActive ? (
+          <div className="lc-filter-actions">
+            <button type="button" className="lc-filter-clear" onClick={clearDrillFilters}>
+              <X size={13} />
+              Clear filters
+            </button>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   // Friendly empty state shown whenever a filtered list has no matches, instead of an
   // empty bordered list box. `onReset` clears filters so the user can recover in one tap.
   function renderFilterEmpty(onReset: () => void) {
@@ -5077,6 +5245,20 @@ export default function LeetCodeMode() {
             <p className="muted">Official problems, a better practice surface, streaks, and Kojo as a coach instead of a code dump.</p>
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="lc-official-link"
+              onClick={() => openRandomUnsolved(browseProblems)}
+              disabled={!browseProblems.some((problem) => !progress[problem.slug])}
+              title={
+                browseProblems.some((problem) => !progress[problem.slug])
+                  ? "Open a random problem you have not solved"
+                  : "Nothing left to pick, you have solved everything"
+              }
+            >
+              <Shuffle size={16} />
+              Random problem
+            </button>
             <Link to="/mock-interview" className="lc-official-link">
               <Users size={16} />
               Mock Interview
@@ -5085,17 +5267,17 @@ export default function LeetCodeMode() {
               <ExternalLink size={16} />
               Open LeetCode
             </a>
-            {betaMode ? (
-              <button
-                type="button"
-                className="lc-cog-btn"
-                onClick={() => setSettingsOpen(true)}
-                aria-label="KojoCode settings"
-                title="KojoCode settings"
-              >
-                <Settings size={16} />
-              </button>
-            ) : null}
+            {/* Ungated: interview realism defaults on, so every user needs a way back to
+                tags and starter code, not just beta accounts. */}
+            <button
+              type="button"
+              className="lc-cog-btn"
+              onClick={() => setSettingsOpen(true)}
+              aria-label="KojoCode settings"
+              title="KojoCode settings"
+            >
+              <Settings size={16} />
+            </button>
           </div>
         </header>
 
@@ -5818,6 +6000,8 @@ export default function LeetCodeMode() {
             </button>
           </div>
 
+          {drills.length > 0 ? renderDrillFilterBar() : null}
+
           {drillsLoading && drills.length === 0 ? (
             <SkeletonList rows={3} label="Loading your drills" />
           ) : drills.length === 0 ? (
@@ -5825,10 +6009,11 @@ export default function LeetCodeMode() {
           ) : (
             (() => {
               const now = Date.now();
-              const dueToday = drills
+              const visibleDrills = drills.filter(drillMatchesFilters);
+              const dueToday = visibleDrills
                 .filter((drill) => new Date(drill.next_due_at).getTime() <= now)
                 .sort((a, b) => a.current_pass - b.current_pass);
-              const upcoming = drills
+              const upcoming = visibleDrills
                 .filter((drill) => new Date(drill.next_due_at).getTime() > now)
                 .sort((a, b) => new Date(a.next_due_at).getTime() - new Date(b.next_due_at).getTime());
 
@@ -5886,6 +6071,12 @@ export default function LeetCodeMode() {
                 );
               };
 
+              // Everything filtered out: one recoverable empty state instead of two
+              // "nothing here" sections that look like the drills were lost.
+              if (visibleDrills.length === 0) {
+                return renderFilterEmpty(clearDrillFilters);
+              }
+
               return (
                 <div className="lc-drill-sections">
                   <section className="lc-drill-section">
@@ -5942,6 +6133,22 @@ export default function LeetCodeMode() {
               <Search size={16} />
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search problems" />
             </div>
+            {/* Draws from the filtered list, so an active difficulty or topic filter still
+                applies. Unsolved only: the point is to land on something new. */}
+            <button
+              type="button"
+              className="lc-random-btn"
+              onClick={() => openRandomUnsolved(visibleProblems)}
+              disabled={!visibleProblems.some((problem) => !progress[problem.slug])}
+              title={
+                visibleProblems.some((problem) => !progress[problem.slug])
+                  ? "Open a random unsolved problem from this list"
+                  : "Nothing left to pick here"
+              }
+            >
+              <Shuffle size={16} />
+              Random
+            </button>
           </div>
           {renderFilterBar(true)}
         </header>
@@ -5963,8 +6170,8 @@ export default function LeetCodeMode() {
                   </button>
                   <button type="button" className="lc-problem-title-btn" onClick={() => openProblem(problem.categoryId, problem.slug)}>
                     <span>{problem.title}</span>
-                    <small>{topicLabel}</small>
-                    {problem.subtopics.length > 0 ? (
+                    {interviewRealism ? null : <small>{topicLabel}</small>}
+                    {!interviewRealism && problem.subtopics.length > 0 ? (
                       <span className="lc-subtopic-tags">
                         {problem.subtopics.map((sub) => (
                           <span key={sub} className="lc-subtopic-tag">{sub}</span>
@@ -6314,10 +6521,19 @@ export default function LeetCodeMode() {
       />
       <div className="lc-editor-shell">
       <div className="lc-editor-topbar">
-        <button type="button" className="lc-back-btn" onClick={() => setView({ type: "category", categoryId: currentProblem.categoryId })} aria-label={`Back to ${currentProblem.categoryLabel}`}>
-          <ChevronLeft size={16} />
-          <span className="lc-tb-label">{currentProblem.categoryLabel}</span>
-        </button>
+        {/* The category breadcrumb names the technique, so interview realism swaps it for a
+            plain route back to the dashboard. */}
+        {interviewRealism ? (
+          <button type="button" className="lc-back-btn" onClick={() => setView({ type: "tree" })} aria-label="Back to KojoCode dashboard">
+            <ChevronLeft size={16} />
+            <span className="lc-tb-label">Dashboard</span>
+          </button>
+        ) : (
+          <button type="button" className="lc-back-btn" onClick={() => setView({ type: "category", categoryId: currentProblem.categoryId })} aria-label={`Back to ${currentProblem.categoryLabel}`}>
+            <ChevronLeft size={16} />
+            <span className="lc-tb-label">{currentProblem.categoryLabel}</span>
+          </button>
+        )}
         <div className="lc-editor-title">
           <span>{currentProblem.title}</span>
           <span className={`lc-difficulty lc-difficulty--${difficultyClass(currentProblem.difficulty)}`}>{currentProblem.difficulty}</span>
@@ -6467,7 +6683,7 @@ export default function LeetCodeMode() {
           <h2 className="lc-problem-heading">{currentProblem.title}</h2>
           <div className="lc-problem-meta">
             <span className={`lc-difficulty lc-difficulty--${difficultyClass(currentProblem.difficulty)}`}>{currentProblem.difficulty}</span>
-            <span>{currentProblem.categoryLabel}</span>
+            {interviewRealism ? null : <span>{currentProblem.categoryLabel}</span>}
             {currentProblem.isExtra ? <span>Extra</span> : null}
           </div>
 
@@ -6506,11 +6722,13 @@ export default function LeetCodeMode() {
 
           {currentProblemData && !isCustomProblem ? (
             <>
-              <div className="lc-topic-tags">
-                {currentProblemData.topic_tags.slice(0, 4).map((tag) => (
-                  <span key={tag.slug}>{tag.name}</span>
-                ))}
-              </div>
+              {interviewRealism ? null : (
+                <div className="lc-topic-tags">
+                  {currentProblemData.topic_tags.slice(0, 4).map((tag) => (
+                    <span key={tag.slug}>{tag.name}</span>
+                  ))}
+                </div>
+              )}
               <div className="lc-official-statement" dangerouslySetInnerHTML={{ __html: sanitizeLeetCodeHtml(currentProblemData.content_html) }} />
             </>
           ) : null}

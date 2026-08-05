@@ -5,6 +5,7 @@ from src.models.flashcard import Flashcard, FlashcardAttempt
 from src.models.folder import Folder
 from src.models.folder_file import FolderFile
 from src.models.frq_answer import FRQAnswer
+from src.models.job_description import UserJobDescription
 from src.models.kojo_action_card import KojoActionCard
 from src.models.kojo_conversation import KojoConversation
 from src.models.kojo_message import KojoMessage
@@ -70,5 +71,6 @@ __all__ = [
     "User",
     "UserAnswer",
     "UserAttempt",
+    "UserJobDescription",
     "UserMemory",
 ]
