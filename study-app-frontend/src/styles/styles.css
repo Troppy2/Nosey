@@ -5757,7 +5757,10 @@ select[class*="lc-"]:focus-visible {
 .lc-problem-row {
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr) auto auto;
-  align-items: center;
+  /* Top-align so the check and difficulty sit on the title's first line rather
+     than floating at mid-card on multi-line rows (title + topic + subtopic tags).
+     The check then reads as belonging to the title it toggles. */
+  align-items: start;
   gap: 12px;
   min-height: 58px;
   padding: 14px 16px;
@@ -5766,6 +5769,16 @@ select[class*="lc-"]:focus-visible {
   background: var(--white);
   box-shadow: var(--shadow-sm);
   transition: box-shadow 0.13s ease, transform 0.13s ease;
+}
+
+/* Nudge the taller check icon and difficulty pill down a hair so their optical
+   centers sit on the title's first-line text. */
+.lc-problem-row > .lc-problem-check {
+  margin-top: 1px;
+}
+
+.lc-problem-row > .lc-difficulty {
+  margin-top: 1px;
 }
 
 .lc-problem-row:hover {
