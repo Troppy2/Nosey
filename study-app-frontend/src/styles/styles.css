@@ -5835,12 +5835,19 @@ select[class*="lc-"]:focus-visible {
   cursor: pointer;
 }
 
-.lc-problem-title-btn span {
+/* Title only (first span). Scoped with > :first-of-type so the truncation does
+   NOT leak onto the subtopic-tag spans that share this button (the element-inside-
+   container gotcha). Clamps to two lines so long problem names stay readable
+   instead of being cut to "Longest Substri...". */
+.lc-problem-title-btn > span:first-of-type {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
   font-size: 0.92rem;
   font-weight: 750;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
 }
 
 .lc-problem-title-btn small {
