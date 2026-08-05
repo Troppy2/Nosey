@@ -6732,7 +6732,15 @@ export default function LeetCodeMode() {
           ) : null}
 
           {problemLoading ? (
-            <div className="lc-statement-state"><Loader2 size={18} className="spin" /><span>Loading official statement…</span></div>
+            <div className="lc-statement-skeleton" role="status" aria-busy="true">
+              <span className="lc-skeleton-line" style={{ width: "94%" }} />
+              <span className="lc-skeleton-line" style={{ width: "100%" }} />
+              <span className="lc-skeleton-line" style={{ width: "82%" }} />
+              <span className="lc-skeleton-line" style={{ width: "38%" }} />
+              <span className="lc-skeleton-line" style={{ width: "97%", marginTop: 8 }} />
+              <span className="lc-skeleton-line" style={{ width: "68%" }} />
+              <span className="lc-visually-hidden">Loading official statement…</span>
+            </div>
           ) : null}
 
           {problemError ? (
