@@ -6540,6 +6540,7 @@ export default function LeetCodeMode() {
         </div>
         <div className="lc-editor-actions">
           <div className="lc-toolbar-cluster" aria-label="Reference links">
+            <span className="lc-toolbar-cluster-label">Links</span>
             {!isStreakChallengeProblem ? (
               <a className="lc-toolbar-btn" href={`https://www.youtube.com/results?search_query=neetcode+${encodeURIComponent(currentProblem.title)}`} target="_blank" rel="noreferrer" aria-label="Search NeetCode on YouTube">
                 <Youtube size={16} />
