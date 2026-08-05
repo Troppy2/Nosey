@@ -5,18 +5,21 @@ import {
   FileText,
   Loader2,
   LogOut,
+  MessagesSquare,
   ScanLine,
+  Send,
   Type,
   Upload,
   X,
   XCircle,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { screenResume } from "../lib/api";
-import type { MockInterviewSession, ResumeScreenResult } from "../lib/types";
+import { screenResume, sendResumeGrillMessage } from "../lib/api";
+import type { InterviewChatMessage, MockInterviewSession, ResumeScreenResult } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
 import { loadMockProgress, saveMockProgress, type MockProgress, type MockCompany } from "../lib/mockInterview";
+import { MockProgressGate } from "../components/MockProgressGate";
 
 const ACCEPT = ".pdf,.docx,.doc,.txt,.md,.tex";
 
@@ -31,15 +34,21 @@ type InputMode = "upload" | "paste";
 
 export default function MockInterviewResume() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  return (
+    <MockProgressGate
+      sessionId={Number(sessionId)}
+      label="Loading your resume screen"
+      render={(stored) => <ResumeScreenView stored={stored} />}
+    />
+  );
+}
+
+function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
+  const { sessionId } = useParams<{ sessionId: string }>();
   const numericSessionId = Number(sessionId);
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as { session?: MockInterviewSession; selectedStages?: string[] } | null;
-
-  const stored = useMemo<MockProgress | null>(
-    () => (Number.isFinite(numericSessionId) ? loadMockProgress(numericSessionId) : null),
-    [numericSessionId],
-  );
 
   const rawCompany = (state?.session?.company ?? stored?.company ?? "random") as MockCompany;
   const company = (rawCompany === "custom" ? "random" : rawCompany) as CompanyKey;
@@ -70,6 +79,25 @@ export default function MockInterviewResume() {
   // Drives the gauge fill animation (0 -> score) when a result appears.
   const [gauge, setGauge] = useState(0);
 
+  // Resume deep dive: the interviewer grills the candidate on their own resume. Opens
+  // only after a scan (the server needs the parsed resume to quote from) and is always
+  // skippable, like the scan itself.
+  const [grillOpen, setGrillOpen] = useState(() => (stored?.resume?.grillMessages?.length ?? 0) > 0);
+  const [grillMessages, setGrillMessages] = useState<InterviewChatMessage[]>(
+    () => stored?.resume?.grillMessages ?? [],
+  );
+  const [grillCoveredGoals, setGrillCoveredGoals] = useState<string[]>(
+    () => stored?.resume?.grillCoveredGoals ?? [],
+  );
+  const [grillDone, setGrillDone] = useState(() => stored?.resume?.grillDone ?? false);
+  const [grillInput, setGrillInput] = useState("");
+  const [grillSending, setGrillSending] = useState(false);
+  const [grillError, setGrillError] = useState<string | null>(null);
+  const grillThreadRef = useRef<HTMLDivElement>(null);
+  const grillInputRef = useRef<HTMLTextAreaElement>(null);
+
+  const GRILL_TOTAL_GOALS = 5;
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -91,6 +119,58 @@ export default function MockInterviewResume() {
       updatedAt: Date.now(),
       resume: { ...base, ...partial, completed: completed ?? base.completed },
     });
+  }
+
+  function scrollGrillToBottom() {
+    setTimeout(() => {
+      grillThreadRef.current?.scrollTo({
+        top: grillThreadRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }, 50);
+  }
+
+  // One turn of the deep dive. `message` is null for the opening question.
+  async function sendGrillTurn(message: string | null) {
+    if (grillSending) return;
+    setGrillError(null);
+    setGrillSending(true);
+    const history = message === null ? [] : grillMessages;
+    const nextHistory =
+      message === null ? [] : [...grillMessages, { role: "user", content: message } as InterviewChatMessage];
+    if (message !== null) {
+      setGrillMessages(nextHistory);
+      setGrillInput("");
+      scrollGrillToBottom();
+    }
+    try {
+      const res = await sendResumeGrillMessage(numericSessionId, message, history, grillCoveredGoals);
+      const withReply = [...nextHistory, { role: "interviewer", content: res.reply } as InterviewChatMessage];
+      setGrillMessages(withReply);
+      const covered = res.covered_goals ?? grillCoveredGoals;
+      setGrillCoveredGoals(covered);
+      setGrillDone(res.is_done);
+      persist({ grillMessages: withReply, grillCoveredGoals: covered, grillDone: res.is_done });
+    } catch (e: unknown) {
+      setGrillError(e instanceof Error ? e.message : "Could not reach the interviewer. Try again.");
+    } finally {
+      setGrillSending(false);
+      scrollGrillToBottom();
+      grillInputRef.current?.focus();
+    }
+  }
+
+  function startGrill() {
+    setGrillOpen(true);
+    if (grillMessages.length === 0) void sendGrillTurn(null);
+  }
+
+  function handleGrillKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      const text = grillInput.trim();
+      if (text && !grillSending && !grillDone) void sendGrillTurn(text);
+    }
   }
 
   function nextRoute() {
@@ -406,6 +486,97 @@ export default function MockInterviewResume() {
               </div>
             )}
           </div>
+        </section>
+      )}
+
+      {/* Resume deep dive: only offered once a scan has run, since the interviewer
+          quotes the parsed resume back at the candidate. */}
+      {result && (
+        <section className="card ats-grill">
+          <div className="ats-grill-head">
+            <div>
+              <span className="eyebrow">
+                <MessagesSquare size={13} /> Resume Deep Dive
+              </span>
+              <p className="muted small" style={{ marginTop: 4 }}>
+                {grillOpen
+                  ? `${companyLabel} hiring manager, ${Math.min(grillCoveredGoals.length, GRILL_TOTAL_GOALS)} of ${GRILL_TOTAL_GOALS} questions covered.`
+                  : "The part an ATS score cannot tell you: can you defend what is on the page? Five questions on your own projects, numbers, and choices."}
+              </p>
+            </div>
+            {!grillOpen && (
+              <button className="button button-primary" onClick={startGrill} disabled={grillSending}>
+                {grillSending ? <Loader2 size={15} className="spin" /> : <MessagesSquare size={15} />}
+                Start the deep dive
+              </button>
+            )}
+          </div>
+
+          {grillOpen && (
+            <>
+              <div className="ats-grill-thread" ref={grillThreadRef}>
+                {grillMessages.map((msg, i) => (
+                  <div
+                    key={i}
+                    className={`mock-chat-msg ${
+                      msg.role === "interviewer" ? "mock-chat-msg--interviewer" : "mock-chat-msg--user"
+                    }`}
+                  >
+                    <span className="mock-chat-msg-role">
+                      {msg.role === "interviewer" ? `${companyLabel} Interviewer` : "You"}
+                    </span>
+                    <p className="mock-chat-msg-bubble">{msg.content}</p>
+                  </div>
+                ))}
+                {grillSending && (
+                  <div className="mock-chat-msg mock-chat-msg--interviewer">
+                    <span className="mock-chat-msg-role">{companyLabel} Interviewer</span>
+                    <p className="mock-chat-msg-bubble mock-chat-typing">
+                      <Loader2 size={13} className="spin" /> Typing…
+                    </p>
+                  </div>
+                )}
+                {grillDone && (
+                  <div style={{ textAlign: "center", padding: "14px 0 2px" }}>
+                    <span className="eyebrow">Deep dive complete</span>
+                    <p className="muted small" style={{ marginTop: 4 }}>
+                      Your answers feed the final debrief. Continue when you are ready.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {grillError && (
+                <div className="ats-error">
+                  <AlertCircle size={15} /> {grillError}
+                </div>
+              )}
+
+              {!grillDone && (
+                <div className="mock-stage3-chat-input-row">
+                  <textarea
+                    ref={grillInputRef}
+                    className="kojo-input"
+                    placeholder="Type your answer (Enter to send, Shift+Enter for newline)"
+                    value={grillInput}
+                    onChange={(e) => setGrillInput(e.target.value)}
+                    onKeyDown={handleGrillKeyDown}
+                    disabled={grillSending}
+                    rows={3}
+                    style={{ flex: 1, minHeight: 56, maxHeight: 160, resize: "none" }}
+                  />
+                  <button
+                    className="kojo-send"
+                    onClick={() => void sendGrillTurn(grillInput.trim())}
+                    disabled={!grillInput.trim() || grillSending}
+                    title="Send answer"
+                  >
+                    {grillSending ? <Loader2 size={15} className="spin" /> : <Send size={15} />}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
         </section>
       )}
 

@@ -720,6 +720,34 @@ export type MockInterviewSession = {
   stage3_script?: string | null;
   stage3_answers?: string | null;
   overall_feedback?: string | null;
+  // Cloud-synced snapshot of the whole run (a serialized MockProgress) plus when it
+  // was last pushed. The client keeps localStorage as its fast path and takes
+  // whichever of the two is newer on mount.
+  progress_json?: string | null;
+  progress_updated_at?: string | null;
+  resume_file_name?: string | null;
+  resume_grill?: string | null;
+  created_at?: string | null;
+};
+
+// A job description saved to the user's account, with the parsed analysis kept
+// alongside it so reloading a JD does not re-run the LLM parse.
+export type SavedJDParsed = {
+  role_focus: string;
+  culture: string;
+  seniority: string;
+  topics: string[];
+  subtopics: string[];
+  difficulties: string[];
+};
+
+export type SavedJobDescription = {
+  id: ID;
+  name: string;
+  company_name?: string | null;
+  jd_text: string;
+  parsed?: SavedJDParsed | null;
+  updated_at?: string | null;
 };
 
 export type ResumeScreenResult = {

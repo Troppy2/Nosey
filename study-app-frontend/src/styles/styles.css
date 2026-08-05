@@ -22252,3 +22252,245 @@ button.lc-reminder-feature-cta:disabled {
   outline: 2px solid #dc2626;
   outline-offset: 2px;
 }
+
+/* ── KojoCode: Random unsolved shortcut ─────────────────────────────────────── */
+/* Matches the .lc-official-link / .lc-toolbar-btn look so the browse toolbar reads as
+   one control set. Disabled means the pool has nothing unsolved left to pick. */
+.lc-random-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 8px 14px;
+  border: 1px solid var(--lc-border);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.lc-random-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+}
+
+/* The hero shortcut borrows .lc-official-link, which was written for anchors, so the
+   button element needs the inherited font and a disabled state of its own. */
+button.lc-official-link {
+  font-family: inherit;
+}
+
+.lc-random-btn:disabled,
+button.lc-official-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.lc-random-btn:disabled:hover,
+button.lc-official-link:disabled:hover {
+  border-color: var(--lc-border);
+  background: var(--white);
+}
+
+/* ── Mock Interview: past interviews ────────────────────────────────────────── */
+.mock-setup-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.mock-history-link {
+  white-space: nowrap;
+}
+
+.mock-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.mock-history-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+.mock-history-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--green-dark);
+}
+
+.mock-history-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mock-history-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mock-history-company {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.mock-history-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mock-history-meta span:not(:last-child)::after {
+  content: "·";
+  margin-left: 10px;
+}
+
+/* Pill form of the summary page's recommendation colours. The .rec-* rules there
+   style a full-width card (thick left border, gradient), so the pill restates them. */
+.mock-history-rec {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--green-lightest);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.mock-history-rec.rec-strong-hire { background: #ecfdf5; border-color: #10b981; color: #047857; }
+.mock-history-rec.rec-hire        { background: #eff6ff; border-color: #3b82f6; color: #1d4ed8; }
+.mock-history-rec.rec-borderline  { background: #fffbeb; border-color: #f59e0b; color: #b45309; }
+.mock-history-rec.rec-no-hire     { background: #fef2f2; border-color: #ef4444; color: #b91c1c; }
+.mock-history-rec--open           { background: var(--green-lightest); border-color: var(--lc-border); color: #596949; }
+
+.mock-history-chevron {
+  flex-shrink: 0;
+  color: #8a9a7b;
+}
+
+.mock-history-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+/* ── Mock Interview: resume deep dive (grill) ───────────────────────────────── */
+/* Lives inside the Resume Screen page under the ATS report. Reuses the Stage 3 chat
+   bubbles and input row; only the container and thread height are new. */
+.ats-grill {
+  margin-top: 18px;
+  padding: 18px 20px;
+}
+
+.ats-grill-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ats-grill-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 420px;
+  overflow-y: auto;
+  margin-top: 16px;
+  padding: 4px 2px;
+}
+
+.ats-grill .mock-stage3-chat-input-row {
+  border-top: 1px solid var(--green-light-mid);
+  padding: 12px 0 0;
+  margin-top: 12px;
+}
+
+@media (max-width: 700px) {
+  .ats-grill-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* ── Mock Interview: saved job descriptions ─────────────────────────────────── */
+/* Chips in the custom-company panel. Each is a load button plus a delete affordance,
+   so the pair sits in one bordered pill rather than two separate controls. */
+.mock-saved-jd-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.mock-saved-jd {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 999px;
+  background: var(--white);
+  overflow: hidden;
+}
+
+.mock-saved-jd.selected {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+}
+
+.mock-saved-jd-load {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mock-saved-jd-load:hover {
+  color: var(--green-dark);
+}
+
+.mock-saved-jd-delete {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px 6px 4px;
+  border: none;
+  background: transparent;
+  color: #8a9a7b;
+  cursor: pointer;
+}
+
+.mock-saved-jd-delete:hover {
+  color: #dc2626;
+}

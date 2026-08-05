@@ -1,11 +1,12 @@
 import { AlertCircle, CheckCircle2, Minus, RefreshCw, Trophy, XCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { LoadingNotice } from "../components/Loaders";
 import { finishMockInterview } from "../lib/api";
 import type { MockInterviewFinishResponse, MockInterviewSession } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
-import { clearActiveMockSession, loadMockProgress } from "../lib/mockInterview";
+import { clearActiveMockSession, type MockProgress } from "../lib/mockInterview";
+import { MockProgressGate } from "../components/MockProgressGate";
 
 const RECOMMENDATION_META: Record<
   string,
@@ -46,15 +47,22 @@ const VERDICT_LABELS: Record<string, { label: string; className: string }> = {
 
 export default function MockInterviewSummary() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  return (
+    <MockProgressGate
+      sessionId={Number(sessionId)}
+      label="Loading your summary"
+      render={(stored) => <SummaryView stored={stored} />}
+    />
+  );
+}
+
+function SummaryView({ stored }: { stored: MockProgress | null }) {
+  const { sessionId } = useParams<{ sessionId: string }>();
   const numericSessionId = Number(sessionId);
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as { session?: MockInterviewSession; selectedStages?: string[] } | null;
 
-  const stored = useMemo(
-    () => (Number.isFinite(numericSessionId) ? loadMockProgress(numericSessionId) : null),
-    [numericSessionId],
-  );
   const rawCompany = state?.session?.company ?? stored?.company ?? "random";
   const company = (rawCompany === "custom" ? "random" : rawCompany) as CompanyKey;
   const companyLabel =
