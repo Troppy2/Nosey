@@ -9,6 +9,7 @@ export const SETTINGS_KEYS = {
   weaknessSensitivity: "nosey_lc_weakness_sensitivity",
   difficultyPrompt: "nosey_lc_difficulty_prompt",
   interviewerMode: "nosey_lc_interviewer_mode",
+  interviewRealism: "nosey_lc_interview_realism",
 } as const;
 
 // Kojo custom instructions are capped so they can't crowd out the notes context
@@ -92,6 +93,12 @@ export function useSettings() {
   const [interviewerMode, setInterviewerModeState] = useState(() =>
     readStringSetting(SETTINGS_KEYS.interviewerMode, "bigtech"),
   );
+  // Interview realism: hides the strategy giveaways a real interview would never
+  // hand you (LeetCode topic tags, curated technique chips, the starter snippet).
+  // Defaults ON so practice mirrors an interview unless the user opts out.
+  const [interviewRealism, setInterviewRealismState] = useState(() =>
+    readBooleanSetting(SETTINGS_KEYS.interviewRealism, true),
+  );
   const [betaMode, setBetaModeState] = useState(deriveBetaAccess);
 
   // Sync state when another instance of useSettings writes a setting.
@@ -117,6 +124,9 @@ export function useSettings() {
       }
       if (e.key === scopeKey(SETTINGS_KEYS.interviewerMode) && e.newValue !== null) {
         setInterviewerModeState(e.newValue);
+      }
+      if (e.key === scopeKey(SETTINGS_KEYS.interviewRealism) && e.newValue !== null) {
+        setInterviewRealismState(e.newValue !== "false");
       }
       // Beta access follows the stored user record (admin-granted). Re-derive
       // when it changes in another tab (login/logout or an admin grant picked
@@ -165,6 +175,11 @@ export function useSettings() {
     writeSetting(scopeKey(SETTINGS_KEYS.interviewerMode), value);
   }
 
+  function setInterviewRealism(value: boolean) {
+    setInterviewRealismState(value);
+    writeSetting(scopeKey(SETTINGS_KEYS.interviewRealism), String(value));
+  }
+
   return {
     questionFallbackEnabled,
     setQuestionFallbackEnabled,
@@ -180,6 +195,8 @@ export function useSettings() {
     setDifficultyPromptEnabled,
     interviewerMode,
     setInterviewerMode,
+    interviewRealism,
+    setInterviewRealism,
     betaMode,
   };
 }

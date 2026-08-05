@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import BIGINT_ID, Base, TimestampMixin
@@ -38,8 +39,22 @@ class MockInterviewSession(Base, TimestampMixin):
     # stage3, stage3_complete, complete. See routes/mock_interview.py STATUS_* constants.
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
 
+    # Full client-side run snapshot (the frontend's MockProgress blob) plus the time it
+    # was last pushed. The client writes localStorage first and syncs here debounced, then
+    # merges the newer of the two on mount, so a run survives a refresh, a cleared cache,
+    # or a different device. Null until the first sync.
+    progress_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    progress_updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
     # Resume Screen (optional first stage): ATS evaluation result JSON.
     resume_screen: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # The extracted resume text the ATS screen ran on, plus the uploaded file's name.
+    # Kept so a resumed session still has the resume and so the resume grill round can
+    # quote what the candidate actually wrote.
+    resume_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    resume_file_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    # Resume deep-dive (grill) round feedback JSON ({feedback}).
+    resume_grill: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Stage 1 OA results JSON: [{slug, title, difficulty, code, verdict, feedback}]
     stage1_results: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

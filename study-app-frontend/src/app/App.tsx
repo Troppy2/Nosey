@@ -23,6 +23,7 @@ import MockInterviewStage2 from "../pages/MockInterviewStage2";
 import MockInterviewStage3 from "../pages/MockInterviewStage3";
 import MockInterviewStage1Results from "../pages/MockInterviewStage1Results";
 import MockInterviewSummary from "../pages/MockInterviewSummary";
+import MockInterviewHistory from "../pages/MockInterviewHistory";
 import QuestionEditor from "../pages/QuestionEditor";
 import Results from "../pages/Results";
 import TakeTest from "../pages/TakeTest";
@@ -80,6 +81,7 @@ export default function App() {
           <Route path="/folders/:folderId/flashcards/manage" element={<FlashcardsManage />} />
           <Route path="/leetcode" element={<SignedInRoute><LeetCodeMode /></SignedInRoute>} />
           <Route path="/mock-interview" element={<MockInterviewSetup />} />
+          <Route path="/mock-interview/history" element={<MockInterviewHistory />} />
           <Route path="/mock-interview/:sessionId/resume" element={<MockInterviewResume />} />
           <Route path="/mock-interview/:sessionId/stage1" element={<MockInterviewStage1 />} />
           <Route path="/mock-interview/:sessionId/stage1-results" element={<MockInterviewStage1Results />} />
