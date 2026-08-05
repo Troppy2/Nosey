@@ -1,10 +1,7 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <rect width="64" height="64" rx="10" ry="10" fill="#718355" />
-  <!-- Book icon approximating Lucide BookOpen -->
-  <g transform="translate(8,12)" fill="none" stroke="#e9f5db" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M2 2 C18 0 26 0 42 2 v36 C26 34 18 34 2 38 z" />
-    <path d="M2 2 v36" />
-    <path d="M42 2 v36" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#718355"/>
+  <g stroke="#e9f5db" stroke-width="34" stroke-linecap="round" fill="none">
+    <circle cx="222" cy="222" r="102"/>
+    <path d="M294 294 L390 390"/>
   </g>
 </svg>
