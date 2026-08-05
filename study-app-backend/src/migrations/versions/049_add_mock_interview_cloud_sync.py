@@ -14,14 +14,14 @@ the source of truth:
 - resume_grill: JSON feedback from the resume deep-dive round, read by the final
   summary alongside the other stages.
 
-Revision ID: 049_add_mock_interview_cloud_sync
+Revision ID: 049_mock_interview_cloud_sync
 Revises: 048_add_lc_solution_articles
 Create Date: 2026-08-04
 """
 import sqlalchemy as sa
 from alembic import op
 
-revision = "049_add_mock_interview_cloud_sync"
+revision = "049_mock_interview_cloud_sync"
 down_revision = "048_add_lc_solution_articles"
 branch_labels = None
 depends_on = None

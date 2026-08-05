@@ -7,14 +7,14 @@ with the parsed analysis and the config the user settled on, so a repeat run is 
 dropdown pick with no LLM call.
 
 Revision ID: 050_add_user_job_descriptions
-Revises: 049_add_mock_interview_cloud_sync
+Revises: 049_mock_interview_cloud_sync
 Create Date: 2026-08-04
 """
 import sqlalchemy as sa
 from alembic import op
 
 revision = "050_add_user_job_descriptions"
-down_revision = "049_add_mock_interview_cloud_sync"
+down_revision = "049_mock_interview_cloud_sync"
 branch_labels = None
 depends_on = None
 
