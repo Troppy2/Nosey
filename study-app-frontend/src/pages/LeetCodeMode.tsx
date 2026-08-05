@@ -5837,7 +5837,7 @@ export default function LeetCodeMode() {
                   ) : null}
 
                   {total === 0 ? (
-                    <p className="muted">No problems in this bank yet. Paste some titles below.</p>
+                    <p className="lc-inline-empty">No problems in this bank yet. Paste some titles below.</p>
                   ) : (
                     <ul className="lc-bank-problem-list">
                       {selectedBank.problem_slugs.map((slug) => {
@@ -6085,7 +6085,7 @@ export default function LeetCodeMode() {
                       <span className="lc-drill-count">{dueToday.length}</span>
                     </h2>
                     {dueToday.length === 0 ? (
-                      <p className="muted small">Nothing due. Come back when a drill resurfaces.</p>
+                      <p className="lc-inline-empty">Nothing due. Come back when a drill resurfaces.</p>
                     ) : (
                       <div className="lc-drill-grid">{dueToday.map((drill) => renderDrill(drill, true))}</div>
                     )}
