@@ -1,19 +1,14 @@
 import {
   ArrowLeft,
-  Briefcase,
   Building2,
   ChevronRight,
-  Clock,
-  Code2,
   FileText,
   History,
   Loader2,
-  MessageSquare,
   Play,
   Save,
   Shuffle,
   Sparkles,
-  Users,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -49,39 +44,10 @@ import {
   type MockCompany,
   type MockProgress,
 } from "../lib/mockInterview";
+import { MockLoopRail } from "../components/MockLoopRail";
+import { formatLoopDuration, totalLoopMinutes, type LoopStageKey } from "../data/mockInterviewLoop";
 
 const DIFFICULTY_OPTIONS: TaxonomyDifficulty[] = ["Easy", "Medium", "Hard"];
-
-const STAGE_OPTIONS = [
-  {
-    key: "resume",
-    label: "Resume Screen",
-    description: "ATS check on your resume: would it clear the screen and earn an OA? Never blocks you.",
-    icon: FileText,
-    time: "2 min",
-  },
-  {
-    key: "stage1",
-    label: "Stage 1: Online Assessment",
-    description: "2 to 3 LeetCode problems in a real in-app editor, run against sample cases. No hints.",
-    icon: Code2,
-    time: "60 to 90 min",
-  },
-  {
-    key: "stage2",
-    label: "Stage 2: Technical Interview",
-    description: "Conversational AI interviewer. Background, CS questions, then 1 live coding challenge.",
-    icon: Users,
-    time: "45 min",
-  },
-  {
-    key: "stage3",
-    label: "Stage 3: Behavioral Interview",
-    description: "Company-specific STAR questions. Type your answers; speak them out loud first.",
-    icon: MessageSquare,
-    time: "30 to 45 min",
-  },
-];
 
 // Target seniority. Drives the difficulty mix of Stage 1 problems and how strict
 // the AI interviewer is across every stage. Internship is the default.
@@ -167,7 +133,7 @@ export default function MockInterviewSetup() {
       : COMPANY_OPTIONS.find((c) => c.key === active.company)?.label ?? active.company
     : "";
 
-  function toggleStage(key: string) {
+  function toggleStage(key: LoopStageKey) {
     setSelectedStages((prev) =>
       prev.includes(key) ? prev.filter((s) => s !== key) : [...prev, key],
     );
@@ -401,10 +367,7 @@ export default function MockInterviewSetup() {
     }
   }
 
-  const totalTime = selectedStages.reduce((sum, key) => {
-    const mins = key === "resume" ? 2 : key === "stage1" ? 90 : 45;
-    return sum + mins;
-  }, 0);
+  const totalTime = totalLoopMinutes(selectedStages);
 
   return (
     <div className="page page-narrow">
@@ -419,7 +382,7 @@ export default function MockInterviewSetup() {
               Interview Loop Simulator
             </h1>
             <p className="muted small" style={{ marginTop: 6 }}>
-              Simulate a real SWE interview loop end to end. No hand-holding.
+              Run a real SWE loop end to end, on the clock, with no hints.
             </p>
           </div>
           <div className="mock-setup-hero-actions">
@@ -430,36 +393,6 @@ export default function MockInterviewSetup() {
             >
               <History size={15} /> Past interviews
             </button>
-            <Briefcase size={28} style={{ color: "var(--green-dark)", flexShrink: 0 }} />
-          </div>
-        </div>
-        <div className="mock-setup-loop-bar">
-          <div className="mock-loop-step">
-            <div className="mock-loop-step-icon">
-              <FileText size={12} />
-            </div>
-            Resume Screen
-          </div>
-          <span className="mock-loop-arrow">{"→"}</span>
-          <div className="mock-loop-step">
-            <div className="mock-loop-step-icon">
-              <Code2 size={12} />
-            </div>
-            Online Assessment
-          </div>
-          <span className="mock-loop-arrow">{"→"}</span>
-          <div className="mock-loop-step">
-            <div className="mock-loop-step-icon">
-              <Users size={12} />
-            </div>
-            Technical Interview
-          </div>
-          <span className="mock-loop-arrow">{"→"}</span>
-          <div className="mock-loop-step">
-            <div className="mock-loop-step-icon">
-              <MessageSquare size={12} />
-            </div>
-            Behavioral Interview
           </div>
         </div>
       </div>
@@ -700,7 +633,7 @@ export default function MockInterviewSetup() {
       {/* Level selector */}
       <section className="card mock-setup-section">
         <h2 className="eyebrow">Choose Level</h2>
-        <p className="muted small" style={{ marginTop: -4, marginBottom: 10 }}>
+        <p className="muted small" style={{ marginTop: 4, marginBottom: 12 }}>
           Sets the difficulty of Stage 1 problems and how strict the interviewer is. Defaults to internship.
         </p>
         <div className="mock-level-grid">
@@ -717,54 +650,31 @@ export default function MockInterviewSetup() {
         </div>
       </section>
 
-      {/* Stage selector */}
-      <section className="card mock-setup-section">
-        <h2 className="eyebrow">Choose Stages</h2>
-        <div className="mock-stage-list">
-          {STAGE_OPTIONS.map((stage) => {
-            const Icon = stage.icon;
-            const activeStage = selectedStages.includes(stage.key);
-            return (
-              <button
-                key={stage.key}
-                className={`mock-stage-row${activeStage ? " selected" : ""}`}
-                onClick={() => toggleStage(stage.key)}
-              >
-                <div className="mock-stage-check">
-                  <div className={`mock-stage-checkbox${activeStage ? " checked" : ""}`} />
-                </div>
-                <div className="mock-stage-icon-wrap">
-                  <Icon size={17} />
-                </div>
-                <div className="mock-stage-info">
-                  <span className="mock-stage-label">{stage.label}</span>
-                  <span className="mock-stage-desc">{stage.description}</span>
-                </div>
-                <span className="mock-stage-time pill">
-                  <Clock size={11} style={{ marginRight: 3 }} />
-                  {stage.time}
-                </span>
-              </button>
-            );
-          })}
+      {/* Stage selector: the loop spine. Rail length tracks the time each stage costs. */}
+      <section className="card mock-setup-section mock-loop-section">
+        <div className="mock-loop-section-head">
+          <h2 className="eyebrow">Your loop</h2>
+          <p className="muted small">
+            Switch off any stage you do not want to sit today. The rail shows what each one costs you.
+          </p>
         </div>
+        <MockLoopRail selected={selectedStages} onToggle={toggleStage} />
       </section>
 
       {/* Footer */}
       <div className="mock-setup-footer">
         <div className="mock-setup-footer-meta">
           {selectedStages.length > 0 ? (
-            <p className="muted small" style={{ margin: 0 }}>
-              <Clock
-                size={12}
-                style={{ display: "inline", marginRight: 4, verticalAlign: "middle" }}
-              />
-              {selectedStages.length} stage{selectedStages.length > 1 ? "s" : ""} selected, about{" "}
-              {totalTime} min estimated
+            <p className="mock-setup-tally">
+              <span className="loop-num">{selectedStages.length}</span>
+              <span className="loop-unit">stage{selectedStages.length > 1 ? "s" : ""}</span>
+              <span className="mock-tally-sep" aria-hidden="true" />
+              <span className="loop-num">{formatLoopDuration(totalTime)}</span>
+              <span className="loop-unit">on the clock</span>
             </p>
           ) : (
             <p className="muted small" style={{ margin: 0 }}>
-              No stages selected
+              Pick at least one stage to run.
             </p>
           )}
           {error && <p className="mock-setup-error">{error}</p>}
@@ -776,11 +686,11 @@ export default function MockInterviewSetup() {
         >
           {starting ? (
             <>
-              <Loader2 size={15} className="spin" /> Starting…
+              <Loader2 size={15} className="spin" /> Starting the loop
             </>
           ) : (
             <>
-              Start Interview <ChevronRight size={16} />
+              Start the loop <ChevronRight size={16} />
             </>
           )}
         </button>

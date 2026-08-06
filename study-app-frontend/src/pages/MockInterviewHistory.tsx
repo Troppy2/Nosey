@@ -1,44 +1,18 @@
-import {
-  AlertCircle,
-  ArrowLeft,
-  Briefcase,
-  CheckCircle2,
-  ChevronRight,
-  Clock,
-  Minus,
-  XCircle,
-} from "lucide-react";
+import { AlertCircle, ArrowLeft, Briefcase, ChevronRight, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LoadingNotice } from "../components/Loaders";
 import { listMockInterviewSessions } from "../lib/api";
 import type { MockInterviewSession } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
-
-// Same ladder the backend uses when it reads a recommendation out of the debrief
-// (routes/mock_interview.py::_extract_recommendation). Longest label first so
-// "STRONG HIRE" is not swallowed by the "HIRE" check.
-const RECOMMENDATIONS = ["STRONG HIRE", "NO HIRE", "BORDERLINE", "HIRE"] as const;
-
-const REC_META: Record<string, { label: string; className: string; icon: React.ElementType }> = {
-  "STRONG HIRE": { label: "Strong Hire", className: "rec-strong-hire", icon: CheckCircle2 },
-  HIRE: { label: "Hire", className: "rec-hire", icon: CheckCircle2 },
-  BORDERLINE: { label: "Borderline", className: "rec-borderline", icon: Minus },
-  "NO HIRE": { label: "No Hire", className: "rec-no-hire", icon: XCircle },
-};
+import { MockLoopTrack } from "../components/MockLoopRail";
+import { RECOMMENDATIONS, recommendationMeta } from "../data/mockInterviewLoop";
 
 const LEVEL_LABELS: Record<string, string> = {
   intern: "Internship",
   junior: "New grad / Junior",
   mid: "Mid-level",
   senior: "Senior",
-};
-
-const STAGE_LABELS: Record<string, string> = {
-  resume: "Resume Screen",
-  stage1: "OA",
-  stage2: "Technical",
-  stage3: "Behavioral",
 };
 
 function recommendationOf(session: MockInterviewSession): string | null {
@@ -129,7 +103,7 @@ export default function MockInterviewHistory() {
         <div className="mock-history-list">
           {sessions.map((session) => {
             const rec = recommendationOf(session);
-            const meta = rec ? REC_META[rec] : null;
+            const meta = rec ? recommendationMeta(rec) : null;
             const RecIcon = meta?.icon;
             const complete = session.status === "complete";
             const stages = stagesOf(session);
@@ -164,8 +138,8 @@ export default function MockInterviewHistory() {
                   <div className="mock-history-meta muted small">
                     <span>{LEVEL_LABELS[session.level ?? "intern"] ?? session.level}</span>
                     {formatDate(session.created_at) ? <span>{formatDate(session.created_at)}</span> : null}
-                    <span>{stages.map((s) => STAGE_LABELS[s] ?? s).join(", ")}</span>
                   </div>
+                  <MockLoopTrack stages={stages} current={complete ? "done" : "unknown"} compact />
                 </div>
                 <ChevronRight size={16} className="mock-history-chevron" />
               </button>

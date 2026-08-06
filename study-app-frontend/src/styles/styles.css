@@ -5230,8 +5230,25 @@ select[class*="lc-"]:focus-visible {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 20px;
+  gap: 16px 20px;
   margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+/* The title column absorbs the reflow (its text wraps) so the action group never
+   splits into a 2x2. When space runs out, the whole group drops to its own line
+   below the title as one row, instead of the buttons jumping around. */
+.lc-hero > div:first-child {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.lc-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
 }
 
 .lc-hero p {
@@ -5716,16 +5733,19 @@ select[class*="lc-"]:focus-visible {
 .lc-category-tools {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
 }
 
+/* The search grows to fill the row so the action buttons group together right
+   after it, instead of space-between flinging them to opposite edges. */
 .lc-search {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: min(360px, 100%);
+  flex: 1 1 auto;
+  min-width: 180px;
+  max-width: 460px;
   padding: 0 12px;
   border: 1px solid var(--lc-border);
   border-radius: 8px;
@@ -6715,6 +6735,11 @@ select[class*="lc-"]:focus-visible {
     flex-direction: column;
   }
 
+  /* One row of four buttons cannot fit on a phone, so allow the group to wrap here. */
+  .lc-hero-actions {
+    flex-wrap: wrap;
+  }
+
   .lc-dashboard {
     grid-template-columns: 1fr;
   }
@@ -7104,6 +7129,11 @@ select[class*="lc-"]:focus-visible {
   background: linear-gradient(90deg, #e4ecda 25%, #eff5e8 50%, #e4ecda 75%);
   background-size: 600px 100%;
   animation: sel-kojo-shimmer 1.4s infinite linear;
+}
+
+/* Extra breathing room before the second "paragraph" of placeholder lines. */
+.lc-statement-skeleton .lc-skeleton-line:nth-child(5) {
+  margin-top: 8px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -9292,56 +9322,22 @@ select[class*="lc-"]:focus-visible {
   background: linear-gradient(135deg, var(--green-lightest) 0%, #fff 60%);
   border: 1px solid var(--green-light);
   border-radius: 14px;
-  padding: 28px 32px 24px;
-  margin-bottom: 24px;
+  padding: 24px 32px 22px;
+  margin-bottom: 20px;
 }
 .mock-setup-hero-top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 20px;
 }
 .mock-setup-hero-title {
   font-size: 1.75rem;
   line-height: 1.2;
   margin: 0 0 6px;
 }
-.mock-setup-loop-bar {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  flex-wrap: wrap;
-}
-.mock-loop-step {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 14px;
-  background: rgba(255,255,255,0.85);
-  border: 1.5px solid var(--green-light-mid);
-  border-radius: 8px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--ink);
-}
-.mock-loop-step-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background: var(--green-lightest);
-  color: var(--green-dark);
-  flex-shrink: 0;
-}
-.mock-loop-arrow {
-  color: var(--green-light-mid);
-  font-size: 1rem;
-  padding: 0 6px;
-  line-height: 1;
-}
+/* The hero's pill-and-arrow loop bar was removed: the loop spine below now carries
+   the sequence, and carries the time budget with it. */
 
 /* ── Setup page: sections ── */
 .mock-setup-section {
@@ -9410,76 +9406,8 @@ select[class*="lc-"]:focus-visible {
   font-weight: 600;
 }
 
-.mock-stage-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 14px;
-}
-
-.mock-stage-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 18px;
-  border: 2px solid var(--green-light-mid);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.8);
-  cursor: pointer;
-  text-align: left;
-  transition: border-color var(--transition-normal), background var(--transition-normal), box-shadow var(--transition-normal);
-  width: 100%;
-}
-.mock-stage-row:hover {
-  border-color: var(--green-mid);
-  box-shadow: var(--shadow-md);
-}
-.mock-stage-row.selected {
-  border-color: var(--green-dark);
-  background: var(--green-lightest);
-  box-shadow: 0 0 0 3px rgba(113,131,85,0.15);
-}
-
-.mock-stage-check { flex-shrink: 0; }
-.mock-stage-checkbox {
-  width: 18px; height: 18px;
-  border: 2px solid var(--green-light-mid);
-  border-radius: 5px;
-  transition: background 0.15s, border-color 0.15s;
-  position: relative;
-}
-.mock-stage-checkbox.checked {
-  background: var(--green-dark);
-  border-color: var(--green-dark);
-}
-.mock-stage-checkbox.checked::after {
-  content: "";
-  position: absolute;
-  inset: 2px;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 10'%3E%3Cpath d='M1 5l3.5 3.5L11 1' stroke='white' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
-}
-
-.mock-stage-icon-wrap {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
-  background: var(--green-lightest);
-  color: var(--green-dark);
-  border: 1px solid var(--green-light);
-}
-.mock-stage-row.selected .mock-stage-icon-wrap {
-  background: var(--green-light);
-  border-color: var(--green-light-mid);
-}
-
-.mock-stage-info { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.mock-stage-label { font-weight: 600; font-size: 0.92rem; color: var(--ink); }
-.mock-stage-desc  { font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
-.mock-stage-time  { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; flex-shrink: 0; font-size: 0.78rem; }
+/* The checkbox-and-icon stage rows were replaced by the loop spine (.loop-spine,
+   at the end of this file), which encodes the same choice plus its time cost. */
 
 .mock-setup-footer {
   display: flex;
@@ -10022,39 +9950,8 @@ select[class*="lc-"]:focus-visible {
 }
 .mock-stage2-tts-btn.active { color: var(--green-dark); border-color: var(--green-dark); background: var(--green-lightest); }
 
-.mock-stage2-progress {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
-  margin-bottom: 20px;
-}
-.mock-stage2-progress-track {
-  flex: 1;
-  height: 4px;
-  background: var(--green-light);
-  border-radius: 2px;
-  overflow: hidden;
-  margin: 0 4px;
-}
-.mock-stage2-progress-fill {
-  height: 100%;
-  background: var(--green-dark);
-  border-radius: 2px;
-  transition: width 0.3s ease;
-}
-.mock-stage2-progress-dot {
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  background: var(--green-light-mid);
-  border: none;
-  cursor: default;
-  padding: 0;
-  transition: background 0.15s, transform 0.2s;
-  flex-shrink: 0;
-}
-.mock-stage2-progress-dot.active { background: var(--green-dark); transform: scale(1.4); }
-.mock-stage2-progress-dot.done   { background: var(--green-mid); }
+/* The old dot-and-track progress indicator for Stage 2 was already unreferenced;
+   .loop-track in the stage header is what shows loop position now. */
 
 .mock-stage2-script-card {
   padding: 28px 32px 22px;
@@ -10105,11 +10002,6 @@ select[class*="lc-"]:focus-visible {
   gap: 10px;
   margin: 16px 0 24px;
 }
-.mock-stage2-step-counter {
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-
 .mock-stage2-coding-area {
   display: flex;
   flex-direction: column;
@@ -10508,28 +10400,9 @@ select[class*="lc-"]:focus-visible {
 .rec-borderline  { border-left: 5px solid #f59e0b; background: linear-gradient(90deg, #fffbeb 0%, #fff 100%); }
 .rec-no-hire     { border-left: 5px solid #ef4444; background: linear-gradient(90deg, #fef2f2 0%, #fff 100%); }
 
-.mock-summary-stages {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-.mock-stage-verdict-chip {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  background: #fff;
-  border: 1.5px solid var(--green-light-mid);
-  border-radius: 10px;
-  min-width: 200px;
-}
-.mock-stage-verdict-chip-name {
-  font-size: 0.82rem;
-  color: var(--muted);
-  font-weight: 500;
-  flex: 1;
-}
+/* Per-stage verdicts moved onto the loop spine (.loop-spine--verdicts) so the
+   debrief reads back in the same shape the loop was configured in. */
+
 .mock-summary-feedback {
   padding: 22px 24px;
   display: flex;
@@ -10551,14 +10424,12 @@ select[class*="lc-"]:focus-visible {
   .mock-stage1-body { flex-direction: column; }
   .mock-stage1-problem-panel { width: 100%; max-width: none; border-right: none; border-bottom: 1px solid var(--green-light-mid); max-height: 260px; }
   .mock-stage2-script-card { padding: 20px 22px; }
-  .mock-setup-loop-bar { display: none; }
 }
 
 @media (max-width: 760px) {
   .mock-stage1-layout { height: calc(100vh - 56px); }
 }
 @media (max-width: 600px) {
-  .mock-stage-verdict-chip { min-width: 160px; }
   .mock-rec-card { padding: 20px; gap: 16px; }
 }
 
@@ -22566,4 +22437,421 @@ button.lc-official-link:disabled:hover {
 
 .mock-saved-jd-delete:hover {
   color: #dc2626;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MOCK INTERVIEW: THE LOOP SPINE
+   One vertical rail carries the whole feature. Each station is a stage of
+   the loop, and the rail segment beneath it is sized from that stage's real
+   time budget, so the length of the rail is the time estimate. Switching a
+   stage off collapses its segment and visibly shortens the day.
+   Time is always set in mono with tabular figures, here and everywhere else
+   in this feature.
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Deeper than --ink so the spine is the darkest mark on the page. */
+  --loop-ink: #1c2416;
+  --loop-rail-off: rgba(113, 131, 85, 0.28);
+}
+
+.mock-loop-section {
+  padding: 22px 26px 26px;
+}
+
+.mock-loop-section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 18px;
+}
+
+.mock-loop-section-head p {
+  margin: 0;
+  max-width: 60ch;
+}
+
+.loop-spine {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.loop-station {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 0 16px;
+}
+
+/* ── The rail itself ── */
+.loop-gutter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 2px;
+}
+
+.loop-node {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--green-light-mid);
+  background: var(--white);
+  color: var(--green-mid);
+  transition:
+    background var(--transition-normal),
+    border-color var(--transition-normal),
+    color var(--transition-normal);
+}
+
+.loop-station.is-on .loop-node {
+  background: var(--loop-ink);
+  border-color: var(--loop-ink);
+  color: var(--green-lightest);
+}
+
+/* The segment is the time. Its height comes from --station-h, which the
+   component derives from the stage's minute budget; an unselected stage sets
+   it to 0 and the row falls back to its content height. */
+.loop-segment {
+  flex: 1;
+  width: 2px;
+  min-height: var(--station-h, 0px);
+  margin: 6px 0 -2px;
+  border-radius: 2px;
+  /* Declared as a gradient in both states so the on/off change interpolates. A
+     flat colour and a gradient are not interpolable, so the transition would
+     otherwise snap halfway through instead of fading. */
+  background: linear-gradient(180deg, var(--loop-rail-off), var(--loop-rail-off));
+  transition: min-height var(--transition-normal), background var(--transition-normal);
+}
+
+.loop-station.is-on .loop-segment {
+  background: linear-gradient(180deg, var(--loop-ink), var(--green-dark));
+}
+
+.loop-station:last-child .loop-segment {
+  display: none;
+}
+
+/* ── Station content ── */
+.loop-station-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 2px 12px 16px 0;
+  border: none;
+  background: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.loop-station-body--static {
+  cursor: default;
+}
+
+.loop-station-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.loop-station-index {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--green-mid);
+  transition: color var(--transition-normal);
+}
+
+.loop-station.is-on .loop-station-index {
+  color: var(--green-dark);
+}
+
+.loop-station-label {
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  transition: color var(--transition-normal);
+}
+
+.loop-station.is-on .loop-station-label {
+  color: var(--loop-ink);
+}
+
+/* Time, set in mono and zero-padded so the column reads like a schedule. */
+.loop-station-time {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+/* The two-part time cluster: a mono figure and its uppercase unit. Used on the
+   spine and restated in the setup footer, so it is one pair of classes. */
+.loop-num {
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--green-mid);
+  transition: color var(--transition-normal);
+}
+
+.loop-unit {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gray-500);
+}
+
+.loop-station.is-on .loop-num {
+  color: var(--loop-ink);
+}
+
+.loop-station-time--total .loop-num {
+  font-size: 1.05rem;
+  color: var(--green-dark);
+}
+
+.loop-station-desc {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--gray-500);
+  max-width: 62ch;
+  transition: color var(--transition-normal);
+}
+
+.loop-station.is-on .loop-station-desc {
+  color: var(--muted);
+}
+
+/* The debrief always happens, so it reads as a destination, not an option. */
+.loop-station--terminal .loop-node {
+  background: var(--green-lightest);
+  border-color: var(--green-dark);
+  border-style: dashed;
+  color: var(--green-dark);
+}
+
+.loop-station--terminal .loop-station-label {
+  color: var(--loop-ink);
+}
+
+.loop-station--terminal .loop-station-body {
+  padding-bottom: 2px;
+}
+
+.loop-station-body:hover .loop-station-label {
+  color: var(--loop-ink);
+}
+
+/* Only the offset differs from the global :focus-visible. */
+.loop-station-body:focus-visible {
+  outline-offset: 4px;
+}
+
+/* ── Setup footer tally: the same mono time, restated as the commitment ── */
+.mock-setup-tally {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  flex-wrap: wrap;
+}
+
+.mock-setup-tally .loop-num {
+  font-size: 1rem;
+  color: var(--loop-ink);
+}
+
+.mock-setup-tally .loop-unit {
+  font-size: 0.72rem;
+}
+
+.mock-tally-sep {
+  width: 1px;
+  height: 13px;
+  align-self: center;
+  background: var(--green-light-mid);
+}
+
+/* ── The spine, replayed as verdicts on the debrief page ── */
+.loop-spine--verdicts {
+  margin-bottom: 24px;
+}
+
+.loop-spine--verdicts .loop-station-body {
+  padding-bottom: 18px;
+}
+
+.loop-spine--verdicts .loop-segment {
+  min-height: 18px;
+}
+
+/* Namespaced: the bare .verdict-* classes are badge fills and would flood the row.
+   strong and pass keep the default ink node from `.loop-station.is-on`, so only the
+   two that need flagging are listed. */
+.loop-spine--verdicts .loop-station.loop-verdict-borderline .loop-node {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+}
+
+.loop-spine--verdicts .loop-station.loop-verdict-needs-work .loop-node {
+  background: #fee2e2;
+  border-color: #ef4444;
+  color: #991b1b;
+}
+
+.loop-spine--verdicts .mock-verdict-badge {
+  margin-left: auto;
+}
+
+/* ── The spine laid flat: stage headers, results, history rows ── */
+.loop-track {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 14px 0 0;
+  padding: 0;
+}
+
+.loop-track-station {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* Enough padding that the connector reads as a rail between stations rather
+     than as a hyphen attached to the label. */
+  padding-right: 18px;
+  margin-right: 6px;
+  position: relative;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--gray-500);
+}
+
+/* The connector between stations: the rail, flattened. */
+.loop-track-station:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  right: 4px;
+  width: 10px;
+  height: 1.5px;
+  background: var(--loop-rail-off);
+}
+
+.loop-track-node {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--green-light-mid);
+  background: var(--white);
+}
+
+.loop-track-station.is-done .loop-track-node {
+  background: var(--loop-ink);
+  border-color: var(--loop-ink);
+}
+
+.loop-track-station.is-done {
+  color: var(--muted);
+}
+
+.loop-track-station.is-current .loop-track-node {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.22);
+}
+
+.loop-track-station.is-current {
+  color: var(--loop-ink);
+}
+
+.loop-track-station.is-done:not(:last-child)::after {
+  background: var(--green-mid);
+}
+
+/* The results header is centred, so the track under it has to be too. */
+.mock-results-page-header .loop-track {
+  justify-content: center;
+}
+
+.loop-track--compact {
+  margin-top: 6px;
+}
+
+.loop-track--compact .loop-track-station {
+  font-size: 0.68rem;
+  padding-right: 14px;
+  margin-right: 4px;
+}
+
+.loop-track--compact .loop-track-station:not(:last-child)::after {
+  right: 3px;
+  width: 8px;
+}
+
+.loop-track--compact .loop-track-node {
+  width: 6px;
+  height: 6px;
+}
+
+/* ── The one orchestrated moment: the rail draws itself on arrival ──
+   Scoped off the debrief spine on purpose. There the reader has just waited on an
+   LLM call, and staggering the verdicts holds the last one back another ~0.6s. */
+.loop-spine:not(.loop-spine--verdicts) .loop-station {
+  animation: loop-station-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--station-i, 0) * 70ms);
+}
+
+@keyframes loop-station-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loop-spine .loop-station {
+    animation: none;
+  }
+  .loop-segment,
+  .loop-node,
+  .loop-station-label,
+  .loop-num,
+  .loop-station-desc {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .loop-station {
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 0 12px;
+  }
+  .loop-station-time {
+    margin-left: 0;
+  }
+  .mock-loop-section {
+    padding: 18px 16px 20px;
+  }
 }

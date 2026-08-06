@@ -19,6 +19,7 @@ import type { CodingProblemInfo, InterviewChatMessage, MockInterviewSession } fr
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
 import { loadMockProgress, saveMockProgress, type MockProgress, type MockCompany } from "../lib/mockInterview";
 import { MockProgressGate } from "../components/MockProgressGate";
+import { MockLoopTrack } from "../components/MockLoopRail";
 
 function speak(text: string) {
   if (!window.speechSynthesis) return;
@@ -262,6 +263,7 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
                 {Math.min(coveredGoals.length, totalGoals)} of {totalGoals} covered
               </span>
             </div>
+            <MockLoopTrack stages={selectedStages} current="stage2" compact />
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
