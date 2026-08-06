@@ -5244,7 +5244,7 @@ export default function LeetCodeMode() {
             <h1>KojoCode</h1>
             <p className="muted">Official problems, a better practice surface, streaks, and Kojo as a coach instead of a code dump.</p>
           </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <div className="lc-hero-actions">
             <button
               type="button"
               className="lc-official-link"
@@ -6634,21 +6634,6 @@ export default function LeetCodeMode() {
             </div>
           ) : null}
 
-          {/* Interview realism hides the starter code, so the way back has to be here in
-              the editor too, not only on the dashboard. */}
-          <div className="lc-toolbar-cluster" aria-label="KojoCode settings">
-            <span className="lc-toolbar-cluster-label">Settings</span>
-            <button
-              type="button"
-              className="lc-toolbar-btn"
-              onClick={() => setSettingsOpen(true)}
-              aria-label="KojoCode settings"
-              title="KojoCode settings"
-            >
-              <Settings size={16} />
-              <span className="lc-tb-label">Settings</span>
-            </button>
-          </div>
         </div>
       </div>
 
@@ -6733,12 +6718,9 @@ export default function LeetCodeMode() {
 
           {problemLoading ? (
             <div className="lc-statement-skeleton" role="status" aria-busy="true">
-              <span className="lc-skeleton-line" style={{ width: "94%" }} />
-              <span className="lc-skeleton-line" style={{ width: "100%" }} />
-              <span className="lc-skeleton-line" style={{ width: "82%" }} />
-              <span className="lc-skeleton-line" style={{ width: "38%" }} />
-              <span className="lc-skeleton-line" style={{ width: "97%", marginTop: 8 }} />
-              <span className="lc-skeleton-line" style={{ width: "68%" }} />
+              {[94, 100, 82, 38, 97, 68].map((width, i) => (
+                <span key={i} className="lc-skeleton-line" style={{ width: `${width}%` }} />
+              ))}
               <span className="lc-visually-hidden">Loading official statement…</span>
             </div>
           ) : null}
