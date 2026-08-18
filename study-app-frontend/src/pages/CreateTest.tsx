@@ -136,12 +136,13 @@ export default function CreateTest() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!title.trim() || !folderId) return;
+    if (!folderId) return;
+    const resolvedTitle = title.trim() || "Untitled Test";
     setIsSubmitting(true);
     try {
       const result = await createTest({
         folderId,
-        title: title.trim(),
+        title: resolvedTitle,
         testType,
         files,
         countMcq: advancedMode ? countMcq : undefined,
@@ -174,7 +175,7 @@ export default function CreateTest() {
       // Save creation params so FolderDetail can show the prompt later
       if (folderId) {
         const params: TestCreationParams = {
-          title: title.trim(), folderId, testType, countMcq, countFrq,
+          title: resolvedTitle, folderId, testType, countMcq, countFrq,
           countTf, countMs, countRank,
           isMathMode, isCodingMode, codingLanguage, difficulty,
           topicFocus, customInstructions, advancedMode,
@@ -257,7 +258,6 @@ export default function CreateTest() {
   }
 
   const canSubmit =
-    title.trim() &&
     folderId !== null &&
     !isSubmitting &&
     (files.length > 0 || practiceTestFile !== null || folderFileCount > 0);
@@ -305,7 +305,7 @@ export default function CreateTest() {
           <Card className="form-panel">
             <TextInput
               label="Test title"
-              value={title}
+              value={title || "Untitled Test"}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Midterm Practice"
             />
