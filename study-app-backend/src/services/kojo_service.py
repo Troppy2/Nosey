@@ -329,7 +329,7 @@ class KojoService:
         prompt = _build_prompt(
             notes_context, user_message, history, strictness=strictness or "medium",
             custom_instruction=custom_instruction, user_memory=user_memory,
-            interviewer_mode=interviewer_mode,
+            interviewer_mode=interviewer_mode, owner_id=user_id,
         )
 
         try:
@@ -400,7 +400,7 @@ class KojoService:
         prompt = _build_prompt(
             notes_context, user_message, history, strictness=strictness or "medium",
             custom_instruction=custom_instruction, user_memory=user_memory,
-            interviewer_mode=interviewer_mode,
+            interviewer_mode=interviewer_mode, owner_id=user_id,
         )
 
         llm = LLMService()
@@ -621,7 +621,9 @@ class KojoService:
                 await repo.add_message(conversation.id, "user", user_message)
                 history = await repo.get_history(conversation.id, limit=10, after=conversation.cleared_at)
                 wrong_answers_context = _format_wrong_answers_context(wrong_answers_data)
-                prompt = _build_review_wrong_answers_prompt(notes_context, wrong_answers_context, user_message, history)
+                prompt = _build_review_wrong_answers_prompt(
+                    notes_context, wrong_answers_context, user_message, history, owner_id=user_id
+                )
             else:
                 # No recent wrong answers found
                 await repo.add_message(conversation.id, "user", user_message)
@@ -642,6 +644,7 @@ class KojoService:
             prompt = _build_prompt(
                 notes_context, user_message, history, strictness=strictness or "medium",
                 custom_instruction=custom_instruction, user_memory=user_memory,
+                owner_id=user_id,
             )
 
         active_provider = provider
@@ -663,6 +666,7 @@ class KojoService:
                     history_block=history_block,
                     provider=active_provider,
                     strictness=kojo_strictness,
+                    owner_id=user_id,
                 )
             elif active_provider:
                 kojo_response = await llm.call_kojo(prompt if isinstance(prompt, str) else str(prompt), provider=active_provider)
@@ -757,7 +761,9 @@ class KojoService:
                 await repo.add_message(conversation.id, "user", user_message)
                 history = await repo.get_history(conversation.id, limit=10, after=conversation.cleared_at)
                 wrong_answers_context = _format_wrong_answers_context(wrong_answers_data)
-                prompt = _build_review_wrong_answers_prompt(notes_context, wrong_answers_context, user_message, history)
+                prompt = _build_review_wrong_answers_prompt(
+                    notes_context, wrong_answers_context, user_message, history, owner_id=user_id
+                )
             else:
                 await repo.add_message(conversation.id, "user", user_message)
                 prebuilt = "You don't have any wrong answers from your most recent test to review. Keep practicing!"
@@ -768,6 +774,7 @@ class KojoService:
             prompt = _build_prompt(
                 notes_context, user_message, history, strictness=strictness or "medium",
                 custom_instruction=custom_instruction, user_memory=user_memory,
+                owner_id=user_id,
             )
 
         llm = LLMService()
@@ -795,6 +802,7 @@ class KojoService:
                     history_block=history_block,
                     provider=provider,
                     strictness=kojo_strictness,
+                    owner_id=user_id,
                 )
                 kojo_response = full
                 yield {"type": "delta", "text": full}
@@ -895,6 +903,7 @@ class KojoService:
         prompt = _build_prompt(
             notes_context, user_message, history, strictness=strictness or "medium",
             custom_instruction=custom_instruction, user_memory=user_memory,
+            owner_id=user_id,
         )
 
         llm = LLMService()
@@ -1437,9 +1446,13 @@ _STOPWORDS = {
 }
 
 
-def _extract_relevant_sections(notes: str, user_message: str, max_sections: int = 6) -> str:
+def _extract_relevant_sections(
+    notes: str, user_message: str, max_sections: int = 6, owner_id: Optional[int] = None
+) -> str:
     """Return the paragraphs from notes that best match the user's question keywords."""
-    context, meta = HybridRAGService().retrieve_context(notes, user_message, top_k=max_sections)
+    context, meta = HybridRAGService().retrieve_context(
+        notes, user_message, top_k=max_sections, owner_id=owner_id
+    )
     if context and meta.get("retrieval_selected_chunks", 0):
         return context
 
@@ -1473,7 +1486,9 @@ def _extract_relevant_sections(notes: str, user_message: str, max_sections: int 
     return "\n\n".join(para for _, para in scored[:max_sections])
 
 
-def _build_review_wrong_answers_prompt(notes: str, wrong_answers: str, user_message: str, history: list) -> str:
+def _build_review_wrong_answers_prompt(
+    notes: str, wrong_answers: str, user_message: str, history: list, owner_id: Optional[int] = None
+) -> str:
     """Build prompt for reviewing wrong answers with RAG-enhanced feedback."""
     history_lines: list[str] = []
     for msg in history[:-1]:
@@ -1489,7 +1504,7 @@ def _build_review_wrong_answers_prompt(notes: str, wrong_answers: str, user_mess
             f"UPLOADED DOCUMENTS ({len(doc_sources)}): {', '.join(doc_sources)}\n\n"
             if len(doc_sources) > 1 else ""
         )
-        relevant = _extract_relevant_sections(notes, wrong_answers)
+        relevant = _extract_relevant_sections(notes, wrong_answers, owner_id=owner_id)
         relevant_block = (
             "RELEVANT SECTIONS FROM STUDENT'S NOTES (pre-matched to their answers):\n"
             f"{relevant}\n\n"
@@ -1652,6 +1667,7 @@ def _build_prompt(
     custom_instruction: Optional[str] = None,
     user_memory: Optional[str] = None,
     interviewer_mode: Optional[str] = None,
+    owner_id: Optional[int] = None,
 ) -> str:
     history_lines: list[str] = []
     for msg in history[:-1]:
@@ -1667,7 +1683,7 @@ def _build_prompt(
             f"UPLOADED DOCUMENTS ({len(doc_sources)}): {', '.join(doc_sources)}\n\n"
             if len(doc_sources) > 1 else ""
         )
-        relevant = _extract_relevant_sections(notes, user_message)
+        relevant = _extract_relevant_sections(notes, user_message, owner_id=owner_id)
         relevant_block = (
             "RELEVANT SECTIONS FROM STUDENT'S NOTES (pre-matched to their question):\n"
             f"{relevant}\n\n"
