@@ -416,6 +416,7 @@ class LLMService:
         enable_fallback: bool = True,
         prior_questions: Optional[list[str]] = None,
         on_question: Optional[Callable[[str, object], Awaitable[None]]] = None,
+        owner_id: Optional[int] = None,
     ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
         if self._is_mcq_only_mode(test_type):
             count_frq = 0
@@ -441,7 +442,7 @@ class LLMService:
         # Run CPU-bound RAG retrieval in a thread pool to avoid blocking the event loop
         loop = asyncio.get_event_loop()
         generation_notes, retrieval_meta = await loop.run_in_executor(
-            None, self._retrieve_relevant_context, notes, retrieval_query, _RETRIEVAL_TOP_K
+            None, self._retrieve_relevant_context, notes, retrieval_query, _RETRIEVAL_TOP_K, owner_id
         )
         diagnostics: dict[str, object] = {
             "fallback_used": False,
@@ -1067,6 +1068,7 @@ class LLMService:
         enable_fallback: bool = True,
         prior_questions: Optional[list[str]] = None,
         on_question: Optional[Callable[[str, object], Awaitable[None]]] = None,
+        owner_id: Optional[int] = None,
     ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
         """Generate questions from study notes using practice test as a style template.
         
@@ -1092,7 +1094,7 @@ class LLMService:
         )
         loop = asyncio.get_event_loop()
         source_context, retrieval_meta = await loop.run_in_executor(
-            None, self._retrieve_relevant_context, notes, retrieval_query, _RETRIEVAL_TOP_K
+            None, self._retrieve_relevant_context, notes, retrieval_query, _RETRIEVAL_TOP_K, owner_id
         )
         study = await self._extract_study_content(source_context, provider=provider)
         
@@ -3358,8 +3360,9 @@ Return only the JSON object."""
         notes: str,
         query: str,
         top_k: int = _RETRIEVAL_TOP_K,
+        owner_id: Optional[int] = None,
     ) -> tuple[str, dict[str, object]]:
-        return self._retrieve_relevant_context(notes, query, top_k=top_k)
+        return self._retrieve_relevant_context(notes, query, top_k=top_k, owner_id=owner_id)
 
     async def map_reduce_long_answer(
         self,
@@ -3368,6 +3371,7 @@ Return only the JSON object."""
         history_block: str = "",
         provider: Optional[str] = None,
         strictness: str = "medium",
+        owner_id: Optional[int] = None,
     ) -> str:
         strictness = (strictness or "medium").strip().lower()
         if strictness not in {"strict", "medium", "none"}:
@@ -3401,6 +3405,7 @@ Return only the JSON object."""
                 f"[{source}]\n{doc_text}",
                 user_query,
                 top_k=max(2, _RETRIEVAL_TOP_K // 2),
+                owner_id=owner_id,
             )
             logger.info(
                 "map_reduce: Retrieved context for document",
@@ -4584,8 +4589,9 @@ Return only the JSON object."""
         notes: str,
         query: str,
         top_k: int = _RETRIEVAL_TOP_K,
+        owner_id: Optional[int] = None,
     ) -> tuple[str, dict[str, object]]:
-        return self._rag.retrieve_context(notes, query, top_k=top_k)
+        return self._rag.retrieve_context(notes, query, top_k=top_k, owner_id=owner_id)
 
     def _chunk_notes_for_retrieval(
         self,

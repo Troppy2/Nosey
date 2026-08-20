@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import date
 
@@ -11,6 +12,7 @@ from src.models.user import User
 from src.repositories.user_repository import UserRepository
 from src.schemas.auth_schema import AuthResponse, DateOfBirthRequest, GoogleAuthRequest, UserResponse
 from src.services.auth_service import AuthService
+from src.services.rag_service import HybridRAGService
 from src.limiter import limiter
 from src.utils.exceptions import StudyAppException
 
@@ -88,6 +90,23 @@ async def delete_account(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> None:
+    # Purge the vector index BEFORE the database rows. If the index cannot be cleared we
+    # abort with nothing deleted, so the account is never removed while chunks of its note
+    # text survive in Qdrant. The user can retry; a partial deletion would be unrecoverable.
+    user_id = current_user.id
+    try:
+        # The Qdrant client is synchronous, so keep it off the event loop.
+        await asyncio.to_thread(HybridRAGService().purge_owner, user_id)
+    except Exception as exc:
+        logger.exception("Vector index purge failed; account deletion aborted")
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Could not delete your indexed note text right now, so nothing was deleted. "
+                "Please try again shortly."
+            ),
+        ) from exc
+
     try:
         await UserRepository(session).delete_user(current_user)
         await session.commit()
