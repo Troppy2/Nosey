@@ -59,12 +59,13 @@ def _load_heavy_ml_deps() -> None:
 
 try:
     from qdrant_client import QdrantClient
-    from qdrant_client.models import Distance, FieldCondition, Filter, MatchValue, PayloadSchemaType, PointStruct, VectorParams
+    from qdrant_client.models import Distance, FieldCondition, Filter, FilterSelector, MatchValue, PayloadSchemaType, PointStruct, VectorParams
 except ImportError:  # pragma: no cover - exercised only without optional deps
     QdrantClient = None  # type: ignore[assignment]
     Distance = None  # type: ignore[assignment]
     FieldCondition = None  # type: ignore[assignment]
     Filter = None  # type: ignore[assignment]
+    FilterSelector = None  # type: ignore[assignment]
     MatchValue = None  # type: ignore[assignment]
     PayloadSchemaType = None  # type: ignore[assignment]
     PointStruct = None  # type: ignore[assignment]
@@ -117,13 +118,21 @@ class HybridRAGService:
         query: str,
         top_k: int = _DEFAULT_TOP_K,
         source_filter: Optional[list[str]] = None,
+        owner_id: Optional[int] = None,
     ) -> tuple[str, dict[str, object]]:
+        """Retrieve the most relevant note chunks for a query.
+
+        owner_id stamps every point written to Qdrant with the account it belongs to so
+        account deletion can purge them (see purge_owner). When it is None nothing is
+        written to the remote index, because unattributed points cannot be deleted later.
+        """
         _load_heavy_ml_deps()
         query = (query or "").strip()
         cache_key = hashlib.sha256(
             (
                 f"{hashlib.sha256((notes or '').encode('utf-8', errors='ignore')).hexdigest()}"
                 f"::{query.lower()}::{top_k}::{','.join(sorted(source_filter or []))}"
+                f"::{owner_id if owner_id is not None else 'anon'}"
             ).encode("utf-8")
         ).hexdigest()
         cached = self._cache_get(cache_key)
@@ -155,7 +164,7 @@ class HybridRAGService:
             self._cache_set(cache_key, result)
             return result
 
-        candidates = self._qdrant_candidates(chunks, query, top_k * _STAGE_MULTIPLIER)
+        candidates = self._qdrant_candidates(chunks, query, top_k * _STAGE_MULTIPLIER, owner_id)
         if candidates:
             meta["retrieval_backend"] = "qdrant"
         else:
@@ -331,9 +340,15 @@ class HybridRAGService:
         scored.sort(key=lambda item: item[0], reverse=True)
         return [chunk for _, chunk in scored[: max(1, min(limit, len(scored)))]]
 
-    def _qdrant_candidates(self, chunks: list[RagChunk], query: str, limit: int) -> list[RagChunk]:
+    def _qdrant_candidates(
+        self, chunks: list[RagChunk], query: str, limit: int, owner_id: Optional[int] = None
+    ) -> list[RagChunk]:
         client = self._get_qdrant_client()
         if client is None:
+            return []
+        # Every point we write must be attributable to an account, otherwise deleting that
+        # account cannot purge it. Callers without a user fall back to local hybrid RAG.
+        if owner_id is None:
             return []
         vectors = self._embed_many([chunk.text for chunk in chunks])
         if not vectors:
@@ -346,27 +361,20 @@ class HybridRAGService:
                     collection_name=collection_name,
                     vectors_config=VectorParams(size=len(vectors[0]), distance=Distance.COSINE),
                 )
-            # Qdrant rejects a filtered query (400) unless the filtered payload field has an
-            # index. We filter on "namespace", so ensure a keyword index exists. Idempotent and
-            # cached per process so it only runs once per collection per restart.
-            if collection_name not in self.__class__._qdrant_indexed_collections:
-                try:
-                    client.create_payload_index(
-                        collection_name=collection_name,
-                        field_name="namespace",
-                        field_schema=PayloadSchemaType.KEYWORD,
-                    )
-                except Exception as index_exc:
-                    # Already-exists errors are fine; anything else still lets the query try.
-                    logger.debug("Qdrant namespace index ensure: %s", index_exc)
-                self.__class__._qdrant_indexed_collections.add(collection_name)
-            namespace = hashlib.sha256("||".join(f"{c.source}:{c.index}:{c.text[:120]}" for c in chunks).encode("utf-8")).hexdigest()
+            self._ensure_payload_indexes(client, collection_name)
+            # The owner is part of the namespace so two accounts holding identical notes get
+            # separate points, and purging one account never touches the other's chunks.
+            namespace = hashlib.sha256(
+                f"{owner_id}||".encode("utf-8")
+                + "||".join(f"{c.source}:{c.index}:{c.text[:120]}" for c in chunks).encode("utf-8")
+            ).hexdigest()
             points = [
                 PointStruct(
                     id=int(hashlib.sha256(f"{namespace}:{chunk.index}".encode("utf-8")).hexdigest()[:15], 16),
                     vector=vector,
                     payload={
                         "namespace": namespace,
+                        "owner_id": owner_id,
                         "chunk_index": chunk.index,
                         "source": chunk.source,
                         "source_type": chunk.source_type,
@@ -400,6 +408,70 @@ class HybridRAGService:
             if isinstance(index, int) and index in by_index:
                 ordered.append(by_index[index])
         return ordered
+
+    def _ensure_payload_indexes(self, client: Any, collection_name: str) -> None:
+        """Create the payload indexes both the query and the purge filter depend on.
+
+        Qdrant rejects a filtered query or delete (400) unless the filtered payload field
+        has an index. Idempotent, and cached per process so it only runs once per
+        collection per restart.
+        """
+        if collection_name in self.__class__._qdrant_indexed_collections:
+            return
+        for field_name, field_schema in (
+            ("namespace", PayloadSchemaType.KEYWORD),
+            # owner_id is indexed so account deletion can purge by filter.
+            ("owner_id", PayloadSchemaType.INTEGER),
+        ):
+            try:
+                client.create_payload_index(
+                    collection_name=collection_name,
+                    field_name=field_name,
+                    field_schema=field_schema,
+                )
+            except Exception as index_exc:
+                # Already-exists errors are fine; anything else still lets the caller try.
+                logger.debug("Qdrant %s index ensure: %s", field_name, index_exc)
+        self.__class__._qdrant_indexed_collections.add(collection_name)
+
+    def purge_owner(self, owner_id: int) -> int:
+        """Delete every vector-index chunk belonging to one account.
+
+        Called when an account is deleted, so indexed note text does not outlive the
+        account it came from. Returns the number of points deleted. Raises if the index
+        is reachable but the delete fails, so the caller can abort the deletion rather
+        than report a purge that did not happen. Returns 0 when Qdrant is not configured,
+        because in that case nothing was ever written to a remote index.
+        """
+        client = self._get_qdrant_client()
+        if client is None:
+            return 0
+        collection_name = getattr(settings, "qdrant_collection", "nosey_rag")
+        owner_filter = Filter(must=[FieldCondition(key="owner_id", match=MatchValue(value=owner_id))])
+        existing = {item.name for item in client.get_collections().collections}
+        if collection_name not in existing:
+            return 0
+        # A filter on owner_id is a 400 without its payload index, which on a collection
+        # that has not served a retrieval since startup would make deletion look like a
+        # transient failure forever.
+        self._ensure_payload_indexes(client, collection_name)
+        # Count first so the log records what was actually removed. An exact count is
+        # cheap here because it is scoped to a single owner.
+        try:
+            before = int(client.count(collection_name=collection_name, count_filter=owner_filter, exact=True).count)
+        except Exception as count_exc:
+            logger.debug("Qdrant owner count failed, proceeding with delete: %s", count_exc)
+            before = 0
+        client.delete(
+            collection_name=collection_name,
+            points_selector=FilterSelector(filter=owner_filter),
+            wait=True,
+        )
+        logger.info(
+            "Purged vector index chunks for deleted account",
+            extra={"owner_id": owner_id, "points_deleted": before},
+        )
+        return before
 
     def _ensure_source_diversity(self, selected: list[RagChunk], pool: list[RagChunk]) -> list[RagChunk]:
         """Append one representative chunk for each source not already in selected.
