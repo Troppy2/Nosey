@@ -1194,6 +1194,15 @@ function LeftRail({
     localStorage.setItem(scopeKey(storageKey), String(collapsed));
   }, [storageKey, collapsed]);
 
+  // Below 760px the rail is a horizontal scroll strip, so the later sections sit off
+  // screen. Pull the current one into view on mount and on every section change,
+  // otherwise landing on Practice looks like the menu forgot where you are. The
+  // vertical desktop rail never overflows, so this is a no-op there.
+  const activeItemRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    activeItemRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [active]);
+
   return (
     <aside className="lc-rail" data-collapsed={collapsed} aria-label="KojoCode sections">
       <div className="lc-rail-header">
@@ -1220,6 +1229,7 @@ function LeftRail({
             <button
               key={item.key}
               type="button"
+              ref={isActive ? activeItemRef : undefined}
               className={`lc-rail-item${isActive ? " is-active" : ""}`}
               aria-current={isActive ? "page" : undefined}
               title={collapsed ? item.label : undefined}
