@@ -807,7 +807,7 @@ function PromptModal({
   const mode = params.isCodingMode
     ? `Coding (${params.codingLanguage})`
     : params.isMathMode
-      ? "Math"
+      ? "STEM"
       : "Standard";
 
   return (
