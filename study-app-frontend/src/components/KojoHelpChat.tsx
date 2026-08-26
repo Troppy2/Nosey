@@ -1,4 +1,4 @@
-import { AlertCircle, Lock, Maximize2, Minimize2, Send, Sparkles, X } from "lucide-react";
+import { AlertCircle, ArrowDown, Lock, Maximize2, Minimize2, Send, Sparkles, X } from "lucide-react";
 import KojoMascot from "./KojoMascot";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -119,10 +119,6 @@ export function KojoHelpChat({
   useEffect(() => {
     if (!loadingThread) inputRef.current?.focus();
   }, [loadingThread]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading]);
 
   useEffect(() => {
     document.body.style.overflow = isFullscreen ? "hidden" : "";
@@ -347,6 +343,16 @@ export function KojoHelpChat({
 
         {/* ── Input ── */}
         <div className="kojo-input-area">
+          <button
+            type="button"
+            className="kojo-scroll-bottom"
+            onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
+            aria-label="Scroll to latest message"
+            title="Scroll to latest message"
+          >
+            <ArrowDown size={16} />
+          </button>
+
           <p className={`kojo-input-label${disabled && disabledNote ? " kojo-input-label--locked" : ""}`}>
             {disabled && disabledNote ? (
               <>

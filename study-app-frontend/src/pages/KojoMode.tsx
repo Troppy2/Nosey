@@ -1,5 +1,6 @@
 import {
   AlertCircle,
+  ArrowDown,
   ArrowLeft,
   ArrowUp,
   BookOpen,
@@ -987,10 +988,6 @@ export default function KojoMode() {
     if (loadingFolders || conversationId === null) return;
     saveLastLocation({ folderId, conversationId });
   }, [folderId, conversationId, loadingFolders]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading]);
 
   // Hydrate resent-prompt history and the saved composer draft for the active
   // conversation. Editing state is reset here so a half-typed edit never bleeds
@@ -2195,6 +2192,16 @@ export default function KojoMode() {
 
         {/* Input */}
         <div className="chat-mode-input-area">
+          <button
+            type="button"
+            className="kojo-scroll-bottom"
+            onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
+            aria-label="Scroll to latest message"
+            title="Scroll to latest message"
+          >
+            <ArrowDown size={16} />
+          </button>
+
           <div className="chat-mode-input-shell">
             {showSlashMenu && visibleCommands.length > 0 ? (
               <SlashCommandMenu commands={visibleCommands} activeIndex={slashActiveIndex} onSelect={selectCommand} />

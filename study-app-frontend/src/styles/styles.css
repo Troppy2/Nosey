@@ -16030,6 +16030,55 @@ a.lm-module-row:focus-visible {
   }
 }
 
+.kojo-input-area,
+.chat-mode-input-area {
+  position: relative;
+}
+
+.kojo-scroll-bottom {
+  position: absolute;
+  right: 20px;
+  bottom: calc(100% + 10px);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--green-dark);
+  border-radius: 50%;
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+
+.kojo-scroll-bottom:hover {
+  background: var(--green-dark);
+  color: var(--white);
+  transform: translateY(-1px);
+}
+
+.kojo-scroll-bottom:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .kojo-scroll-bottom {
+    right: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kojo-scroll-bottom {
+    transition: none;
+  }
+  .kojo-scroll-bottom:hover {
+    transform: none;
+  }
+}
 /* Dashboard "Review These" weak cards: keeps the dark gradient of .card-dark
    with light-on-dark bones, same trick as the score hero. */
 .skel-weak-card {
