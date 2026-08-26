@@ -1,4 +1,4 @@
-import { AlertCircle, Maximize2, Minimize2, Send, Sparkles, Trash2, X } from "lucide-react";
+import { AlertCircle, ArrowDown, Maximize2, Minimize2, Send, Sparkles, Trash2, X } from "lucide-react";
 import KojoMascot from "./KojoMascot";
 import { useEffect, useRef, useState } from "react";
 import { clearKojoConversation, fetchKojoConversation, fetchProviderStatus, isGuestSession, kojoChat, kojoChatStream } from "../lib/api";
@@ -71,10 +71,6 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
     setClearNotice(null);
     inputRef.current?.focus();
   }, [folderId]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading]);
 
   useEffect(() => {
     document.body.style.overflow = isFullscreen ? "hidden" : "";
@@ -353,6 +349,16 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
 
         {/* ── Input ── */}
         <div className="kojo-input-area">
+          <button
+            type="button"
+            className="kojo-scroll-bottom"
+            onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
+            aria-label="Scroll to latest message"
+            title="Scroll to latest message"
+          >
+            <ArrowDown size={16} />
+          </button>
+
           <p className="kojo-input-label">Message Kojo</p>
           <div className={isFullscreen ? "kojo-input-row" : undefined}>
             {isFullscreen && modelPicker}
