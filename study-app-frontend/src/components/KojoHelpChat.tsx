@@ -12,6 +12,7 @@ import type { KojoMessage } from "../lib/types";
 import { formatTime } from "./KojoChat";
 import { MarkdownContent } from "./MarkdownContent";
 import { SlashCommandMenu, type CommandOption } from "./SlashCommandMenu";
+import { useChatScroll } from "../lib/useChatScroll";
 
 export interface KojoHelpChatProps {
   /** Stable per-context id (e.g. a problem slug or test id) used to look up
@@ -75,9 +76,14 @@ export function KojoHelpChat({
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [loadingThread, setLoadingThread] = useState(true);
-  const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const threadKey = scopeKey(`nosey_kojo_thread_${storageKey}`);
+
+  // Auto-scroll + "scroll to latest" button state. Watches `loadingThread` so
+  // the bottom snaps to once the conversation history finishes loading.
+  const { containerRef: messagesRef, endRef: bottomRef, atBottom, scrollToBottom } = useChatScroll({
+    deps: [messages, isLoading, loadingThread, conversationId],
+  });
 
   // Resolve (or create) the conversation backing this context. Only the
   // conversation id pointer lives in localStorage; the messages themselves
@@ -264,7 +270,7 @@ export function KojoHelpChat({
         ) : null}
 
         {/* ── Messages ── */}
-        <div className="kojo-messages">
+        <div className="kojo-messages" ref={messagesRef}>
           <div className="kojo-messages-inner">
             {loadingThread ? (
               <div className="kojo-thread-loading" role="status">
@@ -346,7 +352,8 @@ export function KojoHelpChat({
           <button
             type="button"
             className="kojo-scroll-bottom"
-            onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
+            hidden={atBottom}
+            onClick={() => scrollToBottom()}
             aria-label="Scroll to latest message"
             title="Scroll to latest message"
           >

@@ -82,6 +82,7 @@ import type {
   TestBlueprint,
 } from "../lib/types";
 import { useSettings } from "../lib/useSettings";
+import { useChatScroll } from "../lib/useChatScroll";
 
 // Short chip label, full prompt sent to Kojo. Keeping the two separate lets the
 // composer row stay compact without truncating what Kojo actually receives.
@@ -848,10 +849,19 @@ export default function KojoMode() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
 
-  const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachMenuRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll + "scroll to latest" button state. `streamingId` covers the
+  // in-flight token stream, `pendingAction` covers action-card drafting
+  // (loading state without a streaming bubble), and `conversationId` makes the
+  // hook re-run when a restored conversation finishes loading. `view` is in
+  // here so the hook re-measures when the message column remounts after the
+  // folders/home round-trip.
+  const { containerRef: messagesRef, endRef: bottomRef, atBottom, scrollToBottom } = useChatScroll({
+    deps: [messages, actionCards, streamingId, isLoading, pendingAction, conversationId, view],
+  });
 
   const isGeneralMode = folderId === GENERAL_FOLDER_ID && !loadingFolders;
   const showSlashMenu = input.trimStart().startsWith("/");
@@ -1898,7 +1908,7 @@ export default function KojoMode() {
         )}
 
         {/* Messages */}
-        <div className="chat-mode-messages">
+        <div className="chat-mode-messages" ref={messagesRef}>
           <SelectionKojoAssistant folderId={folderId ?? 0} folderName={selectedFolder?.name ?? ""} onAskKojo={handleSelectionAskKojo}>
             <div className="chat-mode-messages-inner">
               {messages.length === 0 && !isLoading && (
@@ -2195,7 +2205,8 @@ export default function KojoMode() {
           <button
             type="button"
             className="kojo-scroll-bottom"
-            onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
+            hidden={atBottom}
+            onClick={() => scrollToBottom()}
             aria-label="Scroll to latest message"
             title="Scroll to latest message"
           >
