@@ -3,6 +3,8 @@ import ReactDOM from "react-dom/client";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import App from "./app/App";
 import "driver.js/dist/driver.css";
+import "./styles/base.css";
+import "./styles/layout.css";
 import "./styles/styles.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

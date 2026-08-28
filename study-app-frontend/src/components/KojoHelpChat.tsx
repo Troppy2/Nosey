@@ -13,6 +13,7 @@ import { formatTime } from "./KojoChat";
 import { MarkdownContent } from "./MarkdownContent";
 import { SlashCommandMenu, type CommandOption } from "./SlashCommandMenu";
 import { useChatScroll } from "../lib/useChatScroll";
+import "../styles/components/kojo-help-chat.css";
 
 export interface KojoHelpChatProps {
   /** Stable per-context id (e.g. a problem slug or test id) used to look up
