@@ -3176,8 +3176,8 @@ h3 {
 /* ── Messages ── */
 .kojo-messages {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  scroll-behavior: smooth;
 }
 
 
@@ -4957,6 +4957,7 @@ h3 {
 
 .chat-mode-messages {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -16052,6 +16053,13 @@ a.lm-module-row:focus-visible {
   cursor: pointer;
   box-shadow: var(--shadow-sm);
   transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+
+/* The `display: inline-flex` above shadows the browser's `[hidden] { display: none }`
+   default, so the explicit rule below is required to actually hide the button when
+   the user is at the bottom of the chat. */
+.kojo-scroll-bottom[hidden] {
+  display: none;
 }
 
 .kojo-scroll-bottom:hover {
