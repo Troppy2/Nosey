@@ -219,7 +219,7 @@ describe("useChatScroll", () => {
     await actAndFlush(() => handle!.scrollToOffset(0));
     await waitFor(() => expect(handle!.atBottom()).toBe(false));
 
-    let captured: { behavior: string } | null = null;
+    let captured: { behavior: string } | null | undefined;
     const el = handle!.containerEl();
     const original = el.scrollTo;
     el.scrollTo = (opts: { top: number; behavior?: string }) => {
@@ -230,8 +230,8 @@ describe("useChatScroll", () => {
     act(() => {
       handle!.clickScrollToBottom();
     });
-
-    expect(captured?.behavior).toBe("smooth");
+    if (!captured) throw new Error("scrollToBottom did not call scrollTo");
+    expect(captured.behavior).toBe("smooth");
     expect(handle!.atBottom()).toBe(true);
   });
 });
