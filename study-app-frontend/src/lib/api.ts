@@ -59,6 +59,7 @@ import type {
   TestSummary,
   TestTake,
 } from "./types";
+import { reportBackendNetworkFailure } from "./backendStatus";
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "https://noesy.onrender.com";
 const TOKEN_KEY = "nosey_access_token";
@@ -114,6 +115,23 @@ export function sanitizeRedirect(raw: string | null | undefined): string {
 type RequestOptions = RequestInit & {
   allowMock?: boolean;
 };
+
+// Wraps raw fetch so a network-level failure (server unreachable, no HTTP
+// response at all) flips the global backend status and mounts the waiting
+// screen, instead of surfacing as a generic "Failed to fetch" error. A server
+// that responds, even with a 5xx, is reachable and is NOT reported here.
+// User-cancelled requests (AbortError from a stream/stop button) pass through
+// untouched, they say nothing about the server.
+async function guardedFetch(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (err) {
+    const name = (err as { name?: string } | null)?.name;
+    if (name === "AbortError") throw err;
+    reportBackendNetworkFailure();
+    throw new Error("Unable to reach the server. It may be starting up, try again in a moment.");
+  }
+}
 
 function formatApiErrorDetail(detail: unknown): string {
   if (typeof detail === "string") {
@@ -183,7 +201,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await guardedFetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers,
   });
@@ -245,7 +263,7 @@ export function setGoogleSession() {
 }
 
 export async function googleSignIn(idToken: string) {
-  const res = await fetch(`${API_BASE_URL}/auth/google`, {
+  const res = await guardedFetch(`${API_BASE_URL}/auth/google`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -747,7 +765,7 @@ async function consumeKojoStream(
   const headers = new Headers({ "Content-Type": "application/json" });
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await guardedFetch(`${API_BASE_URL}${path}`, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
@@ -802,18 +820,31 @@ async function consumeKojoStream(
     }
   };
 
-  for (;;) {
-    const { value, done: streamDone } = await reader.read();
-    if (streamDone) break;
-    buffer += decoder.decode(value, { stream: true });
-    let sep: number;
-    while ((sep = buffer.indexOf("\n\n")) !== -1) {
-      const raw = buffer.slice(0, sep);
-      buffer = buffer.slice(sep + 2);
-      handleEvent(raw);
+  let streamError: unknown = null;
+  try {
+    for (;;) {
+      const { value, done: streamDone } = await reader.read();
+      if (streamDone) break;
+      buffer += decoder.decode(value, { stream: true });
+      let sep: number;
+      while ((sep = buffer.indexOf("\n\n")) !== -1) {
+        const raw = buffer.slice(0, sep);
+        buffer = buffer.slice(sep + 2);
+        handleEvent(raw);
+      }
     }
+    if (buffer.trim()) handleEvent(buffer);
+  } catch (err) {
+    // A transport failure mid-stream means the server dropped the connection,
+    // so the backend may be down. Surfacing it flips the waiting screen (the
+    // debounce in backendStatus absorbs a single blip).
+    const name = (err as { name?: string } | null)?.name;
+    if (name !== "AbortError") {
+      reportBackendNetworkFailure();
+      throw new Error("Connection lost while Kojo was answering. The server may be starting up, try again in a moment.");
+    }
+    throw err;
   }
-  if (buffer.trim()) handleEvent(buffer);
 
   if (!done) throw new Error("Kojo stream ended before completing. Try again.");
   return done;
@@ -1450,7 +1481,7 @@ export async function streamLCCustomProblems(
   const headers = new Headers({ "Content-Type": "application/json" });
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const response = await fetch(`${API_BASE_URL}/leetcode/custom-problems/generate-stream`, {
+  const response = await guardedFetch(`${API_BASE_URL}/leetcode/custom-problems/generate-stream`, {
     method: "POST",
     headers,
     body: JSON.stringify({ topics, difficulty, count, provider }),
@@ -1498,18 +1529,27 @@ export async function streamLCCustomProblems(
     }
   };
 
-  for (;;) {
-    const { value, done: streamDone } = await reader.read();
-    if (streamDone) break;
-    buffer += decoder.decode(value, { stream: true });
-    let sep: number;
-    while ((sep = buffer.indexOf("\n\n")) !== -1) {
-      const raw = buffer.slice(0, sep);
-      buffer = buffer.slice(sep + 2);
-      handleEvent(raw);
+  try {
+    for (;;) {
+      const { value, done: streamDone } = await reader.read();
+      if (streamDone) break;
+      buffer += decoder.decode(value, { stream: true });
+      let sep: number;
+      while ((sep = buffer.indexOf("\n\n")) !== -1) {
+        const raw = buffer.slice(0, sep);
+        buffer = buffer.slice(sep + 2);
+        handleEvent(raw);
+      }
     }
+    if (buffer.trim()) handleEvent(buffer);
+  } catch (err) {
+    const name = (err as { name?: string } | null)?.name;
+    if (name !== "AbortError") {
+      reportBackendNetworkFailure();
+      throw new Error("Connection lost while Kojo was generating. The server may be starting up, try again in a moment.");
+    }
+    throw err;
   }
-  if (buffer.trim()) handleEvent(buffer);
 
   if (!done) throw new Error("Kojo stream ended before completing. Try again.");
   return { count: total };
@@ -1983,7 +2023,7 @@ async function adminRequest<T>(path: string, options: RequestInit = {}): Promise
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
   headers.set("Authorization", `Bearer ${token}`);
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  const response = await guardedFetch(`${API_BASE_URL}${path}`, { ...options, headers });
   if (!response.ok) {
     let message = `Request failed: ${response.status}`;
     try {
