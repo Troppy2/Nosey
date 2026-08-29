@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { useConfetti } from "../components/Confetti";
 import { InlineLoading, LoadingNotice } from "../components/Loaders";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { SkeletonText } from "../components/Skeletons";
@@ -232,6 +233,10 @@ export default function LearningModuleLesson() {
   const [result, setResult] = useState<QuizAttemptResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Whole-track completion celebration: fired when the LAST module's quiz
+  // passes and every other module is already passed.
+  const { fire: fireConfetti, element: confettiElement } = useConfetti();
 
   // ── Article editing ─────────────────────────────────────────────────────────
   const [editing, setEditing] = useState(false);
@@ -557,6 +562,12 @@ export default function LearningModuleLesson() {
       setResult(graded);
       // Reflect the pass locally so "Next module" unlocks without a refetch.
       if (graded.passed && track && module) {
+        // The WHOLE track is complete when this was the last module and every
+        // other module was already passed. That moment gets confetti; passing a
+        // single module or finishing the last article alone does not.
+        const trackCompleted =
+          !nextModule && track.modules.every((m) => m.id === module.id || m.passed);
+        if (trackCompleted) fireConfetti();
         setTrack({
           ...track,
           modules: track.modules.map((m) =>
@@ -1078,6 +1089,7 @@ export default function LearningModuleLesson() {
         )}
       </section>
       )}
+      {confettiElement}
     </div>
   );
 }
