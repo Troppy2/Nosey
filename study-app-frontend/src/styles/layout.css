@@ -30,3 +30,9 @@ h2 { font-size: 1.45rem; line-height: 1.25; }
 h3 { color: var(--ink); font-size: 1rem; line-height: 1.35; }
 .muted { color: #596949; }
 .small { font-size: 0.9rem; }
+
+/* Custom SVG, sized and aligned to the Lucide icons in the sidebar. */
+.learning-mode-nav-icon {
+  display: block;
+  flex: 0 0 auto;
+}
