@@ -59,7 +59,7 @@ import type {
   TestSummary,
   TestTake,
 } from "./types";
-import { reportBackendNetworkFailure } from "./backendStatus";
+import { reportBackendHttpFailure, reportBackendNetworkFailure } from "./backendStatus";
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "https://noesy.onrender.com";
 const TOKEN_KEY = "nosey_access_token";
@@ -116,15 +116,20 @@ type RequestOptions = RequestInit & {
   allowMock?: boolean;
 };
 
-// Wraps raw fetch so a network-level failure (server unreachable, no HTTP
-// response at all) flips the global backend status and mounts the waiting
-// screen, instead of surfacing as a generic "Failed to fetch" error. A server
-// that responds, even with a 5xx, is reachable and is NOT reported here.
-// User-cancelled requests (AbortError from a stream/stop button) pass through
-// untouched, they say nothing about the server.
+// Wraps raw fetch so a failure to reach the server mounts the waiting screen
+// instead of surfacing as a generic error. Two kinds of failure are reported:
+// a network-level throw (no HTTP response at all), and a gateway status code
+// (502/503/504), which is what Render's proxy returns while a free-tier
+// instance is waking up. A 5xx like 500 or an app-generated 503 is not treated
+// as down on its own: backendStatus re-checks /health before flipping, so a
+// reachable app keeps its normal error handling. User-cancelled requests
+// (AbortError from a stream/stop button) pass through untouched, they say
+// nothing about the server.
 async function guardedFetch(url: string, init: RequestInit): Promise<Response> {
   try {
-    return await fetch(url, init);
+    const response = await fetch(url, init);
+    reportBackendHttpFailure(response.status);
+    return response;
   } catch (err) {
     const name = (err as { name?: string } | null)?.name;
     if (name === "AbortError") throw err;
