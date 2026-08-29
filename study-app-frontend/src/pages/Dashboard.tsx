@@ -1,4 +1,4 @@
-import { BookOpen, Brain, Edit3, FolderOpen, Plus, Trash2, TrendingUp, Undo2, X } from "lucide-react";
+import { BookOpen, Brain, Edit3, FolderOpen, Plus, Trash2, TrendingUp, Undo2, X, FileCheck, Folder as FolderIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -9,6 +9,7 @@ import { SkeletonFolderMiniGrid, SkeletonStatGrid, SkeletonTestRows, SkeletonWea
 import { deleteTest, fetchFlashcards, fetchFolders, fetchTests, getResumableTests, getStoredUser, scopeKey, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
 import type { Flashcard, Folder, ResumableTestInfo, TestSummary } from "../lib/types";
+import { FlashcardsIcon } from "../components/FlashcardsIcon";
 
 const TYPE_START_DELAY_MS = 3000;
 const TYPE_ROTATE_INTERVAL_MS = 5 * 60 * 1000;
@@ -299,8 +300,8 @@ export default function Dashboard() {
     const scoreCount = Math.max(0, scored.length - baseline.scoreCount);
     const average = scoreCount > 0 ? Math.round(scoreSum / scoreCount) : null;
     return [
-      { label: "Tests Taken", value: attempts.toString(), icon: BookOpen },
-      { label: "Cards Reviewed", value: cardsReviewed.toString(), icon: Brain },
+      { label: "Tests Taken", value: attempts.toString(), icon: FileCheck },
+      { label: "Cards Reviewed", value: cardsReviewed.toString(), icon: FlashcardsIcon, iconSize: 30 },
       { label: "Average Score", value: average ? `${average}%` : "New", icon: TrendingUp },
     ];
   }, [flashcards, tests, statsResetVersion]);
@@ -418,7 +419,7 @@ export default function Dashboard() {
                 return (
                   <Card key={stat.label} interactive tone="soft" className="stat-card">
                     <div>
-                      <Icon size={23} />
+                      <Icon size={stat.iconSize ?? 23} />
                       <span>{stat.label}</span>
                     </div>
                     <strong>{stat.value}</strong>
@@ -440,7 +441,7 @@ export default function Dashboard() {
                     {folders.slice(0, 4).map((folder) => (
                       <Link key={folder.id} to={`/folders/${folder.id}`}>
                         <Card interactive className="folder-mini">
-                          <FolderOpen size={25} style={{ color: folder.color ?? "var(--green-dark)" }} />
+                          <FolderIcon size={25} style={{ color: folder.color ?? "var(--green-dark)" }} />
                           <div>
                             <h3>{folder.name}</h3>
                             <p className="muted small">{folder.subject ?? "General"}</p>
