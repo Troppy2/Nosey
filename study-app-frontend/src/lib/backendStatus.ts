@@ -19,10 +19,12 @@ export const BACKEND_API_BASE_URL =
 export type BackendStatus = "up" | "down" | "recovered";
 
 // Probe cadence per state. While down we poll fast so the user is let back in
-// within seconds of the server finishing its boot; while up we only re-check
-// every 10 minutes (the requested background cadence).
+// within seconds of the server finishing its boot; while up we re-check every
+// 5 minutes. Downtime is also detected instantly from API responses (see
+// reportBackendHttpFailure), so the periodic probe is a backstop, not the only
+// detector.
 const POLL_MS: Record<Exclude<BackendStatus, "recovered">, number> = {
-  up: 10 * 60 * 1000,
+  up: 5 * 60 * 1000,
   down: 25 * 1000,
 };
 
@@ -35,12 +37,12 @@ let watcherStarted = false;
 let probeInFlight = false;
 let probeTimer: number | undefined;
 
-// Debounce for network-failure reports. A single transient blip on one API call
-// (a dropped packet, a stalled connection) must not immediately cover the whole
-// app with the waiting screen. We only commit to "down" from an API failure once
-// TWO network failures land within DEBOUNCE_MS, so a lone blip self-heals without
-// ever mounting the overlay. The periodic /health probe remains the authoritative
-// source and flips to "down" directly on a negative result.
+// Debounce for failure reports. A single transient blip on one API call (a
+// dropped packet, a stalled connection) must not immediately cover the whole
+// app with the waiting screen. We only commit to "down" once TWO failures land
+// within DEBOUNCE_MS, so a lone blip self-heals without ever mounting the
+// overlay. The /health probe remains the authoritative source and flips to
+// "down" directly on a negative result.
 const DEBOUNCE_MS = 4000;
 let failureTimer: number | undefined;
 let failureCount = 0;
@@ -107,7 +109,7 @@ function scheduleNextProbe() {
 }
 
 // Idempotent. Call once from the app root. Starts the boot probe, keeps the
-// 10-minute background check alive, and re-probes immediately when the tab
+// 5-minute background check alive, and re-probes immediately when the tab
 // becomes visible again (background tabs get their timers throttled, which
 // would otherwise delay recovery detection).
 export function startBackendWatcher() {
@@ -122,16 +124,21 @@ export function startBackendWatcher() {
   });
 }
 
-// Called by api.ts when a request fails at the network level (fetch threw,
-// never got an HTTP response). A server that answers at all, even with a 5xx,
-// is up and should show normal error handling instead of the waiting screen.
-//
-// Debounced: requires two failures within DEBOUNCE_MS before mounting the
-// waiting screen, so a single transient blip (which the follow-up re-probe will
-// clear in about a second) never yanks the user out of the app. On a confirmed
-// failure we still kick a re-probe so a healthy server drops straight to
-// "recovered" instead of sitting on "down".
-export function reportBackendNetworkFailure() {
+// A response with any of these statuses means the deployment is not serving the
+// app: Render's proxy answers 502/503/504 while a free-tier instance is waking
+// up. A status code alone never flips the app to "down": the app itself can
+// return 503 legitimately (an LLM provider failure maps to it), so every report
+// kicks a /health probe and that probe is the authoritative source. The debounce
+// prevents a single transient blip from covering the whole app, and the probe
+// clears a healthy result (app is fine, only a packet dropped) in about a
+// second.
+const SERVER_DOWN_HTTP_STATUS = new Set([502, 503, 504]);
+
+// Debounced: requires two reports within DEBOUNCE_MS before mounting the
+// waiting screen, so a lone blip self-heals without the overlay ever mounting.
+// Every report also kicks a re-probe, so a healthy server drops straight back
+// to normal handling.
+function reportFailure(markDownImmediately: boolean) {
   failureCount += 1;
   if (failureTimer !== undefined) window.clearTimeout(failureTimer);
   failureTimer = window.setTimeout(() => {
@@ -141,14 +148,33 @@ export function reportBackendNetworkFailure() {
   if (failureCount >= 2 && status === "up") {
     if (failureTimer !== undefined) window.clearTimeout(failureTimer);
     failureCount = 0;
-    setStatus("down");
+    if (markDownImmediately) setStatus("down");
   }
   void checkBackendNow();
 }
 
+// Called by api.ts when a request fails at the network level (fetch threw,
+// never got an HTTP response). There is no doubt the server is unreachable, so
+// on a confirmed double-failure we flip immediately and let the re-probe sort
+// out recovery.
+export function reportBackendNetworkFailure() {
+  reportFailure(true);
+}
+
+// Called by api.ts when a request did get an HTTP response but the status says
+// the deployment is not serving the app (502/503/504, see
+// SERVER_DOWN_HTTP_STATUS). We never flip straight to "down" from a status
+// code alone because the app generates its own 503s (LLM provider failures);
+// the follow-up /health probe is the final word and mounts the waiting screen
+// only when it also fails.
+export function reportBackendHttpFailure(statusCode: number) {
+  if (!SERVER_DOWN_HTTP_STATUS.has(statusCode)) return;
+  reportFailure(false);
+}
+
 // Called from the waiting screen's "Take me back" action. The user has
 // acknowledged recovery, so we jump straight back to the normal app without
-// forcing a full page reload (the watcher keeps the 10-minute cadence running).
+// forcing a full page reload (the watcher keeps the 5-minute cadence running).
 export function dismissBackendRecovery() {
   setStatus("up");
   scheduleNextProbe();
