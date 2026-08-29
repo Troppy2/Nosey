@@ -22815,3 +22815,193 @@ button.lc-official-link:disabled:hover {
 .privacy-modal-body strong {
   font-weight: 600;
 }
+
+/* ============================================================
+   Server waiting screen (backend down / booting)
+   ============================================================ */
+
+.waiting-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  padding: 32px 16px;
+  background: linear-gradient(180deg, var(--green-lightest) 0%, #f2f7ea 100%);
+  color: var(--ink);
+}
+
+.waiting-card {
+  width: min(100%, 700px);
+  padding: 32px 32px 28px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--green-light-mid);
+  border-radius: 18px;
+  box-shadow: var(--shadow-lg);
+}
+
+.waiting-eyebrow {
+  margin: 0 0 10px;
+  color: var(--green-dark);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.waiting-title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: clamp(1.85rem, 4.5vw, 2.5rem);
+  line-height: 1.15;
+}
+
+.waiting-body {
+  margin: 14px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.waiting-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px 28px;
+  margin: 22px 0 0;
+}
+
+.waiting-timer-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.waiting-meta-label {
+  color: var(--green-dark);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.waiting-timer {
+  font-family: var(--font-mono);
+  font-size: 1.9rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.waiting-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 14px 8px 10px;
+  color: var(--ink);
+  font-size: 0.9rem;
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light-mid);
+  border-radius: 999px;
+}
+
+.waiting-status-dot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  background: var(--warning);
+  border-radius: 50%;
+  animation: waiting-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes waiting-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+.waiting-game-stage {
+  margin-top: 22px;
+  overflow: hidden;
+  background: #fbfdf7;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+}
+
+.waiting-game-stage[data-dimmed] canvas {
+  opacity: 0.25;
+  filter: saturate(0.4);
+  transition: opacity 0.35s ease, filter 0.35s ease;
+}
+
+.waiting-game canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 960 / 300;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.waiting-game-hint {
+  margin: 10px 0 0;
+  color: var(--ink);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.waiting-game-hint kbd {
+  display: inline-block;
+  padding: 0 6px;
+  color: var(--green-dark);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light-mid);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+}
+
+.waiting-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+@media (max-width: 640px) {
+  .waiting-card {
+    padding: 26px 20px 22px;
+  }
+  .waiting-meta {
+    gap: 16px 18px;
+  }
+  .waiting-timer {
+    font-size: 1.7rem;
+  }
+  .waiting-status {
+    font-size: 0.84rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .waiting-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .waiting-status {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .waiting-status-dot {
+    animation: none;
+  }
+  .waiting-game-stage[data-dimmed] canvas {
+    transition: none;
+  }
+}
