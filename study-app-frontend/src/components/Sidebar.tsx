@@ -172,7 +172,7 @@ export function Sidebar() {
                 title={isSidebarCollapsed ? item.label : undefined}
               >
                 {item.icon === LearningModeIcon ? (
-                  <LearningModeIcon size={30} className="learning-mode-nav-icon" />
+                  <LearningModeIcon size={19} className="learning-mode-nav-icon" />
                 ) : (
                   <Icon size={19} />
                 )}
