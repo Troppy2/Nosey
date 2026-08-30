@@ -1,11 +1,10 @@
-import { ChevronLeft, ChevronRight, Code2, FolderOpen, LayoutDashboard, Menu, MessageCircle, Settings, ShieldCheck, X } from "lucide-react";
+import { Apple, ChevronLeft, ChevronRight, Code2, FolderOpen, LayoutDashboard, Menu, MessageCircle, Settings, ShieldCheck, X } from "lucide-react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { useSettings } from "../lib/useSettings";
 import { getStoredUser, isGuestSession, scopeKey } from "../lib/api";
 import { OnboardingTour } from "./OnboardingTour";
 import { AgeGateModal } from "./AgeGateModal";
-import { LearningModeIcon } from "./LearningModeIcon";
 
 const ADMIN_EMAILS = ["jamesinah34@gmail.com", "jamesinah883@gmail.com"];
 
@@ -14,7 +13,7 @@ const sidebarStorageKey = "nosey_sidebar_collapsed";
 const BASE_NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, beta: false, guestHidden: false, tourId: undefined },
   { to: "/folders", label: "Folders", icon: FolderOpen, beta: false, guestHidden: false, tourId: "tour-nav-folders" },
-  { to: "/flashcards", label: "Learning Modes", icon: LearningModeIcon, beta: false, guestHidden: false, tourId: undefined },
+  { to: "/flashcards", label: "Learning Modes", icon: Apple, beta: false, guestHidden: false, tourId: undefined },
   { to: "/leetcode", label: "KojoCode", icon: Code2, beta: true, guestHidden: true, tourId: undefined },
   { to: "/kojo/chat", label: "Chat", icon: MessageCircle, beta: false, guestHidden: true, tourId: "tour-nav-kojo" },
   { to: "/settings", label: "Settings", icon: Settings, beta: false, guestHidden: false, tourId: undefined },
@@ -171,11 +170,7 @@ export function Sidebar() {
                 aria-label={item.label}
                 title={isSidebarCollapsed ? item.label : undefined}
               >
-                {item.icon === LearningModeIcon ? (
-                  <LearningModeIcon size={19} className="learning-mode-nav-icon" />
-                ) : (
-                  <Icon size={19} />
-                )}
+                <Icon size={19} />
                 <span className="nav-label">{item.label}</span>
               </NavLink>
             );
