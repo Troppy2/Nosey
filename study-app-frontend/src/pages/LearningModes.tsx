@@ -1,4 +1,4 @@
-import { ArrowLeft, FolderOpen, GraduationCap, Puzzle } from "lucide-react";
+import { ArrowLeft, FolderOpen, BookCopy, Puzzle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Card } from "../components/Card";
@@ -135,7 +135,7 @@ export default function LearningModes() {
           <ModeCard
             to={`/flashcards/${selectedFolderId}/modules`}
             disabled={false}
-            icon={<GraduationCap size={26} />}
+            icon={<BookCopy size={26} />}
             accent="var(--info)"
             title="Learning Modules"
             blurb="AI-written lessons from your notes, read aloud, each followed by a short quiz."
