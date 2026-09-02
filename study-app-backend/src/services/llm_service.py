@@ -1874,6 +1874,37 @@ Return JSON only with these exact keys:
             f"with the rules above): {text}\n\n"
         )
 
+    # Notation spoken the way a teacher says it, never as raw symbols. Same
+    # ruleset the article's tts_script prompt uses; kept in one place because
+    # both episode prompts and any future format need it identically.
+    _SPOKEN_NOTATION_RULES = (
+        "Spoken prose only: no markdown, no LaTeX, no code fences, no stage directions, no speaker "
+        "labels inside the text. Say every piece of notation the way a teacher says it aloud: "
+        "'O(n)' becomes 'O of n', 'O(n log n)' becomes 'O of n log n', '$x^2 + 2x$' becomes "
+        "'x squared plus two x', 'a_i' becomes 'a sub i', 'f(x)' becomes 'f of x', 'n!' becomes "
+        "'n factorial', '<=' becomes 'less than or equal to', 'arr[i]' becomes 'arr at index i', "
+        "'append()' becomes 'the append method'. Walk through code in words rather than dictating it."
+    )
+
+    def _checkpoint_rules_block(self, count: int) -> str:
+        return (
+            f"\"checkpoints\": exactly {count} multiple-choice comprehension checks that pause "
+            "playback and ask the listener a question. Each is an object with:\n"
+            "- \"after_turn\": the 0-based index into the script that playback pauses AFTER. The "
+            "question must be answerable from everything up to and including that turn, and never "
+            "from anything later. Values must strictly increase, the first must be at least 2, the "
+            "last must come before the final turn, and they should be spread roughly evenly.\n"
+            "- \"question\": phrased for someone who has been LISTENING, not reading. Short, "
+            "self-contained, no reference to 'the slide' or 'the text above'.\n"
+            "- \"options\": exactly 4 short answer strings.\n"
+            "- \"correct_index\": the 0-based index of the correct option.\n"
+            "- \"explanation\": one or two sentences on why the right answer is right, shown after "
+            "the listener answers.\n"
+            "Test understanding of what was just explained, not recall of a phrase. Distractors must "
+            "be plausible to someone who half-followed. Vary which index is correct. Write any math "
+            "in words, never as LaTeX, since these are read on a phone mid-episode.\n\n"
+        )
+
     async def generate_module_outline(
         self,
         notes: str,
@@ -2058,6 +2089,305 @@ Return JSON only with these exact keys:
             raise LLMException("The AI could not rebuild the quiz from your edited lesson. Try again.")
 
         return {"tts_script": tts_script, "quiz": quiz}
+
+    # Speakers allowed per format. Anything else is dropped, because the frontend
+    # maps each speaker key to a voice and an unknown key would silently collapse
+    # the cast to one voice.
+    _EPISODE_SPEAKERS = {"podcast": ("host", "expert"), "lecture": ("lecturer",)}
+
+    @classmethod
+    def _parse_episode_turns(cls, raw_turns: object, episode_format: str) -> list[dict[str, str]]:
+        """Validate the script array from an episode-generation response."""
+        allowed = cls._EPISODE_SPEAKERS.get(episode_format, ("lecturer",))
+        turns: list[dict[str, str]] = []
+        if not isinstance(raw_turns, list):
+            return turns
+        for item in raw_turns:
+            if not isinstance(item, dict):
+                continue
+            speaker = str(item.get("speaker") or "").strip().lower()
+            if speaker not in allowed:
+                # A lecture is single-voice, so a stray speaker is a labelling
+                # slip rather than a real second cast member: keep the words.
+                if len(allowed) == 1:
+                    speaker = allowed[0]
+                else:
+                    continue
+            text = str(item.get("text") or "").strip()
+            if text:
+                turns.append({"speaker": speaker, "text": text[:3000]})
+        return turns[:120]
+
+    @staticmethod
+    def _parse_episode_slides(raw_slides: object, turn_count: int) -> list[dict[str, object]]:
+        """Validate the lecture slide array and clamp every start_turn in range.
+
+        Slides are sorted by start_turn and the first is forced to 0, so the deck
+        always has something on screen from the first spoken word.
+        """
+        slides: list[dict[str, object]] = []
+        if not isinstance(raw_slides, list):
+            return slides
+        for item in raw_slides:
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get("title") or "").strip()
+            bullets_raw = item.get("bullets")
+            bullets = (
+                [str(b).strip()[:160] for b in bullets_raw if str(b).strip()][:5]
+                if isinstance(bullets_raw, list)
+                else []
+            )
+            try:
+                start_turn = int(item.get("start_turn"))  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                continue
+            if not title or not bullets:
+                continue
+            slides.append(
+                {
+                    "title": title[:120],
+                    "bullets": bullets,
+                    # Optional worked example, equation, or short code block
+                    # rendered in its own panel under the bullets.
+                    "example": str(item.get("example") or "").strip()[:600] or None,
+                    "start_turn": max(0, min(start_turn, max(0, turn_count - 1))),
+                }
+            )
+        slides.sort(key=lambda s: int(s["start_turn"]))
+        if slides:
+            slides[0]["start_turn"] = 0
+        return slides[:16]
+
+    @staticmethod
+    def _parse_episode_checkpoints(
+        raw_checkpoints: object, turn_count: int, count: int
+    ) -> list[dict[str, object]]:
+        """Validate the mid-episode question array.
+
+        Same shape as the module quiz (question, options, correct_index) plus an
+        after_turn anchor and an explanation revealed once answered.
+        """
+        checkpoints: list[dict[str, object]] = []
+        if not isinstance(raw_checkpoints, list) or turn_count < 3:
+            return checkpoints
+        for item in raw_checkpoints:
+            if not isinstance(item, dict):
+                continue
+            question = str(item.get("question") or "").strip()
+            options_raw = item.get("options")
+            options = (
+                [str(o).strip() for o in options_raw if str(o).strip()][:4]
+                if isinstance(options_raw, list)
+                else []
+            )
+            try:
+                correct_index = int(item.get("correct_index"))  # type: ignore[arg-type]
+                after_turn = int(item.get("after_turn"))  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                continue
+            if not question or len(options) < 2 or not 0 <= correct_index < len(options):
+                continue
+            # Never fire on the opening turn (nothing taught yet) or after the
+            # last one (that is what the end-of-episode summary is for).
+            after_turn = max(1, min(after_turn, turn_count - 2))
+            checkpoints.append(
+                {
+                    "after_turn": after_turn,
+                    "question": question[:500],
+                    "options": options,
+                    "correct_index": correct_index,
+                    "explanation": str(item.get("explanation") or "").strip()[:500],
+                }
+            )
+        # One stop per turn: collapse collisions, keep listening order.
+        seen: set[int] = set()
+        unique: list[dict[str, object]] = []
+        for cp in sorted(checkpoints, key=lambda c: int(c["after_turn"])):
+            turn = int(cp["after_turn"])
+            if turn in seen:
+                continue
+            seen.add(turn)
+            unique.append(cp)
+        return unique[:count]
+
+    @staticmethod
+    def _strip_slide_echo(
+        turns: list[dict[str, str]], slides: list[dict[str, object]]
+    ) -> list[dict[str, str]]:
+        """LECTURE ONLY. Drop narration that just reads its own slide bullets back.
+
+        The anti-redundancy rule in the prompt is the real defence; this is the
+        crude backstop for weaker models, in the spirit of _is_valid_math_mcq. It
+        catches whole-sentence echoes of a bullet. Soft paraphrase is not
+        detectable here and is accepted.
+        """
+        if not slides:
+            return turns
+
+        def norm(text: str) -> str:
+            return re.sub(r"[^a-z0-9 ]", "", text.lower()).strip()
+
+        active: list[int] = []
+        slide_i = 0
+        for turn_i in range(len(turns)):
+            while slide_i + 1 < len(slides) and int(slides[slide_i + 1]["start_turn"]) <= turn_i:
+                slide_i += 1
+            active.append(slide_i)
+
+        cleaned: list[dict[str, str]] = []
+        for turn_i, turn in enumerate(turns):
+            bullets = {norm(str(b)) for b in slides[active[turn_i]]["bullets"]}  # type: ignore[index]
+            sentences = re.split(r"(?<=[.!?])\s+", turn["text"])
+            kept = [s for s in sentences if norm(s) not in bullets or len(sentences) == 1]
+            cleaned.append({"speaker": turn["speaker"], "text": " ".join(kept).strip() or turn["text"]})
+        return cleaned
+
+    async def generate_podcast_episode(
+        self,
+        notes: str,
+        checkpoint_count: int = 5,
+        provider: Optional[str] = None,
+        custom_instructions: Optional[str] = None,
+    ) -> dict[str, object]:
+        """Author a complete two-voice podcast episode from a folder's notes.
+
+        ONE call: title, dialogue, and checkpoints together. There is no slide
+        deck and no article. The whole point of this format is that a folder
+        becomes something listenable for the price of a single generation, so do
+        not add a second call to this path for any reason.
+
+        Returns {"title": str, "turns": [{"speaker", "text"}],
+        "checkpoints": [...]}. Speakers are "host" and "expert".
+        """
+        from src.utils.exceptions import LLMException
+
+        count = max(1, min(10, int(checkpoint_count)))
+        prompt = (
+            "You are writing a single audio episode that teaches a student their own course notes. "
+            "Two people talk. There are no slides and no visuals: everything the listener gets, they "
+            "get through their ears.\n\n"
+            "Return ONE JSON object with keys \"title\", \"turns\", and \"checkpoints\".\n\n"
+            "1. \"title\": a short, specific episode title, at most 10 words, no numbering.\n\n"
+            "2. \"turns\": the dialogue, an array of 30 to 45 objects, each with:\n"
+            "- \"speaker\": either \"host\" or \"expert\".\n"
+            "- \"text\": what that person says, 1 to 4 sentences.\n"
+            "The HOST drives: opens the episode, asks the question a learner would actually ask, "
+            "pushes for a concrete example, says when something sounds confusing, and closes. The "
+            "EXPERT carries the substance and explains in depth. They are not equals and must not "
+            "simply agree with each other. Open with the host framing what the episode covers in one "
+            "or two sentences. Close with the expert giving the one idea worth remembering.\n"
+            "Cover the important material in the notes, in an order that builds: nothing may depend "
+            "on something explained later. Ground every claim in the notes and invent nothing. "
+            "Because there is no deck, anything visual must be described in words the listener can "
+            "picture. "
+            f"{self._SPOKEN_NOTATION_RULES}\n\n"
+            f"3. {self._checkpoint_rules_block(count)}"
+            f"{self._module_instructions_block(custom_instructions)}"
+            f"NOTES:\n{notes[:12000]}"
+        )
+        data = await self._complete_json(prompt, provider=provider)
+
+        turns = self._parse_episode_turns(data.get("turns"), "podcast")
+        if len(turns) < 8:
+            raise LLMException("The AI could not write a usable episode from these notes. Try again.")
+        # A one-sided "conversation" is a failed podcast, not a degraded one.
+        if len({t["speaker"] for t in turns}) < 2:
+            raise LLMException("The AI wrote only one speaker for this episode. Try again.")
+
+        checkpoints = self._parse_episode_checkpoints(data.get("checkpoints"), len(turns), count)
+        if len(checkpoints) < count:
+            raise LLMException(
+                "The AI could not write the checkpoint questions for this episode. Try again."
+            )
+
+        return {
+            "title": str(data.get("title") or "").strip()[:255] or "Podcast episode",
+            "turns": turns,
+            "checkpoints": checkpoints,
+        }
+
+    async def generate_lecture_episode(
+        self,
+        notes: str,
+        checkpoint_count: int = 5,
+        provider: Optional[str] = None,
+        custom_instructions: Optional[str] = None,
+    ) -> dict[str, object]:
+        """Author a single-voice video lecture plus its slide deck, in ONE call.
+
+        Returns {"title": str, "turns": [{"speaker": "lecturer", "text"}],
+        "slides": [{"title", "bullets", "example", "start_turn"}],
+        "checkpoints": [...]}.
+
+        Script and deck MUST come from one call: the lecturer has to know what is
+        on screen as each line is written, otherwise the narration decays into
+        reading the slides aloud, which is the failure this format has to avoid.
+        """
+        from src.utils.exceptions import LLMException
+
+        count = max(1, min(10, int(checkpoint_count)))
+        prompt = (
+            "You are writing a single recorded lecture that teaches a student their own course "
+            "notes: one lecturer speaking over a slide deck that advances as they talk. The deck is "
+            "the main surface. The listener is watching the slides.\n\n"
+            "Return ONE JSON object with keys \"title\", \"turns\", \"slides\", and \"checkpoints\".\n\n"
+            "1. \"title\": a short, specific lecture title, at most 10 words, no numbering.\n\n"
+            "2. \"turns\": the narration, an array of 25 to 40 objects, each with:\n"
+            "- \"speaker\": always the string \"lecturer\".\n"
+            "- \"text\": 2 to 5 sentences of continuous spoken prose.\n"
+            "This is one person teaching, not a conversation: no questions to an imaginary audience, "
+            "no back and forth. Open by saying what the lecture covers. Build in an order where "
+            "nothing depends on something explained later. Work through examples out loud, step by "
+            "step. Close with what to take away. Ground every claim in the notes and invent nothing. "
+            f"{self._SPOKEN_NOTATION_RULES}\n\n"
+            "3. \"slides\": an array of 6 to 12 objects, each with:\n"
+            "- \"title\": the slide title, at most 8 words.\n"
+            "- \"bullets\": 3 to 5 lines. These are teaching slides, so a line may be a short phrase "
+            "or a compact statement of a rule, but never a full paragraph and never more than about "
+            "12 words.\n"
+            "- \"example\": OPTIONAL. One worked example, equation, short code snippet, or labelled "
+            "step sequence shown in a panel under the bullets. Use it on slides where seeing the "
+            "thing matters more than hearing about it. Write it as plain text; keep it under 6 "
+            "lines. Use null when the slide does not need one.\n"
+            "- \"start_turn\": the 0-based turn index this slide appears at. The first slide MUST be "
+            "0, values must strictly increase, and slides should be spaced roughly evenly.\n\n"
+            "CRITICAL RULE ON THE RELATIONSHIP BETWEEN SCRIPT AND DECK. The slide states the thing; "
+            "the lecturer explains it. No turn may read out or paraphrase the bullet text of the "
+            "slide showing at that moment. The narration expands on what is on screen: it gives the "
+            "reasoning, walks the example, names the mistake people make. The lecturer may point at "
+            "the screen, for example 'the third line there is the one that surprises people', but "
+            "must never recite it. If a line could be understood as reading the slide aloud, rewrite "
+            "it.\n\n"
+            f"4. {self._checkpoint_rules_block(count)}"
+            f"{self._module_instructions_block(custom_instructions)}"
+            f"NOTES:\n{notes[:12000]}"
+        )
+        data = await self._complete_json(prompt, provider=provider)
+
+        turns = self._parse_episode_turns(data.get("turns"), "lecture")
+        if len(turns) < 8:
+            raise LLMException("The AI could not write a usable lecture from these notes. Try again.")
+
+        slides = self._parse_episode_slides(data.get("slides"), len(turns))
+        if len(slides) < 3:
+            # A lecture with no deck is not this format. Fail so _complete_json's
+            # provider chain gets a chance at the next provider.
+            raise LLMException("The AI could not build the slide deck for this lecture. Try again.")
+
+        checkpoints = self._parse_episode_checkpoints(data.get("checkpoints"), len(turns), count)
+        if len(checkpoints) < count:
+            raise LLMException(
+                "The AI could not write the checkpoint questions for this lecture. Try again."
+            )
+
+        turns = self._strip_slide_echo(turns, slides)
+        return {
+            "title": str(data.get("title") or "").strip()[:255] or "Video lecture",
+            "turns": turns,
+            "slides": slides,
+            "checkpoints": checkpoints,
+        }
 
     async def generate_custom_problem(
         self,

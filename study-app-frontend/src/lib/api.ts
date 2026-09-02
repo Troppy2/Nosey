@@ -29,6 +29,8 @@ import type {
   LCGeneratedCustomProblem,
   LearningModule,
   LearningTrack,
+  ModuleEpisode,
+  CheckpointAnswerResult,
   QuizAttemptResult,
   LeetCodeComplexityCheckResponse,
   LeetCodeGradeResponse,
@@ -640,9 +642,12 @@ export async function fetchProviderStatus(): Promise<ProviderStatus> {
 // ── Learning Modules ─────────────────────────────────────────────────────────
 
 // Returns null when the folder has no track yet (backend 404s in that case).
-export async function fetchLearningTrack(folderId: number): Promise<LearningTrack | null> {
+export async function fetchLearningTrack(
+  folderId: number,
+  format: "article" | "podcast" | "lecture" = "article",
+): Promise<LearningTrack | null> {
   try {
-    return await request<LearningTrack>(`/folders/${folderId}/learning-track`);
+    return await request<LearningTrack>(`/folders/${folderId}/learning-track?format=${format}`);
   } catch (err) {
     if (err instanceof Error && err.message.includes("Learning track not found")) {
       return null;
@@ -654,20 +659,34 @@ export async function fetchLearningTrack(folderId: number): Promise<LearningTrac
 export async function createLearningTrack(
   folderId: number,
   moduleCount: number,
-  options?: { provider?: string; customInstructions?: string },
+  options?: {
+    provider?: string;
+    customInstructions?: string;
+    format?: "article" | "podcast" | "lecture";
+  },
 ): Promise<LearningTrack> {
   return request<LearningTrack>(`/folders/${folderId}/learning-track`, {
     method: "POST",
     body: JSON.stringify({
       module_count: moduleCount,
+      ...(options?.format ? { format: options.format } : {}),
       ...(options?.provider ? { provider: options.provider } : {}),
       ...(options?.customInstructions ? { custom_instructions: options.customInstructions } : {}),
     }),
   });
 }
 
-export async function deleteLearningTrack(folderId: number): Promise<void> {
-  await request(`/folders/${folderId}/learning-track`, { method: "DELETE" });
+export async function deleteLearningTrack(
+  folderId: number,
+  format: "article" | "podcast" | "lecture" = "article",
+): Promise<void> {
+  await request(`/folders/${folderId}/learning-track?format=${format}`, { method: "DELETE" });
+}
+
+// Every ACTIVE track for a folder, at most one per format, so the hub can
+// render all three format slots in one request.
+export async function fetchActiveTracks(folderId: number): Promise<LearningTrack[]> {
+  return request<LearningTrack[]>(`/folders/${folderId}/learning-tracks`);
 }
 
 // Archives the whole track (freeing the folder's active slot so a new track can
@@ -717,6 +736,24 @@ export async function submitModuleQuiz(moduleId: number, answers: number[]): Pro
   return request<QuizAttemptResult>(`/learning-modules/${moduleId}/quiz-attempt`, {
     method: "POST",
     body: JSON.stringify({ answers }),
+  });
+}
+
+// The episode payload for a podcast/lecture module. correct_index and
+// explanation are stripped server-side until each checkpoint is answered.
+export async function fetchModuleEpisode(moduleId: number): Promise<ModuleEpisode> {
+  return request<ModuleEpisode>(`/learning-modules/${moduleId}/episode`);
+}
+
+// Grades one checkpoint server-side. answer -1 means skipped (scores wrong).
+export async function answerCheckpoint(
+  moduleId: number,
+  checkpointIndex: number,
+  answer: number,
+): Promise<CheckpointAnswerResult> {
+  return request<CheckpointAnswerResult>(`/learning-modules/${moduleId}/checkpoint-answer`, {
+    method: "POST",
+    body: JSON.stringify({ checkpoint_index: checkpointIndex, answer }),
   });
 }
 

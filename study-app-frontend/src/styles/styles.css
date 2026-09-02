@@ -14813,10 +14813,16 @@ a.lm-module-row:focus-visible {
   color: var(--white);
   cursor: pointer;
   transition: background var(--transition-fast);
+  outline: none;
 }
 
 .lm-audio-toggle:hover {
   background: var(--green-dark-mid);
+}
+
+.lm-audio-toggle:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 3px;
 }
 
 .lm-audio-body {
@@ -23004,5 +23010,591 @@ button.lc-official-link:disabled:hover {
   }
   .waiting-game-stage[data-dimmed] canvas {
     transition: none;
+  }
+  .lm-spin {
+    animation: none;
+  }
+  .lm-audio-toggle,
+  .lm-audio-seek,
+  .lm-checkpoint-option {
+    transition: none;
+  }
+  .lm-checkpoint-dots button {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* ── Learning module episode formats (podcast, video lecture) --------------- */
+/* This block must never redefine a selector the article lesson player already
+   owns (.lm-audio-toggle, .lm-audio-body, .lm-audio-titles, .lm-audio-seek,
+   .lm-audio-rates, .lm-audio-rate, .lm-audio-restart, .lm-failed, .lm-spin).
+   The episode player reuses those classes and their existing rules as-is;
+   anything it needs beyond that goes on a modifier class instead. */
+
+.lm-format-picker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.65rem;
+  margin-bottom: 1.15rem;
+}
+.lm-format-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  padding: 0.9rem 0.75rem;
+  border: 1.5px solid var(--green-lightest);
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+}
+.lm-format-card:hover {
+  border-color: var(--green-mid);
+}
+.lm-format-card:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.lm-format-card.is-selected {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+  box-shadow: inset 0 0 0 1px var(--green-dark);
+}
+.lm-format-card-icon {
+  color: var(--green-dark);
+}
+.lm-format-card-name {
+  font-weight: 700;
+  font-size: 1rem;
+}
+.lm-format-card-blurb {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.lm-episode-note {
+  margin: 0 0 0.9rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: var(--green-lightest);
+}
+/* Reuses .lm-stale's advisory-strip shape (an inline notice on this same page
+   family) with the warning token instead of a new hardcoded amber. */
+.lm-speech-notice {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  margin: 0 0 0.9rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--warning) 14%, var(--white));
+  color: var(--warning);
+  font-size: 0.9rem;
+}
+.lm-speech-notice svg { flex: none; }
+.lm-speech-notice p { margin: 0; color: var(--ink); }
+.lm-speech-notice--inline { margin-bottom: 0; }
+
+/* One shell for both slot states (empty = create, filled = ready/generating/
+   failed): same padding, same icon position, same title size, same vertical
+   order, so a slot reads as one object in two states rather than two
+   different components. */
+.lm-format-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.lm-format-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.9rem 0.75rem;
+}
+.lm-format-slot--empty {
+  padding: 0;
+  border-style: dashed;
+}
+.lm-format-slot-create {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  width: 100%;
+  height: 100%;
+  padding: 0.9rem 0.75rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+  text-align: left;
+}
+.lm-format-slot-create:hover .lm-format-slot-icon {
+  transform: translateY(-2px);
+}
+.lm-format-slot-create:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.lm-format-slot-icon {
+  color: var(--green-dark);
+  transition: transform var(--transition-fast);
+}
+.lm-format-slot-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.lm-format-slot-title {
+  font-weight: 700;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.lm-format-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--green-dark);
+  background: var(--green-lightest);
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+}
+.lm-format-slot-state {
+  min-height: 1.4rem;
+  display: flex;
+  align-items: center;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+.lm-format-completed {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--green-dark);
+  font-weight: 600;
+}
+.lm-format-slot.is-failed .form-error { margin: 0; }
+.lm-format-slot-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: auto;
+}
+.lm-format-slot-actions .button { padding: 0.4rem 0.75rem; }
+
+/* Episode player */
+/* .card supplies background, border, and shadow only, never padding, so every
+   Card consumer must set its own. These four never got any: content was
+   sitting flush against the card border with nothing else to blame for the
+   cramped, uneven feel across both the podcast and lecture screens. */
+.lm-episode .lm-header-main h1 { margin: 0 0 0.15rem; }
+.lm-episode-stage {
+  min-height: 10rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 1.25rem;
+}
+.lm-slide {
+  padding: 0.4rem 0.15rem;
+}
+.lm-slide-title {
+  font-size: 1.6rem;
+  line-height: 1.2;
+  margin: 0 0 0.9rem;
+  color: var(--ink);
+}
+.lm-slide-bullets {
+  margin: 0 0 0.75rem;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+/* No global list reset exists in this stylesheet, so the browser's own li
+   margin was stacking on top of the flex gap above, doubling the space
+   between bullets. Zero it explicitly rather than relying on the UA default. */
+.lm-slide-bullets li {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.4;
+  color: var(--ink);
+}
+.lm-slide-example {
+  margin: 0.25rem 0 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  background: var(--green-lightest);
+  border-left: 3px solid var(--green-dark);
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
+.lm-slide-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+}
+.lm-slide-dots {
+  display: flex;
+  gap: 0.1rem;
+}
+/* The visible dot stays small; the button's own box is the real (>=32px) tap
+   target, via padding rather than width/height, so touch does not shrink to
+   the dot's 10px footprint. */
+.lm-slide-dots button,
+.lm-checkpoint-dots button {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  display: grid;
+  place-items: center;
+}
+/* Always carries its own border, so an unfilled dot stays visible whether it
+   sits on the plain page background, the green-lightest player, or a white
+   card. A flat green-lightest fill with no border was invisible on the page
+   itself, since that is the page's own background color. */
+.lm-slide-dots button::before,
+.lm-checkpoint-dots button::before {
+  content: "";
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1.5px solid var(--green-mid);
+}
+.lm-slide-dots button:focus-visible,
+.lm-checkpoint-dots button:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 1px;
+}
+.lm-slide-dots button.is-active::before {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+}
+.lm-episode-transcript {
+  padding: 1.25rem;
+}
+.lm-episode-transcript .lm-transcript-toggle {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  color: var(--green-dark);
+  padding: 0.3rem 0;
+}
+.lm-episode-transcript .lm-transcript-toggle:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.lm-transcript-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  margin-top: 0.6rem;
+}
+.lm-turn {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  padding: 0.25rem 0.4rem;
+  border-radius: 10px;
+  scroll-margin-top: 1.25rem;
+}
+.lm-turn.is-active {
+  background: var(--green-lightest);
+}
+.lm-turn p {
+  margin: 0.1rem 0 0;
+  line-height: 1.55;
+}
+/* Host: filled. Expert: outlined. Same green, no second hue, so the two
+   speakers stay distinguishable in greyscale and for a colorblind reader
+   (the app's existing filled/outline pairing for primary vs. secondary). */
+.lm-speaker-chip {
+  flex: none;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--white);
+  background: var(--green-dark);
+  border: 1px solid var(--green-dark);
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  margin-top: 0.1rem;
+}
+.lm-speaker-chip.is-expert {
+  background: var(--white);
+  color: var(--green-dark);
+}
+/* Matches the article player's own background/border combo (line ~14800)
+   rather than white: the active rate pill is white, so on a white player it
+   was invisible. green-lightest is what makes that pill readable. */
+.lm-episode-player {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem;
+  border: 1px solid var(--green-light);
+  border-radius: 14px;
+  margin: 0.9rem 0;
+  background: var(--green-lightest);
+}
+.lm-audio-format {
+  display: inline-flex;
+  color: var(--green-dark);
+}
+/* The article's .lm-audio-titles is justify-content: space-between, built for
+   a title on the left and a byline on the right. The episode player only has
+   one icon and one status word, so space-between flings them to opposite
+   ends of the row and reads as the icon floating loose. Keep them together. */
+.lm-episode-player .lm-audio-titles {
+  justify-content: flex-start;
+  gap: 0.4rem;
+}
+.lm-checkpoint-marks {
+  position: relative;
+  height: 0.5rem;
+}
+.lm-checkpoint-marks span {
+  position: absolute;
+  top: 0;
+  width: 3px;
+  height: 0.5rem;
+  border-radius: 2px;
+  background: var(--green-mid);
+  transform: translateX(-50%);
+}
+.lm-checkpoint-marks span.is-correct { background: var(--green-dark); }
+.lm-checkpoint-marks span.is-missed { background: var(--error); }
+.lm-checkpoint-dots {
+  display: flex;
+  gap: 0.25rem;
+  justify-content: center;
+  margin: 0.4rem 0 0.9rem;
+}
+/* Correct / missed / unreached must not be color-only: filled vs. a ring vs.
+   empty, backed by an aria-label naming the state (set in EpisodePlayer.tsx). */
+.lm-checkpoint-dots button.is-correct::before {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+}
+.lm-checkpoint-dots button.is-missed::before {
+  background: var(--white);
+  border: 2px solid var(--error);
+}
+/* Unreached uses the shared base rule (transparent fill, green-mid ring); no
+   override needed, kept only as an explicit no-op for clarity at the callsite. */
+.lm-checkpoint-dots button.is-unreached::before { background: transparent; }
+.lm-checkpoint {
+  margin: 0.9rem 0;
+  padding: 1.25rem;
+}
+.lm-checkpoint-q {
+  font-size: 1.25rem;
+  line-height: 1.3;
+  margin: 0.4rem 0 1.1rem;
+  color: var(--ink);
+}
+.lm-checkpoint-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.lm-checkpoint-option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  border: 1.5px solid var(--green-lightest);
+  border-radius: 12px;
+  background: var(--white);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+}
+.lm-checkpoint-option:hover:not(:disabled) {
+  border-color: var(--green-dark);
+}
+.lm-checkpoint-option:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.lm-checkpoint-option:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+.lm-checkpoint-option-letter {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: var(--green-lightest);
+  color: var(--green-dark);
+}
+.lm-checkpoint-option.is-correct {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+}
+.lm-checkpoint-option.is-wrong {
+  border-color: var(--error);
+  background: color-mix(in srgb, var(--error) 8%, var(--white));
+}
+.lm-checkpoint-explain {
+  margin: 0.75rem 0 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: var(--green-lightest);
+  font-size: 0.9rem;
+}
+.lm-checkpoint-explain p { margin: 0; }
+.lm-checkpoint-skip {
+  display: block;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  margin-top: 1rem;
+  padding: 0;
+  font-size: 0.85rem;
+}
+.lm-checkpoint-skip:hover:not(:disabled) {
+  color: var(--green-dark);
+}
+.lm-checkpoint-skip:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.lm-summary-entry {
+  justify-content: center;
+  margin: 0.5rem 0;
+}
+.lm-episode-summary {
+  padding: 1.25rem;
+}
+.lm-episode-summary h2 { margin-top: 0; }
+.lm-checkpoint-review {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.lm-review-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+.lm-review-status {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.1rem;
+}
+.lm-review-status .is-correct { color: var(--green-dark); }
+.lm-review-status .is-wrong { color: var(--error); }
+.lm-review-empty {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--green-lightest);
+}
+.lm-review-body p { margin: 0 0 0.25rem; }
+.lm-review-q { font-weight: 600; }
+.lm-passed {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--green-lightest);
+  border-color: var(--green-dark);
+  margin: 0.9rem 0;
+}
+.lm-passed svg { color: var(--green-dark); flex: none; }
+.lm-passed p { margin: 0; }
+.lm-missed-list {
+  margin-top: 0.6rem;
+}
+.lm-missed-list h3 { margin: 0 0 0.25rem; }
+.lm-missed-card {
+  margin: 0.6rem 0;
+  padding: 0.9rem 1rem;
+}
+.lm-missed-q {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.lm-missed-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.6rem;
+}
+.lm-jump-link {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--green-dark);
+  text-decoration: underline;
+  font-size: 0.85rem;
+}
+.lm-jump-link:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lm-format-card,
+  .lm-format-slot-icon,
+  .lm-checkpoint-option {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .lm-format-picker {
+    grid-template-columns: 1fr;
+  }
+  .lm-episode-player {
+    flex-wrap: wrap;
+  }
+  .lm-audio-rates {
+    order: 3;
+    width: 100%;
+    justify-content: center;
   }
 }
