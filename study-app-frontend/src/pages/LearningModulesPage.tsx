@@ -9,12 +9,14 @@ import {
   GraduationCap,
   Loader2,
   Lock,
+  Mic2,
+  Presentation,
   RefreshCcw,
   Trash2,
   Upload,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -27,13 +29,14 @@ import {
   createLearningTrack,
   deleteLearningTrack,
   deleteTrackById,
+  fetchActiveTracks,
   fetchArchivedTracks,
   fetchFolderFiles,
-  fetchLearningTrack,
   uploadFolderFiles,
 } from "../lib/api";
+import { speechCapability } from "../components/episodeSpeech";
 import { useSettings } from "../lib/useSettings";
-import type { LearningTrack } from "../lib/types";
+import type { LearningTrack, TrackFormat } from "../lib/types";
 
 const POLL_MS = 2500;
 
@@ -49,6 +52,16 @@ export default function LearningModulesPage() {
   const [loaded, setLoaded] = useState(false);
   const [moduleCount, setModuleCount] = useState(5);
   const [customInstructions, setCustomInstructions] = useState("");
+  // The format being created on the setup screen. Episode formats (podcast,
+  // lecture) build exactly one module in a single pass, so they hide the
+  // module-count control.
+  const [format, setFormat] = useState<TrackFormat>("article");
+  // Active podcast/lecture tracks for this folder, rendered as their own slots
+  // next to the article track. One active track per format (server-enforced).
+  const [episodeTracks, setEpisodeTracks] = useState<LearningTrack[]>([]);
+  // Shown when the user picks an episode format on a browser with no usable
+  // speech output: the transcript + checkpoints still work, silence does not.
+  const [speechNotice, setSpeechNotice] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -80,14 +93,15 @@ export default function LearningModulesPage() {
     });
   }
 
-  const loadTrack = useCallback(async () => {
+  const loadTracks = useCallback(async () => {
     if (numericFolderId == null) return;
     try {
-      const data = await fetchLearningTrack(numericFolderId);
-      setTrack(data);
+      const all = await fetchActiveTracks(numericFolderId);
+      setTrack(all.find((t) => (t.format ?? "article") === "article") ?? null);
+      setEpisodeTracks(all.filter((t) => (t.format ?? "article") !== "article"));
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load the learning track.");
+      setError(err instanceof Error ? err.message : "Could not load the learning tracks.");
     } finally {
       setLoaded(true);
     }
@@ -103,20 +117,22 @@ export default function LearningModulesPage() {
   }, [numericFolderId]);
 
   useEffect(() => {
-    void loadTrack();
+    void loadTracks();
     void loadArchived();
-  }, [loadTrack, loadArchived]);
+  }, [loadTracks, loadArchived]);
 
-  // Poll while generating so modules appear as the background job fills them in.
+  // Poll while ANY active track is generating so modules appear as the
+  // background job fills them in.
+  const anyGenerating = track?.status === "generating" || episodeTracks.some((t) => t.status === "generating");
   useEffect(() => {
-    if (track?.status !== "generating") return;
-    pollRef.current = window.setInterval(() => void loadTrack(), POLL_MS);
+    if (!anyGenerating) return;
+    pollRef.current = window.setInterval(() => void loadTracks(), POLL_MS);
     return () => {
       if (pollRef.current != null) window.clearInterval(pollRef.current);
     };
-  }, [track?.status, loadTrack]);
+  }, [anyGenerating, loadTracks]);
 
-  async function handleGenerate() {
+  async function handleGenerate(forFormat: TrackFormat = format) {
     if (numericFolderId == null || busy) return;
     setBusy(true);
     setError(null);
@@ -151,15 +167,35 @@ export default function LearningModulesPage() {
       }
 
       setGenPhase("starting");
-      const created = await createLearningTrack(numericFolderId, moduleCount, {
+      // Episode formats ignore the module count: one module, one LLM call.
+      const created = await createLearningTrack(numericFolderId, forFormat === "article" ? moduleCount : 1, {
+        format: forFormat,
         customInstructions: customInstructions.trim() || undefined,
       });
-      setTrack(created);
+      if (forFormat === "article") {
+        setTrack(created);
+      } else {
+        await loadTracks();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start generation.");
     } finally {
       setBusy(false);
       setGenPhase("idle");
+    }
+  }
+
+  async function deleteEpisodeTrack(episode: LearningTrack) {
+    if (numericFolderId == null || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteLearningTrack(numericFolderId, (episode.format ?? "podcast") as TrackFormat);
+      await loadTracks();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete the episode.");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -356,6 +392,147 @@ export default function LearningModulesPage() {
     );
   }
 
+  // Format picker on the create screen: the first real choice of this feature.
+  // Episode formats build one module in a single LLM call and hide the
+  // module-count control.
+  const FORMAT_OPTIONS: { value: TrackFormat; icon: ReactNode; name: string; blurb: string }[] = [
+    {
+      value: "article",
+      icon: <BookOpenCheck size={20} />,
+      name: "Article",
+      blurb: "A written lesson you can read, edit, and listen to.",
+    },
+    {
+      value: "podcast",
+      icon: <Mic2 size={20} />,
+      name: "Podcast",
+      blurb: "Two voices talking through your notes. Listen anywhere.",
+    },
+    {
+      value: "lecture",
+      icon: <Presentation size={20} />,
+      name: "Slide deck",
+      blurb: "A lecturer walking you through the slides.",
+    },
+  ];
+
+  function renderFormatPicker() {
+    return (
+      <div className="lm-format-picker" role="radiogroup" aria-label="Track format">
+        {FORMAT_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={format === option.value}
+            className={`lm-format-card ${format === option.value ? "is-selected" : ""}`}
+            onClick={() => {
+              setFormat(option.value);
+              // Feature-detect speech the moment audio formats are picked: the
+              // format stays usable either way (transcript + checkpoints), but
+              // the user should know what is disabled on this device.
+              if (option.value !== "article") {
+                setSpeechNotice(!speechCapability().usable);
+              } else {
+                setSpeechNotice(false);
+              }
+            }}
+          >
+            <span className="lm-format-card-icon">{option.icon}</span>
+            <span className="lm-format-card-name">{option.name}</span>
+            <span className="lm-format-card-blurb">{option.blurb}</span>
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  // One slot per episode format on the hub body: state (generating, ready,
+  // failed), a completion badge, and a delete action. Empty slots offer
+  // one-tap creation straight from the folder's notes.
+  function renderEpisodeSlot(slotFormat: "podcast" | "lecture") {
+    const episode = episodeTracks.find((t) => (t.format ?? "article") === slotFormat);
+    const isPodcast = slotFormat === "podcast";
+    if (!episode) {
+      return (
+        <Card className="lm-format-slot lm-format-slot--empty" key={slotFormat}>
+          <button
+            type="button"
+            className="lm-format-slot-create"
+            disabled={busy}
+            onClick={() => void handleGenerate(slotFormat)}
+          >
+            <span className="lm-format-slot-icon">
+              {isPodcast ? <Mic2 size={20} /> : <Presentation size={20} />}
+            </span>
+            <strong>{isPodcast ? "Add a podcast episode" : "Add a slide deck"}</strong>
+            <span className="muted small">
+              {isPodcast
+                ? "Two voices talking through your notes. Built in one pass."
+                : "A lecturer walking you through the slides. Built in one pass."}
+            </span>
+          </button>
+        </Card>
+      );
+    }
+
+    const done = episode.modules.some((m) => m.passed);
+    const moduleId = episode.modules[0]?.id;
+    const ready = episode.status === "ready" && moduleId != null;
+    return (
+      <Card
+        className={`lm-format-slot ${episode.status === "ready" ? "is-ready" : ""} ${
+          episode.status === "failed" ? "is-failed" : ""
+        }`}
+        key={slotFormat}
+      >
+        <div className="lm-format-slot-head">
+          <span className="lm-format-slot-icon">
+            {isPodcast ? <Mic2 size={16} /> : <Presentation size={16} />}
+          </span>
+          <span className="lm-format-slot-title">
+            {episode.status === "ready" && episode.modules[0]
+              ? episode.modules[0].title
+              : isPodcast
+                ? "Podcast"
+                : "Slide deck"}
+          </span>
+          <span className="lm-format-badge">{isPodcast ? "Podcast" : "Slide deck"}</span>
+        </div>
+        <div className="lm-format-slot-state">
+          {episode.status === "generating" ? (
+            <InlineLoading label="Building episode" />
+          ) : episode.status === "failed" ? (
+            <span className="form-error small">{episode.error ?? "Generation failed. Try again."}</span>
+          ) : done ? (
+            <span className="lm-format-completed">
+              <CheckCircle2 size={16} /> Completed by listening
+            </span>
+          ) : (
+            <span className="muted small">Not passed yet</span>
+          )}
+        </div>
+        {ready ? (
+          <div className="lm-format-slot-actions">
+            <Link to={`/flashcards/${numericFolderId}/episode/${moduleId}`}>
+              <Button variant="secondary">Listen</Button>
+            </Link>
+            <button
+              type="button"
+              className="flash-icon-btn flash-icon-btn--danger"
+              aria-label="Delete episode track"
+              title="Delete episode track"
+              disabled={busy}
+              onClick={() => void deleteEpisodeTrack(episode)}
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        ) : null}
+      </Card>
+    );
+  }
+
   if (numericFolderId == null) return <Navigate to="/flashcards" replace />;
   if (!betaMode) return <Navigate to={`/flashcards/${numericFolderId}`} replace />;
 
@@ -386,35 +563,56 @@ export default function LearningModulesPage() {
         </header>
 
         <Card className="lm-setup">
-          <label className="lm-setup-label" htmlFor="lm-module-count">
-            Number of modules
-          </label>
-          <div className="lm-count-row">
-            <input
-              id="lm-module-count"
-              className="lm-count-slider"
-              type="range"
-              min={1}
-              max={20}
-              value={moduleCount}
-              onChange={(e) => setModuleCount(Number(e.target.value))}
-            />
-            <span className="lm-count-value">{moduleCount}</span>
-          </div>
-          <p className="muted small">
-            Built from the notes saved in this folder. More modules split the material into finer
-            slices; 20 is the maximum.
-          </p>
-          {moduleCount > 10 ? (
-            <div className="lm-count-warning">
+          {renderFormatPicker()}
+          {speechNotice ? (
+            <div className="lm-speech-notice lm-speech-notice--inline">
               <AlertCircle size={16} />
               <p className="small">
-                Big tracks take a while. Each module is written one at a time, so {moduleCount}{" "}
-                modules can take several minutes to finish. You can start module 1 as soon as it's
-                ready.
+                Audio playback is not available in this browser. You can still read the transcript
+                and answer the checkpoint questions.
               </p>
             </div>
           ) : null}
+          {format === "article" ? (
+            <>
+              <label className="lm-setup-label" htmlFor="lm-module-count">
+                Number of modules
+              </label>
+              <div className="lm-count-row">
+                <input
+                  id="lm-module-count"
+                  className="lm-count-slider"
+                  type="range"
+                  min={1}
+                  max={20}
+                  value={moduleCount}
+                  onChange={(e) => setModuleCount(Number(e.target.value))}
+                />
+                <span className="lm-count-value">{moduleCount}</span>
+              </div>
+              <p className="muted small">
+                Built from the notes saved in this folder. More modules split the material into
+                finer slices; 20 is the maximum.
+              </p>
+              {moduleCount > 10 ? (
+                <div className="lm-count-warning">
+                  <AlertCircle size={16} />
+                  <p className="small">
+                    Big tracks take a while. Each module is written one at a time, so {moduleCount}{" "}
+                    modules can take several minutes to finish. You can start module 1 as soon as
+                    it's ready.
+                  </p>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <p className="lm-episode-note">
+              One episode, built in a single pass from this folder's notes.{" "}
+              {format === "podcast"
+                ? "A host and an expert in two voices, with a transcript."
+                : "One lecturer over a slide deck, with a transcript."}
+            </p>
+          )}
           <label className="lm-setup-label" htmlFor="lm-file-input">
             Add notes <span className="muted lm-label-optional">(optional)</span>
           </label>
@@ -489,7 +687,11 @@ export default function LearningModulesPage() {
             />
           ) : null}
           <div className="button-row">
-            <Button icon={<GraduationCap size={18} />} onClick={() => void handleGenerate()} disabled={busy}>
+            <Button
+              icon={<GraduationCap size={18} />}
+              onClick={() => void handleGenerate(format)}
+              disabled={busy}
+            >
               {busy ? (
                 <InlineLoading
                   label={
@@ -500,12 +702,18 @@ export default function LearningModulesPage() {
                         : "Starting"
                   }
                 />
-              ) : (
+              ) : format === "article" ? (
                 "Generate track"
+              ) : format === "podcast" ? (
+                "Generate podcast"
+              ) : (
+                "Generate lecture"
               )}
             </Button>
           </div>
         </Card>
+
+        <div className="lm-format-slots">{renderEpisodeSlot("podcast")}{renderEpisodeSlot("lecture")}</div>
 
         {renderArchivedTracks()}
       </div>
@@ -682,6 +890,8 @@ export default function LearningModulesPage() {
             </li>
           ))}
       </ol>
+
+      <div className="lm-format-slots">{renderEpisodeSlot("podcast")}{renderEpisodeSlot("lecture")}</div>
 
       {renderArchivedTracks()}
 
