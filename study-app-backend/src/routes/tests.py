@@ -161,6 +161,7 @@ async def _generate_questions_background(
                 enable_fallback=enable_fallback,
                 prior_questions=prior,
                 on_question=on_question,
+                owner_id=user_id,
             )
         if practice_test_content:
             # Parsing extracts questions from a fixed document and has no
@@ -186,6 +187,7 @@ async def _generate_questions_background(
             enable_fallback=enable_fallback,
             prior_questions=prior,
             on_question=on_question,
+            owner_id=user_id,
         )
 
     # Persist one MCQ/FRQ batch in a short-lived session, then release the

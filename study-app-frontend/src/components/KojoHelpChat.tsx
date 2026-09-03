@@ -1,4 +1,4 @@
-import { AlertCircle, Lock, Maximize2, Minimize2, Send, Sparkles, X } from "lucide-react";
+import { AlertCircle, ArrowDown, Lock, Maximize2, Minimize2, Send, Sparkles, X } from "lucide-react";
 import KojoMascot from "./KojoMascot";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -12,6 +12,8 @@ import type { KojoMessage } from "../lib/types";
 import { formatTime } from "./KojoChat";
 import { MarkdownContent } from "./MarkdownContent";
 import { SlashCommandMenu, type CommandOption } from "./SlashCommandMenu";
+import { useChatScroll } from "../lib/useChatScroll";
+import "../styles/components/kojo-help-chat.css";
 
 export interface KojoHelpChatProps {
   /** Stable per-context id (e.g. a problem slug or test id) used to look up
@@ -75,9 +77,14 @@ export function KojoHelpChat({
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [loadingThread, setLoadingThread] = useState(true);
-  const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const threadKey = scopeKey(`nosey_kojo_thread_${storageKey}`);
+
+  // Auto-scroll + "scroll to latest" button state. Watches `loadingThread` so
+  // the bottom snaps to once the conversation history finishes loading.
+  const { containerRef: messagesRef, endRef: bottomRef, atBottom, scrollToBottom } = useChatScroll({
+    deps: [messages, isLoading, loadingThread, conversationId],
+  });
 
   // Resolve (or create) the conversation backing this context. Only the
   // conversation id pointer lives in localStorage; the messages themselves
@@ -119,10 +126,6 @@ export function KojoHelpChat({
   useEffect(() => {
     if (!loadingThread) inputRef.current?.focus();
   }, [loadingThread]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading]);
 
   useEffect(() => {
     document.body.style.overflow = isFullscreen ? "hidden" : "";
@@ -268,7 +271,7 @@ export function KojoHelpChat({
         ) : null}
 
         {/* ── Messages ── */}
-        <div className="kojo-messages">
+        <div className="kojo-messages" ref={messagesRef}>
           <div className="kojo-messages-inner">
             {loadingThread ? (
               <div className="kojo-thread-loading" role="status">
@@ -347,6 +350,17 @@ export function KojoHelpChat({
 
         {/* ── Input ── */}
         <div className="kojo-input-area">
+          <button
+            type="button"
+            className="kojo-scroll-bottom"
+            hidden={atBottom}
+            onClick={() => scrollToBottom()}
+            aria-label="Scroll to latest message"
+            title="Scroll to latest message"
+          >
+            <ArrowDown size={16} />
+          </button>
+
           <p className={`kojo-input-label${disabled && disabledNote ? " kojo-input-label--locked" : ""}`}>
             {disabled && disabledNote ? (
               <>

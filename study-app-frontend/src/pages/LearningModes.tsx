@@ -1,10 +1,11 @@
-import { ArrowLeft, FolderOpen, GraduationCap, Layers, Puzzle } from "lucide-react";
+import { ArrowLeft, FolderOpen, BookCopy, Puzzle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { Button } from "../components/Button";
 import { Skeleton, SkeletonFolderGrid } from "../components/Skeletons";
+import { FlashcardsIcon } from "../components/FlashcardsIcon";
 import { fetchFolders } from "../lib/api";
 import { useSettings } from "../lib/useSettings";
 import type { Folder } from "../lib/types";
@@ -113,7 +114,7 @@ export default function LearningModes() {
         <ModeCard
           to={`/flashcards/${selectedFolderId}/review`}
           disabled={!hasCards}
-          icon={<Layers size={26} />}
+          icon={<FlashcardsIcon size={32} />}
           accent="var(--green-dark)"
           title="Flashcards"
           blurb="Flip through your cards one at a time and rate how well you knew each one."
@@ -134,7 +135,7 @@ export default function LearningModes() {
           <ModeCard
             to={`/flashcards/${selectedFolderId}/modules`}
             disabled={false}
-            icon={<GraduationCap size={26} />}
+            icon={<BookCopy size={26} />}
             accent="var(--info)"
             title="Learning Modules"
             blurb="AI-written lessons from your notes, read aloud, each followed by a short quiz."

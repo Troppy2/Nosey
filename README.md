@@ -200,3 +200,5 @@ Nosey--AI Study Tool/
 ## Support & Feedback
 
 Have questions or found a bug? Please open an issue on GitHub. For feature requests, discuss in issues or pull requests.
+
+For anything that does not belong in a public issue, including privacy questions and data access or deletion requests, email [jamesinah34@gmail.com](mailto:jamesinah34@gmail.com).

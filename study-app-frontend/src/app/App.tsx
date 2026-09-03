@@ -1,12 +1,20 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Sidebar } from "../components/Sidebar";
+import WaitingScreen from "../components/WaitingScreen";
+import {
+  getBackendStatus,
+  startBackendWatcher,
+  subscribeBackendStatus,
+  type BackendStatus,
+} from "../lib/backendStatus";
 import CreateTest from "../pages/CreateTest";
 import Dashboard from "../pages/Dashboard";
 import Flashcards from "../pages/Flashcards";
 import LearningModes from "../pages/LearningModes";
 import LearningModuleLesson from "../pages/LearningModuleLesson";
 import LearningModulesPage from "../pages/LearningModulesPage";
+import EpisodePlayer from "../pages/EpisodePlayer";
 import Matching from "../pages/Matching";
 import FlashcardsManage from "../pages/FlashcardsManage";
 import FolderDetail from "../pages/FolderDetail";
@@ -23,6 +31,7 @@ import MockInterviewStage2 from "../pages/MockInterviewStage2";
 import MockInterviewStage3 from "../pages/MockInterviewStage3";
 import MockInterviewStage1Results from "../pages/MockInterviewStage1Results";
 import MockInterviewSummary from "../pages/MockInterviewSummary";
+import MockInterviewHistory from "../pages/MockInterviewHistory";
 import QuestionEditor from "../pages/QuestionEditor";
 import Results from "../pages/Results";
 import TakeTest from "../pages/TakeTest";
@@ -30,7 +39,6 @@ import AdminPanel from "../pages/AdminPanel";
 import Settings from "../pages/Settings";
 
 // Dependency imports for tracking the last visited path
-import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 
 function SignedInRoute({ children }: { children: React.ReactNode }) {
@@ -57,10 +65,29 @@ function PathTracker() {
   return null;
 }
 
+// The backendStatus module tracks reachability of the Render backend. While it
+// reports down (or recovered-but-unconfirmed), this gate replaces the whole
+// app with the waiting screen: the game, the elapsed timer, and the explainer.
+// Everything renders from static assets, so it works with zero backend.
+function BackendGate({ children }: { children: React.ReactNode }) {
+  const [status, setStatus] = useState<BackendStatus>(getBackendStatus());
+
+  useEffect(() => {
+    startBackendWatcher();
+    return subscribeBackendStatus(setStatus);
+  }, []);
+
+  if (status === "down" || status === "recovered") {
+    return <WaitingScreen />;
+  }
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
+      <BackendGate>
+        <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/sign-in" element={<SignIn />} />
         <Route element={<RequireAuth><Sidebar /></RequireAuth>}>
@@ -77,9 +104,11 @@ export default function App() {
           <Route path="/flashcards/:folderId/matching" element={<Matching />} />
           <Route path="/flashcards/:folderId/modules" element={<LearningModulesPage />} />
           <Route path="/flashcards/:folderId/modules/:moduleId" element={<LearningModuleLesson />} />
+          <Route path="/flashcards/:folderId/episode/:moduleId" element={<EpisodePlayer />} />
           <Route path="/folders/:folderId/flashcards/manage" element={<FlashcardsManage />} />
           <Route path="/leetcode" element={<SignedInRoute><LeetCodeMode /></SignedInRoute>} />
           <Route path="/mock-interview" element={<MockInterviewSetup />} />
+          <Route path="/mock-interview/history" element={<MockInterviewHistory />} />
           <Route path="/mock-interview/:sessionId/resume" element={<MockInterviewResume />} />
           <Route path="/mock-interview/:sessionId/stage1" element={<MockInterviewStage1 />} />
           <Route path="/mock-interview/:sessionId/stage1-results" element={<MockInterviewStage1Results />} />
@@ -92,6 +121,7 @@ export default function App() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </BackendGate>
     </BrowserRouter>
   );
 }

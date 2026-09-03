@@ -199,6 +199,7 @@ class TestService:
                 custom_instructions=custom_instructions,
                 provider=active_provider,
                 enable_fallback=enable_fallback,
+                owner_id=user_id,
             )
             beta_source_notes = combined_study_content
             generation_meta = {}
@@ -269,6 +270,7 @@ class TestService:
                 custom_instructions=custom_instructions,
                 provider=active_provider,
                 enable_fallback=enable_fallback,
+                owner_id=user_id,
             )
             beta_source_notes = notes_content
             generation_meta = {}

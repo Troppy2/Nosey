@@ -1,60 +1,33 @@
-import { AlertCircle, CheckCircle2, Minus, RefreshCw, Trophy, XCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { AlertCircle, RefreshCw, Trophy } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { LoadingNotice } from "../components/Loaders";
 import { finishMockInterview } from "../lib/api";
 import type { MockInterviewFinishResponse, MockInterviewSession } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
-import { clearActiveMockSession, loadMockProgress } from "../lib/mockInterview";
-
-const RECOMMENDATION_META: Record<
-  string,
-  { label: string; className: string; icon: React.ElementType; description: string }
-> = {
-  "STRONG HIRE": {
-    label: "Strong Hire",
-    className: "rec-strong-hire",
-    icon: CheckCircle2,
-    description: "Exceptional performance across all stages.",
-  },
-  HIRE: {
-    label: "Hire",
-    className: "rec-hire",
-    icon: CheckCircle2,
-    description: "Solid performance. Ready for the role.",
-  },
-  BORDERLINE: {
-    label: "Borderline",
-    className: "rec-borderline",
-    icon: Minus,
-    description: "Mixed performance. More practice needed.",
-  },
-  "NO HIRE": {
-    label: "No Hire",
-    className: "rec-no-hire",
-    icon: XCircle,
-    description: "Significant gaps identified. Keep practicing.",
-  },
-};
-
-const VERDICT_LABELS: Record<string, { label: string; className: string }> = {
-  strong: { label: "Strong Pass", className: "verdict-strong" },
-  pass: { label: "Pass", className: "verdict-pass" },
-  borderline: { label: "Borderline", className: "verdict-borderline" },
-  needs_work: { label: "Needs Work", className: "verdict-needs-work" },
-};
+import { clearActiveMockSession, type MockProgress } from "../lib/mockInterview";
+import { MockProgressGate } from "../components/MockProgressGate";
+import { LoopStation } from "../components/MockLoopRail";
+import { LOOP_STAGES, recommendationMeta, verdictMeta } from "../data/mockInterviewLoop";
 
 export default function MockInterviewSummary() {
+  const { sessionId } = useParams<{ sessionId: string }>();
+  return (
+    <MockProgressGate
+      sessionId={Number(sessionId)}
+      label="Loading your summary"
+      render={(stored) => <SummaryView stored={stored} />}
+    />
+  );
+}
+
+function SummaryView({ stored }: { stored: MockProgress | null }) {
   const { sessionId } = useParams<{ sessionId: string }>();
   const numericSessionId = Number(sessionId);
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as { session?: MockInterviewSession; selectedStages?: string[] } | null;
 
-  const stored = useMemo(
-    () => (Number.isFinite(numericSessionId) ? loadMockProgress(numericSessionId) : null),
-    [numericSessionId],
-  );
   const rawCompany = state?.session?.company ?? stored?.company ?? "random";
   const company = (rawCompany === "custom" ? "random" : rawCompany) as CompanyKey;
   const companyLabel =
@@ -122,8 +95,9 @@ export default function MockInterviewSummary() {
     );
   }
 
-  const recMeta = RECOMMENDATION_META[result.hiring_recommendation] ?? RECOMMENDATION_META.BORDERLINE;
+  const recMeta = recommendationMeta(result.hiring_recommendation);
   const RecIcon = recMeta.icon;
+  const graded = LOOP_STAGES.filter((stage) => result[stage.verdictKey]);
 
   return (
     <div className="page page-narrow">
@@ -148,20 +122,22 @@ export default function MockInterviewSummary() {
         </div>
       </div>
 
-      <div className="mock-summary-stages">
-        {result.resume_verdict && (
-          <StageVerdictChip stage="Resume Screen" verdict={result.resume_verdict} />
-        )}
-        {result.stage1_verdict && (
-          <StageVerdictChip stage="Stage 1: Online Assessment" verdict={result.stage1_verdict} />
-        )}
-        {result.stage2_verdict && (
-          <StageVerdictChip stage="Stage 2: Technical Interview" verdict={result.stage2_verdict} />
-        )}
-        {result.stage3_verdict && (
-          <StageVerdictChip stage="Stage 3: Behavioral" verdict={result.stage3_verdict} />
-        )}
-      </div>
+      {/* The same spine from setup, now carrying a verdict at every station you ran. */}
+      <ol className="loop-spine loop-spine--verdicts" aria-label="Verdict by stage">
+        {graded.map((stage, i) => {
+          const meta = verdictMeta(result[stage.verdictKey]);
+          return (
+            <LoopStation
+              key={stage.key}
+              icon={stage.icon}
+              index={i + 1}
+              label={stage.label}
+              className={`loop-${meta.className}`}
+              trailing={<span className={`mock-verdict-badge ${meta.className}`}>{meta.label}</span>}
+            />
+          );
+        })}
+      </ol>
 
       <div className="card mock-summary-feedback">
         <span className="eyebrow">Recruiter Debrief</span>
@@ -176,16 +152,6 @@ export default function MockInterviewSummary() {
           <RefreshCw size={14} /> Try Again
         </button>
       </div>
-    </div>
-  );
-}
-
-function StageVerdictChip({ stage, verdict }: { stage: string; verdict: string }) {
-  const meta = VERDICT_LABELS[verdict] ?? VERDICT_LABELS.borderline;
-  return (
-    <div className="mock-stage-verdict-chip">
-      <span className="mock-stage-verdict-chip-name">{stage}</span>
-      <span className={`mock-verdict-badge ${meta.className}`}>{meta.label}</span>
     </div>
   );
 }

@@ -29,6 +29,8 @@ import type {
   LCGeneratedCustomProblem,
   LearningModule,
   LearningTrack,
+  ModuleEpisode,
+  CheckpointAnswerResult,
   QuizAttemptResult,
   LeetCodeComplexityCheckResponse,
   LeetCodeGradeResponse,
@@ -49,6 +51,8 @@ import type {
   QuestionUpdate,
   ResumableTestInfo,
   ReviewSummaryResponse,
+  SavedJDParsed,
+  SavedJobDescription,
   SlashCommand,
   SlashCommandInput,
   SubmittedAnswer,
@@ -57,6 +61,7 @@ import type {
   TestSummary,
   TestTake,
 } from "./types";
+import { reportBackendHttpFailure, reportBackendNetworkFailure } from "./backendStatus";
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "https://noesy.onrender.com";
 const TOKEN_KEY = "nosey_access_token";
@@ -112,6 +117,28 @@ export function sanitizeRedirect(raw: string | null | undefined): string {
 type RequestOptions = RequestInit & {
   allowMock?: boolean;
 };
+
+// Wraps raw fetch so a failure to reach the server mounts the waiting screen
+// instead of surfacing as a generic error. Two kinds of failure are reported:
+// a network-level throw (no HTTP response at all), and a gateway status code
+// (502/503/504), which is what Render's proxy returns while a free-tier
+// instance is waking up. A 5xx like 500 or an app-generated 503 is not treated
+// as down on its own: backendStatus re-checks /health before flipping, so a
+// reachable app keeps its normal error handling. User-cancelled requests
+// (AbortError from a stream/stop button) pass through untouched, they say
+// nothing about the server.
+async function guardedFetch(url: string, init: RequestInit): Promise<Response> {
+  try {
+    const response = await fetch(url, init);
+    reportBackendHttpFailure(response.status);
+    return response;
+  } catch (err) {
+    const name = (err as { name?: string } | null)?.name;
+    if (name === "AbortError") throw err;
+    reportBackendNetworkFailure();
+    throw new Error("Unable to reach the server. It may be starting up, try again in a moment.");
+  }
+}
 
 function formatApiErrorDetail(detail: unknown): string {
   if (typeof detail === "string") {
@@ -181,7 +208,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await guardedFetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers,
   });
@@ -243,7 +270,7 @@ export function setGoogleSession() {
 }
 
 export async function googleSignIn(idToken: string) {
-  const res = await fetch(`${API_BASE_URL}/auth/google`, {
+  const res = await guardedFetch(`${API_BASE_URL}/auth/google`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -615,9 +642,12 @@ export async function fetchProviderStatus(): Promise<ProviderStatus> {
 // ── Learning Modules ─────────────────────────────────────────────────────────
 
 // Returns null when the folder has no track yet (backend 404s in that case).
-export async function fetchLearningTrack(folderId: number): Promise<LearningTrack | null> {
+export async function fetchLearningTrack(
+  folderId: number,
+  format: "article" | "podcast" | "lecture" = "article",
+): Promise<LearningTrack | null> {
   try {
-    return await request<LearningTrack>(`/folders/${folderId}/learning-track`);
+    return await request<LearningTrack>(`/folders/${folderId}/learning-track?format=${format}`);
   } catch (err) {
     if (err instanceof Error && err.message.includes("Learning track not found")) {
       return null;
@@ -629,20 +659,34 @@ export async function fetchLearningTrack(folderId: number): Promise<LearningTrac
 export async function createLearningTrack(
   folderId: number,
   moduleCount: number,
-  options?: { provider?: string; customInstructions?: string },
+  options?: {
+    provider?: string;
+    customInstructions?: string;
+    format?: "article" | "podcast" | "lecture";
+  },
 ): Promise<LearningTrack> {
   return request<LearningTrack>(`/folders/${folderId}/learning-track`, {
     method: "POST",
     body: JSON.stringify({
       module_count: moduleCount,
+      ...(options?.format ? { format: options.format } : {}),
       ...(options?.provider ? { provider: options.provider } : {}),
       ...(options?.customInstructions ? { custom_instructions: options.customInstructions } : {}),
     }),
   });
 }
 
-export async function deleteLearningTrack(folderId: number): Promise<void> {
-  await request(`/folders/${folderId}/learning-track`, { method: "DELETE" });
+export async function deleteLearningTrack(
+  folderId: number,
+  format: "article" | "podcast" | "lecture" = "article",
+): Promise<void> {
+  await request(`/folders/${folderId}/learning-track?format=${format}`, { method: "DELETE" });
+}
+
+// Every ACTIVE track for a folder, at most one per format, so the hub can
+// render all three format slots in one request.
+export async function fetchActiveTracks(folderId: number): Promise<LearningTrack[]> {
+  return request<LearningTrack[]>(`/folders/${folderId}/learning-tracks`);
 }
 
 // Archives the whole track (freeing the folder's active slot so a new track can
@@ -692,6 +736,24 @@ export async function submitModuleQuiz(moduleId: number, answers: number[]): Pro
   return request<QuizAttemptResult>(`/learning-modules/${moduleId}/quiz-attempt`, {
     method: "POST",
     body: JSON.stringify({ answers }),
+  });
+}
+
+// The episode payload for a podcast/lecture module. correct_index and
+// explanation are stripped server-side until each checkpoint is answered.
+export async function fetchModuleEpisode(moduleId: number): Promise<ModuleEpisode> {
+  return request<ModuleEpisode>(`/learning-modules/${moduleId}/episode`);
+}
+
+// Grades one checkpoint server-side. answer -1 means skipped (scores wrong).
+export async function answerCheckpoint(
+  moduleId: number,
+  checkpointIndex: number,
+  answer: number,
+): Promise<CheckpointAnswerResult> {
+  return request<CheckpointAnswerResult>(`/learning-modules/${moduleId}/checkpoint-answer`, {
+    method: "POST",
+    body: JSON.stringify({ checkpoint_index: checkpointIndex, answer }),
   });
 }
 
@@ -745,7 +807,7 @@ async function consumeKojoStream(
   const headers = new Headers({ "Content-Type": "application/json" });
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await guardedFetch(`${API_BASE_URL}${path}`, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
@@ -800,18 +862,31 @@ async function consumeKojoStream(
     }
   };
 
-  for (;;) {
-    const { value, done: streamDone } = await reader.read();
-    if (streamDone) break;
-    buffer += decoder.decode(value, { stream: true });
-    let sep: number;
-    while ((sep = buffer.indexOf("\n\n")) !== -1) {
-      const raw = buffer.slice(0, sep);
-      buffer = buffer.slice(sep + 2);
-      handleEvent(raw);
+  let streamError: unknown = null;
+  try {
+    for (;;) {
+      const { value, done: streamDone } = await reader.read();
+      if (streamDone) break;
+      buffer += decoder.decode(value, { stream: true });
+      let sep: number;
+      while ((sep = buffer.indexOf("\n\n")) !== -1) {
+        const raw = buffer.slice(0, sep);
+        buffer = buffer.slice(sep + 2);
+        handleEvent(raw);
+      }
     }
+    if (buffer.trim()) handleEvent(buffer);
+  } catch (err) {
+    // A transport failure mid-stream means the server dropped the connection,
+    // so the backend may be down. Surfacing it flips the waiting screen (the
+    // debounce in backendStatus absorbs a single blip).
+    const name = (err as { name?: string } | null)?.name;
+    if (name !== "AbortError") {
+      reportBackendNetworkFailure();
+      throw new Error("Connection lost while Kojo was answering. The server may be starting up, try again in a moment.");
+    }
+    throw err;
   }
-  if (buffer.trim()) handleEvent(buffer);
 
   if (!done) throw new Error("Kojo stream ended before completing. Try again.");
   return done;
@@ -1448,7 +1523,7 @@ export async function streamLCCustomProblems(
   const headers = new Headers({ "Content-Type": "application/json" });
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const response = await fetch(`${API_BASE_URL}/leetcode/custom-problems/generate-stream`, {
+  const response = await guardedFetch(`${API_BASE_URL}/leetcode/custom-problems/generate-stream`, {
     method: "POST",
     headers,
     body: JSON.stringify({ topics, difficulty, count, provider }),
@@ -1496,18 +1571,27 @@ export async function streamLCCustomProblems(
     }
   };
 
-  for (;;) {
-    const { value, done: streamDone } = await reader.read();
-    if (streamDone) break;
-    buffer += decoder.decode(value, { stream: true });
-    let sep: number;
-    while ((sep = buffer.indexOf("\n\n")) !== -1) {
-      const raw = buffer.slice(0, sep);
-      buffer = buffer.slice(sep + 2);
-      handleEvent(raw);
+  try {
+    for (;;) {
+      const { value, done: streamDone } = await reader.read();
+      if (streamDone) break;
+      buffer += decoder.decode(value, { stream: true });
+      let sep: number;
+      while ((sep = buffer.indexOf("\n\n")) !== -1) {
+        const raw = buffer.slice(0, sep);
+        buffer = buffer.slice(sep + 2);
+        handleEvent(raw);
+      }
     }
+    if (buffer.trim()) handleEvent(buffer);
+  } catch (err) {
+    const name = (err as { name?: string } | null)?.name;
+    if (name !== "AbortError") {
+      reportBackendNetworkFailure();
+      throw new Error("Connection lost while Kojo was generating. The server may be starting up, try again in a moment.");
+    }
+    throw err;
   }
-  if (buffer.trim()) handleEvent(buffer);
 
   if (!done) throw new Error("Kojo stream ended before completing. Try again.");
   return { count: total };
@@ -1560,10 +1644,19 @@ export async function createLCDaily(
   topic: string,
   targetDifficulty: string,
   seedSlug: string,
+  seedTitle: string,
   provider?: string,
   subtopic?: string | null,
 ): Promise<LCCustomProblem> {
-  const body: Record<string, unknown> = { topic, target_difficulty: targetDifficulty, seed_slug: seedSlug };
+  // seed_title is what the backend actually reskins from: it stores no problem
+  // statements and can't fetch them from LeetCode in prod, so it works from the model's
+  // knowledge of the named catalog problem. seed_slug is still sent for logging/parity.
+  const body: Record<string, unknown> = {
+    topic,
+    target_difficulty: targetDifficulty,
+    seed_slug: seedSlug,
+    seed_title: seedTitle,
+  };
   if (provider) body.provider = provider;
   if (subtopic) body.subtopic = subtopic;
   return request<LCCustomProblem>("/leetcode/daily", {
@@ -1763,12 +1856,66 @@ export async function parseJobDescription(
   });
 }
 
+// ── Saved job descriptions ────────────────────────────────────────────────────
+// A JD pasted once and reused: the raw text plus the parsed analysis live on the
+// user's account, so picking a saved JD prefills the setup panel with no LLM call.
+
+export async function listJobDescriptions(): Promise<SavedJobDescription[]> {
+  return request<SavedJobDescription[]>("/job-descriptions");
+}
+
+export async function saveJobDescription(body: {
+  name: string;
+  company_name?: string | null;
+  jd_text: string;
+  parsed?: SavedJDParsed | null;
+}): Promise<SavedJobDescription> {
+  return request<SavedJobDescription>("/job-descriptions", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateJobDescription(
+  jdId: number,
+  body: {
+    name?: string;
+    company_name?: string | null;
+    jd_text?: string;
+    parsed?: SavedJDParsed | null;
+  },
+): Promise<SavedJobDescription> {
+  return request<SavedJobDescription>(`/job-descriptions/${jdId}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteJobDescription(jdId: number): Promise<void> {
+  await request<void>(`/job-descriptions/${jdId}`, { method: "DELETE" });
+}
+
 export async function getMockInterviewSession(sessionId: number): Promise<MockInterviewSession> {
   return request<MockInterviewSession>(`/mock-interview/${sessionId}`);
 }
 
 export async function listMockInterviewSessions(): Promise<MockInterviewSession[]> {
   return request<MockInterviewSession[]>("/mock-interview");
+}
+
+// Push the client's whole run snapshot. Called debounced from mockInterview.ts, so a
+// refresh, a cleared cache, or a different device can pick the run back up.
+export async function syncMockProgress(sessionId: number, progressJson: string): Promise<void> {
+  await request<void>(`/mock-interview/${sessionId}/progress`, {
+    method: "PUT",
+    body: JSON.stringify({ progress_json: progressJson }),
+  });
+}
+
+// The newest unfinished run for this user, or null. Used when the device has no local
+// snapshot to offer a Resume from.
+export async function fetchActiveMockSession(): Promise<MockInterviewSession | null> {
+  return request<MockInterviewSession | null>("/mock-interview/active");
 }
 
 export async function screenResume(
@@ -1797,6 +1944,24 @@ export type Stage1SubmissionItem = {
   tests_passed: number;
   tests_total: number;
 };
+
+// Resume deep dive: the interviewer grills the candidate on their own resume after the
+// ATS scan. Same call shape as the Stage 2/3 chats, the client carries the transcript.
+export async function sendResumeGrillMessage(
+  sessionId: number,
+  message: string | null,
+  history: InterviewChatMessage[],
+  coveredGoals: string[] = [],
+  provider?: string,
+): Promise<{ reply: string; is_done: boolean; covered_goals: string[] }> {
+  return request<{ reply: string; is_done: boolean; covered_goals: string[] }>(
+    `/mock-interview/${sessionId}/resume/grill/message`,
+    {
+      method: "POST",
+      body: JSON.stringify({ message, history, covered_goals: coveredGoals, provider }),
+    },
+  );
+}
 
 export async function gradeStage1(
   sessionId: number,
@@ -1900,7 +2065,7 @@ async function adminRequest<T>(path: string, options: RequestInit = {}): Promise
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
   headers.set("Authorization", `Bearer ${token}`);
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  const response = await guardedFetch(`${API_BASE_URL}${path}`, { ...options, headers });
   if (!response.ok) {
     let message = `Request failed: ${response.status}`;
     try {

@@ -1,0 +1,35 @@
+/* Shared application shell and page framing. */
+.page {
+  width: min(1560px, 100%);
+  margin: 0 auto;
+  padding: clamp(24px, 3vw, 40px) clamp(16px, 3.5vw, 48px) clamp(44px, 6vw, 64px);
+}
+
+.page-narrow { width: min(960px, 100%); }
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 36px;
+}
+
+.eyebrow {
+  color: var(--green-dark);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1, h2, h3, p { margin: 0; }
+h1, h2 { color: var(--ink); font-family: var(--font-serif); }
+h1 { font-size: 2.25rem; line-height: 1.16; }
+h2 { font-size: 1.45rem; line-height: 1.25; }
+h3 { color: var(--ink); font-size: 1rem; line-height: 1.35; }
+.muted { color: #596949; }
+.small { font-size: 0.9rem; }
+
+/* Custom SVG, sized and aligned to the Lucide icons in the sidebar. */
+

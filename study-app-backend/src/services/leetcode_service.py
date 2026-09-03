@@ -20,9 +20,39 @@ from src.schemas.leetcode_schema import (
 )
 from src.services.llm_service import LLMService
 from src.utils.exceptions import LLMException, ResourceNotFoundException
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 _LEETCODE_GRAPHQL_URL = "https://leetcode.com/graphql"
 _REQUEST_TIMEOUT_SECONDS = 30
+# Shorter budget for the Daily KojoCode seed fetch specifically. That fetch is optional
+# (failure just falls back to a title-only reskin), and it runs BEFORE a slow LLM call, so
+# a full 30s of doomed waiting would be added to every daily whenever LeetCode is
+# unreachable. Bounding it keeps the fallback fast instead of merely correct.
+_SEED_FETCH_TIMEOUT_SECONDS = 8
+
+# LeetCode's public GraphQL endpoint sits behind Cloudflare, which blocks requests that
+# look automated. From a residential IP a bare request succeeds, but from a datacenter IP
+# (Render, and any cloud host) it is served a challenge instead: the HTTP status is still
+# 200, but the payload carries no "question" object, so the fetch surfaces as a 404 on a
+# perfectly valid slug. Presenting browser-like headers is what gets the request through.
+#
+# This is best-effort and inherently fragile. Cloudflare can tighten at any time and these
+# headers stop being enough, at which point every LeetCode fetch 404s again from prod.
+# See the tracking issue linked in session-notes for the durable fix (seed-free daily
+# generation, or a graceful fallback when the seed fetch fails).
+_LEETCODE_BROWSER_HEADERS = {
+    "content-type": "application/json",
+    "user-agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    ),
+    "referer": "https://leetcode.com/problemset/",
+    "origin": "https://leetcode.com",
+    "accept": "application/json",
+    "accept-language": "en-US,en;q=0.9",
+}
 
 
 @dataclass(frozen=True)
@@ -235,27 +265,63 @@ class LeetCodeService:
             "complexity_explanation": str(data.get("complexity_explanation", "") or "").strip()[:8000],
         }
 
+    @staticmethod
+    def _title_from_slug(slug: str) -> str:
+        """Best-effort "course-schedule-ii" -> "Course Schedule Ii". Only used when a
+        client sends a seed_slug without a seed_title (older frontend builds). Rough but
+        close enough for the model to recognise the problem it names."""
+        return " ".join(part.capitalize() for part in (slug or "").split("-") if part)
+
     async def generate_daily_problem(
         self,
         topic: str,
         target_difficulty: str,
-        seed_slug: str,
+        seed_slug: str = "",
+        seed_title: str = "",
         subtopic: Optional[str] = None,
         provider: Optional[str] = None,
     ) -> LCGeneratedCustomProblem:
-        """Reskin a real seed problem into a fresh Daily KojoCode problem on the given
-        topic (and, when targeting a weak area, subtopic) at the given difficulty.
-        Fetches the seed's real statement first, then makes a single LLM call. Fetch
-        errors (bad slug) propagate as ResourceNotFoundException so the route can map
-        them to 404."""
-        seed = await self._fetch_problem(seed_slug)
-        seed_statement = self._html_to_text(seed.content_html)
+        """Reskin a seed problem into a fresh Daily KojoCode problem on the given topic
+        (and, when targeting a weak area, subtopic) at the given difficulty.
+
+        PREFERRED path: fetch the real LeetCode statement for seed_slug and reskin that,
+        which is the best grounding available.
+
+        FALLBACK path: if that fetch fails for any reason, reskin from the catalog TITLE
+        alone and let the model work from its knowledge of the named problem. This matters
+        because the fetch is unreliable from prod: Cloudflare blocks datacenter IPs and the
+        block used to surface as a 404 on every daily generation (GH #75). The app stores
+        no statements of its own (the catalog is metadata only, prep banks hold bare
+        slugs), so the title is the strongest seed available without the network.
+
+        The fallback swallows ALL fetch errors, so a daily is never blocked by LeetCode
+        being unreachable and this method can no longer raise ResourceNotFoundException."""
+        title = (seed_title or "").strip() or self._title_from_slug(seed_slug)
+        seed_statement = ""
+        if seed_slug:
+            try:
+                seed = await self._fetch_problem(seed_slug, timeout=_SEED_FETCH_TIMEOUT_SECONDS)
+                seed_statement = self._html_to_text(seed.content_html)
+                # The real title beats the catalog's, which beats one derived from a slug.
+                title = seed.title or title
+            except Exception as exc:  # noqa: BLE001 - the seed is optional by design
+                # Covers the Cloudflare block, a bad slug, and any timeout or transport
+                # error alike: all of them just mean "reskin from the title instead".
+                logger.info(
+                    "Daily seed fetch failed for %s (%s: %s). Falling back to title-only "
+                    "reskin of %r.",
+                    seed_slug,
+                    type(exc).__name__,
+                    exc,
+                    title,
+                )
+
         try:
             data = await LLMService().generate_daily_problem(
                 topic=topic,
                 subtopic=subtopic,
                 target_difficulty=target_difficulty,
-                seed_title=seed.title,
+                seed_title=title,
                 seed_statement=seed_statement,
                 provider=provider,
             )
@@ -342,7 +408,9 @@ class LeetCodeService:
             test_cases=test_cases,
         )
 
-    async def _fetch_problem(self, title_slug: str) -> _FetchedProblem:
+    async def _fetch_problem(
+        self, title_slug: str, timeout: float = _REQUEST_TIMEOUT_SECONDS
+    ) -> _FetchedProblem:
         payload = {
             "query": (
                 "query questionData($titleSlug: String!) { "
@@ -355,17 +423,40 @@ class LeetCodeService:
             "variables": {"titleSlug": title_slug},
         }
 
-        async with httpx.AsyncClient(timeout=_REQUEST_TIMEOUT_SECONDS) as client:
-            response = await client.post(
-                _LEETCODE_GRAPHQL_URL,
-                headers={"content-type": "application/json"},
-                json=payload,
-            )
+        # A per-problem referer is more convincing to Cloudflare than a generic one, since
+        # it matches what a browser sitting on that problem's page would actually send.
+        headers = {
+            **_LEETCODE_BROWSER_HEADERS,
+            "referer": f"https://leetcode.com/problems/{title_slug}/",
+        }
+
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            response = await client.post(_LEETCODE_GRAPHQL_URL, headers=headers, json=payload)
             response.raise_for_status()
-            data = response.json()
+            try:
+                data = response.json()
+            except ValueError:
+                # A Cloudflare challenge comes back as HTML with a 200, so the decode fails
+                # here rather than at raise_for_status. Log a snippet: this is the signal
+                # that the browser headers above have stopped being enough.
+                logger.warning(
+                    "LeetCode fetch for %s returned non-JSON (likely a Cloudflare block). "
+                    "content-type=%s body[:200]=%r",
+                    title_slug,
+                    response.headers.get("content-type"),
+                    response.text[:200],
+                )
+                raise ResourceNotFoundException("LeetCode problem")
 
         question = (data.get("data") or {}).get("question")
         if not question:
+            # Distinguishes a genuinely bad slug from a block that returned valid JSON with
+            # a null question. Without this the two are indistinguishable in prod logs.
+            logger.warning(
+                "LeetCode fetch for %s returned no question object. errors=%r",
+                title_slug,
+                data.get("errors"),
+            )
             raise ResourceNotFoundException("LeetCode problem")
 
         topic_tags = [

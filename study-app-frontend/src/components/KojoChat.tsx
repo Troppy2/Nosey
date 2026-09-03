@@ -1,9 +1,10 @@
-import { AlertCircle, Maximize2, Minimize2, Send, Sparkles, Trash2, X } from "lucide-react";
+import { AlertCircle, ArrowDown, Maximize2, Minimize2, Send, Sparkles, Trash2, X } from "lucide-react";
 import KojoMascot from "./KojoMascot";
 import { useEffect, useRef, useState } from "react";
 import { clearKojoConversation, fetchKojoConversation, fetchProviderStatus, isGuestSession, kojoChat, kojoChatStream } from "../lib/api";
 import type { KojoMessage, ProviderStatus } from "../lib/types";
 import { useSettings } from "../lib/useSettings";
+import { useChatScroll } from "../lib/useChatScroll";
 import { FeatureSurvey } from "./FeatureSurvey";
 import { MarkdownContent } from "./MarkdownContent";
 import { useLocation } from 'react-router-dom'
@@ -43,12 +44,17 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
   const [clearNotice, setClearNotice] = useState<string | null>(null);
   const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
   const { generationProvider, betaMode } = useSettings();
-  const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   // Tracks whether the user actually sent a message this session, so the survey
   // only fires after real interaction (not just opening an existing chat).
   const hasInteractedRef = useRef(false);
   const [closingSurvey, setClosingSurvey] = useState(false);
+
+  // Auto-scroll + "scroll to latest" button state, shared with the help chat
+  // and chat mode. See useChatScroll for the full contract.
+  const { containerRef: messagesRef, endRef: bottomRef, atBottom, scrollToBottom } = useChatScroll({
+    deps: [messages, isLoading, folderId],
+  });
 
   // Route close attempts through the survey: if the user chatted, offer the
   // survey first and defer the real close until it resolves.
@@ -71,10 +77,6 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
     setClearNotice(null);
     inputRef.current?.focus();
   }, [folderId]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading]);
 
   useEffect(() => {
     document.body.style.overflow = isFullscreen ? "hidden" : "";
@@ -274,7 +276,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
         )}
 
         {/* ── Messages ── */}
-        <div className="kojo-messages">
+        <div className="kojo-messages" ref={messagesRef}>
           <div className="kojo-messages-inner">
             {messages.length === 0 && !isLoading ? (
               <div className="kojo-empty">
@@ -353,6 +355,17 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
 
         {/* ── Input ── */}
         <div className="kojo-input-area">
+          <button
+            type="button"
+            className="kojo-scroll-bottom"
+            hidden={atBottom}
+            onClick={() => scrollToBottom()}
+            aria-label="Scroll to latest message"
+            title="Scroll to latest message"
+          >
+            <ArrowDown size={16} />
+          </button>
+
           <p className="kojo-input-label">Message Kojo</p>
           <div className={isFullscreen ? "kojo-input-row" : undefined}>
             {isFullscreen && modelPicker}
