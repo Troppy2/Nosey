@@ -14,6 +14,7 @@ import Flashcards from "../pages/Flashcards";
 import LearningModes from "../pages/LearningModes";
 import LearningModuleLesson from "../pages/LearningModuleLesson";
 import LearningModulesPage from "../pages/LearningModulesPage";
+import EpisodePlayer from "../pages/EpisodePlayer";
 import Matching from "../pages/Matching";
 import FlashcardsManage from "../pages/FlashcardsManage";
 import FolderDetail from "../pages/FolderDetail";
@@ -103,6 +104,7 @@ export default function App() {
           <Route path="/flashcards/:folderId/matching" element={<Matching />} />
           <Route path="/flashcards/:folderId/modules" element={<LearningModulesPage />} />
           <Route path="/flashcards/:folderId/modules/:moduleId" element={<LearningModuleLesson />} />
+          <Route path="/flashcards/:folderId/episode/:moduleId" element={<EpisodePlayer />} />
           <Route path="/folders/:folderId/flashcards/manage" element={<FlashcardsManage />} />
           <Route path="/leetcode" element={<SignedInRoute><LeetCodeMode /></SignedInRoute>} />
           <Route path="/mock-interview" element={<MockInterviewSetup />} />
