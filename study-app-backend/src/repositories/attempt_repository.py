@@ -38,6 +38,7 @@ class AttemptRepository(BaseRepository[UserAttempt]):
         confidence: Optional[float],
         flagged_uncertain: bool,
         reasoning: Optional[str] = None,
+        work_strokes: Optional[str] = None,
     ) -> UserAnswer:
         answer = UserAnswer(
             attempt_id=attempt_id,
@@ -48,6 +49,11 @@ class AttemptRepository(BaseRepository[UserAttempt]):
             ai_reasoning=reasoning,
             confidence_score=confidence,
             flagged_uncertain=flagged_uncertain,
+            # Scratch-pad strokes (STEM Scratch Pad feature). Only ever passed
+            # by save_draft_attempt; a graded submission never sets this, so
+            # the grade-and-discard guarantee holds for the rendered image
+            # even though these in-progress strokes are persisted.
+            work_strokes=work_strokes,
         )
         self.session.add(answer)
         await self.session.flush()

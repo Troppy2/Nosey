@@ -31,3 +31,33 @@ def resolve_request_provider(user: User, requested: Optional[str]) -> Optional[s
     if user_can_override_provider(user):
         return requested
     return "auto"
+
+
+def resolve_ocr_engine(user: User, requested: Optional[str]) -> str:
+    """The OCR engine a request may actually use (STEM Scratch Pad feature).
+
+    Deliberately NOT resolve_request_provider: that function validates against
+    the LLM provider set (groq/gemini/claude/ollama), so a request for
+    engine="groq" would pass its validation and then fail to dispatch, since no
+    such OCR engine exists. This validates against the real OCR registry
+    instead and falls back to the default on an unknown value rather than
+    raising - a bad client-supplied engine name should degrade a grading
+    submission, not 400 it.
+    """
+    from src.services.ocr_service import valid_ocr_engines
+
+    default = "claude"
+    if not user_can_override_provider(user):
+        return default
+    candidate = (requested or default).strip().lower()
+    return candidate if candidate in valid_ocr_engines() else default
+
+
+def can_submit_scratch_pad_work(user: User) -> bool:
+    """Whether this user may submit a scratch-pad drawing at all.
+
+    Separate from resolve_ocr_engine: this gates the feature itself (STEM
+    Scratch Pad is beta-only), while resolve_ocr_engine only gates which
+    engine an already-permitted request may pick.
+    """
+    return user_can_override_provider(user)
