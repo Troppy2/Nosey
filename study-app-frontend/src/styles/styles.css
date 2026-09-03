@@ -23795,11 +23795,31 @@ button.lc-official-link:disabled:hover {
 .scratchpad-finger-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
   margin-left: auto;
-  font-size: 0.8rem;
+  height: 2rem;
+  padding: 0 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--green-light-mid);
+  background: var(--white);
   color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
   cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.scratchpad-finger-toggle:hover {
+  border-color: var(--green-dark);
+  color: var(--ink);
+}
+.scratchpad-finger-toggle:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.scratchpad-finger-toggle.is-active {
+  background: var(--green-lightest);
+  border-color: var(--green-dark);
+  color: var(--green-dark);
 }
 
 .scratchpad-canvas-container {
