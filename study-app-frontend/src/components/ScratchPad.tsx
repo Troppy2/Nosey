@@ -1,5 +1,5 @@
 import { ChevronDown, Eraser, Hand, Maximize2, Minimize2, PenLine, Plus, Trash2, Undo2, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { scopeKey } from "../lib/api";
 import { MarkdownContent } from "./MarkdownContent";
 
@@ -38,6 +38,15 @@ const MIN_INK_BBOX_AREA = 400; // logical units^2, e.g. a 20x20 mark
 export function emptyScratchPad(): ScratchPadData {
   return { version: 1, strokes: [] };
 }
+
+// A stable empty value for render paths that need a placeholder every render.
+// Calling emptyScratchPad() inline in JSX hands the pad a brand new strokes
+// array on each parent render, which the pad reads as "the strokes changed
+// outside of me" and adopts, wiping work in progress. Never mutate this.
+export const EMPTY_SCRATCH_PAD: ScratchPadData = Object.freeze({
+  version: 1,
+  strokes: Object.freeze([]) as unknown as Stroke[],
+}) as ScratchPadData;
 
 export function parseScratchPadJson(raw: string | null | undefined): ScratchPadData {
   if (!raw) return emptyScratchPad();
@@ -267,16 +276,47 @@ type Gesture =
   | { kind: "erase"; pointerId: number; snapshot: Stroke[]; remaining: Stroke[] };
 
 function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfaceProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Two stacked canvases. The static one holds committed strokes and repaints
+  // only when they change; the live one holds just the stroke being drawn and
+  // is appended to incrementally. Repainting every committed stroke on every
+  // frame is what made writing lag once a page had real work on it: the
+  // per-frame cost grew with everything already written.
+  const staticCanvasRef = useRef<HTMLCanvasElement>(null);
+  const liveCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
   const gestureRef = useRef<Gesture | null>(null);
   const rafPendingRef = useRef(false);
-  // Once a pen (stylus) touches the pad this session, ignore touch input for
-  // drawing so resting a palm does not add stray strokes. No effect on mouse.
-  const penSeenRef = useRef(false);
-  const [allowFingerDraw, setAllowFingerDraw] = useState(true);
+  // How much of the in-progress stroke the live layer has already drawn, so
+  // each frame appends only the new part instead of redrawing the stroke.
+  const liveProgressRef = useRef<{ nextControl: number; lastMid: [number, number] | null }>({
+    nextControl: 1,
+    lastMid: null,
+  });
+
+  const [allowFingerDraw, setAllowFingerDraw] = useState<boolean>(() => {
+    const saved = localStorage.getItem(scopeKey("nosey_scratchpad_finger"));
+    return saved === null ? true : saved === "1";
+  });
   const [tool, setTool] = useState<"pen" | "erase">("pen");
   const [history, setHistory] = useState<Stroke[][]>([]);
+
+  // The canvas owns what it renders. Routing every stroke through the parent
+  // first meant a finished stroke could not appear until the whole test page
+  // re-rendered, which is why ink showed up seconds late, or only once the pen
+  // touched down again.
+  const [localStrokes, setLocalStrokes] = useState<Stroke[]>(strokes);
+  const lastEmittedRef = useRef<Stroke[]>(strokes);
+
+  // Adopt strokes that came from outside (a draft loading, the parent
+  // resetting) while ignoring the echo of what this component just emitted.
+  useEffect(() => {
+    if (strokes !== lastEmittedRef.current) {
+      lastEmittedRef.current = strokes;
+      setLocalStrokes(strokes);
+    }
+  }, [strokes]);
+
   // Sized on open to fit whatever was drawn before, so reopening a drawing
   // made on an extended page does not clip the work below the default height.
   const [pageHeight, setPageHeight] = useState(() => {
@@ -288,9 +328,21 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     );
   });
 
+  const commitStrokes = useCallback(
+    (next: Stroke[]) => {
+      lastEmittedRef.current = next;
+      setLocalStrokes(next);
+      // Tell the parent after the ink has painted. The parent update re-renders
+      // the test page and schedules a draft save, and doing that inline is what
+      // made a finished stroke appear late.
+      requestAnimationFrame(() => onStrokesChange(next));
+    },
+    [onStrokesChange],
+  );
+
   const toLogical = useCallback(
     (clientX: number, clientY: number): [number, number] => {
-      const canvas = canvasRef.current;
+      const canvas = liveCanvasRef.current;
       if (!canvas) return [0, 0];
       // The canvas element's own rect, not the container's: the canvas may
       // stand taller than the container and scroll inside it.
@@ -303,69 +355,124 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     [pageHeight],
   );
 
-  // One paint path for committed strokes, the in-progress stroke, and the live
-  // result of an erase drag, so all three render identically.
-  const paintFrame = useCallback(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    const cssWidth = canvas.width / dpr;
-    const cssHeight = canvas.height / dpr;
-    ctx.clearRect(0, 0, cssWidth, cssHeight);
+  function inkStyle(ctx: CanvasRenderingContext2D) {
     ctx.strokeStyle = "#26301f";
     ctx.lineWidth = 2.4;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    const scaleX = cssWidth / SCRATCH_PAD_LOGICAL_WIDTH;
-    const scaleY = cssHeight / pageHeight;
-    const gesture = gestureRef.current;
-    const committed = gesture?.kind === "erase" ? gesture.remaining : strokes;
-    for (const stroke of committed) drawSmoothPath(ctx, stroke.points, scaleX, scaleY);
-    if (gesture?.kind === "draw") drawSmoothPath(ctx, gesture.points, scaleX, scaleY);
-  }, [strokes, pageHeight]);
+  }
 
-  // Pointer events fire faster than the display refreshes, so painting is
-  // coalesced onto one animation frame rather than run per event. This is much
-  // of why writing feels smoother: the main thread is no longer repainting
-  // several times between frames while the pen is moving.
-  const scheduleFrame = useCallback(() => {
+  function canvasScale(canvas: HTMLCanvasElement, height: number): [number, number] {
+    const dpr = window.devicePixelRatio || 1;
+    return [canvas.width / dpr / SCRATCH_PAD_LOGICAL_WIDTH, canvas.height / dpr / height];
+  }
+
+  // Repaints committed strokes. `override` lets an erase drag preview its
+  // result before that result is committed.
+  const paintStatic = useCallback(
+    (override?: Stroke[]) => {
+      const canvas = staticCanvasRef.current;
+      const ctx = canvas?.getContext("2d");
+      if (!canvas || !ctx) return;
+      const dpr = window.devicePixelRatio || 1;
+      ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+      inkStyle(ctx);
+      const [scaleX, scaleY] = canvasScale(canvas, pageHeight);
+      for (const stroke of override ?? localStrokes) drawSmoothPath(ctx, stroke.points, scaleX, scaleY);
+    },
+    [localStrokes, pageHeight],
+  );
+
+  function clearLive() {
+    const canvas = liveCanvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    liveProgressRef.current = { nextControl: 1, lastMid: null };
+  }
+
+  // Appends the part of the in-progress stroke that has not been drawn yet, as
+  // quadratic curves through sample midpoints. Cost is proportional to the new
+  // samples, not to the length of the stroke or to what is already on the page.
+  function extendLive(points: number[]) {
+    const canvas = liveCanvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    const n = points.length / 2;
+    if (n < 3) return; // needs at least one complete curve segment
+    const [scaleX, scaleY] = canvasScale(canvas, pageHeight);
+    const px = (i: number) => points[i * 2] * scaleX;
+    const py = (i: number) => points[i * 2 + 1] * scaleY;
+    const progress = liveProgressRef.current;
+
+    inkStyle(ctx);
+    ctx.beginPath();
+    if (progress.lastMid) ctx.moveTo(progress.lastMid[0], progress.lastMid[1]);
+    else ctx.moveTo(px(0), py(0));
+
+    let drew = false;
+    for (let i = progress.nextControl; i <= n - 2; i++) {
+      const mx = (px(i) + px(i + 1)) / 2;
+      const my = (py(i) + py(i + 1)) / 2;
+      ctx.quadraticCurveTo(px(i), py(i), mx, my);
+      progress.lastMid = [mx, my];
+      progress.nextControl = i + 1;
+      drew = true;
+    }
+    if (drew) ctx.stroke();
+  }
+
+  // Pointer events fire faster than the display refreshes, so the live layer is
+  // extended once per frame rather than once per event.
+  function scheduleLive() {
     if (rafPendingRef.current) return;
     rafPendingRef.current = true;
     requestAnimationFrame(() => {
       rafPendingRef.current = false;
-      paintFrame();
+      const gesture = gestureRef.current;
+      if (gesture?.kind === "draw") extendLive(gesture.points);
     });
-  }, [paintFrame]);
+  }
 
-  // Held in a ref so the mount-only ResizeObserver below always calls the
-  // CURRENT painter. Calling the captured one repainted the strokes as they
-  // stood when the pad opened, which looked exactly like a resize wiping the
-  // page: the stroke data was fine, only the canvas was stale.
-  const paintFrameRef = useRef(paintFrame);
+  // Held in a ref so the mount-only ResizeObserver always calls the CURRENT
+  // painter. Calling the captured one repainted the strokes as they stood when
+  // the pad opened, which looked exactly like a resize wiping the page.
+  const paintStaticRef = useRef(paintStatic);
   useEffect(() => {
-    paintFrameRef.current = paintFrame;
-  }, [paintFrame]);
+    paintStaticRef.current = paintStatic;
+  }, [paintStatic]);
 
   // Any assignment to canvas.width/height clears the canvas, so sizing always
-  // means: resize the backing store, re-apply the dpr transform, full replay.
+  // means: resize both backing stores, re-apply the dpr transform, full replay.
   const applySize = useCallback(() => {
     const container = containerRef.current;
-    const canvas = canvasRef.current;
-    if (!container || !canvas) return;
+    const page = pageRef.current;
+    const staticCanvas = staticCanvasRef.current;
+    const liveCanvas = liveCanvasRef.current;
+    if (!container || !page || !staticCanvas || !liveCanvas) return;
     const cssWidth = container.clientWidth;
     if (cssWidth <= 0) return;
-    // The canvas keeps the logical page's aspect ratio, so it may stand taller
+    // The page keeps the logical sheet's aspect ratio, so it may stand taller
     // than the container, which then scrolls.
     const cssHeight = (cssWidth / SCRATCH_PAD_LOGICAL_WIDTH) * pageHeight;
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.max(1, Math.round(cssWidth * dpr));
-    canvas.height = Math.max(1, Math.round(cssHeight * dpr));
-    canvas.style.width = `${cssWidth}px`;
-    canvas.style.height = `${cssHeight}px`;
-    const ctx = canvas.getContext("2d");
-    if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    paintFrameRef.current();
+    page.style.height = `${cssHeight}px`;
+    for (const canvas of [staticCanvas, liveCanvas]) {
+      canvas.width = Math.max(1, Math.round(cssWidth * dpr));
+      canvas.height = Math.max(1, Math.round(cssHeight * dpr));
+      canvas.style.width = `${cssWidth}px`;
+      canvas.style.height = `${cssHeight}px`;
+      const ctx = canvas.getContext("2d");
+      if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    paintStaticRef.current();
+    // Resizing wiped the live layer too, so an in-progress stroke is redrawn
+    // from its start.
+    liveProgressRef.current = { nextControl: 1, lastMid: null };
+    const gesture = gestureRef.current;
+    if (gesture?.kind === "draw") extendLive(gesture.points);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageHeight]);
 
   const applySizeRef = useRef(applySize);
@@ -389,15 +496,17 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     };
   }, []);
 
-  // Growing the page changes the backing store, so it needs the same treatment
-  // as a container resize.
+  // Growing the page changes the backing stores, same treatment as a resize.
   useEffect(() => {
     applySizeRef.current();
   }, [pageHeight]);
 
-  useEffect(() => {
-    paintFrame();
-  }, [paintFrame]);
+  // useLayoutEffect, not useEffect: a finished stroke is cleared from the live
+  // layer synchronously, so the static layer has to pick it up before the
+  // browser paints. On useEffect the stroke would blink out for one frame.
+  useLayoutEffect(() => {
+    paintStatic();
+  }, [paintStatic]);
 
   function eraseAt(clientX: number, clientY: number) {
     const gesture = gestureRef.current;
@@ -406,29 +515,33 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     const kept = gesture.remaining.filter((stroke) => !strokeHit(stroke.points, x, y, ERASE_RADIUS));
     if (kept.length !== gesture.remaining.length) {
       gesture.remaining = kept;
-      scheduleFrame();
+      paintStatic(kept);
     }
   }
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
-    if (e.pointerType === "pen") penSeenRef.current = true;
+    // With finger drawing off, touch does nothing here at all: it neither
+    // draws nor erases. touch-action on the canvas hands the gesture back to
+    // the browser, so the page scrolls and zooms the way it normally would.
+    if (e.pointerType === "touch" && !allowFingerDraw) return;
+
     // Many styluses report their eraser tip as a pen with the eraser button
     // bit set (button 5, or bit 0x20 of buttons). Treat that as an erase
     // gesture whatever the toolbar says, since the hardware already said so.
     const stylusEraser = e.pointerType === "pen" && (e.button === 5 || (e.buttons & 0x20) !== 0);
     const erasing = tool === "erase" || stylusEraser;
-    if (!erasing && e.pointerType === "touch" && penSeenRef.current && !allowFingerDraw) return;
 
-    const canvas = canvasRef.current;
+    const canvas = liveCanvasRef.current;
     if (!canvas) return;
     canvas.setPointerCapture(e.pointerId);
 
     if (erasing) {
-      gestureRef.current = { kind: "erase", pointerId: e.pointerId, snapshot: strokes, remaining: strokes };
+      gestureRef.current = { kind: "erase", pointerId: e.pointerId, snapshot: localStrokes, remaining: localStrokes };
       eraseAt(e.clientX, e.clientY);
       return;
     }
 
+    clearLive();
     const [x, y] = toLogical(e.clientX, e.clientY);
     gestureRef.current = { kind: "draw", pointerId: e.pointerId, points: [x, y] };
   }
@@ -452,7 +565,7 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
       const [x, y] = toLogical(evt.clientX, evt.clientY);
       gesture.points.push(x, y);
     }
-    scheduleFrame();
+    scheduleLive();
   }
 
   function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -463,47 +576,54 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     if (gesture.kind === "erase") {
       if (gesture.remaining.length !== gesture.snapshot.length) {
         setHistory((h) => [...h, gesture.snapshot]);
-        onStrokesChange(gesture.remaining);
+        commitStrokes(gesture.remaining);
       }
-      // Deliberately no repaint here. The gesture is over, so a frame drawn
-      // before the parent commits the new strokes would paint the just-erased
-      // strokes back for one frame. The repaint effect handles it once the
-      // committed strokes arrive; if nothing was erased, the canvas is already
-      // correct.
       return;
     }
 
     if (gesture.points.length < 4) {
-      scheduleFrame();
+      clearLive();
       return; // a tap, not a stroke
     }
     const simplified = simplifyStroke(gesture.points);
-    const next = [...strokes, { points: simplified }].slice(-MAX_STROKES_PER_QUESTION);
-    setHistory((h) => [...h, strokes]);
-    onStrokesChange(next);
+    const next = [...localStrokes, { points: simplified }].slice(-MAX_STROKES_PER_QUESTION);
+    setHistory((h) => [...h, localStrokes]);
+    // The static layer picks this stroke up on the very next paint, which
+    // React commits synchronously from local state, so clearing the live layer
+    // here does not leave a visible gap.
+    clearLive();
+    commitStrokes(next);
   }
 
   function handlePointerCancel() {
     gestureRef.current = null;
-    scheduleFrame();
+    clearLive();
   }
 
   function undo() {
     if (history.length === 0) return;
     const prev = history[history.length - 1];
     setHistory((h) => h.slice(0, -1));
-    onStrokesChange(prev);
+    commitStrokes(prev);
   }
 
   function clearAll() {
-    if (strokes.length === 0) return;
-    setHistory((h) => [...h, strokes]);
-    onStrokesChange([]);
+    if (localStrokes.length === 0) return;
+    setHistory((h) => [...h, localStrokes]);
+    commitStrokes([]);
+  }
+
+  function toggleFingerDraw() {
+    setAllowFingerDraw((v) => {
+      const next = !v;
+      localStorage.setItem(scopeKey("nosey_scratchpad_finger"), next ? "1" : "0");
+      return next;
+    });
   }
 
   function addSpace() {
     setPageHeight((h) => Math.min(MAX_LOGICAL_HEIGHT, h + LOGICAL_HEIGHT_STEP));
-    // Two frames: one for React to commit the taller canvas, one for layout to
+    // Two frames: one for React to commit the taller page, one for layout to
     // settle before scrolling down to the new space.
     requestAnimationFrame(() =>
       requestAnimationFrame(() => {
@@ -537,7 +657,7 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
           type="button"
           className="scratchpad-tool-btn"
           onClick={clearAll}
-          disabled={strokes.length === 0}
+          disabled={localStrokes.length === 0}
           aria-label="Clear the page"
           title="Clear the page"
         >
@@ -546,23 +666,29 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
         <button
           type="button"
           className={`scratchpad-finger-toggle${allowFingerDraw ? " is-active" : ""}`}
-          onClick={() => setAllowFingerDraw((v) => !v)}
+          onClick={toggleFingerDraw}
           aria-pressed={allowFingerDraw}
+          title={allowFingerDraw ? "Finger draws on the page" : "Finger scrolls the page, only a stylus draws"}
         >
           <Hand size={14} />
-          Draw with finger
+          {allowFingerDraw ? "Draw with finger" : "Finger scrolls"}
         </button>
       </div>
       <div ref={containerRef} className={`scratchpad-canvas-container ${paperClass}`}>
-        <canvas
-          ref={canvasRef}
-          className={`scratchpad-canvas${tool === "erase" ? " is-erasing" : ""}`}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerCancel}
-          onPointerLeave={handlePointerUp}
-        />
+        <div ref={pageRef} className="scratchpad-page">
+          <canvas ref={staticCanvasRef} className="scratchpad-canvas scratchpad-canvas--static" aria-hidden="true" />
+          <canvas
+            ref={liveCanvasRef}
+            className={`scratchpad-canvas scratchpad-canvas--live${tool === "erase" ? " is-erasing" : ""}${
+              allowFingerDraw ? "" : " allows-scroll"
+            }`}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
+            onPointerLeave={handlePointerUp}
+          />
+        </div>
       </div>
       <button type="button" className="scratchpad-extend-btn" onClick={addSpace} disabled={atMaxHeight}>
         <Plus size={13} />
@@ -599,6 +725,9 @@ export function ScratchPadModal({
   const cardRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
   const [customSize, setCustomSize] = useState<{ w: number; h: number } | null>(null);
+  // The question runs through KaTeX, which is not cheap. Without this it would
+  // re-typeset on every stroke, since a stroke updates the parent's state.
+  const questionNode = useMemo(() => <MarkdownContent content={questionText} />, [questionText]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -661,7 +790,7 @@ export function ScratchPadModal({
               <PenLine size={13} /> Scratch pad
             </span>
             <div className="scratchpad-question-text">
-              <MarkdownContent content={questionText} />
+              {questionNode}
             </div>
           </div>
           <div className="scratchpad-header-actions">
