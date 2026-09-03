@@ -519,16 +519,45 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     }
   }
 
+  // If a gesture is still open when a new one starts, the device dropped its
+  // pointerup or pointercancel: an occasional real failure mode for stylus
+  // input, particularly on quick up/down taps. Left alone, the stale gesture
+  // sits in gestureRef forever and its unfinished draw is never committed.
+  // Finalizing it here (rather than silently discarding) is what makes the
+  // pad self-heal instead of needing a manual erase-and-retry to un-stick.
+  function finalizeOrphanedGesture() {
+    const gesture = gestureRef.current;
+    if (!gesture) return;
+    gestureRef.current = null;
+    if (gesture.kind === "draw" && gesture.points.length >= 4) {
+      const simplified = simplifyStroke(gesture.points);
+      const next = [...localStrokes, { points: simplified }].slice(-MAX_STROKES_PER_QUESTION);
+      setHistory((h) => [...h, localStrokes]);
+      clearLive();
+      commitStrokes(next);
+    } else if (gesture.kind === "erase" && gesture.remaining.length !== gesture.snapshot.length) {
+      setHistory((h) => [...h, gesture.snapshot]);
+      commitStrokes(gesture.remaining);
+    }
+  }
+
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
     // With finger drawing off, touch does nothing here at all: it neither
     // draws nor erases. touch-action on the canvas hands the gesture back to
     // the browser, so the page scrolls and zooms the way it normally would.
     if (e.pointerType === "touch" && !allowFingerDraw) return;
 
-    // Many styluses report their eraser tip as a pen with the eraser button
-    // bit set (button 5, or bit 0x20 of buttons). Treat that as an erase
-    // gesture whatever the toolbar says, since the hardware already said so.
-    const stylusEraser = e.pointerType === "pen" && (e.button === 5 || (e.buttons & 0x20) !== 0);
+    if (gestureRef.current && gestureRef.current.pointerId !== e.pointerId) finalizeOrphanedGesture();
+
+    // A stylus eraser tip is only reliably signalled by `button === 5` on the
+    // exact event where it made contact. The `buttons` bitmask's eraser bit
+    // (0x20) is a live, driver-reported flag, and several Windows Ink /
+    // Chromium digitizer combinations leave it spuriously set after the
+    // eraser end was last used, turning the NEXT ordinary tip-down into a
+    // silent no-op erase: the pen moves, nothing draws, until a full clean
+    // erase gesture resets the stuck state. `button` alone does not have that
+    // failure mode, so it is the only signal trusted here.
+    const stylusEraser = e.pointerType === "pen" && e.button === 5;
     const erasing = tool === "erase" || stylusEraser;
 
     const canvas = liveCanvasRef.current;
