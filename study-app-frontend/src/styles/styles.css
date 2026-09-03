@@ -23674,6 +23674,9 @@ button.lc-official-link:disabled:hover {
   color: var(--ink);
   font-size: 0.92rem;
   line-height: 1.4;
+}
+.scratchpad-question-text .kojo-md-p {
+  margin: 0;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
