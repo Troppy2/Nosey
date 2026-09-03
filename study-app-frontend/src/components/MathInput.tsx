@@ -1,6 +1,5 @@
 import katex from "katex";
 import "katex/dist/katex.min.css";
-import { ChevronDown, PenLine } from "lucide-react";
 import type { MathfieldElement } from "mathlive";
 import type { DetailedHTMLProps, HTMLAttributes } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -60,8 +59,6 @@ export function MathInput({ value, onChange, placeholder }: MathInputProps) {
   const [fieldReady, setFieldReady] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const [latexMode, setLatexMode] = useState(false);
-  const [scratchpad, setScratchpad] = useState("");
-  const [scratchOpen, setScratchOpen] = useState(false);
 
   // Keep the latest onChange reachable from the input listener without
   // re-binding the listener on every TakeTest render (it passes an inline arrow).
@@ -186,27 +183,6 @@ export function MathInput({ value, onChange, placeholder }: MathInputProps) {
           <span className="loader" />
         </div>
       )}
-
-      <div className="math-scratchpad">
-        <button
-          type="button"
-          className="math-scratchpad-toggle"
-          onClick={() => setScratchOpen((o) => !o)}
-        >
-          <PenLine size={14} />
-          Scratch work
-          <ChevronDown size={14} className={scratchOpen ? "rotated" : ""} />
-        </button>
-        {scratchOpen && (
-          <textarea
-            className="field-input math-scratchpad-area"
-            value={scratchpad}
-            onChange={(e) => setScratchpad(e.target.value)}
-            placeholder="Work out your problem here , this isn't submitted…"
-            rows={5}
-          />
-        )}
-      </div>
     </div>
   );
 }

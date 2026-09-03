@@ -11,6 +11,15 @@ import { InlineLoading, LoadingNotice } from "../components/Loaders";
 import { KojoHelpChat } from "../components/KojoHelpChat";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { MathInput } from "../components/MathInput";
+import {
+  emptyScratchPad,
+  exportScratchPadPng,
+  isScratchPadEmpty,
+  parseScratchPadJson,
+  ScratchPadTrigger,
+  type PaperStyle,
+  type ScratchPadData,
+} from "../components/ScratchPad";
 import type { ProgressStage } from "../components/Progress";
 import { ProgressOverlay, useStagedProgress } from "../components/Progress";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
@@ -54,6 +63,15 @@ export default function TakeTest() {
   const [test, setTest] = useState<TestTake | null>(null);
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
+  // Scratch-pad drawings, keyed by question id (STEM Scratch Pad feature,
+  // beta only). Available on every question type in math mode, not just
+  // free-response, so this lives at the page level rather than inside
+  // MathInput. Persisted through the existing draft-attempt round trip so a
+  // drawing resumes across devices exactly like a typed answer.
+  const [workStrokes, setWorkStrokes] = useState<Record<number, ScratchPadData>>({});
+  const [paperStyle, setPaperStyle] = useState<PaperStyle>(
+    () => (localStorage.getItem(scopeKey("nosey_scratchpad_paper")) as PaperStyle | null) ?? "blank",
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [graded, setGraded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -125,6 +143,11 @@ export default function TakeTest() {
     });
   }
 
+  function changePaperStyle(style: PaperStyle) {
+    setPaperStyle(style);
+    localStorage.setItem(scopeKey("nosey_scratchpad_paper"), style);
+  }
+
   // Ephemeral per-turn grounding sent to Kojo alongside each message (never
   // shown as a chat bubble): the question the student is currently working on.
   function buildTestKojoContext(): string {
@@ -177,6 +200,10 @@ export default function TakeTest() {
       if (event.target instanceof Element && event.target.closest(".math-input-wrap")) {
         return;
       }
+      // Do not navigate questions out from under an open scratch pad.
+      if (event.target instanceof Element && event.target.closest(".scratchpad-modal")) {
+        return;
+      }
       if (event.key === "ArrowRight") {
         event.preventDefault();
         setIndex((currentIndex) => {
@@ -205,8 +232,13 @@ export default function TakeTest() {
       const draft = await getDraftAttempt(numericTestId);
       if (draft && draft.answers.length > 0) {
         const draftAnswers: Record<number, string> = {};
+        const draftStrokes: Record<number, ScratchPadData> = {};
         draft.answers.forEach((ans) => {
           draftAnswers[ans.question_id] = ans.user_answer;
+          if (ans.work_strokes) {
+            const parsed = parseScratchPadJson(ans.work_strokes);
+            if (!isScratchPadEmpty(parsed)) draftStrokes[ans.question_id] = parsed;
+          }
         });
         const answered = Object.values(draftAnswers).filter(Boolean).length;
         const exitedTime = draft.exited_at ? new Date(draft.exited_at).toLocaleString() : "unknown";
@@ -218,6 +250,7 @@ export default function TakeTest() {
         setShowResumeDialog(true);
         // Don't load answers yet - wait for user to confirm
         sessionStorage.setItem(`_draft_answers_${numericTestId}`, JSON.stringify(draftAnswers));
+        sessionStorage.setItem(`_draft_strokes_${numericTestId}`, JSON.stringify(draftStrokes));
       }
     }
     loadDraft();
@@ -235,13 +268,29 @@ export default function TakeTest() {
     }
   }, [numericTestId]);
 
+  // Builds the draft payload from the union of question ids that have a
+  // typed answer OR scratch-pad strokes: a draw-only question (empty typed
+  // text, real strokes) still needs its work saved, or it would be silently
+  // dropped from every draft round trip.
+  function buildDraftAnswers(): DraftAttemptAnswer[] {
+    const ids = new Set<number>([
+      ...Object.keys(answers).map(Number),
+      ...Object.keys(workStrokes).map(Number),
+    ]);
+    return [...ids].map((qid) => {
+      const strokes = workStrokes[qid];
+      return {
+        question_id: qid,
+        user_answer: answers[qid] ?? "",
+        work_strokes: strokes && !isScratchPadEmpty(strokes) ? JSON.stringify(strokes) : undefined,
+      };
+    });
+  }
+
   // Auto-save answers when they change
   useEffect(() => {
     const timer = setTimeout(() => {
-      const draftAnswers: DraftAttemptAnswer[] = Object.entries(answers).map(([qid, answer]) => ({
-        question_id: Number(qid),
-        user_answer: answer,
-      }));
+      const draftAnswers = buildDraftAnswers();
       if (draftAnswers.length > 0) {
         saveDraftAttempt(numericTestId, draftAnswers).catch((err) =>
           console.error("Draft auto-save failed:", err),
@@ -249,15 +298,13 @@ export default function TakeTest() {
       }
     }, 1000);
     return () => clearTimeout(timer);
-  }, [answers, numericTestId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answers, workStrokes, numericTestId]);
 
   // Save draft on page leave
   useEffect(() => {
     function handleBeforeUnload() {
-      const draftAnswers: DraftAttemptAnswer[] = Object.entries(answers).map(([qid, answer]) => ({
-        question_id: Number(qid),
-        user_answer: answer,
-      }));
+      const draftAnswers = buildDraftAnswers();
       if (draftAnswers.length > 0) {
         // Use synchronous API call via navigator.sendBeacon if available
         const payload = JSON.stringify({
@@ -271,13 +318,19 @@ export default function TakeTest() {
     }
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [answers, numericTestId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answers, workStrokes, numericTestId]);
 
   function handleResume() {
     const draftAnswers = sessionStorage.getItem(`_draft_answers_${numericTestId}`);
     if (draftAnswers) {
       setAnswers(JSON.parse(draftAnswers) as Record<number, string>);
       sessionStorage.removeItem(`_draft_answers_${numericTestId}`);
+    }
+    const draftStrokes = sessionStorage.getItem(`_draft_strokes_${numericTestId}`);
+    if (draftStrokes) {
+      setWorkStrokes(JSON.parse(draftStrokes) as Record<number, ScratchPadData>);
+      sessionStorage.removeItem(`_draft_strokes_${numericTestId}`);
     }
     const savedIndex = localStorage.getItem(scopeKey(`nosey_test_index_${numericTestId}`));
     if (savedIndex !== null) setIndex(Number(savedIndex));
@@ -286,6 +339,8 @@ export default function TakeTest() {
 
   function handleStartFresh() {
     setAnswers({});
+    setWorkStrokes({});
+    sessionStorage.removeItem(`_draft_strokes_${numericTestId}`);
     localStorage.removeItem(scopeKey(`nosey_test_index_${numericTestId}`));
     setShowResumeDialog(false);
   }
@@ -373,11 +428,18 @@ export default function TakeTest() {
     });
   }
 
-  const answeredCount = test ? test.questions.filter((item) => isQuestionAnswered(item, answers[item.id])).length : 0;
+  function hasScratchWork(questionId: number): boolean {
+    const strokes = workStrokes[questionId];
+    return Boolean(strokes && !isScratchPadEmpty(strokes));
+  }
+
+  const answeredCount = test
+    ? test.questions.filter((item) => isQuestionAnswered(item, answers[item.id], hasScratchWork(item.id))).length
+    : 0;
   const progress = totalSlots ? ((index + 1) / totalSlots) * 100 : 0;
   // Can only submit once generation has finished and every loaded question is answered.
   const canSubmit = test && !isGenerating && loadedCount > 0
-    ? test.questions.every((item) => isQuestionAnswered(item, answers[item.id]))
+    ? test.questions.every((item) => isQuestionAnswered(item, answers[item.id], hasScratchWork(item.id)))
     : false;
   const isMathMode = Boolean(test?.is_math_mode);
   const isCodingMode = Boolean(test?.is_coding_mode);
@@ -387,6 +449,9 @@ export default function TakeTest() {
   useEffect(() => {
     function handleLetterKey(event: KeyboardEvent) {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      // The scratch pad's canvas is not a text input, so without this guard
+      // pressing "a" while drawing would change the MCQ answer underneath it.
+      if (event.target instanceof HTMLCanvasElement) return;
       if (!question || question.type !== "MCQ") return;
       const key = event.key.toLowerCase();
       const map: Record<string, number> = { a: 0, b: 1, c: 2, d: 3 };
@@ -403,13 +468,31 @@ export default function TakeTest() {
     return () => window.removeEventListener("keydown", handleLetterKey);
   }, [question]);
 
-  const submittedAnswers = useMemo<SubmittedAnswer[]>(
-    () =>
-      Object.entries(answers)
-        .filter(([, answer]) => answer.trim())
-        .map(([question_id, answer]) => ({ question_id: Number(question_id), answer })),
-    [answers],
-  );
+  // Built at submit time, not as a memo: exporting each drawing to a PNG is
+  // real canvas work (crop, scale, re-render), so it should happen once, on
+  // submit, not on every answers/workStrokes change. Includes any question
+  // with strokes even when the typed answer is empty, since a draw-only
+  // submission is legal; the naive Object.entries(answers).filter(...) this
+  // used to be would silently drop those questions.
+  function buildSubmittedAnswers(): SubmittedAnswer[] {
+    const ids = new Set<number>([
+      ...Object.keys(answers).map(Number),
+      ...Object.keys(workStrokes).map(Number),
+    ]);
+    const result: SubmittedAnswer[] = [];
+    for (const questionId of ids) {
+      const typedAnswer = (answers[questionId] ?? "").trim();
+      const strokes = workStrokes[questionId];
+      const workImage = strokes ? exportScratchPadPng(strokes) : null;
+      if (!typedAnswer && !workImage) continue;
+      result.push({
+        question_id: questionId,
+        answer: typedAnswer,
+        ...(workImage ? { work_image: workImage } : {}),
+      });
+    }
+    return result;
+  }
 
   // Grading is one round trip, so there is nothing real to count. What we do
   // know is the pipeline: the answer key is instant, and every written answer
@@ -419,9 +502,19 @@ export default function TakeTest() {
     const questions = test?.questions ?? [];
     const written = questions.filter((question) => question.type === "FRQ").length;
     const keyed = questions.length - written;
+    // Drawings with real ink add an OCR transcription call per question
+    // before grading even starts (STEM Scratch Pad feature), so the "Reading"
+    // stage needs real time budgeted for it, not just the text-grading estimate.
+    const drawings = questions.filter((q) => hasScratchWork(Number(q.id))).length;
     const stages: ProgressStage[] = [{ label: "Collecting your answers", seconds: 1.5 }];
     if (keyed > 0) {
       stages.push({ label: "Checking against the answer key", seconds: 2 });
+    }
+    if (drawings > 0) {
+      stages.push({
+        label: drawings === 1 ? "Reading your handwritten work" : `Reading your ${drawings} handwritten answers`,
+        seconds: Math.max(5, drawings * 4),
+      });
     }
     if (written > 0) {
       stages.push({
@@ -432,7 +525,8 @@ export default function TakeTest() {
     }
     stages.push({ label: "Scoring and writing feedback", seconds: 3.5 });
     return stages;
-  }, [test]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [test, workStrokes]);
 
   const hasWrittenAnswers = gradingStages.some((stage) => stage.label.startsWith("Reading"));
   const grading = useStagedProgress(gradingStages, { running: isSubmitting, done: graded });
@@ -442,9 +536,10 @@ export default function TakeTest() {
     setIsSubmitting(true);
     setGraded(false);
     try {
-      const result = await submitAttempt(test.id, submittedAnswers);
+      const result = await submitAttempt(test.id, buildSubmittedAnswers());
       localStorage.removeItem(scopeKey(`nosey_test_index_${numericTestId}`));
       clearToolStorage();
+      setWorkStrokes({});
       sessionStorage.setItem(`nosey_attempt_${result.attempt_id}`, JSON.stringify(result));
       const completedKey = scopeKey("nosey_completed_test_ids");
       const existing = JSON.parse(localStorage.getItem(completedKey) ?? "[]") as number[];
@@ -680,7 +775,7 @@ export default function TakeTest() {
                 </div>
                 <div className="test-nav-grid">
                   {test.questions.map((item, itemIndex) => {
-                    const answered = isQuestionAnswered(item, answers[item.id]);
+                    const answered = isQuestionAnswered(item, answers[item.id], hasScratchWork(item.id));
                     const marked = bookmarks.has(item.id);
                     return (
                       <button
@@ -856,6 +951,15 @@ export default function TakeTest() {
                   placeholder="Use the details from your notes..."
                 />
               )}
+              {isMathMode && betaMode ? (
+                <ScratchPadTrigger
+                  questionText={question.question_text}
+                  data={workStrokes[question.id] ?? emptyScratchPad()}
+                  onChange={(data) => setWorkStrokes((prev) => ({ ...prev, [question.id]: data }))}
+                  paperStyle={paperStyle}
+                  onPaperStyleChange={changePaperStyle}
+                />
+              ) : null}
             </Card>
           );
           if (learningActive && test.folder_id) {
@@ -1149,7 +1253,11 @@ function questionTypeLabel(question: Question): string {
   }
 }
 
-function isQuestionAnswered(question: Question, answer?: string): boolean {
+// hasWork: true when the question carries a non-empty scratch-pad drawing
+// (STEM Scratch Pad feature). A drawing alone counts as answered, since a
+// draw-only submission is legal (no typed answer required).
+function isQuestionAnswered(question: Question, answer?: string, hasWork = false): boolean {
+  if (hasWork) return true;
   if (!answer || !answer.trim()) return false;
   if (question.type === "MS") {
     try {
