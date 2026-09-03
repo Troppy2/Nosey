@@ -23627,6 +23627,13 @@ button.lc-official-link:disabled:hover {
 
 .scratchpad-backdrop {
   z-index: 1100;
+  /* No backdrop blur under this particular modal. The canvas above it
+     repaints continuously while a stroke is being drawn, and a full-screen
+     blur has to recomposite on every one of those frames, which on a tablet
+     is enough on its own to make ink trail behind the stylus. */
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(0, 0, 0, 0.55);
 }
 
 .scratchpad-modal {
@@ -23838,17 +23845,37 @@ button.lc-official-link:disabled:hover {
   overflow-x: hidden;
   overflow-y: auto;
 }
+/* The page holds the two stacked canvases. Its height is set in JS to the
+   logical page length, so it can stand taller than the container and scroll. */
+.scratchpad-page {
+  position: relative;
+  width: 100%;
+}
 .scratchpad-canvas {
+  position: absolute;
+  inset: 0;
   display: block;
   /* Sized in JS: the width tracks the container, the height follows the
      logical page length, so neither is set here. */
-  /* Without this, the browser pans/scrolls on touch instead of drawing;
-     preventDefault alone is not enough since pointer listeners are passive
-     by default in modern browsers. */
+}
+/* Committed strokes. Never receives input; the live layer above it does. */
+.scratchpad-canvas--static {
+  pointer-events: none;
+}
+.scratchpad-canvas--live {
+  /* Without this the browser pans/scrolls on touch instead of drawing, and
+     preventDefault alone is not enough since pointer listeners are passive by
+     default in modern browsers. */
   touch-action: none;
   cursor: crosshair;
 }
-.scratchpad-canvas.is-erasing {
+/* With finger drawing turned off, touch belongs to the browser again, so a
+   finger scrolls and pinch-zooms the page instead of marking it. A stylus is
+   unaffected and still draws. */
+.scratchpad-canvas--live.allows-scroll {
+  touch-action: pan-y pinch-zoom;
+}
+.scratchpad-canvas--live.is-erasing {
   cursor: cell;
 }
 /* Paper styles are CSS decoration behind a transparent canvas only. The
