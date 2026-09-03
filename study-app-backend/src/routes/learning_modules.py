@@ -19,9 +19,16 @@ from src.models.user import User
 from src.repositories.usage_event_repository import UsageEventRepository
 from src.schemas.learning_module_schema import (
     ArchiveTrackRequest,
+    CheckpointAnswerRequest,
+    CheckpointAnswerResponse,
     CreateLearningTrackRequest,
+    EpisodeCheckpointPublic,
+    EpisodeCheckpointState,
+    EpisodeSlide,
+    EpisodeTurn,
     LearningModuleResponse,
     LearningTrackResponse,
+    ModuleEpisodeResponse,
     QuizAttemptRequest,
     QuizAttemptResponse,
     QuizQuestionPublic,
@@ -40,6 +47,10 @@ logger = get_logger(__name__)
 # Questions per module quiz and the pass bar (80%, so 4/5).
 QUIZ_QUESTION_COUNT = 5
 PASS_RATIO = 0.8
+
+# Checkpoints per episode and the pass bar: same count and same 80% threshold
+# as the article quiz, so _pass_threshold and the pass semantics are shared.
+CHECKPOINT_COUNT = QUIZ_QUESTION_COUNT
 
 # Strong references to detached generation tasks, mirroring routes/tests.py:
 # generation is spawned with asyncio.create_task (NOT FastAPI BackgroundTasks)
@@ -91,13 +102,68 @@ async def _generate_track_background(
     _t0 = time.monotonic()
     llm = LLMService()
     try:
-        # Read the folder's saved notes in a short-lived session.
+        # Read the folder's saved notes AND the track's format in a short-lived
+        # session. The format is read from the row (not the call arguments) so
+        # a task spawned before a rebuild still behaves correctly.
         async with async_session_maker() as session:
             notes = await FileService().get_folder_files_content(folder_id, user_id, session)
+            track_row = await session.get(LearningTrack, track_id)
+            track_format = track_row.format if track_row is not None else "article"
         if not notes:
             await _mark_track_failed(
                 track_id,
                 "This folder has no saved notes. Upload notes to the folder first, then rebuild the track.",
+            )
+            return
+
+        # Episode formats are a single module authored in ONE call straight from
+        # the notes: no outline pass and no article. Everything below the branch
+        # is the untouched article path.
+        if track_format in ("podcast", "lecture"):
+            llm_call = (
+                llm.generate_podcast_episode
+                if track_format == "podcast"
+                else llm.generate_lecture_episode
+            )
+            episode = await llm_call(
+                notes,
+                checkpoint_count=CHECKPOINT_COUNT,
+                provider=provider,
+                custom_instructions=custom_instructions,
+            )
+            async with async_session_maker() as session:
+                track = await session.get(LearningTrack, track_id)
+                if track is None:
+                    return  # cancelled
+                track.notes_hash = _hash_notes(notes)
+                session.add(
+                    LearningModule(
+                        track_id=track_id,
+                        order_index=0,
+                        title=str(episode["title"]),
+                        episode_script=json.dumps(episode["turns"]),
+                        slides=json.dumps(episode["slides"]) if episode.get("slides") else None,
+                        checkpoints=json.dumps(episode["checkpoints"]),
+                    )
+                )
+                track.status = "ready"
+                await session.commit()
+
+            # Usage event, same shape as the article path (one event per build,
+            # successful or not; the format itself is already visible on the
+            # track row, so no schema change is invented here).
+            duration_ms = int((time.monotonic() - _t0) * 1000)
+            async with async_session_maker() as session:
+                try:
+                    await UsageEventRepository(session).log_event(
+                        user_id, "learning_track_generation", duration_ms, provider=provider
+                    )
+                    await session.commit()
+                except Exception:
+                    pass
+            logger.info(
+                "Learning track generation complete",
+                extra={"track_id": track_id, "track_format": track_format},
             )
             return
 
@@ -204,7 +270,10 @@ def _module_to_response(module: LearningModule) -> LearningModuleResponse:
         quiz=quiz,
         best_score=module.best_score,
         passed=module.passed,
-        ready=bool(module.lesson_content and module.quiz_json),
+        ready=bool(module.episode_script and module.checkpoints)
+        if module.episode_script
+        else bool(module.lesson_content and module.quiz_json),
+        episode_ready=bool(module.episode_script and module.checkpoints),
     )
 
 
@@ -215,6 +284,7 @@ def _track_to_response(track: LearningTrack, notes_stale: bool = False) -> Learn
         status=track.status,
         error=track.error,
         module_count=track.module_count,
+        format=track.format,
         custom_instructions=track.custom_instructions,
         notes_stale=notes_stale,
         is_archived=track.is_archived,
@@ -230,6 +300,43 @@ async def _get_owned_folder(folder_id: int, user_id: int, session: AsyncSession)
     if folder is None:
         raise ResourceNotFoundException("Folder")
     return folder
+
+
+async def _get_owned_module(module_id: int, user_id: int, session: AsyncSession) -> LearningModule:
+    """A module that belongs to one of the user's folders (active or archived)."""
+    module = await session.scalar(
+        select(LearningModule)
+        .join(LearningTrack, LearningTrack.id == LearningModule.track_id)
+        .join(Folder, Folder.id == LearningTrack.folder_id)
+        .where(LearningModule.id == module_id, Folder.user_id == user_id)
+    )
+    if module is None:
+        raise ResourceNotFoundException("Learning module")
+    return module
+
+
+def _checkpoint_progress(module: LearningModule, total: int) -> list[dict[str, object]]:
+    """The listener's per-checkpoint record, normalized to length `total`.
+
+    Stored progress can be short or absent (never started, or the track was
+    rebuilt), so it is padded here rather than trusted.
+    """
+    try:
+        raw = json.loads(module.checkpoint_progress or "[]")
+    except ValueError:
+        raw = []
+    progress: list[dict[str, object]] = []
+    for i in range(total):
+        item = raw[i] if isinstance(raw, list) and i < len(raw) and isinstance(raw[i], dict) else {}
+        answer = item.get("answer")
+        progress.append(
+            {
+                "answer": int(answer) if isinstance(answer, int) and answer >= 0 else None,
+                "correct": bool(item.get("correct")),
+                "seen": bool(item.get("seen")),
+            }
+        )
+    return progress
 
 
 @router.post(
@@ -274,14 +381,23 @@ async def create_learning_track(
         # (Ollama-first, Claude last), enforced before the detached build task.
         provider = resolve_request_provider(user, provider)
 
+        track_format = (data.format or "article").strip().lower()
+        if track_format not in ("article", "podcast", "lecture"):
+            raise StudyAppException("format must be article, podcast, or lecture")
+        # Episode formats are ONE module by design: a single LLM call is what
+        # makes them cheap and fast enough to offer at all. The UI hides the
+        # count control for them; this is the server-side guarantee.
+        module_count = 1 if track_format != "article" else data.module_count
+
         custom_instructions = (data.custom_instructions or "").strip()[:10000] or None
 
-        # Rebuild semantics: replace the folder's ACTIVE track only (archived
-        # tracks are kept). Deleting the old row is also the cancel signal for
-        # an in-flight generation (see background task).
+        # Rebuild semantics: replace the folder's ACTIVE track for THIS FORMAT
+        # only (archived tracks are kept). Deleting the old row is also the
+        # cancel signal for an in-flight generation (see background task).
         existing = await session.scalar(
             select(LearningTrack).where(
                 LearningTrack.folder_id == folder_id,
+                LearningTrack.format == track_format,
                 LearningTrack.is_archived.is_(False),
             )
         )
@@ -292,7 +408,8 @@ async def create_learning_track(
         track = LearningTrack(
             folder_id=folder_id,
             status="generating",
-            module_count=data.module_count,
+            format=track_format,
+            module_count=module_count,
             provider=provider,
             custom_instructions=custom_instructions,
         )
@@ -309,7 +426,7 @@ async def create_learning_track(
                 track_id=track.id,
                 user_id=user.id,
                 folder_id=folder_id,
-                module_count=data.module_count,
+                module_count=module_count,
                 provider=provider,
                 custom_instructions=custom_instructions,
             )
@@ -327,6 +444,7 @@ async def create_learning_track(
 @router.get("/folders/{folder_id}/learning-track", response_model=LearningTrackResponse)
 async def get_learning_track(
     folder_id: int,
+    format: str = "article",
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> LearningTrackResponse:
@@ -334,7 +452,11 @@ async def get_learning_track(
         await _get_owned_folder(folder_id, user.id, session)
         track = await session.scalar(
             select(LearningTrack)
-            .where(LearningTrack.folder_id == folder_id, LearningTrack.is_archived.is_(False))
+            .where(
+                LearningTrack.folder_id == folder_id,
+                LearningTrack.format == (format or "article"),
+                LearningTrack.is_archived.is_(False),
+            )
             .options(selectinload(LearningTrack.modules))
         )
         if track is None:
@@ -348,6 +470,29 @@ async def get_learning_track(
             notes_stale = bool(current_notes) and _hash_notes(current_notes) != track.notes_hash
 
         return _track_to_response(track, notes_stale=notes_stale)
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/folders/{folder_id}/learning-tracks", response_model=list[LearningTrackResponse])
+async def list_active_tracks(
+    folder_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[LearningTrackResponse]:
+    """Every active track for the folder, at most one per format, so the hub can
+    render all three format slots in one request."""
+    try:
+        await _get_owned_folder(folder_id, user.id, session)
+        tracks = (
+            await session.scalars(
+                select(LearningTrack)
+                .where(LearningTrack.folder_id == folder_id, LearningTrack.is_archived.is_(False))
+                .options(selectinload(LearningTrack.modules))
+                .order_by(LearningTrack.created_at.asc())
+            )
+        ).all()
+        return [_track_to_response(t) for t in tracks]
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -423,12 +568,13 @@ async def set_track_archived(
             active = await session.scalar(
                 select(LearningTrack.id).where(
                     LearningTrack.folder_id == track.folder_id,
+                    LearningTrack.format == track.format,
                     LearningTrack.is_archived.is_(False),
                 )
             )
             if active is not None:
                 raise StudyAppException(
-                    "This folder already has an active track. Archive or delete it before restoring."
+                    "This folder already has an active track for this format. Archive or delete it before restoring."
                 )
 
         track.is_archived = data.archived
@@ -443,16 +589,19 @@ async def set_track_archived(
 @router.delete("/folders/{folder_id}/learning-track", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_learning_track(
     folder_id: int,
+    format: str = "article",
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> None:
-    """Delete the folder's ACTIVE track. Doubles as cancel while generation is
-    running. Archived tracks are deleted via delete_track_by_id."""
+    """Delete the folder's ACTIVE track for a format. Doubles as cancel while
+    generation is running. Archived tracks are deleted via delete_track_by_id."""
     try:
         await _get_owned_folder(folder_id, user.id, session)
         track = await session.scalar(
             select(LearningTrack).where(
-                LearningTrack.folder_id == folder_id, LearningTrack.is_archived.is_(False)
+                LearningTrack.folder_id == folder_id,
+                LearningTrack.format == (format or "article"),
+                LearningTrack.is_archived.is_(False),
             )
         )
         if track is None:
@@ -493,12 +642,7 @@ async def update_module_video(
 ) -> LearningModuleResponse:
     """Attach (or clear) the module's video link. Display only, no LLM."""
     try:
-        module = await session.scalar(
-            select(LearningModule)
-            .join(LearningTrack, LearningTrack.id == LearningModule.track_id)
-            .join(Folder, Folder.id == LearningTrack.folder_id)
-            .where(LearningModule.id == module_id, Folder.user_id == user.id)
-        )
+        module = await _get_owned_module(module_id, user.id, session)
         if module is None:
             raise ResourceNotFoundException("Learning module")
 
@@ -534,12 +678,7 @@ async def update_module_lesson(
     fallback keeps working), and the client gets a 503 explaining that.
     """
     try:
-        module = await session.scalar(
-            select(LearningModule)
-            .join(LearningTrack, LearningTrack.id == LearningModule.track_id)
-            .join(Folder, Folder.id == LearningTrack.folder_id)
-            .where(LearningModule.id == module_id, Folder.user_id == user.id)
-        )
+        module = await _get_owned_module(module_id, user.id, session)
         if module is None:
             raise ResourceNotFoundException("Learning module")
         if not module.lesson_content:
@@ -598,12 +737,7 @@ async def submit_quiz_attempt(
 ) -> QuizAttemptResponse:
     """Grade a module quiz server-side (correct answers never reach the client)."""
     try:
-        module = await session.scalar(
-            select(LearningModule)
-            .join(LearningTrack, LearningTrack.id == LearningModule.track_id)
-            .join(Folder, Folder.id == LearningTrack.folder_id)
-            .where(LearningModule.id == module_id, Folder.user_id == user.id)
-        )
+        module = await _get_owned_module(module_id, user.id, session)
         if module is None:
             raise ResourceNotFoundException("Learning module")
         if not module.quiz_json:
@@ -633,6 +767,159 @@ async def submit_quiz_attempt(
             total=total,
             passed=module.passed,
             correct_indices=correct_indices,
+            best_score=module.best_score or score,
+        )
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except StudyAppException as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/learning-modules/{module_id}/episode", response_model=ModuleEpisodeResponse)
+async def get_module_episode(
+    module_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> ModuleEpisodeResponse:
+    """The episode payload for a podcast/lecture module.
+
+    Sends the script turns, the lecture slides, and the checkpoint questions
+    with correct_index AND explanation stripped. Answers are graded server-side
+    one at a time through the checkpoint-answer endpoint, exactly like the
+    article quiz is.
+    """
+    try:
+        module = await _get_owned_module(module_id, user.id, session)
+        if not module.episode_script:
+            raise ResourceNotFoundException("Learning module episode")
+
+        try:
+            turns = json.loads(module.episode_script)
+            slides_raw = json.loads(module.slides) if module.slides else []
+            checkpoints = json.loads(module.checkpoints) if module.checkpoints else []
+        except ValueError as exc:
+            raise StudyAppException("This episode's content is corrupted. Rebuild the track.") from exc
+
+        # 404 (not a valid episode) when the script exists but checkpoints do
+        # not, since the player is built around the checkpoint stops.
+        if not checkpoints:
+            raise ResourceNotFoundException("Learning module episode")
+
+        total = len(checkpoints)
+        progress = _checkpoint_progress(module, total)
+        score = sum(1 for p in progress if p["correct"])
+
+        # The format comes from the owning track, fetched by id so no
+        # relationship lazy-load fires (MissingGreenlet trap in this codebase).
+        track = await session.get(LearningTrack, module.track_id)
+        episode_format = track.format if track is not None else "article"
+
+        return ModuleEpisodeResponse(
+            module_id=module.id,
+            title=module.title,
+            format=episode_format,
+            turns=[
+                EpisodeTurn(
+                    speaker=str(t.get("speaker") or "lecturer")[:40],
+                    text=str(t.get("text") or ""),
+                )
+                for t in turns
+                if isinstance(t, dict)
+            ],
+            slides=[
+                EpisodeSlide(
+                    title=str(s.get("title") or ""),
+                    bullets=[str(b) for b in s.get("bullets", []) if isinstance(s.get("bullets"), list)],
+                    example=str(s["example"]) if s.get("example") else None,
+                    start_turn=int(s.get("start_turn") or 0),
+                )
+                for s in slides_raw
+                if isinstance(s, dict)
+            ],
+            checkpoints=[
+                EpisodeCheckpointPublic(
+                    after_turn=int(c.get("after_turn") or 0),
+                    question=str(c.get("question") or ""),
+                    options=[str(o) for o in c.get("options", []) if isinstance(c.get("options"), list)],
+                )
+                for c in checkpoints
+                if isinstance(c, dict)
+            ],
+            progress=[EpisodeCheckpointState(**p) for p in progress],
+            score=score,
+            total=total,
+            pass_threshold=_pass_threshold(total),
+            passed=bool(module.passed),
+        )
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except StudyAppException as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post(
+    "/learning-modules/{module_id}/checkpoint-answer",
+    response_model=CheckpointAnswerResponse,
+)
+async def answer_checkpoint(
+    module_id: int,
+    data: CheckpointAnswerRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> CheckpointAnswerResponse:
+    """Grade one mid-episode checkpoint, server-side and one at a time.
+
+    No LLM call, so no rate limit: this is a cheap scalar compare plus a row
+    update. Passing needs the same 4 of 5 the article quiz uses, and progress
+    is shared with the quiz path (best_score keeps the maximum, passed is never
+    un-set).
+    """
+    try:
+        module = await _get_owned_module(module_id, user.id, session)
+        if not module.checkpoints:
+            raise StudyAppException("This episode has no checkpoints.")
+
+        try:
+            checkpoints = json.loads(module.checkpoints)
+        except ValueError as exc:
+            raise StudyAppException("This episode's checkpoints are corrupted. Rebuild the track.") from exc
+
+        total = len(checkpoints)
+        index = data.checkpoint_index
+        if not 0 <= index < total:
+            raise StudyAppException(f"checkpoint_index must be between 0 and {total - 1}.")
+
+        progress = _checkpoint_progress(module, total)
+        correct_index = int(checkpoints[index]["correct_index"])
+        correct = data.answer == correct_index
+        # -1 is an explicit skip: recorded as seen and wrong, so it shows up in
+        # the end-of-episode retry list.
+        progress[index] = {
+            "answer": data.answer if data.answer >= 0 else None,
+            "correct": correct,
+            "seen": True,
+        }
+        module.checkpoint_progress = json.dumps(progress)
+
+        score = sum(1 for p in progress if p["correct"])
+        threshold = _pass_threshold(total)
+        # Shared progress with the article quiz: keep the best score ever
+        # achieved and never un-pass a passed module.
+        if module.best_score is None or score > module.best_score:
+            module.best_score = score
+        if score >= threshold:
+            module.passed = True
+        complete = sum(1 for p in progress if p["seen"]) >= total
+        await session.commit()
+
+        return CheckpointAnswerResponse(
+            correct=correct,
+            correct_index=correct_index,
+            explanation=str(checkpoints[index].get("explanation") or ""),
+            score=score,
+            total=total,
+            passed=module.passed,
+            complete=complete,
             best_score=module.best_score or score,
         )
     except ResourceNotFoundException as exc:

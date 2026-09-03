@@ -7,6 +7,9 @@ from pydantic import BaseModel, Field
 
 class CreateLearningTrackRequest(BaseModel):
     module_count: int = Field(default=5, ge=1, le=20)
+    # article | podcast | lecture. Episode formats ignore module_count and are
+    # always built as exactly one module.
+    format: str = "article"
     provider: Optional[str] = None
     # Generous ceiling as an abuse/token-cost guard; the UI does not surface it.
     custom_instructions: Optional[str] = Field(default=None, max_length=10000)
@@ -51,6 +54,9 @@ class LearningModuleResponse(BaseModel):
     passed: bool
     # True once both the lesson and quiz have been generated.
     ready: bool
+    # True on episode-format modules whose script and checkpoints exist. False
+    # on article modules, which never have an episode.
+    episode_ready: bool = False
 
 
 class LearningTrackResponse(BaseModel):
@@ -59,6 +65,8 @@ class LearningTrackResponse(BaseModel):
     status: str
     error: Optional[str] = None
     module_count: int
+    # article | podcast | lecture. Echoed so the hub can label each format slot.
+    format: str = "article"
     # Echoed back so the UI can show them and a rebuild can reuse them.
     custom_instructions: Optional[str] = None
     # True when the folder's current notes no longer match the notes this track
@@ -83,4 +91,73 @@ class QuizAttemptResponse(BaseModel):
     passed: bool
     # 0-based correct option index per question, revealed after grading.
     correct_indices: list[int]
+    best_score: int
+
+
+class EpisodeTurn(BaseModel):
+    # "host" or "expert" for podcast, "lecturer" for a lecture.
+    speaker: str
+    text: str
+
+
+class EpisodeSlide(BaseModel):
+    title: str
+    bullets: list[str]
+    # Optional worked example panel under the bullets.
+    example: Optional[str] = None
+    # 0-based turn index at which this slide takes the screen.
+    start_turn: int
+
+
+class EpisodeCheckpointPublic(BaseModel):
+    """A checkpoint as sent to the client: no correct_index, no explanation.
+
+    Both are withheld until the answer is submitted, because in episode formats
+    these checkpoints ARE the graded artifact that marks the module passed.
+    """
+
+    after_turn: int
+    question: str
+    options: list[str]
+
+
+class EpisodeCheckpointState(BaseModel):
+    answer: Optional[int] = None
+    correct: bool = False
+    # True once answered or skipped, which is what distinguishes a skip from a
+    # checkpoint the listener has not reached yet.
+    seen: bool = False
+
+
+class ModuleEpisodeResponse(BaseModel):
+    module_id: int
+    title: str
+    # podcast | lecture, echoed so the player knows which layout to render.
+    format: str
+    turns: list[EpisodeTurn]
+    # Always empty for podcast.
+    slides: list[EpisodeSlide]
+    checkpoints: list[EpisodeCheckpointPublic]
+    progress: list[EpisodeCheckpointState]
+    score: int
+    total: int
+    pass_threshold: int
+    passed: bool
+
+
+class CheckpointAnswerRequest(BaseModel):
+    checkpoint_index: int
+    # Chosen option index; -1 means skipped, which scores as wrong.
+    answer: int
+
+
+class CheckpointAnswerResponse(BaseModel):
+    correct: bool
+    correct_index: int
+    explanation: str
+    score: int
+    total: int
+    passed: bool
+    # True once every checkpoint has been answered or skipped.
+    complete: bool
     best_score: int
