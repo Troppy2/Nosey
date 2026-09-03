@@ -23598,3 +23598,279 @@ button.lc-official-link:disabled:hover {
     justify-content: center;
   }
 }
+
+/* ── STEM Scratch Pad (handwritten scratch work, beta) ---------------------- */
+
+.scratchpad-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 10px;
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+.scratchpad-open-btn:hover {
+  border-color: var(--green-dark);
+}
+.scratchpad-open-btn:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.scratchpad-backdrop {
+  z-index: 1100;
+}
+
+.scratchpad-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: min(720px, 92vw);
+  height: min(560px, 85vh);
+  padding: 1rem 1.15rem 1.25rem;
+  position: relative;
+  resize: none;
+}
+.scratchpad-modal--comfortable {
+  width: min(720px, 92vw);
+  height: min(560px, 85vh);
+}
+.scratchpad-modal--large {
+  width: min(1040px, 96vw);
+  height: min(760px, 92vh);
+}
+.scratchpad-modal--full {
+  width: 96vw;
+  height: 94vh;
+}
+
+.scratchpad-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.scratchpad-header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.scratchpad-header-main .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.scratchpad-question-text {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.92rem;
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.scratchpad-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+}
+.scratchpad-size-buttons {
+  display: inline-flex;
+  gap: 0.2rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 8px;
+  padding: 0.15rem;
+}
+.scratchpad-size-buttons button {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.scratchpad-size-buttons button.is-active {
+  background: var(--green-dark);
+  color: var(--white);
+}
+.scratchpad-size-buttons button:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 1px;
+}
+.scratchpad-minimize {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--ink);
+  cursor: pointer;
+}
+.scratchpad-minimize:hover {
+  border-color: var(--green-dark);
+}
+.scratchpad-minimize:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.scratchpad-paper-picker {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+.scratchpad-paper-picker button {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.scratchpad-paper-picker button.is-active {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-weight: 600;
+}
+.scratchpad-paper-picker button:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.scratchpad-canvas-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+  min-height: 0;
+}
+.scratchpad-canvas-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.scratchpad-tool-btn {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--ink);
+  cursor: pointer;
+}
+.scratchpad-tool-btn:hover:not(:disabled) {
+  border-color: var(--green-dark);
+}
+.scratchpad-tool-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.scratchpad-tool-btn:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.scratchpad-finger-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.scratchpad-canvas-container {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 10px;
+  background: var(--white);
+  overflow: hidden;
+}
+.scratchpad-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Without this, the browser pans/scrolls on touch instead of drawing;
+     preventDefault alone is not enough since pointer listeners are passive
+     by default in modern browsers. */
+  touch-action: none;
+  cursor: crosshair;
+}
+/* Paper styles are CSS decoration behind a transparent canvas only. The
+   exported PNG is strokes composited on a fresh white background (see
+   exportScratchPadPng), so these ruled lines never reach the OCR engine. */
+.scratchpad-paper-lined {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 31px,
+    var(--green-lightest) 32px
+  );
+}
+.scratchpad-paper-graph {
+  background-image:
+    repeating-linear-gradient(to right, var(--green-lightest) 0 1px, transparent 1px 24px),
+    repeating-linear-gradient(to bottom, var(--green-lightest) 0 1px, transparent 1px 24px);
+}
+
+.scratchpad-resize-handle {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 1.1rem;
+  height: 1.1rem;
+  cursor: nwse-resize;
+  touch-action: none;
+  border-radius: 3px;
+}
+.scratchpad-resize-handle::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-right: 2px solid var(--green-light-mid);
+  border-bottom: 2px solid var(--green-light-mid);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scratchpad-open-btn,
+  .scratchpad-tool-btn {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .scratchpad-modal,
+  .scratchpad-modal--comfortable,
+  .scratchpad-modal--large {
+    width: 96vw;
+    height: 88vh;
+  }
+  .scratchpad-header {
+    flex-direction: column;
+  }
+}
