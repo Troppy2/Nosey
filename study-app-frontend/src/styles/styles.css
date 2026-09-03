@@ -23862,18 +23862,20 @@ button.lc-official-link:disabled:hover {
 .scratchpad-canvas--static {
   pointer-events: none;
 }
+/* Always "none", in both finger modes. Scrolling by finger is implemented in
+   the pointer handlers instead of being delegated to the browser, because
+   native touch panning brings the browser's multi-touch gesture arbitration
+   with it: as soon as a second contact (a resting palm) appears, the browser
+   may cancel the other live pointer to claim the gesture for scrolling, which
+   killed the stylus stroke in progress and threw it away. Handling it here
+   keeps the pen and the palm as two independent pointers. */
 .scratchpad-canvas--live {
-  /* Without this the browser pans/scrolls on touch instead of drawing, and
-     preventDefault alone is not enough since pointer listeners are passive by
-     default in modern browsers. */
   touch-action: none;
   cursor: crosshair;
 }
-/* With finger drawing turned off, touch belongs to the browser again, so a
-   finger scrolls and pinch-zooms the page instead of marking it. A stylus is
-   unaffected and still draws. */
+/* Finger scrolls rather than draws, so the pointer reads as a grab surface. */
 .scratchpad-canvas--live.allows-scroll {
-  touch-action: pan-y pinch-zoom;
+  cursor: grab;
 }
 .scratchpad-canvas--live.is-erasing {
   cursor: cell;
