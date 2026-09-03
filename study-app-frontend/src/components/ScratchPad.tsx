@@ -1,6 +1,7 @@
 import { ChevronDown, Eraser, Maximize2, Minimize2, PenLine, Undo2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { scopeKey } from "../lib/api";
+import { MarkdownContent } from "./MarkdownContent";
 
 // ── Stroke data model ───────────────────────────────────────────────────────
 // Strokes live in a FIXED LOGICAL PAPER SPACE (not CSS pixels, not device
@@ -482,7 +483,9 @@ export function ScratchPadModal({
             <span className="eyebrow">
               <PenLine size={13} /> Scratch pad
             </span>
-            <p className="scratchpad-question-text">{questionText}</p>
+            <div className="scratchpad-question-text">
+              <MarkdownContent content={questionText} />
+            </div>
           </div>
           <div className="scratchpad-header-actions">
             <div className="scratchpad-size-buttons" role="group" aria-label="Scratch pad size">
