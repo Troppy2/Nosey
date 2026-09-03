@@ -270,10 +270,13 @@ function drawSmoothPath(ctx: CanvasRenderingContext2D, points: number[], scaleX:
 
 // One pointer gesture. Erasing is modelled as a gesture rather than a mode
 // flag so a stylus eraser tip can erase without disturbing whichever tool the
-// toolbar has selected.
+// toolbar has selected. Gestures are tracked per pointer id, because a stylus
+// drawing and a palm or finger resting on the glass are two live pointers at
+// once and must not interfere with each other.
 type Gesture =
   | { kind: "draw"; pointerId: number; points: number[] }
-  | { kind: "erase"; pointerId: number; snapshot: Stroke[]; remaining: Stroke[] };
+  | { kind: "erase"; pointerId: number; snapshot: Stroke[]; remaining: Stroke[] }
+  | { kind: "scroll"; pointerId: number; startY: number; startTop: number };
 
 function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfaceProps) {
   // Two stacked canvases. The static one holds committed strokes and repaints
@@ -285,7 +288,7 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
   const liveCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
-  const gestureRef = useRef<Gesture | null>(null);
+  const gesturesRef = useRef<Map<number, Gesture>>(new Map());
   const rafPendingRef = useRef(false);
   // How much of the in-progress stroke the live layer has already drawn, so
   // each frame appends only the new part instead of redrawing the stroke.
@@ -430,8 +433,9 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     rafPendingRef.current = true;
     requestAnimationFrame(() => {
       rafPendingRef.current = false;
-      const gesture = gestureRef.current;
-      if (gesture?.kind === "draw") extendLive(gesture.points);
+      for (const gesture of gesturesRef.current.values()) {
+        if (gesture.kind === "draw") extendLive(gesture.points);
+      }
     });
   }
 
@@ -470,8 +474,9 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     // Resizing wiped the live layer too, so an in-progress stroke is redrawn
     // from its start.
     liveProgressRef.current = { nextControl: 1, lastMid: null };
-    const gesture = gestureRef.current;
-    if (gesture?.kind === "draw") extendLive(gesture.points);
+    for (const gesture of gesturesRef.current.values()) {
+      if (gesture.kind === "draw") extendLive(gesture.points);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageHeight]);
 
@@ -508,8 +513,8 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     paintStatic();
   }, [paintStatic]);
 
-  function eraseAt(clientX: number, clientY: number) {
-    const gesture = gestureRef.current;
+  function eraseAt(pointerId: number, clientX: number, clientY: number) {
+    const gesture = gesturesRef.current.get(pointerId);
     if (!gesture || gesture.kind !== "erase") return;
     const [x, y] = toLogical(clientX, clientY);
     const kept = gesture.remaining.filter((stroke) => !strokeHit(stroke.points, x, y, ERASE_RADIUS));
@@ -519,88 +524,15 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     }
   }
 
-  // If a gesture is still open when a new one starts, the device dropped its
-  // pointerup or pointercancel: an occasional real failure mode for stylus
-  // input, particularly on quick up/down taps. Left alone, the stale gesture
-  // sits in gestureRef forever and its unfinished draw is never committed.
-  // Finalizing it here (rather than silently discarding) is what makes the
-  // pad self-heal instead of needing a manual erase-and-retry to un-stick.
-  function finalizeOrphanedGesture() {
-    const gesture = gestureRef.current;
+  // Closes out one pointer's gesture, committing whatever it produced. Used
+  // both on a normal pointerup and to recover a gesture whose pointerup the
+  // device never delivered (an occasional real failure for stylus input).
+  function finalizeGesture(pointerId: number) {
+    const gesture = gesturesRef.current.get(pointerId);
     if (!gesture) return;
-    gestureRef.current = null;
-    if (gesture.kind === "draw" && gesture.points.length >= 4) {
-      const simplified = simplifyStroke(gesture.points);
-      const next = [...localStrokes, { points: simplified }].slice(-MAX_STROKES_PER_QUESTION);
-      setHistory((h) => [...h, localStrokes]);
-      clearLive();
-      commitStrokes(next);
-    } else if (gesture.kind === "erase" && gesture.remaining.length !== gesture.snapshot.length) {
-      setHistory((h) => [...h, gesture.snapshot]);
-      commitStrokes(gesture.remaining);
-    }
-  }
+    gesturesRef.current.delete(pointerId);
 
-  function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
-    // With finger drawing off, touch does nothing here at all: it neither
-    // draws nor erases. touch-action on the canvas hands the gesture back to
-    // the browser, so the page scrolls and zooms the way it normally would.
-    if (e.pointerType === "touch" && !allowFingerDraw) return;
-
-    if (gestureRef.current && gestureRef.current.pointerId !== e.pointerId) finalizeOrphanedGesture();
-
-    // A stylus eraser tip is only reliably signalled by `button === 5` on the
-    // exact event where it made contact. The `buttons` bitmask's eraser bit
-    // (0x20) is a live, driver-reported flag, and several Windows Ink /
-    // Chromium digitizer combinations leave it spuriously set after the
-    // eraser end was last used, turning the NEXT ordinary tip-down into a
-    // silent no-op erase: the pen moves, nothing draws, until a full clean
-    // erase gesture resets the stuck state. `button` alone does not have that
-    // failure mode, so it is the only signal trusted here.
-    const stylusEraser = e.pointerType === "pen" && e.button === 5;
-    const erasing = tool === "erase" || stylusEraser;
-
-    const canvas = liveCanvasRef.current;
-    if (!canvas) return;
-    canvas.setPointerCapture(e.pointerId);
-
-    if (erasing) {
-      gestureRef.current = { kind: "erase", pointerId: e.pointerId, snapshot: localStrokes, remaining: localStrokes };
-      eraseAt(e.clientX, e.clientY);
-      return;
-    }
-
-    clearLive();
-    const [x, y] = toLogical(e.clientX, e.clientY);
-    gestureRef.current = { kind: "draw", pointerId: e.pointerId, points: [x, y] };
-  }
-
-  function handlePointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
-    const gesture = gestureRef.current;
-    if (!gesture || gesture.pointerId !== e.pointerId) return;
-
-    if (gesture.kind === "erase") {
-      eraseAt(e.clientX, e.clientY);
-      return;
-    }
-
-    // getCoalescedEvents returns every sample the browser batched since the
-    // last frame. Keeping them is what stops fast writing from coming out
-    // sparse and angular, which then transcribes badly.
-    const native = e.nativeEvent;
-    const events = typeof native.getCoalescedEvents === "function" ? native.getCoalescedEvents() : [];
-    for (const evt of events.length ? events : [native]) {
-      if (gesture.points.length >= MAX_POINTS_PER_STROKE * 2) break;
-      const [x, y] = toLogical(evt.clientX, evt.clientY);
-      gesture.points.push(x, y);
-    }
-    scheduleLive();
-  }
-
-  function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
-    const gesture = gestureRef.current;
-    if (!gesture || gesture.pointerId !== e.pointerId) return;
-    gestureRef.current = null;
+    if (gesture.kind === "scroll") return;
 
     if (gesture.kind === "erase") {
       if (gesture.remaining.length !== gesture.snapshot.length) {
@@ -624,9 +556,103 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     commitStrokes(next);
   }
 
-  function handlePointerCancel() {
-    gestureRef.current = null;
+  function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
+    // Only ever recovers THIS pointer id. A different pointer going down is
+    // not evidence that this one ended: a stylus drawing while a palm rests on
+    // the glass is exactly that case, and treating it as an ended gesture is
+    // what cut strokes short.
+    if (gesturesRef.current.has(e.pointerId)) finalizeGesture(e.pointerId);
+
+    if (e.pointerType === "touch" && !allowFingerDraw) {
+      // Finger still drives the page, it just does not mark it: drag to
+      // scroll, handled here rather than by the browser. touch-action stays
+      // "none" so the browser never runs its own multi-touch gesture
+      // arbitration, which is what fired pointercancel at an in-progress
+      // stylus stroke the moment a second finger landed, discarding it.
+      const canvas = liveCanvasRef.current;
+      const container = containerRef.current;
+      if (!canvas || !container) return;
+      canvas.setPointerCapture(e.pointerId);
+      gesturesRef.current.set(e.pointerId, {
+        kind: "scroll",
+        pointerId: e.pointerId,
+        startY: e.clientY,
+        startTop: container.scrollTop,
+      });
+      return;
+    }
+
+    // A stylus eraser tip is only reliably signalled by `button === 5` on the
+    // exact event where it made contact. The `buttons` bitmask's eraser bit
+    // (0x20) is a live, driver-reported flag, and several Windows Ink /
+    // Chromium digitizer combinations leave it spuriously set after the
+    // eraser end was last used, turning the NEXT ordinary tip-down into a
+    // silent no-op erase: the pen moves, nothing draws, until a full clean
+    // erase gesture resets the stuck state. `button` alone does not have that
+    // failure mode, so it is the only signal trusted here.
+    const stylusEraser = e.pointerType === "pen" && e.button === 5;
+    const erasing = tool === "erase" || stylusEraser;
+
+    const canvas = liveCanvasRef.current;
+    if (!canvas) return;
+    canvas.setPointerCapture(e.pointerId);
+
+    if (erasing) {
+      gesturesRef.current.set(e.pointerId, {
+        kind: "erase",
+        pointerId: e.pointerId,
+        snapshot: localStrokes,
+        remaining: localStrokes,
+      });
+      eraseAt(e.pointerId, e.clientX, e.clientY);
+      return;
+    }
+
     clearLive();
+    const [x, y] = toLogical(e.clientX, e.clientY);
+    gesturesRef.current.set(e.pointerId, { kind: "draw", pointerId: e.pointerId, points: [x, y] });
+  }
+
+  function handlePointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
+    const gesture = gesturesRef.current.get(e.pointerId);
+    if (!gesture) return;
+
+    if (gesture.kind === "scroll") {
+      const container = containerRef.current;
+      if (container) container.scrollTop = gesture.startTop + (gesture.startY - e.clientY);
+      return;
+    }
+
+    if (gesture.kind === "erase") {
+      eraseAt(e.pointerId, e.clientX, e.clientY);
+      return;
+    }
+
+    // getCoalescedEvents returns every sample the browser batched since the
+    // last frame. Keeping them is what stops fast writing from coming out
+    // sparse and angular, which then transcribes badly.
+    const native = e.nativeEvent;
+    const events = typeof native.getCoalescedEvents === "function" ? native.getCoalescedEvents() : [];
+    for (const evt of events.length ? events : [native]) {
+      if (gesture.points.length >= MAX_POINTS_PER_STROKE * 2) break;
+      const [x, y] = toLogical(evt.clientX, evt.clientY);
+      gesture.points.push(x, y);
+    }
+    scheduleLive();
+  }
+
+  function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
+    finalizeGesture(e.pointerId);
+  }
+
+  function handlePointerCancel(e: React.PointerEvent<HTMLCanvasElement>) {
+    const gesture = gesturesRef.current.get(e.pointerId);
+    if (!gesture) return;
+    gesturesRef.current.delete(e.pointerId);
+    // An abandoned erase drag has been previewing its result on the static
+    // layer without committing it, so the real strokes have to be put back.
+    if (gesture.kind === "erase") paintStatic();
+    else if (gesture.kind === "draw") clearLive();
   }
 
   function undo() {
