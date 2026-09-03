@@ -23788,6 +23788,11 @@ button.lc-official-link:disabled:hover {
   opacity: 0.4;
   cursor: not-allowed;
 }
+.scratchpad-tool-btn.is-active {
+  background: var(--green-lightest);
+  border-color: var(--green-dark);
+  color: var(--green-dark);
+}
 .scratchpad-tool-btn:focus-visible {
   outline: 2px solid var(--green-dark);
   outline-offset: 2px;
@@ -23829,22 +23834,30 @@ button.lc-official-link:disabled:hover {
   border: 1px solid var(--green-light-mid);
   border-radius: 10px;
   background: var(--white);
-  overflow: hidden;
+  /* The page can stand taller than the modal, so it scrolls vertically. */
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 .scratchpad-canvas {
   display: block;
-  width: 100%;
-  height: 100%;
+  /* Sized in JS: the width tracks the container, the height follows the
+     logical page length, so neither is set here. */
   /* Without this, the browser pans/scrolls on touch instead of drawing;
      preventDefault alone is not enough since pointer listeners are passive
      by default in modern browsers. */
   touch-action: none;
   cursor: crosshair;
 }
+.scratchpad-canvas.is-erasing {
+  cursor: cell;
+}
 /* Paper styles are CSS decoration behind a transparent canvas only. The
    exported PNG is strokes composited on a fresh white background (see
-   exportScratchPadPng), so these ruled lines never reach the OCR engine. */
+   exportScratchPadPng), so these ruled lines never reach the OCR engine.
+   background-attachment: local keeps the ruling pinned to the page as it
+   scrolls, rather than to the viewport, so lines stay under the ink. */
 .scratchpad-paper-lined {
+  background-attachment: local;
   background-image: repeating-linear-gradient(
     to bottom,
     transparent,
@@ -23853,9 +23866,37 @@ button.lc-official-link:disabled:hover {
   );
 }
 .scratchpad-paper-graph {
+  background-attachment: local;
   background-image:
     repeating-linear-gradient(to right, var(--green-lightest) 0 1px, transparent 1px 24px),
     repeating-linear-gradient(to bottom, var(--green-lightest) 0 1px, transparent 1px 24px);
+}
+.scratchpad-extend-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  align-self: center;
+  padding: 0.3rem 0.85rem;
+  border: 1px dashed var(--green-light-mid);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.scratchpad-extend-btn:hover:not(:disabled) {
+  border-color: var(--green-dark);
+  color: var(--green-dark);
+}
+.scratchpad-extend-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.scratchpad-extend-btn:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
 }
 
 .scratchpad-resize-handle {
