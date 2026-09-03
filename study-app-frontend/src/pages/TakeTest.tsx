@@ -12,7 +12,7 @@ import { KojoHelpChat } from "../components/KojoHelpChat";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { MathInput } from "../components/MathInput";
 import {
-  emptyScratchPad,
+  EMPTY_SCRATCH_PAD,
   exportScratchPadPng,
   isScratchPadEmpty,
   parseScratchPadJson,
@@ -954,7 +954,7 @@ export default function TakeTest() {
               {isMathMode && betaMode ? (
                 <ScratchPadTrigger
                   questionText={question.question_text}
-                  data={workStrokes[question.id] ?? emptyScratchPad()}
+                  data={workStrokes[question.id] ?? EMPTY_SCRATCH_PAD}
                   onChange={(data) => setWorkStrokes((prev) => ({ ...prev, [question.id]: data }))}
                   paperStyle={paperStyle}
                   onPaperStyleChange={changePaperStyle}
