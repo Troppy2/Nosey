@@ -1,4 +1,4 @@
-import { ChevronDown, Eraser, Maximize2, Minimize2, PenLine, Undo2, X } from "lucide-react";
+import { ChevronDown, Eraser, Hand, Maximize2, Minimize2, PenLine, Undo2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { scopeKey } from "../lib/api";
 import { MarkdownContent } from "./MarkdownContent";
@@ -371,14 +371,15 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
         <button type="button" className="scratchpad-tool-btn" onClick={clearAll} disabled={strokes.length === 0} aria-label="Clear the page">
           <Eraser size={16} />
         </button>
-        <label className="scratchpad-finger-toggle">
-          <input
-            type="checkbox"
-            checked={allowFingerDraw}
-            onChange={(e) => setAllowFingerDraw(e.target.checked)}
-          />
+        <button
+          type="button"
+          className={`scratchpad-finger-toggle${allowFingerDraw ? " is-active" : ""}`}
+          onClick={() => setAllowFingerDraw((v) => !v)}
+          aria-pressed={allowFingerDraw}
+        >
+          <Hand size={14} />
           Draw with finger
-        </label>
+        </button>
       </div>
       <div ref={containerRef} className={`scratchpad-canvas-container ${paperClass}`}>
         <canvas
