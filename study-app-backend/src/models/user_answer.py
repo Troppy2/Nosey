@@ -30,6 +30,12 @@ class UserAnswer(Base):
     ai_reasoning: Mapped[Optional[str]] = mapped_column(Text)
     confidence_score: Mapped[Optional[Decimal]] = mapped_column(Numeric(3, 2))
     flagged_uncertain: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Scratch-pad drawing strokes captured while the attempt is a draft
+    # (STEM Scratch Pad feature), as opaque JSON in the frontend's stroke
+    # format. Only ever populated on an in_progress attempt; the draft is
+    # deleted at submit time, so this is always None on a graded row. The
+    # rendered image sent to OCR for grading is never persisted at all.
+    work_strokes: Mapped[Optional[str]] = mapped_column(Text)
 
     attempt: Mapped[UserAttempt] = relationship("UserAttempt", back_populates="answers")
     question: Mapped[Question] = relationship("Question", back_populates="user_answers")

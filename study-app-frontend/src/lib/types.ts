@@ -123,6 +123,9 @@ export type TestTake = {
 export type SubmittedAnswer = {
   question_id: ID;
   answer: string;
+  // Base64-encoded PNG of a scratch-pad drawing (STEM Scratch Pad feature,
+  // beta only). Optional: a typed answer alone is still the common case.
+  work_image?: string | null;
 };
 
 export type AnswerResult = {
@@ -136,6 +139,10 @@ export type AnswerResult = {
   confidence?: number | null;
   flagged_uncertain: boolean;
   is_math?: boolean;
+  // What the OCR engine read from a scratch-pad drawing, if one was
+  // submitted. Response-only: never persisted, so it is absent when this
+  // attempt is viewed again later.
+  work_transcript?: string | null;
 };
 
 export type AttemptResult = {
@@ -166,6 +173,10 @@ export type AttemptDetail = AttemptSummary & {
 export type DraftAttemptAnswer = {
   question_id: ID;
   user_answer: string;
+  // Scratch-pad strokes captured so far, as opaque JSON (STEM Scratch Pad
+  // feature). Lets a drawing resume across devices the same way a typed
+  // answer already does.
+  work_strokes?: string | null;
 };
 
 export type DraftAttemptResponse = {

@@ -531,15 +531,18 @@ export async function fetchTest(testId: number): Promise<TestTake> {
   }
 }
 
-export async function submitAttempt(testId: number, answers: SubmittedAnswer[]): Promise<AttemptResult> {
-  try {
-    return await request<AttemptResult>(`/tests/${testId}/attempts`, {
-      method: "POST",
-      body: JSON.stringify({ answers }),
-    });
-  } catch {
-    throw new Error("Unable to submit attempt");
-  }
+export async function submitAttempt(
+  testId: number,
+  answers: SubmittedAnswer[],
+  ocrEngine?: string,
+): Promise<AttemptResult> {
+  // Let the server's actual error through (payload too large, non-beta
+  // rejection, etc.) rather than a generic message: STEM Scratch Pad
+  // submissions can fail for reasons the student needs to read.
+  return request<AttemptResult>(`/tests/${testId}/attempts`, {
+    method: "POST",
+    body: JSON.stringify({ answers, ...(ocrEngine ? { ocr_engine: ocrEngine } : {}) }),
+  });
 }
 
 export async function saveDraftAttempt(testId: number, answers: DraftAttemptAnswer[]): Promise<DraftAttemptResponse> {

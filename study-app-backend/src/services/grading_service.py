@@ -17,19 +17,37 @@ from src.schemas.attempt_schema import (
     DraftAttemptAnswer,
     DraftAttemptResponse,
     FRQGrade,
+    OcrResult,
     ResumableTestInfo,
     SaveDraftAttemptRequest,
     SubmittedAnswer,
 )
 from src.schemas.test_schema import WeaknessResponse
 from src.services.llm_service import LLMService
+from src.services.ocr_service import OcrService
 from src.utils.exceptions import ResourceNotFoundException, ValidationException
+from src.utils.logger import get_logger
 from typing import Optional
+
+logger = get_logger(__name__)
+
+# Max wall-clock a single scratch-pad transcription may take before grading
+# proceeds without it (STEM Scratch Pad feature). OCR must never extend the
+# request beyond the existing grading budget; a slow OCR call degrades to
+# work=None exactly like a failed one.
+_OCR_TIMEOUT_SECONDS = 45
+# Bounds concurrent vision calls within one submission, independent of how
+# many questions carry a drawing. Created fresh per submit_and_grade call
+# below, never as a module-level or instance attribute: an asyncio primitive
+# bound to a dead event loop is a classic prod-only bug, and CLAUDE.md bans
+# shared mutable state on services.
+_OCR_CONCURRENCY = 3
 
 
 class GradingService:
     def __init__(self, llm_service: Optional[LLMService] = None) -> None:
         self.llm_service = llm_service or LLMService()
+        self.ocr_service = OcrService()
 
     async def submit_and_grade(
         self,
@@ -37,12 +55,13 @@ class GradingService:
         user_id: int,
         answers: list[SubmittedAnswer],
         session: AsyncSession,
+        ocr_engine: Optional[str] = None,
     ) -> AttemptResult:
         test = await TestRepository(session).get_owned_with_questions(test_id, user_id)
         if test is None:
             raise ResourceNotFoundException("Test")
         question_by_id = {question.id: question for question in test.questions}
-        submitted_by_id = {answer.question_id: answer.answer for answer in answers}
+        submitted_by_id = {answer.question_id: answer for answer in answers}
         if not submitted_by_id:
             raise ValidationException("At least one answer is required")
 
@@ -64,23 +83,63 @@ class GradingService:
         is_coding_mode = getattr(test, "is_coding_mode", False)
         coding_language = getattr(test, "coding_language", None) or "Python"
 
+        # Transcribe any scratch-pad drawings first, bounded by a semaphore so
+        # a submission with several drawings does not fire unbounded
+        # concurrent vision calls. A drawing with no work.image never reaches
+        # this loop at all (no ink, no cost): see ocr-routing.md.
+        ocr_semaphore = asyncio.Semaphore(_OCR_CONCURRENCY)
+        work_by_question_id: dict[int, Optional[OcrResult]] = {}
+
+        async def _transcribe_one(question_id: int, image_b64: str) -> None:
+            async with ocr_semaphore:
+                try:
+                    result = await asyncio.wait_for(
+                        self.ocr_service.transcribe(image_b64, engine=ocr_engine),
+                        timeout=_OCR_TIMEOUT_SECONDS,
+                    )
+                except Exception as exc:
+                    # OCR failure must never lose a submission. Grade exactly
+                    # as if no drawing had been submitted.
+                    logger.warning("Scratch-pad OCR failed for question %s: %s", question_id, exc)
+                    result = None
+                work_by_question_id[question_id] = result
+
+        drawings = [
+            (qid, ans.work_image) for qid, ans in submitted_by_id.items() if ans.work_image
+        ]
+        if drawings:
+            await asyncio.gather(*(_transcribe_one(qid, image) for qid, image in drawings))
+
         # Grade all questions in parallel — LLM calls for FRQ are concurrent, MCQ is instant
         pairs = [(question_by_id[qid], ans) for qid, ans in submitted_by_id.items()]
         grades = await asyncio.gather(*(
             self._grade_question(
-                q, ans, notes,
+                q, ans.answer, notes,
                 is_math_mode=is_math_mode,
                 is_coding_mode=is_coding_mode,
                 coding_language=coding_language,
+                work=work_by_question_id.get(ans.question_id),
             )
             for q, ans in pairs
         ))
 
         results: list[AnswerResult] = []
         correct_count = 0
-        for (question, user_answer), grade in zip(pairs, grades):
+        for (question, submitted), grade in zip(pairs, grades):
             if grade.is_correct:
                 correct_count += 1
+            # Read from work_by_question_id directly, not grade.work_transcript:
+            # grade_math_answer echoes it back, but MCQ/TF/MS/RANK/coding
+            # grading never touches `work`, so relying on the grade result
+            # alone would silently drop the transcript (and the OCR call that
+            # produced it) for every non-math-FRQ question type, even though
+            # the scratch pad is available on all of them.
+            question_work = work_by_question_id.get(question.id)
+            work_transcript = question_work.transcript if question_work else None
+            # A draw-only answer (empty typed text) is persisted as its
+            # transcript, so it is not stored as an empty string and Results
+            # has something to show for "your answer".
+            user_answer = submitted.answer or (work_transcript or "")
             await repo.add_answer(
                 attempt.id,
                 question.id,
@@ -104,6 +163,8 @@ class GradingService:
                     confidence=grade.confidence,
                     flagged_uncertain=grade.flagged_uncertain,
                     is_math=is_math_mode and question.question_type == "FRQ",
+                    # Response-only, never persisted (see OcrResult / AnswerResult).
+                    work_transcript=work_transcript,
                 )
             )
 
@@ -132,6 +193,7 @@ class GradingService:
         is_math_mode: bool = False,
         is_coding_mode: bool = False,
         coding_language: str = "Python",
+        work: Optional[OcrResult] = None,
     ) -> FRQGrade:
         qtype = question.question_type
 
@@ -168,6 +230,7 @@ class GradingService:
                 question=question.question_text,
                 expected_answer=question.frq_answer.expected_answer,
                 user_answer=user_answer,
+                work=work,
             )
         return await self.llm_service.grade_frq_answer(
             notes=notes,
@@ -453,23 +516,26 @@ class GradingService:
         await repo.clear_answers(attempt.id)
 
         # Save new answers
-        submitted_by_id = {answer.question_id: answer.user_answer for answer in answers}
+        submitted_by_id = {answer.question_id: answer for answer in answers}
         question_by_id = {question.id: question for question in test.questions}
 
         for question_id in submitted_by_id:
             if question_by_id.get(question_id) is None:
                 raise ValidationException(f"Question {question_id} does not belong to this test")
 
-        for question_id, user_answer in submitted_by_id.items():
+        for question_id, draft_answer in submitted_by_id.items():
             # Draft answers: is_correct is None (not graded yet)
             await repo.add_answer(
                 attempt.id,
                 question_id,
-                user_answer,
+                draft_answer.user_answer,
                 is_correct=None,
                 feedback=None,
                 confidence=None,
                 flagged_uncertain=False,
+                # Scratch-pad strokes so far (STEM Scratch Pad feature); this
+                # is the only place work_strokes is ever written.
+                work_strokes=draft_answer.work_strokes,
             )
 
         # Update exit timestamp
@@ -501,7 +567,11 @@ class GradingService:
 
         # Convert answers to response format
         draft_answers = [
-            DraftAttemptAnswer(question_id=ans.question_id, user_answer=ans.user_answer)
+            DraftAttemptAnswer(
+                question_id=ans.question_id,
+                user_answer=ans.user_answer,
+                work_strokes=ans.work_strokes,
+            )
             for ans in attempt.answers
         ]
 
