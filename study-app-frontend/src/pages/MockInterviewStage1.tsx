@@ -20,6 +20,7 @@ import { LoadingNotice } from "../components/Loaders";
 import type { ProgressStage } from "../components/Progress";
 import { ProgressOverlay, useStagedProgress } from "../components/Progress";
 import { fetchLeetCodeProblem, gradeStage1, type Stage1SubmissionItem } from "../lib/api";
+import { useSettings } from "../lib/useSettings";
 import { runPythonLeetCode, type RunnerResult } from "../lib/pyodideRunner";
 import { isLeetCodeRunnable, sanitizeLeetCodeHtml } from "../lib/leetcodeHtml";
 import {
@@ -29,6 +30,7 @@ import {
   type MockCompany,
   type Stage1QuestionProgress,
 } from "../lib/mockInterview";
+import { MockProgressGate } from "../components/MockProgressGate";
 import {
   COMPANY_OPTIONS,
   pickCustomProblems,
@@ -84,6 +86,20 @@ function freshQuestion(p: InterviewProblem): Stage1QuestionProgress {
 
 export default function MockInterviewStage1() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  return (
+    <MockProgressGate
+      sessionId={Number(sessionId)}
+      label="Loading your assessment"
+      render={(stored) => <Stage1Runner stored={stored} />}
+    />
+  );
+}
+
+function Stage1Runner({ stored }: { stored: MockProgress | null }) {
+  // Shared with KojoCode: hides the topic pills and the starter snippet so the OA reads
+  // like the real thing. Set from the KojoCode settings cog.
+  const { interviewRealism } = useSettings();
+  const { sessionId } = useParams<{ sessionId: string }>();
   const numericSessionId = Number(sessionId);
   const navigate = useNavigate();
   const location = useLocation();
@@ -91,12 +107,6 @@ export default function MockInterviewStage1() {
     session?: MockInterviewSession;
     selectedStages?: string[];
   } | null;
-
-  // Resolve identity from navigation state first, then from any saved progress.
-  const stored = useMemo<MockProgress | null>(
-    () => (Number.isFinite(numericSessionId) ? loadMockProgress(numericSessionId) : null),
-    [numericSessionId],
-  );
 
   const rawCompany = (locationState?.session?.company ?? stored?.company ?? "random") as MockCompany;
   const isCustom = rawCompany === "custom";
@@ -216,7 +226,9 @@ export default function MockInterviewStage1() {
       .then((data) => {
         if (cancelled) return;
         setProblemData((prev) => ({ ...prev, [currentSlug]: data }));
-        // Seed the editor with the official stub only if untouched.
+        // Seed the editor with the official stub only if untouched. Interview realism
+        // leaves it blank: a real OA does not hand you the signature to reason from.
+        if (interviewRealism) return;
         setQuestions((prev) => {
           const idx = prev.findIndex((q) => q.slug === currentSlug);
           if (idx < 0) return prev;
@@ -512,11 +524,13 @@ export default function MockInterviewStage1() {
               <span className={`pill mock-diff-${current.difficulty.toLowerCase()}`}>
                 {current.difficulty}
               </span>
-              {current.topics.map((t) => (
-                <span key={t} className="pill">
-                  {t}
-                </span>
-              ))}
+              {interviewRealism
+                ? null
+                : current.topics.map((t) => (
+                    <span key={t} className="pill">
+                      {t}
+                    </span>
+                  ))}
             </div>
           </div>
 

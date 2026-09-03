@@ -1,22 +1,27 @@
 import {
   ArrowLeft,
-  Briefcase,
   Building2,
   ChevronRight,
-  Clock,
-  Code2,
   FileText,
+  History,
   Loader2,
-  MessageSquare,
   Play,
+  Save,
   Shuffle,
   Sparkles,
-  Users,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createMockInterviewSession, parseJobDescription } from "../lib/api";
+import {
+  createMockInterviewSession,
+  deleteJobDescription,
+  fetchActiveMockSession,
+  listJobDescriptions,
+  parseJobDescription,
+  saveJobDescription,
+  updateJobDescription,
+} from "../lib/api";
 import {
   COMPANY_OPTIONS,
   type CompanyKey,
@@ -28,7 +33,7 @@ import {
   subtopicsForTopics,
   type TaxonomyDifficulty,
 } from "../data/leetcodeTaxonomy";
-import type { MockCustomConfig } from "../lib/types";
+import type { MockCustomConfig, SavedJobDescription } from "../lib/types";
 import {
   clearActiveMockSession,
   clearMockProgress,
@@ -37,40 +42,12 @@ import {
   resumeRouteFor,
   saveMockProgress,
   type MockCompany,
+  type MockProgress,
 } from "../lib/mockInterview";
+import { MockLoopRail } from "../components/MockLoopRail";
+import { formatLoopDuration, totalLoopMinutes, type LoopStageKey } from "../data/mockInterviewLoop";
 
 const DIFFICULTY_OPTIONS: TaxonomyDifficulty[] = ["Easy", "Medium", "Hard"];
-
-const STAGE_OPTIONS = [
-  {
-    key: "resume",
-    label: "Resume Screen",
-    description: "ATS check on your resume: would it clear the screen and earn an OA? Never blocks you.",
-    icon: FileText,
-    time: "2 min",
-  },
-  {
-    key: "stage1",
-    label: "Stage 1: Online Assessment",
-    description: "2 to 3 LeetCode problems in a real in-app editor, run against sample cases. No hints.",
-    icon: Code2,
-    time: "60 to 90 min",
-  },
-  {
-    key: "stage2",
-    label: "Stage 2: Technical Interview",
-    description: "Conversational AI interviewer. Background, CS questions, then 1 live coding challenge.",
-    icon: Users,
-    time: "45 min",
-  },
-  {
-    key: "stage3",
-    label: "Stage 3: Behavioral Interview",
-    description: "Company-specific STAR questions. Type your answers; speak them out loud first.",
-    icon: MessageSquare,
-    time: "30 to 45 min",
-  },
-];
 
 // Target seniority. Drives the difficulty mix of Stage 1 problems and how strict
 // the AI interviewer is across every stage. Internship is the default.
@@ -108,6 +85,14 @@ export default function MockInterviewSetup() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
+  // Saved JDs, so a JD is pasted and analyzed once and reused after that.
+  // loadedJdId tracks which saved JD is currently in the panel, which turns the save
+  // button into an update instead of creating a near-duplicate.
+  const [savedJds, setSavedJds] = useState<SavedJobDescription[]>([]);
+  const [loadedJdId, setLoadedJdId] = useState<number | null>(null);
+  const [savingJd, setSavingJd] = useState(false);
+  const [jdSaveNote, setJdSaveNote] = useState<string | null>(null);
+
   const [selectedStages, setSelectedStages] = useState<string[]>([
     "resume",
     "stage1",
@@ -117,15 +102,38 @@ export default function MockInterviewSetup() {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Offer to resume an interview that was left in progress.
+  // Offer to resume an interview that was left in progress. The local pointer answers
+  // instantly; if this device has none (fresh browser, cleared storage, different
+  // machine) the server is asked for the newest unfinished run.
   const [active, setActive] = useState(() => getActiveMockSession());
+  useEffect(() => {
+    if (active) return;
+    let cancelled = false;
+    fetchActiveMockSession()
+      .then((session) => {
+        if (cancelled || !session?.progress_json) return;
+        const remote = JSON.parse(session.progress_json) as MockProgress;
+        if (!remote?.sessionId) return;
+        // Write the snapshot locally so Resume behaves exactly as it does on the
+        // device the run started on.
+        saveMockProgress(remote);
+        setActive(getActiveMockSession());
+      })
+      .catch(() => {
+        // No server run, or offline. The banner just stays hidden.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const activeCompanyLabel = active
     ? active.company === "custom"
       ? active.customCompany ?? "Custom"
       : COMPANY_OPTIONS.find((c) => c.key === active.company)?.label ?? active.company
     : "";
 
-  function toggleStage(key: string) {
+  function toggleStage(key: LoopStageKey) {
     setSelectedStages((prev) =>
       prev.includes(key) ? prev.filter((s) => s !== key) : [...prev, key],
     );
@@ -152,6 +160,93 @@ export default function MockInterviewSetup() {
     setSelectedSubtopics((prev) =>
       prev.includes(label) ? prev.filter((x) => x !== label) : [...prev, label],
     );
+  }
+
+  // Saved JDs load lazily: they only matter once the custom path is picked.
+  useEffect(() => {
+    if (selectedCompany !== "custom" || savedJds.length > 0) return;
+    let cancelled = false;
+    listJobDescriptions()
+      .then((rows) => {
+        if (!cancelled) setSavedJds(rows);
+      })
+      .catch(() => {
+        // Not fatal: the panel still works, you just paste the JD by hand.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCompany]);
+
+  // Refill the whole custom panel from a saved JD. The stored analysis stands in for
+  // the parse-jd call, so loading one costs nothing.
+  function applySavedJd(jd: SavedJobDescription) {
+    setLoadedJdId(jd.id);
+    setJdSaveNote(null);
+    setAnalyzeError(null);
+    setJdText(jd.jd_text);
+    setCustomName(jd.company_name ?? jd.name);
+    const parsed = jd.parsed;
+    if (!parsed) return;
+    setCustomRoleFocus(parsed.role_focus);
+    setCustomCulture(parsed.culture);
+    if (parsed.seniority) setSelectedLevel(parsed.seniority as InterviewLevel);
+    if (parsed.topics.length > 0) setSelectedTopics(parsed.topics);
+    setSelectedSubtopics(parsed.subtopics ?? []);
+    if (parsed.difficulties.length > 0) {
+      setSelectedDifficulties(parsed.difficulties as TaxonomyDifficulty[]);
+    }
+  }
+
+  async function handleSaveJd() {
+    const jd = jdText.trim();
+    if (jd.length < 20 || savingJd) return;
+    // Name it after the company when there is one, so the picker reads like a list of
+    // roles rather than "Untitled 1, Untitled 2".
+    const name = (customName.trim() || "Saved job description").slice(0, 120);
+    const parsed = {
+      role_focus: customRoleFocus,
+      culture: customCulture,
+      seniority: selectedLevel,
+      topics: selectedTopics,
+      subtopics: selectedSubtopics,
+      difficulties: selectedDifficulties,
+    };
+    setSavingJd(true);
+    setJdSaveNote(null);
+    try {
+      const saved = loadedJdId
+        ? await updateJobDescription(loadedJdId, {
+            name,
+            company_name: customName.trim() || null,
+            jd_text: jd,
+            parsed,
+          })
+        : await saveJobDescription({
+            name,
+            company_name: customName.trim() || null,
+            jd_text: jd,
+            parsed,
+          });
+      setSavedJds((prev) => [saved, ...prev.filter((row) => row.id !== saved.id)]);
+      setLoadedJdId(Number(saved.id));
+      setJdSaveNote(`Saved as "${saved.name}". Pick it from the list next time.`);
+    } catch (e: unknown) {
+      setJdSaveNote(e instanceof Error ? e.message : "Could not save this job description.");
+    } finally {
+      setSavingJd(false);
+    }
+  }
+
+  async function handleDeleteJd(jdId: number) {
+    try {
+      await deleteJobDescription(jdId);
+      setSavedJds((prev) => prev.filter((row) => row.id !== jdId));
+      if (loadedJdId === jdId) setLoadedJdId(null);
+    } catch (e: unknown) {
+      setJdSaveNote(e instanceof Error ? e.message : "Could not delete that job description.");
+    }
   }
 
   async function handleAnalyzeJd() {
@@ -272,10 +367,7 @@ export default function MockInterviewSetup() {
     }
   }
 
-  const totalTime = selectedStages.reduce((sum, key) => {
-    const mins = key === "resume" ? 2 : key === "stage1" ? 90 : 45;
-    return sum + mins;
-  }, 0);
+  const totalTime = totalLoopMinutes(selectedStages);
 
   return (
     <div className="page page-narrow">
@@ -290,38 +382,17 @@ export default function MockInterviewSetup() {
               Interview Loop Simulator
             </h1>
             <p className="muted small" style={{ marginTop: 6 }}>
-              Simulate a real SWE interview loop end to end. No hand-holding.
+              Run a real SWE loop end to end, on the clock, with no hints.
             </p>
           </div>
-          <Briefcase size={28} style={{ color: "var(--green-dark)", flexShrink: 0, marginTop: 4 }} />
-        </div>
-        <div className="mock-setup-loop-bar">
-          <div className="mock-loop-step">
-            <div className="mock-loop-step-icon">
-              <FileText size={12} />
-            </div>
-            Resume Screen
-          </div>
-          <span className="mock-loop-arrow">{"→"}</span>
-          <div className="mock-loop-step">
-            <div className="mock-loop-step-icon">
-              <Code2 size={12} />
-            </div>
-            Online Assessment
-          </div>
-          <span className="mock-loop-arrow">{"→"}</span>
-          <div className="mock-loop-step">
-            <div className="mock-loop-step-icon">
-              <Users size={12} />
-            </div>
-            Technical Interview
-          </div>
-          <span className="mock-loop-arrow">{"→"}</span>
-          <div className="mock-loop-step">
-            <div className="mock-loop-step-icon">
-              <MessageSquare size={12} />
-            </div>
-            Behavioral Interview
+          <div className="mock-setup-hero-actions">
+            <button
+              type="button"
+              className="button button-ghost mock-history-link"
+              onClick={() => navigate("/mock-interview/history")}
+            >
+              <History size={15} /> Past interviews
+            </button>
           </div>
         </div>
       </div>
@@ -398,6 +469,41 @@ export default function MockInterviewSetup() {
               difficulties and topics it tends to ask, or paste specific problems.
             </p>
 
+            {/* Saved JDs: pick one to refill this whole panel from the stored analysis,
+                no re-paste and no second trip to the model. */}
+            {savedJds.length > 0 && (
+              <>
+                <label className="mock-custom-label">Saved job descriptions</label>
+                <div className="mock-saved-jd-row">
+                  {savedJds.map((jd) => (
+                    <span
+                      key={jd.id}
+                      className={`mock-saved-jd${loadedJdId === jd.id ? " selected" : ""}`}
+                    >
+                      <button
+                        type="button"
+                        className="mock-saved-jd-load"
+                        onClick={() => applySavedJd(jd)}
+                        title={jd.company_name ? `Load ${jd.name} (${jd.company_name})` : `Load ${jd.name}`}
+                      >
+                        <FileText size={13} />
+                        {jd.name}
+                      </button>
+                      <button
+                        type="button"
+                        className="mock-saved-jd-delete"
+                        onClick={() => void handleDeleteJd(jd.id)}
+                        aria-label={`Delete saved job description ${jd.name}`}
+                        title="Delete"
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
+
             <label className="mock-custom-label" htmlFor="mock-custom-name">Company name</label>
             <input
               id="mock-custom-name"
@@ -425,6 +531,21 @@ export default function MockInterviewSetup() {
                 {analyzing ? <Loader2 size={14} className="spin" /> : <Sparkles size={14} />}
                 {analyzing ? "Analyzing" : "Analyze job description"}
               </button>
+              <button
+                className="button button-secondary"
+                onClick={() => void handleSaveJd()}
+                disabled={savingJd || jdText.trim().length < 20}
+                title={
+                  jdText.trim().length < 20
+                    ? "Paste a job description first"
+                    : loadedJdId
+                    ? "Update this saved job description"
+                    : "Save this job description to reuse later"
+                }
+              >
+                {savingJd ? <Loader2 size={14} className="spin" /> : <Save size={14} />}
+                {loadedJdId ? "Update saved JD" : "Save this JD"}
+              </button>
               {customRoleFocus && !analyzing && (
                 <span className="muted small" style={{ alignSelf: "center" }}>
                   Read as: {customRoleFocus}
@@ -432,6 +553,7 @@ export default function MockInterviewSetup() {
               )}
             </div>
             {analyzeError && <p className="small" style={{ color: "var(--error)" }}>{analyzeError}</p>}
+            {jdSaveNote && <p className="small muted">{jdSaveNote}</p>}
 
             <label className="mock-custom-label">Difficulty</label>
             <div className="mock-chip-row">
@@ -511,7 +633,7 @@ export default function MockInterviewSetup() {
       {/* Level selector */}
       <section className="card mock-setup-section">
         <h2 className="eyebrow">Choose Level</h2>
-        <p className="muted small" style={{ marginTop: -4, marginBottom: 10 }}>
+        <p className="muted small" style={{ marginTop: 4, marginBottom: 12 }}>
           Sets the difficulty of Stage 1 problems and how strict the interviewer is. Defaults to internship.
         </p>
         <div className="mock-level-grid">
@@ -528,54 +650,31 @@ export default function MockInterviewSetup() {
         </div>
       </section>
 
-      {/* Stage selector */}
-      <section className="card mock-setup-section">
-        <h2 className="eyebrow">Choose Stages</h2>
-        <div className="mock-stage-list">
-          {STAGE_OPTIONS.map((stage) => {
-            const Icon = stage.icon;
-            const activeStage = selectedStages.includes(stage.key);
-            return (
-              <button
-                key={stage.key}
-                className={`mock-stage-row${activeStage ? " selected" : ""}`}
-                onClick={() => toggleStage(stage.key)}
-              >
-                <div className="mock-stage-check">
-                  <div className={`mock-stage-checkbox${activeStage ? " checked" : ""}`} />
-                </div>
-                <div className="mock-stage-icon-wrap">
-                  <Icon size={17} />
-                </div>
-                <div className="mock-stage-info">
-                  <span className="mock-stage-label">{stage.label}</span>
-                  <span className="mock-stage-desc">{stage.description}</span>
-                </div>
-                <span className="mock-stage-time pill">
-                  <Clock size={11} style={{ marginRight: 3 }} />
-                  {stage.time}
-                </span>
-              </button>
-            );
-          })}
+      {/* Stage selector: the loop spine. Rail length tracks the time each stage costs. */}
+      <section className="card mock-setup-section mock-loop-section">
+        <div className="mock-loop-section-head">
+          <h2 className="eyebrow">Your loop</h2>
+          <p className="muted small">
+            Switch off any stage you do not want to sit today. The rail shows what each one costs you.
+          </p>
         </div>
+        <MockLoopRail selected={selectedStages} onToggle={toggleStage} />
       </section>
 
       {/* Footer */}
       <div className="mock-setup-footer">
         <div className="mock-setup-footer-meta">
           {selectedStages.length > 0 ? (
-            <p className="muted small" style={{ margin: 0 }}>
-              <Clock
-                size={12}
-                style={{ display: "inline", marginRight: 4, verticalAlign: "middle" }}
-              />
-              {selectedStages.length} stage{selectedStages.length > 1 ? "s" : ""} selected, about{" "}
-              {totalTime} min estimated
+            <p className="mock-setup-tally">
+              <span className="loop-num">{selectedStages.length}</span>
+              <span className="loop-unit">stage{selectedStages.length > 1 ? "s" : ""}</span>
+              <span className="mock-tally-sep" aria-hidden="true" />
+              <span className="loop-num">{formatLoopDuration(totalTime)}</span>
+              <span className="loop-unit">on the clock</span>
             </p>
           ) : (
             <p className="muted small" style={{ margin: 0 }}>
-              No stages selected
+              Pick at least one stage to run.
             </p>
           )}
           {error && <p className="mock-setup-error">{error}</p>}
@@ -587,11 +686,11 @@ export default function MockInterviewSetup() {
         >
           {starting ? (
             <>
-              <Loader2 size={15} className="spin" /> Starting…
+              <Loader2 size={15} className="spin" /> Starting the loop
             </>
           ) : (
             <>
-              Start Interview <ChevronRight size={16} />
+              Start the loop <ChevronRight size={16} />
             </>
           )}
         </button>

@@ -1,4 +1,4 @@
-// Local persistence for an in-progress Mock Interview.
+// Persistence for an in-progress Mock Interview.
 //
 // The interview flow spans several routes (setup, stage1, stage2, stage3,
 // summary). Previously all cross-page state lived only in React Router's
@@ -6,8 +6,14 @@
 // problems). This module snapshots the whole run to localStorage, user-scoped
 // via scopeKey, so any page can rehydrate on reload and the setup screen can
 // offer a "Resume" entry point.
+//
+// localStorage is the fast path, not the source of truth: every save also pushes
+// the snapshot to the server (debounced, flushed on tab hide/close), and
+// hydrateMockProgress takes whichever copy is newer on mount. This is the same
+// shape as KojoCode's code-workspace sync, and it is what lets a run survive a
+// cleared cache or move to another device.
 
-import { scopeKey } from "./api";
+import { getMockInterviewSession, isGuestSession, scopeKey, syncMockProgress } from "./api";
 import type { CompanyKey, InterviewLevel, InterviewProblem } from "../data/mockInterviewProblems";
 import type {
   CodingProblemInfo,
@@ -28,6 +34,11 @@ export type ResumeProgress = {
   fileName: string | null;
   result: ResumeScreenResult | null;
   completed: boolean;
+  // Resume deep dive (the grill that follows the scan). Optional because runs from
+  // before this round existed, and runs that skipped it, have none.
+  grillMessages?: InterviewChatMessage[];
+  grillCoveredGoals?: string[];
+  grillDone?: boolean;
 };
 
 export type Stage1QuestionProgress = {
@@ -113,9 +124,53 @@ export function loadMockProgress(sessionId: number): MockProgress | null {
   }
 }
 
+// Debounced cloud push. Stage pages save on nearly every keystroke, so pushing on
+// each save would hammer the API; the snapshot is coalesced and sent once things go
+// quiet, and flushed immediately when the tab is hidden or closed.
+const CLOUD_SYNC_DELAY_MS = 1500;
+let cloudTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingCloud: { sessionId: number; body: string } | null = null;
+let flushListenersBound = false;
+
+function pushPendingCloudSync(): void {
+  if (!pendingCloud) return;
+  const { sessionId, body } = pendingCloud;
+  pendingCloud = null;
+  if (cloudTimer) {
+    clearTimeout(cloudTimer);
+    cloudTimer = null;
+  }
+  // Best effort: localStorage already has the snapshot, so a failed push just means
+  // this device stays ahead of the server until the next save.
+  syncMockProgress(sessionId, body).catch(() => {});
+}
+
+function bindFlushListeners(): void {
+  if (flushListenersBound || typeof window === "undefined") return;
+  flushListenersBound = true;
+  window.addEventListener("beforeunload", pushPendingCloudSync);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") pushPendingCloudSync();
+  });
+}
+
+function scheduleCloudSync(record: MockProgress): void {
+  if (isGuestSession()) return;
+  bindFlushListeners();
+  // Only one push is ever pending. If it belongs to a different session (the user
+  // navigated between runs inside the debounce window) flush it first, otherwise
+  // that session's last edit would be dropped on the floor.
+  if (pendingCloud && pendingCloud.sessionId !== record.sessionId) {
+    pushPendingCloudSync();
+  }
+  pendingCloud = { sessionId: record.sessionId, body: JSON.stringify(record) };
+  if (cloudTimer) clearTimeout(cloudTimer);
+  cloudTimer = setTimeout(pushPendingCloudSync, CLOUD_SYNC_DELAY_MS);
+}
+
 export function saveMockProgress(progress: MockProgress): void {
+  const record: MockProgress = { ...progress, updatedAt: Date.now() };
   try {
-    const record: MockProgress = { ...progress, updatedAt: Date.now() };
     localStorage.setItem(progressKey(progress.sessionId), JSON.stringify(record));
     const pointer: ActiveMockPointer = {
       sessionId: record.sessionId,
@@ -127,8 +182,49 @@ export function saveMockProgress(progress: MockProgress): void {
     };
     localStorage.setItem(scopeKey(ACTIVE_KEY), JSON.stringify(pointer));
   } catch {
-    // Storage full or unavailable. Progress just will not survive a reload.
+    // Storage full or unavailable. The cloud push below still runs, so the run is
+    // not lost, it just will not survive a reload offline.
   }
+  scheduleCloudSync(record);
+}
+
+// Reconcile local and server snapshots for one session and return the winner.
+// Newer updatedAt wins outright: both copies describe the same forward-only run, so
+// the later write is strictly more complete. A server win is written back to
+// localStorage so the rest of the page can keep reading locally as before.
+export async function hydrateMockProgress(sessionId: number): Promise<MockProgress | null> {
+  const local = loadMockProgress(sessionId);
+  if (isGuestSession()) return local;
+  let remote: MockProgress | null = null;
+  try {
+    const session = await getMockInterviewSession(sessionId);
+    if (!session?.progress_json) return local;
+    const parsed = JSON.parse(session.progress_json) as MockProgress;
+    if (!parsed || parsed.sessionId !== sessionId) return local;
+    if (local && local.updatedAt >= (parsed.updatedAt ?? 0)) return local;
+    remote = parsed;
+  } catch {
+    // Offline, or the session is gone: carry on with whatever is local.
+    return local;
+  }
+
+  // Caching the winner locally is an optimisation, so a full storage quota must not
+  // cost us the newer snapshot we just fetched.
+  try {
+    localStorage.setItem(progressKey(sessionId), JSON.stringify(remote));
+    const pointer: ActiveMockPointer = {
+      sessionId: remote.sessionId,
+      company: remote.company,
+      level: remote.level,
+      customCompany: remote.customCompany,
+      selectedStages: remote.selectedStages,
+      updatedAt: remote.updatedAt,
+    };
+    localStorage.setItem(scopeKey(ACTIVE_KEY), JSON.stringify(pointer));
+  } catch {
+    // Storage unavailable. The run still resumes, it just re-fetches next time.
+  }
+  return remote;
 }
 
 export function clearMockProgress(sessionId: number): void {

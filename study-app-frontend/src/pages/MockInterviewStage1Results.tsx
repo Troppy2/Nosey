@@ -1,8 +1,10 @@
-import { CheckCircle2, ChevronRight, Clock, Minus, XCircle } from "lucide-react";
-import { useMemo } from "react";
+import { ChevronRight, Clock } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type { MockInterviewSession, Stage1GradeResponse, Stage1QuestionResult } from "../lib/types";
-import { loadMockProgress } from "../lib/mockInterview";
+import type { MockProgress } from "../lib/mockInterview";
+import { MockProgressGate } from "../components/MockProgressGate";
+import { MockLoopTrack } from "../components/MockLoopRail";
+import { verdictMeta } from "../data/mockInterviewLoop";
 
 function formatMs(ms: number): string {
   const totalSec = Math.round(ms / 1000);
@@ -11,18 +13,8 @@ function formatMs(ms: number): string {
   return `${m}m ${s}s`;
 }
 
-const VERDICT_META: Record<
-  string,
-  { label: string; className: string; icon: React.ElementType; color: string }
-> = {
-  strong: { label: "Strong Pass", className: "verdict-strong", icon: CheckCircle2, color: "#10b981" },
-  pass: { label: "Pass", className: "verdict-pass", icon: CheckCircle2, color: "#3b82f6" },
-  borderline: { label: "Borderline", className: "verdict-borderline", icon: Minus, color: "#f59e0b" },
-  needs_work: { label: "Needs Work", className: "verdict-needs-work", icon: XCircle, color: "#ef4444" },
-};
-
 function VerdictBadge({ verdict }: { verdict: string }) {
-  const meta = VERDICT_META[verdict] ?? VERDICT_META.borderline;
+  const meta = verdictMeta(verdict);
   const Icon = meta.icon;
   return (
     <span className={`mock-verdict-badge ${meta.className}`}>
@@ -44,6 +36,18 @@ function overallVerdict(results: Stage1QuestionResult[]): string {
 
 export default function MockInterviewStage1Results() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  return (
+    <MockProgressGate
+      sessionId={Number(sessionId)}
+      label="Loading your results"
+      render={(stored) => <Stage1ResultsView stored={stored} />}
+    />
+  );
+}
+
+// Prefers navigation state, falls back to the persisted snapshot on refresh.
+function Stage1ResultsView({ stored }: { stored: MockProgress | null }) {
+  const { sessionId } = useParams<{ sessionId: string }>();
   const numericSessionId = Number(sessionId);
   const navigate = useNavigate();
   const location = useLocation();
@@ -52,12 +56,6 @@ export default function MockInterviewStage1Results() {
     session?: MockInterviewSession;
     selectedStages?: string[];
   } | null;
-
-  // Prefer navigation state, fall back to the persisted snapshot on refresh.
-  const stored = useMemo(
-    () => (Number.isFinite(numericSessionId) ? loadMockProgress(numericSessionId) : null),
-    [numericSessionId],
-  );
 
   const results = state?.gradeResponse?.results ?? stored?.stage1?.results ?? null;
   const selectedStages = state?.selectedStages ?? stored?.selectedStages ?? ["stage1"];
@@ -68,7 +66,7 @@ export default function MockInterviewStage1Results() {
   }
 
   const overall = overallVerdict(results);
-  const overallMeta = VERDICT_META[overall] ?? VERDICT_META.borderline;
+  const overallMeta = verdictMeta(overall);
   const OverallIcon = overallMeta.icon;
   const passedCount = results.filter((r) => r.verdict === "strong" || r.verdict === "pass").length;
 
@@ -88,6 +86,7 @@ export default function MockInterviewStage1Results() {
         <p className="muted small" style={{ marginTop: 6 }}>
           Here is how you performed on each problem.
         </p>
+        <MockLoopTrack stages={selectedStages} current="stage1" />
       </div>
 
       <div className={`card mock-overall-card mock-overall-${overall}`}>

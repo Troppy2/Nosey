@@ -1,167 +1,9 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+/* Legacy styles still to be migrated. Global tokens and defaults live in base.css. */
 
-:root {
-  --green-lightest: #e9f5db;
-  --green-light: #cfe1b9;
-  --green-light-mid: #b5c99a;
-  --green-mid: #97a97c;
-  --green-dark-mid: #87986a;
-  --green-dark: #718355;
-  --ink: #26301f;
-  --white: #ffffff;
-  --success: #10b981;
-  --warning: #d97706;
-  --error: #dc2626;
-  --info: #3b82f6;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 10px rgba(38, 48, 31, 0.08);
-  --shadow-lg: 0 16px 32px rgba(38, 48, 31, 0.12);
-  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-serif: "Lora", Georgia, serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
-  --muted: #596949;
-  --border: var(--green-light-mid);
-  --gray-200: rgba(113, 131, 85, 0.18);
-  --gray-500: #7a8a6e;
-}
-
-* {
-  box-sizing: border-box;
-}
 
 /* ── Global scrollbar styling ── */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
 
-::-webkit-scrollbar-thumb {
-  background: var(--green-light-mid);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--green-mid);
-}
-
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--green-light-mid) transparent;
-}
-
-html {
-  min-height: 100%;
-  background: var(--green-lightest);
-  color: var(--ink);
-  font-family: var(--font-sans);
-  scroll-behavior: smooth;
-  -webkit-text-size-adjust: 100%;
-}
-
-body {
-  min-height: 100%;
-  margin: 0;
-}
-
-body,
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
-
-button,
-a {
-  -webkit-tap-highlight-color: transparent;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-button {
-  border: 0;
-}
-
-:focus-visible {
-  outline: 2px solid var(--green-dark);
-  outline-offset: 3px;
-}
-
-#root {
-  min-height: 100vh;
-}
-
-.page {
-  width: min(1560px, 100%);
-  margin: 0 auto;
-  padding: clamp(24px, 3vw, 40px) clamp(16px, 3.5vw, 48px) clamp(44px, 6vw, 64px);
-}
-
-.page-narrow {
-  width: min(960px, 100%);
-}
-
-.page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 36px;
-}
-
-.eyebrow {
-  color: var(--green-dark);
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-h1,
-h2,
-h3,
-p {
-  margin: 0;
-}
-
-h1,
-h2 {
-  color: var(--ink);
-  font-family: var(--font-serif);
-}
-
-h1 {
-  font-size: 2.25rem;
-  line-height: 1.16;
-}
-
-h2 {
-  font-size: 1.45rem;
-  line-height: 1.25;
-}
-
-h3 {
-  color: var(--ink);
-  font-size: 1rem;
-  line-height: 1.35;
-}
-
-.muted {
-  color: #596949;
-}
-
-.small {
-  font-size: 0.9rem;
-}
 
 .shell {
   display: grid;
@@ -709,6 +551,7 @@ h3 {
   gap: 14px;
   place-items: center;
   padding: 56px 24px;
+  margin: 5px;
   color: #596949;
   text-align: center;
   background: rgba(255, 255, 255, 0.46);
@@ -3176,8 +3019,8 @@ h3 {
 /* ── Messages ── */
 .kojo-messages {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  scroll-behavior: smooth;
 }
 
 
@@ -4957,6 +4800,7 @@ h3 {
 
 .chat-mode-messages {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -5230,8 +5074,25 @@ select[class*="lc-"]:focus-visible {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 20px;
+  gap: 16px 20px;
   margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+/* The title column absorbs the reflow (its text wraps) so the action group never
+   splits into a 2x2. When space runs out, the whole group drops to its own line
+   below the title as one row, instead of the buttons jumping around. */
+.lc-hero > div:first-child {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.lc-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
 }
 
 .lc-hero p {
@@ -5716,16 +5577,19 @@ select[class*="lc-"]:focus-visible {
 .lc-category-tools {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
 }
 
+/* The search grows to fill the row so the action buttons group together right
+   after it, instead of space-between flinging them to opposite edges. */
 .lc-search {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: min(360px, 100%);
+  flex: 1 1 auto;
+  min-width: 180px;
+  max-width: 460px;
   padding: 0 12px;
   border: 1px solid var(--lc-border);
   border-radius: 8px;
@@ -5757,7 +5621,10 @@ select[class*="lc-"]:focus-visible {
 .lc-problem-row {
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr) auto auto;
-  align-items: center;
+  /* Top-align so the check and difficulty sit on the title's first line rather
+     than floating at mid-card on multi-line rows (title + topic + subtopic tags).
+     The check then reads as belonging to the title it toggles. */
+  align-items: start;
   gap: 12px;
   min-height: 58px;
   padding: 14px 16px;
@@ -5766,6 +5633,16 @@ select[class*="lc-"]:focus-visible {
   background: var(--white);
   box-shadow: var(--shadow-sm);
   transition: box-shadow 0.13s ease, transform 0.13s ease;
+}
+
+/* Nudge the taller check icon and difficulty pill down a hair so their optical
+   centers sit on the title's first-line text. */
+.lc-problem-row > .lc-problem-check {
+  margin-top: 1px;
+}
+
+.lc-problem-row > .lc-difficulty {
+  margin-top: 1px;
 }
 
 .lc-problem-row:hover {
@@ -5835,12 +5712,19 @@ select[class*="lc-"]:focus-visible {
   cursor: pointer;
 }
 
-.lc-problem-title-btn span {
+/* Title only (first span). Scoped with > :first-of-type so the truncation does
+   NOT leak onto the subtopic-tag spans that share this button (the element-inside-
+   container gotcha). Clamps to two lines so long problem names stay readable
+   instead of being cut to "Longest Substri...". */
+.lc-problem-title-btn > span:first-of-type {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
   font-size: 0.92rem;
   font-weight: 750;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
 }
 
 .lc-problem-title-btn small {
@@ -6695,6 +6579,19 @@ select[class*="lc-"]:focus-visible {
     flex-direction: column;
   }
 
+  /* The desktop rule gives the title column `flex: 1 1 320px` so it absorbs reflow
+     while the hero is a row. Once the hero stacks, flex-basis applies to the block
+     axis instead, so that 320px became a fixed minimum HEIGHT and left a large dead
+     gap between the description and the action buttons. Reset it to content height. */
+  .lc-hero > div:first-child {
+    flex: 0 0 auto;
+  }
+
+  /* One row of four buttons cannot fit on a phone, so allow the group to wrap here. */
+  .lc-hero-actions {
+    flex-wrap: wrap;
+  }
+
   .lc-dashboard {
     grid-template-columns: 1fr;
   }
@@ -7065,6 +6962,48 @@ select[class*="lc-"]:focus-visible {
 
 .lc-statement-state--error {
   color: #b91c1c;
+}
+
+/* Statement loading skeleton. The heading + difficulty already render from
+   client-side data, so only the fetched body is a placeholder. Reuses the app's
+   existing skeleton shimmer (sel-kojo-shimmer) and sage gradient so it matches the
+   rest of the product rather than introducing a third skeleton style. */
+.lc-statement-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 10px 0 14px;
+}
+
+.lc-statement-skeleton .lc-skeleton-line {
+  height: 13px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #e4ecda 25%, #eff5e8 50%, #e4ecda 75%);
+  background-size: 600px 100%;
+  animation: sel-kojo-shimmer 1.4s infinite linear;
+}
+
+/* Extra breathing room before the second "paragraph" of placeholder lines. */
+.lc-statement-skeleton .lc-skeleton-line:nth-child(5) {
+  margin-top: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-statement-skeleton .lc-skeleton-line {
+    animation: none;
+  }
+}
+
+.lc-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .lc-topic-tags {
@@ -9235,56 +9174,22 @@ select[class*="lc-"]:focus-visible {
   background: linear-gradient(135deg, var(--green-lightest) 0%, #fff 60%);
   border: 1px solid var(--green-light);
   border-radius: 14px;
-  padding: 28px 32px 24px;
-  margin-bottom: 24px;
+  padding: 24px 32px 22px;
+  margin-bottom: 20px;
 }
 .mock-setup-hero-top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 20px;
 }
 .mock-setup-hero-title {
   font-size: 1.75rem;
   line-height: 1.2;
   margin: 0 0 6px;
 }
-.mock-setup-loop-bar {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  flex-wrap: wrap;
-}
-.mock-loop-step {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 14px;
-  background: rgba(255,255,255,0.85);
-  border: 1.5px solid var(--green-light-mid);
-  border-radius: 8px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--ink);
-}
-.mock-loop-step-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background: var(--green-lightest);
-  color: var(--green-dark);
-  flex-shrink: 0;
-}
-.mock-loop-arrow {
-  color: var(--green-light-mid);
-  font-size: 1rem;
-  padding: 0 6px;
-  line-height: 1;
-}
+/* The hero's pill-and-arrow loop bar was removed: the loop spine below now carries
+   the sequence, and carries the time budget with it. */
 
 /* ── Setup page: sections ── */
 .mock-setup-section {
@@ -9353,76 +9258,8 @@ select[class*="lc-"]:focus-visible {
   font-weight: 600;
 }
 
-.mock-stage-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 14px;
-}
-
-.mock-stage-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 18px;
-  border: 2px solid var(--green-light-mid);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.8);
-  cursor: pointer;
-  text-align: left;
-  transition: border-color var(--transition-normal), background var(--transition-normal), box-shadow var(--transition-normal);
-  width: 100%;
-}
-.mock-stage-row:hover {
-  border-color: var(--green-mid);
-  box-shadow: var(--shadow-md);
-}
-.mock-stage-row.selected {
-  border-color: var(--green-dark);
-  background: var(--green-lightest);
-  box-shadow: 0 0 0 3px rgba(113,131,85,0.15);
-}
-
-.mock-stage-check { flex-shrink: 0; }
-.mock-stage-checkbox {
-  width: 18px; height: 18px;
-  border: 2px solid var(--green-light-mid);
-  border-radius: 5px;
-  transition: background 0.15s, border-color 0.15s;
-  position: relative;
-}
-.mock-stage-checkbox.checked {
-  background: var(--green-dark);
-  border-color: var(--green-dark);
-}
-.mock-stage-checkbox.checked::after {
-  content: "";
-  position: absolute;
-  inset: 2px;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 10'%3E%3Cpath d='M1 5l3.5 3.5L11 1' stroke='white' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
-}
-
-.mock-stage-icon-wrap {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
-  background: var(--green-lightest);
-  color: var(--green-dark);
-  border: 1px solid var(--green-light);
-}
-.mock-stage-row.selected .mock-stage-icon-wrap {
-  background: var(--green-light);
-  border-color: var(--green-light-mid);
-}
-
-.mock-stage-info { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.mock-stage-label { font-weight: 600; font-size: 0.92rem; color: var(--ink); }
-.mock-stage-desc  { font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
-.mock-stage-time  { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; flex-shrink: 0; font-size: 0.78rem; }
+/* The checkbox-and-icon stage rows were replaced by the loop spine (.loop-spine,
+   at the end of this file), which encodes the same choice plus its time cost. */
 
 .mock-setup-footer {
   display: flex;
@@ -9965,39 +9802,8 @@ select[class*="lc-"]:focus-visible {
 }
 .mock-stage2-tts-btn.active { color: var(--green-dark); border-color: var(--green-dark); background: var(--green-lightest); }
 
-.mock-stage2-progress {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
-  margin-bottom: 20px;
-}
-.mock-stage2-progress-track {
-  flex: 1;
-  height: 4px;
-  background: var(--green-light);
-  border-radius: 2px;
-  overflow: hidden;
-  margin: 0 4px;
-}
-.mock-stage2-progress-fill {
-  height: 100%;
-  background: var(--green-dark);
-  border-radius: 2px;
-  transition: width 0.3s ease;
-}
-.mock-stage2-progress-dot {
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  background: var(--green-light-mid);
-  border: none;
-  cursor: default;
-  padding: 0;
-  transition: background 0.15s, transform 0.2s;
-  flex-shrink: 0;
-}
-.mock-stage2-progress-dot.active { background: var(--green-dark); transform: scale(1.4); }
-.mock-stage2-progress-dot.done   { background: var(--green-mid); }
+/* The old dot-and-track progress indicator for Stage 2 was already unreferenced;
+   .loop-track in the stage header is what shows loop position now. */
 
 .mock-stage2-script-card {
   padding: 28px 32px 22px;
@@ -10048,11 +9854,6 @@ select[class*="lc-"]:focus-visible {
   gap: 10px;
   margin: 16px 0 24px;
 }
-.mock-stage2-step-counter {
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-
 .mock-stage2-coding-area {
   display: flex;
   flex-direction: column;
@@ -10451,28 +10252,9 @@ select[class*="lc-"]:focus-visible {
 .rec-borderline  { border-left: 5px solid #f59e0b; background: linear-gradient(90deg, #fffbeb 0%, #fff 100%); }
 .rec-no-hire     { border-left: 5px solid #ef4444; background: linear-gradient(90deg, #fef2f2 0%, #fff 100%); }
 
-.mock-summary-stages {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-.mock-stage-verdict-chip {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  background: #fff;
-  border: 1.5px solid var(--green-light-mid);
-  border-radius: 10px;
-  min-width: 200px;
-}
-.mock-stage-verdict-chip-name {
-  font-size: 0.82rem;
-  color: var(--muted);
-  font-weight: 500;
-  flex: 1;
-}
+/* Per-stage verdicts moved onto the loop spine (.loop-spine--verdicts) so the
+   debrief reads back in the same shape the loop was configured in. */
+
 .mock-summary-feedback {
   padding: 22px 24px;
   display: flex;
@@ -10494,14 +10276,12 @@ select[class*="lc-"]:focus-visible {
   .mock-stage1-body { flex-direction: column; }
   .mock-stage1-problem-panel { width: 100%; max-width: none; border-right: none; border-bottom: 1px solid var(--green-light-mid); max-height: 260px; }
   .mock-stage2-script-card { padding: 20px 22px; }
-  .mock-setup-loop-bar { display: none; }
 }
 
 @media (max-width: 760px) {
   .mock-stage1-layout { height: calc(100vh - 56px); }
 }
 @media (max-width: 600px) {
-  .mock-stage-verdict-chip { min-width: 160px; }
   .mock-rec-card { padding: 20px; gap: 16px; }
 }
 
@@ -10942,8 +10722,8 @@ select[class*="lc-"]:focus-visible {
 /* ── Privacy modal ── */
 
 .privacy-modal {
-  width: min(540px, 100%);
-  max-height: 80vh;
+  width: min(620px, 100%);
+  max-height: 85vh;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -13752,6 +13532,22 @@ select.lc-custom-input {
   transform: translateY(-1px);
 }
 
+/* Section-level empty: a lighter, calmer counterpart to .lc-empty for empties
+   that sit inside an otherwise-populated view (a drill column, a bank detail
+   panel). Shares the dashed-border language without the icon/serif/reset weight. */
+.lc-inline-empty {
+  margin: 4px 0;
+  padding: 20px 18px;
+  border: 1px dashed color-mix(in srgb, var(--green-dark) 22%, white);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.4);
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+}
+
 /* ── Streaming test generation ─────────────────────────────────────────────── */
 /* Full-screen state shown before the first streamed question lands. */
 .test-generating-splash {
@@ -15017,10 +14813,16 @@ a.lm-module-row:focus-visible {
   color: var(--white);
   cursor: pointer;
   transition: background var(--transition-fast);
+  outline: none;
 }
 
 .lm-audio-toggle:hover {
   background: var(--green-dark-mid);
+}
+
+.lm-audio-toggle:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 3px;
 }
 
 .lm-audio-body {
@@ -16078,6 +15880,62 @@ a.lm-module-row:focus-visible {
   }
 }
 
+.kojo-input-area,
+.chat-mode-input-area {
+  position: relative;
+}
+
+.kojo-scroll-bottom {
+  position: absolute;
+  right: 20px;
+  bottom: calc(100% + 10px);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--green-dark);
+  border-radius: 50%;
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+
+/* The `display: inline-flex` above shadows the browser's `[hidden] { display: none }`
+   default, so the explicit rule below is required to actually hide the button when
+   the user is at the bottom of the chat. */
+.kojo-scroll-bottom[hidden] {
+  display: none;
+}
+
+.kojo-scroll-bottom:hover {
+  background: var(--green-dark);
+  color: var(--white);
+  transform: translateY(-1px);
+}
+
+.kojo-scroll-bottom:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .kojo-scroll-bottom {
+    right: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kojo-scroll-bottom {
+    transition: none;
+  }
+  .kojo-scroll-bottom:hover {
+    transform: none;
+  }
+}
 /* Dashboard "Review These" weak cards: keeps the dark gradient of .card-dark
    with light-on-dark bones, same trick as the score hero. */
 .skel-weak-card {
@@ -19417,12 +19275,26 @@ button.lc-reminder-feature-cta:disabled {
     width: 100% !important;
     height: auto;
     max-height: none;
-    overflow: visible;
     align-items: center;
     padding: 10px 12px;
+    /* The horizontal strip scrolls sideways only. `overflow: visible` + `overflow-x:
+       auto` used to compute overflow-y to auto as well, which reserved a scrollbar
+       gutter (a chunky grey bar under the menu on Windows) and clipped the pills.
+       The scrollbar chrome itself is hidden, the edge fade below signals the scroll. */
     overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    /* Fade the trailing edge so cut-off items read as "more to scroll" instead of
+       looking accidentally chopped. */
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
     border-right: none;
     border-bottom: 1px solid var(--lc-border);
+  }
+
+  .lc-rail::-webkit-scrollbar {
+    display: none;
   }
   .lc-rail-header {
     margin-bottom: 0;
@@ -19459,6 +19331,23 @@ button.lc-reminder-feature-cta:disabled {
   .lc-rail-streak small {
     display: inline;
     align-self: center;
+  }
+}
+
+/* On a phone the rail's "KojoCode Beta" wordmark burns ~110px of the strip while the
+   page heading directly below already says it. Dropping it hands that space back to
+   the nav pills, which is what actually needs to be reachable. */
+@media (max-width: 560px) {
+  .lc-rail .lc-rail-brand {
+    display: none;
+  }
+
+  .lc-rail-header {
+    display: none;
+  }
+
+  .lc-rail-nav {
+    padding: 0 4px;
   }
 }
 
@@ -19649,6 +19538,39 @@ button.lc-reminder-feature-cta:disabled {
   border-radius: 8px;
   font-family: var(--font-mono);
   font-size: 0.85rem;
+  color: var(--ink);
+}
+
+/* Ask Kojo hints toggle: shrink the shared switch and align its label to the
+   builder's compact type scale so it reads as part of the same control set. */
+.lc-practice-toggle {
+  align-self: flex-start;
+  gap: 10px;
+  padding: 2px 0;
+}
+
+.lc-practice-toggle .toggle-switch-track {
+  width: 42px;
+  height: 22px;
+  border-radius: 11px;
+}
+
+.lc-practice-toggle .toggle-switch-thumb {
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+}
+
+.lc-practice-toggle.toggle-switch--on .toggle-switch-thumb {
+  transform: translateX(20px);
+}
+
+.lc-practice-toggle .toggle-switch-label {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--ink);
 }
 
@@ -22218,4 +22140,1461 @@ button.lc-reminder-feature-cta:disabled {
 .lc-drill-remove:focus-visible {
   outline: 2px solid #dc2626;
   outline-offset: 2px;
+}
+
+/* ── KojoCode: Random unsolved shortcut ─────────────────────────────────────── */
+/* Matches the .lc-official-link / .lc-toolbar-btn look so the browse toolbar reads as
+   one control set. Disabled means the pool has nothing unsolved left to pick. */
+.lc-random-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 8px 14px;
+  border: 1px solid var(--lc-border);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.lc-random-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+}
+
+/* The hero shortcut borrows .lc-official-link, which was written for anchors, so the
+   button element needs the inherited font and a disabled state of its own. */
+button.lc-official-link {
+  font-family: inherit;
+}
+
+.lc-random-btn:disabled,
+button.lc-official-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.lc-random-btn:disabled:hover,
+button.lc-official-link:disabled:hover {
+  border-color: var(--lc-border);
+  background: var(--white);
+}
+
+/* ── Mock Interview: past interviews ────────────────────────────────────────── */
+.mock-setup-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.mock-history-link {
+  white-space: nowrap;
+}
+
+.mock-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.mock-history-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+.mock-history-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--green-dark);
+}
+
+.mock-history-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mock-history-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mock-history-company {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.mock-history-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mock-history-meta span:not(:last-child)::after {
+  content: "·";
+  margin-left: 10px;
+}
+
+/* Pill form of the summary page's recommendation colours. The .rec-* rules there
+   style a full-width card (thick left border, gradient), so the pill restates them. */
+.mock-history-rec {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--green-lightest);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.mock-history-rec.rec-strong-hire { background: #ecfdf5; border-color: #10b981; color: #047857; }
+.mock-history-rec.rec-hire        { background: #eff6ff; border-color: #3b82f6; color: #1d4ed8; }
+.mock-history-rec.rec-borderline  { background: #fffbeb; border-color: #f59e0b; color: #b45309; }
+.mock-history-rec.rec-no-hire     { background: #fef2f2; border-color: #ef4444; color: #b91c1c; }
+.mock-history-rec--open           { background: var(--green-lightest); border-color: var(--lc-border); color: #596949; }
+
+.mock-history-chevron {
+  flex-shrink: 0;
+  color: #8a9a7b;
+}
+
+.mock-history-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+/* ── Mock Interview: resume deep dive (grill) ───────────────────────────────── */
+/* Lives inside the Resume Screen page under the ATS report. Reuses the Stage 3 chat
+   bubbles and input row; only the container and thread height are new. */
+.ats-grill {
+  margin-top: 18px;
+  padding: 18px 20px;
+}
+
+.ats-grill-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ats-grill-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 420px;
+  overflow-y: auto;
+  margin-top: 16px;
+  padding: 4px 2px;
+}
+
+.ats-grill .mock-stage3-chat-input-row {
+  border-top: 1px solid var(--green-light-mid);
+  padding: 12px 0 0;
+  margin-top: 12px;
+}
+
+@media (max-width: 700px) {
+  .ats-grill-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* ── Mock Interview: saved job descriptions ─────────────────────────────────── */
+/* Chips in the custom-company panel. Each is a load button plus a delete affordance,
+   so the pair sits in one bordered pill rather than two separate controls. */
+.mock-saved-jd-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.mock-saved-jd {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 999px;
+  background: var(--white);
+  overflow: hidden;
+}
+
+.mock-saved-jd.selected {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+}
+
+.mock-saved-jd-load {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mock-saved-jd-load:hover {
+  color: var(--green-dark);
+}
+
+.mock-saved-jd-delete {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px 6px 4px;
+  border: none;
+  background: transparent;
+  color: #8a9a7b;
+  cursor: pointer;
+}
+
+.mock-saved-jd-delete:hover {
+  color: #dc2626;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MOCK INTERVIEW: THE LOOP SPINE
+   One vertical rail carries the whole feature. Each station is a stage of
+   the loop, and the rail segment beneath it is sized from that stage's real
+   time budget, so the length of the rail is the time estimate. Switching a
+   stage off collapses its segment and visibly shortens the day.
+   Time is always set in mono with tabular figures, here and everywhere else
+   in this feature.
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Deeper than --ink so the spine is the darkest mark on the page. */
+  --loop-ink: #1c2416;
+  --loop-rail-off: rgba(113, 131, 85, 0.28);
+}
+
+.mock-loop-section {
+  padding: 22px 26px 26px;
+}
+
+.mock-loop-section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 18px;
+}
+
+.mock-loop-section-head p {
+  margin: 0;
+  max-width: 60ch;
+}
+
+.loop-spine {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.loop-station {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 0 16px;
+}
+
+/* ── The rail itself ── */
+.loop-gutter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 2px;
+}
+
+.loop-node {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--green-light-mid);
+  background: var(--white);
+  color: var(--green-mid);
+  transition:
+    background var(--transition-normal),
+    border-color var(--transition-normal),
+    color var(--transition-normal);
+}
+
+.loop-station.is-on .loop-node {
+  background: var(--loop-ink);
+  border-color: var(--loop-ink);
+  color: var(--green-lightest);
+}
+
+/* The segment is the time. Its height comes from --station-h, which the
+   component derives from the stage's minute budget; an unselected stage sets
+   it to 0 and the row falls back to its content height. */
+.loop-segment {
+  flex: 1;
+  width: 2px;
+  min-height: var(--station-h, 0px);
+  margin: 6px 0 -2px;
+  border-radius: 2px;
+  /* Declared as a gradient in both states so the on/off change interpolates. A
+     flat colour and a gradient are not interpolable, so the transition would
+     otherwise snap halfway through instead of fading. */
+  background: linear-gradient(180deg, var(--loop-rail-off), var(--loop-rail-off));
+  transition: min-height var(--transition-normal), background var(--transition-normal);
+}
+
+.loop-station.is-on .loop-segment {
+  background: linear-gradient(180deg, var(--loop-ink), var(--green-dark));
+}
+
+.loop-station:last-child .loop-segment {
+  display: none;
+}
+
+/* ── Station content ── */
+.loop-station-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 2px 12px 16px 0;
+  border: none;
+  background: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.loop-station-body--static {
+  cursor: default;
+}
+
+.loop-station-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.loop-station-index {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--green-mid);
+  transition: color var(--transition-normal);
+}
+
+.loop-station.is-on .loop-station-index {
+  color: var(--green-dark);
+}
+
+.loop-station-label {
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  transition: color var(--transition-normal);
+}
+
+.loop-station.is-on .loop-station-label {
+  color: var(--loop-ink);
+}
+
+/* Time, set in mono and zero-padded so the column reads like a schedule. */
+.loop-station-time {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+/* The two-part time cluster: a mono figure and its uppercase unit. Used on the
+   spine and restated in the setup footer, so it is one pair of classes. */
+.loop-num {
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--green-mid);
+  transition: color var(--transition-normal);
+}
+
+.loop-unit {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gray-500);
+}
+
+.loop-station.is-on .loop-num {
+  color: var(--loop-ink);
+}
+
+.loop-station-time--total .loop-num {
+  font-size: 1.05rem;
+  color: var(--green-dark);
+}
+
+.loop-station-desc {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--gray-500);
+  max-width: 62ch;
+  transition: color var(--transition-normal);
+}
+
+.loop-station.is-on .loop-station-desc {
+  color: var(--muted);
+}
+
+/* The debrief always happens, so it reads as a destination, not an option. */
+.loop-station--terminal .loop-node {
+  background: var(--green-lightest);
+  border-color: var(--green-dark);
+  border-style: dashed;
+  color: var(--green-dark);
+}
+
+.loop-station--terminal .loop-station-label {
+  color: var(--loop-ink);
+}
+
+.loop-station--terminal .loop-station-body {
+  padding-bottom: 2px;
+}
+
+.loop-station-body:hover .loop-station-label {
+  color: var(--loop-ink);
+}
+
+/* Only the offset differs from the global :focus-visible. */
+.loop-station-body:focus-visible {
+  outline-offset: 4px;
+}
+
+/* ── Setup footer tally: the same mono time, restated as the commitment ── */
+.mock-setup-tally {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  flex-wrap: wrap;
+}
+
+.mock-setup-tally .loop-num {
+  font-size: 1rem;
+  color: var(--loop-ink);
+}
+
+.mock-setup-tally .loop-unit {
+  font-size: 0.72rem;
+}
+
+.mock-tally-sep {
+  width: 1px;
+  height: 13px;
+  align-self: center;
+  background: var(--green-light-mid);
+}
+
+/* ── The spine, replayed as verdicts on the debrief page ── */
+.loop-spine--verdicts {
+  margin-bottom: 24px;
+}
+
+.loop-spine--verdicts .loop-station-body {
+  padding-bottom: 18px;
+}
+
+.loop-spine--verdicts .loop-segment {
+  min-height: 18px;
+}
+
+/* Namespaced: the bare .verdict-* classes are badge fills and would flood the row.
+   strong and pass keep the default ink node from `.loop-station.is-on`, so only the
+   two that need flagging are listed. */
+.loop-spine--verdicts .loop-station.loop-verdict-borderline .loop-node {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+}
+
+.loop-spine--verdicts .loop-station.loop-verdict-needs-work .loop-node {
+  background: #fee2e2;
+  border-color: #ef4444;
+  color: #991b1b;
+}
+
+.loop-spine--verdicts .mock-verdict-badge {
+  margin-left: auto;
+}
+
+/* ── The spine laid flat: stage headers, results, history rows ── */
+.loop-track {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 14px 0 0;
+  padding: 0;
+}
+
+.loop-track-station {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* Enough padding that the connector reads as a rail between stations rather
+     than as a hyphen attached to the label. */
+  padding-right: 18px;
+  margin-right: 6px;
+  position: relative;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--gray-500);
+}
+
+/* The connector between stations: the rail, flattened. */
+.loop-track-station:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  right: 4px;
+  width: 10px;
+  height: 1.5px;
+  background: var(--loop-rail-off);
+}
+
+.loop-track-node {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--green-light-mid);
+  background: var(--white);
+}
+
+.loop-track-station.is-done .loop-track-node {
+  background: var(--loop-ink);
+  border-color: var(--loop-ink);
+}
+
+.loop-track-station.is-done {
+  color: var(--muted);
+}
+
+.loop-track-station.is-current .loop-track-node {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.22);
+}
+
+.loop-track-station.is-current {
+  color: var(--loop-ink);
+}
+
+.loop-track-station.is-done:not(:last-child)::after {
+  background: var(--green-mid);
+}
+
+/* The results header is centred, so the track under it has to be too. */
+.mock-results-page-header .loop-track {
+  justify-content: center;
+}
+
+.loop-track--compact {
+  margin-top: 6px;
+}
+
+.loop-track--compact .loop-track-station {
+  font-size: 0.68rem;
+  padding-right: 14px;
+  margin-right: 4px;
+}
+
+.loop-track--compact .loop-track-station:not(:last-child)::after {
+  right: 3px;
+  width: 8px;
+}
+
+.loop-track--compact .loop-track-node {
+  width: 6px;
+  height: 6px;
+}
+
+/* ── The one orchestrated moment: the rail draws itself on arrival ──
+   Scoped off the debrief spine on purpose. There the reader has just waited on an
+   LLM call, and staggering the verdicts holds the last one back another ~0.6s. */
+.loop-spine:not(.loop-spine--verdicts) .loop-station {
+  animation: loop-station-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--station-i, 0) * 70ms);
+}
+
+@keyframes loop-station-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loop-spine .loop-station {
+    animation: none;
+  }
+  .loop-segment,
+  .loop-node,
+  .loop-station-label,
+  .loop-num,
+  .loop-station-desc {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .loop-station {
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 0 12px;
+  }
+  .loop-station-time {
+    margin-left: 0;
+  }
+  .mock-loop-section {
+    padding: 18px 16px 20px;
+  }
+}
+
+
+/* ============================================================
+   Privacy policy and terms of service modal
+   ============================================================ */
+
+.privacy-modal-body .policy-divider {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 10px 0 4px;
+}
+
+.privacy-modal-body .policy-section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.privacy-modal-body strong {
+  font-weight: 600;
+}
+
+/* ============================================================
+   Server waiting screen (backend down / booting)
+   ============================================================ */
+
+.waiting-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  padding: 32px 16px;
+  background: linear-gradient(180deg, var(--green-lightest) 0%, #f2f7ea 100%);
+  color: var(--ink);
+}
+
+.waiting-card {
+  width: min(100%, 700px);
+  padding: 32px 32px 28px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--green-light-mid);
+  border-radius: 18px;
+  box-shadow: var(--shadow-lg);
+}
+
+.waiting-eyebrow {
+  margin: 0 0 10px;
+  color: var(--green-dark);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.waiting-title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: clamp(1.85rem, 4.5vw, 2.5rem);
+  line-height: 1.15;
+}
+
+.waiting-body {
+  margin: 14px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.waiting-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px 28px;
+  margin: 22px 0 0;
+}
+
+.waiting-timer-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.waiting-meta-label {
+  color: var(--green-dark);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.waiting-timer {
+  font-family: var(--font-mono);
+  font-size: 1.9rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.waiting-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 14px 8px 10px;
+  color: var(--ink);
+  font-size: 0.9rem;
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light-mid);
+  border-radius: 999px;
+}
+
+.waiting-status-dot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  background: var(--warning);
+  border-radius: 50%;
+  animation: waiting-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes waiting-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+.waiting-game-stage {
+  margin-top: 22px;
+  overflow: hidden;
+  background: #fbfdf7;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+}
+
+.waiting-game-stage[data-dimmed] canvas {
+  opacity: 0.25;
+  filter: saturate(0.4);
+  transition: opacity 0.35s ease, filter 0.35s ease;
+}
+
+.waiting-game canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 960 / 300;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.waiting-game-hint {
+  margin: 10px 0 0;
+  color: var(--ink);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.waiting-game-hint kbd {
+  display: inline-block;
+  padding: 0 6px;
+  color: var(--green-dark);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light-mid);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+}
+
+.waiting-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+@media (max-width: 640px) {
+  .waiting-card {
+    padding: 26px 20px 22px;
+  }
+  .waiting-meta {
+    gap: 16px 18px;
+  }
+  .waiting-timer {
+    font-size: 1.7rem;
+  }
+  .waiting-status {
+    font-size: 0.84rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .waiting-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .waiting-status {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .waiting-status-dot {
+    animation: none;
+  }
+  .waiting-game-stage[data-dimmed] canvas {
+    transition: none;
+  }
+  .lm-spin {
+    animation: none;
+  }
+  .lm-audio-toggle,
+  .lm-audio-seek,
+  .lm-checkpoint-option {
+    transition: none;
+  }
+  .lm-checkpoint-dots button {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* ── Learning module episode formats (podcast, video lecture) --------------- */
+/* This block must never redefine a selector the article lesson player already
+   owns (.lm-audio-toggle, .lm-audio-body, .lm-audio-titles, .lm-audio-seek,
+   .lm-audio-rates, .lm-audio-rate, .lm-audio-restart, .lm-failed, .lm-spin).
+   The episode player reuses those classes and their existing rules as-is;
+   anything it needs beyond that goes on a modifier class instead. */
+
+.lm-format-picker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.65rem;
+  margin-bottom: 1.15rem;
+}
+.lm-format-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  padding: 0.9rem 0.75rem;
+  border: 1.5px solid var(--green-lightest);
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+}
+.lm-format-card:hover {
+  border-color: var(--green-mid);
+}
+.lm-format-card:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.lm-format-card.is-selected {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+  box-shadow: inset 0 0 0 1px var(--green-dark);
+}
+.lm-format-card-icon {
+  color: var(--green-dark);
+}
+.lm-format-card-name {
+  font-weight: 700;
+  font-size: 1rem;
+}
+.lm-format-card-blurb {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.lm-episode-note {
+  margin: 0 0 0.9rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: var(--green-lightest);
+}
+/* Reuses .lm-stale's advisory-strip shape (an inline notice on this same page
+   family) with the warning token instead of a new hardcoded amber. */
+.lm-speech-notice {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  margin: 0 0 0.9rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--warning) 14%, var(--white));
+  color: var(--warning);
+  font-size: 0.9rem;
+}
+.lm-speech-notice svg { flex: none; }
+.lm-speech-notice p { margin: 0; color: var(--ink); }
+.lm-speech-notice--inline { margin-bottom: 0; }
+
+/* One shell for both slot states (empty = create, filled = ready/generating/
+   failed): same padding, same icon position, same title size, same vertical
+   order, so a slot reads as one object in two states rather than two
+   different components. */
+.lm-format-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.lm-format-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.9rem 0.75rem;
+}
+.lm-format-slot--empty {
+  padding: 0;
+  border-style: dashed;
+}
+.lm-format-slot-create {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  width: 100%;
+  height: 100%;
+  padding: 0.9rem 0.75rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+  text-align: left;
+}
+.lm-format-slot-create:hover .lm-format-slot-icon {
+  transform: translateY(-2px);
+}
+.lm-format-slot-create:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.lm-format-slot-icon {
+  color: var(--green-dark);
+  transition: transform var(--transition-fast);
+}
+.lm-format-slot-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.lm-format-slot-title {
+  font-weight: 700;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.lm-format-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--green-dark);
+  background: var(--green-lightest);
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+}
+.lm-format-slot-state {
+  min-height: 1.4rem;
+  display: flex;
+  align-items: center;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+.lm-format-completed {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--green-dark);
+  font-weight: 600;
+}
+.lm-format-slot.is-failed .form-error { margin: 0; }
+.lm-format-slot-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: auto;
+}
+.lm-format-slot-actions .button { padding: 0.4rem 0.75rem; }
+
+/* Episode player */
+/* .card supplies background, border, and shadow only, never padding, so every
+   Card consumer must set its own. These four never got any: content was
+   sitting flush against the card border with nothing else to blame for the
+   cramped, uneven feel across both the podcast and lecture screens. */
+.lm-episode .lm-header-main h1 { margin: 0 0 0.15rem; }
+.lm-episode-stage {
+  min-height: 10rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 1.25rem;
+}
+.lm-slide {
+  padding: 0.4rem 0.15rem;
+}
+.lm-slide-title {
+  font-size: 1.6rem;
+  line-height: 1.2;
+  margin: 0 0 0.9rem;
+  color: var(--ink);
+}
+.lm-slide-bullets {
+  margin: 0 0 0.75rem;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+/* No global list reset exists in this stylesheet, so the browser's own li
+   margin was stacking on top of the flex gap above, doubling the space
+   between bullets. Zero it explicitly rather than relying on the UA default. */
+.lm-slide-bullets li {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.4;
+  color: var(--ink);
+}
+.lm-slide-example {
+  margin: 0.25rem 0 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  background: var(--green-lightest);
+  border-left: 3px solid var(--green-dark);
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
+.lm-slide-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+}
+.lm-slide-dots {
+  display: flex;
+  gap: 0.1rem;
+}
+/* The visible dot stays small; the button's own box is the real (>=32px) tap
+   target, via padding rather than width/height, so touch does not shrink to
+   the dot's 10px footprint. */
+.lm-slide-dots button,
+.lm-checkpoint-dots button {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  display: grid;
+  place-items: center;
+}
+/* Always carries its own border, so an unfilled dot stays visible whether it
+   sits on the plain page background, the green-lightest player, or a white
+   card. A flat green-lightest fill with no border was invisible on the page
+   itself, since that is the page's own background color. */
+.lm-slide-dots button::before,
+.lm-checkpoint-dots button::before {
+  content: "";
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1.5px solid var(--green-mid);
+}
+.lm-slide-dots button:focus-visible,
+.lm-checkpoint-dots button:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 1px;
+}
+.lm-slide-dots button.is-active::before {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+}
+.lm-episode-transcript {
+  padding: 1.25rem;
+}
+.lm-episode-transcript .lm-transcript-toggle {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  color: var(--green-dark);
+  padding: 0.3rem 0;
+}
+.lm-episode-transcript .lm-transcript-toggle:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.lm-transcript-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  margin-top: 0.6rem;
+}
+.lm-turn {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  padding: 0.25rem 0.4rem;
+  border-radius: 10px;
+  scroll-margin-top: 1.25rem;
+}
+.lm-turn.is-active {
+  background: var(--green-lightest);
+}
+.lm-turn p {
+  margin: 0.1rem 0 0;
+  line-height: 1.55;
+}
+/* Host: filled. Expert: outlined. Same green, no second hue, so the two
+   speakers stay distinguishable in greyscale and for a colorblind reader
+   (the app's existing filled/outline pairing for primary vs. secondary). */
+.lm-speaker-chip {
+  flex: none;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--white);
+  background: var(--green-dark);
+  border: 1px solid var(--green-dark);
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  margin-top: 0.1rem;
+}
+.lm-speaker-chip.is-expert {
+  background: var(--white);
+  color: var(--green-dark);
+}
+/* Matches the article player's own background/border combo (line ~14800)
+   rather than white: the active rate pill is white, so on a white player it
+   was invisible. green-lightest is what makes that pill readable. */
+.lm-episode-player {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem;
+  border: 1px solid var(--green-light);
+  border-radius: 14px;
+  margin: 0.9rem 0;
+  background: var(--green-lightest);
+}
+.lm-audio-format {
+  display: inline-flex;
+  color: var(--green-dark);
+}
+/* The article's .lm-audio-titles is justify-content: space-between, built for
+   a title on the left and a byline on the right. The episode player only has
+   one icon and one status word, so space-between flings them to opposite
+   ends of the row and reads as the icon floating loose. Keep them together. */
+.lm-episode-player .lm-audio-titles {
+  justify-content: flex-start;
+  gap: 0.4rem;
+}
+.lm-checkpoint-marks {
+  position: relative;
+  height: 0.5rem;
+}
+.lm-checkpoint-marks span {
+  position: absolute;
+  top: 0;
+  width: 3px;
+  height: 0.5rem;
+  border-radius: 2px;
+  background: var(--green-mid);
+  transform: translateX(-50%);
+}
+.lm-checkpoint-marks span.is-correct { background: var(--green-dark); }
+.lm-checkpoint-marks span.is-missed { background: var(--error); }
+.lm-checkpoint-dots {
+  display: flex;
+  gap: 0.25rem;
+  justify-content: center;
+  margin: 0.4rem 0 0.9rem;
+}
+/* Correct / missed / unreached must not be color-only: filled vs. a ring vs.
+   empty, backed by an aria-label naming the state (set in EpisodePlayer.tsx). */
+.lm-checkpoint-dots button.is-correct::before {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+}
+.lm-checkpoint-dots button.is-missed::before {
+  background: var(--white);
+  border: 2px solid var(--error);
+}
+/* Unreached uses the shared base rule (transparent fill, green-mid ring); no
+   override needed, kept only as an explicit no-op for clarity at the callsite. */
+.lm-checkpoint-dots button.is-unreached::before { background: transparent; }
+.lm-checkpoint {
+  margin: 0.9rem 0;
+  padding: 1.25rem;
+}
+.lm-checkpoint-q {
+  font-size: 1.25rem;
+  line-height: 1.3;
+  margin: 0.4rem 0 1.1rem;
+  color: var(--ink);
+}
+.lm-checkpoint-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.lm-checkpoint-option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  border: 1.5px solid var(--green-lightest);
+  border-radius: 12px;
+  background: var(--white);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+}
+.lm-checkpoint-option:hover:not(:disabled) {
+  border-color: var(--green-dark);
+}
+.lm-checkpoint-option:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.lm-checkpoint-option:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+.lm-checkpoint-option-letter {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: var(--green-lightest);
+  color: var(--green-dark);
+}
+.lm-checkpoint-option.is-correct {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+}
+.lm-checkpoint-option.is-wrong {
+  border-color: var(--error);
+  background: color-mix(in srgb, var(--error) 8%, var(--white));
+}
+.lm-checkpoint-explain {
+  margin: 0.75rem 0 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: var(--green-lightest);
+  font-size: 0.9rem;
+}
+.lm-checkpoint-explain p { margin: 0; }
+.lm-checkpoint-skip {
+  display: block;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  margin-top: 1rem;
+  padding: 0;
+  font-size: 0.85rem;
+}
+.lm-checkpoint-skip:hover:not(:disabled) {
+  color: var(--green-dark);
+}
+.lm-checkpoint-skip:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.lm-summary-entry {
+  justify-content: center;
+  margin: 0.5rem 0;
+}
+.lm-episode-summary {
+  padding: 1.25rem;
+}
+.lm-episode-summary h2 { margin-top: 0; }
+.lm-checkpoint-review {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.lm-review-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+.lm-review-status {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.1rem;
+}
+.lm-review-status .is-correct { color: var(--green-dark); }
+.lm-review-status .is-wrong { color: var(--error); }
+.lm-review-empty {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--green-lightest);
+}
+.lm-review-body p { margin: 0 0 0.25rem; }
+.lm-review-q { font-weight: 600; }
+.lm-passed {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--green-lightest);
+  border-color: var(--green-dark);
+  margin: 0.9rem 0;
+}
+.lm-passed svg { color: var(--green-dark); flex: none; }
+.lm-passed p { margin: 0; }
+.lm-missed-list {
+  margin-top: 0.6rem;
+}
+.lm-missed-list h3 { margin: 0 0 0.25rem; }
+.lm-missed-card {
+  margin: 0.6rem 0;
+  padding: 0.9rem 1rem;
+}
+.lm-missed-q {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.lm-missed-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.6rem;
+}
+.lm-jump-link {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--green-dark);
+  text-decoration: underline;
+  font-size: 0.85rem;
+}
+.lm-jump-link:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lm-format-card,
+  .lm-format-slot-icon,
+  .lm-checkpoint-option {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .lm-format-picker {
+    grid-template-columns: 1fr;
+  }
+  .lm-episode-player {
+    flex-wrap: wrap;
+  }
+  .lm-audio-rates {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+  }
 }

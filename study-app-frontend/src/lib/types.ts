@@ -225,7 +225,12 @@ export type LearningModule = {
   best_score?: number | null;
   passed: boolean;
   ready: boolean;
+  // True on episode-format modules whose script + checkpoints exist; false on
+  // article modules, which never have an episode.
+  episode_ready?: boolean;
 };
+
+export type TrackFormat = "article" | "podcast" | "lecture";
 
 export type LearningTrack = {
   id: ID;
@@ -233,6 +238,9 @@ export type LearningTrack = {
   status: "generating" | "ready" | "failed";
   error?: string | null;
   module_count: number;
+  // article | podcast | lecture, chosen at creation. The hub renders one slot
+  // per format.
+  format?: TrackFormat;
   custom_instructions?: string | null;
   notes_stale: boolean;
   // Archived tracks are kept for review but do not occupy the folder's active
@@ -240,6 +248,68 @@ export type LearningTrack = {
   is_archived?: boolean;
   created_at?: string | null;
   modules: LearningModule[];
+};
+
+// ── Episode formats (podcast, video-lecture) ─────────────────────────────────
+
+// One spoken turn. "host" and "expert" for podcast, always "lecturer" for a
+// lecture. The player maps each speaker key to a TTS voice.
+export type EpisodeTurn = {
+  speaker: string;
+  text: string;
+};
+
+// One lecture slide. The deck advances when the spoken turn index crosses
+// start_turn. Podcasts have no slides.
+export type EpisodeSlide = {
+  title: string;
+  bullets: string[];
+  // Optional worked example / equation / code block in its own panel.
+  example?: string | null;
+  start_turn: number;
+};
+
+// A checkpoint as sent to the client: no correct_index, no explanation. Both
+// are withheld until the listener answers (server-graded, like the quiz).
+export type EpisodeCheckpoint = {
+  after_turn: number;
+  question: string;
+  options: string[];
+};
+
+// Per-checkpoint listener record, parallel to the checkpoints array.
+export type EpisodeCheckpointState = {
+  answer?: number | null;
+  correct: boolean;
+  // True once answered or skipped (distinguishes a skip from unreached).
+  seen: boolean;
+};
+
+export type ModuleEpisode = {
+  module_id: ID;
+  title: string;
+  format: "podcast" | "lecture";
+  turns: EpisodeTurn[];
+  slides: EpisodeSlide[];
+  checkpoints: EpisodeCheckpoint[];
+  progress: EpisodeCheckpointState[];
+  score: number;
+  total: number;
+  pass_threshold: number;
+  passed: boolean;
+};
+
+// Result of grading one checkpoint: reveals the correct answer and explanation
+// only for the answered item, plus the running score.
+export type CheckpointAnswerResult = {
+  correct: boolean;
+  correct_index: number;
+  explanation: string;
+  score: number;
+  total: number;
+  passed: boolean;
+  complete: boolean;
+  best_score: number;
 };
 
 export type QuizAttemptResult = {
@@ -720,6 +790,34 @@ export type MockInterviewSession = {
   stage3_script?: string | null;
   stage3_answers?: string | null;
   overall_feedback?: string | null;
+  // Cloud-synced snapshot of the whole run (a serialized MockProgress) plus when it
+  // was last pushed. The client keeps localStorage as its fast path and takes
+  // whichever of the two is newer on mount.
+  progress_json?: string | null;
+  progress_updated_at?: string | null;
+  resume_file_name?: string | null;
+  resume_grill?: string | null;
+  created_at?: string | null;
+};
+
+// A job description saved to the user's account, with the parsed analysis kept
+// alongside it so reloading a JD does not re-run the LLM parse.
+export type SavedJDParsed = {
+  role_focus: string;
+  culture: string;
+  seniority: string;
+  topics: string[];
+  subtopics: string[];
+  difficulties: string[];
+};
+
+export type SavedJobDescription = {
+  id: ID;
+  name: string;
+  company_name?: string | null;
+  jd_text: string;
+  parsed?: SavedJDParsed | null;
+  updated_at?: string | null;
 };
 
 export type ResumeScreenResult = {

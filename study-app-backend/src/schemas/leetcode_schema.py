@@ -254,6 +254,12 @@ class LCDailyProblemRequest(BaseModel):
     subtopic: Optional[str] = Field(default=None, max_length=120)
     target_difficulty: str = Field(default="Medium", max_length=20)
     seed_slug: str = Field(..., min_length=1, max_length=200)
+    # The seed's catalog title, which is what the reskin actually works from: no problem
+    # statements are stored anywhere and LeetCode can't be fetched from prod (GH #75), so
+    # the model reskins from its own knowledge of the named problem. Optional purely for
+    # backward compatibility, older frontend builds send only seed_slug and the backend
+    # derives a rough title from it.
+    seed_title: str = Field(default="", max_length=300)
     provider: Optional[str] = Field(default=None)
 
     def normalized_difficulty(self) -> str:

@@ -26,6 +26,7 @@ if TYPE_CHECKING:
         LCStruggleEvent,
         LCTestRun,
     )
+    from src.models.job_description import UserJobDescription
     from src.models.mock_interview import MockInterviewSession
     from src.models.slash_command import SlashCommand
     from src.models.user_attempt import UserAttempt
@@ -96,6 +97,9 @@ class User(Base, TimestampMixin):
     )
     mock_interview_sessions: Mapped[list[MockInterviewSession]] = relationship(
         "MockInterviewSession", back_populates="user", cascade="all, delete-orphan"
+    )
+    job_descriptions: Mapped[list[UserJobDescription]] = relationship(
+        "UserJobDescription", back_populates="user", cascade="all, delete-orphan"
     )
 
     @property

@@ -1,0 +1,21 @@
+/*
+ * KojoHelpChat
+ *
+ * Component-owned styles live here so chat UI changes do not require searching
+ * the legacy global stylesheet. Migrate additional `.kojo-*` rules here as
+ * they are updated.
+ */
+
+/* Keep the message feed scrollable while hiding its scrollbar chrome.
+ * - Firefox: `scrollbar-width`
+ * - legacy Edge/IE: `-ms-overflow-style`
+ * - Chromium/Safari: the WebKit pseudo-element below
+ */
+.kojo-messages {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.kojo-messages::-webkit-scrollbar {
+  display: none;
+}

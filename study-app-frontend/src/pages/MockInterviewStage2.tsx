@@ -11,13 +11,15 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { LoadingNotice } from "../components/Loaders";
 import { sendStage2Message, submitStage2 } from "../lib/api";
 import type { CodingProblemInfo, InterviewChatMessage, MockInterviewSession } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
 import { loadMockProgress, saveMockProgress, type MockProgress, type MockCompany } from "../lib/mockInterview";
+import { MockProgressGate } from "../components/MockProgressGate";
+import { MockLoopTrack } from "../components/MockLoopRail";
 
 function speak(text: string) {
   if (!window.speechSynthesis) return;
@@ -36,15 +38,21 @@ const ttsSupported = typeof window !== "undefined" && "speechSynthesis" in windo
 
 export default function MockInterviewStage2() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  return (
+    <MockProgressGate
+      sessionId={Number(sessionId)}
+      label="Loading your interview"
+      render={(stored) => <Stage2Runner stored={stored} />}
+    />
+  );
+}
+
+function Stage2Runner({ stored }: { stored: MockProgress | null }) {
+  const { sessionId } = useParams<{ sessionId: string }>();
   const numericSessionId = Number(sessionId);
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as { session?: MockInterviewSession; selectedStages?: string[] } | null;
-
-  const stored = useMemo<MockProgress | null>(
-    () => (Number.isFinite(numericSessionId) ? loadMockProgress(numericSessionId) : null),
-    [numericSessionId],
-  );
 
   const rawCompany = (state?.session?.company ?? stored?.company ?? "random") as MockCompany;
   const company = (rawCompany === "custom" ? "random" : rawCompany) as CompanyKey;
@@ -255,6 +263,7 @@ export default function MockInterviewStage2() {
                 {Math.min(coveredGoals.length, totalGoals)} of {totalGoals} covered
               </span>
             </div>
+            <MockLoopTrack stages={selectedStages} current="stage2" compact />
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
