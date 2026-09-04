@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Sidebar } from "../components/Sidebar";
 import WaitingScreen from "../components/WaitingScreen";
+import { ToastHost } from "../components/ToastHost";
 import {
   getBackendStatus,
   startBackendWatcher,
@@ -86,6 +87,7 @@ function BackendGate({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <BrowserRouter>
+      <ToastHost />
       <BackendGate>
         <Routes>
         <Route path="/" element={<Landing />} />

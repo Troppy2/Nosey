@@ -1,0 +1,98 @@
+/* Toast stack. Anchored top-right on every size, clear of the sticky topbar on
+   mobile and of the page gutter on desktop. */
+
+.toast-host {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top));
+  right: 14px;
+  z-index: 900;
+  display: grid;
+  gap: 10px;
+  width: min(360px, calc(100vw - 28px));
+  justify-items: stretch;
+  pointer-events: none;
+}
+
+.toast {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 12px 12px 12px 14px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--green-light-mid);
+  border-left: 3px solid var(--green-dark);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
+  animation: toast-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.toast[data-kind="success"] { border-left-color: var(--success); }
+.toast[data-kind="error"] { border-left-color: var(--error); }
+.toast[data-kind="info"] { border-left-color: var(--green-dark); }
+
+.toast[data-kind="success"] .toast-icon { color: var(--success); }
+.toast[data-kind="error"] .toast-icon { color: var(--error); }
+.toast[data-kind="info"] .toast-icon { color: var(--green-dark); }
+
+.toast-icon {
+  margin-top: 1px;
+  flex: 0 0 auto;
+}
+
+.toast-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.toast-copy strong {
+  font-size: 0.94rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.toast-copy span {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.toast-close {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.toast-close:hover {
+  color: var(--ink);
+  background: rgba(113, 131, 85, 0.14);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}
