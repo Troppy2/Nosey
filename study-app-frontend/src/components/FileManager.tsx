@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { type FolderFile, type SkippedFile, addFolderTextNote, deleteFolderFile, fetchFolderFiles, uploadFolderFiles } from "../lib/api";
 import { Button } from "./Button";
 import { ConfirmModal } from "./ConfirmModal";
+import { FormError } from "./FormError";
 import { InlineLoading } from "./Loaders";
 import { ProgressBar } from "./Progress";
 import { SkeletonList } from "./Skeletons";
@@ -249,11 +250,7 @@ export function FileManager({ folderId, onClose }: Props) {
             : "Saved as a text note, usable in tests and Kojo just like a file."}
         </p>
 
-        {error && (
-          <div className="form-error" style={{ marginBottom: 12 }}>
-            {error}
-          </div>
-        )}
+        <FormError message={error} style={{ marginBottom: 12 }} />
 
         {skippedFiles.length > 0 && (
           <div
