@@ -1,35 +1,133 @@
 import { useEffect, useRef } from "react";
 
 // Kojo chases a yarn ball through a Chrome-dino-style runner, drawn on a fixed
-// logical canvas (960x300) that CSS scales down to fit. All game state lives in
-// a mutable ref so the component never re-renders during play; the HUD (score,
-// high score, game over) is painted on the canvas itself.
+// logical canvas (960x300) that CSS scales down to fit. Everything is pixel art:
+// each shape is a map of CELL-sized cells snapped to one grid, and smoothing is
+// off, so the whole scene reads as a single low-res sprite sheet.
+// All game state lives in a mutable ref so the component never re-renders during
+// play; the HUD (score, high score, game over) is painted on the canvas itself.
 
 const WORLD_W = 960;
 const WORLD_H = 300;
-const GROUND_Y = 252;
+const GROUND_Y = 250;
 
 const KOJO_X = 130;
-// Kojo is drawn as pixel art: a SPRITE_COLS x SPRITE_ROWS map of cells, each
-// CELL pixels square. Dots are empty, "#" is fur, "b" is the light belly patch
-// and "e" is the eye. Legs are drawn separately so the two pairs can animate.
+// Every sprite is a grid of CELL x CELL pixels. Dots are empty; the other
+// characters map to palette colors through the sprite's own legend.
 const CELL = 5;
-const SPRITE_COLS = 13;
-const SPRITE_ROWS = 10;
+// Kojo the cat, in profile and mid-run: tail up and curled at the left, a
+// rounded body, and a head with two ears, one eye, a light muzzle and a nose.
+// The bottom two rows are left clear for the animated legs.
+const SPRITE_COLS = 14;
+const SPRITE_ROWS = 11;
 const KOJO_SPRITE = [
-  ".........#.#.",
-  "#.......##.##",
-  "##......#####",
-  ".##########e#",
-  ".############",
-  "..##bbb##....",
-  "..##bbb##....",
-  "..########...",
-  ".............",
-  ".............",
+  ".#............",
+  "#.........#..#",
+  "#........#b##b",
+  ".#.......###e#",
+  "..#########bbn",
+  "..###########.",
+  "..##bbb#####..",
+  "..##bbb###....",
+  "..########....",
+  "..............",
+  "..............",
 ];
 const KOJO_W = SPRITE_COLS * CELL;
 const KOJO_H = SPRITE_ROWS * CELL;
+
+// A boulder: lit along the top-left, shadowed toward the bottom-right.
+const BOULDER_SPRITE = [
+  "....llll....",
+  "..llllllmm..",
+  ".llllmmmmmm.",
+  "llllmmmmmmdd",
+  "llmmmmmmmmdd",
+  "lmmmmmmmmddd",
+  "mmmmmmmmdddd",
+  "mmmmmmdddddd",
+  ".mmmmdddddd.",
+];
+const BOULDER_W = 12 * CELL;
+const BOULDER_H = BOULDER_SPRITE.length * CELL;
+
+// A street lamp: dark post, warm bulb.
+const LAMP_SPRITE = [
+  "..dd..",
+  ".dggd.",
+  ".dggd.",
+  "..dd..",
+  "..dd..",
+  "..dd..",
+  "..dd..",
+  "..dd..",
+  "..dd..",
+  "..dd..",
+  "..dd..",
+  "..dd..",
+  "..dd..",
+  "..dd..",
+  "..dd..",
+  ".dddd.",
+  "dddddd",
+];
+const LAMP_W = 6 * CELL;
+const LAMP_H = LAMP_SPRITE.length * CELL;
+
+// The yarn ball is rasterized once into YARN_FRAMES pixel frames covering a full
+// turn. Stepping baked frames keeps the spin on the pixel grid; ctx.rotate would
+// smear the ball back into smooth curves.
+//
+// Each wrap thread is a great circle on a sphere, so it rasterizes as a curved
+// band that sweeps around the ball as it turns. Flat stripes were the obvious
+// alternative and they alias badly at this size: at some angles every cell lands
+// on a stripe and the ball goes solid, at others none do and it goes bald.
+const YARN_CELLS = 8;
+const YARN_R = (YARN_CELLS * CELL) / 2;
+const YARN_FRAMES = 12;
+// Each band is [tilt out of the screen plane, phase offset around the ball].
+const YARN_BANDS: [number, number][] = [
+  [0.7, 0],
+  [-0.6, 2.1],
+];
+const YARN_BAND_WIDTH = 0.2;
+
+function buildYarnFrames(): string[][] {
+  const frames: string[][] = [];
+  for (let f = 0; f < YARN_FRAMES; f++) {
+    const spin = (Math.PI * 2 * f) / YARN_FRAMES;
+    const rows: string[] = [];
+    for (let r = 0; r < YARN_CELLS; r++) {
+      let row = "";
+      for (let c = 0; c < YARN_CELLS; c++) {
+        // Cell center in a -1..1 box, so the ball mask is a unit circle and the
+        // front of the sphere is at w = sqrt(1 - u^2 - v^2).
+        const u = (c + 0.5) / (YARN_CELLS / 2) - 1;
+        const v = (r + 0.5) / (YARN_CELLS / 2) - 1;
+        const d2 = u * u + v * v;
+        if (d2 > 1) {
+          row += ".";
+          continue;
+        }
+        const w = Math.sqrt(Math.max(0, 1 - d2));
+        // A cell is thread if it sits near the plane of any band's great circle.
+        const onThread = YARN_BANDS.some(([tilt, phase]) => {
+          const a = spin + phase;
+          const nx = Math.cos(a) * Math.cos(tilt);
+          const ny = Math.sin(a) * Math.cos(tilt);
+          const nz = Math.sin(tilt);
+          return Math.abs(u * nx + v * ny + w * nz) < YARN_BAND_WIDTH;
+        });
+        row += onThread ? "d" : "y";
+      }
+      rows.push(row);
+    }
+    frames.push(rows);
+  }
+  return frames;
+}
+
+const YARN_FRAME_SPRITES = buildYarnFrames();
 
 const GRAVITY = 2600;
 const JUMP_VELOCITY = -840;
@@ -46,20 +144,28 @@ interface Palette {
   ink: string;
   green: string;
   greenLight: string;
+  greenMid: string;
   amber: string;
   amberDark: string;
   white: string;
-  water: string;
-  waterDeep: string;
+  stoneLight: string;
+  stoneMid: string;
+  stoneDark: string;
 }
 
-type ObstacleKind = "water" | "lamp";
+type ObstacleKind = "boulder" | "lamp";
 
 interface Obstacle {
   x: number;
   w: number;
   h: number;
   kind: ObstacleKind;
+}
+
+interface Dust {
+  x: number;
+  y: number;
+  life: number;
 }
 
 interface GameState {
@@ -78,7 +184,10 @@ interface GameState {
   groundScroll: number;
   time: number;
   clouds: { x: number; y: number; scale: number }[];
-  yarnRotate: number;
+  yarnRoll: number;
+  yarnHop: number;
+  dust: Dust[];
+  dustIn: number;
 }
 
 function makeState(): GameState {
@@ -102,7 +211,10 @@ function makeState(): GameState {
       { x: 480, y: 110, scale: 0.7 },
       { x: 800, y: 40, scale: 1.2 },
     ],
-    yarnRotate: 0,
+    yarnRoll: 0,
+    yarnHop: 0,
+    dust: [],
+    dustIn: 0,
   };
 }
 
@@ -129,8 +241,8 @@ function cssVar(name: string, fallback: string): string {
 }
 
 function obstacleFor(kind: ObstacleKind, x: number): Obstacle {
-  if (kind === "water") return { x, w: 84, h: 34, kind };
-  return { x, w: 28, h: 84, kind };
+  if (kind === "boulder") return { x, w: BOULDER_W, h: BOULDER_H, kind };
+  return { x, w: LAMP_W, h: LAMP_H, kind };
 }
 
 export default function KojoRunnerGame() {
@@ -143,17 +255,21 @@ export default function KojoRunnerGame() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    // Hard pixel edges: nothing in this scene should be interpolated.
+    ctx.imageSmoothingEnabled = false;
 
     const palette = (paletteRef.current ??= {
       ink: cssVar("--ink", "#26301f"),
       green: cssVar("--green-dark", "#718355"),
       greenLight: cssVar("--green-light", "#cfe1b9"),
+      greenMid: cssVar("--green-light-mid", "#b5cf9c"),
       amber: cssVar("--warning", "#d97706"),
       amberDark: cssVar("--warning-dark", "#b45309"),
       white: "#ffffff",
-      // Water blues live only in the game; the app palette has no blue token.
-      water: "#a5d0ea",
-      waterDeep: "#4e84ad",
+      // Stone tones live only in the game; the app palette has no neutral grey.
+      stoneLight: "#b9bdaa",
+      stoneMid: "#8b917c",
+      stoneDark: "#5d6352",
     });
 
     const state = makeState();
@@ -207,15 +323,17 @@ export default function KojoRunnerGame() {
     let last = performance.now();
 
     const spawnObstacle = () => {
-      const kind: ObstacleKind = Math.random() < 0.5 ? "water" : "lamp";
+      const kind: ObstacleKind = Math.random() < 0.6 ? "boulder" : "lamp";
       state.obstacles.push(obstacleFor(kind, WORLD_W + 20));
     };
 
     const collide = (o: Obstacle): boolean => {
-      const x = KOJO_X + 12;
-      const y = GROUND_Y - KOJO_H + state.kojoY + 8;
-      const w = KOJO_W - 22;
-      const h = KOJO_H - 14;
+      // Hitbox covers the body only. The tail, ears and legs stick out past it
+      // so a clipped whisker never ends a run.
+      const x = KOJO_X + CELL * 3;
+      const y = GROUND_Y - KOJO_H + state.kojoY + CELL * 4;
+      const w = KOJO_W - CELL * 6;
+      const h = KOJO_H - CELL * 5;
       // Shrink the obstacle hitbox a touch so near-misses feel fair.
       const ox = o.x + 6;
       const oy = GROUND_Y - o.h + 4;
@@ -244,8 +362,26 @@ export default function KojoRunnerGame() {
         state.speed = BASE_SPEED + Math.min(state.distance * 0.12, MAX_EXTRA_SPEED);
         state.distance += state.speed * dt;
         state.score = state.distance * SCORE_PER_PX;
-        state.groundScroll = (state.groundScroll + state.speed * dt) % 42;
-        state.yarnRotate += (state.speed * dt) / 22;
+        state.groundScroll = (state.groundScroll + state.speed * dt) % (CELL * 8);
+        // Roll rate follows the ground it rolls on: one radian of spin per
+        // radius travelled, so the ball never looks like it is skidding.
+        state.yarnRoll = (state.yarnRoll + (state.speed * dt) / YARN_R) % (Math.PI * 2);
+        // A small hop on part of each turn keeps the chase lively without
+        // letting the ball float free of the ground.
+        state.yarnHop = Math.max(0, Math.sin(state.yarnRoll * 1.5)) * CELL * 1.6;
+
+        // Dust kicked up at the yarn's contact point, on the pixel grid.
+        state.dustIn -= state.speed * dt;
+        if (state.dustIn <= 0) {
+          state.dustIn = 26 + Math.random() * 22;
+          state.dust.push({ x: KOJO_X + 250 - YARN_R, y: GROUND_Y - CELL, life: 1 });
+        }
+        for (const d of state.dust) {
+          d.x -= state.speed * 0.55 * dt;
+          d.y -= 22 * dt;
+          d.life -= dt * 1.6;
+        }
+        state.dust = state.dust.filter((d) => d.life > 0);
 
         state.spawnIn -= state.speed * dt;
         if (state.spawnIn <= 0) {
@@ -295,7 +431,7 @@ export default function KojoRunnerGame() {
         width={WORLD_W}
         height={WORLD_H}
         role="img"
-        aria-label="Waiting game: make Kojo the cat jump over obstacles while he chases a yarn ball. Tap, click, or press Space to jump."
+        aria-label="Waiting game: make Kojo the cat jump over boulders and lamp posts while he chases a rolling yarn ball. Tap, click, or press Space to jump."
       />
     </div>
   );
@@ -303,127 +439,127 @@ export default function KojoRunnerGame() {
 
 // === Drawing ===
 
+// Snap a coordinate to the sprite grid so nothing lands on a half pixel.
+function snap(value: number): number {
+  return Math.round(value / CELL) * CELL;
+}
+
+// Paint a sprite map at (x, y) using a legend of character to color. Characters
+// missing from the legend are treated as empty cells.
+function drawSprite(
+  ctx: CanvasRenderingContext2D,
+  sprite: string[],
+  x: number,
+  y: number,
+  legend: Record<string, string>,
+) {
+  const left = snap(x);
+  const top = snap(y);
+  for (let r = 0; r < sprite.length; r++) {
+    const row = sprite[r];
+    for (let c = 0; c < row.length; c++) {
+      const color = legend[row[c]];
+      if (!color) continue;
+      ctx.fillStyle = color;
+      ctx.fillRect(left + c * CELL, top + r * CELL, CELL, CELL);
+    }
+  }
+}
+
 function draw(state: GameState, p: Palette, ctx: CanvasRenderingContext2D) {
   ctx.clearRect(0, 0, WORLD_W, WORLD_H);
 
-  // Clouds (slow parallax)
-  ctx.fillStyle = p.greenLight;
-  for (const c of state.clouds) {
-    ctx.beginPath();
-    ctx.arc(c.x, c.y, 26 * c.scale, 0, Math.PI * 2);
-    ctx.arc(c.x + 28 * c.scale, c.y + 4 * c.scale, 20 * c.scale, 0, Math.PI * 2);
-    ctx.arc(c.x - 28 * c.scale, c.y + 4 * c.scale, 20 * c.scale, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Ground line + scrolling dashes
-  ctx.strokeStyle = p.green;
-  ctx.lineWidth = 4;
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  ctx.moveTo(0, GROUND_Y);
-  ctx.lineTo(WORLD_W, GROUND_Y);
-  ctx.stroke();
-  ctx.strokeStyle = "rgba(113, 131, 85, 0.35)";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  for (let x = -state.groundScroll; x < WORLD_W + 42; x += 42) {
-    ctx.moveTo(x, GROUND_Y + 14);
-    ctx.lineTo(x + 18, GROUND_Y + 14);
-  }
-  ctx.stroke();
-
+  drawClouds(state, p, ctx);
+  drawGround(state, p, ctx);
+  drawDust(state, p, ctx);
   drawYarn(state, p, ctx);
   for (const o of state.obstacles) drawObstacle(o, p, ctx);
   drawKojo(state, p, ctx);
   drawHud(state, p, ctx);
 }
 
+// Blocky clouds: four stacked bars, widest through the middle.
+const CLOUD_SPRITE = [
+  "..####..",
+  ".######.",
+  "########",
+  ".####...",
+];
+
+function drawClouds(state: GameState, p: Palette, ctx: CanvasRenderingContext2D) {
+  for (const c of state.clouds) {
+    // Scale in whole cells so a larger cloud still sits on the same grid.
+    const step = Math.max(1, Math.round(c.scale * 2));
+    for (let r = 0; r < CLOUD_SPRITE.length; r++) {
+      for (let col = 0; col < CLOUD_SPRITE[r].length; col++) {
+        if (CLOUD_SPRITE[r][col] === ".") continue;
+        ctx.fillStyle = r === 0 ? p.greenLight : p.greenMid;
+        ctx.fillRect(snap(c.x) + col * CELL * step, snap(c.y) + r * CELL * step, CELL * step, CELL * step);
+      }
+    }
+  }
+}
+
+function drawGround(state: GameState, p: Palette, ctx: CanvasRenderingContext2D) {
+  // Solid crust, then a scrolling scatter of loose cells beneath it, so the
+  // ground reads as moving without a single anti-aliased line.
+  ctx.fillStyle = p.green;
+  ctx.fillRect(0, GROUND_Y, WORLD_W, CELL);
+
+  const offset = snap(state.groundScroll);
+  ctx.fillStyle = p.greenMid;
+  for (let x = -offset; x < WORLD_W + CELL * 8; x += CELL * 8) {
+    ctx.fillRect(snap(x), GROUND_Y + CELL * 2, CELL * 3, CELL);
+    ctx.fillRect(snap(x) + CELL * 5, GROUND_Y + CELL * 4, CELL * 2, CELL);
+  }
+}
+
+function drawDust(state: GameState, p: Palette, ctx: CanvasRenderingContext2D) {
+  for (const d of state.dust) {
+    ctx.fillStyle = d.life > 0.5 ? p.greenMid : p.greenLight;
+    ctx.fillRect(snap(d.x), snap(d.y), CELL, CELL);
+  }
+}
+
 function drawYarn(state: GameState, p: Palette, ctx: CanvasRenderingContext2D) {
-  const x = KOJO_X + 250;
-  const y = GROUND_Y - 16 + Math.sin(state.time * 5) * 3;
-  const r = 15;
+  const centerX = KOJO_X + 250;
+  const bottom = GROUND_Y - state.yarnHop;
+  const left = centerX - YARN_R;
+  const top = bottom - YARN_R * 2;
 
-  // trailing thread
-  ctx.strokeStyle = p.amber;
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(x - 4, y + 4);
-  ctx.quadraticCurveTo(x - 34, y + 26, x - 26, GROUND_Y - 2);
-  ctx.stroke();
+  // Loose thread trailing back toward Kojo, drawn as a stepped pixel run.
+  ctx.fillStyle = p.amberDark;
+  for (let i = 1; i <= 7; i++) {
+    const tx = left - i * CELL * 2;
+    const ty = GROUND_Y - CELL - Math.round(Math.sin(state.time * 6 - i * 0.7)) * CELL;
+    ctx.fillRect(snap(tx), snap(ty), CELL * 2, CELL);
+  }
 
-  ctx.fillStyle = p.amber;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fill();
-  // wrap lines use a darker thread so they read on the amber ball
-  ctx.strokeStyle = p.amberDark;
-  ctx.lineWidth = 3.5;
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(state.yarnRotate);
-  ctx.beginPath();
-  ctx.arc(0, 0, r * 0.55, 0, Math.PI * 2);
-  ctx.moveTo(-r * 0.7, 0);
-  ctx.lineTo(r * 0.7, 0);
-  ctx.stroke();
-  ctx.restore();
+  // Contact shadow: a flat bar that narrows while the ball is off the ground.
+  const shadowInset = Math.round(state.yarnHop / CELL) * CELL;
+  ctx.fillStyle = p.greenMid;
+  ctx.fillRect(snap(left) + shadowInset, GROUND_Y, YARN_R * 2 - shadowInset * 2, CELL);
+
+  const frameIndex = Math.floor(state.yarnRoll / ((Math.PI * 2) / YARN_FRAMES)) % YARN_FRAMES;
+  drawSprite(ctx, YARN_FRAME_SPRITES[frameIndex], left, top, { y: p.amber, d: p.amberDark });
 }
 
 function drawObstacle(o: Obstacle, p: Palette, ctx: CanvasRenderingContext2D) {
-  if (o.kind === "water") {
-    // A pool of water: a soft blue circle with a deep rim, a white shine arc
-    // and a ripple ring so it reads as liquid rather than a solid blob.
-    const cx = o.x + o.w / 2;
-    const cy = GROUND_Y - o.h / 2;
-    ctx.fillStyle = p.water;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, o.w / 2, o.h / 2, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = p.waterDeep;
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-    // shine arc on the upper left
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(cx - o.w * 0.2, cy - o.h * 0.25, o.w * 0.2, Math.PI * 1.1, Math.PI * 1.8);
-    ctx.stroke();
-    // inner ripple ring
-    ctx.strokeStyle = p.waterDeep;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy - 2, o.w * 0.2, o.h * 0.3, 0, 0, Math.PI * 2);
-    ctx.stroke();
+  if (o.kind === "boulder") {
+    drawSprite(ctx, BOULDER_SPRITE, o.x, GROUND_Y - o.h, {
+      l: p.stoneLight,
+      m: p.stoneMid,
+      d: p.stoneDark,
+    });
+    // Two chips so a run of boulders does not look stamped from one tile.
+    ctx.fillStyle = p.stoneDark;
+    ctx.fillRect(snap(o.x) + CELL * 4, snap(GROUND_Y - o.h) + CELL * 3, CELL, CELL);
+    ctx.fillRect(snap(o.x) + CELL * 6, snap(GROUND_Y - o.h) + CELL * 5, CELL, CELL);
   } else {
-    // A street lamp: thin dark pole with a glowing amber head and light rays.
-    const cx = o.x + o.w / 2;
-    const top = GROUND_Y - o.h;
-    // light rays fanning out from the head
-    ctx.strokeStyle = "rgba(217, 119, 6, 0.45)";
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.moveTo(cx, top + 14);
-    ctx.lineTo(cx - 14, top + 44);
-    ctx.moveTo(cx, top + 14);
-    ctx.lineTo(cx + 14, top + 44);
-    ctx.stroke();
-    // pole + base
-    ctx.fillStyle = p.ink;
-    ctx.fillRect(cx - 3, top + 16, 6, o.h - 22);
-    ctx.fillRect(o.x + 3, GROUND_Y - 6, o.w - 6, 6);
-    // lamp head
-    ctx.fillStyle = p.ink;
-    ctx.fillRect(cx - 8, top + 4, 16, 10);
-    // warm glowing bulb
-    ctx.fillStyle = p.amber;
-    ctx.beginPath();
-    ctx.arc(cx, top + 14, 7, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "rgba(255, 244, 214, 0.95)";
-    ctx.beginPath();
-    ctx.arc(cx, top + 12, 3, 0, Math.PI * 2);
-    ctx.fill();
+    drawSprite(ctx, LAMP_SPRITE, o.x, GROUND_Y - o.h, { d: p.ink, g: p.amber });
+    // One white cell in the bulb so the lamp has a warm center.
+    ctx.fillStyle = p.white;
+    ctx.fillRect(snap(o.x) + CELL * 2, snap(GROUND_Y - o.h) + CELL, CELL, CELL);
   }
 }
 
@@ -432,10 +568,10 @@ function drawKojo(state: GameState, p: Palette, ctx: CanvasRenderingContext2D) {
   // flattens Kojo onto it. Each map cell is CELL x CELL pixels.
   const feetY = GROUND_Y + state.kojoY;
   const runPhase = state.time * 13;
-  const squish = state.over ? 0.35 : 1;
+  const squish = state.over ? 0.4 : 1;
 
   ctx.save();
-  ctx.translate(KOJO_X, Math.round(feetY));
+  ctx.translate(KOJO_X, snap(feetY));
   ctx.scale(1, squish);
 
   const cell = (c: number, r: number, color: string, h = CELL) => {
@@ -453,22 +589,25 @@ function drawKojo(state: GameState, p: Palette, ctx: CanvasRenderingContext2D) {
     }
   }
 
-  // legs: two pairs that alternate, hanging from the body bottom edge down to
-  // the ground. The extended pair plants at the ground line, the tucked pair
-  // lifts, and both compress with the body under the squish.
+  // legs: two pairs that alternate under the body. Lengths step in whole cells
+  // rather than easing, so the run cycle stays on the pixel grid and reads as
+  // a two-frame sprite animation.
   const backLift = Math.abs(Math.sin(runPhase));
   const frontLift = Math.abs(Math.sin(runPhase + Math.PI));
-  const bodyBottom = 7 * CELL - SPRITE_ROWS * CELL + CELL; // y of body bottom edge
-  // back pair at cols 3-4, front pair at cols 6-7
+  const bodyBottom = 9 * CELL - SPRITE_ROWS * CELL; // y of the body's bottom edge
+  // haunches at cols 3-4, front legs at cols 7-8
   for (const [c, lift] of [
     [3, backLift],
     [4, backLift],
-    [6, frontLift],
     [7, frontLift],
+    [8, frontLift],
   ] as [number, number][]) {
-    const h = Math.max(4, Math.round(CELL * (1 + lift)));
-    ctx.fillStyle = p.ink;
+    const h = CELL * (lift > 0.5 ? 2 : 1);
+    ctx.fillStyle = p.green;
     ctx.fillRect(c * CELL, bodyBottom, CELL, h);
+    // Dark paw cell at the bottom of each leg.
+    ctx.fillStyle = p.ink;
+    ctx.fillRect(c * CELL, bodyBottom + h - CELL, CELL, CELL);
   }
 
   ctx.restore();
@@ -480,29 +619,36 @@ function drawHud(state: GameState, p: Palette, ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = p.ink;
   const score = String(Math.floor(state.score)).padStart(5, "0");
   const high = String(Math.floor(state.high)).padStart(5, "0");
-  ctx.fillText(`SCORE ${score}   HI ${high}`, WORLD_W - 318, 16);
+  ctx.fillText(`SCORE ${score}   HI ${high}`, WORLD_W - 320, 20);
 
   ctx.globalAlpha = 0.4;
   ctx.font = '500 15px "JetBrains Mono", ui-monospace, Consolas, monospace';
-  ctx.fillText("kojo chases the yarn", 18, 18);
+  ctx.fillText("kojo chases the yarn", 20, 20);
   ctx.globalAlpha = 1;
 
   if (state.over) {
-    const bw = 520;
-    const bx = (WORLD_W - bw) / 2;
-    ctx.fillStyle = "rgba(255,255,255,0.94)";
-    ctx.strokeStyle = "rgba(113, 131, 85, 0.3)";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.roundRect(bx, WORLD_H / 2 - 48, bw, 96, 12);
-    ctx.fill();
-    ctx.stroke();
+    // Stepped panel: a filled block with a hard cell-wide frame, no radius and
+    // no shadow, so the game-over card belongs to the same pixel world.
+    const bw = CELL * 96;
+    const bh = CELL * 18;
+    const bx = snap((WORLD_W - bw) / 2);
+    const by = snap(WORLD_H / 2 - bh / 2 - 24);
+    ctx.fillStyle = p.ink;
+    ctx.fillRect(bx - CELL, by - CELL, bw + CELL * 2, bh + CELL * 2);
+    ctx.fillStyle = p.white;
+    ctx.fillRect(bx, by, bw, bh);
+    // Knock the four corner cells back out so the block has clipped corners.
+    ctx.clearRect(bx - CELL, by - CELL, CELL, CELL);
+    ctx.clearRect(bx + bw, by - CELL, CELL, CELL);
+    ctx.clearRect(bx - CELL, by + bh, CELL, CELL);
+    ctx.clearRect(bx + bw, by + bh, CELL, CELL);
+
     ctx.textAlign = "center";
     ctx.fillStyle = p.ink;
-    ctx.font = '700 32px "Lora", Georgia, serif';
-    ctx.fillText("Oh no, Kojo tripped!", WORLD_W / 2, WORLD_H / 2 - 32);
-    ctx.font = '500 16px "Inter", sans-serif';
-    ctx.fillText("Tap, click, or press Space to try again", WORLD_W / 2, WORLD_H / 2 + 12);
+    ctx.font = '700 24px "JetBrains Mono", ui-monospace, Consolas, monospace';
+    ctx.fillText("KOJO LOST THE YARN", WORLD_W / 2, by + CELL * 4);
+    ctx.font = '500 14px "JetBrains Mono", ui-monospace, Consolas, monospace';
+    ctx.fillText("PRESS SPACE TO CHASE AGAIN", WORLD_W / 2, by + CELL * 11);
     ctx.textAlign = "left";
   }
 }
