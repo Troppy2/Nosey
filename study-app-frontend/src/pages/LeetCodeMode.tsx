@@ -1,6 +1,7 @@
 import Editor, { type Monaco } from "@monaco-editor/react";
 import {
   AlertCircle,
+  ArrowLeft,
   ArrowRight,
   Binary,
   BookOpen,
@@ -1206,6 +1207,12 @@ function LeftRail({
   return (
     <aside className="lc-rail" data-collapsed={collapsed} aria-label="KojoCode sections">
       <div className="lc-rail-header">
+        {/* KojoCode carries no dock (it is an immersive route), and the rail's
+            own "Back to dashboard" only switches views inside the mode, so this
+            is the way out. Mobile shell only; desktop has the sidebar. */}
+        <Link className="lc-rail-back-btn" to="/dashboard" aria-label="Back to dashboard" title="Back to dashboard">
+          <ArrowLeft size={20} />
+        </Link>
         <div className="lc-rail-brand">
           <span className="lc-rail-brand-name">KojoCode</span>
           <span className="lc-rail-brand-badge">Beta</span>

@@ -2,12 +2,16 @@ import { Edit3, FolderOpen, Grid3X3, List, Plus, Trash2 } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
+import { FormError } from "../components/FormError";
 import { Card } from "../components/Card";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
 import { TextInput } from "../components/Field";
 import { SkeletonFolderGrid } from "../components/Skeletons";
+import { PullToRefreshIndicator } from "../components/PullToRefreshIndicator";
 import { createFolder, deleteFolder, fetchFolders, scopeKey, updateFolder } from "../lib/api";
+import { toast } from "../lib/toast";
+import { usePullToRefresh } from "../lib/usePullToRefresh";
 import type { Folder } from "../lib/types";
 
 export default function Folders() {
@@ -26,11 +30,16 @@ export default function Folders() {
   const [subject, setSubject] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  async function refreshFolders() {
+    const data = await fetchFolders();
+    setFolders(data);
+  }
+
   useEffect(() => {
-    fetchFolders()
-      .then(setFolders)
-      .finally(() => setIsLoading(false));
+    refreshFolders().finally(() => setIsLoading(false));
   }, []);
+
+  const { pullPx, isRefreshing } = usePullToRefresh(refreshFolders);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -42,6 +51,7 @@ export default function Folders() {
       setSubject("");
       setIsModalOpen(false);
       setError(null);
+      toast.success("Folder created", folder.name);
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Unable to create that folder.");
     }
@@ -71,6 +81,7 @@ export default function Folders() {
     })
       .then((updated) => {
         setFolders((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+        toast.success("Folder renamed");
       })
       .catch((err) => {
         setFolders(prev);
@@ -84,14 +95,17 @@ export default function Folders() {
     const prev = folders;
     setFolders((current) => current.filter((item) => item.id !== folder.id));
     setFolderAction(null);
-    deleteFolder(folder.id).catch((err) => {
-      setFolders(prev);
-      setError(err instanceof Error ? err.message : "Unable to delete that folder.");
-    });
+    deleteFolder(folder.id)
+      .then(() => toast.success("Folder deleted"))
+      .catch((err) => {
+        setFolders(prev);
+        setError(err instanceof Error ? err.message : "Unable to delete that folder.");
+      });
   }
 
   return (
     <div className="page">
+      <PullToRefreshIndicator pullPx={pullPx} isRefreshing={isRefreshing} />
       <header className="page-header">
         <div>
           <span className="eyebrow">Library</span>
@@ -113,7 +127,7 @@ export default function Folders() {
         </div>
       </header>
 
-      {error ? <div className="form-error">{error}</div> : null}
+      <FormError message={error} />
 
       {/* Without this the empty state flashes on every visit before the fetch
           lands, telling the user they have no folders when they do. */}

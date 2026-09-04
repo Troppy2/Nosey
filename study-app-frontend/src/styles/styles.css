@@ -23967,3 +23967,15 @@ button.lc-official-link:disabled:hover {
     flex-direction: column;
   }
 }
+
+/* Kojo chat's mobile-only back control. Hidden by default; the mobile shell
+   stylesheet turns it on (see styles/components/mobile-shell.css). */
+.chat-mode-back-btn {
+  display: none;
+}
+
+/* KojoCode's mobile-only back control, mirroring .chat-mode-back-btn. Hidden
+   by default; the mobile shell stylesheet turns it on. */
+.lc-rail-back-btn {
+  display: none;
+}

@@ -2,12 +2,14 @@ import { ArrowLeft, Atom, Calculator, Code2, FileText, Settings2, Upload } from 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "../components/Button";
+import { FormError } from "../components/FormError";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { SelectInput, TextInput } from "../components/Field";
 import { InlineLoading, LoadingNotice } from "../components/Loaders";
 import { createTest, fetchFolderFiles, fetchFolders, fetchProviderStatus, scopeKey } from "../lib/api";
 import { useSettings } from "../lib/useSettings";
+import { toast } from "../lib/toast";
 import type { Folder, ProviderStatus, TestCreationParams } from "../lib/types";
 
 const MAX_UPLOAD_FILE_SIZE_MB = 100;
@@ -189,12 +191,15 @@ export default function CreateTest() {
       // test for taking as soon as the first questions are ready. Only a test that
       // is already fully ready (rare fast path) opens straight away.
       if (result.generation_status === "ready") {
+        toast.success("Practice test ready");
         if (advancedMode && reviewBeforeTaking) {
           navigate(`/test/${result.test_id}/edit`);
         } else {
           navigate(`/test/${result.test_id}`);
         }
       } else {
+        // Still generating: FolderDetail's poll raises the completion toast once
+        // it flips to ready or failed.
         navigate(`/folders/${folderId}`);
       }
     } catch (submitError) {
@@ -287,7 +292,7 @@ export default function CreateTest() {
         </button>
       </header>
 
-      {error ? <div className="form-error">{error}</div> : null}
+      <FormError message={error} />
 
       {folders.length === 0 ? (
         <EmptyState

@@ -2,6 +2,7 @@ import { AlertCircle, ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Folder
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "../components/Button";
+import { FormError } from "../components/FormError";
 import { Card } from "../components/Card";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
@@ -308,7 +309,7 @@ export default function Flashcards() {
         </div>
       </header>
 
-      {actionError ? <div className="form-error flash-error">{actionError}</div> : null}
+      <FormError message={actionError} className="flash-error" />
 
       <main className="flash-wrap">
         <div className="flash-meta">

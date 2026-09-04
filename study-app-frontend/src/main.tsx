@@ -6,6 +6,7 @@ import "driver.js/dist/driver.css";
 import "./styles/base.css";
 import "./styles/layout.css";
 import "./styles/styles.css";
+import "./styles/components/mobile-shell.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

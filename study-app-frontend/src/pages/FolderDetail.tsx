@@ -1,6 +1,7 @@
 import { Archive, BookOpen, Brain, ChevronDown, ChevronUp, Edit3, Files, FolderOpen, History, Info, Loader2, Plus, RotateCcw, ScrollText, Settings, Trash2, X } from "lucide-react";
 import KojoMascot from "../components/KojoMascot";
-import { useEffect, useState } from "react";
+import { FormError } from "../components/FormError";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -10,6 +11,7 @@ import { FileManager } from "../components/FileManager";
 import { Skeleton, SkeletonTestRows } from "../components/Skeletons";
 import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, regenerateTest, reindexFolderFiles, scopeKey, updateFolder, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
+import { toast } from "../lib/toast";
 import type { AttemptSummary, Flashcard, Folder, TestCreationParams, TestSummary } from "../lib/types";
 
 const PERSONA_DESCRIPTIONS: Record<string, string> = {
@@ -71,6 +73,9 @@ export default function FolderDetail() {
     let cancelled = false;
     let done = false;
     let inFlight = false;
+    // Tracks tests seen mid-generation so a completion can be told apart from
+    // a test that was simply already "ready" on the first load.
+    const seenGenerating = new Set<number>();
     setTestsLoading(true);
 
     const load = () => {
@@ -79,6 +84,18 @@ export default function FolderDetail() {
       fetchTests(id)
         .then((data) => {
           if (cancelled || done) return;
+          for (const test of data) {
+            if (test.generation_status === "generating") {
+              seenGenerating.add(test.id);
+            } else if (seenGenerating.has(test.id)) {
+              seenGenerating.delete(test.id);
+              if (test.generation_status === "ready") {
+                toast.success("Practice test ready", test.title);
+              } else if (test.generation_status === "failed") {
+                toast.error("Practice test generation failed", test.title);
+              }
+            }
+          }
           setTests(data);
           setTestsLoading(false);
           if (!data.some((t) => t.generation_status === "generating")) {
@@ -186,6 +203,7 @@ export default function FolderDetail() {
             item.id === test.id ? { ...item, title: updated.title, description: updated.description ?? item.description } : item,
           ),
         );
+        toast.success("Test renamed");
       })
       .catch((err) => {
         setTests(prev);
@@ -199,10 +217,12 @@ export default function FolderDetail() {
     const prev = tests;
     setTests((current) => current.filter((item) => item.id !== test.id));
     setDeletingTest(null);
-    deleteTest(test.id).catch((err) => {
-      setTests(prev);
-      setError(err instanceof Error ? err.message : "Unable to delete that test.");
-    });
+    deleteTest(test.id)
+      .then(() => toast.success("Test deleted"))
+      .catch((err) => {
+        setTests(prev);
+        setError(err instanceof Error ? err.message : "Unable to delete that test.");
+      });
   }
 
   async function updateKojoSetting(patch: Partial<Pick<Folder, "kojo_sync_default" | "kojo_allow_artifacts" | "kojo_auto_index" | "kojo_persona" | "avoid_repeat_questions">>) {
@@ -461,7 +481,7 @@ export default function FolderDetail() {
         </div>
       ) : null}
 
-      {error ? <div className="form-error">{error}</div> : null}
+      <FormError message={error} />
 
       <section>
         <div className="section-title">
