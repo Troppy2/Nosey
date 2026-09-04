@@ -2,12 +2,16 @@ import { BookOpen, Brain, Edit3, FolderOpen, Plus, Trash2, TrendingUp, Undo2, X,
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
+import { FormError } from "../components/FormError";
 import { Card } from "../components/Card";
 import { ConfirmModal, RenameModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
 import { SkeletonFolderMiniGrid, SkeletonStatGrid, SkeletonTestRows, SkeletonWeakStack } from "../components/Skeletons";
+import { PullToRefreshIndicator } from "../components/PullToRefreshIndicator";
 import { deleteTest, fetchFlashcards, fetchFolders, fetchTests, getResumableTests, getStoredUser, scopeKey, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
+import { toast } from "../lib/toast";
+import { usePullToRefresh } from "../lib/usePullToRefresh";
 import type { Flashcard, Folder, ResumableTestInfo, TestSummary } from "../lib/types";
 import { FlashcardsIcon } from "../components/FlashcardsIcon";
 
@@ -111,6 +115,32 @@ export default function Dashboard() {
   const [statsResetVersion, setStatsResetVersion] = useState(0);
   const displayTitleRef = useRef(displayTitle);
 
+  // Shared by the initial load effect and pull-to-refresh, so a manual
+  // refresh reuses the exact same fetch + cache-write path.
+  async function refreshDashboardData() {
+    const [folderData, testData, flashcardData, resumableData] = await Promise.all([
+      fetchFolders(),
+      fetchTests(),
+      fetchFlashcards(),
+      getResumableTests(),
+    ]);
+    setFolders(folderData);
+    setTests(testData);
+    setFlashcards(flashcardData);
+    setResumableTests(resumableData);
+    setError(null);
+    try {
+      sessionStorage.setItem(
+        scopeKey(DASHBOARD_CACHE_KEY),
+        JSON.stringify({ folders: folderData, tests: testData, flashcards: flashcardData, resumableTests: resumableData }),
+      );
+    } catch {
+      /* ignore quota errors */
+    }
+  }
+
+  const { pullPx, isRefreshing } = usePullToRefresh(refreshDashboardData);
+
   useEffect(() => {
     displayTitleRef.current = displayTitle;
   }, [displayTitle]);
@@ -136,28 +166,7 @@ export default function Dashboard() {
       /* ignore malformed cache */
     }
 
-    Promise.all([fetchFolders(), fetchTests(), fetchFlashcards(), getResumableTests()])
-      .then(([folderData, testData, flashcardData, resumableData]) => {
-        if (!active) return;
-        setFolders(folderData);
-        setTests(testData);
-        setFlashcards(flashcardData);
-        setResumableTests(resumableData);
-        setError(null);
-        try {
-          sessionStorage.setItem(
-            scopeKey(DASHBOARD_CACHE_KEY),
-            JSON.stringify({
-              folders: folderData,
-              tests: testData,
-              flashcards: flashcardData,
-              resumableTests: resumableData,
-            }),
-          );
-        } catch {
-          /* ignore quota errors */
-        }
-      })
+    refreshDashboardData()
       .catch((loadError) => {
         // Keep showing cached data if the background refresh fails.
         if (active && !hadCache) {
@@ -329,6 +338,7 @@ export default function Dashboard() {
         ),
       );
       setError(null);
+      toast.success("Test renamed");
     } catch (renameError) {
       setError(renameError instanceof Error ? renameError.message : "Unable to rename that test.");
     }
@@ -342,6 +352,7 @@ export default function Dashboard() {
       await deleteTest(test.id);
       setTests((current) => current.filter((item) => item.id !== test.id));
       setError(null);
+      toast.success("Test deleted");
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Unable to delete that test.");
     }
@@ -368,6 +379,7 @@ export default function Dashboard() {
         />
       ) : null}
       <div className="page">
+        <PullToRefreshIndicator pullPx={pullPx} isRefreshing={isRefreshing} />
         <header className="page-header">
           <div>
             <span className="eyebrow">Dashboard</span>
@@ -379,7 +391,7 @@ export default function Dashboard() {
           </Link>
         </header>
 
-        {error ? <div className="form-error">{error}</div> : null}
+        <FormError message={error} />
 
         {isLoading ? (
           // Full trace of the loaded dashboard: stat grid, then the two-column

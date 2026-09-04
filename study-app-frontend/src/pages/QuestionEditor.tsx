@@ -2,6 +2,7 @@ import { ArrowLeft, Plus, Save, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
+import { FormError } from "../components/FormError";
 import { Card } from "../components/Card";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { SkeletonList } from "../components/Skeletons";
@@ -113,7 +114,7 @@ function MCQCard({
         </button>
       </div>
 
-      {error && <div className="form-error" style={{ margin: 0 }}>{error}</div>}
+      <FormError message={error} style={{ margin: 0 }} />
 
       <div className="field">
         <label className="field-label">Question</label>
@@ -236,7 +237,7 @@ function FRQCard({
         </button>
       </div>
 
-      {error && <div className="form-error" style={{ margin: 0 }}>{error}</div>}
+      <FormError message={error} style={{ margin: 0 }} />
 
       <div className="field">
         <label className="field-label">Question</label>
@@ -315,7 +316,7 @@ function AddQuestionPanel({
     <Card className="form-panel" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <span className="eyebrow">Add question</span>
 
-      {error && <div className="form-error" style={{ margin: 0 }}>{error}</div>}
+      <FormError message={error} style={{ margin: 0 }} />
 
       <div className="choice-grid">
         {(["MCQ", "FRQ"] as const).map((t) => (
@@ -431,7 +432,7 @@ export default function QuestionEditor() {
         <Button onClick={() => navigate(`/test/${id}`)}>Take Test</Button>
       </header>
 
-      {error && <div className="form-error">{error}</div>}
+      <FormError message={error} />
 
       {loading ? (
         <SkeletonList rows={4} label="Loading questions" />

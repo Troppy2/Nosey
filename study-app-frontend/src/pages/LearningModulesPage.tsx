@@ -19,6 +19,7 @@ import {
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
+import { FormError } from "../components/FormError";
 import { Card } from "../components/Card";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { InlineLoading, LoadingNotice } from "../components/Loaders";
@@ -36,6 +37,7 @@ import {
 } from "../lib/api";
 import { speechCapability } from "../components/episodeSpeech";
 import { useSettings } from "../lib/useSettings";
+import { toast } from "../lib/toast";
 import type { LearningTrack, TrackFormat } from "../lib/types";
 
 const POLL_MS = 2500;
@@ -76,6 +78,9 @@ export default function LearningModulesPage() {
   const [archiveBusy, setArchiveBusy] = useState(false);
   const [deleteArchivedId, setDeleteArchivedId] = useState<number | null>(null);
   const pollRef = useRef<number | null>(null);
+  // Tracks seen mid-generation, so a poll tick can tell a completion apart
+  // from a track that was simply already ready on the first load.
+  const seenGenerating = useRef<Set<number>>(new Set());
 
   // Direct upload on the setup screen: files are saved into the folder (same
   // pipeline as everywhere else), so they also benefit tests and flashcards.
@@ -97,6 +102,20 @@ export default function LearningModulesPage() {
     if (numericFolderId == null) return;
     try {
       const all = await fetchActiveTracks(numericFolderId);
+      for (const t of all) {
+        const format = t.format ?? "article";
+        const label = format === "podcast" ? "Podcast" : format === "lecture" ? "Slide deck" : "Learning module";
+        if (t.status === "generating") {
+          seenGenerating.current.add(t.id);
+        } else if (seenGenerating.current.has(t.id)) {
+          seenGenerating.current.delete(t.id);
+          if (t.status === "ready") {
+            toast.success(`${label} ready`);
+          } else if (t.status === "failed") {
+            toast.error(`${label} generation failed`);
+          }
+        }
+      }
       setTrack(all.find((t) => (t.format ?? "article") === "article") ?? null);
       setEpisodeTracks(all.filter((t) => (t.format ?? "article") !== "article"));
       setError(null);
@@ -676,7 +695,7 @@ export default function LearningModulesPage() {
             value={customInstructions}
             onChange={(e) => setCustomInstructions(e.target.value)}
           />
-          {error ? <div className="form-error">{error}</div> : null}
+          <FormError message={error} />
           {genPhase === "uploading" || genPhase === "extracting" ? (
             <LoadingNotice
               compact
@@ -776,7 +795,7 @@ export default function LearningModulesPage() {
         ) : null}
       </header>
 
-      {error ? <div className="form-error">{error}</div> : null}
+      <FormError message={error} />
 
       {track.status === "failed" ? (
         <Card className="lm-failed">

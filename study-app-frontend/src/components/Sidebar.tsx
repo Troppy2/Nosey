@@ -2,9 +2,11 @@ import { Apple, ChevronLeft, ChevronRight, Code2, FolderOpen, LayoutDashboard, M
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { useSettings } from "../lib/useSettings";
+import { useMobileShell } from "../lib/useMobileShell";
 import { getStoredUser, isGuestSession, scopeKey } from "../lib/api";
 import { OnboardingTour } from "./OnboardingTour";
 import { AgeGateModal } from "./AgeGateModal";
+import { MobileDock, isImmersiveRoute } from "./MobileDock";
 
 const ADMIN_EMAILS = ["jamesinah34@gmail.com", "jamesinah883@gmail.com"];
 
@@ -35,6 +37,7 @@ export function Sidebar() {
     ),
     ...(isAdmin && !guest ? [adminItem] : []),
   ];
+  const isMobileShell = useMobileShell();
   const [isNavHidden, setIsNavHidden] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -44,11 +47,10 @@ export function Sidebar() {
   const lastScrollY = useRef(0);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Close drawer on route change
+  // Close drawer on route change (desktop drawer only; mobile has no drawer)
   useEffect(() => {
     setIsDrawerOpen(false);
   }, [location.pathname]);
-
 
   useEffect(() => {
     localStorage.setItem(scopeKey(sidebarStorageKey), String(isSidebarCollapsed));
@@ -56,24 +58,26 @@ export function Sidebar() {
 
   // Close drawer on Escape key
   useEffect(() => {
+    if (isMobileShell) return;
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setIsDrawerOpen(false);
     };
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, []);
+  }, [isMobileShell]);
 
   // Lock body scroll while mobile drawer is open
   useEffect(() => {
+    if (isMobileShell) return;
     document.body.style.overflow = isDrawerOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
-  }, [isDrawerOpen]);
+  }, [isDrawerOpen, isMobileShell]);
 
   useEffect(() => {
+    if (isMobileShell) return;
     const handleScroll = () => {
-      // On desktop the sidebar is a sticky left column , never hide it.
-      // On mobile (<760px) the drawer handles visibility; skip scroll-hide there too.
-      if (window.innerWidth > 1100 || window.innerWidth <= 760) {
+      // On desktop the sidebar is a sticky left column, never hide it.
+      if (window.innerWidth > 1100) {
         setIsNavHidden(false);
         return;
       }
@@ -96,7 +100,20 @@ export function Sidebar() {
       window.removeEventListener("scroll", handleScroll);
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     };
-  }, []);
+  }, [isMobileShell]);
+
+  if (isMobileShell) {
+    return (
+      <div className="shell shell--mobile">
+        <main className="shell-main">
+          <AgeGateModal />
+          <OnboardingTour />
+          <Outlet />
+        </main>
+        {isImmersiveRoute(location.pathname) ? null : <MobileDock items={navItems} />}
+      </div>
+    );
+  }
 
   return (
     <div className="shell" data-sidebar-collapsed={isSidebarCollapsed}>

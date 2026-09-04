@@ -26,6 +26,7 @@ import {
   unarchiveFolder,
 } from "../lib/api";
 import { KOJO_CUSTOM_INSTRUCTION_MAX, useSettings } from "../lib/useSettings";
+import { toast } from "../lib/toast";
 import { useEffect, useRef, useState } from "react";
 import type { Folder, KojoClearedConversation, KojoMemory, SlashCommand } from "../lib/types";
 import SlashCommandManager from "../components/SlashCommandManager";
@@ -119,6 +120,7 @@ export default function Settings() {
     try {
       await unarchiveFolder(folderId);
       await loadArchivedFolders();
+      toast.success("Class restored");
     } catch (err) {
       setUnarchiveError(err instanceof Error ? err.message : "Unable to restore this class.");
     } finally {
@@ -232,6 +234,7 @@ export default function Settings() {
       localStorage.setItem(scopeKey(STATS_RESET_BASELINE_KEY), JSON.stringify(baseline));
       window.dispatchEvent(new Event("nosey-stats-reset"));
       setStatsResetNotice("Stats reset. Dashboard totals now start from zero.");
+      toast.success("Stats reset");
     } catch (err) {
       setStatsResetNotice(err instanceof Error ? err.message : "Unable to reset stats right now.");
     } finally {
@@ -255,6 +258,8 @@ export default function Settings() {
       const result = await restoreKojoConversation(folderId);
       if (!result.restored) {
         setRestoreError("This chat can no longer be restored. The 5-hour window may have expired.");
+      } else {
+        toast.success("Chat restored");
       }
       await loadClearedConversations();
     } catch (err) {

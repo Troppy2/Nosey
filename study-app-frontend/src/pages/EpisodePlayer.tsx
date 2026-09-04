@@ -12,6 +12,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
+import { FormError } from "../components/FormError";
 import { Card } from "../components/Card";
 import { useConfetti } from "../components/Confetti";
 import { SkeletonText } from "../components/Skeletons";
@@ -472,7 +473,7 @@ function EpisodePlayerInner({
                     <Button onClick={() => speech.startSpeechFrom(speech.chunkPos)}>Continue</Button>
                   </div>
                 ) : null}
-                {checkpointError ? <div className="form-error">{checkpointError}</div> : null}
+                <FormError message={checkpointError} />
               </>
             );
           })()}
