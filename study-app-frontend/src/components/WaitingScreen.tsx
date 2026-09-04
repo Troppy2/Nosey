@@ -138,7 +138,7 @@ export default function WaitingScreen() {
           <KojoRunnerGame />
         </div>
         <p className="waiting-game-hint">
-          Tap, click, or press <kbd>Space</kbd> to make Kojo jump over obstacles.
+          Tap, click, or press <kbd>Space</kbd> to hop Kojo over the boulders. Hold it for a longer jump.
         </p>
 
         {recovered ? (
