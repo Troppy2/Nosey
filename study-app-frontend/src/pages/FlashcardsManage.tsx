@@ -2,6 +2,7 @@ import { ArrowLeft, Edit3, Plus, Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
+import { FormError } from "../components/FormError";
 import { Card } from "../components/Card";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { TextInput } from "../components/Field";
@@ -20,6 +21,7 @@ import {
   updateFlashcard,
 } from "../lib/api";
 import { useSettings } from "../lib/useSettings";
+import { toast } from "../lib/toast";
 import type { Flashcard, ProviderStatus } from "../lib/types";
 
 const MANAGE_PAGE_SIZE = 50;
@@ -186,6 +188,7 @@ export default function FlashcardsManage() {
     try {
       const generated = await generateFlashcardsFromFile(id, files, 10, effectiveProvider, localStorage.getItem(scopeKey("nosey_question_fallback")) === "true");
       setCards((prev) => [...generated, ...prev]);
+      toast.success(`${generated.length} flashcard${generated.length === 1 ? "" : "s"} generated`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate flashcards.");
     } finally {
@@ -213,6 +216,7 @@ export default function FlashcardsManage() {
           seen.add(key);
           return true;
         });
+        toast.success(`${fresh.length} flashcard${fresh.length === 1 ? "" : "s"} generated`);
         return [...fresh, ...prev];
       });
     } catch (err) {
@@ -248,7 +252,7 @@ export default function FlashcardsManage() {
         </div>
       </header>
 
-      {error ? <div className="form-error">{error}</div> : null}
+      <FormError message={error} />
 
       <Card tone="soft" className="flashcard-gen-panel">
         <div className="flashcard-gen-head">

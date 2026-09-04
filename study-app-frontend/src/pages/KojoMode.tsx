@@ -1790,6 +1790,12 @@ export default function KojoMode() {
         {/* Header */}
         <div className="chat-mode-header">
           <div className="chat-mode-header-left">
+            {/* Chat has no dock (its composer owns the bottom of the screen),
+                so the way back lives here in its own header rather than as a
+                floating overlay, which would land on the menu button below. */}
+            <Link className="chat-mode-back-btn" to="/dashboard" aria-label="Back to dashboard" title="Back to dashboard">
+              <ArrowLeft size={20} />
+            </Link>
             <button
               type="button"
               className="chat-mode-menu-btn"

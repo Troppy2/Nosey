@@ -13,6 +13,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
+import { FormError } from "../components/FormError";
 import { Card } from "../components/Card";
 import { useConfetti } from "../components/Confetti";
 import { InlineLoading, LoadingNotice } from "../components/Loaders";
@@ -778,7 +779,7 @@ export default function LearningModuleLesson() {
             onChange={(e) => setVideoDraft(e.target.value)}
             disabled={savingVideo}
           />
-          {videoError ? <div className="form-error">{videoError}</div> : null}
+          <FormError message={videoError} />
           <div className="button-row">
             <Button
               onClick={() => void handleSaveVideo(videoDraft.trim() || null)}
@@ -814,7 +815,7 @@ export default function LearningModuleLesson() {
             onChange={(e) => setDraft(e.target.value)}
             disabled={savingEdit}
           />
-          {editError ? <div className="form-error">{editError}</div> : null}
+          <FormError message={editError} />
           {savingEdit ? (
             <LoadingNotice
               compact
@@ -951,7 +952,7 @@ export default function LearningModuleLesson() {
           );
         })}
 
-        {error ? <div className="form-error">{error}</div> : null}
+        <FormError message={error} />
 
         {result == null ? (
           <div className="button-row">

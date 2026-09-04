@@ -1,0 +1,10 @@
+/* Sits inline above a page's content, growing as the drag distance increases
+   and settling to a fixed height while the refresh runs. */
+
+.pull-refresh {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition: height var(--transition-fast);
+}

@@ -1,0 +1,105 @@
+/* Floating bottom dock for the mobile shell. See useMobileShell.ts for why the
+   query is not width-only.
+
+   Sizing rule: the dock must show every nav item at once at any phone width.
+   Seven items (eight for an admin) is past what a 375px screen can give a
+   labelled active item, so items are icon-only and share the rail evenly via
+   `flex: 1 1 0`. The active route is marked with a filled circle instead of an
+   expanding labelled pill: a nav bar with items scrolled off the edge reads as
+   a layout failure, not as an affordance. */
+
+.mobile-dock {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 120;
+  display: flex;
+  justify-content: center;
+  padding: 8px 12px calc(10px + env(safe-area-inset-bottom));
+  pointer-events: none;
+  /* Fade the page out behind the dock rather than cutting it off. */
+  background: linear-gradient(to top, var(--green-lightest) 46%, rgba(233, 245, 219, 0));
+  transition: transform var(--transition-normal), opacity var(--transition-normal);
+}
+
+.mobile-dock[data-hidden="true"] {
+  transform: translateY(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mobile-dock[data-hidden="true"] .dock-rail {
+  pointer-events: none;
+}
+
+.dock-rail {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  max-width: 420px;
+  padding: 5px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--green-light-mid);
+  border-radius: 999px;
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(16px);
+  /* Safety net only: the flex sizing below is meant to make this unreachable. */
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  pointer-events: auto;
+}
+
+.dock-rail::-webkit-scrollbar {
+  display: none;
+}
+
+/* Items share the rail evenly, so the row stays complete and symmetrical from
+   a 360px phone up to the rail's max width, with any item count. */
+.dock-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 56px;
+  height: 42px;
+  padding: 0;
+  color: #536342;
+  border-radius: 999px;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.dock-link:active {
+  background: rgba(113, 131, 85, 0.16);
+}
+
+.dock-icon {
+  flex: 0 0 auto;
+}
+
+/* Icon-only rail: the label stays in the accessibility tree (and the tooltip)
+   so every item keeps its name, but never takes horizontal space. */
+.dock-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.dock-link.active {
+  color: var(--green-lightest);
+  background: var(--green-dark);
+  box-shadow: 0 2px 8px rgba(38, 48, 31, 0.22);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dock-link,
+  .mobile-dock {
+    transition: none;
+  }
+}
