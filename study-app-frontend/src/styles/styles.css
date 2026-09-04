@@ -22949,6 +22949,10 @@ button.lc-official-link:disabled:hover {
   touch-action: manipulation;
   -webkit-user-select: none;
   user-select: none;
+  /* The runner is drawn as pixel art on a 5px cell grid. Nearest-neighbour
+     upscaling keeps the cells square instead of blurring them. */
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
 }
 
 .waiting-game-hint {
