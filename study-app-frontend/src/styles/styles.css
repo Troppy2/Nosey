@@ -23599,6 +23599,375 @@ button.lc-official-link:disabled:hover {
   }
 }
 
+/* ── STEM Scratch Pad (handwritten scratch work, beta) ---------------------- */
+
+.scratchpad-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 10px;
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+.scratchpad-open-btn:hover {
+  border-color: var(--green-dark);
+}
+.scratchpad-open-btn:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.scratchpad-backdrop {
+  z-index: 1100;
+  /* No backdrop blur under this particular modal. The canvas above it
+     repaints continuously while a stroke is being drawn, and a full-screen
+     blur has to recomposite on every one of those frames, which on a tablet
+     is enough on its own to make ink trail behind the stylus. */
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.scratchpad-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: min(720px, 92vw);
+  height: min(560px, 85vh);
+  padding: 1rem 1.15rem 1.25rem;
+  position: relative;
+  resize: none;
+}
+.scratchpad-modal--comfortable {
+  width: min(720px, 92vw);
+  height: min(560px, 85vh);
+}
+.scratchpad-modal--large {
+  width: min(1040px, 96vw);
+  height: min(760px, 92vh);
+}
+.scratchpad-modal--full {
+  width: 96vw;
+  height: 94vh;
+}
+
+.scratchpad-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.scratchpad-header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.scratchpad-header-main .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.scratchpad-question-text {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+.scratchpad-question-text .kojo-md-p {
+  margin: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.scratchpad-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+}
+.scratchpad-size-buttons {
+  display: inline-flex;
+  gap: 0.2rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 8px;
+  padding: 0.15rem;
+}
+.scratchpad-size-buttons button {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.scratchpad-size-buttons button.is-active {
+  background: var(--green-dark);
+  color: var(--white);
+}
+.scratchpad-size-buttons button:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 1px;
+}
+.scratchpad-minimize {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--ink);
+  cursor: pointer;
+}
+.scratchpad-minimize:hover {
+  border-color: var(--green-dark);
+}
+.scratchpad-minimize:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.scratchpad-paper-picker {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+.scratchpad-paper-picker button {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.scratchpad-paper-picker button.is-active {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-weight: 600;
+}
+.scratchpad-paper-picker button:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.scratchpad-canvas-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+  min-height: 0;
+}
+.scratchpad-canvas-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.scratchpad-tool-btn {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--ink);
+  cursor: pointer;
+}
+.scratchpad-tool-btn:hover:not(:disabled) {
+  border-color: var(--green-dark);
+}
+.scratchpad-tool-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.scratchpad-tool-btn.is-active {
+  background: var(--green-lightest);
+  border-color: var(--green-dark);
+  color: var(--green-dark);
+}
+.scratchpad-tool-btn:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.scratchpad-finger-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+  height: 2rem;
+  padding: 0 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--green-light-mid);
+  background: var(--white);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.scratchpad-finger-toggle:hover {
+  border-color: var(--green-dark);
+  color: var(--ink);
+}
+.scratchpad-finger-toggle:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.scratchpad-finger-toggle.is-active {
+  background: var(--green-lightest);
+  border-color: var(--green-dark);
+  color: var(--green-dark);
+}
+
+.scratchpad-canvas-container {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 10px;
+  background: var(--white);
+  /* The page can stand taller than the modal, so it scrolls vertically. */
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+/* The page holds the two stacked canvases. Its height is set in JS to the
+   logical page length, so it can stand taller than the container and scroll. */
+.scratchpad-page {
+  position: relative;
+  width: 100%;
+}
+.scratchpad-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  /* Sized in JS: the width tracks the container, the height follows the
+     logical page length, so neither is set here. */
+}
+/* Committed strokes. Never receives input; the live layer above it does. */
+.scratchpad-canvas--static {
+  pointer-events: none;
+}
+/* Always "none", in both finger modes. Scrolling by finger is implemented in
+   the pointer handlers instead of being delegated to the browser, because
+   native touch panning brings the browser's multi-touch gesture arbitration
+   with it: as soon as a second contact (a resting palm) appears, the browser
+   may cancel the other live pointer to claim the gesture for scrolling, which
+   killed the stylus stroke in progress and threw it away. Handling it here
+   keeps the pen and the palm as two independent pointers. */
+.scratchpad-canvas--live {
+  touch-action: none;
+  cursor: crosshair;
+}
+/* Finger scrolls rather than draws, so the pointer reads as a grab surface. */
+.scratchpad-canvas--live.allows-scroll {
+  cursor: grab;
+}
+.scratchpad-canvas--live.is-erasing {
+  cursor: cell;
+}
+/* Paper styles are CSS decoration behind a transparent canvas only. The
+   exported PNG is strokes composited on a fresh white background (see
+   exportScratchPadPng), so these ruled lines never reach the OCR engine.
+   background-attachment: local keeps the ruling pinned to the page as it
+   scrolls, rather than to the viewport, so lines stay under the ink. */
+.scratchpad-paper-lined {
+  background-attachment: local;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 31px,
+    var(--green-lightest) 32px
+  );
+}
+.scratchpad-paper-graph {
+  background-attachment: local;
+  background-image:
+    repeating-linear-gradient(to right, var(--green-lightest) 0 1px, transparent 1px 24px),
+    repeating-linear-gradient(to bottom, var(--green-lightest) 0 1px, transparent 1px 24px);
+}
+.scratchpad-extend-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  align-self: center;
+  padding: 0.3rem 0.85rem;
+  border: 1px dashed var(--green-light-mid);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.scratchpad-extend-btn:hover:not(:disabled) {
+  border-color: var(--green-dark);
+  color: var(--green-dark);
+}
+.scratchpad-extend-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.scratchpad-extend-btn:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.scratchpad-resize-handle {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 1.1rem;
+  height: 1.1rem;
+  cursor: nwse-resize;
+  touch-action: none;
+  border-radius: 3px;
+}
+.scratchpad-resize-handle::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-right: 2px solid var(--green-light-mid);
+  border-bottom: 2px solid var(--green-light-mid);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scratchpad-open-btn,
+  .scratchpad-tool-btn {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .scratchpad-modal,
+  .scratchpad-modal--comfortable,
+  .scratchpad-modal--large {
+    width: 96vw;
+    height: 88vh;
+  }
+  .scratchpad-header {
+    flex-direction: column;
+  }
+}
+
 /* Kojo chat's mobile-only back control. Hidden by default; the mobile shell
    stylesheet turns it on (see styles/components/mobile-shell.css). */
 .chat-mode-back-btn {
