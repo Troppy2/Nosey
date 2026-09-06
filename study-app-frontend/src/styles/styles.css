@@ -16322,10 +16322,32 @@ a.lm-module-row:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1;
   min-width: 0;
 }
 
+/* The header is one shrinking row: the back/menu/collapse buttons and the folder
+   pill keep their size, and the chat name is the only part that gives. A flex item
+   defaults to `min-width: auto`, so without the min-width:0 below, .chat-mode-header-left
+   refuses to shrink past its text and the title runs off the edge instead of
+   ellipsing. Applies at every width, so phone and desktop behave the same. */
+.chat-mode-header-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-mode-header-left > .chat-mode-back-btn,
+.chat-mode-header-left > .chat-mode-menu-btn,
+.chat-mode-header-left > .chat-mode-collapse-btn {
+  flex-shrink: 0;
+}
+
 .chat-mode-title-wrap .chat-mode-title {
+  /* Must be a block box: text-overflow is ignored on a flex container, and the
+     base .chat-mode-title rule sets display:flex, which silently killed the
+     ellipsis these three lines were already asking for. */
+  display: block;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
