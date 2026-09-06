@@ -606,9 +606,10 @@ export type LCCustomProblem = {
   starter_code: string;
   test_cases: LCCustomTestCase[];
   is_archived?: boolean;
-  // "daily_kojo" marks a generated Daily KojoCode problem (source-filtered out of the
-  // Custom Questions list). Absent/"user" for an ordinary user-authored problem.
-  source?: "user" | "daily_kojo";
+  // Marks a generated problem so it stays out of the user-authored Custom Questions
+  // list: "daily_kojo" for a Daily KojoCode problem, "streak_rescue" for a Save My
+  // Streak one. Absent/"user" for an ordinary user-authored problem.
+  source?: "user" | "daily_kojo" | "streak_rescue";
   daily_date?: string | null;
 };
 
@@ -689,6 +690,9 @@ export type LCStreakChallenge = {
   expires_at: string | null;
   completed_at: string | null;
   created_at: string;
+  // The generated rescue problem, resolved server-side. Null only when the client had
+  // no seed to send and the rescue fell back to a catalog problem it can look up itself.
+  problem?: LCCustomProblem | null;
 };
 
 // ── Struggle events + weakness scorer (beta-only) ───────────────────────────

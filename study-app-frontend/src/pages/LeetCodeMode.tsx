@@ -601,6 +601,13 @@ function getCustomProblemsKey(): string {
   return `${CUSTOM_PROBLEMS_KEY_PREFIX}:${getUserStoragePrefix()}`;
 }
 
+// Kojo built this problem rather than the user writing it. Both generated sources live
+// in the custom-problem tables (they reuse its progress/workspace/run/grade plumbing)
+// but neither belongs in the user's own Custom Questions list.
+function isGeneratedProblem(problem: LCCustomProblem): boolean {
+  return problem.source === "daily_kojo" || problem.source === "streak_rescue";
+}
+
 function loadCustomProblems(): LCCustomProblem[] {
   const raw = loadJson<LCCustomProblem[]>(getCustomProblemsKey(), []);
   return Array.isArray(raw) ? raw.filter((item) => item && typeof item.slug === "string") : [];
@@ -888,19 +895,27 @@ function todayKey() {
   return new Date().toLocaleDateString("en-CA");
 }
 
-function countStreak(dates: string[]) {
-  const dateSet = new Set(dates);
+// Length of the unbroken run of active days ending on `anchor`, walking backwards.
+// The single definition of "a streak", shared by the dashboard counter and the rescue
+// card, so a change to the date-key format can never make the two disagree.
+function runEndingOn(dateSet: Set<string>, anchor: Date) {
+  const cursor = new Date(anchor);
   let count = 0;
-  const cursor = new Date();
-  // If today isn't solved yet, count from yesterday , user has until midnight to maintain streak
-  if (!dateSet.has(cursor.toLocaleDateString("en-CA"))) {
-    cursor.setDate(cursor.getDate() - 1);
-  }
   while (dateSet.has(cursor.toLocaleDateString("en-CA"))) {
     count += 1;
     cursor.setDate(cursor.getDate() - 1);
   }
   return count;
+}
+
+function countStreak(dates: string[]) {
+  const dateSet = new Set(dates);
+  const anchor = new Date();
+  // If today isn't solved yet, count from yesterday , user has until midnight to maintain streak
+  if (!dateSet.has(anchor.toLocaleDateString("en-CA"))) {
+    anchor.setDate(anchor.getDate() - 1);
+  }
+  return runEndingOn(dateSet, anchor);
 }
 
 function streakExpiresIn(): string {
@@ -1004,6 +1019,23 @@ function pickStreakChallengeSlug(pool: Problem[], progress: Record<string, boole
 function pickRandomUnsolved(pool: Problem[], progress: Record<string, boolean>): Problem | null {
   const unsolved = pool.filter((problem) => !progress[problem.slug]);
   return unsolved.length > 0 ? randomFrom(unsolved) : null;
+}
+
+// Reads the shape of the break out of the activity log: how many days were earned
+// before the streak snapped, and how many have gone by since (today included, since it
+// is unsolved while the rescue card is showing). The rescue card draws these as a chain
+// of day cells, so both numbers have to be the user's real history, not a decoration.
+function describeStreakBreak(dates: string[]): { earned: number; missed: number } {
+  const dateSet = new Set(dates);
+  if (dateSet.size === 0) return { earned: 0, missed: 0 };
+
+  const lastDay = new Date(`${Array.from(dateSet).sort().pop()}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return {
+    earned: runEndingOn(dateSet, lastDay),
+    missed: Math.max(0, Math.round((today.getTime() - lastDay.getTime()) / 86400000)),
+  };
 }
 
 function fillStreakGap(currentDates: string[]): string[] {
@@ -1700,6 +1732,100 @@ function TopicMasteryCard({ progress }: { progress: Record<string, boolean> }) {
   );
 }
 
+// The streak rescue card. Instead of an alert box it draws the chain itself: the days
+// already earned, the gap where the streak snapped, and today as the slot still open.
+// That is the whole explanation of what the rescue does, so the copy underneath only has
+// to name the payoff and the action.
+const RESCUE_CHAIN_MAX_EARNED = 7;
+const RESCUE_CHAIN_MAX_GAP = 5;
+
+function StreakRescueCard({
+  activityDates,
+  challenge,
+  problem,
+  loading,
+  error,
+  onBuild,
+  onOpen,
+}: {
+  activityDates: string[];
+  challenge: LCStreakChallenge | null;
+  problem: Problem | null;
+  loading: boolean;
+  error: string | null;
+  onBuild: () => void;
+  onOpen: () => void;
+}) {
+  const { earned, missed } = describeStreakBreak(activityDates);
+  // Run the actual restore through the actual streak counter, so the number promised
+  // here is by construction the number the user gets after solving.
+  const restored = countStreak(fillStreakGap(activityDates));
+  const shownEarned = Math.min(earned, RESCUE_CHAIN_MAX_EARNED);
+  // The last missed day is today, drawn as the open slot, so the gap cells are one short.
+  const gap = Math.max(missed - 1, 0);
+  const shownGap = Math.min(gap, RESCUE_CHAIN_MAX_GAP);
+
+  return (
+    <section className="lc-rescue" aria-labelledby="lc-rescue-title">
+      <div className="lc-rescue-head">
+        <h2 className="lc-rescue-title" id="lc-rescue-title">Streak paused</h2>
+        <span className="lc-rescue-tag">Beta</span>
+      </div>
+
+      <div className="lc-rescue-chain" role="img" aria-label={`${earned} days earned, ${missed} missed including today`}>
+        {earned > shownEarned ? <span className="lc-rescue-more">+{earned - shownEarned}</span> : null}
+        {Array.from({ length: shownEarned }, (_, i) => (
+          <span key={`earned-${i}`} className="lc-rescue-cell lc-rescue-cell--earned" />
+        ))}
+        {Array.from({ length: shownGap }, (_, i) => (
+          <span key={`gap-${i}`} className="lc-rescue-cell lc-rescue-cell--gap" />
+        ))}
+        {gap > shownGap ? <span className="lc-rescue-more lc-rescue-more--gap">+{gap - shownGap}</span> : null}
+        <span className="lc-rescue-cell lc-rescue-cell--today" />
+      </div>
+      <p className="lc-rescue-legend">
+        {earned} {earned === 1 ? "day" : "days"} earned, {missed} missed
+      </p>
+
+      {problem && challenge ? (
+        <>
+          <div className="lc-rescue-problem">
+            <span className="lc-rescue-problem-title">{problem.title}</span>
+            <span className="lc-rescue-problem-meta">
+              <span className={`lc-difficulty lc-difficulty--${difficultyClass(problem.difficulty)}`}>
+                {problem.difficulty}
+              </span>
+              <span>{problem.categoryLabel}</span>
+            </span>
+          </div>
+          <p className="lc-rescue-copy">
+            {challenge.problem
+              ? "Built from your weakest area. Kojo and NeetCode are off for this one."
+              : "Kojo and NeetCode are off for this one."}
+          </p>
+          <button type="button" className="lc-rescue-action" onClick={onOpen}>
+            Start solving
+            <ArrowRight size={16} />
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="lc-rescue-copy">
+            Solve one problem built from your weakest area to close the gap and pick your streak
+            back up at <strong>{restored} days</strong>.
+          </p>
+          <button type="button" className="lc-rescue-action" onClick={onBuild} disabled={loading}>
+            {loading ? <Loader2 size={16} className="spin" /> : <Flame size={16} />}
+            {loading ? "Building your rescue problem..." : "Save my streak"}
+          </button>
+        </>
+      )}
+
+      {error ? <p className="lc-daily-error">{error}</p> : null}
+    </section>
+  );
+}
+
 type FocusRow = { id: string; label: string; score: string; fillPct: number; color: string };
 
 // The Focus areas card: names the topics that need the most work. When real struggle
@@ -2101,6 +2227,8 @@ export default function LeetCodeMode() {
   const notesSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notesDragOffset = useRef<{ x: number; y: number } | null>(null);
   const [streakChallenge, setStreakChallenge] = useState<LCStreakChallenge | null>(null);
+  const [streakRescueLoading, setStreakRescueLoading] = useState(false);
+  const [streakRescueError, setStreakRescueError] = useState<string | null>(null);
   const [dailyProblem, setDailyProblem] = useState<LCCustomProblem | null>(null);
   const [dailyLoading, setDailyLoading] = useState(false);
   const [dailyError, setDailyError] = useState<string | null>(null);
@@ -2215,15 +2343,16 @@ export default function LeetCodeMode() {
   // Full list (active + archived) backs deep-link lookups so an archived problem can
   // still be opened directly. The active/archived splits below back the list views.
   const allCustomProblemList = useMemo(() => customProblems.map(customToProblem), [customProblems]);
-  // Daily KojoCode problems are excluded from the user-authored Custom Questions list
-  // (they render in their own Daily KojoCode section instead), but stay reachable by
-  // direct slug via allCustomProblemList above so opening one from the dashboard works.
+  // Generated problems (the Daily KojoCode question, a Save My Streak rescue) are
+  // excluded from the user-authored Custom Questions list: they render in their own
+  // sections. They stay reachable by direct slug via allCustomProblemList above, so
+  // opening one from the dashboard still works.
   const activeCustomProblems = useMemo(
-    () => customProblems.filter((cp) => !cp.is_archived && cp.source !== "daily_kojo"),
+    () => customProblems.filter((cp) => !cp.is_archived && !isGeneratedProblem(cp)),
     [customProblems],
   );
   const archivedCustomProblems = useMemo(
-    () => customProblems.filter((cp) => cp.is_archived && cp.source !== "daily_kojo"),
+    () => customProblems.filter((cp) => cp.is_archived && !isGeneratedProblem(cp)),
     [customProblems],
   );
   const customProblemList = useMemo(() => activeCustomProblems.map(customToProblem), [activeCustomProblems]);
@@ -2291,11 +2420,19 @@ export default function LeetCodeMode() {
     ? customProblems.find((cp) => cp.slug === currentProblem.slug) ?? null
     : null;
   const isCustomProblem = Boolean(currentCustomProblem);
-  const isStreakChallengeProblem =
-    betaMode &&
-    streakChallenge !== null &&
-    streakChallenge.completed_at === null &&
-    currentProblem?.slug === streakChallenge.problem_slug;
+  // One rule for "this slug is the open rescue", shared by the workspace restrictions
+  // (Kojo and NeetCode off, warning banner) and by the streak bridge in recordSolveDates.
+  // Two spellings of it could disagree, restricting a problem without restoring the
+  // streak, or the reverse.
+  function isRescueSlug(slug: string | undefined): boolean {
+    return (
+      betaMode &&
+      streakChallenge !== null &&
+      streakChallenge.completed_at === null &&
+      slug === streakChallenge.problem_slug
+    );
+  }
+  const isStreakChallengeProblem = isRescueSlug(currentProblem?.slug);
   const currentProblemState = currentProblem ? problemStates[currentProblem.slug] : undefined;
   const currentProblemData = currentCustomProblem ? customToProblemData(currentCustomProblem) : currentProblemState?.data;
   const currentCustomCases = currentProblem ? customCases[currentProblem.slug] ?? [] : [];
@@ -2724,43 +2861,77 @@ export default function LeetCodeMode() {
     };
   }, [activityDates, progress, customProblemList]);
 
-  // Show the streak rescue challenge at the bottom of the roadmap when:
-  // - beta mode is on
-  // - the current streak is 0 (streak has ended)
-  // - the user had a streak before (so there is something to save)
-  // - a challenge exists and has not been completed yet
-  const showStreakChallenge =
-    betaMode &&
-    stats.currentStreak === 0 &&
-    stats.bestStreak > 0 &&
-    streakChallenge !== null &&
-    streakChallenge.completed_at === null;
+  // Show the rescue card at the bottom of the roadmap when beta mode is on, the streak
+  // has ended (0), and there was a streak to lose. Unlike the challenge row itself the
+  // card shows before one exists: it is what offers to build the rescue problem.
+  const canRescueStreak =
+    betaMode && !isGuestSession() && stats.currentStreak === 0 && stats.bestStreak > 0;
+  const activeStreakChallenge =
+    streakChallenge && streakChallenge.completed_at === null ? streakChallenge : null;
 
-  // The actual rescue problem chosen for this challenge (random per streak loss).
-  // Look it up across verified + all custom problems so the node can show its real
-  // title/difficulty and navigate to its real category.
-  const streakChallengeProblem = streakChallenge
-    ? [...UNIQUE_PROBLEMS, ...allCustomProblemList].find((p) => p.slug === streakChallenge.problem_slug) ?? null
+  // The rescue problem for the active challenge. Generated rescues arrive inline on the
+  // challenge (the server resolves them), so this only has to fall back to a catalog
+  // lookup for the pre-generation slugs and for older rows.
+  const streakChallengeProblem = activeStreakChallenge
+    ? (activeStreakChallenge.problem ? customToProblem(activeStreakChallenge.problem) : null) ??
+      [...UNIQUE_PROBLEMS, ...allCustomProblemList].find((p) => p.slug === activeStreakChallenge.problem_slug) ??
+      null
     : null;
 
-  async function ensureStreakChallengeExists() {
-    if (isGuestSession() || !betaMode) return;
-    if (streakChallenge && streakChallenge.completed_at === null) return;
-    // Pick a fresh random unsolved Medium/Hard from the verified + custom catalog.
-    // The pick is locked in on the server row, so it stays fixed until completed.
-    const slug = pickStreakChallengeSlug([...UNIQUE_PROBLEMS, ...customProblemList], progress);
-    const created = await createLCStreakChallenge(slug);
-    if (created) setStreakChallenge(created);
+  // Builds the rescue on demand. This is a real LLM call, so it is bound to the user
+  // pressing the button and never fired from an effect: the streak card used to
+  // auto-create a challenge on every load where the streak read 0.
+  async function handleBuildStreakRescue() {
+    if (streakRescueLoading) return;
+    if (activeStreakChallenge) {
+      openStreakChallenge();
+      return;
+    }
+    setStreakRescueLoading(true);
+    setStreakRescueError(null);
+    try {
+      const target = await pickWeakTarget();
+      // The catalog pick is the fallback the server uses if generation fails, so a
+      // rescue always exists even when no provider answers. It is also all we can send
+      // when no seed could be picked at all.
+      const fallbackSlug = pickStreakChallengeSlug([...UNIQUE_PROBLEMS, ...customProblemList], progress);
+      const created = await createLCStreakChallenge(
+        target
+          ? {
+              problemSlug: fallbackSlug,
+              topic: target.topicLabel,
+              subtopic: target.targetSubtopic,
+              targetDifficulty: target.targetDifficulty,
+              seedSlug: target.seed.slug,
+              seedTitle: target.seed.title,
+              provider: generationProvider,
+            }
+          : { problemSlug: fallbackSlug },
+      );
+      if (target) pushRecentDailySeed(target.seed.slug);
+      setStreakChallenge(created);
+      // Generated rescues live in the custom-problem plumbing, so the list has to know
+      // about the new one before the problem view can render it.
+      if (created.problem) setCustomProblems((prev) => [...prev, created.problem as LCCustomProblem]);
+    } catch (error) {
+      setStreakRescueError(
+        error instanceof Error ? error.message : "Kojo couldn't build your rescue problem. Try again.",
+      );
+    } finally {
+      setStreakRescueLoading(false);
+    }
   }
 
-  // When streak drops to 0 and the user has a prior streak, auto-create the challenge.
-  useEffect(() => {
-    if (!betaMode || isGuestSession()) return;
-    if (stats.currentStreak === 0 && stats.bestStreak > 0) {
-      void ensureStreakChallengeExists();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stats.currentStreak, stats.bestStreak, betaMode]);
+  // Opens whichever problem the active challenge points at. Generated rescues sit in the
+  // Custom bucket; catalog fallbacks keep their own category.
+  function openStreakChallenge() {
+    if (!activeStreakChallenge) return;
+    setView({
+      type: "problem",
+      categoryId: streakChallengeProblem?.categoryId ?? CUSTOM_CATEGORY_ID,
+      problemSlug: activeStreakChallenge.problem_slug,
+    });
+  }
 
   // Looks a slug up across the official catalog + the user's own custom problems, for
   // displaying a real title in the Prep Banks / Drills lists (which only store slugs).
@@ -2823,6 +2994,87 @@ export default function LeetCodeMode() {
     return { matched, unmatched };
   }
 
+  // Picks what the next generated problem should drill: the user's weakest area, plus a
+  // catalog seed to reskin. Shared by the Daily KojoCode question and the Save My Streak
+  // rescue, which target weakness identically and differ only in what they do with the
+  // result. Returns null when no seed could be found.
+  async function pickWeakTarget(): Promise<{
+    seed: Problem;
+    topicLabel: string;
+    targetSubtopic: string | null;
+    targetDifficulty: "Easy" | "Medium" | "Hard";
+  } | null> {
+    const resetIso = readWeaknessResetIso();
+    const recent = loadRecentDailySeeds();
+
+    let seed: Problem | undefined;
+    let topicLabel = "";
+    let targetSubtopic: string | null = null;
+    let targetDifficulty: "Easy" | "Medium" | "Hard" = "Medium";
+
+    // If a Prep Bank is active, target that bank's own weak areas (bank-scoped
+    // weakness, computed separately from the global scorer). This is struggle-driven,
+    // not completion-driven, so it stops pinning to whichever bank topic is least
+    // complete and follows where the user actually struggles.
+    const activeBank = prepBanks.find((bank) => bank.is_active);
+    if (activeBank && activeBank.problem_slugs.length) {
+      const bankProblems = activeBank.problem_slugs
+        .map(findProblem)
+        .filter((problem): problem is Problem => Boolean(problem));
+      const bankScores = await fetchLCWeakness(
+        weaknessSensitivity,
+        activeBank.id as number,
+        resetIso,
+      ).catch(() => [] as LCWeaknessTopic[]);
+
+      // Rank the bank's topics by real struggle; fall back to completion ordering
+      // only on cold start (no bank signals yet).
+      const bankTopicIds = new Set(bankProblems.map((p) => p.categoryId));
+      const weakTopic = pickWeightedTopic(
+        preferSubtopicTargets(bankScores.filter((t) => bankTopicIds.has(resolveTopic(t.topic).id))),
+        3,
+      );
+      targetSubtopic = weakTopic?.subtopic ?? null;
+      const chosenTopicId = weakTopic
+        ? resolveTopic(weakTopic.topic).id
+        : bankTopicStats(activeBank.problem_slugs)[0]?.id;
+      const topicPool = chosenTopicId
+        ? bankProblems.filter((problem) => problem.categoryId === chosenTopicId)
+        : [];
+      const pool = topicPool.length ? topicPool : bankProblems;
+      seed = chooseDailySeed(pool, recent, progress, targetSubtopic);
+      if (seed) {
+        topicLabel = CATEGORY_META[seed.categoryId]?.label ?? seed.categoryLabel;
+        targetDifficulty = weakTopic
+          ? difficultyForLevel(weakTopic.level)
+          : seed.difficulty === "Easy" || seed.difficulty === "Hard"
+            ? seed.difficulty
+            : "Medium";
+      }
+    }
+
+    // Full-catalog path: no active bank (or none of its slugs resolved). Rotate
+    // across the top few globally weak topics; cold-start to a random topic.
+    if (!seed) {
+      const weakTopic = pickWeightedTopic(preferSubtopicTargets(weakness), 3);
+      targetSubtopic = weakTopic?.subtopic ?? null;
+      targetDifficulty = weakTopic ? difficultyForLevel(weakTopic.level) : "Easy";
+      const matchedCategory =
+        (weakTopic &&
+          CATEGORIES.find(
+            (c) =>
+              c.id === weakTopic.topic ||
+              c.label.toLowerCase() === weakTopic.topic.toLowerCase(),
+          )) ||
+        CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
+      const pool = matchedCategory.problems.length ? matchedCategory.problems : UNIQUE_PROBLEMS;
+      seed = chooseDailySeed(pool, recent, progress, targetSubtopic);
+      topicLabel = matchedCategory.label;
+    }
+
+    return seed ? { seed, topicLabel, targetSubtopic, targetDifficulty } : null;
+  }
+
   // Daily KojoCode: reskins a random problem from the user's weakest recent topic (or a
   // random topic on cold start) at the mapped difficulty (1-2 Easy, 3 Medium, 4-5 Hard,
   // per todo-daily-kojocode.md). Re-pressing after today's problem exists just opens it.
@@ -2835,75 +3087,9 @@ export default function LeetCodeMode() {
     setDailyLoading(true);
     setDailyError(null);
     try {
-      const resetIso = readWeaknessResetIso();
-      const recent = loadRecentDailySeeds();
-
-      let seed: Problem | undefined;
-      let topicLabel = "";
-      let targetSubtopic: string | null = null;
-      let targetDifficulty: "Easy" | "Medium" | "Hard" = "Medium";
-
-      // If a Prep Bank is active, the daily targets that bank's own weak areas
-      // (bank-scoped weakness, computed separately from the global scorer). This is
-      // struggle-driven, not completion-driven, so it stops pinning to whichever bank
-      // topic is least complete and follows where the user actually struggles.
-      const activeBank = prepBanks.find((bank) => bank.is_active);
-      if (activeBank && activeBank.problem_slugs.length) {
-        const bankProblems = activeBank.problem_slugs
-          .map(findProblem)
-          .filter((problem): problem is Problem => Boolean(problem));
-        const bankScores = await fetchLCWeakness(
-          weaknessSensitivity,
-          activeBank.id as number,
-          resetIso,
-        ).catch(() => [] as LCWeaknessTopic[]);
-
-        // Rank the bank's topics by real struggle; fall back to completion ordering
-        // only on cold start (no bank signals yet).
-        const bankTopicIds = new Set(bankProblems.map((p) => p.categoryId));
-        const weakTopic = pickWeightedTopic(
-          preferSubtopicTargets(bankScores.filter((t) => bankTopicIds.has(resolveTopic(t.topic).id))),
-          3,
-        );
-        targetSubtopic = weakTopic?.subtopic ?? null;
-        const chosenTopicId = weakTopic
-          ? resolveTopic(weakTopic.topic).id
-          : bankTopicStats(activeBank.problem_slugs)[0]?.id;
-        const topicPool = chosenTopicId
-          ? bankProblems.filter((problem) => problem.categoryId === chosenTopicId)
-          : [];
-        const pool = topicPool.length ? topicPool : bankProblems;
-        seed = chooseDailySeed(pool, recent, progress, targetSubtopic);
-        if (seed) {
-          topicLabel = CATEGORY_META[seed.categoryId]?.label ?? seed.categoryLabel;
-          targetDifficulty = weakTopic
-            ? difficultyForLevel(weakTopic.level)
-            : seed.difficulty === "Easy" || seed.difficulty === "Hard"
-              ? seed.difficulty
-              : "Medium";
-        }
-      }
-
-      // Full-catalog path: no active bank (or none of its slugs resolved). Rotate
-      // across the top few globally weak topics; cold-start to a random topic.
-      if (!seed) {
-        const weakTopic = pickWeightedTopic(preferSubtopicTargets(weakness), 3);
-        targetSubtopic = weakTopic?.subtopic ?? null;
-        targetDifficulty = weakTopic ? difficultyForLevel(weakTopic.level) : "Easy";
-        const matchedCategory =
-          (weakTopic &&
-            CATEGORIES.find(
-              (c) =>
-                c.id === weakTopic.topic ||
-                c.label.toLowerCase() === weakTopic.topic.toLowerCase(),
-            )) ||
-          CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
-        const pool = matchedCategory.problems.length ? matchedCategory.problems : UNIQUE_PROBLEMS;
-        seed = chooseDailySeed(pool, recent, progress, targetSubtopic);
-        topicLabel = matchedCategory.label;
-      }
-
-      if (!seed) throw new Error("Kojo couldn't find a problem to base today's question on.");
+      const target = await pickWeakTarget();
+      if (!target) throw new Error("Kojo couldn't find a problem to base today's question on.");
+      const { seed, topicLabel, targetSubtopic, targetDifficulty } = target;
 
       const created = await createLCDaily(
         topicLabel,
@@ -3676,12 +3862,34 @@ export default function LeetCodeMode() {
     }
   }
 
+  // Records a solve and, when the solved problem IS the active rescue, bridges every
+  // missing day from the last recorded activity through today so the chain reads as
+  // unbroken again. Both completion paths go through here: the runner's auto-mark and
+  // the manual check button. The check button used to skip the bridge entirely, which is
+  // why ticking a rescue problem left the streak sitting at 1 instead of restoring it.
+  //
+  // The bridge here is only the optimistic redraw. POST /streak-challenge/complete does
+  // the same backfill server-side inside the transaction that closes the challenge, so
+  // the restore survives this request failing and does not depend on any client
+  // remembering the special case.
+  function recordSolveDates(problem: Problem): string[] {
+    if (!isRescueSlug(problem.slug)) return recordSolvedToday();
+
+    const bridgedDates = fillStreakGap(activityDates);
+    setActivityDates(bridgedDates);
+    saveActivityDates(bridgedDates);
+    completeLCStreakChallenge(todayKey())
+      .then(() => setStreakChallenge((prev) => (prev ? { ...prev, completed_at: new Date().toISOString() } : prev)))
+      .catch(() => {});
+    return bridgedDates;
+  }
+
   function toggleProgress(problem: Problem) {
     const nextDone = !progress[problem.slug];
     const next = { ...progress, [problem.slug]: nextDone };
     setProgress(next);
     saveProgress(next);
-    const nextDates = nextDone ? recordSolvedToday() : activityDates;
+    const nextDates = nextDone ? recordSolveDates(problem) : activityDates;
     // Only a first-ever solve optimistically bumps the count; re-checking an
     // already-solved problem must not. The server is authoritative regardless.
     const isNewSolve = nextDone && !solvedAt[problem.slug];
@@ -3699,21 +3907,8 @@ export default function LeetCodeMode() {
     // already-solved problem (e.g. a drill re-run) must not. Drill clears are
     // counted server-side from the drill_completed event, not here.
     const nextCounts = solvedAt[problem.slug] ? solvedDayCounts : bumpTodayCount();
-
-    // If this is the streak challenge problem, bridge the activity gap so the streak
-    // is restored to continuity before adding today.
-    if (isStreakChallengeProblem) {
-      const bridgedDates = fillStreakGap(activityDates);
-      setActivityDates(bridgedDates);
-      saveActivityDates(bridgedDates);
-      pushProgressToDb(next, bridgedDates, nextCounts).then(refreshServerCounts);
-      completeLCStreakChallenge()
-        .then(() => setStreakChallenge((prev) => prev ? { ...prev, completed_at: new Date().toISOString() } : prev))
-        .catch(() => {});
-    } else {
-      const nextDates = recordSolvedToday();
-      pushProgressToDb(next, nextDates, nextCounts).then(refreshServerCounts);
-    }
+    const nextDates = recordSolveDates(problem);
+    pushProgressToDb(next, nextDates, nextCounts).then(refreshServerCounts);
     onProblemCompleted(problem);
   }
 
@@ -5423,48 +5618,16 @@ export default function LeetCodeMode() {
           })}
         </section>
 
-        {showStreakChallenge ? (
-          <section className="lc-streak-section" aria-label="Save My Streak challenge">
-            <button
-              type="button"
-              className="lc-streak-node"
-              onClick={() =>
-                setView({
-                  type: "problem",
-                  categoryId: streakChallengeProblem?.categoryId ?? "arrays",
-                  problemSlug: streakChallenge?.problem_slug ?? STREAK_CHALLENGE_FALLBACK_SLUG,
-                })
-              }
-            >
-              <span className="lc-streak-node-icon">
-                <ShieldAlert size={22} />
-              </span>
-              <span className="lc-streak-node-copy">
-                <span className="lc-streak-node-title">
-                  <strong>Save My Streak</strong>
-                  <span className="lc-streak-badge">Beta</span>
-                </span>
-                <span className="lc-streak-node-meta">
-                  {streakChallengeProblem ? (
-                    <span className={`lc-difficulty lc-difficulty--${difficultyClass(streakChallengeProblem.difficulty)}`}>
-                      {streakChallengeProblem.difficulty}
-                    </span>
-                  ) : null}
-                  <span className="lc-streak-node-desc">
-                    {(streakChallengeProblem?.title ?? "Rescue problem")} - no Kojo, no NeetCode
-                  </span>
-                </span>
-                {streakChallenge?.expires_at ? (
-                  <small className="lc-streak-node-expires">
-                    Expires {new Date(streakChallenge.expires_at).toLocaleString()}
-                  </small>
-                ) : (
-                  <small className="lc-streak-node-expires">No expiry - solve to restore your streak</small>
-                )}
-              </span>
-              <span className="lc-streak-node-flame"><Flame size={20} /></span>
-            </button>
-          </section>
+        {canRescueStreak ? (
+          <StreakRescueCard
+            activityDates={activityDates}
+            challenge={activeStreakChallenge}
+            problem={streakChallengeProblem}
+            loading={streakRescueLoading}
+            error={streakRescueError}
+            onBuild={handleBuildStreakRescue}
+            onOpen={openStreakChallenge}
+          />
         ) : null}
 
         {customModalNode}

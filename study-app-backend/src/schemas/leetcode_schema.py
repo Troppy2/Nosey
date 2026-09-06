@@ -167,6 +167,12 @@ class LCCustomProblemSyncRequest(LCCustomProblemBase):
 
 class LCCustomProblemResponse(LCCustomProblemBase):
     slug: str
+    # How the problem came to exist: "user" for a hand-written one, "daily_kojo" for a
+    # generated Daily KojoCode problem, "streak_rescue" for a Save My Streak problem.
+    # The client filters generated rows out of the Custom Questions list on this, so it
+    # has to travel on the wire, not just live in the DB.
+    source: str = "user"
+    daily_date: Optional[str] = None
 
 
 class LCCustomProblemListResponse(BaseModel):
@@ -243,17 +249,17 @@ class LCSolutionArticleResponse(BaseModel):
 
 # ── Daily KojoCode ────────────────────────────────────────────────────────────
 
-class LCDailyProblemRequest(BaseModel):
-    """Client sends the weak topic, the target difficulty, and a seed problem slug it
-    picked from the catalog it owns (the backend has no catalog to pick one itself).
-    The backend reskins that seed into today's problem. The generated problem is
-    returned as a normal LCCustomProblemResponse and locked to one per calendar day."""
+class LCReskinRequestBase(BaseModel):
+    """Shared shape for every "reskin a catalog seed into a fresh problem" request. The
+    client sends the weak topic, a target difficulty, and a seed problem it picked from
+    the catalog it owns (the backend has no catalog to pick one itself). Both the Daily
+    KojoCode question and the Save My Streak rescue are built this way."""
 
-    topic: str = Field(..., min_length=1, max_length=120)
+    topic: Optional[str] = Field(default=None, max_length=120)
     # The weak subtopic being targeted (e.g. "BFS"); the reskin preserves it.
     subtopic: Optional[str] = Field(default=None, max_length=120)
     target_difficulty: str = Field(default="Medium", max_length=20)
-    seed_slug: str = Field(..., min_length=1, max_length=200)
+    seed_slug: Optional[str] = Field(default=None, max_length=200)
     # The seed's catalog title, which is what the reskin actually works from: no problem
     # statements are stored anywhere and LeetCode can't be fetched from prod (GH #75), so
     # the model reskins from its own knowledge of the named problem. Optional purely for
@@ -267,13 +273,37 @@ class LCDailyProblemRequest(BaseModel):
         return value if value in ("Easy", "Medium", "Hard") else "Medium"
 
 
+class LCDailyProblemRequest(LCReskinRequestBase):
+    """The generated problem is returned as a normal LCCustomProblemResponse and locked
+    to one per calendar day. Topic and seed are required here, unlike the rescue, whose
+    client can fall back to a catalog problem when it cannot pick a seed."""
+
+    topic: str = Field(..., min_length=1, max_length=120)
+    seed_slug: str = Field(..., min_length=1, max_length=200)
+
+
 # ── Streak challenge (Save My Streak, beta-only) ──────────────────────────────
 
-class LCStreakChallengeCreateRequest(BaseModel):
-    # The client picks the rescue problem (it owns the verified catalog, the
-    # difficulties, and the per-user completed state) and passes the slug here.
-    # Optional so an empty POST still works and falls back to a server default.
+class LCStreakChallengeCreateRequest(LCReskinRequestBase):
+    """A rescue generates a fresh problem aimed at the user's weakest area, reusing the
+    Daily KojoCode reskin.
+
+    problem_slug is the no-seed path only: it is used when the client could not pick a
+    seed at all (an exhausted catalog, or an older build). It is NOT a failure fallback,
+    because a challenge has no expiry and create is create-or-return, so a rescue
+    silently downgraded to a catalog problem could never be regenerated. A failed
+    generation raises 503 instead and the card's button retries."""
+
     problem_slug: Optional[str] = None
+
+
+class LCStreakChallengeCompleteRequest(BaseModel):
+    """The client's local calendar day. Bridging the streak gap needs it because
+    lc_activity_dates is keyed on the client's local YYYY-MM-DD, not on UTC, so the
+    server cannot work out which day "today" is on its own. Optional: an older build
+    that posts an empty body falls back to the server's UTC day."""
+
+    today: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
 
 
 class LCStreakChallengeResponse(BaseModel):
@@ -282,6 +312,10 @@ class LCStreakChallengeResponse(BaseModel):
     expires_at: Optional[str] = None
     completed_at: Optional[str] = None
     created_at: str
+    # The generated rescue problem, resolved server-side so the client can render its
+    # title and difficulty without hunting for the slug in its own catalog. Null only on
+    # the no-seed catalog path and on rows predating generation.
+    problem: Optional[LCCustomProblemResponse] = None
 
 
 # ── Struggle events + weakness scorer ─────────────────────────────────────────

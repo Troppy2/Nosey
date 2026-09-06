@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -53,9 +53,11 @@ from src.schemas.leetcode_schema import (
     LCProgressResponse,
     LCProgressSyncRequest,
     LCReclassifyResponse,
+    LCReskinRequestBase,
     LCSolutionArticleRequest,
     LCSolutionArticleResponse,
     LCSolutionCodeComment,
+    LCStreakChallengeCompleteRequest,
     LCStreakChallengeCreateRequest,
     LCStreakChallengeResponse,
     LCWorkspaceResponse,
@@ -527,6 +529,8 @@ def _serialize_custom_problem(row: LCCustomProblem) -> LCCustomProblemResponse:
         starter_code=row.starter_code,
         test_cases=test_cases,
         is_archived=row.is_archived,
+        source=row.source,
+        daily_date=row.daily_date,
     )
 
 
@@ -856,6 +860,58 @@ def _today_str() -> str:
     return datetime.now(timezone.utc).date().isoformat()
 
 
+async def _build_generated_problem(
+    user: User,
+    req: LCReskinRequestBase,
+    *,
+    source: str,
+    slug_prefix: str,
+    default_title: str,
+    difficulty: Optional[str] = None,
+    daily_date: Optional[str] = None,
+) -> LCCustomProblem:
+    """Reskin the client's catalog seed into a fresh problem row. Shared by the Daily
+    KojoCode question and the Save My Streak rescue, which differ only in the slug
+    prefix, the source tag, and whether the row is bound to a calendar day.
+
+    Returns an unsaved row so the caller owns the transaction: the daily needs its own
+    IntegrityError handling for the one-per-day unique index, and the rescue commits the
+    problem and the challenge row together."""
+    target_difficulty = difficulty or req.normalized_difficulty()
+    try:
+        generated = await LeetCodeService().generate_daily_problem(
+            topic=req.topic or "unknown",
+            subtopic=req.subtopic,
+            target_difficulty=target_difficulty,
+            seed_slug=req.seed_slug or "",
+            seed_title=req.seed_title,
+            # Same policy gate every other generation route goes through: a client
+            # cannot name a provider its plan is not entitled to.
+            provider=resolve_request_provider(user, req.provider),
+        )
+    except LLMException as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return LCCustomProblem(
+        user_id=user.id,
+        # Reuses the custom-problem plumbing (progress/workspace/notes/run/grade all
+        # key on slug), so it must start with "custom-" like every other custom slug.
+        slug=f"{slug_prefix}-{uuid.uuid4().hex}",
+        title=generated.title or default_title,
+        # Topic and difficulty are authoritative from the request, not the LLM: the
+        # client owns the topic taxonomy and the backend owns the difficulty floor.
+        topic=(req.topic or "unknown").strip()[:120] or "unknown",
+        subtopic=(req.subtopic or "").strip()[:120] or None,
+        difficulty=target_difficulty,
+        description=generated.description,
+        url="",
+        starter_code=generated.starter_code,
+        test_cases_json=json.dumps([case.model_dump() for case in generated.test_cases]),
+        source=source,
+        daily_date=daily_date,
+    )
+
+
 async def _find_today_daily(session: AsyncSession, user_id: int) -> Optional[LCCustomProblem]:
     return (
         await session.execute(
@@ -891,35 +947,12 @@ async def create_daily_problem(
     if existing:
         return _serialize_custom_problem(existing)
 
-    try:
-        generated = await LeetCodeService().generate_daily_problem(
-            topic=body.topic,
-            subtopic=body.subtopic,
-            target_difficulty=body.normalized_difficulty(),
-            seed_slug=body.seed_slug,
-            seed_title=body.seed_title,
-            provider=resolve_request_provider(user, body.provider),
-        )
-    except LLMException as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-    row = LCCustomProblem(
-        user_id=user.id,
-        # Reuses the custom-problem plumbing (progress/workspace/notes/run/grade all
-        # key on slug), so it must start with "custom-" like every other custom slug.
-        slug=f"custom-daily-{uuid.uuid4().hex}",
-        title=generated.title or "Daily KojoCode Problem",
-        # Topic and difficulty are authoritative from the client's request, not the LLM:
-        # the backend takes target_difficulty as given (see the KojoCode plan) and the
-        # client owns the topic taxonomy.
-        topic=(body.topic or "unknown").strip()[:120] or "unknown",
-        subtopic=(body.subtopic or "").strip()[:120] or None,
-        difficulty=body.normalized_difficulty(),
-        description=generated.description,
-        url="",
-        starter_code=generated.starter_code,
-        test_cases_json=json.dumps([case.model_dump() for case in generated.test_cases]),
+    row = await _build_generated_problem(
+        user,
+        body,
         source="daily_kojo",
+        slug_prefix="custom-daily",
+        default_title="Daily KojoCode Problem",
         daily_date=_today_str(),
     )
     session.add(row)
@@ -941,14 +974,65 @@ async def create_daily_problem(
 
 # ── Streak challenge (Save My Streak, beta-only) ──────────────────────────────
 
-def _serialize_streak_challenge(row: LCStreakChallenge) -> LCStreakChallengeResponse:
+def _serialize_streak_challenge(
+    row: LCStreakChallenge,
+    problem: Optional[LCCustomProblem] = None,
+) -> LCStreakChallengeResponse:
     return LCStreakChallengeResponse(
         id=row.id,
         problem_slug=row.problem_slug,
         expires_at=row.expires_at.isoformat() if row.expires_at else None,
         completed_at=row.completed_at.isoformat() if row.completed_at else None,
         created_at=row.created_at.isoformat(),
+        problem=_serialize_custom_problem(problem) if problem else None,
     )
+
+
+async def _find_rescue_problem(
+    session: AsyncSession, user_id: int, slug: str
+) -> Optional[LCCustomProblem]:
+    """Resolve a challenge's slug to the generated problem behind it. Catalog slugs
+    (the pre-generation fallback) have no row here, which is why this returns None
+    rather than raising."""
+    if not slug.startswith("custom-"):
+        return None
+    return (
+        await session.execute(
+            select(LCCustomProblem).where(
+                LCCustomProblem.user_id == user_id,
+                LCCustomProblem.slug == slug,
+            )
+        )
+    ).scalar_one_or_none()
+
+
+async def _build_rescue_problem(
+    user: User, payload: LCStreakChallengeCreateRequest
+) -> Optional[LCCustomProblem]:
+    """Reskin the client's seed into a fresh rescue problem, the same generation the
+    Daily KojoCode uses. Returns None only when there is no seed to reskin; a failed
+    generation raises 503 from the shared builder so the card's button can retry, rather
+    than locking the user into a catalog problem they can never regenerate.
+
+    daily_date stays NULL: it drives the one-per-day unique index scoped to
+    source = 'daily_kojo', and a rescue is not bound to a calendar day."""
+    if not payload.seed_slug:
+        return None
+    return await _build_generated_problem(
+        user,
+        payload,
+        source="streak_rescue",
+        slug_prefix="custom-rescue",
+        default_title="Streak Rescue Problem",
+        # A rescue is a real test, so it never lands on the Easy a cold-start daily can
+        # get. Enforced here rather than client-side so no caller can skip it.
+        difficulty=_rescue_difficulty(payload),
+    )
+
+
+def _rescue_difficulty(payload: LCStreakChallengeCreateRequest) -> str:
+    normalized = payload.normalized_difficulty()
+    return "Medium" if normalized == "Easy" else normalized
 
 
 @router.get("/streak-challenge", response_model=Optional[LCStreakChallengeResponse])
@@ -966,7 +1050,7 @@ async def get_streak_challenge(
     ).scalar_one_or_none()
     if not row:
         return None
-    return _serialize_streak_challenge(row)
+    return _serialize_streak_challenge(row, await _find_rescue_problem(session, user.id, row.problem_slug))
 
 
 @router.post("/streak-challenge", response_model=LCStreakChallengeResponse, status_code=status.HTTP_201_CREATED)
@@ -976,7 +1060,8 @@ async def create_streak_challenge(
     user: User = Depends(get_current_user),
 ) -> LCStreakChallengeResponse:
     # Only one active (uncompleted) challenge at a time. The problem stays fixed while
-    # this challenge is active; a fresh random one is picked on the next streak loss.
+    # this challenge is active, so a second press re-opens the same rescue instead of
+    # burning another generation.
     existing = (
         await session.execute(
             select(LCStreakChallenge)
@@ -988,21 +1073,89 @@ async def create_streak_challenge(
         )
     ).scalar_one_or_none()
     if existing:
-        return _serialize_streak_challenge(existing)
+        return _serialize_streak_challenge(
+            existing, await _find_rescue_problem(session, user.id, existing.problem_slug)
+        )
+
+    # A failed generation raises 503 out of here, so the button can retry. The only way
+    # problem comes back None is that the client had no seed to send.
+    problem = await _build_rescue_problem(user, payload) if payload else None
     requested_slug = (payload.problem_slug or "").strip() if payload else ""
     row = LCStreakChallenge(
         user_id=user.id,
-        problem_slug=requested_slug or STREAK_CHALLENGE_FALLBACK_SLUG,
+        problem_slug=problem.slug if problem else (requested_slug or STREAK_CHALLENGE_FALLBACK_SLUG),
         expires_at=None,
     )
+    if problem:
+        session.add(problem)
     session.add(row)
     await session.commit()
     await session.refresh(row)
-    return _serialize_streak_challenge(row)
+    return _serialize_streak_challenge(row, problem)
+
+
+async def _bridge_streak_gap(session: AsyncSession, user_id: int, today_str: Optional[str]) -> None:
+    """Fill in an activity row for every missed day between the user's streak and today,
+    so the chain reads as unbroken again.
+
+    This is what "saving the streak" actually means, and it lives here, in the same
+    transaction that closes the challenge, so no client path can mark a rescue solved
+    without it. The client bridges its local copy too, for an instant redraw; both
+    converge because this only ever inserts days that are missing, making it safe to
+    run before, after, or instead of the client's own bridge."""
+    existing = set(
+        (
+            await session.execute(
+                select(LCActivityDate.activity_date).where(LCActivityDate.user_id == user_id)
+            )
+        ).scalars().all()
+    )
+
+    # Timezones run up to a day ahead of UTC, so that is as far ahead of the server's own
+    # day as a client is allowed to claim. Without the cap a wrong clock could backfill
+    # an unbounded run of days.
+    cap = datetime.now(timezone.utc).date() + timedelta(days=1)
+    try:
+        today = date.fromisoformat(today_str) if today_str else cap - timedelta(days=1)
+    except ValueError:
+        today = cap - timedelta(days=1)
+    today = min(today, cap)
+
+    days: set[date] = set()
+    for value in existing:
+        try:
+            days.add(date.fromisoformat(value))
+        except ValueError:
+            continue  # a malformed stored key must not stop the bridge
+
+    # Walk back over the unbroken run that ends on today to find where it starts. The
+    # gap to close sits before that run, NOT before the most recent activity: by the
+    # time this runs the client has usually already recorded today, so anchoring on the
+    # latest stored day would find no gap and silently restore nothing.
+    run_start = today
+    while run_start - timedelta(days=1) in days:
+        run_start -= timedelta(days=1)
+
+    earlier = [day for day in days if day < run_start]
+    # No earlier activity means there is no gap to bridge, only today to record.
+    cursor = max(earlier) + timedelta(days=1) if earlier else today
+
+    wanted: set[str] = set()
+    while cursor <= today:
+        wanted.add(cursor.isoformat())
+        cursor += timedelta(days=1)
+    wanted.add(today.isoformat())
+
+    # Diff against what is already stored in one go. Adding a row per loop iteration
+    # instead would re-insert a day the loop had just added, tripping the
+    # (user_id, activity_date) unique constraint.
+    for day in sorted(wanted - existing):
+        session.add(LCActivityDate(user_id=user_id, activity_date=day, count=1))
 
 
 @router.post("/streak-challenge/complete", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
 async def complete_streak_challenge(
+    body: Optional[LCStreakChallengeCompleteRequest] = None,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> Response:
@@ -1020,6 +1173,7 @@ async def complete_streak_challenge(
     if not row:
         raise HTTPException(status_code=404, detail="No active streak challenge found.")
     row.completed_at = datetime.now(timezone.utc)
+    await _bridge_streak_gap(session, user.id, body.today if body else None)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
