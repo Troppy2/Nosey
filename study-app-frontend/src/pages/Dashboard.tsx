@@ -483,9 +483,9 @@ export default function Dashboard() {
                                 {test.answered_question_count} of {test.total_question_count} answered · Last: {new Date(test.exited_at).toLocaleDateString()}
                               </p>
                             </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--green-dark)" }}>
+                            <div className="test-row-resume">
                               <Undo2 size={18} />
-                              <span style={{ fontSize: "14px", fontWeight: "500" }}>Resume</span>
+                              <span>Resume</span>
                             </div>
                           </Link>
                           <div className="row-actions">

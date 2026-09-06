@@ -777,6 +777,17 @@
   flex: 1;
 }
 
+/* The "Resume" affordance on a Continue Test row. Was an inline style object in
+   Dashboard.tsx. */
+.test-row-resume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--green-dark);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
 .mini-meta {
   display: flex;
   flex-wrap: wrap;
@@ -2309,6 +2320,7 @@
     left: 0;
     width: min(300px, 85vw);
     height: 100vh;
+    height: 100dvh;
     z-index: 200;
     flex-direction: column;
     gap: 24px;
@@ -2636,6 +2648,7 @@
   right: 0;
   width: 460px;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   background: #f9faf7;
@@ -4625,7 +4638,12 @@
 .chat-mode-shell {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
+  /* 100vh is Android Chrome's LARGE viewport: it counts the retractable
+     toolbar, so the shell runs taller than the screen and leaves a dead green
+     band under the composer. dvh tracks the visible viewport. 100vh stays as
+     the fallback for browsers without dvh. */
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background:
     radial-gradient(circle at top left, rgba(207, 225, 185, 0.44), transparent 28%),
@@ -19154,7 +19172,9 @@ button.lc-reminder-feature-cta:disabled {
   flex-shrink: 0;
   width: var(--lc-rail-w);
   height: 100vh;
+  height: 100dvh;
   max-height: 100vh;
+  max-height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
