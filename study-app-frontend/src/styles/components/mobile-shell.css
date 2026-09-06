@@ -17,24 +17,24 @@
      routes) is the only chrome, so give the page its own top breathing room. */
   .shell--mobile .page {
     padding-top: clamp(20px, 5vw, 28px);
-    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+    padding-bottom: var(--dock-clearance);
   }
 
   /* Rounded edges throughout, per the design brief. */
   .shell--mobile .card,
   .shell--mobile .question-card {
-    border-radius: 18px;
+    border-radius: var(--radius-card-mobile);
   }
 
   .shell--mobile .button,
   .shell--mobile .nav-link {
-    border-radius: 14px;
+    border-radius: var(--radius-xl);
   }
 
   .shell--mobile input,
   .shell--mobile select,
   .shell--mobile textarea {
-    border-radius: 12px;
+    border-radius: var(--radius-xl);
   }
 
   /* Stats are a glance strip: three across, the number doing the talking.
@@ -188,6 +188,68 @@
     overflow-wrap: anywhere;
   }
 
+  /* List view on a phone.
+     styles.css (max-width: 760px) restacks .folder-list-row into three bands:
+     the link on its own full-width row, then the counts, then the actions on a
+     row below that. The result was the same height and the same shape as the
+     grid card, so the grid/list toggle appeared to do nothing on mobile.
+
+     List is the dense view, so it earns its keep here: one title line that
+     truncates, the counts folded onto a second line beside it, and the actions
+     pulled inline and centered against both rows. Roughly half the height of a
+     grid card. */
+  .shell--mobile .folder-list-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    min-height: 0;
+    gap: 2px 10px;
+    padding: 10px 12px;
+  }
+
+  .shell--mobile .folder-list-row > .folder-list-main {
+    grid-column: 1;
+    grid-row: 1;
+    gap: 10px;
+  }
+
+  .shell--mobile .folder-list-row > .mini-meta {
+    grid-column: 1;
+    grid-row: 2;
+    margin-top: 0;
+  }
+
+  /* Spanning both rows is what removes the third band. */
+  .shell--mobile .folder-list-row > .row-actions {
+    grid-column: 2;
+    grid-row: 1 / -1;
+    align-self: center;
+  }
+
+  .shell--mobile .folder-list-row .folder-list-main svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .shell--mobile .folder-list-row h3 {
+    font-size: 0.95rem;
+    line-height: 1.25;
+    /* The one place the title truncates instead of wrapping: a list row that
+       grows to three lines is a card again. */
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  /* The subject stays. Hiding it would make the row shorter, but the point of
+     the list view is more information per screen, not less. */
+  .shell--mobile .folder-list-row .folder-list-main p {
+    font-size: 0.76rem;
+    line-height: 1.25;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
   /* Back controls for the immersive routes that had no way out of their own:
      Kojo chat and KojoCode. Both live inside the page's own header rather than
      as a floating overlay, which would land on chrome the page already owns.
@@ -202,7 +264,7 @@
     height: 38px;
     color: var(--green-dark);
     background: rgba(113, 131, 85, 0.1);
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     transition: background var(--transition-fast);
   }
 

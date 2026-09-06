@@ -467,7 +467,7 @@ export default function FolderDetail() {
                 />
                 <Button
                   type="button"
-                  variant="danger"
+                  variant="danger-outline"
                   icon={<Archive size={15} />}
                   onClick={() => void handleArchive()}
                   disabled={archiving || archiveConfirmValue.toLowerCase() !== "archive"}

@@ -789,6 +789,10 @@ export default function KojoMode() {
   const [loadingFolders, setLoadingFolders] = useState(true);
   const [conversations, setConversations] = useState<KojoConversationSummary[]>([]);
   const [conversationId, setConversationId] = useState<number | null>(null);
+  // A "new chat" that exists only on screen. The conversation row is not created
+  // on the server until the first prompt is actually sent, so opening a new chat
+  // and walking away leaves nothing behind. See ensureConversation().
+  const [pendingNewChat, setPendingNewChat] = useState(false);
   const [messages, setMessages] = useState<KojoMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -864,6 +868,9 @@ export default function KojoMode() {
   });
 
   const isGeneralMode = folderId === GENERAL_FOLDER_ID && !loadingFolders;
+  // A pending new chat has no id yet but is fully writable: the composer is what
+  // brings the conversation into existence.
+  const canCompose = conversationId !== null || pendingNewChat;
   const showSlashMenu = input.trimStart().startsWith("/");
 
   const chatCommands = useMemo(
@@ -976,6 +983,11 @@ export default function KojoMode() {
       } else if (bootstrap.conversations.length > 0) {
         setConversationId(bootstrap.conversations[0].id);
         fetchKojoActionCards(bootstrap.conversations[0].id).then(setActionCards);
+      } else {
+        // Nothing here yet. The backend no longer mints a conversation just
+        // because the screen opened, so start in the pending state: the
+        // composer is live and the first prompt creates the row.
+        setPendingNewChat(true);
       }
       setSessionFiles(bootstrap.files);
     };
@@ -1098,8 +1110,9 @@ export default function KojoMode() {
 
   // ── Action card flow (beta: chat-proposed creations) ───────────────────────
 
-  async function handleActionRequest(actionType: KojoActionType, trigger: string, display?: string) {
-    if (conversationId === null) return;
+  async function handleActionRequest(actionType: KojoActionType, trigger: string, display?: string, convId?: number) {
+    const targetConvId = convId ?? (await ensureConversation());
+    if (targetConvId === null) return;
     const userMsg: KojoMessage = { id: Date.now(), role: "user", content: trigger, created_at: new Date().toISOString(), display };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
@@ -1108,7 +1121,7 @@ export default function KojoMode() {
     setIsLoading(true);
     setError(null);
     try {
-      const card = await proposeKojoAction(conversationId, actionType, trigger, generationProvider);
+      const card = await proposeKojoAction(targetConvId, actionType, trigger, generationProvider);
       setActionCards((prev) => [...prev, card]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kojo couldn't draft that plan. Try again.");
@@ -1137,11 +1150,16 @@ export default function KojoMode() {
     priorVersions?: string[],
   ) {
     const msg = (text ?? input).trim();
-    if (!msg || isLoading || conversationId === null) return;
+    if (!msg || isLoading) return;
+
+    // The prompt is the commitment, so this is where a pending new chat becomes
+    // a real conversation.
+    const activeConvId = await ensureConversation();
+    if (activeConvId === null) return;
 
     // Explicit action command from the slash menu
     if (actionType && actionType !== "chat" && actionType !== "blueprint") {
-      await handleActionRequest(actionType, msg, display);
+      await handleActionRequest(actionType, msg, display, activeConvId);
       return;
     }
 
@@ -1155,13 +1173,13 @@ export default function KojoMode() {
     if (betaMode && !actionType) {
       const hit = ACTION_TRIGGERS.find((t) => t.pattern.test(msg));
       if (hit) {
-        await handleActionRequest(hit.type, msg, display);
+        await handleActionRequest(hit.type, msg, display, activeConvId);
         return;
       }
     }
 
     const userMsg: KojoMessage = { id: Date.now(), role: "user", content: msg, created_at: new Date().toISOString(), display };
-    const convId = conversationId;
+    const convId = activeConvId;
     // The assistant bubble is inserted up front in a streaming state so the
     // staged-thinking indicator and live reasoning show while tokens arrive.
     const tempId = Date.now() + 1;
@@ -1462,27 +1480,48 @@ export default function KojoMode() {
     }
   }
 
-  async function handleNewChat() {
-    if (isLoading) return;
-    setSidebarOpen(false);
-    setView("chat");
+  /**
+   * Resolve the conversation to write into, creating it on the server the first
+   * time it is actually needed. Returns null if creation failed.
+   *
+   * Everything that persists something (a prompt, an action, an upload) calls
+   * this instead of reading `conversationId` directly, so a chat row only ever
+   * exists because the user committed to it. A failed send still keeps the
+   * conversation: they typed it, and the retry belongs in the same thread.
+   */
+  async function ensureConversation(): Promise<number | null> {
+    if (conversationId !== null) return conversationId;
     try {
       const fresh = isGeneralMode
         ? await createGeneralKojoConversation()
         : await createKojoConversation(folderId!);
       setConversations((prev) => [fresh, ...prev]);
       setConversationId(fresh.id);
-      setMessages([]);
-      setSessionFiles([]);
-      setActionCards([]);
-      setError(null);
-      setClearNotice(null);
-      setConfirmClear(false);
-      setDeletingConvId(null);
-      inputRef.current?.focus();
+      setPendingNewChat(false);
+      return fresh.id;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to start new chat.");
+      return null;
     }
+  }
+
+  // Opening a new chat is a local reset only. Nothing is written until the first
+  // prompt lands, which is what keeps the recent list free of empty "Untitled"
+  // rows left by chats that were opened and abandoned.
+  function handleNewChat() {
+    if (isLoading) return;
+    setSidebarOpen(false);
+    setView("chat");
+    setConversationId(null);
+    setPendingNewChat(true);
+    setMessages([]);
+    setSessionFiles([]);
+    setActionCards([]);
+    setError(null);
+    setClearNotice(null);
+    setConfirmClear(false);
+    setDeletingConvId(null);
+    inputRef.current?.focus();
   }
 
   async function handleSwitchConversation(conv: KojoConversationSummary) {
@@ -1518,12 +1557,11 @@ export default function KojoMode() {
           fetchConversationFiles(remaining[0].id).then(setSessionFiles);
           fetchKojoActionCards(remaining[0].id).then(setActionCards);
         } else {
-          // No conversations left , auto-create a fresh one
-          const fresh = isGeneralMode
-            ? await createGeneralKojoConversation()
-            : await createKojoConversation(folderId!);
-          setConversations([fresh]);
-          setConversationId(fresh.id);
+          // No conversations left. Drop into a pending new chat rather than
+          // creating a replacement row the user never asked for.
+          setConversations([]);
+          setConversationId(null);
+          setPendingNewChat(true);
           setMessages([]);
           setSessionFiles([]);
           setActionCards([]);
@@ -1544,14 +1582,16 @@ export default function KojoMode() {
   }
 
   async function handleUpload(files: FileList | File[]) {
-    if (!conversationId || isUploading) return;
+    if (isUploading) return;
     const arr = Array.from(files);
     if (arr.length === 0) return;
+    const targetConvId = await ensureConversation();
+    if (targetConvId === null) return;
     setIsUploading(true);
     setUploadError(null);
     setShowAttachMenu(false);
     try {
-      const uploaded = await uploadConversationFiles(conversationId, arr);
+      const uploaded = await uploadConversationFiles(targetConvId, arr);
       setSessionFiles((prev) => [...prev, ...uploaded]);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "Upload failed");
@@ -1681,16 +1721,6 @@ export default function KojoMode() {
           <span className="chat-mode-brand-name">Kojo</span>
           <button
             type="button"
-            className="chat-mode-brand-new"
-            onClick={() => void handleNewChat()}
-            disabled={isLoading}
-            aria-label="New chat"
-            title="New chat"
-          >
-            <MessageSquarePlus size={15} />
-          </button>
-          <button
-            type="button"
             className="chat-mode-sidebar-close"
             onClick={() => setSidebarOpen(false)}
             aria-label="Close menu"
@@ -1774,7 +1804,7 @@ export default function KojoMode() {
                         onClick={() => setDeletingConvId(conv.id)}
                         title="Delete chat"
                       >
-                        <Trash2 size={11} />
+                        <Trash2 size={15} />
                       </button>
                     )}
                   </div>
@@ -1889,7 +1919,7 @@ export default function KojoMode() {
             folder={selectedFolder}
             conversations={conversations}
             files={sessionFiles}
-            disabled={conversationId === null || isLoading}
+            disabled={!canCompose || isLoading}
             uploading={isUploading}
             uploadError={uploadError}
             onUpload={handleUpload}
@@ -2253,7 +2283,7 @@ export default function KojoMode() {
                     type="button"
                     className={`kojo-attach-btn${showAttachMenu ? " kojo-attach-btn--open" : ""}`}
                     onClick={() => setShowAttachMenu((v) => !v)}
-                    disabled={isLoading || conversationId === null}
+                    disabled={isLoading || !canCompose}
                     aria-label="Attach files and actions"
                   >
                     {isUploading ? <span className="loader loader--sm" /> : <Plus size={16} />}
@@ -2314,7 +2344,7 @@ export default function KojoMode() {
                   value={input}
                   onChange={handleInputChange}
                   onKeyDown={handleKeyDown}
-                  disabled={isLoading || conversationId === null}
+                  disabled={isLoading || !canCompose}
                 />
 
                 {streamingId !== null ? (
@@ -2331,7 +2361,7 @@ export default function KojoMode() {
                   <button
                     className="kojo-send"
                     onClick={() => handleSend()}
-                    disabled={!input.trim() || isLoading || conversationId === null}
+                    disabled={!input.trim() || isLoading || !canCompose}
                     type="button"
                     aria-label="Send"
                   >

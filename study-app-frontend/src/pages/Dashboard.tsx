@@ -311,7 +311,7 @@ export default function Dashboard() {
     return [
       { label: "Tests Taken", value: attempts.toString(), icon: FileCheck },
       { label: "Cards Reviewed", value: cardsReviewed.toString(), icon: FlashcardsIcon, iconSize: 30 },
-      { label: "Average Score", value: average ? `${average}%` : "New", icon: TrendingUp },
+      { label: "Average Score", value: average ? `${average}%` : "-", icon: TrendingUp },
     ];
   }, [flashcards, tests, statsResetVersion]);
 
@@ -428,7 +428,7 @@ export default function Dashboard() {
               {stats.map((stat) => {
                 const Icon = stat.icon;
                 return (
-                  <Card key={stat.label} interactive tone="soft" className="stat-card">
+                  <Card key={stat.label} tone="soft" className="stat-card">
                     <div>
                       <Icon size={stat.iconSize ?? 23} />
                       <span>{stat.label}</span>
@@ -448,23 +448,36 @@ export default function Dashboard() {
                       View all
                     </Link>
                   </div>
-                  <div className="grid grid-2">
-                    {folders.slice(0, 4).map((folder) => (
-                      <Link key={folder.id} to={`/folders/${folder.id}`}>
-                        <Card interactive className="folder-mini">
-                          <FolderIcon size={25} style={{ color: folder.color ?? "var(--green-dark)" }} />
-                          <div>
-                            <h3>{folder.name}</h3>
-                            <p className="muted small">{folder.subject ?? "General"}</p>
-                            <div className="mini-meta">
-                              <span>{folder.test_count} tests</span>
-                              <span>{folder.flashcard_count} cards</span>
+                  {folders.length === 0 ? (
+                    <EmptyState
+                      icon={<FolderOpen />}
+                      title="No folders yet"
+                      body="Folders group a subject's tests and flashcards. Create one to get started."
+                      action={
+                        <Link to="/folders">
+                          <Button>Create Folder</Button>
+                        </Link>
+                      }
+                    />
+                  ) : (
+                    <div className="grid grid-2">
+                      {folders.slice(0, 4).map((folder) => (
+                        <Link key={folder.id} to={`/folders/${folder.id}`}>
+                          <Card interactive className="folder-mini">
+                            <FolderIcon size={25} style={{ color: folder.color ?? "var(--green-dark)" }} />
+                            <div>
+                              <h3>{folder.name}</h3>
+                              <p className="muted small">{folder.subject ?? "General"}</p>
+                              <div className="mini-meta">
+                                <span>{folder.test_count} tests</span>
+                                <span>{folder.flashcard_count} cards</span>
+                              </div>
                             </div>
-                          </div>
-                        </Card>
-                      </Link>
-                    ))}
-                  </div>
+                          </Card>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </section>
 
                 {pendingResumableTests.length > 0 && (

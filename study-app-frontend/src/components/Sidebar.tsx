@@ -1,4 +1,4 @@
-import { Apple, ChevronLeft, ChevronRight, Code2, FolderOpen, LayoutDashboard, Menu, MessageCircle, Settings, ShieldCheck, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Code2, Folder, LayoutDashboard, Menu, MessageCircle, Settings, ShieldCheck, Sprout, X } from "lucide-react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { useSettings } from "../lib/useSettings";
@@ -14,8 +14,8 @@ const sidebarStorageKey = "nosey_sidebar_collapsed";
 
 const BASE_NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, beta: false, guestHidden: false, tourId: undefined },
-  { to: "/folders", label: "Folders", icon: FolderOpen, beta: false, guestHidden: false, tourId: "tour-nav-folders" },
-  { to: "/flashcards", label: "Learning Modes", icon: Apple, beta: false, guestHidden: false, tourId: undefined },
+  { to: "/folders", label: "Folders", icon: Folder, beta: false, guestHidden: false, tourId: "tour-nav-folders" },
+  { to: "/flashcards", label: "Learning Modes", icon: Sprout, beta: false, guestHidden: false, tourId: undefined },
   { to: "/leetcode", label: "KojoCode", icon: Code2, beta: true, guestHidden: true, tourId: undefined },
   { to: "/kojo/chat", label: "Chat", icon: MessageCircle, beta: false, guestHidden: true, tourId: "tour-nav-kojo" },
   { to: "/settings", label: "Settings", icon: Settings, beta: false, guestHidden: false, tourId: undefined },
@@ -29,14 +29,15 @@ export function Sidebar() {
   const isAdmin = !!currentUser?.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase());
   const adminItem = { to: "/admin", label: "Admin", icon: ShieldCheck, beta: false, guestHidden: true, tourId: undefined };
   const kojoEnabled = currentUser?.kojo_enabled !== false;
-  const navItems = [
-    ...BASE_NAV_ITEMS.filter((item) =>
-      (!item.beta || betaMode) &&
-      (!item.guestHidden || !guest) &&
-      (item.to !== "/kojo/chat" || kojoEnabled)
-    ),
-    ...(isAdmin && !guest ? [adminItem] : []),
-  ];
+  const visibleBaseItems = BASE_NAV_ITEMS.filter((item) =>
+    (!item.beta || betaMode) &&
+    (!item.guestHidden || !guest) &&
+    (item.to !== "/kojo/chat" || kojoEnabled)
+  );
+  const showAdmin = isAdmin && !guest;
+  // The sidebar has room to list everything; the dock does not.
+  const navItems = [...visibleBaseItems, ...(showAdmin ? [adminItem] : [])];
+  const dockItems = visibleBaseItems;
   const isMobileShell = useMobileShell();
   const [isNavHidden, setIsNavHidden] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -110,7 +111,7 @@ export function Sidebar() {
           <OnboardingTour />
           <Outlet />
         </main>
-        {isImmersiveRoute(location.pathname) ? null : <MobileDock items={navItems} />}
+        {isImmersiveRoute(location.pathname) ? null : <MobileDock items={dockItems} />}
       </div>
     );
   }

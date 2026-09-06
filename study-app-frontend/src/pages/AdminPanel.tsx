@@ -281,7 +281,7 @@ export default function AdminPanel() {
           <Button variant="secondary" onClick={() => void handleAuth()} disabled={authLoading}>
             {authLoading ? "Renewing..." : "Renew session"}
           </Button>
-          <Button variant="danger" onClick={handleSignOut}>
+          <Button variant="danger-outline" onClick={handleSignOut}>
             Exit
           </Button>
         </div>

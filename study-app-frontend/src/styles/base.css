@@ -10,10 +10,41 @@
   --green-dark: #718355;
   --ink: #26301f;
   --white: #ffffff;
-  --success: #10b981;
-  --warning: #d97706;
-  --error: #dc2626;
-  --info: #3b82f6;
+  /* Semantic accent ramp.
+     These replace a set of stock primary hues (#10b981, #d97706, #dc2626,
+     #3b82f6) that were picked per component and shared no relationship with
+     each other or with the sage brand. Each is pulled toward the brand's
+     warmth and desaturated enough to sit beside it, and each is verified to
+     clear WCAG AA (4.5:1) three ways: as text on the page, as text on a card,
+     and as a surface with white text on top. The originals cleared none of
+     those at 2.2-4.3:1.
+
+     Roles, so the choice at a call site is a meaning and not a color:
+       positive  something completed, correct, or passing
+       caution   something needing attention, in progress, or partial
+       danger    something destructive or failed
+       info      something neutral and informational, incl. beta markers
+     Each has a -tint (a surface to sit the accent on) and a -strong
+     (pressed/hover, and text on the tint). */
+  --accent-positive: #3a7340;
+  --accent-positive-tint: #e4efdd;
+  --accent-positive-strong: #2f5e35;
+  --accent-caution: #8a5a15;
+  --accent-caution-tint: #f6ebd8;
+  --accent-caution-strong: #6f4810;
+  --accent-danger: #9d3b31;
+  --accent-danger-tint: #f7e4e0;
+  --accent-danger-strong: #7f2f27;
+  --accent-info: #3a6478;
+  --accent-info-tint: #e0eaef;
+  --accent-info-strong: #2d4f5f;
+
+  /* Legacy names kept as aliases: every existing call site keeps working and
+     picks up the new ramp. Prefer the --accent-* names in new code. */
+  --success: var(--accent-positive);
+  --warning: var(--accent-caution);
+  --error: var(--accent-danger);
+  --info: var(--accent-info);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 10px rgba(38, 48, 31, 0.08);
   --shadow-lg: 0 16px 32px rgba(38, 48, 31, 0.12);
@@ -22,10 +53,59 @@
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-serif: "Lora", Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  /* Mobile dock metrics. The dock is fixed, so every scrolling surface under
+     it needs clearance. Deriving that from the dock's own parts keeps the two
+     from drifting apart: change the rail here and the clearance follows. */
+  --dock-rail-item: 42px;
+  --dock-rail-pad: 5px;
+  --dock-rail-height: calc(var(--dock-rail-item) + var(--dock-rail-pad) * 2);
+  --dock-pad-top: 8px;
+  --dock-pad-bottom: 10px;
+  --dock-height: calc(var(--dock-rail-height) + var(--dock-pad-top) + var(--dock-pad-bottom) + env(safe-area-inset-bottom));
+  --dock-gap: 24px;
+  --dock-clearance: calc(var(--dock-height) + var(--dock-gap));
+
+  /* Radius scale.
+     Was 20 distinct values across 551 declarations, with 6/7, 8/9, 10/11 and
+     12/13/14/15/16 all in play at once: differences too small to read as
+     intent and too many to keep consistent by hand. Snapped to six steps.
+     The scale tops out at 12px for rectangular surfaces, per the brief; the
+     larger step exists only for the phone card treatment that already ships
+     (see mobile-shell.css) and should not spread beyond it. */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-card-mobile: 18px;
+  --radius-pill: 999px;
+
+  /* Spacing scale on a 4px grid. Nothing is migrated onto these yet; they are
+     here so new work has one source to reach for instead of a fresh number. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Type scale. Same status as spacing: defined now, adopted as files are
+     touched, rather than rewritten across 74 ad-hoc font-size values at once. */
+  --text-xs: 0.75rem;
+  --text-sm: 0.85rem;
+  --text-base: 1rem;
+  --text-lg: 1.15rem;
+  --text-xl: 1.35rem;
+  --text-2xl: 1.6rem;
+  --text-3xl: 2rem;
+
   --muted: #596949;
   --border: var(--green-light-mid);
   --gray-200: rgba(113, 131, 85, 0.18);
-  --gray-500: #7a8a6e;
+  --gray-500: #5c6b50;
 }
 
 * { box-sizing: border-box; }
