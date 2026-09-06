@@ -346,6 +346,35 @@ export async function resetOnboarding(): Promise<void> {
   }
 }
 
+// Sets what the user wants to be called. Sending an empty string clears the
+// preference and falls display back to the name on their Google account.
+export async function updatePreferredName(name: string): Promise<AuthUser> {
+  const user = await request<AuthUser>("/auth/preferred-name", {
+    method: "POST",
+    body: JSON.stringify({ preferred_name: name.trim() || null }),
+  });
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  return user;
+}
+
+// The short name to greet someone by. A preferred name is used verbatim, since
+// someone who asked to be called "JJ" did not ask to be called "JJ Something";
+// a Google full name is still reduced to its first word, which is what the
+// dashboard did before preferred names existed.
+export function getGreetingName(): string {
+  const user = getStoredUser();
+  const preferred = user?.preferred_name?.trim();
+  if (preferred) return preferred;
+
+  const fullName = user?.full_name?.trim();
+  if (fullName) return fullName.split(/\s+/)[0];
+
+  const emailName = user?.email?.split("@")[0]?.trim();
+  if (emailName) return emailName.charAt(0).toUpperCase() + emailName.slice(1);
+
+  return "Unknown User";
+}
+
 export async function submitDateOfBirth(dob: string): Promise<AuthUser> {
   const user = await request<AuthUser>("/auth/date-of-birth", {
     method: "POST",

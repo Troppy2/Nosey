@@ -4,7 +4,7 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { CollapsibleSection } from "../components/CollapsibleSection";
 import { ConfirmModal, TypeToConfirmModal } from "../components/ConfirmModal";
-import { SelectInput } from "../components/Field";
+import { SelectInput, TextInput } from "../components/Field";
 import { SkeletonList } from "../components/Skeletons";
 import {
   deleteAccount,
@@ -19,6 +19,7 @@ import {
   isGuestSession,
   refreshKojoMemory,
   resetOnboarding,
+  updatePreferredName,
   restoreKojoConversation,
   scopeKey,
   setGoogleSession,
@@ -50,6 +51,8 @@ export default function Settings() {
   // sign-in affordances and the guest pitch are only meaningful before this.
   const isSignedIn = !!user && !guest;
   const [loading, setLoading] = useState(false);
+  const [preferredName, setPreferredName] = useState(() => getStoredUser()?.preferred_name ?? "");
+  const [savingName, setSavingName] = useState(false);
   const [signInError, setSignInError] = useState<string | null>(null);
   const [signInSuccess, setSignInSuccess] = useState(false);
   const [clearedConversations, setClearedConversations] = useState<KojoClearedConversation[]>([]);
@@ -294,7 +297,7 @@ export default function Settings() {
       <Card className="settings-card">
         <div className="settings-summary">
           <span className="pill">{guest ? "Guest session" : user ? "Signed in" : "Signed out"}</span>
-          <h2>{user?.full_name ?? "No active session"}</h2>
+          <h2>{user?.display_name ?? user?.full_name ?? "No active session"}</h2>
           {user?.email ? <p className="muted small">{user.email}</p> : null}
           {guest ? (
             <p className="muted">
@@ -478,6 +481,49 @@ export default function Settings() {
         ) : null}
 
         <h2 className="settings-group-title">App preferences</h2>
+
+        {isSignedIn ? (
+          <CollapsibleSection title="What we call you">
+            <p className="muted small">
+              Used to greet you on the dashboard. Leave it empty to go
+              back to the name on your Google account.
+            </p>
+            <div className="settings-name-row">
+              <TextInput
+                label="Preferred name"
+                id="preferred-name"
+                value={preferredName}
+                maxLength={60}
+                placeholder={user?.full_name ?? "Your name"}
+                onChange={(e) => setPreferredName(e.target.value)}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={savingName || preferredName.trim() === (user?.preferred_name ?? "").trim()}
+                onClick={async () => {
+                  setSavingName(true);
+                  try {
+                    const updated = await updatePreferredName(preferredName);
+                    setUser(updated);
+                    setPreferredName(updated.preferred_name ?? "");
+                    toast.success(
+                      updated.preferred_name
+                        ? `We will call you ${updated.preferred_name}.`
+                        : "Back to the name on your Google account.",
+                    );
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Could not save that name");
+                  } finally {
+                    setSavingName(false);
+                  }
+                }}
+              >
+                {savingName ? "Saving" : "Save name"}
+              </Button>
+            </div>
+          </CollapsibleSection>
+        ) : null}
 
         {!guest && betaMode ? (
           <CollapsibleSection title="Beta features">

@@ -46,6 +46,12 @@ class User(Base, TimestampMixin):
     admin_session_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
     date_of_birth: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     age: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # What the user asked to be called, if anything. Deliberately NOT a
+    # rewrite of full_name: create_or_update() overwrites full_name from the
+    # Google profile on every single sign-in, so a preferred name stored there
+    # would silently revert the next time the user logged in. NULL means "no
+    # preference", and display falls back to full_name.
+    preferred_name: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
     # Server-side record that the first-run walkthrough was finished or skipped.
     # localStorage alone could not carry this: it is per-browser, so a cleared
     # cache, a second device, or a guest promoting to a real account all made

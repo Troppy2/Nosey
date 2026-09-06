@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 
 class GoogleAuthRequest(BaseModel):
@@ -14,12 +14,18 @@ class DateOfBirthRequest(BaseModel):
     date_of_birth: date
 
 
+class PreferredNameRequest(BaseModel):
+    # None or blank clears the preference and falls display back to full_name.
+    preferred_name: Optional[str] = Field(default=None, max_length=60)
+
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     email: str
     full_name: Optional[str] = None
+    preferred_name: Optional[str] = None
     profile_picture_url: Optional[str] = None
     is_admin: bool = False
     is_beta: bool = False
@@ -27,6 +33,17 @@ class UserResponse(BaseModel):
     date_of_birth: Optional[date] = None
     age: Optional[int] = None
     onboarding_completed_at: Optional[datetime] = None
+
+    @computed_field
+    @property
+    def display_name(self) -> str:
+        """The one name the UI should show. Computed here so the greeting, the
+        settings header and the mock interviewer cannot drift apart."""
+        for candidate in (self.preferred_name, self.full_name):
+            if candidate and candidate.strip():
+                return candidate.strip()
+        local = self.email.split("@")[0].strip()
+        return local[:1].upper() + local[1:] if local else "there"
 
     @computed_field
     @property

@@ -24206,3 +24206,18 @@ button.lc-official-link:disabled:hover {
 .eyebrow-group--described {
   margin-bottom: 6px;
 }
+
+/* Preferred-name row in Settings: the field grows, the save button keeps its
+   intrinsic width, and they align on the input rather than the label. */
+.settings-name-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.settings-name-row .field {
+  flex: 1 1 220px;
+  min-width: 0;
+  margin-bottom: 0;
+}
