@@ -24065,3 +24065,17 @@ button.lc-official-link:disabled:hover {
 .lc-rail-back-btn {
   display: none;
 }
+
+/* ── Group labels (Create a practice test) ────────────────────────────────── */
+/* An .eyebrow that heads a GROUP of controls rather than sitting above a page
+   heading. Was four inline style objects in CreateTest.tsx. The two spacings are a
+   real distinction, not drift: a label sits tighter to a description paragraph than
+   to the controls themselves. */
+.eyebrow-group {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.eyebrow-group--described {
+  margin-bottom: 6px;
+}

@@ -15,11 +15,16 @@
   margin-bottom: 36px;
 }
 
+/* Uppercase needs positive tracking: caps share a uniform height and tighter
+   sidebearings, so at letter-spacing 0 they clot together. Matches the tracking the
+   other uppercase labels already use (.lc-filter-label 0.07em, .ats-stamp 0.14em).
+   An eyebrow earns its place only when it names something the heading does not, so
+   it is deliberately absent from pages whose <h1> already says it. */
 .eyebrow {
   color: var(--green-dark);
   font-size: 0.78rem;
   font-weight: 700;
-  letter-spacing: 0;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
 }
 

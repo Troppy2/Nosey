@@ -179,7 +179,6 @@ export default function Flashcards() {
       <div className="page">
         <header className="page-header">
           <div>
-            <span className="eyebrow">Review</span>
             <h1>Flashcard Classes</h1>
             <p className="muted">Pick a class folder to start reviewing its flashcards.</p>
           </div>

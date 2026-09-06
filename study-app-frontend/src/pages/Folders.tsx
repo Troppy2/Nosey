@@ -108,7 +108,6 @@ export default function Folders() {
       <PullToRefreshIndicator pullPx={pullPx} isRefreshing={isRefreshing} />
       <header className="page-header">
         <div>
-          <span className="eyebrow">Library</span>
           <h1>Folders</h1>
           <p className="muted">Organize tests and flashcards by subject or exam.</p>
         </div>

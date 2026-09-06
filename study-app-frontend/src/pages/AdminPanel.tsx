@@ -265,7 +265,6 @@ export default function AdminPanel() {
     <div className="page">
       <header className="page-header">
         <div>
-          <span className="eyebrow">Admin</span>
           <h1>Admin panel</h1>
           <p className="muted">Platform overview, feature health, and LLM provider stats.</p>
         </div>

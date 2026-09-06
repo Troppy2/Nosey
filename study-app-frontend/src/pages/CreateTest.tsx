@@ -275,7 +275,6 @@ export default function CreateTest() {
       </Link>
       <header className="page-header">
         <div>
-          <span className="eyebrow">Generate</span>
           <h1>Create a practice test</h1>
           <p className="muted">
             Upload PDF, DOCX, TXT, or Markdown documents ({MAX_UPLOAD_FILE_SIZE_MB} MB each, {MAX_UPLOAD_TOTAL_SIZE_MB} MB total), or use files already saved in the folder, and choose the question style Nosey should generate.
@@ -422,7 +421,7 @@ export default function CreateTest() {
 
                 {/* Difficulty */}
                 <div>
-                  <span className="eyebrow" style={{ display: "block", marginBottom: 10 }}>Difficulty</span>
+                  <span className="eyebrow eyebrow-group">Difficulty</span>
                   <div className="choice-grid">
                     {(["easy", "medium", "hard", "mixed"] as const).map((d) => (
                       <button
@@ -482,7 +481,7 @@ export default function CreateTest() {
 
                 {/* Question counts */}
                 <div>
-                  <span className="eyebrow" style={{ display: "block", marginBottom: 10 }}>Question count</span>
+                  <span className="eyebrow eyebrow-group">Question count</span>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                     <div className="field">
                       <label className="field-label" htmlFor="count-mcq">MCQ questions</label>
@@ -518,7 +517,7 @@ export default function CreateTest() {
                 {/* Extra question types (beta) */}
                 {betaMode && (
                   <div className="extra-types-section">
-                    <span className="eyebrow" style={{ display: "block", marginBottom: 6 }}>
+                    <span className="eyebrow eyebrow-group eyebrow-group--described">
                       Extra question types <span className="pill pill--beta">Beta</span>
                     </span>
                     <p className="muted" style={{ marginTop: 0, marginBottom: 10, fontSize: "0.8rem" }}>
@@ -567,7 +566,7 @@ export default function CreateTest() {
 
                 {/* Practice test upload */}
                 <div>
-                  <span className="eyebrow" style={{ display: "block", marginBottom: 8 }}>Upload practice test</span>
+                  <span className="eyebrow eyebrow-group eyebrow-group--described">Upload practice test</span>
                   <p className="muted" style={{ marginTop: 0, marginBottom: 10, fontSize: "0.875rem" }}>
                     Upload an existing practice test , Nosey will extract and recreate the questions. If the folder already has saved files, Nosey can also use those for test generation.
                   </p>

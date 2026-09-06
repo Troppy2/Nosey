@@ -34,7 +34,6 @@ export default function LearningModes() {
       <div className="page">
         <header className="page-header">
           <div>
-            <span className="eyebrow">Study</span>
             <h1>Learning Modes</h1>
             <p className="muted">Pick a class folder, then choose how you want to study it.</p>
           </div>
