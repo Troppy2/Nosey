@@ -10428,9 +10428,13 @@ select[class*="lc-"]:focus-visible {
     border-left: none;
   }
 
-  /* KojoMode full-page: subtract the mobile topbar (~61px) so the chat doesn't overflow */
+  /* KojoMode full-page. This used to subtract 61px for the mobile topbar, but the
+     mobile shell redesign (2026-09-04) removed that bar: Sidebar.tsx returns the
+     dock shell early and never renders .mobile-topbar, and below 760px the shell
+     is ALWAYS the mobile one, so the bar can never be present here. The reserved
+     61px was showing as a band of page green under the composer. */
   .chat-mode-shell {
-    height: calc(100dvh - 61px);
+    height: 100dvh;
   }
 
   /* Flashcard manage: row-actions must stay auto-width inside the flex row */
