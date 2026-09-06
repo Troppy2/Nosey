@@ -354,6 +354,9 @@ export type AuthUser = {
   id: ID;
   email: string;
   full_name?: string | null;
+  preferred_name?: string | null;
+  /** Server-computed: preferred_name, else full_name, else the email local part. */
+  display_name?: string;
   profile_picture_url?: string | null;
   is_guest?: boolean;
   is_admin?: boolean;

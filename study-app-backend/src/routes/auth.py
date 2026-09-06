@@ -10,7 +10,13 @@ from src.database import get_session
 from src.dependencies import get_current_user
 from src.models.user import User
 from src.repositories.user_repository import UserRepository
-from src.schemas.auth_schema import AuthResponse, DateOfBirthRequest, GoogleAuthRequest, UserResponse
+from src.schemas.auth_schema import (
+    AuthResponse,
+    DateOfBirthRequest,
+    GoogleAuthRequest,
+    PreferredNameRequest,
+    UserResponse,
+)
 from src.services.auth_service import AuthService
 from src.services.rag_service import HybridRAGService
 from src.limiter import limiter
@@ -83,6 +89,27 @@ async def set_date_of_birth(
     except Exception as exc:
         logger.exception("Unexpected error setting date of birth")
         raise HTTPException(status_code=500, detail="Failed to save date of birth") from exc
+
+
+@router.post("/preferred-name", response_model=UserResponse)
+async def set_preferred_name(
+    request: PreferredNameRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserResponse:
+    """Set what the user wants to be called, or clear it by sending blank."""
+    name = (request.preferred_name or "").strip()
+    # Newlines and control characters would break every place the name is
+    # interpolated, including the mock interviewer's prompt.
+    if any(ch < " " or ch == "" for ch in name):
+        raise HTTPException(status_code=400, detail="Preferred name cannot contain line breaks")
+    try:
+        user = await UserRepository(session).set_preferred_name(current_user, name)
+        await session.commit()
+        return UserResponse.model_validate(user)
+    except Exception as exc:
+        logger.exception("Unexpected error setting preferred name")
+        raise HTTPException(status_code=500, detail="Failed to save preferred name") from exc
 
 
 @router.post("/onboarding-complete", response_model=UserResponse)

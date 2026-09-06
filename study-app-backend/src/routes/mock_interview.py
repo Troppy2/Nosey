@@ -178,6 +178,10 @@ def _culture_hint(row: MockInterviewSession) -> str:
 
 
 def _candidate_name(user: User) -> str:
+    # A preferred name is used verbatim: someone who asked to be called "Sam"
+    # or "Dr Okafor" does not want it split on whitespace.
+    if user.preferred_name and user.preferred_name.strip():
+        return user.preferred_name.strip()
     if user.full_name:
         return user.full_name.split()[0]
     return "there"

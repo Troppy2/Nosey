@@ -6935,6 +6935,14 @@
         "documentation": {}
     },
     {
+        "label": "op",
+        "importPath": "alembic",
+        "description": "alembic",
+        "isExtraImport": true,
+        "detail": "alembic",
+        "documentation": {}
+    },
+    {
         "label": "context",
         "importPath": "alembic",
         "description": "alembic",
@@ -8592,6 +8600,14 @@
         "documentation": {}
     },
     {
+        "label": "Field",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
         "label": "computed_field",
         "importPath": "pydantic",
         "description": "pydantic",
@@ -9113,6 +9129,14 @@
     },
     {
         "label": "GoogleAuthRequest",
+        "importPath": "src.schemas.auth_schema",
+        "description": "src.schemas.auth_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.auth_schema",
+        "documentation": {}
+    },
+    {
+        "label": "PreferredNameRequest",
         "importPath": "src.schemas.auth_schema",
         "description": "src.schemas.auth_schema",
         "isExtraImport": true,
@@ -17168,6 +17192,60 @@
     {
         "label": "upgrade",
         "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.054_add_preferred_name",
+        "description": "study-app-backend.src.migrations.versions.054_add_preferred_name",
+        "peekOfCode": "def upgrade() -> None:\n    op.add_column(\"users\", sa.Column(\"preferred_name\", sa.String(length=60), nullable=True))\ndef downgrade() -> None:\n    op.drop_column(\"users\", \"preferred_name\")",
+        "detail": "study-app-backend.src.migrations.versions.054_add_preferred_name",
+        "documentation": {}
+    },
+    {
+        "label": "downgrade",
+        "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.054_add_preferred_name",
+        "description": "study-app-backend.src.migrations.versions.054_add_preferred_name",
+        "peekOfCode": "def downgrade() -> None:\n    op.drop_column(\"users\", \"preferred_name\")",
+        "detail": "study-app-backend.src.migrations.versions.054_add_preferred_name",
+        "documentation": {}
+    },
+    {
+        "label": "revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.054_add_preferred_name",
+        "description": "study-app-backend.src.migrations.versions.054_add_preferred_name",
+        "peekOfCode": "revision = \"054_add_preferred_name\"\ndown_revision = \"053_add_onboarding_completed\"\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.add_column(\"users\", sa.Column(\"preferred_name\", sa.String(length=60), nullable=True))\ndef downgrade() -> None:\n    op.drop_column(\"users\", \"preferred_name\")",
+        "detail": "study-app-backend.src.migrations.versions.054_add_preferred_name",
+        "documentation": {}
+    },
+    {
+        "label": "down_revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.054_add_preferred_name",
+        "description": "study-app-backend.src.migrations.versions.054_add_preferred_name",
+        "peekOfCode": "down_revision = \"053_add_onboarding_completed\"\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.add_column(\"users\", sa.Column(\"preferred_name\", sa.String(length=60), nullable=True))\ndef downgrade() -> None:\n    op.drop_column(\"users\", \"preferred_name\")",
+        "detail": "study-app-backend.src.migrations.versions.054_add_preferred_name",
+        "documentation": {}
+    },
+    {
+        "label": "branch_labels",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.054_add_preferred_name",
+        "description": "study-app-backend.src.migrations.versions.054_add_preferred_name",
+        "peekOfCode": "branch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.add_column(\"users\", sa.Column(\"preferred_name\", sa.String(length=60), nullable=True))\ndef downgrade() -> None:\n    op.drop_column(\"users\", \"preferred_name\")",
+        "detail": "study-app-backend.src.migrations.versions.054_add_preferred_name",
+        "documentation": {}
+    },
+    {
+        "label": "depends_on",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.054_add_preferred_name",
+        "description": "study-app-backend.src.migrations.versions.054_add_preferred_name",
+        "peekOfCode": "depends_on = None\ndef upgrade() -> None:\n    op.add_column(\"users\", sa.Column(\"preferred_name\", sa.String(length=60), nullable=True))\ndef downgrade() -> None:\n    op.drop_column(\"users\", \"preferred_name\")",
+        "detail": "study-app-backend.src.migrations.versions.054_add_preferred_name",
+        "documentation": {}
+    },
+    {
+        "label": "upgrade",
+        "kind": 2,
         "importPath": "study-app-backend.src.migrations.versions.30e3a0b7d13b_add_admin_fields_and_usage_events",
         "description": "study-app-backend.src.migrations.versions.30e3a0b7d13b_add_admin_fields_and_usage_events",
         "peekOfCode": "def upgrade() -> None:\n    # ### commands auto generated by Alembic - please adjust! ###\n    op.create_table('usage_events',\n    sa.Column('id', sa.BigInteger().with_variant(sa.Integer(), 'sqlite'), autoincrement=True, nullable=False),\n    sa.Column('user_id', sa.BigInteger().with_variant(sa.Integer(), 'sqlite'), nullable=False),\n    sa.Column('feature', sa.String(length=50), nullable=False),\n    sa.Column('duration_ms', sa.Integer(), nullable=False),\n    sa.Column('estimated_tokens', sa.Integer(), nullable=True),\n    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),\n    sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),",
@@ -18610,7 +18688,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.auth_schema",
         "description": "study-app-backend.src.schemas.auth_schema",
-        "peekOfCode": "class GoogleAuthRequest(BaseModel):\n    token: str\nclass DateOfBirthRequest(BaseModel):\n    date_of_birth: date\nclass UserResponse(BaseModel):\n    model_config = ConfigDict(from_attributes=True)\n    id: int\n    email: str\n    full_name: Optional[str] = None\n    profile_picture_url: Optional[str] = None",
+        "peekOfCode": "class GoogleAuthRequest(BaseModel):\n    token: str\nclass DateOfBirthRequest(BaseModel):\n    date_of_birth: date\nclass PreferredNameRequest(BaseModel):\n    # None or blank clears the preference and falls display back to full_name.\n    preferred_name: Optional[str] = Field(default=None, max_length=60)\nclass UserResponse(BaseModel):\n    model_config = ConfigDict(from_attributes=True)\n    id: int",
         "detail": "study-app-backend.src.schemas.auth_schema",
         "documentation": {}
     },
@@ -18619,7 +18697,16 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.auth_schema",
         "description": "study-app-backend.src.schemas.auth_schema",
-        "peekOfCode": "class DateOfBirthRequest(BaseModel):\n    date_of_birth: date\nclass UserResponse(BaseModel):\n    model_config = ConfigDict(from_attributes=True)\n    id: int\n    email: str\n    full_name: Optional[str] = None\n    profile_picture_url: Optional[str] = None\n    is_admin: bool = False\n    is_beta: bool = False",
+        "peekOfCode": "class DateOfBirthRequest(BaseModel):\n    date_of_birth: date\nclass PreferredNameRequest(BaseModel):\n    # None or blank clears the preference and falls display back to full_name.\n    preferred_name: Optional[str] = Field(default=None, max_length=60)\nclass UserResponse(BaseModel):\n    model_config = ConfigDict(from_attributes=True)\n    id: int\n    email: str\n    full_name: Optional[str] = None",
+        "detail": "study-app-backend.src.schemas.auth_schema",
+        "documentation": {}
+    },
+    {
+        "label": "PreferredNameRequest",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.auth_schema",
+        "description": "study-app-backend.src.schemas.auth_schema",
+        "peekOfCode": "class PreferredNameRequest(BaseModel):\n    # None or blank clears the preference and falls display back to full_name.\n    preferred_name: Optional[str] = Field(default=None, max_length=60)\nclass UserResponse(BaseModel):\n    model_config = ConfigDict(from_attributes=True)\n    id: int\n    email: str\n    full_name: Optional[str] = None\n    preferred_name: Optional[str] = None\n    profile_picture_url: Optional[str] = None",
         "detail": "study-app-backend.src.schemas.auth_schema",
         "documentation": {}
     },
@@ -18628,7 +18715,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.auth_schema",
         "description": "study-app-backend.src.schemas.auth_schema",
-        "peekOfCode": "class UserResponse(BaseModel):\n    model_config = ConfigDict(from_attributes=True)\n    id: int\n    email: str\n    full_name: Optional[str] = None\n    profile_picture_url: Optional[str] = None\n    is_admin: bool = False\n    is_beta: bool = False\n    email_verified: bool = False\n    date_of_birth: Optional[date] = None",
+        "peekOfCode": "class UserResponse(BaseModel):\n    model_config = ConfigDict(from_attributes=True)\n    id: int\n    email: str\n    full_name: Optional[str] = None\n    preferred_name: Optional[str] = None\n    profile_picture_url: Optional[str] = None\n    is_admin: bool = False\n    is_beta: bool = False\n    email_verified: bool = False",
         "detail": "study-app-backend.src.schemas.auth_schema",
         "documentation": {}
     },

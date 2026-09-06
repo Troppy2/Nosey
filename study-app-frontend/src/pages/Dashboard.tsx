@@ -8,7 +8,7 @@ import { ConfirmModal, RenameModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
 import { SkeletonFolderMiniGrid, SkeletonStatGrid, SkeletonTestRows, SkeletonWeakStack } from "../components/Skeletons";
 import { PullToRefreshIndicator } from "../components/PullToRefreshIndicator";
-import { deleteTest, fetchFlashcards, fetchFolders, fetchTests, getResumableTests, getStoredUser, scopeKey, updateTest } from "../lib/api";
+import { deleteTest, fetchFlashcards, fetchFolders, fetchTests, getGreetingName, getResumableTests, scopeKey, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
 import { toast } from "../lib/toast";
 import { usePullToRefresh } from "../lib/usePullToRefresh";
@@ -72,22 +72,6 @@ const OTHER_MESSAGES = [
   "Time to study perchance",
   "Put your phone on DND and get to work!",
 ];
-
-function getGreetingName() {
-  const user = getStoredUser();
-  const fullName = user?.full_name?.trim();
-
-  if (fullName) {
-    return fullName.split(/\s+/)[0];
-  }
-
-  const emailName = user?.email?.split("@")[0]?.trim();
-  if (emailName) {
-    return emailName.charAt(0).toUpperCase() + emailName.slice(1);
-  }
-
-  return "Unknown User";
-}
 
 function getTimeOfDayMessage(now = new Date()) {
   const hour = now.getHours();
