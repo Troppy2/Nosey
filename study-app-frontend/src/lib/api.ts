@@ -1618,19 +1618,39 @@ export async function fetchLCStreakChallenge(): Promise<import("./types").LCStre
   }
 }
 
-export async function createLCStreakChallenge(problemSlug?: string): Promise<import("./types").LCStreakChallenge | null> {
-  try {
-    return await request<import("./types").LCStreakChallenge>("/leetcode/streak-challenge", {
-      method: "POST",
-      body: JSON.stringify({ problem_slug: problemSlug ?? null }),
-    });
-  } catch {
-    return null;
-  }
+// Builds the rescue challenge. The backend reskins `seed` into a fresh problem aimed at
+// the weak topic (the same generation the Daily KojoCode uses) and falls back to
+// `problemSlug` from the catalog if the model is unreachable. Errors are thrown, not
+// swallowed: this is user-initiated and the card needs something to show.
+export async function createLCStreakChallenge(target: {
+  problemSlug: string;
+  topic?: string;
+  subtopic?: string | null;
+  targetDifficulty?: string;
+  seedSlug?: string;
+  seedTitle?: string;
+  provider?: string;
+}): Promise<import("./types").LCStreakChallenge> {
+  const body: Record<string, unknown> = { problem_slug: target.problemSlug };
+  if (target.topic) body.topic = target.topic;
+  if (target.subtopic) body.subtopic = target.subtopic;
+  if (target.targetDifficulty) body.target_difficulty = target.targetDifficulty;
+  if (target.seedSlug) body.seed_slug = target.seedSlug;
+  if (target.seedTitle) body.seed_title = target.seedTitle;
+  if (target.provider) body.provider = target.provider;
+  return request<import("./types").LCStreakChallenge>("/leetcode/streak-challenge", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
 
-export async function completeLCStreakChallenge(): Promise<void> {
-  await request("/leetcode/streak-challenge/complete", { method: "POST" });
+// `today` is the client's local calendar day. The server bridges the streak gap up to
+// it, and activity is keyed on local dates, so the server cannot derive it from UTC.
+export async function completeLCStreakChallenge(today: string): Promise<void> {
+  await request("/leetcode/streak-challenge/complete", {
+    method: "POST",
+    body: JSON.stringify({ today }),
+  });
 }
 
 // ── Daily KojoCode (beta-only) ────────────────────────────────────────────────

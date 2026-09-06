@@ -13132,100 +13132,182 @@ select.lc-custom-input {
   margin-top: 12px;
 }
 
-/* ── Save My Streak challenge (beta-only, tree-view bottom) ──────────────── */
-.lc-streak-section {
+/* ── Streak rescue card (Save My Streak, beta-only, tree-view bottom) ───── */
+/* Amber, not red: a paused streak is recoverable, and red is this app's danger colour
+   (destructive actions, failed grades). The card's one bold element is the chain, which
+   draws the user's real history: earned days, the gap, and today still open. */
+.lc-rescue {
+  --lc-rescue-accent: var(--warning);
+  --lc-rescue-deep: #92400e;
   margin-top: 30px;
-  padding-top: 22px;
-  border-top: 1px dashed color-mix(in srgb, #dc2626 28%, white);
-}
-
-.lc-streak-node {
-  display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) 36px;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 16px 18px;
-  border: 1.5px solid color-mix(in srgb, #dc2626 30%, white);
-  border-radius: 14px;
-  background: color-mix(in srgb, #dc2626 5%, white);
-  cursor: pointer;
-  text-align: left;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
-}
-
-.lc-streak-node:hover {
-  transform: translateY(-2px);
-  border-color: #dc2626;
-  box-shadow: 0 4px 18px color-mix(in srgb, #dc2626 18%, transparent);
-}
-
-.lc-streak-node-icon {
-  display: inline-grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
+  padding: 22px 24px;
+  border: 1px solid color-mix(in srgb, var(--lc-rescue-accent) 26%, white);
   border-radius: 12px;
-  background: color-mix(in srgb, #dc2626 12%, white);
-  color: #dc2626;
-  flex-shrink: 0;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--lc-rescue-accent) 5%, white), rgba(255, 255, 255, 0.9));
+  box-shadow: var(--shadow-sm);
 }
 
-.lc-streak-node-copy {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.lc-streak-node-title {
+.lc-rescue-head {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: baseline;
+  gap: 10px;
 }
 
-.lc-streak-node-title strong {
-  font-size: 1rem;
+.lc-rescue-title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  font-weight: 600;
   color: var(--ink);
 }
 
-.lc-streak-badge {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.lc-rescue-tag {
+  font-size: 0.7rem;
+  font-weight: 600;
   padding: 2px 7px;
   border-radius: 999px;
-  background: color-mix(in srgb, #dc2626 15%, white);
-  color: #dc2626;
-  border: 1px solid color-mix(in srgb, #dc2626 30%, white);
+  color: var(--lc-rescue-deep);
+  background: color-mix(in srgb, var(--lc-rescue-accent) 14%, white);
+  border: 1px solid color-mix(in srgb, var(--lc-rescue-accent) 28%, white);
 }
 
-.lc-streak-node-meta {
+/* The chain. Earned days are solid, the gap is hatched, today is an open outline. The
+   wider gaps between groups do the separating, so no dividers are needed. */
+.lc-rescue-chain {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
   flex-wrap: wrap;
+  margin: 18px 0 8px;
 }
 
-.lc-streak-node-desc {
-  font-size: 0.82rem;
-  color: #596949;
-  font-weight: 550;
-}
-
-.lc-streak-node-expires {
-  font-size: 0.78rem;
-  color: #dc2626;
-  font-weight: 600;
-}
-
-.lc-streak-node-flame {
-  color: #dc2626;
-  opacity: 0.8;
+.lc-rescue-cell {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
   flex-shrink: 0;
 }
 
-/* Banner shown inside the problem pane for streak challenge problems */
+.lc-rescue-cell--earned {
+  background: var(--green-dark);
+}
+
+.lc-rescue-cell--gap {
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--lc-rescue-accent) 30%, white) 0 2px,
+    transparent 2px 5px
+  );
+  border: 1px solid color-mix(in srgb, var(--lc-rescue-accent) 32%, white);
+}
+
+/* The first cell after the earned run opens the break, so it carries the extra space
+   that separates the two groups. .lc-rescue-cell--today sets its own below, for the
+   case where every missed day is the open slot. */
+.lc-rescue-cell--earned + .lc-rescue-cell--gap {
+  margin-left: 9px;
+}
+
+.lc-rescue-cell--today {
+  margin-left: 9px;
+  border: 1.5px dashed var(--lc-rescue-accent);
+  background: transparent;
+  animation: lc-rescue-breathe 2.6s ease-in-out infinite;
+}
+
+@keyframes lc-rescue-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.42; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-rescue-cell--today { animation: none; }
+}
+
+.lc-rescue-more {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-rescue-more--gap {
+  margin-left: 4px;
+  color: var(--lc-rescue-deep);
+}
+
+.lc-rescue-legend {
+  margin: 0 0 16px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-rescue-problem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid color-mix(in srgb, var(--lc-rescue-accent) 18%, white);
+}
+
+.lc-rescue-problem-title {
+  font-weight: 600;
+  color: var(--ink);
+  min-width: 0;
+}
+
+.lc-rescue-problem-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.lc-rescue-copy {
+  margin: 0 0 18px;
+  max-width: 62ch;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.lc-rescue-copy strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.lc-rescue-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 9px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--white);
+  background: var(--lc-rescue-accent);
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+
+.lc-rescue-action:hover:not(:disabled) {
+  background: var(--lc-rescue-deep);
+  transform: translateY(-1px);
+}
+
+.lc-rescue-action:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+/* Constraint notice shown inside the problem pane while solving a rescue. */
 .lc-streak-challenge-banner {
   display: flex;
   align-items: flex-start;
@@ -13233,9 +13315,9 @@ select.lc-custom-input {
   padding: 10px 14px;
   margin-bottom: 14px;
   border-radius: 10px;
-  background: color-mix(in srgb, #dc2626 7%, white);
-  border: 1px solid color-mix(in srgb, #dc2626 25%, white);
-  color: #991b1b;
+  background: color-mix(in srgb, var(--warning) 8%, white);
+  border: 1px solid color-mix(in srgb, var(--warning) 26%, white);
+  color: #92400e;
   font-size: 0.84rem;
   line-height: 1.5;
 }
@@ -13243,7 +13325,7 @@ select.lc-custom-input {
 .lc-streak-challenge-banner svg {
   flex-shrink: 0;
   margin-top: 2px;
-  color: #dc2626;
+  color: var(--warning);
 }
 
 /* Collapsible "Reasoning" dropdown on graded answers (Results page) */
