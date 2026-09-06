@@ -22,7 +22,7 @@
   color: var(--ink);
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(113, 131, 85, 0.16);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
   backdrop-filter: blur(12px);
   pointer-events: auto;
@@ -64,7 +64,7 @@
   padding: 0;
   color: var(--muted);
   background: transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast);
 }

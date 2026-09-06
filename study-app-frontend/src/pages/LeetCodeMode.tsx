@@ -145,7 +145,6 @@ type Category = {
   id: string;
   label: string;
   icon: LucideIcon;
-  accent: string;
   problems: Problem[];
 };
 
@@ -498,24 +497,24 @@ const CHAT_COMMANDS: SlashCommand[] = [
 ];
 
 const CATEGORY_META: Record<string, Omit<Category, "problems">> = {
-  arrays: { id: "arrays", label: "Arrays", icon: ListChecks, accent: "#16a34a" },
-  strings: { id: "strings", label: "Strings", icon: Braces, accent: "#0891b2" },
-  "hash-table": { id: "hash-table", label: "Hash Table", icon: Hash, accent: "#7c3aed" },
-  "linked-list": { id: "linked-list", label: "Linked List", icon: Link2, accent: "#d97706" },
-  stack: { id: "stack", label: "Stack", icon: Layers3, accent: "#dc2626" },
-  "heap-priority-queue": { id: "heap-priority-queue", label: "Heap / Priority Queue", icon: PanelRightOpen, accent: "#2563eb" },
-  tree: { id: "tree", label: "Tree", icon: GitBranch, accent: "#15803d" },
-  "binary-search": { id: "binary-search", label: "Binary Search", icon: Search, accent: "#0f766e" },
-  "sliding-window": { id: "sliding-window", label: "Sliding Window", icon: Route, accent: "#ea580c" },
-  dp: { id: "dp", label: "Dynamic Programming", icon: Binary, accent: "#9333ea" },
-  backtracking: { id: "backtracking", label: "Backtracking", icon: GitBranch, accent: "#be123c" },
-  graph: { id: "graph", label: "Graph", icon: Network, accent: "#0284c7" },
-  design: { id: "design", label: "Design", icon: BookOpen, accent: "#ca8a04" },
-  advanced: { id: "advanced", label: "Advanced", icon: Trophy, accent: "#4f46e5" },
-  math: { id: "math", label: "Math", icon: Calculator, accent: "#059669" },
-  "bit-manipulation": { id: "bit-manipulation", label: "Bit Manipulation", icon: Code2, accent: "#64748b" },
-  intervals: { id: "intervals", label: "Intervals", icon: PanelRightOpen, accent: "#b45309" },
-  extra: { id: "extra", label: "Extra", icon: Trophy, accent: "#db2777" },
+  arrays: { id: "arrays", label: "Arrays", icon: ListChecks },
+  strings: { id: "strings", label: "Strings", icon: Braces },
+  "hash-table": { id: "hash-table", label: "Hash Table", icon: Hash },
+  "linked-list": { id: "linked-list", label: "Linked List", icon: Link2 },
+  stack: { id: "stack", label: "Stack", icon: Layers3 },
+  "heap-priority-queue": { id: "heap-priority-queue", label: "Heap / Priority Queue", icon: PanelRightOpen },
+  tree: { id: "tree", label: "Tree", icon: GitBranch },
+  "binary-search": { id: "binary-search", label: "Binary Search", icon: Search },
+  "sliding-window": { id: "sliding-window", label: "Sliding Window", icon: Route },
+  dp: { id: "dp", label: "Dynamic Programming", icon: Binary },
+  backtracking: { id: "backtracking", label: "Backtracking", icon: GitBranch },
+  graph: { id: "graph", label: "Graph", icon: Network },
+  design: { id: "design", label: "Design", icon: BookOpen },
+  advanced: { id: "advanced", label: "Advanced", icon: Trophy },
+  math: { id: "math", label: "Math", icon: Calculator },
+  "bit-manipulation": { id: "bit-manipulation", label: "Bit Manipulation", icon: Code2 },
+  intervals: { id: "intervals", label: "Intervals", icon: PanelRightOpen },
+  extra: { id: "extra", label: "Extra", icon: Trophy },
 };
 
 // SUBTOPICS_BY_TOPIC now lives in the shared taxonomy module (imported at the top),
@@ -568,7 +567,7 @@ function buildCategories(): Category[] {
   });
 
   return Array.from(grouped.entries()).map(([id, problems]) => {
-    const meta = CATEGORY_META[id] ?? { id, label: problems[0]?.categoryLabel ?? id, icon: Code2, accent: "#718355" };
+    const meta = CATEGORY_META[id] ?? { id, label: problems[0]?.categoryLabel ?? id, icon: Code2 };
     return { ...meta, problems };
   });
 }
@@ -1494,8 +1493,8 @@ function computeTopicStats(progress: Record<string, boolean>): TopicStat[] {
 // signals) lands with the Phase 2 backend.
 function masteryColor(pct: number): string {
   if (pct >= 0.75) return "var(--green-dark)";
-  if (pct >= 0.45) return "#97a97c";
-  return "#c2681f";
+  if (pct >= 0.45) return "var(--green-mid)";
+  return "var(--accent-caution)";
 }
 
 function focusTopics(progress: Record<string, boolean>): TopicStat[] {
@@ -5493,6 +5492,8 @@ export default function LeetCodeMode() {
           </div>
         </header>
 
+        <h2 className="lc-zone-title">Progress</h2>
+
         <section className="lc-dashboard" aria-label="LeetCode progress dashboard">
           <div className="lc-dashboard-main">
             <span className="lc-stat-label">Total solved</span>
@@ -5524,6 +5525,8 @@ export default function LeetCodeMode() {
             <small>Hard</small><span className="lc-split-val lc-split-val--hard">{stats.hard}</span>
           </div>
         </section>
+
+        <h2 className="lc-zone-title">Practice</h2>
 
         <div className="lc-dash-row">
           <ActivityHeatmap
@@ -5562,12 +5565,14 @@ export default function LeetCodeMode() {
           />
         </div>
 
+        <h2 className="lc-zone-title">Topics</h2>
+
         <section className="lc-custom-section" aria-label="Custom questions">
           {(() => {
             const customDone = customCategoryList.filter((problem) => progress[problem.slug]).length;
             const customPct = customCategoryList.length ? Math.round((customDone / customCategoryList.length) * 100) : 0;
             return (
-              <div className="lc-custom-node" style={{ "--lc-accent": "#b45309" } as CSSProperties}>
+              <div className="lc-custom-node" style={{ "--lc-accent": "var(--accent-caution)" } as CSSProperties}>
                 <button
                   type="button"
                   className="lc-custom-node-main"
@@ -5603,7 +5608,7 @@ export default function LeetCodeMode() {
                 key={category.id}
                 type="button"
                 className="lc-node"
-                style={{ "--lc-accent": category.accent } as CSSProperties}
+                style={{ "--lc-accent": masteryColor(category.problems.length ? done / category.problems.length : 0) } as CSSProperties}
                 data-side={index % 2 === 0 ? "left" : "right"}
                 onClick={() => setView({ type: "category", categoryId: category.id })}
               >
@@ -5647,7 +5652,7 @@ export default function LeetCodeMode() {
         <LeftRail active="practice" streak={stats.currentStreak} onNavigate={setView} />
         <div className="page page-narrow lc-page lc-shell-body">
           <header className="lc-category-header">
-            <div className="lc-category-title-row" style={{ "--lc-accent": "#9333ea" } as CSSProperties}>
+            <div className="lc-category-title-row" style={{ "--lc-accent": "var(--green-dark)" } as CSSProperties}>
               <span className="lc-node-icon"><Sparkles size={22} /></span>
               <div>
                 <h1>Weak-Area Practice</h1>
@@ -5853,7 +5858,7 @@ export default function LeetCodeMode() {
         <LeftRail active="banks" streak={stats.currentStreak} onNavigate={setView} />
         <div className="page page-narrow lc-page lc-shell-body">
           <header className="lc-category-header">
-            <div className="lc-category-title-row" style={{ "--lc-accent": "#0ea5e9" } as CSSProperties}>
+            <div className="lc-category-title-row" style={{ "--lc-accent": "var(--green-dark)" } as CSSProperties}>
               <span className="lc-node-icon"><BookOpen size={22} /></span>
               <div>
                 <h1>Interview Prep Banks</h1>
@@ -6157,7 +6162,7 @@ export default function LeetCodeMode() {
         <LeftRail active="drills" streak={stats.currentStreak} onNavigate={setView} />
         <div className="page page-narrow lc-page lc-shell-body">
           <header className="lc-category-header">
-            <div className="lc-category-title-row" style={{ "--lc-accent": "#0ea5e9" } as CSSProperties}>
+            <div className="lc-category-title-row" style={{ "--lc-accent": "var(--green-dark)" } as CSSProperties}>
               <span className="lc-node-icon"><Route size={22} /></span>
               <div>
                 <h1>3-Pass Drills</h1>
@@ -6309,7 +6314,7 @@ export default function LeetCodeMode() {
             <ChevronLeft size={16} />
             Dashboard
           </button>
-          <div className="lc-category-title-row" style={{ "--lc-accent": "#16a34a" } as CSSProperties}>
+          <div className="lc-category-title-row" style={{ "--lc-accent": "var(--green-dark)" } as CSSProperties}>
             <span className="lc-node-icon"><Search size={22} /></span>
             <div>
               <h1>Browse all problems</h1>
@@ -6406,7 +6411,7 @@ export default function LeetCodeMode() {
             <ChevronLeft size={16} />
             Dashboard
           </button>
-          <div className="lc-category-title-row" style={{ "--lc-accent": "#b45309" } as CSSProperties}>
+          <div className="lc-category-title-row" style={{ "--lc-accent": "var(--accent-caution)" } as CSSProperties}>
             <span className="lc-node-icon"><Code size={22} /></span>
             <div>
               <h1>{CUSTOM_CATEGORY_LABEL}</h1>
@@ -6551,7 +6556,7 @@ export default function LeetCodeMode() {
             <ChevronLeft size={16} />
             Dashboard
           </button>
-          <div className="lc-category-title-row" style={{ "--lc-accent": category.accent } as CSSProperties}>
+          <div className="lc-category-title-row" style={{ "--lc-accent": masteryColor(categoryProblems.length ? done / categoryProblems.length : 0) } as CSSProperties}>
             <span className="lc-node-icon"><Icon size={22} /></span>
             <div>
               <h1>{category.label}</h1>
@@ -7547,7 +7552,7 @@ export default function LeetCodeMode() {
               <button type="button" className="button lc-timeout-action lc-timeout-action--ghost" onClick={closeTimerPicker}>
                 Cancel
               </button>
-              <button type="button" className="button button--primary lc-timeout-action" onClick={applyTimerFromInput}>
+              <button type="button" className="button button-primary lc-timeout-action" onClick={applyTimerFromInput}>
                 Start timer
               </button>
             </div>
@@ -7617,7 +7622,7 @@ export default function LeetCodeMode() {
               </button>
               <button
                 type="button"
-                className="button button--primary lc-timeout-action"
+                className="button button-primary lc-timeout-action"
                 onClick={resetTimerState}
               >
                 Continue without timer

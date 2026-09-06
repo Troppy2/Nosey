@@ -155,9 +155,6 @@ export default function Folders() {
         </section>
       )}
 
-      <button className="floating-action" aria-label="Create folder" onClick={() => setIsModalOpen(true)} type="button">
-        <Plus size={24} />
-      </button>
 
       {isModalOpen ? (
         <div className="modal-backdrop" onMouseDown={() => setIsModalOpen(false)}>

@@ -2618,6 +2618,14 @@
         "documentation": {}
     },
     {
+        "label": "date",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
         "label": "datetime",
         "importPath": "datetime",
         "description": "datetime",
@@ -10883,6 +10891,14 @@
         "documentation": {}
     },
     {
+        "label": "LCReskinRequestBase",
+        "importPath": "src.schemas.leetcode_schema",
+        "description": "src.schemas.leetcode_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.leetcode_schema",
+        "documentation": {}
+    },
+    {
         "label": "LCSolutionArticleRequest",
         "importPath": "src.schemas.leetcode_schema",
         "description": "src.schemas.leetcode_schema",
@@ -10900,6 +10916,14 @@
     },
     {
         "label": "LCSolutionCodeComment",
+        "importPath": "src.schemas.leetcode_schema",
+        "description": "src.schemas.leetcode_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.leetcode_schema",
+        "documentation": {}
+    },
+    {
+        "label": "LCStreakChallengeCompleteRequest",
         "importPath": "src.schemas.leetcode_schema",
         "description": "src.schemas.leetcode_schema",
         "isExtraImport": true,
@@ -19131,7 +19155,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.leetcode_schema",
         "description": "study-app-backend.src.schemas.leetcode_schema",
-        "peekOfCode": "class LCCustomProblemSyncRequest(LCCustomProblemBase):\n    \"\"\"Upsert payload for a single custom problem (keyed by slug in the URL).\"\"\"\nclass LCCustomProblemResponse(LCCustomProblemBase):\n    slug: str\nclass LCCustomProblemListResponse(BaseModel):\n    problems: list[LCCustomProblemResponse] = Field(default_factory=list)\nclass LCReclassifyResponse(BaseModel):\n    \"\"\"Result of the one-time \"Regenerate topics\" backfill: how many stored custom\n    problems had their topic + subtopic (re)classified.\"\"\"\n    updated: int = 0",
+        "peekOfCode": "class LCCustomProblemSyncRequest(LCCustomProblemBase):\n    \"\"\"Upsert payload for a single custom problem (keyed by slug in the URL).\"\"\"\nclass LCCustomProblemResponse(LCCustomProblemBase):\n    slug: str\n    # How the problem came to exist: \"user\" for a hand-written one, \"daily_kojo\" for a\n    # generated Daily KojoCode problem, \"streak_rescue\" for a Save My Streak problem.\n    # The client filters generated rows out of the Custom Questions list on this, so it\n    # has to travel on the wire, not just live in the DB.\n    source: str = \"user\"\n    daily_date: Optional[str] = None",
         "detail": "study-app-backend.src.schemas.leetcode_schema",
         "documentation": {}
     },
@@ -19140,7 +19164,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.leetcode_schema",
         "description": "study-app-backend.src.schemas.leetcode_schema",
-        "peekOfCode": "class LCCustomProblemResponse(LCCustomProblemBase):\n    slug: str\nclass LCCustomProblemListResponse(BaseModel):\n    problems: list[LCCustomProblemResponse] = Field(default_factory=list)\nclass LCReclassifyResponse(BaseModel):\n    \"\"\"Result of the one-time \"Regenerate topics\" backfill: how many stored custom\n    problems had their topic + subtopic (re)classified.\"\"\"\n    updated: int = 0\nclass LCGenerateCustomProblemRequest(BaseModel):\n    \"\"\"The user pastes a function (or any code) and optionally a short hint of intent.",
+        "peekOfCode": "class LCCustomProblemResponse(LCCustomProblemBase):\n    slug: str\n    # How the problem came to exist: \"user\" for a hand-written one, \"daily_kojo\" for a\n    # generated Daily KojoCode problem, \"streak_rescue\" for a Save My Streak problem.\n    # The client filters generated rows out of the Custom Questions list on this, so it\n    # has to travel on the wire, not just live in the DB.\n    source: str = \"user\"\n    daily_date: Optional[str] = None\nclass LCCustomProblemListResponse(BaseModel):\n    problems: list[LCCustomProblemResponse] = Field(default_factory=list)",
         "detail": "study-app-backend.src.schemas.leetcode_schema",
         "documentation": {}
     },
@@ -19217,11 +19241,20 @@
         "documentation": {}
     },
     {
+        "label": "LCReskinRequestBase",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.leetcode_schema",
+        "description": "study-app-backend.src.schemas.leetcode_schema",
+        "peekOfCode": "class LCReskinRequestBase(BaseModel):\n    \"\"\"Shared shape for every \"reskin a catalog seed into a fresh problem\" request. The\n    client sends the weak topic, a target difficulty, and a seed problem it picked from\n    the catalog it owns (the backend has no catalog to pick one itself). Both the Daily\n    KojoCode question and the Save My Streak rescue are built this way.\"\"\"\n    topic: Optional[str] = Field(default=None, max_length=120)\n    # The weak subtopic being targeted (e.g. \"BFS\"); the reskin preserves it.\n    subtopic: Optional[str] = Field(default=None, max_length=120)\n    target_difficulty: str = Field(default=\"Medium\", max_length=20)\n    seed_slug: Optional[str] = Field(default=None, max_length=200)",
+        "detail": "study-app-backend.src.schemas.leetcode_schema",
+        "documentation": {}
+    },
+    {
         "label": "LCDailyProblemRequest",
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.leetcode_schema",
         "description": "study-app-backend.src.schemas.leetcode_schema",
-        "peekOfCode": "class LCDailyProblemRequest(BaseModel):\n    \"\"\"Client sends the weak topic, the target difficulty, and a seed problem slug it\n    picked from the catalog it owns (the backend has no catalog to pick one itself).\n    The backend reskins that seed into today's problem. The generated problem is\n    returned as a normal LCCustomProblemResponse and locked to one per calendar day.\"\"\"\n    topic: str = Field(..., min_length=1, max_length=120)\n    # The weak subtopic being targeted (e.g. \"BFS\"); the reskin preserves it.\n    subtopic: Optional[str] = Field(default=None, max_length=120)\n    target_difficulty: str = Field(default=\"Medium\", max_length=20)\n    seed_slug: str = Field(..., min_length=1, max_length=200)",
+        "peekOfCode": "class LCDailyProblemRequest(LCReskinRequestBase):\n    \"\"\"The generated problem is returned as a normal LCCustomProblemResponse and locked\n    to one per calendar day. Topic and seed are required here, unlike the rescue, whose\n    client can fall back to a catalog problem when it cannot pick a seed.\"\"\"\n    topic: str = Field(..., min_length=1, max_length=120)\n    seed_slug: str = Field(..., min_length=1, max_length=200)\n# ── Streak challenge (Save My Streak, beta-only) ──────────────────────────────\nclass LCStreakChallengeCreateRequest(LCReskinRequestBase):\n    \"\"\"A rescue generates a fresh problem aimed at the user's weakest area, reusing the\n    Daily KojoCode reskin.",
         "detail": "study-app-backend.src.schemas.leetcode_schema",
         "documentation": {}
     },
@@ -19230,7 +19263,16 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.leetcode_schema",
         "description": "study-app-backend.src.schemas.leetcode_schema",
-        "peekOfCode": "class LCStreakChallengeCreateRequest(BaseModel):\n    # The client picks the rescue problem (it owns the verified catalog, the\n    # difficulties, and the per-user completed state) and passes the slug here.\n    # Optional so an empty POST still works and falls back to a server default.\n    problem_slug: Optional[str] = None\nclass LCStreakChallengeResponse(BaseModel):\n    id: int\n    problem_slug: str\n    expires_at: Optional[str] = None\n    completed_at: Optional[str] = None",
+        "peekOfCode": "class LCStreakChallengeCreateRequest(LCReskinRequestBase):\n    \"\"\"A rescue generates a fresh problem aimed at the user's weakest area, reusing the\n    Daily KojoCode reskin.\n    problem_slug is the no-seed path only: it is used when the client could not pick a\n    seed at all (an exhausted catalog, or an older build). It is NOT a failure fallback,\n    because a challenge has no expiry and create is create-or-return, so a rescue\n    silently downgraded to a catalog problem could never be regenerated. A failed\n    generation raises 503 instead and the card's button retries.\"\"\"\n    problem_slug: Optional[str] = None\nclass LCStreakChallengeCompleteRequest(BaseModel):",
+        "detail": "study-app-backend.src.schemas.leetcode_schema",
+        "documentation": {}
+    },
+    {
+        "label": "LCStreakChallengeCompleteRequest",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.leetcode_schema",
+        "description": "study-app-backend.src.schemas.leetcode_schema",
+        "peekOfCode": "class LCStreakChallengeCompleteRequest(BaseModel):\n    \"\"\"The client's local calendar day. Bridging the streak gap needs it because\n    lc_activity_dates is keyed on the client's local YYYY-MM-DD, not on UTC, so the\n    server cannot work out which day \"today\" is on its own. Optional: an older build\n    that posts an empty body falls back to the server's UTC day.\"\"\"\n    today: Optional[str] = Field(default=None, pattern=r\"^\\d{4}-\\d{2}-\\d{2}$\")\nclass LCStreakChallengeResponse(BaseModel):\n    id: int\n    problem_slug: str\n    expires_at: Optional[str] = None",
         "detail": "study-app-backend.src.schemas.leetcode_schema",
         "documentation": {}
     },
@@ -19239,7 +19281,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.leetcode_schema",
         "description": "study-app-backend.src.schemas.leetcode_schema",
-        "peekOfCode": "class LCStreakChallengeResponse(BaseModel):\n    id: int\n    problem_slug: str\n    expires_at: Optional[str] = None\n    completed_at: Optional[str] = None\n    created_at: str\n# ── Struggle events + weakness scorer ─────────────────────────────────────────\nclass LCStruggleEventRequest(BaseModel):\n    \"\"\"Fired by the client's existing timer-expiry modal (it already knows the\n    topic). hint_used and failed_grade events are inserted server-side by the hint",
+        "peekOfCode": "class LCStreakChallengeResponse(BaseModel):\n    id: int\n    problem_slug: str\n    expires_at: Optional[str] = None\n    completed_at: Optional[str] = None\n    created_at: str\n    # The generated rescue problem, resolved server-side so the client can render its\n    # title and difficulty without hunting for the slug in its own catalog. Null only on\n    # the no-seed catalog path and on rows predating generation.\n    problem: Optional[LCCustomProblemResponse] = None",
         "detail": "study-app-backend.src.schemas.leetcode_schema",
         "documentation": {}
     },

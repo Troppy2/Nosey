@@ -74,7 +74,7 @@
   place-items: center;
   color: var(--green-lightest);
   background: var(--green-dark);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
   transition: transform var(--transition-normal), box-shadow var(--transition-normal);
 }
@@ -118,7 +118,7 @@
   color: var(--ink);
   background: rgba(255, 255, 255, 0.46);
   border: 1px solid rgba(113, 131, 85, 0.16);
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: background var(--transition-fast), transform var(--transition-fast), color var(--transition-fast);
 }
@@ -161,7 +161,7 @@
   padding: 14px 16px;
   font-weight: 700;
   font-size: 1rem;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
 }
 
 .spotify-tooltip {
@@ -173,7 +173,7 @@
   background: #fff;
   color: var(--ink);
   padding: 6px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 0.78rem;
   box-shadow: var(--shadow-sm);
   white-space: nowrap;
@@ -304,7 +304,7 @@
   min-height: 52px;
   padding: 12px 16px;
   color: #536342;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   white-space: nowrap;
   cursor: pointer;
   font-weight: 500;
@@ -338,7 +338,7 @@
   gap: 9px;
   min-height: 48px;
   padding: 12px 18px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-weight: 700;
   transition:
@@ -402,18 +402,50 @@
   background: var(--error);
 }
 
-.button-danger:hover:not(:disabled) {
-  background: #b91c1c;
-  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.3);
+/* Same meaning as .button-danger, a fraction of the weight. A filled red bar is
+   the loudest thing the app can draw, so it belongs to the one action that
+   cannot be undone (delete account), not to routine ones like signing out. */
+.button-danger-outline {
+  color: var(--accent-danger);
+  background: transparent;
+  border: 1.5px solid var(--accent-danger);
 }
 
+.button-danger-outline:hover:not(:disabled) {
+  color: var(--accent-danger-strong);
+  background: var(--accent-danger-tint);
+  border-color: var(--accent-danger-strong);
+}
+
+.button-danger:hover:not(:disabled) {
+  background: var(--accent-danger-strong);
+  box-shadow: 0 4px 14px rgba(157, 59, 49, 0.3);
+}
+
+/* Surface levels.
+   Every surface in the app used to resolve to this one treatment and differ
+   only in padding, so a stat readout, a container, and a tappable card all
+   carried the same weight and nothing said which was which. Three levels now,
+   separated at rest rather than only on hover (hover does not exist on a
+   phone, which is where the flatness was most obvious):
+
+     1 flat        a readout that groups numbers. Tinted, borderless, no
+                   shadow: part of the page rather than an object on it.
+     2 raised      the default. A container holding content.
+     3 interactive something you tap. Opaque white against the page's tint,
+                   a larger radius, and a real shadow. */
+
+/* Level 2, the default. */
 .card {
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
-  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
 }
 
+/* A tinted level 2. Still a container, still an object on the page; the tint
+   marks it as set apart (a form, a sign-in panel) rather than as lower in the
+   hierarchy. Level 1 lives on .stat-card. */
 .card-soft {
   background: rgba(207, 225, 185, 0.64);
 }
@@ -424,13 +456,27 @@
   border-color: transparent;
 }
 
+/* Level 3. Everything here applies at any tone. */
 .card-interactive {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
   cursor: pointer;
   transition:
     transform var(--transition-normal),
     box-shadow var(--transition-normal),
     border-color var(--transition-normal),
     background var(--transition-normal);
+}
+
+/* The level-3 fill, scoped to the default tone only.
+   Unscoped, this sat after .card-dark with the same specificity and quietly
+   won the background from it, leaving .card-dark's light text on white: the
+   "Review These" cards rendered as near-invisible pale green on white. A tone
+   has already made the fill decision, so the level only sets it when no tone
+   has. Opacity is the readable difference: a solid white card reads as sitting
+   above a green page in a way a 72%-translucent one does not. */
+.card-plain.card-interactive {
+  background: var(--white);
 }
 
 .card-interactive:hover {
@@ -445,7 +491,7 @@
   color: var(--error);
   background: rgba(220, 38, 38, 0.08);
   border: 1px solid rgba(220, 38, 38, 0.18);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-weight: 600;
 }
 
@@ -486,7 +532,7 @@
   color: var(--ink);
   background: rgba(255, 255, 255, 0.66);
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
 }
 
@@ -527,7 +573,7 @@
   color: var(--green-dark);
   background: rgba(207, 225, 185, 0.72);
   border: 1px solid var(--green-light-mid);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 0.82rem;
   font-weight: 700;
 }
@@ -536,7 +582,7 @@
   height: 8px;
   overflow: hidden;
   background: var(--green-light);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 .progress-fill {
@@ -556,7 +602,7 @@
   text-align: center;
   background: rgba(255, 255, 255, 0.46);
   border: 1px dashed var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .empty-icon {
@@ -566,7 +612,7 @@
   place-items: center;
   color: var(--green-dark);
   background: var(--green-light);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .loader {
@@ -575,7 +621,7 @@
   height: 24px;
   border: 3px solid var(--green-light);
   border-top-color: var(--green-dark);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   animation: spin 800ms linear infinite;
 }
 
@@ -673,10 +719,18 @@
   margin-bottom: 42px;
 }
 
+/* Level 1: a readout, not an object.
+   Tint plus a defining border. The border is what the fill alone could not do,
+   which is give the tile an edge against a page of the same hue. Hierarchy is
+   then carried by the shadow: level 2 and 3 cast one, this does not, so the
+   strip still sits under the cards below it despite the heavier fill. */
 .stat-card {
   display: grid;
   gap: 22px;
   padding: 24px;
+  background: rgba(181, 201, 154, 0.3);
+  border: 1px solid var(--green-light-mid);
+  box-shadow: none;
 }
 
 .stat-card div {
@@ -782,10 +836,14 @@
 .test-row-resume {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
   gap: 8px;
   color: var(--green-dark);
   font-size: 0.875rem;
   font-weight: 500;
+  /* The title beside it is the part that may shrink; this label is either fully
+     readable or it is noise. */
+  white-space: nowrap;
 }
 
 .mini-meta {
@@ -815,7 +873,7 @@
   padding: 8px 12px;
   color: var(--green-lightest);
   background: var(--green-dark);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-weight: 800;
   text-align: center;
 }
@@ -825,7 +883,7 @@
   display: block;
   text-decoration: none;
   color: inherit;
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
 }
 
 .weak-card-link:focus-visible {
@@ -864,7 +922,7 @@
   padding: 4px;
   background: rgba(255, 255, 255, 0.56);
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .segmented button,
@@ -875,7 +933,7 @@
   place-items: center;
   color: var(--green-dark);
   background: transparent;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
@@ -966,7 +1024,7 @@
   place-items: center;
   color: var(--green-dark);
   background: transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast);
 }
@@ -979,26 +1037,6 @@
 .row-actions button:focus-visible {
   outline: 2px solid var(--green-dark);
   outline-offset: 2px;
-}
-
-.floating-action {
-  position: fixed;
-  right: 28px;
-  bottom: 28px;
-  display: grid;
-  width: 56px;
-  height: 56px;
-  place-items: center;
-  color: var(--green-lightest);
-  background: var(--green-dark);
-  border-radius: 999px;
-  box-shadow: var(--shadow-lg);
-  cursor: pointer;
-  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
-}
-
-.floating-action:hover {
-  transform: scale(1.08);
 }
 
 .modal-backdrop {
@@ -1021,7 +1059,7 @@
   padding: 26px;
   background: var(--green-lightest);
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
 }
 
@@ -1073,10 +1111,9 @@
   margin: 0;
   padding-top: 18px;
   border-top: 1px solid var(--green-light-mid);
-  font-size: 0.74rem;
+  font-size: 0.84rem;
   font-weight: 800;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   color: var(--green-dark);
 }
 
@@ -1102,7 +1139,7 @@
   gap: 10px;
   padding: 12px;
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.64);
 }
 
@@ -1116,7 +1153,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 0.9rem;
   font-weight: 500;
 }
@@ -1197,7 +1234,7 @@
   position: relative;
   width: 56px;
   height: 30px;
-  border-radius: 15px;
+  border-radius: var(--radius-xl);
   background: var(--green-light);
   transition: background var(--transition-fast), border-color var(--transition-fast);
   flex-shrink: 0;
@@ -1241,7 +1278,7 @@
   gap: 2px;
   padding: 10px 14px;
   border: 1.5px solid rgba(113, 131, 85, 0.22);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: transparent;
   cursor: pointer;
   text-align: left;
@@ -1311,7 +1348,7 @@
   color: var(--green-dark);
   background: rgba(255, 255, 255, 0.58);
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-weight: 800;
   transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
@@ -1370,7 +1407,7 @@
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.52);
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: #596949;
   font-size: 0.88rem;
 }
@@ -1439,7 +1476,7 @@
   gap: 4px;
   margin-bottom: 14px;
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 0.86rem;
   line-height: 1.35;
 }
@@ -1503,7 +1540,7 @@
   text-align: left;
   background: #fff;
   border: 2px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
 }
@@ -1527,7 +1564,7 @@
   place-items: center;
   color: var(--green-dark);
   border: 1px solid var(--green-light-mid);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-weight: 800;
 }
 
@@ -1552,7 +1589,7 @@
   line-height: 1.4;
   background: #f5f5f5;
   color: #333;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   overflow-x: auto;
   max-height: 200px;
 }
@@ -1595,15 +1632,15 @@
 }
 
 .score-success {
-  background: linear-gradient(135deg, #10b981, #047857);
+  background: linear-gradient(135deg, var(--accent-positive), #047857);
 }
 
 .score-warning {
-  background: linear-gradient(135deg, #d97706, #92400e);
+  background: linear-gradient(135deg, var(--accent-caution), var(--accent-caution-strong));
 }
 
 .score-error {
-  background: linear-gradient(135deg, #dc2626, #991b1b);
+  background: linear-gradient(135deg, var(--accent-danger), var(--accent-danger-strong));
 }
 
 .result-stats {
@@ -1688,7 +1725,7 @@
   padding: 9px 14px;
   background: rgba(220, 38, 38, 0.04);
   border: 1px solid rgba(220, 38, 38, 0.14);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .targeted-topic-icon {
@@ -1749,7 +1786,7 @@
   padding: 10px 12px;
   background: var(--green-lightest);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .targeted-topics-label {
@@ -1772,7 +1809,7 @@
   padding: 3px 8px;
   background: rgba(113, 131, 85, 0.12);
   border: 1px solid var(--green-light-mid);
-  border-radius: 20px;
+  border-radius: var(--radius-card-mobile);
   color: var(--ink);
   max-width: 100%;
   overflow: hidden;
@@ -1792,7 +1829,7 @@
 }
 
 .targeted-error {
-  color: var(--danger, #dc2626);
+  color: var(--danger, var(--accent-danger));
   font-size: 0.875rem;
   margin: 0;
 }
@@ -1845,7 +1882,7 @@
 .review-detail p {
   padding: 12px 14px;
   background: rgba(207, 225, 185, 0.44);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .review-question-markdown .kojo-markdown {
@@ -1900,7 +1937,7 @@
   color: var(--green-dark);
   background: rgba(255, 255, 255, 0.6);
   border: 1.5px solid var(--green-light-mid);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
@@ -1943,7 +1980,7 @@
   color: var(--green-dark);
   background: rgba(255, 255, 255, 0.6);
   border: 1.5px solid var(--green-light-mid);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   cursor: pointer;
   transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
@@ -2089,7 +2126,7 @@
   padding: 14px 10px;
   background: color-mix(in srgb, var(--c) 8%, #fff);
   border: 1px solid color-mix(in srgb, var(--c) 32%, transparent);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   color: var(--c);
   cursor: pointer;
   font-weight: 800;
@@ -2303,7 +2340,7 @@
     padding: 0;
     background: transparent;
     border: none;
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     color: var(--ink);
     transition: background var(--transition-fast);
@@ -2367,7 +2404,7 @@
     padding: 0;
     background: transparent;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
     color: var(--ink);
     transition: background var(--transition-fast);
@@ -2679,7 +2716,7 @@
   background: #f8faf5;
   border: 1px solid rgba(181, 201, 154, 0.6);
   box-shadow: 0 20px 60px rgba(14, 20, 10, 0.22), 0 4px 16px rgba(14, 20, 10, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.5) inset;
-  border-radius: 22px;
+  border-radius: var(--radius-card-mobile);
   overflow: hidden;
   transform-origin: top center;
   animation: sel-kojo-panel-in 0.26s cubic-bezier(0.22, 1, 0.36, 1);
@@ -2808,7 +2845,7 @@
 
 .sel-kojo-skeleton-line {
   height: 13px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: linear-gradient(90deg, #e4ecda 25%, #eff5e8 50%, #e4ecda 75%);
   background-size: 600px 100%;
   animation: sel-kojo-shimmer 1.4s infinite linear;
@@ -2829,7 +2866,7 @@
   align-items: center;
   gap: 6px;
   padding: 6px 14px;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(113, 131, 85, 0.3);
   background: rgba(113, 131, 85, 0.07);
   color: var(--green-dark);
@@ -2892,7 +2929,7 @@
 .kojo-avatar {
   width: 38px;
   height: 38px;
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: #e7f0d8;
   border: 1px solid #cdddba;
   color: #3f5a2c;
@@ -2953,7 +2990,7 @@
   height: 36px;
   padding: 0;
   flex-shrink: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   border: 1px solid #cdddba;
   background: #ffffff;
   color: #2f4222;
@@ -2978,7 +3015,7 @@
 .kojo-header-btn--danger:hover:not(:disabled) {
   border-color: #e8b4b4;
   background: #fdf2f2;
-  color: #c0392b;
+  color: var(--accent-danger-strong);
 }
 
 .kojo-header-btn--danger:active:not(:disabled) {
@@ -3013,7 +3050,7 @@
   color: var(--ink);
   font-size: 0.78rem;
   font-weight: 600;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   padding: 6px 10px;
   cursor: pointer;
 }
@@ -3021,7 +3058,7 @@
 .kojo-clear-inline-btn--confirm {
   background: #fff1f0;
   border-color: #fecaca;
-  color: #b91c1c;
+  color: var(--accent-danger-strong);
 }
 
 .kojo-clear-inline-btn:disabled {
@@ -3110,7 +3147,7 @@
 .kojo-suggestion {
   background: var(--white);
   border: 1px solid var(--green-light-mid);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 11px 15px;
   font-size: 0.855rem;
   color: var(--ink);
@@ -3256,10 +3293,10 @@
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: #fff1f0;
   border: 1px solid #fecaca;
-  color: #b91c1c;
+  color: var(--accent-danger-strong);
   font-size: 0.85rem;
   margin-top: 8px;
 }
@@ -3270,7 +3307,7 @@
   color: #3f5f2f;
   background: #edf7ed;
   border: 1px solid #bfd8bf;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 9px 12px;
 }
 
@@ -3327,7 +3364,7 @@
   background: rgba(113, 131, 85, 0.12);
   color: var(--green-dark);
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 0.84em;
 }
@@ -3335,7 +3372,7 @@
 .kojo-code-block {
   background: #1e2318;
   color: #d4e8b0;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 14px 16px;
   margin: 10px 0;
   overflow-x: auto;
@@ -3413,7 +3450,7 @@
   gap: 10px;
   background: var(--white);
   border: 2px solid var(--green-dark-mid);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   padding: 10px 10px 10px 14px;
   box-shadow: 0 2px 10px rgba(38, 48, 31, 0.12);
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -3436,7 +3473,7 @@
   gap: 2px;
   background: var(--white);
   border: 1px solid var(--green-light-mid);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   padding: 6px;
   box-shadow: var(--shadow-lg);
   max-height: 260px;
@@ -3450,7 +3487,7 @@
   width: 100%;
   border: none;
   background: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 8px 10px;
   text-align: left;
   font-family: inherit;
@@ -3469,7 +3506,7 @@
   justify-content: center;
   width: 26px;
   height: 26px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--green-lightest);
   color: var(--green-dark);
   flex-shrink: 0;
@@ -3554,7 +3591,7 @@
   background: var(--green-dark);
   color: #fff;
   border: none;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   width: 36px;
   height: 36px;
   display: flex;
@@ -3606,7 +3643,7 @@
   background: #f8fbf4;
   border: 1px solid var(--green-light-mid);
   color: var(--green-dark);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   min-height: 38px;
   min-width: 188px;
   padding: 6px 12px;
@@ -3633,7 +3670,7 @@
 
 .kojo-provider-warn {
   font-size: 0.72rem;
-  color: #d97706;
+  color: var(--accent-caution);
   font-weight: 700;
   white-space: nowrap;
   cursor: default;
@@ -3675,7 +3712,7 @@
   padding: 5px 9px;
   background: #f8fbf4;
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--green-dark);
   font-size: 0.8rem;
   font-weight: 600;
@@ -3724,7 +3761,7 @@
   min-width: 200px;
   background: var(--white);
   border: 1px solid var(--green-light-mid);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
   z-index: 210;
@@ -3826,7 +3863,7 @@
   gap: 12px;
   width: 100%;
   padding: 12px 14px;
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   border: 1px solid var(--gray-200);
   background: rgba(255, 255, 255, 0.9);
   text-align: left;
@@ -3844,7 +3881,7 @@
   gap: 12px;
   align-items: center;
   padding: 12px 14px;
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   border: 1px solid var(--gray-200);
   background: rgba(255, 255, 255, 0.9);
 }
@@ -3865,7 +3902,7 @@
 .ordering-index {
   width: 34px;
   height: 34px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--green-lightest);
   color: var(--green-dark);
   display: inline-flex;
@@ -3937,7 +3974,7 @@
   padding: 2px 8px;
   background: var(--green-light);
   color: var(--green-dark);
-  border-radius: 20px;
+  border-radius: var(--radius-card-mobile);
   font-size: 0.72rem;
   font-weight: 600;
   vertical-align: middle;
@@ -3951,7 +3988,7 @@
   padding: 14px 16px;
   background: var(--white);
   border: 1.5px solid var(--green-light);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   cursor: pointer;
   text-align: left;
   transition: border-color var(--transition-fast), background var(--transition-fast);
@@ -3985,7 +4022,7 @@
 
 .math-mode-pill {
   padding: 2px 10px;
-  border-radius: 20px;
+  border-radius: var(--radius-card-mobile);
   font-size: 0.78rem;
   font-weight: 600;
   flex-shrink: 0;
@@ -4030,7 +4067,7 @@
   padding: 4px 10px 4px 8px;
   background: transparent;
   border: 1.5px solid var(--green-light);
-  border-radius: 20px;
+  border-radius: var(--radius-card-mobile);
   font-size: 0.82rem;
   color: var(--green-dark-mid);
   cursor: pointer;
@@ -4079,7 +4116,7 @@
   font-family: "SFMono-Regular", Consolas, monospace;
   background: var(--green-lightest);
   border: 1px solid var(--green-light);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 1px 5px;
   font-size: 0.9em;
 }
@@ -4095,7 +4132,7 @@
   font-family: "SFMono-Regular", Consolas, monospace;
   font-size: 0.9rem;
   background: var(--green-lightest);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 6px 10px;
 }
 
@@ -4117,7 +4154,7 @@
   padding: 10px 14px;
   color: #596949;
   font-size: 0.9rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: rgba(207, 225, 185, 0.35);
   transition: background var(--transition-fast), color var(--transition-fast);
 }
@@ -4280,7 +4317,7 @@
 .math-preview {
   background: var(--white);
   border: 1.5px solid var(--green-light);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 10px 14px;
   margin-bottom: 10px;
   overflow-x: auto;
@@ -4304,7 +4341,7 @@
 .math-keyboard {
   background: var(--green-lightest);
   border: 1.5px solid var(--green-light);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   margin-top: 8px;
 }
@@ -4363,7 +4400,7 @@
   padding: 4px 6px;
   background: var(--white);
   border: 1.5px solid var(--green-light);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -4405,7 +4442,7 @@
   padding: 10px 12px;
   background: var(--white);
   border: 1.5px solid var(--green-light);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   transition: border-color var(--transition-fast);
   flex-wrap: wrap;
   min-height: 44px;
@@ -4420,7 +4457,7 @@
   border: none;
   cursor: pointer;
   padding: 4px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   display: flex;
   align-items: center;
   flex-shrink: 0;
@@ -4437,7 +4474,7 @@
   margin-bottom: 12px;
   padding: 4px;
   background: var(--green-lightest);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
 }
 
 .file-manager-tab {
@@ -4449,7 +4486,7 @@
   padding: 8px 10px;
   background: none;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 0.85rem;
   font-weight: 600;
@@ -4474,7 +4511,7 @@
   gap: 10px;
   padding: 12px 14px;
   border: 1.5px dashed var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--green-lightest);
   transition: border-color var(--transition-fast);
 }
@@ -4507,7 +4544,7 @@
   width: 100%;
   padding: 10px 12px;
   border: 1.5px solid var(--green-light);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 0.9rem;
   font-family: inherit;
   box-sizing: border-box;
@@ -4580,7 +4617,7 @@
 
 .code-editor-frame {
   border: 1.5px solid var(--green-light);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   margin-top: 6px;
 }
@@ -4710,7 +4747,7 @@
   padding: 8px 12px;
   border: none;
   background: transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 0.88rem;
   font-weight: 500;
   color: #4a5568;
@@ -4793,13 +4830,18 @@
   gap: 12px;
 }
 
+/* The title is the one flexible part of the header row, so it truncates rather
+   than pushing the actions off the edge. `display: block` (not flex) is what
+   makes text-overflow apply to the text node inside. */
 .chat-mode-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  display: block;
+  min-width: 0;
+  overflow: hidden;
   font-weight: 800;
   font-size: 0.95rem;
   color: var(--ink);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .chat-mode-subtitle {
@@ -4844,7 +4886,7 @@
   flex-direction: column;
   background: var(--white);
   border: 1.5px solid rgba(113, 131, 85, 0.18);
-  border-radius: 18px;
+  border-radius: var(--radius-card-mobile);
   padding: 14px 14px 12px 16px;
   box-shadow: 0 4px 24px rgba(38, 48, 31, 0.08), 0 1px 3px rgba(38, 48, 31, 0.04);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -4961,7 +5003,7 @@
     height: 38px;
     flex-shrink: 0;
     border: none;
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     background: rgba(113, 131, 85, 0.1);
     color: var(--green-dark);
     cursor: pointer;
@@ -4985,7 +5027,7 @@
     height: 32px;
     margin-left: auto;
     border: none;
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     background: transparent;
     color: #8fa07a;
     cursor: pointer;
@@ -5003,10 +5045,6 @@
   }
 
   /* Touch devices have no hover , keep delete affordances visible */
-  .kojo-chat-item-delete {
-    opacity: 0.65;
-  }
-
   .chat-mode-header-meta {
     display: none;
   }
@@ -5054,7 +5092,7 @@
 
 .chat-mode-main .kojo-suggestion {
   padding: 14px 16px;
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   font-size: 0.875rem;
   border-color: rgba(113, 131, 85, 0.22);
 }
@@ -5130,7 +5168,7 @@ select[class*="lc-"]:focus-visible {
   min-height: 36px;
   padding: 8px 12px;
   border: 1px solid var(--lc-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--white);
   color: var(--ink);
   font-size: 0.86rem;
@@ -5151,7 +5189,7 @@ select[class*="lc-"]:focus-visible {
 .lc-toolbar-timer--urgent {
   border-color: rgba(220, 38, 38, 0.38);
   background: rgba(254, 242, 242, 0.92);
-  color: #991b1b;
+  color: var(--accent-danger-strong);
 }
 
 .lc-toolbar-timer--urgent:hover {
@@ -5203,14 +5241,14 @@ select[class*="lc-"]:focus-visible {
   gap: 6px;
   padding: 4px;
   border: 1px solid var(--lc-border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.84);
 }
 
 .lc-timer-preset {
   min-height: 30px;
   padding: 6px 10px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: #516142;
   font-size: 0.8rem;
@@ -5232,7 +5270,7 @@ select[class*="lc-"]:focus-visible {
   min-height: 36px;
   padding: 0 10px;
   border: 1px solid var(--lc-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.9);
 }
 
@@ -5259,7 +5297,7 @@ select[class*="lc-"]:focus-visible {
   min-height: 36px;
   gap: 7px;
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-variant-numeric: tabular-nums;
 }
 
@@ -5321,7 +5359,7 @@ select[class*="lc-"]:focus-visible {
 }
 
 .lc-timer-ring--alert .lc-timer-ring-progress {
-  stroke: #dc2626;
+  stroke: var(--accent-danger);
 }
 
 @keyframes lc-timer-alert-pulse {
@@ -5346,7 +5384,7 @@ select[class*="lc-"]:focus-visible {
   min-height: 112px;
   padding: 16px;
   border: 1px solid var(--lc-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.82);
   box-shadow: var(--shadow-sm);
 }
@@ -5371,7 +5409,7 @@ select[class*="lc-"]:focus-visible {
 .lc-node-progress {
   height: 8px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(113, 131, 85, 0.16);
 }
 
@@ -5415,15 +5453,15 @@ select[class*="lc-"]:focus-visible {
    Easy/Medium/Hard breakdown is scannable at a glance. Reuses the exact colors
    from .lc-difficulty--* (used on problem rows and filter chips). */
 .lc-stat-tile--split .lc-split-val--easy {
-  color: #166534;
+  color: var(--accent-positive-strong);
 }
 
 .lc-stat-tile--split .lc-split-val--medium {
-  color: #92400e;
+  color: var(--accent-caution-strong);
 }
 
 .lc-stat-tile--split .lc-split-val--hard {
-  color: #991b1b;
+  color: var(--accent-danger-strong);
 }
 
 .lc-stat-tile--streak {
@@ -5443,7 +5481,7 @@ select[class*="lc-"]:focus-visible {
   font-weight: 500;
   white-space: nowrap;
   padding: 5px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.15s;
@@ -5469,7 +5507,7 @@ select[class*="lc-"]:focus-visible {
   bottom: 36px;
   left: 50%;
   width: 3px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: linear-gradient(#87986a, #97a97c, #718355);
   transform: translateX(-50%);
 }
@@ -5483,7 +5521,7 @@ select[class*="lc-"]:focus-visible {
   min-height: 104px;
   padding: 20px;
   border: 1px solid color-mix(in srgb, var(--lc-accent) 34%, white);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: rgba(255, 255, 255, 0.9);
   box-shadow: var(--shadow-sm);
   text-align: left;
@@ -5532,7 +5570,7 @@ select[class*="lc-"]:focus-visible {
   width: 48px;
   height: 48px;
   place-items: center;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--lc-accent) 12%, white);
   color: var(--lc-accent);
 }
@@ -5610,7 +5648,7 @@ select[class*="lc-"]:focus-visible {
   max-width: 460px;
   padding: 0 12px;
   border: 1px solid var(--lc-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--white);
   color: #596949;
 }
@@ -5647,7 +5685,7 @@ select[class*="lc-"]:focus-visible {
   min-height: 58px;
   padding: 14px 16px;
   border: 1px solid var(--lc-border);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: var(--white);
   box-shadow: var(--shadow-sm);
   transition: box-shadow 0.13s ease, transform 0.13s ease;
@@ -5762,25 +5800,25 @@ select[class*="lc-"]:focus-visible {
   justify-content: center;
   min-height: 24px;
   padding: 0 9px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 0.72rem;
   font-weight: 850;
   white-space: nowrap;
 }
 
 .lc-difficulty--easy {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--accent-positive-tint);
+  color: var(--accent-positive-strong);
 }
 
 .lc-difficulty--medium {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--accent-caution-tint);
+  color: var(--accent-caution-strong);
 }
 
 .lc-difficulty--hard {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--accent-danger-tint);
+  color: var(--accent-danger-strong);
 }
 
 .lc-difficulty--reference {
@@ -5849,7 +5887,7 @@ select[class*="lc-"]:focus-visible {
   align-items: center;
   gap: 6px;
   padding: 4px 8px;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   background: rgba(233, 245, 219, 0.5);
 }
 
@@ -5913,7 +5951,7 @@ select[class*="lc-"]:focus-visible {
   min-height: 34px;
   padding: 7px 12px;
   border: 1px solid var(--lc-border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.92);
   color: var(--ink);
   font-size: 0.84rem;
@@ -5958,7 +5996,7 @@ select[class*="lc-"]:focus-visible {
   width: 18px;
   height: 18px;
   margin-left: 2px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: var(--green-dark);
   font-size: 0.72rem;
   font-weight: 900;
@@ -6025,7 +6063,7 @@ select[class*="lc-"]:focus-visible {
 .lc-problem-meta>span:not(.lc-difficulty) {
   min-height: 24px;
   padding: 4px 9px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--green-lightest);
   color: var(--green-dark);
   font-size: 0.72rem;
@@ -6035,7 +6073,7 @@ select[class*="lc-"]:focus-visible {
 .lc-source-note {
   padding: 14px;
   border: 1px solid rgba(113, 131, 85, 0.24);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: rgba(233, 245, 219, 0.44);
 }
 
@@ -6053,7 +6091,7 @@ select[class*="lc-"]:focus-visible {
   margin-top: 16px;
   padding: 13px;
   border: 1px solid rgba(113, 131, 85, 0.24);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--white);
 }
 
@@ -6068,7 +6106,7 @@ select[class*="lc-"]:focus-visible {
   gap: 6px;
   min-height: 34px;
   padding: 0 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--green-dark);
   color: var(--white);
   font-weight: 800;
@@ -6113,7 +6151,7 @@ select[class*="lc-"]:focus-visible {
   flex-direction: column;
   overflow: hidden;
   border: 1px solid rgba(113, 131, 85, 0.28);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--white);
   box-shadow: var(--shadow-lg);
 }
@@ -6225,7 +6263,7 @@ select[class*="lc-"]:focus-visible {
   gap: 3px;
   padding: 12px;
   border: 1px solid var(--lc-border);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: #fbfdf8;
   color: var(--ink);
   cursor: pointer;
@@ -6272,7 +6310,7 @@ select[class*="lc-"]:focus-visible {
   min-height: 54px;
   padding: 0 16px;
   border: 1px solid var(--lc-border);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: #fbfdf8;
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
@@ -6331,8 +6369,8 @@ select[class*="lc-"]:focus-visible {
 }
 
 .lc-timeout-avatar {
-  color: #fee2e2;
-  background: #dc2626;
+  color: var(--accent-danger-tint);
+  background: var(--accent-danger);
 }
 
 .lc-timeout-copy {
@@ -6384,7 +6422,7 @@ select[class*="lc-"]:focus-visible {
   height: 30px;
   margin-left: auto;
   place-items: center;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: #596949;
   cursor: pointer;
@@ -6416,7 +6454,7 @@ select[class*="lc-"]:focus-visible {
   min-height: 138px;
   padding: 12px 14px;
   border: 2px solid var(--green-dark-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #f8fbf4;
   color: var(--ink);
   font-family: inherit;
@@ -6527,7 +6565,7 @@ select[class*="lc-"]:focus-visible {
     padding: 6px;
     margin: 10px 14px 0;
     border: 1px solid var(--lc-border);
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     background: rgba(255, 255, 255, 0.68);
   }
 
@@ -6641,7 +6679,7 @@ select[class*="lc-"]:focus-visible {
   overflow-y: auto;
   padding: 6px;
   border: 1px solid var(--green-light-mid);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: #fff;
   box-shadow: 0 8px 32px rgba(38, 48, 31, 0.15);
   scrollbar-width: none;
@@ -6658,7 +6696,7 @@ select[class*="lc-"]:focus-visible {
   width: 100%;
   padding: 7px 10px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--ink);
   text-align: left;
@@ -6680,7 +6718,7 @@ select[class*="lc-"]:focus-visible {
   flex-shrink: 0;
   width: 30px;
   height: 30px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--green-dark);
   color: #fff;
 }
@@ -6789,7 +6827,7 @@ select[class*="lc-"]:focus-visible {
   min-height: 44px;
   padding: 0 12px;
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.66);
   margin: 4px 0;
 }
@@ -6857,7 +6895,7 @@ select[class*="lc-"]:focus-visible {
   white-space: nowrap;
   padding: 4px 9px;
   border: 1px solid var(--green-light-mid);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(207, 225, 185, 0.72);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.76rem;
@@ -6904,7 +6942,7 @@ select[class*="lc-"]:focus-visible {
   height: 34px;
   background: transparent;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: background 0.12s;
 }
@@ -6928,7 +6966,7 @@ select[class*="lc-"]:focus-visible {
   align-items: center;
   gap: 5px;
   padding: 3px 10px 3px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.25);
   color: rgba(255, 255, 255, 0.92);
@@ -6979,7 +7017,7 @@ select[class*="lc-"]:focus-visible {
 }
 
 .lc-statement-state--error {
-  color: #b91c1c;
+  color: var(--accent-danger-strong);
 }
 
 /* Statement loading skeleton. The heading + difficulty already render from
@@ -6995,7 +7033,7 @@ select[class*="lc-"]:focus-visible {
 
 .lc-statement-skeleton .lc-skeleton-line {
   height: 13px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: linear-gradient(90deg, #e4ecda 25%, #eff5e8 50%, #e4ecda 75%);
   background-size: 600px 100%;
   animation: sel-kojo-shimmer 1.4s infinite linear;
@@ -7034,7 +7072,7 @@ select[class*="lc-"]:focus-visible {
 .lc-topic-tags span {
   min-height: 24px;
   padding: 4px 9px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(233, 245, 219, 0.72);
   color: var(--green-dark);
   font-size: 0.72rem;
@@ -7057,7 +7095,7 @@ select[class*="lc-"]:focus-visible {
 .lc-official-statement pre {
   padding: 14px;
   border: 1px solid rgba(113, 131, 85, 0.18);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #f7f9f3;
   white-space: pre-wrap;
   word-break: break-word;
@@ -7091,7 +7129,7 @@ select[class*="lc-"]:focus-visible {
   min-height: 32px;
   padding: 0 10px;
   border: 1px solid rgba(113, 131, 85, 0.22);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--white);
   color: var(--ink);
   font-size: 0.8rem;
@@ -7116,8 +7154,8 @@ select[class*="lc-"]:focus-visible {
 
 .lc-inline-icon-btn--danger:hover {
   border-color: rgba(220, 38, 38, 0.45);
-  background: #fef2f2;
-  color: #b91c1c;
+  background: var(--accent-danger-tint);
+  color: var(--accent-danger-strong);
 }
 
 .lc-add-test-btn:disabled {
@@ -7136,7 +7174,7 @@ select[class*="lc-"]:focus-visible {
   gap: 10px;
   padding: 12px;
   border: 1px solid rgba(113, 131, 85, 0.18);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.9);
 }
 
@@ -7167,7 +7205,7 @@ select[class*="lc-"]:focus-visible {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid rgba(113, 131, 85, 0.2);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #f9fbf7;
   color: var(--ink);
   font-family: "JetBrains Mono", "Fira Code", monospace;
@@ -7185,7 +7223,7 @@ select[class*="lc-"]:focus-visible {
 .lc-runner-result {
   margin-top: 14px;
   padding: 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   border: 1px solid rgba(113, 131, 85, 0.18);
   background: rgba(255, 255, 255, 0.92);
 }
@@ -7209,7 +7247,7 @@ select[class*="lc-"]:focus-visible {
   margin: 0 0 10px;
   padding: 10px 12px;
   overflow-x: auto;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.8);
   font-size: 0.78rem;
 }
@@ -7223,7 +7261,7 @@ select[class*="lc-"]:focus-visible {
   display: grid;
   gap: 2px;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.72);
 }
 
@@ -7284,7 +7322,7 @@ select[class*="lc-"]:focus-visible {
 .lc-grade-feedback {
   margin-top: 8px;
   border: 1px solid rgba(113, 131, 85, 0.22);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   background: rgba(249, 251, 245, 0.7);
 }
@@ -7311,7 +7349,7 @@ select[class*="lc-"]:focus-visible {
 /* ── Modal ─────────────────────────────────────────────── */
 .modal {
   background: #fff;
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   width: 100%;
   max-width: 440px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -7353,7 +7391,7 @@ select[class*="lc-"]:focus-visible {
   height: 28px;
   border: none;
   background: transparent;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: #888;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
@@ -7377,7 +7415,7 @@ select[class*="lc-"]:focus-visible {
   width: 100%;
   padding: 10px 12px;
   border: 1.5px solid rgba(113, 131, 85, 0.35);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 0.95rem;
   color: var(--ink);
   background: #fff;
@@ -7407,7 +7445,7 @@ select[class*="lc-"]:focus-visible {
 .modal-btn {
   padding: 8px 18px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
@@ -7433,7 +7471,7 @@ select[class*="lc-"]:focus-visible {
 }
 
 .modal-btn--danger {
-  background: #dc2626;
+  background: var(--accent-danger);
   color: #fff;
 }
 
@@ -7466,7 +7504,7 @@ select[class*="lc-"]:focus-visible {
   width: 100%;
   padding: 12px 14px;
   border: 1.5px solid var(--green-dark);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: rgba(233, 245, 219, 0.4);
   color: var(--ink);
   cursor: pointer;
@@ -7503,7 +7541,7 @@ select[class*="lc-"]:focus-visible {
 .kojo-blueprint-card {
   background: #fff;
   border: 1px solid var(--green-light-mid);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   padding: 16px 18px;
   display: flex;
   flex-direction: column;
@@ -7562,7 +7600,7 @@ select[class*="lc-"]:focus-visible {
 .kojo-blueprint-input {
   background: #fff;
   border: 1px solid var(--green-light);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 6px 9px;
   font-size: 0.85rem;
   color: var(--ink);
@@ -7586,7 +7624,7 @@ select[class*="lc-"]:focus-visible {
 .kojo-blueprint-select {
   background: #fff;
   border: 1px solid var(--green-light);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 6px 9px;
   font-size: 0.85rem;
   color: var(--ink);
@@ -7605,9 +7643,9 @@ select[class*="lc-"]:focus-visible {
   align-items: center;
   gap: 6px;
   font-size: 0.8rem;
-  color: #c0392b;
+  color: var(--accent-danger-strong);
   background: #fdf0ef;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 7px 10px;
 }
 
@@ -7622,7 +7660,7 @@ select[class*="lc-"]:focus-visible {
   align-items: center;
   gap: 6px;
   padding: 7px 14px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   font-size: 0.85rem;
   font-weight: 500;
   border: none;
@@ -7697,7 +7735,7 @@ select[class*="lc-"]:focus-visible {
   height: 10px;
   border: 1.5px solid var(--green-light);
   border-top-color: var(--green-dark);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   animation: spin 800ms linear infinite;
   flex-shrink: 0;
 }
@@ -7732,7 +7770,7 @@ select[class*="lc-"]:focus-visible {
   gap: 7px;
   padding: 10px 10px;
   border: 1.5px dashed rgba(113, 131, 85, 0.3);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: transparent;
   font-size: 0.8rem;
   color: #8fa07a;
@@ -7779,7 +7817,7 @@ select[class*="lc-"]:focus-visible {
   justify-content: space-between;
   gap: 6px;
   padding: 5px 8px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: rgba(113, 131, 85, 0.08);
   font-size: 0.75rem;
   color: #596949;
@@ -7801,7 +7839,7 @@ select[class*="lc-"]:focus-visible {
   justify-content: center;
   width: 16px;
   height: 16px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   border: none;
   background: transparent;
   color: #7a8a6e;
@@ -7817,7 +7855,7 @@ select[class*="lc-"]:focus-visible {
 
 .chat-mode-file-chip-delete:hover {
   background: rgba(220, 38, 38, 0.12);
-  color: #c0392b;
+  color: var(--accent-danger-strong);
 }
 
 .chat-mode-sidebar-footer {
@@ -7833,7 +7871,7 @@ select[class*="lc-"]:focus-visible {
   gap: 6px;
   width: 100%;
   padding: 9px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: none;
   background: var(--green-dark);
   color: #fff;
@@ -7868,7 +7906,7 @@ select[class*="lc-"]:focus-visible {
   gap: 2px;
   background: #1a2515;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   padding: 4px 5px;
   box-shadow: 0 8px 24px rgba(10, 16, 8, 0.4), 0 2px 6px rgba(10, 16, 8, 0.2);
   animation: sel-kojo-toolbar-in 0.16s cubic-bezier(0.22, 1, 0.36, 1);
@@ -7886,7 +7924,7 @@ select[class*="lc-"]:focus-visible {
   align-items: center;
   gap: 5px;
   padding: 5px 11px;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: rgba(255, 255, 255, 0.82);
   font-size: 0.8rem;
@@ -7958,7 +7996,7 @@ select[class*="lc-"]:focus-visible {
 .folder-kojo-settings {
   margin: 0 0 24px;
   border: 1px solid rgba(113, 131, 85, 0.2);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: #f9fbf6;
   overflow: hidden;
   animation: kojo-fade-in 0.15s ease;
@@ -8024,7 +8062,7 @@ select[class*="lc-"]:focus-visible {
 .folder-kojo-toggle {
   width: 44px;
   height: 26px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: none;
   background: rgba(113, 131, 85, 0.2);
   cursor: pointer;
@@ -8059,7 +8097,7 @@ select[class*="lc-"]:focus-visible {
 .folder-kojo-persona-select {
   padding: 7px 28px 7px 12px;
   border: 1px solid rgba(113, 131, 85, 0.25);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--white);
   color: var(--ink);
   font-size: 0.875rem;
@@ -8103,7 +8141,7 @@ select[class*="lc-"]:focus-visible {
   font-size: 12px;
   line-height: 1.5;
   padding: 9px 12px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   width: 230px;
   white-space: normal;
   z-index: 200;
@@ -8198,7 +8236,7 @@ select[class*="lc-"]:focus-visible {
   display: flex;
   flex-direction: row;
   align-items: center;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: transparent;
   transition: background 0.12s;
 }
@@ -8250,25 +8288,46 @@ select[class*="lc-"]:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px 6px;
-  margin-right: 4px;
+  /* Was a 19px box around an 11px glyph, which is below the size at which a
+     control reads as a control at all, let alone one you can hit. */
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin-right: 2px;
   border: none;
   background: none;
-  border-radius: 5px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   color: var(--green-mid);
-  opacity: 0;
   transition: opacity 0.12s, background 0.12s, color 0.12s;
 }
 
-.kojo-chat-item:hover .kojo-chat-item-delete,
-.kojo-chat-item--active .kojo-chat-item-delete {
-  opacity: 1;
+/* Reveal-on-hover is a pointer affordance. A touch device has no hover, so the
+   button stayed invisible until the row happened to be the active one; there,
+   it is always visible instead. */
+@media (hover: hover) {
+  .kojo-chat-item-delete {
+    opacity: 0;
+  }
+
+  .kojo-chat-item:hover .kojo-chat-item-delete,
+  .kojo-chat-item--active .kojo-chat-item-delete {
+    opacity: 1;
+  }
+}
+
+/* Touch: always present, and a full 44px target. */
+@media (hover: none) {
+  .kojo-chat-item-delete {
+    width: 44px;
+    height: 44px;
+    opacity: 0.75;
+  }
 }
 
 .kojo-chat-item-delete:hover {
   background: rgba(220, 53, 69, 0.1);
-  color: #dc3545;
+  color: var(--accent-danger);
 }
 
 /* Inline delete confirmation buttons */
@@ -8293,7 +8352,7 @@ select[class*="lc-"]:focus-visible {
   justify-content: center;
   width: 30px;
   height: 30px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   border: 1px solid rgba(113, 131, 85, 0.25);
   background: transparent;
   color: var(--green-dark);
@@ -8324,7 +8383,7 @@ select[class*="lc-"]:focus-visible {
   min-width: 210px;
   background: var(--white);
   border: 1px solid rgba(113, 131, 85, 0.2);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   padding: 6px;
   z-index: 200;
@@ -8336,7 +8395,7 @@ select[class*="lc-"]:focus-visible {
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: transparent;
   border: none;
   cursor: pointer;
@@ -8379,7 +8438,7 @@ select[class*="lc-"]:focus-visible {
   padding: 3px 8px 3px 10px;
   background: rgba(113, 131, 85, 0.1);
   border: 1px solid rgba(113, 131, 85, 0.2);
-  border-radius: 20px;
+  border-radius: var(--radius-card-mobile);
   font-size: 0.75rem;
   color: var(--green-dark);
   max-width: 200px;
@@ -8425,7 +8484,7 @@ select[class*="lc-"]:focus-visible {
   color: var(--green-dark);
   background: rgba(113, 131, 85, 0.1);
   border: 1px solid rgba(113, 131, 85, 0.28);
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   text-decoration: none;
   white-space: nowrap;
   transition: background 0.15s;
@@ -8458,7 +8517,7 @@ select[class*="lc-"]:focus-visible {
   width: min(92vw, 1100px);
   height: min(88vh, 760px);
   background: var(--surface, #fff);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   box-shadow: 0 16px 64px rgba(0, 0, 0, 0.28);
   display: flex;
   flex-direction: column;
@@ -8497,7 +8556,7 @@ select[class*="lc-"]:focus-visible {
   padding: 2px 9px;
   background: rgba(113, 131, 85, 0.12);
   border: 1px solid rgba(113, 131, 85, 0.25);
-  border-radius: 20px;
+  border-radius: var(--radius-card-mobile);
   font-size: 0.78rem;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   color: var(--green-dark, #2d5a27);
@@ -8602,7 +8661,7 @@ select[class*="lc-"]:focus-visible {
 .lc-viz-val {
   display: inline-block;
   padding: 2px 7px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 0.83rem;
 }
@@ -8618,17 +8677,17 @@ select[class*="lc-"]:focus-visible {
 }
 
 .lc-viz-val--bool.lc-viz-val--false {
-  color: #dc2626;
+  color: var(--accent-danger);
   background: rgba(220, 38, 38, 0.1);
 }
 
 .lc-viz-val--num {
-  color: #1d4ed8;
+  color: var(--accent-info-strong);
   background: rgba(29, 78, 216, 0.08);
 }
 
 .lc-viz-val--str {
-  color: #b45309;
+  color: var(--accent-caution-strong);
   background: rgba(180, 83, 9, 0.08);
 }
 
@@ -8655,7 +8714,7 @@ select[class*="lc-"]:focus-visible {
   padding: 5px 8px;
   background: rgba(249, 251, 245, 0.9);
   border: 1px solid rgba(113, 131, 85, 0.28);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 0.82rem;
 }
@@ -8720,7 +8779,7 @@ select[class*="lc-"]:focus-visible {
 
 .lc-viz-dict-key {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  color: #1d4ed8;
+  color: var(--accent-info-strong);
   font-size: 0.8rem;
 }
 
@@ -8742,7 +8801,7 @@ select[class*="lc-"]:focus-visible {
   padding: 14px;
   background: rgba(113, 131, 85, 0.07);
   border: 1px solid rgba(113, 131, 85, 0.2);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
 }
 
 .lc-viz-result-label {
@@ -8761,10 +8820,10 @@ select[class*="lc-"]:focus-visible {
 
 .lc-viz-error {
   font-size: 0.78rem;
-  color: #dc2626;
+  color: var(--accent-danger);
   background: rgba(220, 38, 38, 0.06);
   border: 1px solid rgba(220, 38, 38, 0.15);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 8px 10px;
   margin: 0;
   white-space: pre-wrap;
@@ -8789,7 +8848,7 @@ select[class*="lc-"]:focus-visible {
   width: 34px;
   height: 34px;
   border: 1px solid rgba(113, 131, 85, 0.25);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: none;
   cursor: pointer;
   color: var(--ink);
@@ -8834,7 +8893,7 @@ select[class*="lc-"]:focus-visible {
   padding: 8px 10px;
   background: none;
   border: 1px solid rgba(113, 131, 85, 0.22);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-size: 0.86rem;
   font-weight: 500;
@@ -8873,7 +8932,7 @@ select[class*="lc-"]:focus-visible {
 
 .lc-solution-frame-wrap {
   margin-top: 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid rgba(113, 131, 85, 0.18);
 }
@@ -8924,7 +8983,7 @@ select[class*="lc-"]:focus-visible {
 }
 
 .draft-card-status {
-  color: var(--red, #e53e3e) !important;
+  color: var(--red, var(--accent-danger)) !important;
 }
 
 .draft-card-actions {
@@ -8939,7 +8998,7 @@ select[class*="lc-"]:focus-visible {
   align-items: center;
   justify-content: center;
   padding: 6px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   border: none;
   cursor: pointer;
@@ -8949,7 +9008,7 @@ select[class*="lc-"]:focus-visible {
 
 .draft-card-actions > button:hover {
   background: rgba(229, 62, 62, 0.1);
-  color: var(--red, #e53e3e);
+  color: var(--red, var(--accent-danger));
 }
 
 /* ── Prompt modal ── */
@@ -8986,7 +9045,7 @@ select[class*="lc-"]:focus-visible {
   padding: 4px;
   border: none;
   background: transparent;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   color: var(--muted, #6b7a6b);
   flex-shrink: 0;
@@ -9048,7 +9107,7 @@ select[class*="lc-"]:focus-visible {
   overflow-wrap: break-word;
   background: var(--green-lightest);
   border: 1px solid var(--border, rgba(113, 131, 85, 0.15));
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 10px 12px;
   max-height: 220px;
   overflow-y: auto;
@@ -9089,7 +9148,7 @@ select[class*="lc-"]:focus-visible {
 }
 
 .folder-archive-label {
-  color: var(--red, #e53e3e);
+  color: var(--red, var(--accent-danger));
 }
 
 .folder-archive-action {
@@ -9103,7 +9162,7 @@ select[class*="lc-"]:focus-visible {
   width: 150px;
   padding: 7px 10px;
   border: 1px solid rgba(229, 62, 62, 0.3);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 0.85rem;
   background: var(--surface, #fff);
   color: var(--ink, #1a1a1a);
@@ -9112,11 +9171,11 @@ select[class*="lc-"]:focus-visible {
 }
 
 .folder-archive-input:focus {
-  border-color: var(--red, #e53e3e);
+  border-color: var(--red, var(--accent-danger));
 }
 
 .folder-archive-error {
-  color: var(--red, #e53e3e);
+  color: var(--red, var(--accent-danger));
   max-width: 160px;
   line-height: 1.3;
 }
@@ -9173,25 +9232,25 @@ select[class*="lc-"]:focus-visible {
   align-items: center;
   gap: 4px;
   padding: 3px 9px;
-  border-radius: 20px;
+  border-radius: var(--radius-card-mobile);
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.01em;
 }
-.verdict-strong     { background: #d1fae5; color: #065f46; }
+.verdict-strong     { background: #d1fae5; color: var(--accent-positive-strong); }
 .verdict-pass       { background: #dbeafe; color: #1e40af; }
-.verdict-borderline { background: #fef3c7; color: #92400e; }
-.verdict-needs-work { background: #fee2e2; color: #991b1b; }
+.verdict-borderline { background: var(--accent-caution-tint); color: var(--accent-caution-strong); }
+.verdict-needs-work { background: var(--accent-danger-tint); color: var(--accent-danger-strong); }
 
-.mock-diff-easy   { background: #d1fae5; color: #065f46; }
-.mock-diff-medium { background: #fef3c7; color: #92400e; }
-.mock-diff-hard   { background: #fee2e2; color: #991b1b; }
+.mock-diff-easy   { background: #d1fae5; color: var(--accent-positive-strong); }
+.mock-diff-medium { background: var(--accent-caution-tint); color: var(--accent-caution-strong); }
+.mock-diff-hard   { background: var(--accent-danger-tint); color: var(--accent-danger-strong); }
 
 /* ── Setup page: hero ── */
 .mock-setup-hero {
   background: linear-gradient(135deg, var(--green-lightest) 0%, #fff 60%);
   border: 1px solid var(--green-light);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   padding: 24px 32px 22px;
   margin-bottom: 20px;
 }
@@ -9229,7 +9288,7 @@ select[class*="lc-"]:focus-visible {
   gap: 8px;
   padding: 16px 8px 14px;
   border: 2px solid var(--green-light-mid);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: rgba(255, 255, 255, 0.8);
   cursor: pointer;
   transition: border-color var(--transition-normal), background var(--transition-normal), box-shadow var(--transition-normal), transform var(--transition-normal);
@@ -9288,14 +9347,14 @@ select[class*="lc-"]:focus-visible {
   padding: 16px 20px;
   background: rgba(255,255,255,0.6);
   border: 1px solid var(--green-light);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
 }
 .mock-setup-footer-meta {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
-.mock-setup-error { color: #dc2626; font-size: 0.83rem; margin: 0; }
+.mock-setup-error { color: var(--accent-danger); font-size: 0.83rem; margin: 0; }
 .mock-start-btn {
   display: flex;
   align-items: center;
@@ -9348,7 +9407,7 @@ select[class*="lc-"]:focus-visible {
   padding: 4px 10px;
   background: var(--green-lightest);
   border: 1px solid var(--green-light-mid);
-  border-radius: 20px;
+  border-radius: var(--radius-card-mobile);
   font-size: 0.78rem;
   font-weight: 700;
   color: var(--green-dark);
@@ -9373,7 +9432,7 @@ select[class*="lc-"]:focus-visible {
   gap: 6px;
   padding: 5px 12px 5px 10px;
   border: 1.5px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #fff;
   cursor: pointer;
   font-size: 0.82rem;
@@ -9384,7 +9443,7 @@ select[class*="lc-"]:focus-visible {
 }
 .mock-q-tab:hover   { border-color: var(--green-dark); color: var(--ink); }
 .mock-q-tab.active  { border-color: var(--green-dark); background: var(--green-lightest); color: var(--ink); box-shadow: 0 0 0 2px rgba(113,131,85,0.15); }
-.mock-q-tab.expired { border-color: #dc2626; background: #fff5f5; color: #991b1b; }
+.mock-q-tab.expired { border-color: var(--accent-danger); background: #fff5f5; color: var(--accent-danger-strong); }
 .mock-q-tab.attempted:not(.active) { border-color: var(--green-mid); color: var(--green-dark); background: rgba(207,225,185,0.25); }
 
 /* Status dot inside each tab */
@@ -9396,8 +9455,8 @@ select[class*="lc-"]:focus-visible {
   background: var(--green-light-mid);
 }
 .mock-q-tab.attempted .mock-q-tab-dot,
-.mock-q-tab.active.attempted .mock-q-tab-dot { background: #10b981; }
-.mock-q-tab.expired .mock-q-tab-dot { background: #ef4444; }
+.mock-q-tab.active.attempted .mock-q-tab-dot { background: var(--accent-positive); }
+.mock-q-tab.expired .mock-q-tab-dot { background: var(--accent-danger); }
 .mock-q-tab.active:not(.attempted):not(.expired) .mock-q-tab-dot { background: var(--green-mid); }
 
 /* Timer */
@@ -9408,7 +9467,7 @@ select[class*="lc-"]:focus-visible {
   font-size: 0.9rem;
   font-weight: 700;
   padding: 5px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--green-lightest);
   border: 1.5px solid var(--green-light-mid);
   color: var(--ink);
@@ -9416,8 +9475,8 @@ select[class*="lc-"]:focus-visible {
   flex-shrink: 0;
   letter-spacing: 0.01em;
 }
-.mock-stage1-timer.warning { background: #fef3c7; border-color: #f59e0b; color: #92400e; }
-.mock-stage1-timer.expired { background: #fee2e2; border-color: #ef4444; color: #991b1b; animation: timer-pulse 1s ease-in-out infinite; }
+.mock-stage1-timer.warning { background: var(--accent-caution-tint); border-color: var(--accent-caution); color: var(--accent-caution-strong); }
+.mock-stage1-timer.expired { background: var(--accent-danger-tint); border-color: var(--accent-danger); color: var(--accent-danger-strong); animation: timer-pulse 1s ease-in-out infinite; }
 @keyframes timer-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
 
 /* ── Body split ── */
@@ -9494,9 +9553,9 @@ select[class*="lc-"]:focus-visible {
   padding: 10px 14px;
   background: #fff5f5;
   border: 1px solid #fca5a5;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 0.82rem;
-  color: #991b1b;
+  color: var(--accent-danger-strong);
   font-weight: 500;
 }
 
@@ -9507,7 +9566,7 @@ select[class*="lc-"]:focus-visible {
   padding: 12px 14px;
   background: #fff;
   border: 1.5px solid var(--green-light-mid);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   gap: 10px;
 }
 .mock-stage1-lc-card-text {
@@ -9522,7 +9581,7 @@ select[class*="lc-"]:focus-visible {
   padding: 6px 12px;
   background: var(--green-lightest);
   border: 1px solid var(--green-light-mid);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   font-size: 0.78rem;
   font-weight: 700;
   color: var(--green-dark);
@@ -9552,8 +9611,8 @@ select[class*="lc-"]:focus-visible {
   font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
-.mock-stage1-time-budget-remaining.warning { color: #92400e; }
-.mock-stage1-time-budget-remaining.expired { color: #991b1b; }
+.mock-stage1-time-budget-remaining.warning { color: var(--accent-caution-strong); }
+.mock-stage1-time-budget-remaining.expired { color: var(--accent-danger-strong); }
 .mock-stage1-time-budget-limit {
   font-size: 0.75rem;
   color: var(--muted);
@@ -9561,12 +9620,12 @@ select[class*="lc-"]:focus-visible {
 .mock-stage1-time-bar-track {
   height: 6px;
   background: var(--green-light);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   overflow: hidden;
 }
 .mock-stage1-time-bar-fill {
   height: 100%;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   transition: width 1s linear, background-color 0.5s;
 }
 .mock-stage1-benchmark-row {
@@ -9598,7 +9657,7 @@ select[class*="lc-"]:focus-visible {
   padding: 10px 12px;
   background: #fff;
   border: 1.5px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-family: var(--font-sans);
   font-size: 0.82rem;
   color: var(--ink);
@@ -9671,7 +9730,7 @@ select[class*="lc-"]:focus-visible {
   align-items: center;
   gap: 4px;
   padding: 4px 9px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 0.75rem;
   font-weight: 600;
   border: 1.5px solid var(--green-light-mid);
@@ -9682,8 +9741,8 @@ select[class*="lc-"]:focus-visible {
 }
 .mock-stage1-q-chip:hover { border-color: var(--green-dark); color: var(--ink); }
 .mock-stage1-q-chip.active { border-color: var(--green-dark); background: var(--green-lightest); color: var(--ink); }
-.mock-stage1-q-chip.attempted { border-color: #10b981; background: #f0fdf4; color: #065f46; }
-.mock-stage1-q-chip.expired { border-color: #ef4444; background: #fef2f2; color: #991b1b; }
+.mock-stage1-q-chip.attempted { border-color: var(--accent-positive); background: #f0fdf4; color: var(--accent-positive-strong); }
+.mock-stage1-q-chip.expired { border-color: var(--accent-danger); background: var(--accent-danger-tint); color: var(--accent-danger-strong); }
 .mock-stage1-q-chip-dot {
   width: 6px;
   height: 6px;
@@ -9702,7 +9761,7 @@ select[class*="lc-"]:focus-visible {
   display: flex;
   align-items: center;
   gap: 4px;
-  color: #dc2626;
+  color: var(--accent-danger);
   font-size: 0.82rem;
 }
 
@@ -9721,14 +9780,14 @@ select[class*="lc-"]:focus-visible {
   gap: 20px;
   padding: 24px 28px;
   margin-bottom: 24px;
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
 }
 .mock-overall-icon { flex-shrink: 0; }
 .mock-overall-label { font-size: 1.2rem; font-weight: 700; margin-bottom: 4px; }
-.mock-overall-strong    { border-left: 5px solid #10b981; background: linear-gradient(90deg, #ecfdf5 0%, #fff 100%); }
-.mock-overall-pass      { border-left: 5px solid #3b82f6; background: linear-gradient(90deg, #eff6ff 0%, #fff 100%); }
-.mock-overall-borderline { border-left: 5px solid #f59e0b; background: linear-gradient(90deg, #fffbeb 0%, #fff 100%); }
-.mock-overall-needs_work { border-left: 5px solid #ef4444; background: linear-gradient(90deg, #fef2f2 0%, #fff 100%); }
+.mock-overall-strong    { border-left: 5px solid var(--accent-positive); background: linear-gradient(90deg, #ecfdf5 0%, #fff 100%); }
+.mock-overall-pass      { border-left: 5px solid var(--accent-info); background: linear-gradient(90deg, var(--accent-info-tint) 0%, #fff 100%); }
+.mock-overall-borderline { border-left: 5px solid var(--accent-caution); background: linear-gradient(90deg, var(--accent-caution-tint) 0%, #fff 100%); }
+.mock-overall-needs_work { border-left: 5px solid var(--accent-danger); background: linear-gradient(90deg, var(--accent-danger-tint) 0%, #fff 100%); }
 
 .mock-score-fraction {
   font-size: 2rem;
@@ -9747,10 +9806,10 @@ select[class*="lc-"]:focus-visible {
 
 .mock-results-list { display: flex; flex-direction: column; gap: 12px; }
 .mock-result-card  { padding: 18px 22px; }
-.mock-result-card.verdict-strong    { border-left: 4px solid #10b981; }
-.mock-result-card.verdict-pass      { border-left: 4px solid #3b82f6; }
-.mock-result-card.verdict-borderline { border-left: 4px solid #f59e0b; }
-.mock-result-card.verdict-needs-work { border-left: 4px solid #ef4444; }
+.mock-result-card.verdict-strong    { border-left: 4px solid var(--accent-positive); }
+.mock-result-card.verdict-pass      { border-left: 4px solid var(--accent-info); }
+.mock-result-card.verdict-borderline { border-left: 4px solid var(--accent-caution); }
+.mock-result-card.verdict-needs-work { border-left: 4px solid var(--accent-danger); }
 .mock-result-header {
   display: flex;
   align-items: center;
@@ -9758,7 +9817,7 @@ select[class*="lc-"]:focus-visible {
   gap: 8px;
   margin-bottom: 10px;
 }
-.mock-result-num   { font-weight: 700; font-size: 0.78rem; color: var(--muted); padding: 2px 7px; background: var(--green-lightest); border-radius: 4px; }
+.mock-result-num   { font-weight: 700; font-size: 0.78rem; color: var(--muted); padding: 2px 7px; background: var(--green-lightest); border-radius: var(--radius-xs); }
 .mock-result-title { font-weight: 700; flex: 1; min-width: 120px; font-size: 0.95rem; }
 .mock-result-time  { display: flex; align-items: center; gap: 4px; margin-left: auto; color: var(--muted); }
 .mock-result-feedback { line-height: 1.6; color: var(--muted); font-size: 0.88rem; }
@@ -9775,7 +9834,7 @@ select[class*="lc-"]:focus-visible {
   background: #1e1e1e;
   color: #d4d4d4;
   padding: 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 0.82rem;
   overflow-x: auto;
   margin-top: 8px;
@@ -9877,7 +9936,7 @@ select[class*="lc-"]:focus-visible {
   flex-direction: column;
   gap: 0;
   border: 1px solid var(--green-light-mid);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   overflow: hidden;
   box-shadow: var(--shadow-md);
   margin-top: 8px;
@@ -10017,7 +10076,7 @@ select[class*="lc-"]:focus-visible {
   font-size: 0.85rem;
   line-height: 1.6;
   padding: 8px 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
 }
 
 .mock-stage2-chat-interviewer p {
@@ -10083,7 +10142,7 @@ select[class*="lc-"]:focus-visible {
   height: calc(100vh - 260px);
   min-height: 420px;
   border: 1.5px solid var(--green-light-mid);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   overflow: hidden;
   background: #fff;
   box-shadow: var(--shadow-md);
@@ -10133,7 +10192,7 @@ select[class*="lc-"]:focus-visible {
   font-size: 0.875rem;
   line-height: 1.65;
   padding: 10px 14px;
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
@@ -10193,14 +10252,14 @@ select[class*="lc-"]:focus-visible {
 }
 .mock-stage3-followup {
   padding: 12px 16px;
-  background: #fffbeb;
+  background: var(--accent-caution-tint);
   border: 1px solid #fde68a;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
   gap: 5px;
 }
-.mock-stage3-followup .eyebrow { color: #92400e; }
+.mock-stage3-followup .eyebrow { color: var(--accent-caution-strong); }
 .mock-stage3-followup-btn { align-self: flex-start; font-size: 0.82rem; }
 .mock-star-hint {
   display: flex;
@@ -10213,7 +10272,7 @@ select[class*="lc-"]:focus-visible {
   align-items: center;
   gap: 4px;
   padding: 3px 9px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -10221,8 +10280,8 @@ select[class*="lc-"]:focus-visible {
 }
 .mock-star-chip-s { background: #dbeafe; color: #1e40af; }
 .mock-star-chip-t { background: #fce7f3; color: #9d174d; }
-.mock-star-chip-a { background: #fef3c7; color: #92400e; }
-.mock-star-chip-r { background: #d1fae5; color: #065f46; }
+.mock-star-chip-a { background: var(--accent-caution-tint); color: var(--accent-caution-strong); }
+.mock-star-chip-r { background: #d1fae5; color: var(--accent-positive-strong); }
 .mock-star-hint-label { font-size: 0.75rem; color: var(--muted); font-weight: 500; }
 .mock-stage3-tip {
   display: flex;
@@ -10230,7 +10289,7 @@ select[class*="lc-"]:focus-visible {
   gap: 7px;
   padding: 8px 12px;
   background: var(--green-lightest);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 0.82rem;
 }
 .mock-stage3-input-area {
@@ -10260,15 +10319,15 @@ select[class*="lc-"]:focus-visible {
   gap: 24px;
   padding: 28px 32px;
   margin-bottom: 24px;
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
 }
 .mock-rec-icon { flex-shrink: 0; }
 .mock-rec-label { font-size: 1.5rem; font-weight: 800; margin-bottom: 5px; }
 
-.rec-strong-hire { border-left: 5px solid #10b981; background: linear-gradient(90deg, #ecfdf5 0%, #fff 100%); }
-.rec-hire        { border-left: 5px solid #3b82f6; background: linear-gradient(90deg, #eff6ff 0%, #fff 100%); }
-.rec-borderline  { border-left: 5px solid #f59e0b; background: linear-gradient(90deg, #fffbeb 0%, #fff 100%); }
-.rec-no-hire     { border-left: 5px solid #ef4444; background: linear-gradient(90deg, #fef2f2 0%, #fff 100%); }
+.rec-strong-hire { border-left: 5px solid var(--accent-positive); background: linear-gradient(90deg, #ecfdf5 0%, #fff 100%); }
+.rec-hire        { border-left: 5px solid var(--accent-info); background: linear-gradient(90deg, var(--accent-info-tint) 0%, #fff 100%); }
+.rec-borderline  { border-left: 5px solid var(--accent-caution); background: linear-gradient(90deg, var(--accent-caution-tint) 0%, #fff 100%); }
+.rec-no-hire     { border-left: 5px solid var(--accent-danger); background: linear-gradient(90deg, var(--accent-danger-tint) 0%, #fff 100%); }
 
 /* Per-stage verdicts moved onto the loop spine (.loop-spine--verdicts) so the
    debrief reads back in the same shape the loop was configured in. */
@@ -10308,7 +10367,7 @@ select[class*="lc-"]:focus-visible {
 .driver-popover {
   background: rgba(255, 255, 255, 0.98) !important;
   border: 1px solid var(--green-light-mid) !important;
-  border-radius: 10px !important;
+  border-radius: var(--radius-lg) !important;
   box-shadow: var(--shadow-lg) !important;
   padding: 20px 22px 18px !important;
   max-width: 300px !important;
@@ -10351,7 +10410,7 @@ select[class*="lc-"]:focus-visible {
   justify-content: center !important;
   box-sizing: border-box !important;
   padding: 7px 14px !important;
-  border-radius: 8px !important;
+  border-radius: var(--radius-md) !important;
   font-size: 12.5px !important;
   font-weight: 600 !important;
   cursor: pointer !important;
@@ -10473,12 +10532,6 @@ select[class*="lc-"]:focus-visible {
   /* Folder list: tighter gap on phones */
   .folder-list {
     gap: 8px;
-  }
-
-  /* Floating action button: move up slightly so it clears mobile keyboard */
-  .floating-action {
-    bottom: 20px;
-    right: 20px;
   }
 
   /* CreateTest upload zone: reduce padding on phones */
@@ -10717,7 +10770,7 @@ select[class*="lc-"]:focus-visible {
   color: var(--green-dark);
   background: var(--green-lightest);
   border: 1px solid var(--green-light-mid);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 1px 6px;
   letter-spacing: 0.03em;
 }
@@ -10776,7 +10829,7 @@ select[class*="lc-"]:focus-visible {
   height: 30px;
   border: none;
   background: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   color: var(--green-dark-mid);
 }
@@ -10853,9 +10906,9 @@ select[class*="lc-"]:focus-visible {
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  border-radius: 8px;
-  background: #fef2f2;
-  color: #dc2626;
+  border-radius: var(--radius-md);
+  background: var(--accent-danger-tint);
+  color: var(--accent-danger);
   font-size: 0.85rem;
   width: 100%;
   text-align: left;
@@ -10885,7 +10938,7 @@ select[class*="lc-"]:focus-visible {
   gap: 6px;
   padding: 20px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--surface);
 }
 
@@ -10924,7 +10977,7 @@ select[class*="lc-"]:focus-visible {
 .admin-table-wrap {
   overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .admin-table {
@@ -10987,14 +11040,14 @@ select[class*="lc-"]:focus-visible {
 .admin-badge {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 0.75rem;
   font-weight: 600;
 }
 
 .admin-badge--green {
-  background: #dcfce7;
-  color: #16a34a;
+  background: var(--accent-positive-tint);
+  color: var(--accent-positive);
 }
 
 .admin-badge--muted {
@@ -11004,7 +11057,7 @@ select[class*="lc-"]:focus-visible {
 
 .admin-badge--blue {
   background: #dbeafe;
-  color: #1d4ed8;
+  color: var(--accent-info-strong);
 }
 
 /* Dropdown used to set per-user beta access in the admin roster. */
@@ -11013,7 +11066,7 @@ select[class*="lc-"]:focus-visible {
   font-size: 0.8rem;
   font-weight: 600;
   padding: 4px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--green-lightest);
   background: var(--green-lightest);
   color: var(--muted);
@@ -11022,9 +11075,9 @@ select[class*="lc-"]:focus-visible {
 }
 
 .admin-beta-select--on {
-  background: #dcfce7;
-  border-color: #dcfce7;
-  color: #16a34a;
+  background: var(--accent-positive-tint);
+  border-color: var(--accent-positive-tint);
+  color: var(--accent-positive);
 }
 
 .admin-beta-select:hover:not(:disabled) {
@@ -11037,7 +11090,7 @@ select[class*="lc-"]:focus-visible {
 }
 
 .admin-error {
-  color: #dc2626;
+  color: var(--accent-danger);
   margin-bottom: 12px;
 }
 
@@ -11047,9 +11100,9 @@ select[class*="lc-"]:focus-visible {
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  border-radius: 8px;
-  background: #fef2f2;
-  color: #dc2626;
+  border-radius: var(--radius-md);
+  background: var(--accent-danger-tint);
+  color: var(--accent-danger);
   font-size: 0.85rem;
   margin-bottom: 24px;
 }
@@ -11063,7 +11116,7 @@ select[class*="lc-"]:focus-visible {
   font-weight: 500;
   color: var(--muted);
   padding: 4px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--green-lightest);
 }
 
@@ -11079,8 +11132,8 @@ select[class*="lc-"]:focus-visible {
 }
 
 .admin-badge--red {
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--accent-danger-tint);
+  color: var(--accent-danger);
 }
 
 /* Feature health indicators */
@@ -11093,25 +11146,25 @@ select[class*="lc-"]:focus-visible {
 }
 
 .admin-health--ok {
-  color: #16a34a;
+  color: var(--accent-positive);
 }
 
 .admin-health--warn {
-  color: #d97706;
+  color: var(--accent-caution);
 }
 
 .admin-health--error {
-  color: #dc2626;
+  color: var(--accent-danger);
 }
 
 /* Colored table cells */
 .admin-cell-green {
-  color: #16a34a;
+  color: var(--accent-positive);
   font-weight: 500;
 }
 
 .admin-cell-red {
-  color: #dc2626;
+  color: var(--accent-danger);
   font-weight: 500;
 }
 
@@ -11129,7 +11182,7 @@ select[class*="lc-"]:focus-visible {
 .admin-activity-bar-wrap {
   height: 10px;
   background: var(--green-lightest);
-  border-radius: 99px;
+  border-radius: var(--radius-pill);
   overflow: hidden;
   min-width: 80px;
 }
@@ -11137,7 +11190,7 @@ select[class*="lc-"]:focus-visible {
 .admin-activity-bar {
   height: 100%;
   background: var(--green-dark);
-  border-radius: 99px;
+  border-radius: var(--radius-pill);
   transition: width 0.3s ease;
 }
 
@@ -11166,7 +11219,7 @@ select[class*="lc-"]:focus-visible {
   min-height: 240px;
   padding: 10px 12px;
   border: 1.5px solid #d1e8b0;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--green-lightest);
   font-size: 0.88rem;
   font-family: inherit;
@@ -11190,7 +11243,7 @@ select[class*="lc-"]:focus-visible {
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--green-light);
   background: var(--green-lightest);
   color: var(--green-dark);
@@ -11218,7 +11271,7 @@ select[class*="lc-"]:focus-visible {
   flex-wrap: wrap;
   margin-bottom: 14px;
   padding: 10px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   border: 1px dashed var(--green-light);
   background: var(--green-lightest);
 }
@@ -11237,7 +11290,7 @@ select[class*="lc-"]:focus-visible {
   align-items: center;
   gap: 6px;
   padding: 7px 14px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: none;
   background: var(--green-dark);
   color: #fff;
@@ -11422,7 +11475,7 @@ select[class*="lc-"]:focus-visible {
   padding: 7px 12px;
   background: rgba(255, 255, 255, 0.7);
   border: 1.5px solid var(--green-mid);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: var(--green-dark);
   font-size: 0.85rem;
   font-weight: 700;
@@ -11461,7 +11514,7 @@ select[class*="lc-"]:focus-visible {
   padding: 14px;
   background: #fff;
   border: 1px solid var(--green-light-mid);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
 }
 
@@ -11485,7 +11538,7 @@ select[class*="lc-"]:focus-visible {
   padding: 0;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   color: var(--ink);
 }
@@ -11508,7 +11561,7 @@ select[class*="lc-"]:focus-visible {
   padding: 4px;
   background: #fff;
   border: 1.5px solid var(--green-light-mid);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   color: var(--ink);
   font-weight: 800;
   cursor: pointer;
@@ -11558,7 +11611,7 @@ select[class*="lc-"]:focus-visible {
   display: inline-block;
   width: 11px;
   height: 11px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 .test-nav-dot--answered {
@@ -11579,7 +11632,7 @@ select[class*="lc-"]:focus-visible {
   gap: 5px;
   padding: 4px 10px;
   background: rgba(214, 158, 46, 0.16);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: #9a6b12;
   font-size: 0.74rem;
   font-weight: 800;
@@ -11596,7 +11649,7 @@ select[class*="lc-"]:focus-visible {
   padding: 8px 14px;
   background: rgba(255, 241, 168, 0.4);
   border: 1px dashed #d9b94a;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   font-size: 0.82rem;
   font-weight: 600;
   color: #6b5a12;
@@ -11615,7 +11668,7 @@ select[class*="lc-"]:focus-visible {
   padding: 5px 10px;
   background: #fff;
   border: 1px solid #d9b94a;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: #6b5a12;
   font-size: 0.78rem;
   font-weight: 700;
@@ -11646,7 +11699,7 @@ select[class*="lc-"]:focus-visible {
   flex-shrink: 0;
   background: rgba(255, 255, 255, 0.7);
   border: 2px solid var(--green-light-mid);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   color: var(--green-mid);
   cursor: pointer;
   transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
@@ -11684,7 +11737,7 @@ select[class*="lc-"]:focus-visible {
   height: min(420px, calc(100vh - 120px));
   background: #fff;
   border: 1px solid var(--green-light-mid);
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
 }
@@ -11714,7 +11767,7 @@ select[class*="lc-"]:focus-visible {
   padding: 0;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   color: var(--ink);
 }
@@ -11791,7 +11844,7 @@ select[class*="lc-"]:focus-visible {
   padding: 16px 18px;
   background: rgba(207, 225, 185, 0.18);
   border: 1px dashed var(--green-light-mid);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
 }
 
 .extra-types-grid {
@@ -11822,7 +11875,7 @@ select[class*="lc-"]:focus-visible {
   padding: 16px;
   background: #fff;
   border: 2px solid var(--green-light-mid);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   color: var(--ink);
   font-size: 1.1rem;
   font-weight: 800;
@@ -11873,7 +11926,7 @@ select[class*="lc-"]:focus-visible {
   flex-shrink: 0;
   background: #fff;
   border: 2px solid var(--green-light-mid);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   color: #fff;
   transition: background var(--transition-fast), border-color var(--transition-fast);
 }
@@ -11901,7 +11954,7 @@ select[class*="lc-"]:focus-visible {
   padding: 12px 14px;
   background: #fff;
   border: 2px solid var(--green-light-mid);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
 }
 
 .rank-num {
@@ -11910,7 +11963,7 @@ select[class*="lc-"]:focus-visible {
   width: 30px;
   height: 30px;
   background: var(--green-dark);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: var(--green-lightest);
   font-weight: 800;
 }
@@ -11933,7 +11986,7 @@ select[class*="lc-"]:focus-visible {
   padding: 0;
   background: rgba(207, 225, 185, 0.4);
   border: 1px solid var(--green-light-mid);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   color: var(--green-dark);
   cursor: pointer;
   transition: background var(--transition-fast);
@@ -12006,7 +12059,7 @@ select[class*="lc-"]:focus-visible {
 .mock-stage1-statement pre {
   background: #f4f7ee;
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 10px 12px;
   overflow-x: auto;
   font-size: 0.8rem;
@@ -12015,7 +12068,7 @@ select[class*="lc-"]:focus-visible {
 }
 .mock-stage1-statement code {
   background: #f0f4e8;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 1px 5px;
   font-size: 0.82em;
 }
@@ -12032,7 +12085,7 @@ select[class*="lc-"]:focus-visible {
   color: var(--muted);
   padding: 8px 0;
 }
-.mock-stage1-statement-error { color: #991b1b; }
+.mock-stage1-statement-error { color: var(--accent-danger-strong); }
 
 /* Stage 1: Run button in the dark editor header */
 .mock-stage1-run-btn {
@@ -12041,7 +12094,7 @@ select[class*="lc-"]:focus-visible {
   gap: 6px;
   margin-left: auto;
   padding: 5px 14px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   border: 1px solid #3f8f4f;
   background: #2f7d3f;
   color: #fff;
@@ -12100,7 +12153,7 @@ select[class*="lc-"]:focus-visible {
   margin-top: 8px;
   padding: 8px 10px;
   background: #1a1f15;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid #2b3322;
 }
 .mock-stage1-console-case-label {
@@ -12120,7 +12173,7 @@ select[class*="lc-"]:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: var(--error, #dc2626);
+  color: var(--error, var(--accent-danger));
   font-size: 0.8rem;
   font-weight: 600;
 }
@@ -12181,7 +12234,7 @@ select[class*="lc-"]:focus-visible {
   gap: 6px;
   flex-shrink: 0;
   padding: 8px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: transparent;
   color: var(--muted);
   border: 1.5px solid var(--green-light-mid);
@@ -12195,7 +12248,7 @@ select[class*="lc-"]:focus-visible {
 /* Console shell */
 .ats-console {
   position: relative;
-  border-radius: 18px;
+  border-radius: var(--radius-card-mobile);
   overflow: hidden;
   background: var(--white);
   border: 1px solid var(--green-light-mid);
@@ -12228,7 +12281,7 @@ select[class*="lc-"]:focus-visible {
   color: #b5c99a;
   padding: 3px 9px;
   border: 1px solid rgba(181, 201, 154, 0.28);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 .ats-console-body {
   padding: 22px;
@@ -12245,7 +12298,7 @@ select[class*="lc-"]:focus-visible {
   gap: 0;
   padding: 4px;
   background: var(--green-lightest);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
 }
 .ats-mode {
   position: relative;
@@ -12255,7 +12308,7 @@ select[class*="lc-"]:focus-visible {
   justify-content: center;
   gap: 7px;
   padding: 9px 12px;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   background: transparent;
   cursor: pointer;
   font-weight: 600;
@@ -12270,7 +12323,7 @@ select[class*="lc-"]:focus-visible {
   bottom: 4px;
   left: 4px;
   width: calc(50% - 4px);
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   background: var(--white);
   box-shadow: var(--shadow-sm);
   transition: transform var(--transition-normal);
@@ -12289,7 +12342,7 @@ select[class*="lc-"]:focus-visible {
   padding: 34px 20px;
   cursor: pointer;
   border: 2px dashed var(--green-light-mid);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background:
     radial-gradient(circle at 1px 1px, rgba(113, 131, 85, 0.1) 1px, transparent 0) 0 0 / 16px 16px,
     var(--green-lightest);
@@ -12307,7 +12360,7 @@ select[class*="lc-"]:focus-visible {
   width: 48px;
   height: 48px;
   margin-bottom: 4px;
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: var(--white);
   color: var(--green-dark);
   box-shadow: var(--shadow-sm);
@@ -12321,7 +12374,7 @@ select[class*="lc-"]:focus-visible {
   align-items: center;
   gap: 13px;
   padding: 14px 16px;
-  border-radius: 13px;
+  border-radius: var(--radius-xl);
   background: var(--green-lightest);
   border: 1.5px solid var(--green-light-mid);
 }
@@ -12331,7 +12384,7 @@ select[class*="lc-"]:focus-visible {
   width: 42px;
   height: 42px;
   flex-shrink: 0;
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
   background: var(--green-dark);
   color: var(--white);
 }
@@ -12350,16 +12403,16 @@ select[class*="lc-"]:focus-visible {
   place-items: center;
   width: 32px;
   height: 32px;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
 }
-.ats-file-remove:hover { background: #fef2f2; color: #dc2626; }
+.ats-file-remove:hover { background: var(--accent-danger-tint); color: var(--accent-danger); }
 
 /* Paper textarea */
 .ats-paper {
-  border-radius: 13px;
+  border-radius: var(--radius-xl);
   overflow: hidden;
   border: 1.5px solid var(--green-light-mid);
   background: var(--white);
@@ -12397,7 +12450,7 @@ select[class*="lc-"]:focus-visible {
   display: flex;
   align-items: center;
   gap: 7px;
-  color: #991b1b;
+  color: var(--accent-danger-strong);
   font-size: 0.85rem;
   font-weight: 500;
 }
@@ -12416,7 +12469,7 @@ select[class*="lc-"]:focus-visible {
   gap: 8px;
   flex-shrink: 0;
   padding: 11px 22px;
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
   cursor: pointer;
   font-weight: 700;
   font-size: 0.9rem;
@@ -12464,7 +12517,7 @@ select[class*="lc-"]:focus-visible {
   position: relative;
   margin-top: 18px;
   padding: 26px 24px 24px;
-  border-radius: 18px;
+  border-radius: var(--radius-card-mobile);
   overflow: hidden;
   background: var(--white);
   border: 1px solid var(--green-light-mid);
@@ -12512,7 +12565,7 @@ select[class*="lc-"]:focus-visible {
   align-items: center;
   gap: 7px;
   padding: 7px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 2px solid;
   transform: rotate(-2deg);
   font-family: var(--ats-mono);
@@ -12521,8 +12574,8 @@ select[class*="lc-"]:focus-visible {
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.ats-stamp.pass { color: #166534; border-color: rgba(22, 101, 52, 0.5); background: rgba(220, 252, 231, 0.55); }
-.ats-stamp.fail { color: #991b1b; border-color: rgba(153, 27, 27, 0.5); background: rgba(254, 226, 226, 0.55); }
+.ats-stamp.pass { color: var(--accent-positive-strong); border-color: rgba(22, 101, 52, 0.5); background: rgba(220, 252, 231, 0.55); }
+.ats-stamp.fail { color: var(--accent-danger-strong); border-color: rgba(153, 27, 27, 0.5); background: rgba(254, 226, 226, 0.55); }
 .ats-verdict { margin: 12px 0 4px; font-weight: 700; color: var(--ink); font-size: 1.02rem; line-height: 1.35; }
 .ats-summary { margin: 0; color: var(--muted); font-size: 0.88rem; line-height: 1.6; }
 
@@ -12543,12 +12596,12 @@ select[class*="lc-"]:focus-visible {
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
-.ats-kw-label--match { color: #166534; }
-.ats-kw-label--miss { color: #b45309; }
+.ats-kw-label--match { color: var(--accent-positive-strong); }
+.ats-kw-label--miss { color: var(--accent-caution-strong); }
 .ats-kw-chips { display: flex; flex-wrap: wrap; gap: 7px; }
-.ats-kw { padding: 4px 11px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; }
-.ats-kw--match { background: #dcfce7; color: #166534; border: 1px solid rgba(22, 101, 52, 0.18); }
-.ats-kw--miss { background: var(--white); color: #92400e; border: 1px dashed #d97706; }
+.ats-kw { padding: 4px 11px; border-radius: var(--radius-md); font-size: 0.8rem; font-weight: 600; }
+.ats-kw--match { background: var(--accent-positive-tint); color: var(--accent-positive-strong); border: 1px solid rgba(22, 101, 52, 0.18); }
+.ats-kw--miss { background: var(--white); color: var(--accent-caution-strong); border: 1px dashed var(--accent-caution); }
 
 /* Columns */
 .ats-cols {
@@ -12568,8 +12621,8 @@ select[class*="lc-"]:focus-visible {
   text-transform: uppercase;
   font-weight: 700;
 }
-.ats-col-label--good { color: #166534; }
-.ats-col-label--bad { color: #b45309; }
+.ats-col-label--good { color: var(--accent-positive-strong); }
+.ats-col-label--bad { color: var(--accent-caution-strong); }
 .ats-col-label--fix { color: var(--green-dark); }
 .ats-col ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 9px; }
 .ats-col li {
@@ -12621,7 +12674,7 @@ select[class*="lc-"]:focus-visible {
    ========================================================================== */
 
 :root {
-  --lc-custom-accent: #b45309;
+  --lc-custom-accent: var(--accent-caution-strong);
   --lc-custom-accent-soft: #d97a2b;
   --lc-custom-tint: #fdf6ec;
   --lc-custom-tint-deep: #f7ead6;
@@ -12644,7 +12697,7 @@ select[class*="lc-"]:focus-visible {
   gap: 12px;
   padding: 16px;
   border: 1px solid color-mix(in srgb, var(--lc-custom-accent) 30%, white);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background:
     linear-gradient(135deg, var(--lc-custom-tint), rgba(255, 255, 255, 0.92));
   box-shadow: var(--shadow-sm);
@@ -12654,7 +12707,7 @@ select[class*="lc-"]:focus-visible {
   content: "";
   position: absolute;
   inset: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 1px;
   background: linear-gradient(135deg, color-mix(in srgb, var(--lc-custom-accent) 50%, white), transparent 60%);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
@@ -12698,7 +12751,7 @@ select[class*="lc-"]:focus-visible {
 .lc-custom-node-main .lc-node-progress {
   grid-column: 1 / -1;
   height: 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--lc-custom-accent) 14%, white);
   overflow: hidden;
 }
@@ -12706,7 +12759,7 @@ select[class*="lc-"]:focus-visible {
 .lc-custom-node-main .lc-node-progress span {
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: linear-gradient(90deg, var(--lc-custom-accent), var(--lc-custom-accent-soft));
 }
 
@@ -12723,7 +12776,7 @@ select[class*="lc-"]:focus-visible {
   padding: 0 16px;
   min-height: 44px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: linear-gradient(135deg, var(--lc-custom-accent), var(--lc-custom-accent-soft));
   color: #fff;
   font-size: 0.86rem;
@@ -12783,7 +12836,7 @@ select[class*="lc-"]:focus-visible {
   margin-top: 8px;
   padding: 48px 28px;
   border: 1px dashed color-mix(in srgb, var(--lc-custom-accent) 40%, white);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: var(--lc-custom-tint);
   text-align: center;
 }
@@ -12807,7 +12860,7 @@ select[class*="lc-"]:focus-visible {
   padding: 16px 18px;
   border: 1px solid color-mix(in srgb, var(--lc-custom-accent) 22%, white);
   border-left: 3px solid var(--lc-custom-accent);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--lc-custom-tint);
   color: var(--ink);
   font-size: 0.92rem;
@@ -12819,7 +12872,7 @@ select[class*="lc-"]:focus-visible {
 
 .lc-custom-statement code {
   padding: 1px 5px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   background: var(--lc-custom-tint-deep);
   color: var(--lc-custom-ink);
   font-size: 0.86em;
@@ -12856,7 +12909,7 @@ select[class*="lc-"]:focus-visible {
   gap: 10px;
   padding: 16px;
   border: 1px solid color-mix(in srgb, var(--lc-custom-accent) 26%, white);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background:
     radial-gradient(120% 120% at 0% 0%, var(--lc-custom-tint-deep), transparent 55%),
     var(--lc-custom-tint);
@@ -12877,7 +12930,7 @@ select[class*="lc-"]:focus-visible {
   width: 100%;
   padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--lc-custom-accent) 22%, white);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #fffaf3;
   color: var(--ink);
   font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
@@ -12902,7 +12955,7 @@ select[class*="lc-"]:focus-visible {
   padding: 0 18px;
   min-height: 42px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: linear-gradient(135deg, var(--lc-custom-accent), var(--lc-custom-accent-soft));
   color: #fff;
   font-size: 0.86rem;
@@ -12974,7 +13027,7 @@ select[class*="lc-"]:focus-visible {
   min-height: 42px;
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #fbfdf8;
   color: var(--ink);
   font-family: inherit;
@@ -13004,7 +13057,7 @@ select.lc-custom-input {
   gap: 10px;
   padding: 14px;
   border: 1px solid rgba(113, 131, 85, 0.18);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: rgba(233, 245, 219, 0.34);
 }
 
@@ -13021,7 +13074,7 @@ select.lc-custom-input {
 
 .lc-custom-cases code {
   padding: 1px 5px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   background: rgba(113, 131, 85, 0.14);
   color: var(--green-dark);
   font-size: 0.84em;
@@ -13032,7 +13085,7 @@ select.lc-custom-input {
   gap: 8px;
   padding: 12px;
   border: 1px solid rgba(113, 131, 85, 0.18);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--white);
 }
 
@@ -13068,7 +13121,7 @@ select.lc-custom-input {
   width: 100%;
   padding: 8px 10px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #fbfdf8;
   color: var(--ink);
   font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
@@ -13124,7 +13177,7 @@ select.lc-custom-input {
   gap: 8px;
   padding: 6px 12px;
   border: 1px solid color-mix(in srgb, var(--lc-custom-accent) 28%, white);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--lc-custom-tint);
   color: var(--lc-custom-ink);
   font-size: 0.85rem;
@@ -13160,11 +13213,11 @@ select.lc-custom-input {
    draws the user's real history: earned days, the gap, and today still open. */
 .lc-rescue {
   --lc-rescue-accent: var(--warning);
-  --lc-rescue-deep: #92400e;
+  --lc-rescue-deep: var(--accent-caution-strong);
   margin-top: 30px;
   padding: 22px 24px;
   border: 1px solid color-mix(in srgb, var(--lc-rescue-accent) 26%, white);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: linear-gradient(180deg, color-mix(in srgb, var(--lc-rescue-accent) 5%, white), rgba(255, 255, 255, 0.9));
   box-shadow: var(--shadow-sm);
 }
@@ -13187,7 +13240,7 @@ select.lc-custom-input {
   font-size: 0.7rem;
   font-weight: 600;
   padding: 2px 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: var(--lc-rescue-deep);
   background: color-mix(in srgb, var(--lc-rescue-accent) 14%, white);
   border: 1px solid color-mix(in srgb, var(--lc-rescue-accent) 28%, white);
@@ -13206,7 +13259,7 @@ select.lc-custom-input {
 .lc-rescue-cell {
   width: 16px;
   height: 16px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   flex-shrink: 0;
 }
 
@@ -13273,7 +13326,7 @@ select.lc-custom-input {
   flex-wrap: wrap;
   padding: 12px 14px;
   margin-bottom: 12px;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.75);
   border: 1px solid color-mix(in srgb, var(--lc-rescue-accent) 18%, white);
 }
@@ -13310,7 +13363,7 @@ select.lc-custom-input {
   align-items: center;
   gap: 8px;
   padding: 10px 18px;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   font-size: 0.88rem;
   font-weight: 600;
   color: var(--white);
@@ -13336,10 +13389,10 @@ select.lc-custom-input {
   gap: 8px;
   padding: 10px 14px;
   margin-bottom: 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--warning) 8%, white);
   border: 1px solid color-mix(in srgb, var(--warning) 26%, white);
-  color: #92400e;
+  color: var(--accent-caution-strong);
   font-size: 0.84rem;
   line-height: 1.5;
 }
@@ -13363,7 +13416,7 @@ select.lc-custom-input {
   width: fit-content;
   padding: 6px 12px;
   border: 1px solid var(--green-light, #cfe1b9);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--green-dark);
   font-size: 0.82rem;
@@ -13383,7 +13436,7 @@ select.lc-custom-input {
   padding: 12px 14px;
   background: rgba(207, 225, 185, 0.28);
   border-left: 3px solid var(--green-light, #cfe1b9);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .answer-reasoning-body .kojo-markdown {
@@ -13435,7 +13488,7 @@ select.lc-custom-input {
   gap: 12px;
   padding: 14px 16px;
   border: 1px solid var(--lc-border);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.74));
   box-shadow: var(--shadow-sm);
 }
@@ -13468,7 +13521,7 @@ select.lc-custom-input {
   min-height: 32px;
   padding: 0 12px;
   border: 1px solid var(--lc-border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.6);
   color: var(--muted);
   font-size: 0.8rem;
@@ -13512,31 +13565,31 @@ select.lc-custom-input {
 }
 
 .lc-diff-dot--medium {
-  background: #f59e0b;
+  background: var(--accent-caution);
 }
 
 .lc-diff-dot--hard {
-  background: #ef4444;
+  background: var(--accent-danger);
 }
 
 .lc-filter-chip--easy {
-  background: #dcfce7;
+  background: var(--accent-positive-tint);
   border-color: #86efac;
-  color: #166534;
+  color: var(--accent-positive-strong);
   box-shadow: none;
 }
 
 .lc-filter-chip--medium {
-  background: #fef3c7;
+  background: var(--accent-caution-tint);
   border-color: #fcd34d;
-  color: #92400e;
+  color: var(--accent-caution-strong);
   box-shadow: none;
 }
 
 .lc-filter-chip--hard {
-  background: #fee2e2;
+  background: var(--accent-danger-tint);
   border-color: #fca5a5;
-  color: #991b1b;
+  color: var(--accent-danger-strong);
   box-shadow: none;
 }
 
@@ -13555,7 +13608,7 @@ select.lc-custom-input {
   min-height: 30px;
   padding: 0 10px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--muted);
   font-size: 0.78rem;
@@ -13585,7 +13638,7 @@ select.lc-custom-input {
   gap: 8px;
   padding: clamp(38px, 7vw, 66px) 24px;
   border: 1px dashed color-mix(in srgb, var(--green-dark) 32%, white);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: rgba(255, 255, 255, 0.55);
   text-align: center;
 }
@@ -13622,7 +13675,7 @@ select.lc-custom-input {
   margin-top: 10px;
   min-height: 38px;
   padding: 0 16px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--green-dark);
   color: var(--white);
   font-size: 0.84rem;
@@ -13643,7 +13696,7 @@ select.lc-custom-input {
   margin: 4px 0;
   padding: 20px 18px;
   border: 1px dashed color-mix(in srgb, var(--green-dark) 22%, white);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.4);
   color: var(--muted);
   font-size: 0.85rem;
@@ -13715,10 +13768,10 @@ select.lc-custom-input {
   align-items: flex-start;
   gap: 10px;
   padding: 12px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: rgba(245, 158, 11, 0.12);
   border: 1px solid rgba(245, 158, 11, 0.45);
-  color: #92400e;
+  color: var(--accent-caution-strong);
   font-size: 0.86rem;
   line-height: 1.4;
 }
@@ -13726,7 +13779,7 @@ select.lc-custom-input {
 .review-flagged-notice svg {
   flex-shrink: 0;
   margin-top: 2px;
-  color: #d97706;
+  color: var(--accent-caution);
 }
 
 /* ── MathLive visual math field (math mode answers) ────────────────────── */
@@ -13737,7 +13790,7 @@ select.lc-custom-input {
   padding: 10px 12px;
   background: var(--white);
   border: 1.5px solid var(--green-light);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   --caret-color: var(--green-dark);
   --selection-background-color: var(--green-lightest);
   --contains-highlight-background-color: var(--green-lightest);
@@ -13906,7 +13959,7 @@ select.lc-custom-input {
   padding: 3px;
   color: var(--green-light-mid);
   line-height: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   transition: color 0.14s ease, transform 0.14s ease;
 }
 
@@ -13947,7 +14000,7 @@ select.lc-custom-input {
   resize: vertical;
   padding: 11px 13px;
   border: 1px solid var(--green-light-mid);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   font: inherit;
   font-size: 0.92rem;
   color: var(--ink);
@@ -13979,7 +14032,7 @@ select.lc-custom-input {
   font: inherit;
   font-weight: 500;
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   transition: background 0.14s ease, color 0.14s ease;
 }
 
@@ -13997,7 +14050,7 @@ select.lc-custom-input {
   font: inherit;
   font-weight: 600;
   padding: 10px 18px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   transition: background 0.14s ease, opacity 0.14s ease, transform 0.1s ease;
 }
 
@@ -14032,7 +14085,7 @@ select.lc-custom-input {
   gap: 10px;
   padding: 16px 18px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: var(--white, #fff);
 }
 
@@ -14109,7 +14162,7 @@ select.lc-custom-input {
   padding: 11px 14px;
   border: 1px solid var(--border);
   border-left: 3px solid var(--green-light-mid);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--white, #fff);
 }
 
@@ -14162,14 +14215,16 @@ select.lc-custom-input {
 
 .mode-card {
   --mode-accent: var(--green-dark);
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 1rem;
   padding: 1.4rem;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  /* Level 3, matching .card-interactive rather than carrying its own values. */
+  border-radius: var(--radius-lg);
   background: var(--white);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
   text-decoration: none;
   color: var(--ink);
   transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
@@ -14196,8 +14251,29 @@ select.lc-custom-input {
   place-items: center;
   width: 52px;
   height: 52px;
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   flex-shrink: 0;
+}
+
+/* Status sits beside the title it qualifies, rather than being folded into an
+   eyebrow string like "Lessons / beta" that made the reader parse a category
+   and a status out of one line. */
+/* The badge is taken out of flow and pinned to the card's corner.
+   In the title row it was a flex sibling of the heading, so any title wide
+   enough to fill the line pushed it onto a row of its own, where it read as an
+   orphaned label rather than as a qualifier on the title. The corner is a
+   fixed home that no title length can disturb; the heading reserves room for
+   it so the two can never collide. */
+.mode-card-beta {
+  position: absolute;
+  top: 1.1rem;
+  right: 1.1rem;
+  min-height: 0;
+  padding: 3px 9px;
+}
+
+.mode-card--beta .mode-card-body h2 {
+  padding-right: 3.5rem;
 }
 
 .mode-card-body h2 {
@@ -14210,14 +14286,6 @@ select.lc-custom-input {
   margin: 0;
   font-size: 0.9rem;
   line-height: 1.45;
-}
-
-.mode-card-meta {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
 }
 
 .mode-empty-note {
@@ -14290,7 +14358,7 @@ select.lc-custom-input {
   align-items: baseline;
   gap: 0.3rem;
   padding: 0.4rem 0.8rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(217, 119, 6, 0.12);
   color: var(--warning);
   font-weight: 700;
@@ -14378,7 +14446,7 @@ select.lc-custom-input {
   gap: 0.4rem;
   min-height: 96px;
   padding: 0.7rem 0.75rem;
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   border: 1.5px solid var(--border);
   background: var(--white);
   text-align: left;
@@ -14455,7 +14523,7 @@ select.lc-custom-input {
   right: 0.55rem;
   width: 16px;
   height: 16px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--success);
   opacity: 0.9;
 }
@@ -14551,7 +14619,7 @@ select.lc-custom-input {
   place-items: center;
   width: 78px;
   height: 78px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(217, 119, 6, 0.14);
   color: var(--warning);
   margin-bottom: 0.25rem;
@@ -14566,7 +14634,7 @@ select.lc-custom-input {
   display: inline-flex;
   align-items: center;
   padding: 0.3rem 0.85rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--success);
   color: var(--white);
   font-size: 0.78rem;
@@ -14593,7 +14661,7 @@ select.lc-custom-input {
   flex-direction: column;
   gap: 0.2rem;
   padding: 0.85rem 0.5rem;
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: var(--green-lightest);
 }
 
@@ -14732,7 +14800,7 @@ select.lc-custom-input {
   gap: 0.6rem;
   padding: 0.7rem 1rem;
   margin-bottom: 1rem;
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: var(--green-lightest);
   border: 1px dashed var(--green-light-mid);
   color: var(--muted);
@@ -14759,7 +14827,7 @@ select.lc-custom-input {
   font-weight: 600;
   cursor: pointer;
   padding: 0.25rem 0.4rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .lm-cancel-btn:hover {
@@ -14781,7 +14849,7 @@ select.lc-custom-input {
   align-items: center;
   gap: 0.9rem;
   padding: 0.9rem 1.1rem;
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   border: 1px solid var(--border);
   background: var(--white);
   text-decoration: none;
@@ -14816,7 +14884,7 @@ a.lm-module-row:focus-visible {
   place-items: center;
   width: 34px;
   height: 34px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--green-lightest);
   color: var(--green-dark);
   font-weight: 700;
@@ -14871,7 +14939,7 @@ a.lm-module-row:focus-visible {
   display: block;
   width: 55%;
   height: 0.95em;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--gray-200);
 }
 
@@ -14900,7 +14968,7 @@ a.lm-module-row:focus-visible {
   gap: 0.8rem;
   padding: 0.7rem 0.9rem;
   margin-bottom: 1rem;
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: var(--green-lightest);
   border: 1px solid var(--green-light);
 }
@@ -14912,7 +14980,7 @@ a.lm-module-row:focus-visible {
   height: 44px;
   flex-shrink: 0;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--green-dark);
   color: var(--white);
   cursor: pointer;
@@ -14969,7 +15037,7 @@ a.lm-module-row:focus-visible {
   height: 32px;
   flex-shrink: 0;
   border: 1px solid var(--green-light-mid);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--white);
   color: var(--green-dark);
   cursor: pointer;
@@ -14992,7 +15060,7 @@ a.lm-module-row:focus-visible {
   font-size: 0.78rem;
   font-weight: 600;
   padding: 0.3rem 0.5rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 
@@ -15028,7 +15096,7 @@ a.lm-module-row:focus-visible {
   padding: 6px;
   background: var(--white);
   border: 1px solid var(--green-light-mid);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
 }
 
@@ -15038,7 +15106,7 @@ a.lm-module-row:focus-visible {
   gap: 8px;
   padding: 0.5rem 0.65rem;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--ink);
   font-size: 0.88rem;
@@ -15068,7 +15136,7 @@ a.lm-module-row:focus-visible {
 .lm-voice-select {
   width: 100%;
   padding: 0.6rem 0.75rem;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   border: 1.5px solid var(--border);
   background: var(--white);
   color: var(--ink);
@@ -15090,7 +15158,7 @@ a.lm-module-row:focus-visible {
 .lm-lesson-block {
   padding: 0.35rem 0.6rem;
   margin: 0 -0.6rem;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   border-left: 3px solid transparent;
   transition: background var(--transition-normal), border-color var(--transition-normal);
 }
@@ -15125,7 +15193,7 @@ a.lm-module-row:focus-visible {
   resize: vertical;
   min-height: 70px;
   padding: 0.6rem 0.75rem;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   border: 1.5px solid var(--border);
   background: var(--white);
   color: var(--ink);
@@ -15151,7 +15219,7 @@ a.lm-module-row:focus-visible {
   gap: 0.6rem;
   margin: -0.3rem 0 0;
   padding: 0.6rem 0.75rem;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: rgba(217, 119, 6, 0.08);
   border: 1px solid rgba(217, 119, 6, 0.35);
 }
@@ -15229,7 +15297,7 @@ a.lm-module-row:focus-visible {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--green-light-mid);
   overflow: hidden;
   background: #000;
@@ -15245,7 +15313,7 @@ a.lm-module-row:focus-visible {
 
 .lm-video-player {
   width: 100%;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--green-light-mid);
   background: #000;
 }
@@ -15321,7 +15389,7 @@ a.lm-module-row:focus-visible {
   gap: 0.65rem;
   width: 100%;
   padding: 0.6rem 0.75rem;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   border: 1.5px solid var(--border);
   background: var(--white);
   text-align: left;
@@ -15343,7 +15411,7 @@ a.lm-module-row:focus-visible {
   place-items: center;
   width: 24px;
   height: 24px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--green-lightest);
   color: var(--green-dark);
   font-size: 0.75rem;
@@ -15436,14 +15504,14 @@ a.lm-module-row:focus-visible {
 .skel {
   display: inline-block;
   height: 0.8rem;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: linear-gradient(90deg, #e4ecda 32%, #f4f8ec 50%, #e4ecda 68%);
   background-size: 300% 100%;
   animation: skel-shimmer 1.6s infinite ease-in-out;
 }
 
 .skel--circle {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   flex-shrink: 0;
 }
 
@@ -15467,7 +15535,7 @@ a.lm-module-row:focus-visible {
   padding: 14px 16px;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .skel-card {
@@ -15477,7 +15545,7 @@ a.lm-module-row:focus-visible {
   padding: 16px;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
 }
 
@@ -15526,7 +15594,7 @@ a.lm-module-row:focus-visible {
   width: 4px;
   height: 4px;
   transform: translateY(-50%);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--green-lightest);
   opacity: 0.9;
 }
@@ -15594,7 +15662,7 @@ a.lm-module-row:focus-visible {
   text-align: center;
   background: rgba(255, 255, 255, 0.46);
   border: 1px dashed var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .loading-notice-text {
@@ -15653,7 +15721,7 @@ a.lm-module-row:focus-visible {
   padding: 30px 28px;
   background: var(--white);
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
 }
 
@@ -15707,7 +15775,7 @@ a.lm-module-row:focus-visible {
   flex-shrink: 0;
   place-items: center;
   border: 1.5px solid var(--green-light-mid);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   transition: background var(--transition-normal), border-color var(--transition-normal);
 }
 
@@ -15759,7 +15827,7 @@ a.lm-module-row:focus-visible {
   padding: 24px;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
 }
 
@@ -15774,7 +15842,7 @@ a.lm-module-row:focus-visible {
 }
 
 .skel-folder-icon {
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .skel-folder-footer {
@@ -15790,7 +15858,7 @@ a.lm-module-row:focus-visible {
   padding: 22px;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
 }
 
@@ -15814,7 +15882,7 @@ a.lm-module-row:focus-visible {
   padding: 18px 20px;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .skel-test-row-main {
@@ -15838,7 +15906,7 @@ a.lm-module-row:focus-visible {
   padding: 48px 32px;
   background: linear-gradient(160deg, var(--green-light), var(--green-light-mid));
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .skel-score-hero .skel {
@@ -15858,7 +15926,7 @@ a.lm-module-row:focus-visible {
   padding: 26px;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
 }
 
@@ -15869,7 +15937,7 @@ a.lm-module-row:focus-visible {
 }
 
 .skel-pill {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 .skel-question-prompt {
@@ -15890,7 +15958,7 @@ a.lm-module-row:focus-visible {
   gap: 12px;
   padding: 14px 16px;
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.5);
 }
 
@@ -15904,7 +15972,7 @@ a.lm-module-row:focus-visible {
   padding: 32px;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
 }
 
@@ -15958,7 +16026,7 @@ a.lm-module-row:focus-visible {
   gap: 8px;
   padding: 14px 16px;
   border: 1px solid var(--green-light-mid);
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
 }
 
 .skel-chat-bubble--kojo {
@@ -16004,7 +16072,9 @@ a.lm-module-row:focus-visible {
   background: var(--green-lightest);
   color: var(--green-dark);
   cursor: pointer;
-  box-shadow: var(--shadow-sm);
+  /* It sits over live message text, so it needs to read as a layer above the
+     transcript rather than a mark on it. */
+  box-shadow: 0 2px 10px rgba(38, 48, 31, 0.18), 0 0 0 3px var(--green-lightest);
   transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
 
@@ -16015,10 +16085,14 @@ a.lm-module-row:focus-visible {
   display: none;
 }
 
-.kojo-scroll-bottom:hover {
-  background: var(--green-dark);
-  color: var(--white);
-  transform: translateY(-1px);
+/* Guarded: on a touch device :hover latches after a tap, which left this
+   button stuck in its filled state sitting on top of the message text. */
+@media (hover: hover) {
+  .kojo-scroll-bottom:hover {
+    background: var(--green-dark);
+    color: var(--white);
+    transform: translateY(-1px);
+  }
 }
 
 .kojo-scroll-bottom:focus-visible {
@@ -16039,6 +16113,7 @@ a.lm-module-row:focus-visible {
   .kojo-scroll-bottom:hover {
     transform: none;
   }
+
 }
 /* Dashboard "Review These" weak cards: keeps the dark gradient of .card-dark
    with light-on-dark bones, same trick as the score hero. */
@@ -16047,7 +16122,7 @@ a.lm-module-row:focus-visible {
   gap: 14px;
   padding: 22px;
   background: linear-gradient(135deg, var(--green-dark), #536342);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .skel-weak-card .skel {
@@ -16082,7 +16157,7 @@ a.lm-module-row:focus-visible {
   min-height: 96px;
   padding: 0.7rem 0.75rem;
   border: 1.5px solid var(--green-light-mid);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: rgba(255, 255, 255, 0.72);
 }
 
@@ -16125,7 +16200,7 @@ a.lm-module-row:focus-visible {
   width: 30px;
   height: 30px;
   padding: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -16163,7 +16238,7 @@ a.lm-module-row:focus-visible {
   display: inline-block;
   margin-top: 3px;
   padding: 2px 9px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(113, 131, 85, 0.14);
   color: var(--green-dark);
   font-size: 0.74rem;
@@ -16185,7 +16260,7 @@ a.lm-module-row:focus-visible {
 }
 
 .chat-mode-shell .kojo-suggestion {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 7px 14px;
   font-size: 0.8rem;
   font-weight: 500;
@@ -16224,7 +16299,7 @@ a.lm-module-row:focus-visible {
   justify-content: center;
   width: 26px;
   height: 26px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--green-lightest);
   border: 1px solid var(--green-light);
   color: var(--green-dark);
@@ -16238,31 +16313,6 @@ a.lm-module-row:focus-visible {
   color: var(--ink);
 }
 
-.chat-mode-brand-new {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  margin-left: auto;
-  padding: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.chat-mode-brand-new:hover:not(:disabled) {
-  background: rgba(113, 131, 85, 0.12);
-  color: var(--green-dark);
-}
-
-.chat-mode-brand-new:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 /* Sidebar: prominent new-chat shortcut */
 .chat-mode-new-chat {
   display: flex;
@@ -16270,7 +16320,7 @@ a.lm-module-row:focus-visible {
   gap: 8px;
   margin: 10px 8px 4px;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: transparent;
   font-family: var(--font-mono);
   font-size: 0.8rem;
@@ -16373,7 +16423,7 @@ a.lm-module-row:focus-visible {
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid transparent;
   background: transparent;
   font-family: var(--font-mono);
@@ -16402,7 +16452,7 @@ a.lm-module-row:focus-visible {
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--green-dark);
   color: #fff;
   font-size: 0.62rem;
@@ -16459,7 +16509,7 @@ a.lm-module-row:focus-visible {
   width: 26px;
   height: 26px;
   padding: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -16486,7 +16536,7 @@ a.lm-module-row:focus-visible {
   gap: 9px;
   width: 100%;
   padding: 8px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   transition: background 0.15s ease;
 }
 
@@ -16534,7 +16584,7 @@ a.lm-module-row:focus-visible {
   height: 22px;
   padding: 0;
   margin-top: 2px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -16548,7 +16598,7 @@ a.lm-module-row:focus-visible {
 
 .chat-mode-doc-delete:hover {
   background: #fdf2f2;
-  color: #c0392b;
+  color: var(--accent-danger-strong);
 }
 
 .chat-mode-docs-empty {
@@ -16589,7 +16639,7 @@ a.lm-module-row:focus-visible {
   padding: 0;
   gap: 0;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
 }
 
 .kojo-blueprint-head {
@@ -16735,12 +16785,10 @@ button.kojo-blueprint-head:hover {
   color: var(--k-ink);
 }
 
-.chat-mode-shell .chat-mode-brand-new,
 .chat-mode-shell .chat-mode-collapse-btn {
   color: var(--k-muted);
 }
 
-.chat-mode-shell .chat-mode-brand-new:hover:not(:disabled),
 .chat-mode-shell .chat-mode-collapse-btn:hover {
   background: var(--k-hover);
   color: var(--k-ink);
@@ -16844,7 +16892,7 @@ button.kojo-blueprint-head:hover {
 .chat-mode-title--editable {
   padding: 3px 6px;
   margin-left: -6px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: text;
   transition: background var(--transition-fast);
 }
@@ -16859,7 +16907,7 @@ button.kojo-blueprint-head:hover {
   padding: 3px 6px;
   margin-left: -6px;
   border: 1px solid var(--green-mid);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--white);
   color: var(--k-ink);
   font-family: var(--font-sans);
@@ -16979,7 +17027,7 @@ button.kojo-blueprint-head:hover {
 .chat-mode-shell .kojo-user-bubble {
   max-width: 100%;
   padding: 10px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: var(--k-ink);
   color: var(--k-canvas);
   font-size: 0.9rem;
@@ -17064,7 +17112,7 @@ button.kojo-blueprint-head:hover {
   gap: 6px;
   padding: 6px 12px;
   border: 1px solid var(--k-line);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   font-family: var(--font-sans);
   font-size: 0.72rem;
@@ -17096,7 +17144,7 @@ button.kojo-blueprint-head:hover {
 .chat-mode-shell .chat-mode-input-wrap {
   padding: 8px 10px;
   border: 1px solid var(--k-line);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: var(--k-field);
   box-shadow: none;
 }
@@ -17139,7 +17187,7 @@ button.kojo-blueprint-head:hover {
 .chat-mode-shell .kojo-send {
   width: 30px;
   height: 30px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--k-ink);
   color: var(--k-canvas);
 }
@@ -17214,7 +17262,7 @@ button.kojo-blueprint-head:hover {
   --card-accent: var(--green-dark);
   margin-top: 8px;
   border: 1px solid rgba(113, 131, 85, 0.32);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: rgba(113, 131, 85, 0.07);
 }
 
@@ -17252,7 +17300,7 @@ button.kojo-blueprint-head:hover {
 .chat-mode-shell .kojo-blueprint-input,
 .chat-mode-shell .kojo-blueprint-select {
   border: 1px solid var(--k-line);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--white);
   color: var(--k-ink);
   font-size: 0.82rem;
@@ -17265,7 +17313,7 @@ button.kojo-blueprint-head:hover {
 }
 
 .chat-mode-shell .kojo-blueprint-btn {
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-family: var(--font-sans);
   font-size: 0.74rem;
 }
@@ -17328,7 +17376,7 @@ button.kojo-blueprint-head:hover {
   margin: 0 8px 4px;
   padding: 8px 10px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: transparent;
   font-family: var(--font-sans);
   font-size: 0.8rem;
@@ -17383,7 +17431,7 @@ button.kojo-blueprint-head:hover {
   gap: 6px;
   padding: 8px 14px;
   border: 1px solid var(--k-line);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--white);
   font-family: var(--font-sans);
   font-size: 0.76rem;
@@ -17406,7 +17454,7 @@ button.kojo-blueprint-head:hover {
   margin-bottom: 16px;
   padding: 12px;
   border: 1px solid var(--k-line);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--white);
 }
 
@@ -17415,7 +17463,7 @@ button.kojo-blueprint-head:hover {
   min-width: 160px;
   padding: 8px 10px;
   border: 1px solid var(--k-line);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--k-canvas);
   color: var(--k-ink);
   font-family: inherit;
@@ -17431,7 +17479,7 @@ button.kojo-blueprint-head:hover {
 .kojo-browse-cancel {
   padding: 8px 14px;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   font-family: var(--font-sans);
   font-size: 0.76rem;
   font-weight: 600;
@@ -17467,7 +17515,7 @@ button.kojo-blueprint-head:hover {
   margin-bottom: 20px;
   padding: 10px 14px;
   border: 1px solid var(--k-line);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--white);
   color: var(--k-faint);
   transition: border-color var(--transition-fast);
@@ -17505,7 +17553,7 @@ button.kojo-blueprint-head:hover {
   min-height: 132px;
   padding: 16px;
   border: 1px solid var(--k-line);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: var(--white);
   cursor: pointer;
   text-align: left;
@@ -17599,7 +17647,7 @@ button.kojo-blueprint-head:hover {
   gap: 8px;
   padding: 10px 12px;
   border: 1px solid var(--k-line);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: var(--white);
   transition: border-color var(--transition-fast);
 }
@@ -17643,7 +17691,7 @@ button.kojo-blueprint-head:hover {
   padding: 11px 10px;
   border: none;
   border-bottom: 1px solid var(--k-line);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--k-ink);
   cursor: pointer;
@@ -17685,7 +17733,7 @@ button.kojo-blueprint-head:hover {
 .kojo-home-card {
   padding: 6px 12px 14px;
   border: 1px solid var(--k-line);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: var(--white);
 }
 
@@ -17761,10 +17809,22 @@ button.kojo-blueprint-head:hover {
     flex-wrap: nowrap;
     overflow-x: auto;
     scrollbar-width: none;
+    /* A chip cut flat at the edge reads as a layout failure. Fading the last
+       one out says the row continues, and snapping keeps chips from parking
+       half in view. */
+    scroll-snap-type: x proximity;
+    scroll-padding-left: 2px;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  }
+
+  .chat-mode-shell .chat-mode-input-chips::-webkit-scrollbar {
+    display: none;
   }
 
   .chat-mode-shell .chat-mode-input-chips .kojo-suggestion {
     flex-shrink: 0;
+    scroll-snap-align: start;
   }
 
   .chat-mode-shell .kojo-user-col {
@@ -17829,7 +17889,7 @@ button.kojo-blueprint-head:hover {
   border: 1px solid var(--border, #d8d3c4);
   background: transparent;
   color: inherit;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 6px 10px;
   font-size: 0.78rem;
   cursor: pointer;
@@ -17885,7 +17945,7 @@ button.kojo-blueprint-head:hover {
   font-size: 0.85rem;
   font-weight: 600;
   padding: 0.45rem 0.85rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   cursor: pointer;
 }
 
@@ -17906,7 +17966,7 @@ button.kojo-blueprint-head:hover {
 
 .lm-archived-track {
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: var(--white);
   padding: 0.4rem 0.5rem 0.4rem 0.2rem;
 }
@@ -18117,7 +18177,7 @@ button.kojo-blueprint-head:hover {
   margin-left: auto;
   flex-shrink: 0;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: currentColor;
   opacity: 0.62;
@@ -18177,7 +18237,7 @@ button.kojo-blueprint-head:hover {
   width: 26px;
   height: 26px;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--k-faint);
   cursor: pointer;
@@ -18222,7 +18282,7 @@ button.kojo-blueprint-head:hover {
   width: 20px;
   height: 20px;
   border: none;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   background: transparent;
   color: var(--k-faint);
   cursor: pointer;
@@ -18259,7 +18319,7 @@ button.kojo-blueprint-head:hover {
   align-items: center;
   gap: 4px;
   border: 1px solid #e2b4ae;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: #fdf3f2;
   color: #b3352b;
   font-family: inherit;
@@ -18295,7 +18355,7 @@ button.kojo-blueprint-head:hover {
 .chat-mode-shell .kojo-user-edit-input {
   width: 100%;
   border: 1px solid var(--k-line);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: var(--k-field);
   color: var(--k-ink);
   font-family: var(--font-sans);
@@ -18319,7 +18379,7 @@ button.kojo-blueprint-head:hover {
 
 .chat-mode-shell .kojo-user-edit-cancel,
 .chat-mode-shell .kojo-user-edit-send {
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-family: var(--font-sans);
   font-size: 0.8rem;
   padding: 6px 14px;
@@ -18404,7 +18464,7 @@ button.kojo-blueprint-head:hover {
 .settings-custom-instruction {
   width: 100%;
   border: 1px solid var(--green-light-mid);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--white);
   color: var(--ink);
   font-family: inherit;
@@ -18443,7 +18503,7 @@ button.kojo-blueprint-head:hover {
 
 .settings-memory-card {
   border: 1px solid var(--green-light-mid);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--green-lightest);
   padding: 12px 14px;
   margin: 10px 0;
@@ -18465,7 +18525,7 @@ button.kojo-blueprint-head:hover {
   align-items: center;
   gap: 6px;
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--white);
   color: var(--green-dark);
   font-family: inherit;
@@ -18508,7 +18568,7 @@ button.kojo-blueprint-head:hover {
   width: 26px;
   height: 26px;
   border: 1px solid var(--k-line);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--k-field);
   color: var(--k-ink);
   cursor: pointer;
@@ -18534,7 +18594,7 @@ button.kojo-blueprint-head:hover {
   margin-top: 8px;
   padding: 18px 12px;
   border: 1.5px dashed var(--k-line);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: transparent;
   color: var(--k-muted);
   cursor: pointer;
@@ -18587,7 +18647,7 @@ button.kojo-blueprint-head:hover {
   letter-spacing: 0.04em;
   color: var(--k-faint);
   border: 1px solid var(--k-line);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 2px 5px;
 }
 
@@ -18605,7 +18665,7 @@ button.kojo-blueprint-head:hover {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: rgba(246, 249, 241, 0.92);
   color: var(--k-accent);
   font-size: 0.8rem;
@@ -18618,7 +18678,7 @@ button.kojo-blueprint-head:hover {
   min-width: 0;
   padding: 20px 22px;
   border: 1px solid var(--lc-border);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: rgba(255, 255, 255, 0.82);
   box-shadow: var(--shadow-sm);
 }
@@ -18660,7 +18720,7 @@ button.kojo-blueprint-head:hover {
   gap: 2px;
   padding: 10px 14px;
   border: 1px solid var(--lc-border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--green-lightest, #eef4e4);
   min-width: 92px;
 }
@@ -18691,7 +18751,7 @@ button.kojo-blueprint-head:hover {
   min-width: 160px;
   padding: 10px 14px;
   border: 1px solid color-mix(in srgb, var(--green-dark) 30%, white);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.9);
   color: var(--ink);
   cursor: pointer;
@@ -18757,7 +18817,7 @@ button.kojo-blueprint-head:hover {
 .lc-cadence-cell {
   width: 16px;
   height: 16px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   /* Level 0 = empty. Levels 1-4 ramp the brand green from pale to deep, matching
      the GitHub contribution-graph intensity scale. */
   background: var(--green-lightest, #e9f0dd);
@@ -18825,9 +18885,30 @@ button.kojo-blueprint-head:hover {
 .lc-insight-card {
   padding: 20px 22px;
   border: 1px solid var(--lc-border);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: rgba(255, 255, 255, 0.82);
   box-shadow: var(--shadow-sm);
+}
+
+/* Zone headings for the dashboard.
+   The page stacks eleven panels, and the only headings on it were the panels'
+   own titles at 1.05rem next to node labels at 1rem, so nothing outranked
+   anything and the column read as one undifferentiated pile. These sit a full
+   step above a panel title and carry a rule, which is what lets the eye find
+   the three groups (where you stand, what to do now, the whole map) without
+   reading every card. */
+.lc-zone-title {
+  margin: 34px 0 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--green-light-mid);
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.lc-zone-title:first-of-type {
+  margin-top: 8px;
 }
 
 .lc-insight-title {
@@ -18870,7 +18951,7 @@ button.kojo-blueprint-head:hover {
 
 .lc-mastery-bar {
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: #e3eed3;
   overflow: hidden;
 }
@@ -18878,7 +18959,7 @@ button.kojo-blueprint-head:hover {
 .lc-mastery-bar > span {
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   transition: width 0.3s ease;
 }
 
@@ -18902,7 +18983,7 @@ button.kojo-blueprint-head:hover {
   gap: 6px;
   padding: 6px 12px;
   border: 1px solid var(--lc-border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(233, 245, 219, 0.6);
   color: var(--ink);
   font-size: 0.78rem;
@@ -18932,7 +19013,7 @@ button.kojo-blueprint-head:hover {
   padding: 11px;
   margin-top: auto;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: linear-gradient(135deg, var(--green-dark), #536342);
   color: #ffffff;
   font-size: 0.85rem;
@@ -18962,7 +19043,7 @@ button.kojo-blueprint-head:hover {
   padding: 11px 13px;
   margin-top: auto;
   border: 1px solid var(--green-dark);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--green-lightest);
   color: var(--green-dark);
   font-size: 0.85rem;
@@ -19013,7 +19094,7 @@ button.kojo-blueprint-head:hover {
   width: 100%;
   padding: 18px 20px;
   border: 1px solid var(--lc-border);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: rgba(247, 250, 242, 0.7);
   color: var(--ink);
   cursor: pointer;
@@ -19040,7 +19121,7 @@ button.kojo-blueprint-head:hover {
   flex-shrink: 0;
   width: 38px;
   height: 38px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--green-lightest);
   color: var(--green-dark);
 }
@@ -19053,7 +19134,7 @@ button.kojo-blueprint-head:hover {
   color: var(--green-dark);
   background: #ffffff;
   border: 1px solid var(--lc-border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 2px 9px;
 }
 
@@ -19106,7 +19187,7 @@ button.kojo-blueprint-head:hover {
 button.lc-reminder-feature-cta {
   padding: 7px 12px;
   border: 1px solid var(--green-dark);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--green-dark);
   color: #fff;
   cursor: pointer;
@@ -19254,7 +19335,7 @@ button.lc-reminder-feature-cta:disabled {
   color: var(--green-dark);
   background: var(--green-lightest);
   border: 1px solid var(--lc-border);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 1px 6px;
   white-space: nowrap;
 }
@@ -19267,7 +19348,7 @@ button.lc-reminder-feature-cta:disabled {
   width: 28px;
   height: 28px;
   border: 1px solid var(--lc-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #fff;
   color: var(--muted, #596949);
   cursor: pointer;
@@ -19294,7 +19375,7 @@ button.lc-reminder-feature-cta:disabled {
   width: 100%;
   padding: 9px 12px;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: transparent;
   color: var(--muted, #596949);
   font-size: 0.85rem;
@@ -19357,12 +19438,12 @@ button.lc-reminder-feature-cta:disabled {
   gap: 2px 8px;
   background: var(--green-lightest);
   border: 1px solid var(--lc-border);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
 }
 
 .lc-rail-streak svg {
   grid-row: 1 / span 2;
-  color: #d97706;
+  color: var(--accent-caution);
 }
 
 .lc-rail-streak strong {
@@ -19485,7 +19566,7 @@ button.lc-reminder-feature-cta:disabled {
   margin: 40px auto;
   padding: 32px 34px;
   border: 1px solid var(--lc-border);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: rgba(255, 255, 255, 0.82);
   box-shadow: var(--shadow-sm);
 }
@@ -19499,7 +19580,7 @@ button.lc-reminder-feature-cta:disabled {
   color: var(--green-dark);
   background: var(--green-lightest);
   border: 1px solid var(--lc-border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 3px 12px;
   margin-bottom: 16px;
 }
@@ -19540,7 +19621,7 @@ button.lc-reminder-feature-cta:disabled {
 .lc-daily-error {
   margin: 8px 0 0;
   font-size: 0.82rem;
-  color: var(--error, #b91c1c);
+  color: var(--error, var(--accent-danger-strong));
 }
 
 .lc-daily-source-note {
@@ -19580,7 +19661,7 @@ button.lc-reminder-feature-cta:disabled {
 .lc-pass-banner-clear {
   padding: 7px 14px;
   border: 1px solid color-mix(in srgb, var(--pass-color) 45%, white);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #fff;
   font-size: 0.8rem;
   font-weight: 650;
@@ -19607,7 +19688,7 @@ button.lc-reminder-feature-cta:disabled {
   gap: 18px;
   padding: 22px 24px;
   border: 1px solid var(--lc-border);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: rgba(255, 255, 255, 0.9);
   box-shadow: var(--shadow-sm);
 }
@@ -19633,7 +19714,7 @@ button.lc-reminder-feature-cta:disabled {
   align-self: flex-start;
   padding: 3px;
   border: 1px solid var(--border, #d8dfd0);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: #fff;
   gap: 2px;
 }
@@ -19641,7 +19722,7 @@ button.lc-reminder-feature-cta:disabled {
 .lc-practice-seg-btn {
   padding: 7px 16px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: none;
   font-size: 0.82rem;
   font-weight: 650;
@@ -19663,7 +19744,7 @@ button.lc-reminder-feature-cta:disabled {
   width: 90px;
   padding: 10px;
   border: 1px solid var(--border, #d8dfd0);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-family: var(--font-mono);
   font-size: 0.85rem;
   color: var(--ink);
@@ -19680,7 +19761,7 @@ button.lc-reminder-feature-cta:disabled {
 .lc-practice-toggle .toggle-switch-track {
   width: 42px;
   height: 22px;
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
 }
 
 .lc-practice-toggle .toggle-switch-thumb {
@@ -19706,7 +19787,7 @@ button.lc-reminder-feature-cta:disabled {
   align-self: flex-start;
   min-height: 44px;
   padding: 11px 20px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid transparent;
 }
 
@@ -19743,7 +19824,7 @@ button.lc-reminder-feature-cta:disabled {
   margin-left: auto;
   padding: 8px 16px;
   border: 1px solid var(--border, #d8dfd0);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #fff;
   font-size: 0.82rem;
   font-weight: 650;
@@ -19773,7 +19854,7 @@ button.lc-reminder-feature-cta:disabled {
   gap: 12px;
   padding: 12px 14px;
   border: 1px solid var(--border, #d8dfd0);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: #fff;
   box-shadow: var(--shadow-sm);
 }
@@ -19827,7 +19908,7 @@ button.lc-reminder-feature-cta:disabled {
 .lc-practice-summary {
   padding: 24px;
   border: 1px solid var(--lc-border);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: rgba(255, 255, 255, 0.9);
   box-shadow: var(--shadow-sm);
 }
@@ -19855,7 +19936,7 @@ button.lc-reminder-feature-cta:disabled {
   gap: 4px;
   padding: 16px;
   border: 1px solid var(--lc-border);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: var(--green-lightest);
 }
 
@@ -19891,14 +19972,14 @@ button.lc-reminder-feature-cta:disabled {
 .lc-practice-summary-actions .button-primary {
   min-height: 42px;
   padding: 10px 18px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid transparent;
 }
 
 .lc-practice-secondary {
   padding: 10px 18px;
   border: 1px solid var(--border, #d8dfd0);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #fff;
   font-size: 0.85rem;
   font-weight: 650;
@@ -19921,7 +20002,7 @@ button.lc-reminder-feature-cta:disabled {
   height: 44px;
   flex-shrink: 0;
   border: 1px solid var(--lc-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #fff;
   color: var(--green-dark);
   cursor: pointer;
@@ -19959,7 +20040,7 @@ button.lc-reminder-feature-cta:disabled {
   width: min(460px, 100%);
   padding: 22px 24px;
   border: 1px solid var(--lc-border);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: #fff;
   box-shadow: var(--shadow-lg);
   display: flex;
@@ -19988,7 +20069,7 @@ button.lc-reminder-feature-cta:disabled {
   justify-content: center;
   width: 30px;
   height: 30px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid transparent;
   background: none;
   color: var(--muted, #596949);
@@ -20005,7 +20086,7 @@ button.lc-reminder-feature-cta:disabled {
   width: 100%;
   padding: 11px 12px;
   border: 1px solid var(--border, #d8dfd0);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-family: var(--font-mono);
   font-size: 0.85rem;
   color: var(--ink);
@@ -20027,7 +20108,7 @@ button.lc-reminder-feature-cta:disabled {
 .lc-add-link-cancel {
   padding: 10px 16px;
   border: 1px solid var(--border, #d8dfd0);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #fff;
   font-size: 0.85rem;
   font-weight: 650;
@@ -20044,7 +20125,7 @@ button.lc-reminder-feature-cta:disabled {
 .lc-add-link-submit.lc-add-link-submit {
   min-height: 42px;
   padding: 10px 18px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid transparent;
 }
 
@@ -20062,7 +20143,7 @@ button.lc-reminder-feature-cta:disabled {
   min-width: 180px;
   padding: 10px 12px;
   border: 1px solid var(--border, #d8dfd0);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 0.86rem;
 }
 
@@ -20072,7 +20153,7 @@ button.lc-reminder-feature-cta:disabled {
   gap: 6px;
   padding: 0 16px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--green-dark);
   color: #fff;
   font-weight: 700;
@@ -20112,7 +20193,7 @@ button.lc-reminder-feature-cta:disabled {
   gap: 12px;
   padding: 12px 14px;
   border: 1px solid var(--border, #d8dfd0);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #fff;
 }
 
@@ -20142,7 +20223,7 @@ button.lc-reminder-feature-cta:disabled {
 .lc-bank-card-actions button {
   padding: 6px 12px;
   border: 1px solid var(--border, #d8dfd0);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: #fff;
   font-size: 0.8rem;
   font-weight: 650;
@@ -20156,7 +20237,7 @@ button.lc-reminder-feature-cta:disabled {
   justify-content: center;
   width: 34px;
   height: 34px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border, #d8dfd0);
   background: #fff;
   color: var(--muted, #596949);
@@ -20168,13 +20249,13 @@ button.lc-reminder-feature-cta:disabled {
 }
 
 .lc-bank-delete:hover {
-  color: #dc2626;
-  border-color: color-mix(in srgb, #dc2626 40%, white);
-  background: color-mix(in srgb, #dc2626 8%, white);
+  color: var(--accent-danger);
+  border-color: color-mix(in srgb, var(--accent-danger) 40%, white);
+  background: color-mix(in srgb, var(--accent-danger) 8%, white);
 }
 
 .lc-bank-delete:focus-visible {
-  outline: 2px solid #dc2626;
+  outline: 2px solid var(--accent-danger);
   outline-offset: 2px;
 }
 
@@ -20184,7 +20265,7 @@ button.lc-reminder-feature-cta:disabled {
   margin-top: 24px;
   padding: 22px 24px;
   border: 1px solid var(--lc-border);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: rgba(255, 255, 255, 0.9);
   box-shadow: var(--shadow-sm);
 }
@@ -20194,7 +20275,7 @@ button.lc-reminder-feature-cta:disabled {
   margin: 10px 0;
   padding: 10px 12px;
   border: 1px solid var(--border, #d8dfd0);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-family: "JetBrains Mono", monospace;
   font-size: 0.82rem;
   resize: vertical;
@@ -20216,7 +20297,7 @@ button.lc-reminder-feature-cta:disabled {
   gap: 10px;
   padding: 8px 10px;
   border: 1px solid var(--border, #d8dfd0);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 0.85rem;
 }
 
@@ -20271,7 +20352,7 @@ button.lc-reminder-feature-cta:disabled {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--lc-border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: rgba(233, 245, 219, 0.4);
   cursor: pointer;
   text-align: left;
@@ -20304,7 +20385,7 @@ button.lc-reminder-feature-cta:disabled {
 .lc-focus-meter {
   grid-area: meter;
   height: 5px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: #e3eed3;
   overflow: hidden;
 }
@@ -20312,7 +20393,7 @@ button.lc-reminder-feature-cta:disabled {
 .lc-focus-meter > span {
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   transition: width 0.3s ease;
 }
 
@@ -20330,7 +20411,7 @@ button.lc-reminder-feature-cta:disabled {
   align-items: center;
   gap: 5px;
   padding: 5px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--green-dark-mid);
   background: var(--green-lightest);
   color: var(--green-dark);
@@ -20355,7 +20436,7 @@ button.lc-reminder-feature-cta:disabled {
   justify-content: center;
   min-width: 30px;
   padding: 2px 7px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid transparent;
   font-family: var(--font-mono);
   font-size: 0.66rem;
@@ -20407,7 +20488,7 @@ button.lc-reminder-feature-cta:disabled {
   min-width: 22px;
   height: 22px;
   padding: 0 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--green-lightest);
   border: 1px solid var(--lc-border);
   font-family: var(--font-mono);
@@ -20428,15 +20509,15 @@ button.lc-reminder-feature-cta:disabled {
   gap: 10px;
   padding: 16px;
   border: 1px solid var(--border, #d8dfd0);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: #fff;
   box-shadow: var(--shadow-sm);
 }
 
 /* Red appears only for a drill due now, so it means "now". */
 .lc-drill-card.is-due {
-  border-color: color-mix(in srgb, #dc2626 45%, white);
-  box-shadow: 0 0 0 1px color-mix(in srgb, #dc2626 22%, transparent), var(--shadow-sm);
+  border-color: color-mix(in srgb, var(--accent-danger) 45%, white);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-danger) 22%, transparent), var(--shadow-sm);
 }
 
 .lc-drill-card-head {
@@ -20455,7 +20536,7 @@ button.lc-reminder-feature-cta:disabled {
 }
 
 .lc-drill-card.is-due .lc-drill-when {
-  color: #dc2626;
+  color: var(--accent-danger);
 }
 
 .lc-drill-title {
@@ -20496,7 +20577,7 @@ button.lc-reminder-feature-cta:disabled {
   gap: 6px;
   padding: 8px 14px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: linear-gradient(135deg, var(--green-dark), #536342);
   color: #fff;
   font-size: 0.82rem;
@@ -20512,7 +20593,7 @@ button.lc-reminder-feature-cta:disabled {
 .lc-drill-advance {
   padding: 8px 12px;
   border: 1px solid var(--border, #d8dfd0);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #fff;
   font-size: 0.8rem;
   font-weight: 650;
@@ -20556,7 +20637,7 @@ button.lc-reminder-feature-cta:disabled {
   gap: 8px;
   padding: 9px 14px;
   border: 1px solid var(--lc-border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: #fff;
   color: var(--green-dark);
   cursor: pointer;
@@ -20617,7 +20698,7 @@ button.lc-reminder-feature-cta:disabled {
   gap: 10px;
   padding: 16px;
   border: 1px solid var(--border, #d8dfd0);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: #fff;
   box-shadow: var(--shadow-sm);
   transition:
@@ -20689,7 +20770,7 @@ button.lc-reminder-feature-cta:disabled {
 .lc-bank-active-tag {
   align-self: flex-start;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--green-dark);
   color: #fff;
   font-family: var(--font-mono);
@@ -20711,7 +20792,7 @@ button.lc-reminder-feature-cta:disabled {
 .lc-bank-tile-actions button:not(.lc-bank-delete) {
   padding: 7px 14px;
   border: 1px solid var(--border, #d8dfd0);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #fff;
   font-size: 0.8rem;
   font-weight: 650;
@@ -20811,7 +20892,7 @@ button.lc-reminder-feature-cta:disabled {
   margin: 12px 0 0;
   padding: 9px 12px;
   border: 1px solid color-mix(in srgb, #0ea5e9 30%, white);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, #0ea5e9 7%, white);
   font-size: 0.82rem;
   font-weight: 600;
@@ -20828,7 +20909,7 @@ button.lc-reminder-feature-cta:disabled {
   margin-top: 12px;
   padding: 9px 12px;
   border: 1px dashed var(--green-dark-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: rgba(233, 245, 219, 0.5);
   font-size: 0.82rem;
   font-weight: 650;
@@ -20906,7 +20987,7 @@ button.lc-reminder-feature-cta:disabled {
 .lc-bank-weakmap-bar {
   grid-area: bar;
   height: 5px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: #e3eed3;
   overflow: hidden;
 }
@@ -20914,7 +20995,7 @@ button.lc-reminder-feature-cta:disabled {
 .lc-bank-weakmap-bar > span {
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   transition: width 0.3s ease;
 }
 
@@ -20975,7 +21056,7 @@ button.lc-reminder-feature-cta:disabled {
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid transparent;
   background: transparent;
   color: var(--muted, #596949);
@@ -20988,13 +21069,13 @@ button.lc-reminder-feature-cta:disabled {
 }
 
 .lc-bank-problem-remove:hover {
-  color: #dc2626;
-  background: color-mix(in srgb, #dc2626 8%, white);
-  border-color: color-mix(in srgb, #dc2626 30%, white);
+  color: var(--accent-danger);
+  background: color-mix(in srgb, var(--accent-danger) 8%, white);
+  border-color: color-mix(in srgb, var(--accent-danger) 30%, white);
 }
 
 .lc-bank-problem-remove:focus-visible {
-  outline: 2px solid #dc2626;
+  outline: 2px solid var(--accent-danger);
   outline-offset: 2px;
 }
 
@@ -21005,7 +21086,7 @@ button.lc-reminder-feature-cta:disabled {
 .lc-bank-match-btn {
   padding: 9px 16px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--green-dark, #1f4d2c);
   color: #fff;
   font-weight: 700;
@@ -21097,7 +21178,7 @@ button.lc-reminder-feature-cta:disabled {
   min-width: 210px;
   padding: 10px 12px;
   border: 1px solid var(--border, #d8dfd0);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #fff;
   font-size: 0.85rem;
   font-weight: 600;
@@ -21133,7 +21214,7 @@ button.lc-reminder-feature-cta:disabled {
   overflow-y: auto;
   padding: 6px;
   border: 1px solid var(--lc-border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: #fff;
   box-shadow: var(--shadow-lg);
   display: flex;
@@ -21146,7 +21227,7 @@ button.lc-reminder-feature-cta:disabled {
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-size: 0.85rem;
 }
@@ -21193,7 +21274,7 @@ button.lc-reminder-feature-cta:disabled {
 .lc-bank-add-count select {
   padding: 10px;
   border: 1px solid var(--border, #d8dfd0);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-family: var(--font-mono);
   font-size: 0.85rem;
   color: var(--ink);
@@ -21212,7 +21293,7 @@ button.lc-reminder-feature-cta:disabled {
 .lc-bank-add-btn.lc-bank-add-btn {
   min-height: 42px;
   padding: 10px 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 0.85rem;
 }
 
@@ -21277,7 +21358,7 @@ button.lc-reminder-feature-cta:disabled {
   width: 36px;
   height: 36px;
   border: 1px solid var(--lc-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--white);
   color: var(--ink);
   cursor: pointer;
@@ -21309,7 +21390,7 @@ button.lc-reminder-feature-cta:disabled {
   -ms-overflow-style: none;
   padding: 20px;
   border: 1px solid rgba(113, 131, 85, 0.28);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--white);
   box-shadow: var(--shadow-lg);
 }
@@ -21343,7 +21424,7 @@ button.lc-reminder-feature-cta:disabled {
   width: 30px;
   height: 30px;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted, #596949);
   cursor: pointer;
@@ -21392,7 +21473,7 @@ button.lc-reminder-feature-cta:disabled {
   flex: 1;
   padding: 8px 12px;
   border: 1.5px solid rgba(113, 131, 85, 0.22);
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--ink);
   font-size: 0.84rem;
@@ -21420,9 +21501,9 @@ button.lc-reminder-feature-cta:disabled {
   align-self: flex-start;
   padding: 8px 14px;
   border: 1.5px solid rgba(220, 38, 38, 0.4);
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   background: transparent;
-  color: #b91c1c;
+  color: var(--accent-danger-strong);
   font-size: 0.84rem;
   font-weight: 650;
   cursor: pointer;
@@ -21430,7 +21511,7 @@ button.lc-reminder-feature-cta:disabled {
 }
 
 .lc-settings-clear-btn:hover {
-  border-color: #dc2626;
+  border-color: var(--accent-danger);
   background: rgba(220, 38, 38, 0.06);
 }
 
@@ -21468,7 +21549,7 @@ button.lc-reminder-feature-cta:disabled {
   max-height: 168px;
   overflow-y: auto;
   border: 1px solid var(--border, #d8dfd0);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .lc-completed-item {
@@ -21517,7 +21598,7 @@ button.lc-reminder-feature-cta:disabled {
 .lc-difficulty-btn {
   padding: 14px 12px;
   border: 1.5px solid rgba(113, 131, 85, 0.28);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--white);
   color: var(--ink);
   font-size: 0.95rem;
@@ -21532,7 +21613,7 @@ button.lc-reminder-feature-cta:disabled {
 }
 
 .lc-difficulty-btn--easy:hover {
-  border-color: #10b981;
+  border-color: var(--accent-positive);
   background: rgba(16, 185, 129, 0.08);
 }
 
@@ -21542,12 +21623,12 @@ button.lc-reminder-feature-cta:disabled {
 }
 
 .lc-difficulty-btn--hard:hover {
-  border-color: #d97706;
+  border-color: var(--accent-caution);
   background: rgba(217, 119, 6, 0.08);
 }
 
 .lc-difficulty-btn--brutal:hover {
-  border-color: #dc2626;
+  border-color: var(--accent-danger);
   background: rgba(220, 38, 38, 0.08);
 }
 
@@ -21585,7 +21666,7 @@ button.lc-reminder-feature-cta:disabled {
   padding: 8px 10px;
   background: none;
   border: 1px solid rgba(113, 131, 85, 0.22);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-size: 0.86rem;
   font-weight: 500;
@@ -21655,7 +21736,7 @@ button.lc-reminder-feature-cta:disabled {
   width: 100%;
   padding: 7px 10px;
   border: 1px solid rgba(113, 131, 85, 0.28);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   font-family: "JetBrains Mono", monospace;
   font-size: 0.85rem;
   color: var(--ink);
@@ -21666,7 +21747,7 @@ button.lc-reminder-feature-cta:disabled {
   width: 100%;
   padding: 8px 10px;
   border: 1px solid rgba(113, 131, 85, 0.22);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   font-family: inherit;
   font-size: 0.84rem;
   line-height: 1.45;
@@ -21689,7 +21770,7 @@ button.lc-reminder-feature-cta:disabled {
   gap: 6px;
   padding: 8px 16px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--green-dark, #718355);
   color: #fff;
   font-size: 0.85rem;
@@ -21737,7 +21818,7 @@ button.lc-reminder-feature-cta:disabled {
 .lc-cx-card {
   position: relative;
   border: 1px solid var(--green-light-mid);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: #fff;
   padding: 10px 13px 11px 15px;
   overflow: hidden;
@@ -21856,7 +21937,7 @@ button.lc-reminder-feature-cta:disabled {
 .lc-cx-meter {
   flex: 0 0 66px;
   height: 5px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   background: rgba(113, 131, 85, 0.2);
   overflow: hidden;
 }
@@ -21865,7 +21946,7 @@ button.lc-reminder-feature-cta:disabled {
   display: block;
   height: 100%;
   background: var(--green-dark);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
 }
 
 .lc-cx-meta-label {
@@ -21878,7 +21959,7 @@ button.lc-reminder-feature-cta:disabled {
   gap: 8px;
   align-items: flex-start;
   padding: 9px 11px;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   background: #fdf3e7;
   border: 1px solid #f0d3a6;
   color: #a4560a;
@@ -21918,7 +21999,7 @@ button.lc-reminder-feature-cta:disabled {
   gap: 3px;
   padding: 12px 14px;
   border: 2px solid var(--green-light-mid);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: rgba(255, 255, 255, 0.8);
   cursor: pointer;
   text-align: left;
@@ -21952,7 +22033,7 @@ button.lc-reminder-feature-cta:disabled {
   align-items: center;
   margin-left: 8px;
   padding: 1px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--green-lightest);
   border: 1px solid var(--green-light-mid);
   font-size: 0.72rem;
@@ -21997,7 +22078,7 @@ button.lc-reminder-feature-cta:disabled {
   width: 100%;
   padding: 9px 11px;
   border: 1px solid var(--green-light-mid);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.9);
   font-size: 0.9rem;
   color: var(--ink);
@@ -22021,7 +22102,7 @@ button.lc-reminder-feature-cta:disabled {
 .mock-chip {
   padding: 6px 12px;
   border: 1.5px solid var(--green-light-mid);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.8);
   cursor: pointer;
   font-size: 0.83rem;
@@ -22079,7 +22160,7 @@ button.lc-reminder-feature-cta:disabled {
   justify-content: center;
   padding: 2px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: none;
   color: var(--muted, #596949);
   cursor: pointer;
@@ -22104,7 +22185,7 @@ button.lc-reminder-feature-cta:disabled {
   align-items: center;
   gap: 8px;
   padding: 5px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 0.8rem;
   color: var(--ink);
   cursor: pointer;
@@ -22136,7 +22217,7 @@ button.lc-reminder-feature-cta:disabled {
 
 .lc-subtopic-tag {
   padding: 3px 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--green-lightest);
   color: var(--green-dark);
   font-family: var(--font-mono);
@@ -22151,7 +22232,7 @@ button.lc-reminder-feature-cta:disabled {
   margin-top: 12px;
   padding: 14px 16px;
   border: 1px solid rgba(113, 131, 85, 0.18);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: rgba(113, 131, 85, 0.04);
 }
 
@@ -22175,7 +22256,7 @@ button.lc-reminder-feature-cta:disabled {
   color: var(--green-dark);
   background: rgba(113, 131, 85, 0.1);
   border: 1px solid rgba(113, 131, 85, 0.28);
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   cursor: pointer;
 }
 
@@ -22247,7 +22328,7 @@ button.lc-reminder-feature-cta:disabled {
   justify-content: center;
   width: 24px;
   height: 24px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid transparent;
   background: transparent;
   color: var(--muted, #596949);
@@ -22260,13 +22341,13 @@ button.lc-reminder-feature-cta:disabled {
 }
 
 .lc-drill-remove:hover {
-  color: #dc2626;
-  background: color-mix(in srgb, #dc2626 8%, white);
-  border-color: color-mix(in srgb, #dc2626 30%, white);
+  color: var(--accent-danger);
+  background: color-mix(in srgb, var(--accent-danger) 8%, white);
+  border-color: color-mix(in srgb, var(--accent-danger) 30%, white);
 }
 
 .lc-drill-remove:focus-visible {
-  outline: 2px solid #dc2626;
+  outline: 2px solid var(--accent-danger);
   outline-offset: 2px;
 }
 
@@ -22281,7 +22362,7 @@ button.lc-reminder-feature-cta:disabled {
   min-height: 36px;
   padding: 8px 14px;
   border: 1px solid var(--lc-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--white);
   color: var(--ink);
   font-family: inherit;
@@ -22390,17 +22471,17 @@ button.lc-official-link:disabled:hover {
   align-items: center;
   gap: 5px;
   padding: 3px 9px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid transparent;
   background: var(--green-lightest);
   font-size: 0.74rem;
   font-weight: 700;
 }
 
-.mock-history-rec.rec-strong-hire { background: #ecfdf5; border-color: #10b981; color: #047857; }
-.mock-history-rec.rec-hire        { background: #eff6ff; border-color: #3b82f6; color: #1d4ed8; }
-.mock-history-rec.rec-borderline  { background: #fffbeb; border-color: #f59e0b; color: #b45309; }
-.mock-history-rec.rec-no-hire     { background: #fef2f2; border-color: #ef4444; color: #b91c1c; }
+.mock-history-rec.rec-strong-hire { background: #ecfdf5; border-color: var(--accent-positive); color: #047857; }
+.mock-history-rec.rec-hire        { background: var(--accent-info-tint); border-color: var(--accent-info); color: var(--accent-info-strong); }
+.mock-history-rec.rec-borderline  { background: var(--accent-caution-tint); border-color: var(--accent-caution); color: var(--accent-caution-strong); }
+.mock-history-rec.rec-no-hire     { background: var(--accent-danger-tint); border-color: var(--accent-danger); color: var(--accent-danger-strong); }
 .mock-history-rec--open           { background: var(--green-lightest); border-color: var(--lc-border); color: #596949; }
 
 .mock-history-chevron {
@@ -22470,7 +22551,7 @@ button.lc-official-link:disabled:hover {
   display: inline-flex;
   align-items: center;
   border: 1px solid var(--green-light-mid);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--white);
   overflow: hidden;
 }
@@ -22509,7 +22590,7 @@ button.lc-official-link:disabled:hover {
 }
 
 .mock-saved-jd-delete:hover {
-  color: #dc2626;
+  color: var(--accent-danger);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -22595,7 +22676,7 @@ button.lc-official-link:disabled:hover {
   width: 2px;
   min-height: var(--station-h, 0px);
   margin: 6px 0 -2px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   /* Declared as a gradient in both states so the on/off change interpolates. A
      flat colour and a gradient are not interpolable, so the transition would
      otherwise snap halfway through instead of fading. */
@@ -22624,7 +22705,7 @@ button.lc-official-link:disabled:hover {
   font: inherit;
   color: inherit;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .loop-station-body--static {
@@ -22778,15 +22859,15 @@ button.lc-official-link:disabled:hover {
    strong and pass keep the default ink node from `.loop-station.is-on`, so only the
    two that need flagging are listed. */
 .loop-spine--verdicts .loop-station.loop-verdict-borderline .loop-node {
-  background: #fef3c7;
-  border-color: #f59e0b;
-  color: #92400e;
+  background: var(--accent-caution-tint);
+  border-color: var(--accent-caution);
+  color: var(--accent-caution-strong);
 }
 
 .loop-spine--verdicts .loop-station.loop-verdict-needs-work .loop-node {
-  background: #fee2e2;
-  border-color: #ef4444;
-  color: #991b1b;
+  background: var(--accent-danger-tint);
+  border-color: var(--accent-danger);
+  color: var(--accent-danger-strong);
 }
 
 .loop-spine--verdicts .mock-verdict-badge {
@@ -22972,7 +23053,7 @@ button.lc-official-link:disabled:hover {
   padding: 32px 32px 28px;
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid var(--green-light-mid);
-  border-radius: 18px;
+  border-radius: var(--radius-card-mobile);
   box-shadow: var(--shadow-lg);
 }
 
@@ -23037,7 +23118,7 @@ button.lc-official-link:disabled:hover {
   font-size: 0.9rem;
   background: var(--green-lightest);
   border: 1px solid var(--green-light-mid);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 .waiting-status-dot {
@@ -23059,7 +23140,7 @@ button.lc-official-link:disabled:hover {
   overflow: hidden;
   background: #fbfdf7;
   border: 1px solid var(--green-light-mid);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-sm);
 }
 
@@ -23100,7 +23181,7 @@ button.lc-official-link:disabled:hover {
   background: var(--green-lightest);
   border: 1px solid var(--green-light-mid);
   border-bottom-width: 2px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
 }
 
 .waiting-actions {
@@ -23177,7 +23258,7 @@ button.lc-official-link:disabled:hover {
   gap: 0.25rem;
   padding: 0.9rem 0.75rem;
   border: 1.5px solid var(--green-lightest);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: transparent;
   cursor: pointer;
   text-align: left;
@@ -23213,7 +23294,7 @@ button.lc-official-link:disabled:hover {
   font-size: 0.9rem;
   color: var(--muted);
   padding: 0.6rem 0.75rem;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--green-lightest);
 }
 /* Reuses .lm-stale's advisory-strip shape (an inline notice on this same page
@@ -23224,7 +23305,7 @@ button.lc-official-link:disabled:hover {
   align-items: flex-start;
   margin: 0 0 0.9rem;
   padding: 0.6rem 0.75rem;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--warning) 14%, var(--white));
   color: var(--warning);
   font-size: 0.9rem;
@@ -23301,7 +23382,7 @@ button.lc-official-link:disabled:hover {
   text-transform: uppercase;
   color: var(--green-dark);
   background: var(--green-lightest);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0.1rem 0.5rem;
 }
 .lm-format-slot-state {
@@ -23368,7 +23449,7 @@ button.lc-official-link:disabled:hover {
 .lm-slide-example {
   margin: 0.25rem 0 0;
   padding: 0.75rem 0.9rem;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--green-lightest);
   border-left: 3px solid var(--green-dark);
   font-family: var(--font-mono);
@@ -23413,7 +23494,7 @@ button.lc-official-link:disabled:hover {
   display: block;
   width: 10px;
   height: 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   border: 1.5px solid var(--green-mid);
 }
@@ -23453,7 +23534,7 @@ button.lc-official-link:disabled:hover {
   gap: 0.6rem;
   align-items: flex-start;
   padding: 0.25rem 0.4rem;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   scroll-margin-top: 1.25rem;
 }
 .lm-turn.is-active {
@@ -23475,7 +23556,7 @@ button.lc-official-link:disabled:hover {
   color: var(--white);
   background: var(--green-dark);
   border: 1px solid var(--green-dark);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0.15rem 0.55rem;
   margin-top: 0.1rem;
 }
@@ -23492,7 +23573,7 @@ button.lc-official-link:disabled:hover {
   gap: 0.75rem;
   padding: 0.9rem;
   border: 1px solid var(--green-light);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   margin: 0.9rem 0;
   background: var(--green-lightest);
 }
@@ -23517,7 +23598,7 @@ button.lc-official-link:disabled:hover {
   top: 0;
   width: 3px;
   height: 0.5rem;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: var(--green-mid);
   transform: translateX(-50%);
 }
@@ -23564,7 +23645,7 @@ button.lc-official-link:disabled:hover {
   width: 100%;
   padding: 0.75rem 0.9rem;
   border: 1.5px solid var(--green-lightest);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: var(--white);
   cursor: pointer;
   transition: border-color var(--transition-fast), background var(--transition-fast);
@@ -23587,7 +23668,7 @@ button.lc-official-link:disabled:hover {
   flex: none;
   width: 1.5rem;
   height: 1.5rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   display: grid;
   place-items: center;
   font-size: 0.78rem;
@@ -23606,7 +23687,7 @@ button.lc-official-link:disabled:hover {
 .lm-checkpoint-explain {
   margin: 0.75rem 0 0;
   padding: 0.6rem 0.75rem;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--green-lightest);
   font-size: 0.9rem;
 }
@@ -23662,7 +23743,7 @@ button.lc-official-link:disabled:hover {
 .lm-review-empty {
   width: 12px;
   height: 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--green-lightest);
 }
 .lm-review-body p { margin: 0 0 0.25rem; }
@@ -23740,7 +23821,7 @@ button.lc-official-link:disabled:hover {
   margin-top: 0.75rem;
   padding: 0.5rem 0.85rem;
   border: 1px solid var(--green-light-mid);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--green-lightest);
   color: var(--green-dark);
   font: inherit;
@@ -23832,7 +23913,7 @@ button.lc-official-link:disabled:hover {
   display: inline-flex;
   gap: 0.2rem;
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 0.15rem;
 }
 .scratchpad-size-buttons button {
@@ -23841,7 +23922,7 @@ button.lc-official-link:disabled:hover {
   width: 1.75rem;
   height: 1.75rem;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -23860,7 +23941,7 @@ button.lc-official-link:disabled:hover {
   width: 2rem;
   height: 2rem;
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--white);
   color: var(--ink);
   cursor: pointer;
@@ -23880,7 +23961,7 @@ button.lc-official-link:disabled:hover {
 .scratchpad-paper-picker button {
   padding: 0.3rem 0.7rem;
   border: 1px solid var(--green-light-mid);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--muted);
   font-size: 0.8rem;
@@ -23915,7 +23996,7 @@ button.lc-official-link:disabled:hover {
   width: 2rem;
   height: 2rem;
   border: 1px solid var(--green-light-mid);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--white);
   color: var(--ink);
   cursor: pointer;
@@ -23943,7 +24024,7 @@ button.lc-official-link:disabled:hover {
   margin-left: auto;
   height: 2rem;
   padding: 0 0.7rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--green-light-mid);
   background: var(--white);
   color: var(--muted);
@@ -23971,7 +24052,7 @@ button.lc-official-link:disabled:hover {
   flex: 1;
   min-height: 0;
   border: 1px solid var(--green-light-mid);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--white);
   /* The page can stand taller than the modal, so it scrolls vertically. */
   overflow-x: hidden;
@@ -24040,7 +24121,7 @@ button.lc-official-link:disabled:hover {
   align-self: center;
   padding: 0.3rem 0.85rem;
   border: 1px dashed var(--green-light-mid);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--muted);
   font-size: 0.76rem;
@@ -24068,7 +24149,7 @@ button.lc-official-link:disabled:hover {
   height: 1.1rem;
   cursor: nwse-resize;
   touch-action: none;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
 }
 .scratchpad-resize-handle::after {
   content: "";

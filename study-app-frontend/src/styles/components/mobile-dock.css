@@ -16,7 +16,7 @@
   z-index: 120;
   display: flex;
   justify-content: center;
-  padding: 8px 12px calc(10px + env(safe-area-inset-bottom));
+  padding: var(--dock-pad-top) 12px calc(var(--dock-pad-bottom) + env(safe-area-inset-bottom));
   pointer-events: none;
   /* Fade the page out behind the dock rather than cutting it off. */
   background: linear-gradient(to top, var(--green-lightest) 46%, rgba(233, 245, 219, 0));
@@ -36,13 +36,18 @@
 .dock-rail {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 2px;
-  width: 100%;
-  max-width: 420px;
-  padding: 5px;
+  /* The rail hugs its items rather than stretching. Items are capped at 56px
+     each, so a full-width rail with five of them left a third of the pill empty
+     on the right. Sizing to content keeps the pill symmetrical at any item
+     count, and the max-width still caps it for an admin's eight. */
+  width: fit-content;
+  max-width: min(420px, 100%);
+  padding: var(--dock-rail-pad);
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid var(--green-light-mid);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   box-shadow: var(--shadow-lg);
   backdrop-filter: blur(16px);
   /* Safety net only: the flex sizing below is meant to make this unreachable. */
@@ -56,19 +61,25 @@
   display: none;
 }
 
-/* Items share the rail evenly, so the row stays complete and symmetrical from
-   a 360px phone up to the rail's max width, with any item count. */
+/* Items are a fixed width that may shrink, so the row stays complete and
+   symmetrical from a 360px phone up to the rail's max width, at any count. */
 .dock-link {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 1 1 0;
+  /* Sized by `width`, not by a flex-basis. Against a content-sized rail a
+     flex-basis is only a hypothetical size and does not contribute to the
+     container's max-content width, so `flex: 0 1 56px` let every item collapse
+     to its 21px icon and crushed the rail. A real width does contribute.
+     Shrink stays on so eight items compress to fit the max-width. */
+  flex: 0 1 auto;
+  width: 56px;
   min-width: 0;
   max-width: 56px;
-  height: 42px;
+  height: var(--dock-rail-item);
   padding: 0;
   color: #536342;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   transition: background var(--transition-fast), color var(--transition-fast);
 }
 

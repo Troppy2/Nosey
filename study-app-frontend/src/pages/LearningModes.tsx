@@ -117,7 +117,6 @@ export default function LearningModes() {
           accent="var(--green-dark)"
           title="Flashcards"
           blurb="Flip through your cards one at a time and rate how well you knew each one."
-          meta="Classic review"
         />
         {betaMode ? (
           <ModeCard
@@ -127,7 +126,7 @@ export default function LearningModes() {
             accent="var(--warning)"
             title="Matching"
             blurb="Race the clock to pair every term with its definition across timed rounds."
-            meta="Game / beta"
+            beta
           />
         ) : null}
         {betaMode ? (
@@ -138,7 +137,7 @@ export default function LearningModes() {
             accent="var(--info)"
             title="Learning Modules"
             blurb="AI-written lessons from your notes, read aloud, each followed by a short quiz."
-            meta="Lessons / beta"
+            beta
           />
         ) : null}
       </section>
@@ -159,7 +158,7 @@ function ModeCard({
   accent,
   title,
   blurb,
-  meta,
+  beta = false,
 }: {
   to: string;
   disabled: boolean;
@@ -167,15 +166,15 @@ function ModeCard({
   accent: string;
   title: string;
   blurb: string;
-  meta: string;
+  beta?: boolean;
 }) {
   const inner = (
     <>
+      {beta ? <span className="pill pill--beta mode-card-beta">Beta</span> : null}
       <span className="mode-card-icon" style={{ color: accent, background: `${accent}1a` }}>
         {icon}
       </span>
       <div className="mode-card-body">
-        <span className="mode-card-meta">{meta}</span>
         <h2>{title}</h2>
         <p className="muted">{blurb}</p>
       </div>
@@ -184,14 +183,14 @@ function ModeCard({
 
   if (disabled) {
     return (
-      <div className="mode-card mode-card--disabled" aria-disabled="true">
+      <div className={`mode-card mode-card--disabled${beta ? " mode-card--beta" : ""}`} aria-disabled="true">
         {inner}
       </div>
     );
   }
 
   return (
-    <Link className="mode-card" to={to} style={{ ["--mode-accent" as string]: accent }}>
+    <Link className={`mode-card${beta ? " mode-card--beta" : ""}`} to={to} style={{ ["--mode-accent" as string]: accent }}>
       {inner}
     </Link>
   );

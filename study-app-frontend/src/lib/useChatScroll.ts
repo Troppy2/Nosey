@@ -95,6 +95,10 @@ export function useChatScroll({
       const el = containerRef.current;
       if (!el) return;
 
+      // Whether there is anything to scroll yet. An empty or still-loading
+      // container is not scrollable, and pinning it is a no-op.
+      const isScrollable = el.scrollHeight > el.clientHeight + 1;
+
       const freshAtBottom = measureAtBottom();
       setAtBottomValue(freshAtBottom);
 
@@ -105,7 +109,13 @@ export function useChatScroll({
       if (!shouldFollow) return;
 
       el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
-      hasFollowedRef.current = true;
+      // The one-shot initial pin is only spent once there was real content to
+      // pin to. Marking it spent on an empty container (the common case: the
+      // column mounts before the conversation has loaded) meant that when the
+      // messages did arrive, this pass measured scrollTop 0 against a now-tall
+      // transcript, concluded the user was not at the bottom, and refused to
+      // follow — leaving every restored conversation opened at the very top.
+      if (isScrollable) hasFollowedRef.current = true;
       atBottomRef.current = true;
       setAtBottom(true);
     });
@@ -154,11 +164,19 @@ export function useChatScroll({
       ro.observe(el);
     }
 
-    // 4. First measurement after real layout exists.
+    // 4. Late-loading media (markdown images, KaTeX fonts) grows the transcript
+    //    without mutating the DOM and without resizing the container, so
+    //    neither observer above sees it. `load` does not bubble, so this
+    //    listens in the capture phase.
+    const onMediaLoad = () => visit();
+    el.addEventListener("load", onMediaLoad, true);
+
+    // 5. First measurement after real layout exists.
     visit();
 
     return () => {
       el.removeEventListener("scroll", onScroll);
+      el.removeEventListener("load", onMediaLoad, true);
       mo.disconnect();
       ro?.disconnect();
     };

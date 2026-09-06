@@ -46,6 +46,9 @@ export default function Settings() {
   const navigate = useNavigate();
   const [user, setUser] = useState(getStoredUser);
   const guest = isGuestSession();
+  // A real account, as opposed to a guest session or no session at all. The
+  // sign-in affordances and the guest pitch are only meaningful before this.
+  const isSignedIn = !!user && !guest;
   const [loading, setLoading] = useState(false);
   const [signInError, setSignInError] = useState<string | null>(null);
   const [signInSuccess, setSignInSuccess] = useState(false);
@@ -313,18 +316,25 @@ export default function Settings() {
         ) : null}
 
         <div className="settings-actions">
-          <Button icon={<LogIn size={18} />} onClick={handleSignIn} variant="secondary" disabled={loading}>
-            {loading ? "Signing in…" : "Google sign in"}
-          </Button>
-          <Button icon={<LogOut size={18} />} onClick={handleSignOut} variant="danger">
+          {/* Nothing to connect once a real account is connected. */}
+          {!isSignedIn ? (
+            <Button icon={<LogIn size={18} />} onClick={handleSignIn} variant="secondary" disabled={loading}>
+              {loading ? "Signing in…" : "Google sign in"}
+            </Button>
+          ) : null}
+          <Button icon={<LogOut size={18} />} onClick={handleSignOut} variant="danger-outline">
             Sign out
           </Button>
         </div>
 
-        <div className="settings-note">
-          <Sparkles size={18} />
-          <span>Use the guest session to try the full flow before connecting a real account.</span>
-        </div>
+        {/* The guest pitch is for people deciding whether to sign in, so it goes
+            away once they have. */}
+        {!isSignedIn ? (
+          <div className="settings-note">
+            <Sparkles size={18} />
+            <span>Use the guest session to try the full flow before connecting a real account.</span>
+          </div>
+        ) : null}
 
         <h2 className="settings-group-title">AI &amp; models</h2>
 
@@ -603,7 +613,7 @@ export default function Settings() {
                 Access platform metrics, user roster, and feature performance data.
               </p>
               <div className="settings-reset-row">
-                <Link to="/admin" className="button button--secondary">
+                <Link to="/admin" className="button button-secondary">
                   <ShieldCheck size={16} />
                   Open admin panel
                 </Link>

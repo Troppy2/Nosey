@@ -517,9 +517,11 @@ class KojoService:
         repo = KojoRepository(session)
         conversations = await repo.list_conversations_by_folder(user_id, folder_id)
         if not conversations:
-            fresh = await repo.create_conversation(user_id, folder_id)
-            await session.commit()
-            return self._fresh_bootstrap(fresh, folder_id=fresh.folder_id)
+            # Deliberately empty: a conversation row is created by the first
+            # prompt, not by opening the screen. Auto-creating here filled the
+            # recent list with untouched "Untitled" chats for every folder the
+            # user ever looked at. The frontend opens a pending chat instead.
+            return KojoBootstrapDTO(conversations=[], active=None, files=[])
         return await self._bootstrap_from(repo, conversations, user_id)
 
     async def bootstrap_general(
@@ -531,9 +533,8 @@ class KojoService:
         repo = KojoRepository(session)
         conversations = await repo.list_general_conversations(user_id)
         if not conversations:
-            fresh = await repo.create_general_conversation(user_id)
-            await session.commit()
-            return self._fresh_bootstrap(fresh, folder_id=None)
+            # See bootstrap_folder: creation is deferred to the first prompt.
+            return KojoBootstrapDTO(conversations=[], active=None, files=[])
         return await self._bootstrap_from(repo, conversations, user_id)
 
     def _fresh_bootstrap(self, conversation, folder_id) -> KojoBootstrapDTO:
