@@ -2554,78 +2554,6 @@
         "documentation": {}
     },
     {
-        "label": "timedelta",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "timezone",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "timedelta",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "date",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "date",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "date",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
         "label": "datetime",
         "importPath": "datetime",
         "description": "datetime",
@@ -2658,6 +2586,14 @@
         "documentation": {}
     },
     {
+        "label": "timedelta",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
         "label": "datetime",
         "importPath": "datetime",
         "description": "datetime",
@@ -2667,6 +2603,94 @@
     },
     {
         "label": "date",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "date",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "date",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "timedelta",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "date",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
         "importPath": "datetime",
         "description": "datetime",
         "isExtraImport": true,
@@ -3838,6 +3862,14 @@
     },
     {
         "label": "Date",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "DateTime",
         "importPath": "sqlalchemy",
         "description": "sqlalchemy",
         "isExtraImport": true,
@@ -6452,6 +6484,14 @@
         "description": "PIL",
         "isExtraImport": true,
         "detail": "PIL",
+        "documentation": {}
+    },
+    {
+        "label": "op",
+        "importPath": "alembic",
+        "description": "alembic",
+        "isExtraImport": true,
+        "detail": "alembic",
         "documentation": {}
     },
     {
@@ -17069,6 +17109,60 @@
         "description": "study-app-backend.src.migrations.versions.052_add_scratch_pad_strokes",
         "peekOfCode": "depends_on = None\ndef upgrade() -> None:\n    op.add_column(\"user_answers\", sa.Column(\"work_strokes\", sa.Text(), nullable=True))\ndef downgrade() -> None:\n    op.drop_column(\"user_answers\", \"work_strokes\")",
         "detail": "study-app-backend.src.migrations.versions.052_add_scratch_pad_strokes",
+        "documentation": {}
+    },
+    {
+        "label": "upgrade",
+        "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.053_add_onboarding_completed",
+        "description": "study-app-backend.src.migrations.versions.053_add_onboarding_completed",
+        "peekOfCode": "def upgrade() -> None:\n    op.add_column(\"users\", sa.Column(\"onboarding_completed_at\", sa.DateTime(), nullable=True))\n    # Treat every account that already exists as onboarded. Without this the\n    # column ships as NULL for the whole user base and the new walkthrough\n    # would fire once for every existing user.\n    op.execute(\"UPDATE users SET onboarding_completed_at = CURRENT_TIMESTAMP\")\ndef downgrade() -> None:\n    op.drop_column(\"users\", \"onboarding_completed_at\")",
+        "detail": "study-app-backend.src.migrations.versions.053_add_onboarding_completed",
+        "documentation": {}
+    },
+    {
+        "label": "downgrade",
+        "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.053_add_onboarding_completed",
+        "description": "study-app-backend.src.migrations.versions.053_add_onboarding_completed",
+        "peekOfCode": "def downgrade() -> None:\n    op.drop_column(\"users\", \"onboarding_completed_at\")",
+        "detail": "study-app-backend.src.migrations.versions.053_add_onboarding_completed",
+        "documentation": {}
+    },
+    {
+        "label": "revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.053_add_onboarding_completed",
+        "description": "study-app-backend.src.migrations.versions.053_add_onboarding_completed",
+        "peekOfCode": "revision = \"053_add_onboarding_completed\"\ndown_revision = \"052_add_scratch_pad_strokes\"\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.add_column(\"users\", sa.Column(\"onboarding_completed_at\", sa.DateTime(), nullable=True))\n    # Treat every account that already exists as onboarded. Without this the\n    # column ships as NULL for the whole user base and the new walkthrough\n    # would fire once for every existing user.\n    op.execute(\"UPDATE users SET onboarding_completed_at = CURRENT_TIMESTAMP\")",
+        "detail": "study-app-backend.src.migrations.versions.053_add_onboarding_completed",
+        "documentation": {}
+    },
+    {
+        "label": "down_revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.053_add_onboarding_completed",
+        "description": "study-app-backend.src.migrations.versions.053_add_onboarding_completed",
+        "peekOfCode": "down_revision = \"052_add_scratch_pad_strokes\"\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.add_column(\"users\", sa.Column(\"onboarding_completed_at\", sa.DateTime(), nullable=True))\n    # Treat every account that already exists as onboarded. Without this the\n    # column ships as NULL for the whole user base and the new walkthrough\n    # would fire once for every existing user.\n    op.execute(\"UPDATE users SET onboarding_completed_at = CURRENT_TIMESTAMP\")\ndef downgrade() -> None:",
+        "detail": "study-app-backend.src.migrations.versions.053_add_onboarding_completed",
+        "documentation": {}
+    },
+    {
+        "label": "branch_labels",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.053_add_onboarding_completed",
+        "description": "study-app-backend.src.migrations.versions.053_add_onboarding_completed",
+        "peekOfCode": "branch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.add_column(\"users\", sa.Column(\"onboarding_completed_at\", sa.DateTime(), nullable=True))\n    # Treat every account that already exists as onboarded. Without this the\n    # column ships as NULL for the whole user base and the new walkthrough\n    # would fire once for every existing user.\n    op.execute(\"UPDATE users SET onboarding_completed_at = CURRENT_TIMESTAMP\")\ndef downgrade() -> None:\n    op.drop_column(\"users\", \"onboarding_completed_at\")",
+        "detail": "study-app-backend.src.migrations.versions.053_add_onboarding_completed",
+        "documentation": {}
+    },
+    {
+        "label": "depends_on",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.053_add_onboarding_completed",
+        "description": "study-app-backend.src.migrations.versions.053_add_onboarding_completed",
+        "peekOfCode": "depends_on = None\ndef upgrade() -> None:\n    op.add_column(\"users\", sa.Column(\"onboarding_completed_at\", sa.DateTime(), nullable=True))\n    # Treat every account that already exists as onboarded. Without this the\n    # column ships as NULL for the whole user base and the new walkthrough\n    # would fire once for every existing user.\n    op.execute(\"UPDATE users SET onboarding_completed_at = CURRENT_TIMESTAMP\")\ndef downgrade() -> None:\n    op.drop_column(\"users\", \"onboarding_completed_at\")",
+        "detail": "study-app-backend.src.migrations.versions.053_add_onboarding_completed",
         "documentation": {}
     },
     {

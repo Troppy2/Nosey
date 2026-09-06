@@ -1,5 +1,4 @@
 import { CheckCircle, LogIn, LogOut, RotateCcw, ShieldCheck, Sparkles, XCircle } from "lucide-react";
-import { ONBOARDING_DONE_KEY, TOUR_SEGMENT_KEY } from "../components/OnboardingTour";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -19,6 +18,7 @@ import {
   googleSignIn,
   isGuestSession,
   refreshKojoMemory,
+  resetOnboarding,
   restoreKojoConversation,
   scopeKey,
   setGoogleSession,
@@ -490,21 +490,21 @@ export default function Settings() {
           </CollapsibleSection>
         ) : null}
 
-        <CollapsibleSection title="Onboarding Tour">
+        <CollapsibleSection title="Practice run">
           <p className="muted small">
-            Replay the full guided tour across the app's key pages.
+            Walk through building a test and sitting it, on a sample set of notes. Takes about two
+            minutes and changes nothing in your account.
           </p>
           <div className="settings-reset-row">
             <Button
               type="button"
               variant="secondary"
-              onClick={() => {
-                localStorage.removeItem(scopeKey(ONBOARDING_DONE_KEY));
-                localStorage.removeItem(scopeKey(TOUR_SEGMENT_KEY));
+              onClick={async () => {
+                await resetOnboarding();
                 navigate("/dashboard");
               }}
             >
-              Replay Tour
+              Start the practice run
             </Button>
           </div>
         </CollapsibleSection>

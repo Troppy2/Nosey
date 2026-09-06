@@ -1,0 +1,666 @@
+/* First-run practice run.
+   All selectors are namespaced .ob-* and collide with nothing in styles.css,
+   so this sheet is imported from the component rather than main.tsx.
+
+   The layout is deliberately two-part: a scale model of the app on a sage
+   field up top, and the coach speaking from a keylined strip below it. Keeping
+   the instruction physically outside the model is what stops the run reading
+   as another stack of cards, and it means the model can be pure product UI
+   with no tour chrome sitting on top of it. */
+
+.ob-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(38, 48, 31, 0.72);
+  backdrop-filter: blur(3px);
+}
+
+.ob-frame {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(760px, 100%);
+  max-height: min(720px, 92vh);
+  overflow: hidden;
+  background: var(--white);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ---------- head ---------- */
+
+.ob-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--green-light);
+}
+
+.ob-kicker {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--green-dark);
+}
+
+.ob-rail {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ob-rail-seg {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.ob-rail-bar {
+  display: block;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--green-light);
+  transition: background var(--transition-normal);
+}
+
+.ob-rail-seg--done .ob-rail-bar,
+.ob-rail-seg--current .ob-rail-bar {
+  background: var(--green-dark);
+}
+
+/* Only the stage you are on is named. Labelling all five turns the rail into a
+   table of contents nobody reads. */
+.ob-rail-label {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--green-dark);
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+}
+
+.ob-rail-seg--current .ob-rail-label {
+  opacity: 1;
+}
+
+.ob-skip {
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--green-dark);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.ob-skip:hover {
+  background: var(--green-lightest);
+}
+
+/* Holds the Skip column open on the closing screen so the rail does not shift
+   sideways at the last step. */
+.ob-skip-spacer {
+  display: block;
+  width: 33px;
+}
+
+/* ---------- stage: the sage field the model sits on ---------- */
+
+.ob-stage {
+  /* A floor on the model area so the frame does not jump between a two-line
+     empty state and a four-option question. */
+  min-height: 330px;
+  align-content: center;
+  overflow-y: auto;
+  padding: 24px;
+  background: var(--green-lightest);
+}
+
+.ob-model {
+  display: grid;
+  gap: 16px;
+}
+
+.ob-screen {
+  position: relative;
+  overflow: hidden;
+  background: var(--white);
+  border: 1px solid var(--green-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.ob-screen-bar {
+  padding: 9px 14px;
+  font-size: 12px;
+  color: var(--green-dark);
+  background: var(--green-lightest);
+  border-bottom: 1px solid var(--green-light);
+}
+
+.ob-screen-body {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  padding: 16px;
+}
+
+.ob-screen-body--empty {
+  justify-items: center;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.ob-poster {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  padding: 40px 24px;
+  color: var(--green-dark);
+  text-align: center;
+}
+
+.ob-poster-line {
+  max-width: 34ch;
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 22px;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.ob-poster-sub {
+  max-width: 52ch;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--green-dark);
+}
+
+/* ---------- controls inside the model ---------- */
+
+.ob-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 15px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.ob-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.ob-btn--primary {
+  color: var(--white);
+  background: var(--green-dark);
+}
+
+.ob-btn--primary:not(:disabled):hover {
+  background: var(--ink);
+}
+
+.ob-btn--quiet {
+  color: var(--green-dark);
+  background: var(--white);
+  border-color: var(--green-light-mid);
+}
+
+.ob-btn--quiet:not(:disabled):hover {
+  background: var(--green-lightest);
+}
+
+.ob-btn--ghost {
+  color: var(--green-dark);
+  background: none;
+}
+
+.ob-btn--ghost:hover {
+  background: var(--green-lightest);
+}
+
+/* The one bit of unprompted motion in the run, and it earns its place: it is
+   the answer to "what am I supposed to click", which is the only question the
+   user has at any given moment. */
+.ob-target {
+  animation: ob-pulse 2.2s ease-out infinite;
+}
+
+@keyframes ob-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(113, 131, 85, 0.5); }
+  70% { box-shadow: 0 0 0 9px rgba(113, 131, 85, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(113, 131, 85, 0); }
+}
+
+.ob-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.ob-empty-line {
+  margin: 0;
+  font-size: 14px;
+  color: var(--green-dark);
+}
+
+/* ---------- folder stage ---------- */
+
+.ob-mini-modal {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 16px;
+  border-top: 1px solid var(--green-light);
+  background: var(--white);
+}
+
+.ob-mini-label {
+  font-size: 12px;
+  color: var(--green-dark);
+}
+
+.ob-mini-input {
+  width: min(260px, 100%);
+  padding: 8px 11px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+}
+
+.ob-folder-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 12px 14px;
+  text-align: left;
+  border: 1px solid var(--green-light);
+  border-radius: var(--radius-md);
+}
+
+.ob-folder-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-pill);
+  background: var(--green-mid);
+}
+
+.ob-folder-name {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.ob-folder-meta {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--green-dark);
+}
+
+/* ---------- notes stage ---------- */
+
+.ob-file-list {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ob-file {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 11px 13px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  text-align: left;
+  background: var(--white);
+  border: 1px solid var(--green-light);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.ob-file:hover {
+  background: var(--green-lightest);
+  border-color: var(--green-mid);
+}
+
+.ob-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ob-file-meta {
+  margin-left: auto;
+  flex: none;
+  font-size: 12px;
+  color: var(--green-dark);
+}
+
+/* ---------- generate stage ---------- */
+
+.ob-attached {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 11px;
+  font-size: 13px;
+  color: var(--green-dark);
+  background: var(--green-lightest);
+  border-radius: var(--radius-md);
+}
+
+.ob-excerpt {
+  max-width: 68ch;
+  margin: 0;
+  padding-left: 12px;
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1.65;
+  color: var(--green-dark);
+  border-left: 2px solid var(--green-light-mid);
+}
+
+.ob-stream {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ob-stream-item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 12px;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--green-lightest);
+  border-radius: var(--radius-md);
+  animation: ob-land var(--transition-normal) ease-out;
+}
+
+@keyframes ob-land {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+.ob-stream-index {
+  flex: none;
+  width: 20px;
+  font-size: 12px;
+  color: var(--green-dark);
+}
+
+.ob-stream-pending {
+  padding: 9px 12px;
+  font-size: 13px;
+  color: var(--green-dark);
+  animation: ob-breathe 1.6s ease-in-out infinite;
+}
+
+@keyframes ob-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* ---------- test stage ---------- */
+
+.ob-question {
+  max-width: 62ch;
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.ob-options {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ob-option {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  width: 100%;
+  padding: 11px 13px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink);
+  text-align: left;
+  background: var(--white);
+  border: 1px solid var(--green-light);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.ob-option:not(:disabled):hover {
+  border-color: var(--green-mid);
+}
+
+.ob-option--chosen {
+  background: var(--green-lightest);
+  border-color: var(--green-dark);
+}
+
+.ob-option--right {
+  color: var(--accent-positive-strong);
+  background: var(--accent-positive-tint);
+  border-color: var(--accent-positive);
+}
+
+.ob-option--wrong {
+  color: var(--accent-danger-strong);
+  background: var(--accent-danger-tint);
+  border-color: var(--accent-danger);
+}
+
+.ob-option:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.ob-option-mark {
+  flex: none;
+  width: 14px;
+  padding-top: 2px;
+}
+
+.ob-textarea {
+  width: 100%;
+  padding: 11px 13px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink);
+  resize: vertical;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+}
+
+.ob-explain {
+  max-width: 66ch;
+  margin: 0;
+  padding: 11px 13px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--green-dark);
+  background: var(--green-lightest);
+  border-radius: var(--radius-md);
+}
+
+/* ---------- results stage ---------- */
+
+.ob-score {
+  margin: 0;
+  font-size: 14px;
+  color: var(--green-dark);
+}
+
+.ob-score strong {
+  margin-right: 3px;
+  font-family: var(--font-serif);
+  font-size: 46px;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.ob-recap {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.ob-recap li {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+
+.ob-tick {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+}
+
+.ob-tick--good { background: var(--accent-positive); }
+.ob-tick--miss { background: var(--accent-danger); }
+
+/* ---------- coach ---------- */
+
+.ob-coach {
+  display: grid;
+  gap: 7px;
+  justify-items: start;
+  padding: 16px 20px 18px;
+  border-top: 1px solid var(--green-light);
+}
+
+.ob-coach-title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.ob-coach-body {
+  max-width: 68ch;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--green-dark);
+}
+
+.ob-coach .ob-btn {
+  margin-top: 4px;
+}
+
+/* ---------- focus and motion floors ---------- */
+
+.ob-scrim :focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.ob-btn--primary:focus-visible {
+  outline-color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ob-target,
+  .ob-stream-item,
+  .ob-stream-pending {
+    animation: none;
+  }
+
+  .ob-target {
+    box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.45);
+  }
+}
+
+/* ---------- phone ---------- */
+
+@media (max-width: 760px), (hover: none) and (pointer: coarse) and (max-width: 1100px) {
+  .ob-scrim {
+    padding: 0;
+    place-items: stretch;
+  }
+
+  .ob-frame {
+    width: 100%;
+    max-height: none;
+    height: 100%;
+    border-radius: 0;
+  }
+
+  .ob-head {
+    padding: 12px 14px;
+    padding-top: calc(12px + env(safe-area-inset-top));
+    gap: 10px;
+  }
+
+  .ob-kicker { display: none; }
+
+  .ob-stage {
+    /* Full height on a phone, so centering the model leaves a large dead band
+       above and below it. Anchor to the top instead. */
+    min-height: 0;
+    align-content: start;
+    padding: 14px;
+  }
+
+  .ob-poster { padding: 24px 8px; }
+
+  .ob-poster-line { font-size: 19px; }
+
+  .ob-coach {
+    padding: 14px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .ob-coach-title { font-size: 16px; }
+
+  .ob-btn { padding: 11px 16px; }
+
+  .ob-row { width: 100%; }
+
+  .ob-row .ob-btn { flex: 1 1 auto; justify-content: center; }
+}

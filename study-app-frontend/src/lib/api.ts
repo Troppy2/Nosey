@@ -66,6 +66,9 @@ import { reportBackendHttpFailure, reportBackendNetworkFailure } from "./backend
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "https://noesy.onrender.com";
 const TOKEN_KEY = "nosey_access_token";
 const USER_KEY = "nosey_user";
+// Local mirror of users.onboarding_completed_at. Defined here rather than in
+// the component so api.ts does not have to import from the component tree.
+export const ONBOARDING_DONE_KEY = "nosey_onboarding_done";
 const GUEST_TOKEN = "nosey_guest_token";
 
 // Returns true if there is a non-guest JWT in localStorage whose `exp` claim
@@ -306,6 +309,41 @@ export async function getMe(): Promise<AuthUser> {
   const user = await request<AuthUser>("/auth/me");
   localStorage.setItem(USER_KEY, JSON.stringify(user));
   return user;
+}
+
+// Whether the first-run walkthrough has been finished or skipped.
+//
+// The account is the source of truth (users.onboarding_completed_at), so the
+// answer survives a cleared cache, a second device, and a guest account being
+// promoted to a real one. The localStorage mirror is only a same-tab cache so
+// the walkthrough cannot flash on screen during the moment between mount and
+// the /auth/me response.
+export function hasCompletedOnboarding(): boolean {
+  if (getStoredUser()?.onboarding_completed) return true;
+  return localStorage.getItem(scopeKey(ONBOARDING_DONE_KEY)) === "true";
+}
+
+// Marks the walkthrough finished. Writes the local mirror first and never
+// throws: a user who has just sat through the whole thing must not be shown it
+// again because a network call failed, and the next successful /auth/me will
+// reconcile the server copy anyway.
+export async function completeOnboarding(): Promise<void> {
+  localStorage.setItem(scopeKey(ONBOARDING_DONE_KEY), "true");
+  try {
+    const user = await request<AuthUser>("/auth/onboarding-complete", { method: "POST" });
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  } catch {
+    /* Local mirror already set; the server catches up on the next sign-in. */
+  }
+}
+
+// Clears both copies so the walkthrough can be replayed from Settings.
+export async function resetOnboarding(): Promise<void> {
+  localStorage.removeItem(scopeKey(ONBOARDING_DONE_KEY));
+  const user = getStoredUser();
+  if (user) {
+    localStorage.setItem(USER_KEY, JSON.stringify({ ...user, onboarding_completed: false, onboarding_completed_at: null }));
+  }
 }
 
 export async function submitDateOfBirth(dob: string): Promise<AuthUser> {

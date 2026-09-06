@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import Boolean, Date, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import BIGINT_ID, Base, TimestampMixin
@@ -46,6 +46,11 @@ class User(Base, TimestampMixin):
     admin_session_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
     date_of_birth: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     age: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Server-side record that the first-run walkthrough was finished or skipped.
+    # localStorage alone could not carry this: it is per-browser, so a cleared
+    # cache, a second device, or a guest promoting to a real account all made
+    # the walkthrough reappear for someone who had already done it.
+    onboarding_completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     folders: Mapped[list[Folder]] = relationship(
         "Folder", back_populates="user", cascade="all, delete-orphan"

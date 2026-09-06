@@ -1,239 +1,68 @@
-import { useEffect, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { driver } from "driver.js";
-import { isGuestSession, scopeKey } from "../lib/api";
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ONBOARDING_DONE_KEY, completeOnboarding, getMe, hasCompletedOnboarding, scopeKey } from "../lib/api";
+import { OnboardingSandbox } from "./onboarding/OnboardingSandbox";
 
-export const ONBOARDING_DONE_KEY = "nosey_onboarding_done";
+export { ONBOARDING_DONE_KEY };
+
+/**
+ * Key written by the old multi-page driver.js tour to remember which page it
+ * was mid-handoff to. It no longer means anything, but it is still sitting in
+ * the localStorage of everyone who ever started that tour, and the old guard
+ * let it override a completed flag. That is what made the tour reappear at
+ * random for people who had already finished it: close the tab during a
+ * handoff and the breadcrumb was orphaned forever. Kept only so it can be
+ * cleaned up on sight.
+ */
 export const TOUR_SEGMENT_KEY = "nosey_tour_segment";
 
-type Segment = "dashboard" | "create-test" | "folders" | "kojo";
-
-function getActiveSegment(pathname: string, resumeSegment: string | null, guest: boolean): Segment | null {
-  if (pathname === "/dashboard" && !resumeSegment) return "dashboard";
-  if (pathname === "/create-test" && resumeSegment === "create-test") return "create-test";
-  if (pathname === "/folders" && resumeSegment === "folders") return "folders";
-  if (!guest && pathname === "/kojo/chat" && resumeSegment === "kojo") return "kojo";
-  return null;
-}
-
+/**
+ * Gate for the first-run practice run.
+ *
+ * Completion lives on the account (users.onboarding_completed_at) with a
+ * localStorage mirror, so there is exactly one answer to "has this person been
+ * onboarded" and it follows them across browsers and devices. There is no
+ * resume state of any kind: the run is a single self-contained component, so
+ * there is nothing to leave half-finished and no breadcrumb to go stale.
+ */
 export function OnboardingTour() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const driverRef = useRef<ReturnType<typeof driver> | null>(null);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const isDone = !!localStorage.getItem(scopeKey(ONBOARDING_DONE_KEY));
-    const resumeSegment = localStorage.getItem(scopeKey(TOUR_SEGMENT_KEY));
+    // Clear the dead breadcrumb from the previous tour on every mount.
+    localStorage.removeItem(scopeKey(TOUR_SEGMENT_KEY));
+    localStorage.removeItem(TOUR_SEGMENT_KEY);
 
-    if (isDone && !resumeSegment) return;
+    if (hasCompletedOnboarding()) return;
 
-    const guest = isGuestSession();
-    const segment = getActiveSegment(location.pathname, resumeSegment, guest);
-    if (!segment) return;
-
-    const isMobile = window.innerWidth < 760;
-
-    const timer = setTimeout(() => {
-      driverRef.current?.destroy();
-
-      let d: ReturnType<typeof driver>;
-
-      if (segment === "dashboard") {
-        d = driver({
-          showProgress: true,
-          progressText: "{{current}} of {{total}}",
-          animate: true,
-          overlayOpacity: 0.45,
-          smoothScroll: true,
-          popoverOffset: 12,
-          onDestroyed: () => {
-            if (!localStorage.getItem(scopeKey(TOUR_SEGMENT_KEY))) {
-              localStorage.setItem(scopeKey(ONBOARDING_DONE_KEY), "true");
-            }
-          },
-          steps: [
-            {
-              popover: {
-                title: "Welcome to Nosey!",
-                description: "Let's take a quick tour of the key features. Press Next to move through it, or Escape to skip.",
-                align: "center",
-              },
-            },
-            {
-              element: "#tour-new-test",
-              popover: {
-                title: "Create a Test",
-                description: "Upload your notes (PDF, Word, text) and Nosey generates MCQ and free-response practice questions using AI.",
-                side: "bottom",
-                align: isMobile ? "center" : "end",
-              },
-            },
-            {
-              element: "#tour-stat-grid",
-              popover: {
-                title: "Your Study Stats",
-                description: "Track tests taken, flashcards reviewed, and your average score across all sessions.",
-                side: "bottom",
-                align: "center",
-              },
-            },
-            {
-              element: "#tour-recent-tests",
-              popover: {
-                title: "Recent Tests",
-                description: "All your generated tests live here. Click any to retake it or review your previous answers.",
-                side: "top",
-                align: isMobile ? "center" : "start",
-              },
-            },
-            {
-              element: "#tour-review-cards",
-              popover: {
-                title: "Weak Flashcards",
-                description: "Your hardest cards surface here automatically. Next, let's walk through creating a test.",
-                side: isMobile ? "bottom" : "left",
-                align: isMobile ? "center" : "start",
-                onNextClick: () => {
-                  localStorage.setItem(scopeKey(TOUR_SEGMENT_KEY), "create-test");
-                  d.destroy();
-                  navigate("/create-test");
-                },
-              },
-            },
-          ],
-        });
-
-      } else if (segment === "create-test") {
-        localStorage.removeItem(scopeKey(TOUR_SEGMENT_KEY));
-        d = driver({
-          showProgress: true,
-          progressText: "{{current}} of {{total}}",
-          animate: true,
-          overlayOpacity: 0.45,
-          smoothScroll: true,
-          popoverOffset: 12,
-          onDestroyed: () => {
-            if (!localStorage.getItem(scopeKey(TOUR_SEGMENT_KEY))) {
-              localStorage.setItem(scopeKey(ONBOARDING_DONE_KEY), "true");
-            }
-          },
-          steps: [
-            {
-              element: "#tour-create-type",
-              popover: {
-                title: "Question Type",
-                description: "Pick mixed, MCQ only, or free-response. Advanced mode lets you set exact question counts and difficulty level.",
-                side: "top",
-                align: "center",
-              },
-            },
-            {
-              element: "#tour-create-upload",
-              popover: {
-                title: "Upload Your Notes",
-                description: "Drop in PDFs, Word docs, or text files. Nosey reads them and builds questions from the content automatically.",
-                side: "top",
-                align: "center",
-              },
-            },
-            {
-              popover: {
-                title: "That's the test creator!",
-                description: "Give your test a title, pick a folder, upload notes, and hit Generate. Next: how folders keep everything organized.",
-                align: "center",
-                onNextClick: () => {
-                  localStorage.setItem(scopeKey(TOUR_SEGMENT_KEY), "folders");
-                  d.destroy();
-                  navigate("/folders");
-                },
-              },
-            },
-          ],
-        });
-
-      } else if (segment === "folders") {
-        localStorage.removeItem(scopeKey(TOUR_SEGMENT_KEY));
-        d = driver({
-          showProgress: true,
-          progressText: "{{current}} of {{total}}",
-          animate: true,
-          overlayOpacity: 0.45,
-          smoothScroll: true,
-          popoverOffset: 12,
-          onDestroyed: () => {
-            if (!localStorage.getItem(scopeKey(TOUR_SEGMENT_KEY))) {
-              localStorage.setItem(scopeKey(ONBOARDING_DONE_KEY), "true");
-            }
-          },
-          steps: [
-            {
-              popover: {
-                title: "Folders",
-                description: "Group tests and flashcards by course or subject. Each folder also has its own dedicated Kojo AI chat history.",
-                align: "center",
-              },
-            },
-            {
-              element: "#tour-folders-new",
-              popover: {
-                title: "Create a Folder",
-                description: guest
-                  ? "One folder per course works well. All your tests and flashcards stay organized inside it. Sign in to unlock Kojo AI chat and more."
-                  : "One folder per course works well. All your tests, flashcards, and AI conversations stay organized inside it. Next: Kojo, your AI assistant.",
-                side: "bottom",
-                align: isMobile ? "center" : "end",
-                onNextClick: guest ? undefined : () => {
-                  localStorage.setItem(scopeKey(TOUR_SEGMENT_KEY), "kojo");
-                  d.destroy();
-                  navigate("/kojo/chat");
-                },
-              },
-            },
-          ],
-        });
-
-      } else {
-        // segment === "kojo"
-        localStorage.removeItem(scopeKey(TOUR_SEGMENT_KEY));
-        d = driver({
-          showProgress: true,
-          progressText: "{{current}} of {{total}}",
-          animate: true,
-          overlayOpacity: 0.45,
-          smoothScroll: true,
-          popoverOffset: 12,
-          onDestroyed: () => {
-            localStorage.setItem(scopeKey(ONBOARDING_DONE_KEY), "true");
-          },
-          steps: [
-            {
-              element: "#tour-kojo-chat",
-              popover: {
-                title: "Chat with Kojo",
-                description: "Kojo is your AI study assistant. Ask it to explain a concept, quiz you, or summarize your notes. When you're in a folder, it knows your uploaded content.",
-                side: "top",
-                align: "center",
-              },
-            },
-            {
-              popover: {
-                title: "You're all set!",
-                description: "That's the full tour. Head to Create Test to get started, or explore any section from the sidebar. Good luck studying!",
-                align: "center",
-              },
-            },
-          ],
-        });
-      }
-
-      driverRef.current = d;
-      d.drive();
-    }, 700);
+    let cancelled = false;
+    // The local mirror is empty on a browser this account has not used before,
+    // which is not the same as never having been onboarded. Ask the server
+    // before deciding to interrupt someone.
+    getMe()
+      .then(() => {
+        if (!cancelled && !hasCompletedOnboarding()) setOpen(true);
+      })
+      .catch(() => {
+        if (!cancelled) setOpen(true);
+      });
 
     return () => {
-      clearTimeout(timer);
+      cancelled = true;
     };
-  }, [location.pathname]);
+  }, []);
 
-  return null;
+  const close = useCallback((_outcome: "finished" | "skipped") => {
+    // Skipping counts as completion. Re-ambushing someone who has already said
+    // no is what made the old tour feel broken; Settings has a Replay control
+    // for anyone who wants it back.
+    setOpen(false);
+    void completeOnboarding();
+  }, []);
+
+  const goToCreateTest = useCallback(() => navigate("/create-test"), [navigate]);
+
+  if (!open) return null;
+  return <OnboardingSandbox onClose={close} onCreateTest={goToCreateTest} />;
 }

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 
 from sqlalchemy import extract, func, select
@@ -83,6 +83,14 @@ class UserRepository(BaseRepository[User]):
         user.date_of_birth = dob
         user.age = _compute_age(dob)
         await self.session.flush()
+        return user
+
+    async def mark_onboarding_complete(self, user: User) -> User:
+        # Idempotent: the first completion timestamp is the one that sticks, so
+        # a duplicate call from a double-clicked Finish button cannot move it.
+        if user.onboarding_completed_at is None:
+            user.onboarding_completed_at = datetime.utcnow()
+            await self.session.flush()
         return user
 
     async def refresh_age_if_birthday(self, user: User) -> bool:
