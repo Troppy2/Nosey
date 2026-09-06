@@ -126,7 +126,6 @@ export default function SignIn() {
 
         <Card tone="soft" className="signin-card">
           <div className="signin-copy">
-            <span className="eyebrow">Account</span>
             <h2>Continue with your Google account.</h2>
             <p className="muted">
               New here? We will ask for your date of birth once to keep the app age-appropriate. It stays private and is never shared.

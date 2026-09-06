@@ -382,7 +382,6 @@ export default function Dashboard() {
         <PullToRefreshIndicator pullPx={pullPx} isRefreshing={isRefreshing} />
         <header className="page-header">
           <div>
-            <span className="eyebrow">Dashboard</span>
             <h1 aria-live="polite">{displayTitle || " "}</h1>
             <p className="muted">Recent tests, active folders, and weak concepts in one place.</p>
           </div>

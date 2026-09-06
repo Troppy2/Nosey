@@ -283,7 +283,6 @@ export default function Settings() {
     <div className="page page-narrow settings-page">
       <header className="page-header">
         <div>
-          <span className="eyebrow">Account</span>
           <h1>Settings</h1>
           <p className="muted">Manage your current session and switch between guest and signed-out states.</p>
         </div>
