@@ -229,6 +229,39 @@
     display: none;
   }
 
+  /* Continue Test rows.
+     styles.css (inside `max-width: 760px`) gives .test-row `flex-wrap: wrap`
+     and .test-row-main `flex-basis: 100%`, so the link fills a whole line and
+     pushes .row-actions, a single 44px icon button, onto a second one. That is
+     the tall card with an orphaned X floating under the title. Keep the row on
+     one line and let the TEXT shrink instead, which is the part that can. */
+  .shell--mobile .test-row {
+    align-items: center;
+    flex-wrap: nowrap;
+  }
+
+  .shell--mobile .test-row-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-wrap: nowrap;
+    gap: 10px;
+  }
+
+  /* The title block is the only flexible part; Resume and the score badge keep
+     their intrinsic width so neither can be clipped mid-word. */
+  .shell--mobile .test-row-main > :first-child {
+    min-width: 0;
+  }
+
+  .shell--mobile .test-row-resume,
+  .shell--mobile .test-row .score-badge {
+    flex: 0 0 auto;
+  }
+
+  .shell--mobile .test-row h3 {
+    overflow-wrap: anywhere;
+  }
+
   /* Nothing in the mobile shell may scroll the page sideways. */
   .shell--mobile {
     overflow-x: hidden;
