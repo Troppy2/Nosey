@@ -85,6 +85,21 @@ async def set_date_of_birth(
         raise HTTPException(status_code=500, detail="Failed to save date of birth") from exc
 
 
+@router.post("/onboarding-complete", response_model=UserResponse)
+async def complete_onboarding(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserResponse:
+    """Record that the user finished or skipped the first-run walkthrough."""
+    try:
+        user = await UserRepository(session).mark_onboarding_complete(current_user)
+        await session.commit()
+        return UserResponse.model_validate(user)
+    except Exception as exc:
+        logger.exception("Unexpected error completing onboarding")
+        raise HTTPException(status_code=500, detail="Failed to save onboarding progress") from exc
+
+
 @router.delete("/account", status_code=204)
 async def delete_account(
     current_user: User = Depends(get_current_user),

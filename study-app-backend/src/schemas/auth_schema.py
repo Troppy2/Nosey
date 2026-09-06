@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, computed_field
@@ -26,6 +26,12 @@ class UserResponse(BaseModel):
     email_verified: bool = False
     date_of_birth: Optional[date] = None
     age: Optional[int] = None
+    onboarding_completed_at: Optional[datetime] = None
+
+    @computed_field
+    @property
+    def onboarding_completed(self) -> bool:
+        return self.onboarding_completed_at is not None
 
     @computed_field
     @property

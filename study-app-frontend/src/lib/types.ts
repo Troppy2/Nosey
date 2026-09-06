@@ -362,6 +362,8 @@ export type AuthUser = {
   date_of_birth?: string | null;
   age?: number | null;
   kojo_enabled?: boolean;
+  onboarding_completed?: boolean;
+  onboarding_completed_at?: string | null;
 };
 
 export type AdminUserRow = {
