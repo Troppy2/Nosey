@@ -29,8 +29,10 @@ import unicodedata
 from dataclasses import dataclass, replace
 from difflib import SequenceMatcher
 from fractions import Fraction
+from math import ceil
 from typing import Optional
 
+from src.config import settings
 from src.services.llm_service import DerivedAnswer, LLMService
 from src.utils.logger import get_logger
 
@@ -228,6 +230,22 @@ def answers_match(derived_answer: str, option: str, variant: str = "prose") -> b
         pass
 
     return strings_match(normalized_answer, normalized_option)
+
+
+def inflated_mcq_count(requested: int) -> int:
+    """How many MCQs to actually GENERATE so verification has slack to absorb
+    drops. Applied by the caller before generation; the request count itself
+    (requested) is always what is used for expected_question_count and for
+    the final trim, never this inflated value.
+
+    Bounded to at most +5 over the request, so a 50-question test does not
+    balloon the generation prompt, and capped at the 50-question ceiling the
+    rest of the pipeline already enforces.
+    """
+    if not settings.mcq_verification_enabled or requested <= 0:
+        return requested
+    ratio = max(1.0, min(2.0, settings.mcq_verification_overgen_ratio))
+    return min(50, requested + min(5, ceil(requested * ratio) - requested))
 
 
 def veto_drop(derived_answer: str, options: list[str], variant: str = "prose") -> Optional[int]:
