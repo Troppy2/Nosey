@@ -20,9 +20,11 @@ from src.schemas.test_schema import (
     TestTakeResponse,
     TestUpdate,
 )
+from src.config import settings
 from src.services.file_service import FileService
 from src.services.kojo_context_cache import invalidate_folder
 from src.services.llm_service import LLMService
+from src.services.mcq_verification_service import MCQVerificationService, inflated_mcq_count
 from src.utils.exceptions import ResourceNotFoundException, ValidationException
 from src.utils.validators import VALID_TEST_TYPES
 from typing import Optional
@@ -185,11 +187,12 @@ class TestService:
             )
             
             # Generate questions using practice test as template
+            requested_mcq_case1 = count_mcq if test_type != "FRQ_only" else 0
             mcq_questions, frq_questions = await self.llm_service.generate_from_practice_test_template(
                 notes=combined_study_content,
                 practice_test_content=pt_content,
                 test_type=test_type,
-                count_mcq=count_mcq if test_type != "FRQ_only" else 0,
+                count_mcq=inflated_mcq_count(requested_mcq_case1),
                 count_frq=count_frq if test_type != "MCQ_only" else 0,
                 is_math_mode=is_math_mode,
                 difficulty=difficulty,
@@ -209,6 +212,17 @@ class TestService:
                     generation_meta = meta_candidate
             except Exception:
                 generation_meta = {}
+            if settings.mcq_verification_enabled and mcq_questions:
+                verifier = MCQVerificationService()
+                mcq_questions, verify_stats = await verifier.verify_generated_mcqs(
+                    mcq_questions,
+                    source_content=combined_study_content,
+                    variant=("math" if is_math_mode else "coding" if is_coding_mode else "prose"),
+                    provider=active_provider,
+                    requested_count=requested_mcq_case1,
+                    coding_language=coding_language,
+                )
+                generation_meta["mcq_verification"] = verify_stats
         elif practice_test_file is not None:
             # CASE 2: Practice test only (no study content) - EXTRACT questions from test
             pt_content, pt_file_types = await self.file_service.extract_from_files([practice_test_file])
@@ -260,7 +274,7 @@ class TestService:
             mcq_questions, frq_questions = await self.llm_service.generate_test_questions(
                 notes=notes_content,
                 test_type=test_type,
-                count_mcq=count_mcq,
+                count_mcq=inflated_mcq_count(count_mcq),
                 count_frq=count_frq,
                 is_math_mode=is_math_mode,
                 difficulty=difficulty,
@@ -280,6 +294,17 @@ class TestService:
                     generation_meta = meta_candidate
             except Exception:
                 generation_meta = {}
+            if settings.mcq_verification_enabled and mcq_questions:
+                verifier = MCQVerificationService()
+                mcq_questions, verify_stats = await verifier.verify_generated_mcqs(
+                    mcq_questions,
+                    source_content=notes_content,
+                    variant=("math" if is_math_mode else "coding" if is_coding_mode else "prose"),
+                    provider=active_provider,
+                    requested_count=count_mcq,
+                    coding_language=coding_language,
+                )
+                generation_meta["mcq_verification"] = verify_stats
 
         display_order = 1
         for item in mcq_questions:

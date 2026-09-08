@@ -11,6 +11,8 @@ round to this file as they land, per the build order in
 """
 from __future__ import annotations
 
+import asyncio
+from dataclasses import replace
 from unittest.mock import AsyncMock
 
 from src.services.llm_service import DerivedAnswer, GeneratedMCQ, LLMService
@@ -620,3 +622,102 @@ class TestInflatedMcqCount:
         # A request already at the 50 ceiling cannot inflate further.
         assert inflated_mcq_count(50) == 50
         assert inflated_mcq_count(48) <= 50
+
+
+# ── Step 5: verify_generated_mcqs (integration point A wrapper) ─────────────
+
+from src.services.mcq_verification_service import VerificationOutcome  # noqa: E402
+
+
+def _generated_mcq(question_text: str, correct_index: int) -> GeneratedMCQ:
+    return GeneratedMCQ(question_text=question_text, options=["A", "B", "C", "D"], correct_index=correct_index)
+
+
+class TestVerifyGeneratedMcqs:
+
+    async def test_empty_input_short_circuits(self) -> None:
+        service = MCQVerificationService(llm=LLMService())
+        result, stats = await service.verify_generated_mcqs([], "notes")
+        assert result == []
+        assert stats == {"verified": 0}
+
+    async def test_kept_questions_pass_through_unchanged(self) -> None:
+        questions = [_generated_mcq("Q1?", 0), _generated_mcq("Q2?", 1)]
+        service = MCQVerificationService(llm=LLMService())
+
+        async def fake_verify_and_resolve(items, source_content, **kwargs):
+            return VerificationOutcome(kept=items, dropped_keys=[], stats={"verified": 2, "kept": 2})
+
+        service.verify_and_resolve = fake_verify_and_resolve  # type: ignore[method-assign]
+        result, stats = await service.verify_generated_mcqs(questions, "notes")
+        assert len(result) == 2
+        assert result[0].question_text == "Q1?"
+        assert stats["kept"] == 2
+
+    async def test_recorrected_question_gets_new_index(self) -> None:
+        questions = [_generated_mcq("Q1?", 0)]
+        service = MCQVerificationService(llm=LLMService())
+
+        async def fake_verify_and_resolve(items, source_content, **kwargs):
+            recorrected = [replace(items[0], correct_index=2)]
+            return VerificationOutcome(kept=recorrected, dropped_keys=[], stats={"recorrected": 1})
+
+        service.verify_and_resolve = fake_verify_and_resolve  # type: ignore[method-assign]
+        result, stats = await service.verify_generated_mcqs(questions, "notes")
+        assert len(result) == 1
+        assert result[0].correct_index == 2
+        assert result[0].question_text == "Q1?"  # unchanged aside from the index
+
+    async def test_dropped_question_is_removed(self) -> None:
+        questions = [_generated_mcq("Q1?", 0), _generated_mcq("Q2?", 0)]
+        service = MCQVerificationService(llm=LLMService())
+
+        async def fake_verify_and_resolve(items, source_content, **kwargs):
+            # Drop item at key 0 (Q1?), keep item at key 1 (Q2?).
+            kept = [item for item in items if item.key == 1]
+            return VerificationOutcome(kept=kept, dropped_keys=[0], stats={"dropped": 1})
+
+        service.verify_and_resolve = fake_verify_and_resolve  # type: ignore[method-assign]
+        result, stats = await service.verify_generated_mcqs(questions, "notes")
+        assert len(result) == 1
+        assert result[0].question_text == "Q2?"
+
+    async def test_surplus_trimmed_to_requested_count(self) -> None:
+        # Over-generation produced 3, only 2 were requested: trim the tail.
+        questions = [_generated_mcq(f"Q{i}?", 0) for i in range(3)]
+        service = MCQVerificationService(llm=LLMService())
+
+        async def fake_verify_and_resolve(items, source_content, **kwargs):
+            return VerificationOutcome(kept=items, dropped_keys=[], stats={})
+
+        service.verify_and_resolve = fake_verify_and_resolve  # type: ignore[method-assign]
+        result, stats = await service.verify_generated_mcqs(questions, "notes", requested_count=2)
+        assert len(result) == 2
+        assert result[0].question_text == "Q0?"
+        assert result[1].question_text == "Q1?"
+
+    async def test_verification_exception_keeps_all_questions_unchanged(self) -> None:
+        questions = [_generated_mcq("Q1?", 0)]
+        service = MCQVerificationService(llm=LLMService())
+
+        async def failing_verify_and_resolve(items, source_content, **kwargs):
+            raise Exception("provider exploded")
+
+        service.verify_and_resolve = failing_verify_and_resolve  # type: ignore[method-assign]
+        result, stats = await service.verify_generated_mcqs(questions, "notes")
+        assert result == questions
+        assert "verification_error" in stats
+
+    async def test_verification_timeout_keeps_all_questions_unchanged(self, monkeypatch) -> None:
+        questions = [_generated_mcq("Q1?", 0)]
+        service = MCQVerificationService(llm=LLMService())
+        monkeypatch.setattr("src.services.mcq_verification_service.settings.mcq_verification_timeout_seconds", 0.01)
+
+        async def slow_verify_and_resolve(items, source_content, **kwargs):
+            await asyncio.sleep(1)
+            return VerificationOutcome(kept=items, dropped_keys=[], stats={})
+
+        service.verify_and_resolve = slow_verify_and_resolve  # type: ignore[method-assign]
+        result, stats = await service.verify_generated_mcqs(questions, "notes")
+        assert result == questions
+        assert "verification_error" in stats
