@@ -94,19 +94,25 @@ _LATEX_FRAC_RE = re.compile(r"^\\frac\{([+-]?\d+)\}\{(\d+)\}$")
 _PLAIN_NUMBER_RE = re.compile(r"^[+-]?\d+(?:\.\d+)?$")
 
 
-def normalize_answer_text(text: str, case_sensitive: bool = False) -> str:
+def normalize_answer_text(text: str, case_sensitive: bool = False, strip_markdown_emphasis: bool = True) -> str:
     """Normalize a derived answer or an option for comparison.
 
     Applied identically to the derived answer and to every option, so the
     output only needs to compare equal (or nearly equal) when the two
     genuinely state the same thing. See the plan's "Normalization pipeline"
     for the numbered steps this implements in order.
+
+    strip_markdown_emphasis is False for the math variant: `*` is markdown
+    bold in prose but multiplication in math ("3*x"), and stripping it would
+    silently turn "3*x" into "3x", a different expression, before the math
+    normalizer ever gets to convert \\cdot / \\times into the same symbol.
     """
     if not text:
         return ""
     normalized = unicodedata.normalize("NFKC", text)
 
-    normalized = _MARKDOWN_STRIP_RE.sub("", normalized)
+    if strip_markdown_emphasis:
+        normalized = _MARKDOWN_STRIP_RE.sub("", normalized)
     normalized = _LEADING_LIST_MARKER_RE.sub("", normalized)
     normalized = _LEADING_OPTION_LABEL_RE.sub("", normalized)
 
@@ -129,11 +135,18 @@ def normalize_answer_text(text: str, case_sensitive: bool = False) -> str:
     return normalized.strip()
 
 
+_SPACED_OPERATOR_RE = re.compile(r"\s*([*^+\-])\s*")
+
+
 def _normalize_math_expression(text: str) -> str:
     """Extra math-only normalization, applied on top of normalize_answer_text
     (plan section 4.2). Kept separate so the prose ladder is unaffected."""
     normalized = _LATEX_CDOT_TIMES_RE.sub("*", text)
     normalized = _LATEX_BRACED_POWER_RE.sub(r"^\1", normalized)
+    # \cdot and \times normally carry surrounding spaces ("3 \cdot x"), but a
+    # plain-text option writing the same thing rarely does ("3*x"). Collapse
+    # spacing around * and ^ so the two compare equal.
+    normalized = _SPACED_OPERATOR_RE.sub(r"\1", normalized)
     return normalized
 
 
@@ -224,8 +237,13 @@ def answers_match(derived_answer: str, option: str, variant: str = "prose") -> b
     sensitively, since program output is case sensitive.
     """
     case_sensitive = variant == "coding"
-    normalized_answer = normalize_answer_text(derived_answer, case_sensitive=case_sensitive)
-    normalized_option = normalize_answer_text(option, case_sensitive=case_sensitive)
+    strip_markdown_emphasis = variant != "math"  # "*" is multiplication in math, not bold
+    normalized_answer = normalize_answer_text(
+        derived_answer, case_sensitive=case_sensitive, strip_markdown_emphasis=strip_markdown_emphasis,
+    )
+    normalized_option = normalize_answer_text(
+        option, case_sensitive=case_sensitive, strip_markdown_emphasis=strip_markdown_emphasis,
+    )
     if variant == "math":
         normalized_answer = _normalize_math_expression(normalized_answer)
         normalized_option = _normalize_math_expression(normalized_option)
