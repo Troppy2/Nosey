@@ -148,14 +148,15 @@ class TestParsePracticeTest:
         assert mcq == []
         assert frq == []
 
-    async def test_correct_index_clamped_to_valid_range(self):
-        """correct_index out of bounds (e.g. 99) is clamped to [0, 3]."""
+    async def test_correct_index_out_of_range_is_rejected_not_clamped(self):
+        """correct_index out of bounds (e.g. 99) is rejected, not silently
+        clamped into a confidently wrong answer key (MCQ verification hardening).
+        """
         bad_index = {**VALID_MCQ, "correct_index": 99}
         svc = LLMService()
         svc._complete_json = AsyncMock(return_value={"mcq": [bad_index], "frq": []})
         mcq, _ = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST)
-        assert len(mcq) == 1
-        assert mcq[0].correct_index == 3  # clamped to max 3
+        assert len(mcq) == 0
 
     async def test_metadata_stripped_before_sending_to_llm(self):
         """Document markers are stripped before sending to LLM."""
