@@ -360,3 +360,228 @@ class TestAdjudicateMcqMatches:
         assert len(result) == 14
         assert result[0] == 0
         assert result[13] == 1
+
+
+# ── Step 3: the drop-veto matcher ─────────────────────────────────────────────
+
+from src.services.mcq_verification_service import (  # noqa: E402
+    MCQVerificationService,
+    VerifiableMCQ,
+    answers_match,
+    veto_drop,
+)
+
+
+class TestMatcherLadder:
+    """These assert the VETO outcome (or its absence), never a drop — the
+    matcher can only ever save a question, per the module's one-way-valve
+    design."""
+
+    def test_three_way_match_yields_no_veto(self) -> None:
+        # "4" matches three of the four options: the matcher cannot say which
+        # one was meant, so it must stay silent rather than guess.
+        assert veto_drop("4", ["4", "8", "x = 4", "four"]) is None
+
+    def test_assignment_prefix_matches_bare_value(self) -> None:
+        assert answers_match("x = 4", "4") is True
+        assert answers_match("4", "$x = 4$") is True
+
+    def test_fraction_matches_decimal_and_latex_frac(self) -> None:
+        assert answers_match(r"\frac{1}{2}", "0.5") is True
+        assert answers_match("1/2", "0.5") is True
+
+    def test_number_word_matches_digit(self) -> None:
+        assert answers_match("four", "4") is True
+
+    def test_mitosis_does_not_match_meiosis(self) -> None:
+        # Classic Dice-coefficient false positive risk: a false veto here would
+        # keep a genuinely wrong question, so this must stay unmatched.
+        assert answers_match("mitosis", "meiosis") is False
+
+    def test_short_word_does_not_match_longer_phrase_containing_it(self) -> None:
+        assert answers_match("cell", "cell membrane potential") is False
+
+    def test_coding_variant_is_case_sensitive(self) -> None:
+        assert answers_match("HelloWorld", "helloworld", variant="coding") is False
+        assert answers_match("HelloWorld", "HelloWorld", variant="coding") is True
+
+    def test_single_clear_match_yields_veto_at_that_index(self) -> None:
+        assert veto_drop("Paris", ["London", "Paris", "Berlin", "Madrid"]) == 1
+
+    def test_no_match_at_all_yields_no_veto(self) -> None:
+        assert veto_drop("Tokyo", ["London", "Paris", "Berlin", "Madrid"]) is None
+
+
+# ── Step 5: the decision table ────────────────────────────────────────────────
+
+def _verifiable(key, options=None, correct_index=0) -> VerifiableMCQ:
+    return VerifiableMCQ(
+        key=key,
+        question_text="What is the answer?",
+        options=options or ["A", "B", "C", "D"],
+        correct_index=correct_index,
+    )
+
+
+def _derived(index: int, answer: str, confidence: float, derivable: bool = True) -> DerivedAnswer:
+    return DerivedAnswer(index=index, answer=answer, derivable=derivable, confidence=confidence)
+
+
+class TestDecisionTableUnit:
+    """Directly exercises MCQVerificationService._resolve_item, the single
+    source of truth for the decision table, independent of the LLM calls."""
+
+    def test_matched_equals_stored_key_keeps_unchanged(self) -> None:
+        item = _verifiable("q1", correct_index=1)
+        derived = _derived(0, "B", 0.9)
+        verdict, index = MCQVerificationService._resolve_item(item, derived, matched=1, veto_index=None)
+        assert verdict == "keep"
+
+    def test_matched_differs_high_confidence_recorrects(self) -> None:
+        item = _verifiable("q1", correct_index=0)
+        derived = _derived(0, "B", 0.9)
+        verdict, index = MCQVerificationService._resolve_item(item, derived, matched=1, veto_index=None)
+        assert verdict == "recorrect"
+        assert index == 1
+
+    def test_matched_differs_low_confidence_keeps(self) -> None:
+        item = _verifiable("q1", correct_index=0)
+        derived = _derived(0, "B", 0.4)
+        verdict, index = MCQVerificationService._resolve_item(item, derived, matched=1, veto_index=None)
+        assert verdict == "questionable"
+
+    def test_matched_differs_very_low_confidence_keeps_unchanged(self) -> None:
+        item = _verifiable("q1", correct_index=0)
+        derived = _derived(0, "B", 0.2)
+        verdict, index = MCQVerificationService._resolve_item(item, derived, matched=1, veto_index=None)
+        assert verdict == "keep"
+
+    def test_no_match_high_confidence_no_veto_drops(self) -> None:
+        item = _verifiable("q1", correct_index=0)
+        derived = _derived(0, "nothing here", 0.9)
+        verdict, index = MCQVerificationService._resolve_item(item, derived, matched=-1, veto_index=None)
+        assert verdict == "drop"
+
+    def test_no_match_mid_confidence_no_veto_is_questionable(self) -> None:
+        item = _verifiable("q1", correct_index=0)
+        derived = _derived(0, "nothing here", 0.5)
+        verdict, index = MCQVerificationService._resolve_item(item, derived, matched=-1, veto_index=None)
+        assert verdict == "questionable"
+
+    def test_no_match_low_confidence_keeps(self) -> None:
+        item = _verifiable("q1", correct_index=0)
+        derived = _derived(0, "nothing here", 0.3)
+        verdict, index = MCQVerificationService._resolve_item(item, derived, matched=-1, veto_index=None)
+        assert verdict == "keep"
+
+    def test_no_match_but_veto_present_recorrects(self) -> None:
+        # This is the test that proves the one-way valve works: the adjudicator
+        # wanted to drop, the deterministic matcher disagreed, and the question
+        # survives, recorrected to the vetoed index.
+        item = _verifiable("q1", correct_index=0)
+        derived = _derived(0, "matches option 2", 0.9)
+        verdict, index = MCQVerificationService._resolve_item(item, derived, matched=-1, veto_index=2)
+        assert verdict == "recorrect"
+        assert index == 2
+
+    def test_derivable_false_keeps_regardless_of_everything_else(self) -> None:
+        item = _verifiable("q1", correct_index=0)
+        derived = _derived(0, "", 0.9, derivable=False)
+        verdict, index = MCQVerificationService._resolve_item(item, derived, matched=-1, veto_index=None)
+        assert verdict == "keep"
+
+    def test_no_derivation_keeps(self) -> None:
+        item = _verifiable("q1", correct_index=0)
+        verdict, index = MCQVerificationService._resolve_item(item, None, matched=None, veto_index=None)
+        assert verdict == "keep"
+
+    def test_no_adjudication_verdict_keeps(self) -> None:
+        item = _verifiable("q1", correct_index=0)
+        derived = _derived(0, "something", 0.9)
+        verdict, index = MCQVerificationService._resolve_item(item, derived, matched=None, veto_index=None)
+        assert verdict == "keep"
+
+
+class TestVerifyAndResolveOrchestration:
+    """End-to-end through verify_and_resolve with the LLM calls mocked, so the
+    sharding/caps/stats plumbing is exercised together with the decision table."""
+
+    def _service_with(self, derive_return, adjudicate_return) -> MCQVerificationService:
+        llm = LLMService()
+        llm.derive_mcq_answers = AsyncMock(return_value=derive_return)  # type: ignore[method-assign]
+        llm.adjudicate_mcq_matches = AsyncMock(return_value=adjudicate_return)  # type: ignore[method-assign]
+        return MCQVerificationService(llm=llm)
+
+    async def test_empty_items_short_circuits(self) -> None:
+        service = self._service_with([], {})
+        outcome = await service.verify_and_resolve([], "notes")
+        assert outcome.kept == []
+        assert outcome.dropped_keys == []
+        assert outcome.stats["verified"] == 0
+
+    async def test_matching_answer_keeps_all(self) -> None:
+        items = [_verifiable("q0", options=["A", "B", "C", "D"], correct_index=0)]
+        derive_return = [_derived(0, "A", 0.9)]
+        adjudicate_return = {0: 0}
+        service = self._service_with(derive_return, adjudicate_return)
+        outcome = await service.verify_and_resolve(items, "notes")
+        assert len(outcome.kept) == 1
+        assert outcome.kept[0].correct_index == 0
+        assert outcome.dropped_keys == []
+        assert outcome.stats["kept"] == 1
+        assert outcome.stats["dropped"] == 0
+
+    async def test_recorrection_flows_through(self) -> None:
+        items = [_verifiable("q0", options=["A", "B", "C", "D"], correct_index=0)]
+        derive_return = [_derived(0, "C", 0.9)]
+        adjudicate_return = {0: 2}
+        service = self._service_with(derive_return, adjudicate_return)
+        outcome = await service.verify_and_resolve(items, "notes")
+        assert len(outcome.kept) == 1
+        assert outcome.kept[0].correct_index == 2
+        assert outcome.stats["recorrected"] == 1
+
+    async def test_five_of_eight_drops_triggers_distrust(self) -> None:
+        # 5/8 = 62.5% > the 50% cap: the whole result must be discarded, not
+        # just capped down to the threshold.
+        items = [_verifiable(f"q{i}", correct_index=0) for i in range(8)]
+        derive_return = [_derived(i, "nothing", 0.9) for i in range(8)]
+        # First 5 verify as a clean no-match (drop); last 3 keep as matched.
+        adjudicate_return = {i: -1 for i in range(5)}
+        adjudicate_return.update({i: 0 for i in range(5, 8)})
+        service = self._service_with(derive_return, adjudicate_return)
+        outcome = await service.verify_and_resolve(items, "notes")
+        assert outcome.stats["distrusted"] is True
+        assert len(outcome.kept) == 8
+        assert outcome.dropped_keys == []
+
+    async def test_small_batch_suppresses_drop(self) -> None:
+        items = [_verifiable("q0", correct_index=0), _verifiable("q1", correct_index=0)]
+        derive_return = [_derived(0, "nothing", 0.9), _derived(1, "A", 0.9)]
+        adjudicate_return = {0: -1, 1: 0}
+        service = self._service_with(derive_return, adjudicate_return)
+        outcome = await service.verify_and_resolve(items, "notes")
+        assert len(outcome.kept) == 2
+        assert outcome.dropped_keys == []
+
+    async def test_clean_drop_of_one_of_many(self) -> None:
+        items = [_verifiable(f"q{i}", correct_index=0) for i in range(5)]
+        derive_return = [_derived(i, "nothing" if i == 0 else "A", 0.9) for i in range(5)]
+        adjudicate_return = {0: -1, 1: 0, 2: 0, 3: 0, 4: 0}
+        service = self._service_with(derive_return, adjudicate_return)
+        outcome = await service.verify_and_resolve(items, "notes")
+        assert outcome.dropped_keys == ["q0"]
+        assert len(outcome.kept) == 4
+        assert outcome.stats["dropped"] == 1
+        assert outcome.stats["distrusted"] is False
+
+    async def test_adjudication_skipped_when_nothing_derivable(self) -> None:
+        items = [_verifiable("q0", correct_index=0)]
+        derive_return = [_derived(0, "", 0.0, derivable=False)]
+        llm = LLMService()
+        llm.derive_mcq_answers = AsyncMock(return_value=derive_return)  # type: ignore[method-assign]
+        llm.adjudicate_mcq_matches = AsyncMock()
+        service = MCQVerificationService(llm=llm)
+        outcome = await service.verify_and_resolve(items, "notes")
+        llm.adjudicate_mcq_matches.assert_not_called()
+        assert len(outcome.kept) == 1
