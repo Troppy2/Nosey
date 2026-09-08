@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from src.config import settings
 from src.database import async_session_maker, get_session
 from src.dependencies import get_current_user
 from src.limiter import limiter
@@ -37,6 +38,7 @@ from src.schemas.learning_module_schema import (
 )
 from src.services.file_service import FileService
 from src.services.llm_service import LLMService
+from src.services.mcq_verification_service import MCQVerificationService
 from src.utils.exceptions import LLMException, ResourceNotFoundException, StudyAppException
 from src.utils.logger import get_logger
 from src.utils.provider_policy import resolve_request_provider
@@ -197,21 +199,43 @@ async def _generate_track_background(
         # calls, which matters at 20 modules). Each write is its own short
         # session + commit so progress streams to the poller.
         for module_id, item in zip(module_ids, outline):
+            # Over-generate 2 extra quiz questions when module verification is
+            # on, so a drop still leaves a full QUIZ_QUESTION_COUNT-question
+            # quiz without needing the repair round on the common case.
+            module_quiz_count = (
+                QUIZ_QUESTION_COUNT + 2
+                if settings.mcq_verification_enabled and settings.mcq_verification_modules_enabled
+                else QUIZ_QUESTION_COUNT
+            )
             content = await llm.generate_module_content(
                 notes,
                 item["title"],
                 item.get("summary", ""),
-                quiz_count=QUIZ_QUESTION_COUNT,
+                quiz_count=module_quiz_count,
                 provider=provider,
                 custom_instructions=custom_instructions,
             )
+            quiz = content["quiz"]
+            if settings.mcq_verification_enabled and settings.mcq_verification_modules_enabled and quiz:
+                try:
+                    verifier = MCQVerificationService()
+                    quiz, verify_stats = await verifier.verify_module_quiz(
+                        quiz, source_content=str(content["lesson"]),
+                        requested_count=QUIZ_QUESTION_COUNT, provider=provider,
+                    )
+                    logger.info("Module quiz verification for module_id=%s: %s", module_id, verify_stats)
+                except Exception as verify_exc:
+                    logger.warning(
+                        "Module quiz verification failed for module_id=%s (quiz kept as generated): %s",
+                        module_id, verify_exc,
+                    )
             async with async_session_maker() as session:
                 module = await session.get(LearningModule, module_id)
                 if module is None:
                     return  # cancelled
                 module.lesson_content = str(content["lesson"])
                 module.tts_script = str(content.get("tts_script") or "") or None
-                module.quiz_json = json.dumps(content["quiz"])
+                module.quiz_json = json.dumps(quiz)
                 await session.commit()
 
         # Phase 3: mark ready + usage event.
@@ -697,20 +721,46 @@ async def update_module_lesson(
         module.tts_script = None
         await session.commit()
 
+        support_provider = track.provider if track else None
+        module_quiz_count = (
+            QUIZ_QUESTION_COUNT + 2
+            if settings.mcq_verification_enabled and settings.mcq_verification_modules_enabled
+            else QUIZ_QUESTION_COUNT
+        )
         support = await LLMService().regenerate_module_support(
             lesson,
             module.title,
-            quiz_count=QUIZ_QUESTION_COUNT,
-            provider=track.provider if track else None,
+            quiz_count=module_quiz_count,
+            provider=support_provider,
             custom_instructions=track.custom_instructions if track else None,
         )
+
+        quiz = support["quiz"]
+        if settings.mcq_verification_enabled and settings.mcq_verification_modules_enabled and quiz:
+            # Runs inside the request (not a background task), so a slow or
+            # hung verifier must not block the save. verify_module_quiz
+            # already applies MCQ_VERIFICATION_TIMEOUT_SECONDS internally and
+            # never raises; the quiz is kept as generated on any failure so
+            # the existing LLMException-to-503 mapping below is never
+            # triggered by verification itself.
+            try:
+                verifier = MCQVerificationService()
+                quiz, verify_stats = await verifier.verify_module_quiz(
+                    quiz, source_content=lesson, requested_count=QUIZ_QUESTION_COUNT, provider=support_provider,
+                )
+                logger.info("Module quiz verification for module_id=%s (edit regen): %s", module_id, verify_stats)
+            except Exception as verify_exc:
+                logger.warning(
+                    "Module quiz verification failed for module_id=%s (quiz kept as generated): %s",
+                    module_id, verify_exc,
+                )
 
         # The row may have been deleted mid-call (track rebuild/delete).
         module = await session.get(LearningModule, module.id)
         if module is None:
             raise ResourceNotFoundException("Learning module")
         module.tts_script = str(support.get("tts_script") or "") or None
-        module.quiz_json = json.dumps(support["quiz"])
+        module.quiz_json = json.dumps(quiz)
         await session.commit()
 
         return _module_to_response(module)

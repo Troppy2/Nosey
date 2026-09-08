@@ -1035,3 +1035,91 @@ class TestDeriveMcqAnswersVariantFraming:
     async def test_unknown_variant_falls_back_to_prose(self) -> None:
         prompt = await self._capture_prompt(variant="not_a_real_variant")
         assert "expert subject tutor" in prompt
+
+
+# ── Step 9: verify_module_quiz (integration point C) ─────────────────────────
+
+def _module_quiz_item(question: str, options: list[str], correct_index: int) -> dict:
+    return {"question": question, "options": options, "correct_index": correct_index}
+
+
+class TestVerifyModuleQuiz:
+
+    def _service(self) -> MCQVerificationService:
+        return MCQVerificationService(llm=LLMService())
+
+    async def test_empty_quiz_short_circuits(self) -> None:
+        service = self._service()
+        result, stats = await service.verify_module_quiz([], "lesson", requested_count=5)
+        assert result == []
+        assert stats == {"verified": 0}
+
+    async def test_non_four_option_quiz_is_not_rejected(self) -> None:
+        # Module quizzes allow 2-6 options (_parse_module_quiz), unlike the
+        # 4-option test path; this must not assume exactly four anywhere.
+        quiz = [
+            _module_quiz_item("Q1?", ["A", "B", "C"], 0),
+            _module_quiz_item("Q2?", ["A", "B", "C", "D", "E", "F"], 3),
+        ]
+        service = self._service()
+        outcome = VerificationOutcome(
+            kept=[
+                VerifiableMCQ(key=0, question_text="Q1?", options=["A", "B", "C"], correct_index=0),
+                VerifiableMCQ(key=1, question_text="Q2?", options=["A", "B", "C", "D", "E", "F"], correct_index=3),
+            ],
+            dropped_keys=[], stats={"calls": 2},
+        )
+        service.verify_and_resolve = AsyncMock(return_value=outcome)  # type: ignore[method-assign]
+        result, stats = await service.verify_module_quiz(quiz, "lesson", requested_count=2)
+        assert len(result) == 2
+        assert len(result[0]["options"]) == 3
+        assert len(result[1]["options"]) == 6
+
+    async def test_recorrection_preserves_other_fields(self) -> None:
+        quiz = [_module_quiz_item("Q1?", ["A", "B", "C", "D"], 0)]
+        service = self._service()
+        outcome = VerificationOutcome(
+            kept=[VerifiableMCQ(key=0, question_text="Q1?", options=["A", "B", "C", "D"], correct_index=2)],
+            dropped_keys=[], stats={},
+        )
+        service.verify_and_resolve = AsyncMock(return_value=outcome)  # type: ignore[method-assign]
+        result, stats = await service.verify_module_quiz(quiz, "lesson", requested_count=1)
+        assert result[0]["correct_index"] == 2
+        assert result[0]["question"] == "Q1?"
+        assert result[0]["options"] == ["A", "B", "C", "D"]
+
+    async def test_drop_removes_quiz_item(self) -> None:
+        quiz = [
+            _module_quiz_item("Q1?", ["A", "B", "C", "D"], 0),
+            _module_quiz_item("Q2?", ["A", "B", "C", "D"], 0),
+        ]
+        service = self._service()
+        outcome = VerificationOutcome(
+            kept=[VerifiableMCQ(key=1, question_text="Q2?", options=["A", "B", "C", "D"], correct_index=0)],
+            dropped_keys=[0], stats={},
+        )
+        service.verify_and_resolve = AsyncMock(return_value=outcome)  # type: ignore[method-assign]
+        result, stats = await service.verify_module_quiz(quiz, "lesson", requested_count=1)
+        assert len(result) == 1
+        assert result[0]["question"] == "Q2?"
+
+    async def test_repair_uses_lesson_as_notes_argument(self) -> None:
+        # "Give that method the lesson as its notes argument" per the plan;
+        # source_content IS the lesson for module quizzes.
+        quiz = [_module_quiz_item("Q1?", ["A", "B", "C", "D"], 0)]
+        service = self._service()
+        main_outcome = VerificationOutcome(kept=[], dropped_keys=[0], stats={})
+        replacement = [GeneratedMCQ("New Q?", ["W", "X", "Y", "Z"], 0)]
+        repair_outcome = VerificationOutcome(
+            kept=[VerifiableMCQ(key=0, question_text="New Q?", options=["W", "X", "Y", "Z"], correct_index=0)],
+            dropped_keys=[], stats={},
+        )
+        service.verify_and_resolve = AsyncMock(side_effect=[main_outcome, repair_outcome])  # type: ignore[method-assign]
+        service._llm.regenerate_mcqs_for_topics = AsyncMock(return_value=replacement)  # type: ignore[method-assign]
+
+        result, stats = await service.verify_module_quiz(quiz, "the lesson text", requested_count=1)
+
+        call_kwargs = service._llm.regenerate_mcqs_for_topics.call_args.kwargs
+        assert call_kwargs["notes"] == "the lesson text"
+        assert len(result) == 1
+        assert result[0]["question"] == "New Q?"
