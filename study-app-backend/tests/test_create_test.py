@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.services.mcq_verification_service import inflated_mcq_count
 from src.services.llm_service import (
     GeneratedFRQ,
     GeneratedMCQ,
@@ -186,7 +187,20 @@ class TestCreateTestService:
     Tests for TestService.create_test() with all external dependencies mocked.
     Verifies routing logic (notes vs practice-test path), question storage,
     and validation error handling.
+
+    MCQ verification is disabled for every test in this class: create_test()
+    instantiates its own MCQVerificationService (and, inside that, its own
+    LLMService) rather than reusing the mocked svc.llm_service, so an enabled
+    verifier here would make a real provider-candidate check per test. That
+    behavior (derive/adjudicate calls, the decision table, the veto matcher)
+    is exhaustively covered in test_mcq_verification.py; disabling it here
+    also exercises the MCQ_VERIFICATION_ENABLED=false full-bypass row of the
+    fail-open matrix for free.
     """
+
+    @pytest.fixture(autouse=True)
+    def _disable_mcq_verification(self, monkeypatch):
+        monkeypatch.setattr("src.services.test_service.settings.mcq_verification_enabled", False)
 
     def _make_upload_file(self, name: str = "notes.txt", content: bytes = b"Study content.") -> MagicMock:
         f = MagicMock()
@@ -330,7 +344,10 @@ class TestCreateTestService:
             )
 
         call_kwargs = svc.llm_service.generate_test_questions.call_args.kwargs
-        assert call_kwargs["count_mcq"] == 20
+        # count_mcq is inflated before generation (MCQ verification over-generation,
+        # see mcq_verification_service.inflated_mcq_count); the raw request (20) is
+        # what verification later trims back down to, not what generation receives.
+        assert call_kwargs["count_mcq"] == inflated_mcq_count(20)
         assert call_kwargs["count_frq"] == 8
         assert result.questions_generated == 28
 
@@ -519,3 +536,129 @@ class TestCreateTestService:
         assert result.questions_generated == 10
         assert test_repo.add_mcq_question.await_count == 7
         assert test_repo.add_frq_question.await_count == 3
+
+
+class TestCreateTestMcqVerificationWiring:
+    """MCQ verification IS enabled here (unlike TestCreateTestService, which
+    disables it to stay fast/focused). These tests prove create_test() wires
+    MCQVerificationService in on the notes and practice-test-template paths,
+    that its result replaces mcq_questions before persistence, and that the
+    requested (not inflated) count is what generate_test_questions is asked to
+    over-generate from.
+    """
+
+    def _make_upload_file(self, name: str = "notes.txt", content: bytes = b"Study content.") -> MagicMock:
+        f = MagicMock()
+        f.filename = name
+        f.read = AsyncMock(return_value=content)
+        f.seek = AsyncMock()
+        return f
+
+    def _make_service(self, llm_mcq: list[GeneratedMCQ]):
+        from src.services.test_service import TestService
+
+        svc = TestService()
+        svc.llm_service = MagicMock()
+        svc.llm_service.generate_test_questions = AsyncMock(return_value=(llm_mcq, []))
+        svc.llm_service.generate_from_practice_test_template = AsyncMock(return_value=(llm_mcq, []))
+        svc.llm_service.get_last_generation_meta = MagicMock(return_value={})
+        svc.file_service = MagicMock()
+        svc.file_service.extract_from_files = AsyncMock(return_value=("Extracted content", ["txt"]))
+        svc.file_service.get_folder_files_content = AsyncMock(return_value="")
+        return svc
+
+    def _make_session_and_repo(self):
+        session = AsyncMock()
+        session.commit = AsyncMock()
+        folder = MagicMock()
+        folder_repo = MagicMock()
+        folder_repo.get_owned = AsyncMock(return_value=folder)
+        test = MagicMock()
+        test.id = 42
+        test.title = "T"
+        test_repo = MagicMock()
+        test_repo.create = AsyncMock(return_value=test)
+        test_repo.add_note = AsyncMock()
+        test_repo.add_mcq_question = AsyncMock()
+        test_repo.add_frq_question = AsyncMock()
+        return session, folder_repo, test_repo
+
+    async def test_verifier_drop_removes_a_question_before_persistence(self, monkeypatch):
+        monkeypatch.setattr("src.services.test_service.settings.mcq_verification_enabled", True)
+        mcq_list = [GeneratedMCQ(f"Q{i}", ["A", "B", "C", "D"], 0) for i in range(3)]
+        svc = self._make_service(llm_mcq=mcq_list)
+        session, folder_repo, test_repo = self._make_session_and_repo()
+
+        fake_verifier = MagicMock()
+        # Verification drops Q1, keeping Q0 and Q2 — proves the returned list
+        # (not the original generation output) is what gets persisted.
+        fake_verifier.verify_generated_mcqs = AsyncMock(
+            return_value=([mcq_list[0], mcq_list[2]], {"dropped": 1})
+        )
+
+        with (
+            patch("src.services.test_service.FolderRepository", return_value=folder_repo),
+            patch("src.services.test_service.TestRepository", return_value=test_repo),
+            patch("src.services.test_service.MCQVerificationService", return_value=fake_verifier),
+        ):
+            result = await svc.create_test(
+                folder_id=1, user_id=1, title="T", test_type="MCQ_only",
+                notes_files=[self._make_upload_file()],
+                session=session,
+                count_mcq=3, count_frq=0,
+            )
+
+        fake_verifier.verify_generated_mcqs.assert_awaited_once()
+        assert test_repo.add_mcq_question.await_count == 2
+        assert result.questions_generated == 2
+
+    async def test_generation_receives_inflated_count_not_the_request(self, monkeypatch):
+        monkeypatch.setattr("src.services.test_service.settings.mcq_verification_enabled", True)
+        monkeypatch.setattr("src.services.test_service.settings.mcq_verification_overgen_ratio", 1.3)
+        mcq_list = [GeneratedMCQ(f"Q{i}", ["A", "B", "C", "D"], 0) for i in range(13)]
+        svc = self._make_service(llm_mcq=mcq_list)
+        session, folder_repo, test_repo = self._make_session_and_repo()
+
+        fake_verifier = MagicMock()
+        fake_verifier.verify_generated_mcqs = AsyncMock(return_value=(mcq_list[:10], {}))
+
+        with (
+            patch("src.services.test_service.FolderRepository", return_value=folder_repo),
+            patch("src.services.test_service.TestRepository", return_value=test_repo),
+            patch("src.services.test_service.MCQVerificationService", return_value=fake_verifier),
+        ):
+            await svc.create_test(
+                folder_id=1, user_id=1, title="T", test_type="MCQ_only",
+                notes_files=[self._make_upload_file()],
+                session=session,
+                count_mcq=10, count_frq=0,
+            )
+
+        generate_kwargs = svc.llm_service.generate_test_questions.call_args.kwargs
+        # 10 requested * 1.3 = 13, within the +5 over-generation cap.
+        assert generate_kwargs["count_mcq"] == 13
+        verify_kwargs = fake_verifier.verify_generated_mcqs.call_args.kwargs
+        assert verify_kwargs["requested_count"] == 10
+
+    async def test_bypass_flag_skips_verifier_entirely(self, monkeypatch):
+        monkeypatch.setattr("src.services.test_service.settings.mcq_verification_enabled", False)
+        mcq_list = [GeneratedMCQ(f"Q{i}", ["A", "B", "C", "D"], 0) for i in range(5)]
+        svc = self._make_service(llm_mcq=mcq_list)
+        session, folder_repo, test_repo = self._make_session_and_repo()
+
+        with (
+            patch("src.services.test_service.FolderRepository", return_value=folder_repo),
+            patch("src.services.test_service.TestRepository", return_value=test_repo),
+            patch("src.services.test_service.MCQVerificationService") as mock_verifier_cls,
+        ):
+            result = await svc.create_test(
+                folder_id=1, user_id=1, title="T", test_type="MCQ_only",
+                notes_files=[self._make_upload_file()],
+                session=session,
+                count_mcq=5, count_frq=0,
+            )
+
+        mock_verifier_cls.assert_not_called()
+        generate_kwargs = svc.llm_service.generate_test_questions.call_args.kwargs
+        assert generate_kwargs["count_mcq"] == 5  # unchanged, no inflation
+        assert result.questions_generated == 5
