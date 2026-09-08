@@ -691,3 +691,64 @@ class MCQVerificationService:
             result = result[:requested_count]
 
         return result, stats
+
+    async def verify_module_quiz(
+        self,
+        quiz: list[dict[str, object]],
+        source_content: str,
+        requested_count: int,
+        provider: Optional[str] = None,
+    ) -> tuple[list[dict[str, object]], dict[str, object]]:
+        """Thin dict <-> VerifiableMCQ wrapper for learning-module quizzes
+        (integration point C). Module quiz items are {"question", "options",
+        "correct_index"} (see _parse_module_quiz in llm_service.py), with 2 to
+        6 options rather than always 4 like the test path, so nothing here or
+        in the shared matcher may assume exactly four.
+
+        source_content should be the LESSON just generated (or the edited
+        lesson, for the regenerate-after-edit call site), not the folder
+        notes: the lesson is the source of truth the quiz was written from,
+        and the generation prompt already requires every question to be
+        answerable from the lesson alone. Always the prose variant. Never
+        raises: any internal failure returns the quiz unchanged.
+        """
+        if not quiz:
+            return quiz, {"verified": 0}
+
+        items = [
+            VerifiableMCQ(
+                key=index,
+                question_text=str(item.get("question", "")),
+                options=[str(o) for o in item.get("options", [])],  # type: ignore[union-attr]
+                correct_index=int(item.get("correct_index", 0)),  # type: ignore[arg-type]
+            )
+            for index, item in enumerate(quiz)
+        ]
+        # Repair regenerates via the standard MCQ prompt builders, which always
+        # produce 4 options; that is a valid point within the 2-6 range the
+        # module quiz format allows, just less variable than an original might
+        # have been. No module-specific repair prompt exists, by design (one
+        # shared repair path, not a per-caller reimplementation).
+        kept, _dropped_keys, new_items, stats = await self.verify_and_repair(
+            items, source_content, variant="prose", provider=provider,
+            requested_count=requested_count, test_type="MCQ_only",
+        )
+
+        result: list[dict[str, object]] = []
+        for item in kept:
+            original = quiz[item.key]  # type: ignore[index]
+            if item.correct_index != int(original.get("correct_index", 0)):  # type: ignore[arg-type]
+                result.append({**original, "correct_index": item.correct_index})
+            else:
+                result.append(original)
+        for new_item in new_items:
+            result.append({
+                "question": new_item.question_text,
+                "options": new_item.options,
+                "correct_index": new_item.correct_index,
+            })
+
+        if requested_count > 0 and len(result) > requested_count:
+            result = result[:requested_count]
+
+        return result, stats
