@@ -395,6 +395,22 @@ class TestMatcherLadder:
     def test_number_word_matches_digit(self) -> None:
         assert answers_match("four", "4") is True
 
+    def test_cdot_matches_plain_asterisk_multiplication(self) -> None:
+        # Regression: normalize_answer_text's generic markdown strip used to
+        # remove a literal "*" (it also means markdown bold) BEFORE the math
+        # normalizer could convert \cdot into the same symbol, so "3*x" was
+        # silently mangled into "3x" and this never matched.
+        assert answers_match(r"3 \cdot x^{2}", "3*x^2", variant="math") is True
+        assert answers_match(r"2 \cdot 5", "2*5", variant="math") is True
+
+    def test_braced_power_matches_plain_caret_with_spacing(self) -> None:
+        assert answers_match(r"x^{2} + 1", "x^2+1", variant="math") is True
+
+    def test_prose_variant_still_strips_asterisk_as_markdown_bold(self) -> None:
+        # The math-only exemption must not leak into the default variant:
+        # "*emphasis*" is markdown, not multiplication, outside math mode.
+        assert answers_match("*Paris*", "Paris") is True
+
     def test_mitosis_does_not_match_meiosis(self) -> None:
         # Classic Dice-coefficient false positive risk: a false veto here would
         # keep a genuinely wrong question, so this must stay unmatched.
@@ -973,3 +989,49 @@ class TestRepairRound:
 
         assert service._llm.regenerate_mcqs_for_topics.call_args.kwargs["count"] == 5
         assert stats["repaired"] == 5
+
+
+# ── Steps 7-8: math and coding variant prompt framing for derive_mcq_answers ─
+
+class TestDeriveMcqAnswersVariantFraming:
+
+    async def _capture_prompt(self, **derive_kwargs) -> str:
+        llm = LLMService()
+        captured: list[str] = []
+
+        async def capture(prompt: str, provider=None):
+            captured.append(prompt)
+            return {"answers": []}
+
+        llm._complete_json = capture  # type: ignore[method-assign]
+        await llm.derive_mcq_answers(["Q1?"], "source material", **derive_kwargs)
+        assert len(captured) == 1
+        return captured[0]
+
+    async def test_default_variant_is_prose(self) -> None:
+        prompt = await self._capture_prompt()
+        assert "expert subject tutor" in prompt
+
+    async def test_math_variant_asks_for_latex_and_bans_prose_answers(self) -> None:
+        prompt = await self._capture_prompt(variant="math")
+        assert "expert math tutor" in prompt
+        assert "LaTeX" in prompt
+        assert "expert subject tutor" not in prompt
+
+    async def test_coding_variant_asks_for_exact_output_and_bans_execution(self) -> None:
+        prompt = await self._capture_prompt(variant="coding")
+        assert "expert programmer" in prompt
+        assert "Never execute anything" in prompt
+        assert "expert math tutor" not in prompt
+
+    async def test_coding_variant_includes_language_line_when_given(self) -> None:
+        prompt = await self._capture_prompt(variant="coding", coding_language="Python")
+        assert "LANGUAGE: Python" in prompt
+
+    async def test_coding_variant_omits_language_line_when_not_given(self) -> None:
+        prompt = await self._capture_prompt(variant="coding")
+        assert "LANGUAGE:" not in prompt
+
+    async def test_unknown_variant_falls_back_to_prose(self) -> None:
+        prompt = await self._capture_prompt(variant="not_a_real_variant")
+        assert "expert subject tutor" in prompt
