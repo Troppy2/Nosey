@@ -119,6 +119,23 @@ class ComplexityGrade:
 
 
 @dataclass(frozen=True)
+class DerivedAnswer:
+    """One question answered independently of its answer options.
+
+    index is the position of the question in the batch that was sent. answer is
+    the verifier's own answer in its own words. derivable is False when the
+    source content does not support answering the question at all, in which case
+    the caller must keep the question unchanged rather than drop it. confidence
+    is the verifier's confidence in its OWN answer, mirroring
+    ComplexityGrade.confidence.
+    """
+    index: int
+    answer: str
+    derivable: bool
+    confidence: float
+
+
+@dataclass(frozen=True)
 class _ExtractedTerm:
     term: str
     definition: str
@@ -277,6 +294,13 @@ _RETRIEVAL_EMBED_CACHE_SIZE = 4096
 _RETRIEVAL_RESULT_CACHE_SIZE = 512
 _MAP_REDUCE_MAX_DOCS = 6
 _SAME_PROVIDER_TOPUP_ATTEMPTS = 2
+
+# ── MCQ truthfulness verification ────────────────────────────────────────────
+_VERIFY_CHAR_LIMIT = 8_000  # matches _GENERATE_CHAR_LIMIT
+_VERIFY_QUESTION_CHAR_LIMIT = 400  # matches the ceiling _is_valid_mcq enforces
+_VERIFY_ANSWER_CHAR_LIMIT = 300
+_VERIFY_BATCH_MAX = 12  # shard above this so one call stays within the token budget
+_VERIFY_SHARD_CONCURRENCY = 3
 
 # Server-side duplicate detection (GH #34): a generated question whose normalized
 # text matches a prior question exactly, or with a SequenceMatcher ratio at or above
@@ -1869,6 +1893,283 @@ Return JSON only with these exact keys:
                 flagged_uncertain=True,
                 weakness_severity="none",
             )
+
+    # ── MCQ truthfulness verification ────────────────────────────────────────
+    #
+    # Two fixed calls, never conditional on each other, and a deterministic
+    # matcher (in MCQVerificationService) that may only VETO a drop, never
+    # cause one. See .claude/todos-features/mcq-verification-implementation-plan.md
+    # section 2.1 for why one call cannot both derive an answer blind and
+    # compare it to the options.
+
+    _VERIFY_DERIVE_TASK_FRAMING = {
+        "prose": (
+            "You are an expert subject tutor. Answer each question below using the "
+            "source material and your own subject knowledge, in your own words. Be "
+            "specific and short: a value, a term, or a short phrase, one sentence at "
+            "most. Do not mention multiple choice, options, or an answer key anywhere "
+            "in your answer.\n"
+        ),
+        "math": (
+            "You are an expert math tutor. Solve each problem below using the source "
+            "material. Show your full working in \"reasoning\" only. \"answer\" must be "
+            "the final value or expression alone: no prose, no \"the answer is\" "
+            "preamble, no units unless the problem requires them. Write the answer in "
+            "LaTeX wrapped in $...$ so it can be compared against notation-heavy "
+            "options. If a problem is under-specified or the material is missing a "
+            "needed formula, set \"derivable\" to false and do not invent numbers.\n"
+        ),
+        "coding": (
+            "You are an expert programmer. For each question below, reason about what "
+            "the code does and what the question asks for; trace the execution step by "
+            "step in \"reasoning\" only. \"answer\" must be the exact output, return "
+            "value, or short term the question asks for: preserve whitespace and "
+            "quoting exactly as the program would produce them, and do not reformat "
+            "the answer into prose. Never execute anything yourself; reason from the "
+            "code as written. If a snippet is incomplete or depends on something not "
+            "shown, set \"derivable\" to false.\n"
+        ),
+    }
+
+    def _build_derive_mcq_prompt(
+        self,
+        questions: list[str],
+        source_content: str,
+        variant: str,
+        coding_language: Optional[str] = None,
+    ) -> str:
+        framing = self._VERIFY_DERIVE_TASK_FRAMING.get(variant, self._VERIFY_DERIVE_TASK_FRAMING["prose"])
+        language_line = f"LANGUAGE: {coding_language}\n" if variant == "coding" and coding_language else ""
+        questions_block = "\n".join(
+            f"{index}. {q[:_VERIFY_QUESTION_CHAR_LIMIT]}" for index, q in enumerate(questions)
+        )
+        return (
+            f"{framing}"
+            f"{language_line}"
+            f"SOURCE MATERIAL:\n{source_content[:_VERIFY_CHAR_LIMIT]}\n\n"
+            f"QUESTIONS:\n{questions_block}\n\n"
+            "INSTRUCTIONS:\n"
+            "- Answer every question, in order, one object per question, using the SAME index.\n"
+            "- Put any working or thinking in \"reasoning\" only. \"answer\" holds only the final answer.\n"
+            "- If a question is ambiguous, self-contradictory, or the material does not support a "
+            "definite answer, set \"derivable\" to false and leave \"answer\" empty. Do not guess.\n"
+            "- \"confidence\" is your confidence in your OWN answer, from 0.0 to 1.0.\n\n"
+            "Return JSON only with this exact shape:\n"
+            '{"answers": [{"index": 0, "reasoning": "...", "answer": "...", "derivable": true, "confidence": 0.0}]}'
+        )
+
+    async def _derive_mcq_answers_shard(
+        self,
+        questions: list[str],
+        source_content: str,
+        variant: str,
+        provider: Optional[str],
+        coding_language: Optional[str],
+        base_index: int,
+    ) -> list[DerivedAnswer]:
+        """One derivation call over a single shard, indices offset by base_index."""
+        prompt = self._build_derive_mcq_prompt(questions, source_content, variant, coding_language)
+        try:
+            data = await self._complete_json(prompt, provider=provider)
+        except Exception as exc:
+            logger.warning(
+                "MCQ verification: derivation call failed for %d question(s): %s",
+                len(questions), exc,
+            )
+            return []
+
+        raw_answers = data.get("answers")
+        if not isinstance(raw_answers, list):
+            return []
+
+        results: dict[int, DerivedAnswer] = {}
+        for item in raw_answers:
+            if not isinstance(item, dict):
+                continue
+            try:
+                index = int(item.get("index"))  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                continue
+            if index < 0 or index >= len(questions) or index in results:
+                continue
+            answer = str(item.get("answer", "")).strip()[:_VERIFY_ANSWER_CHAR_LIMIT]
+            derivable = bool(item.get("derivable", True))
+            try:
+                confidence = max(0.0, min(1.0, float(item.get("confidence", 0.0))))
+            except (TypeError, ValueError):
+                confidence = 0.0
+            results[index] = DerivedAnswer(
+                index=index + base_index,
+                answer=answer,
+                derivable=derivable,
+                confidence=confidence,
+            )
+        return list(results.values())
+
+    async def derive_mcq_answers(
+        self,
+        questions: list[str],
+        source_content: str,
+        variant: str = "prose",
+        provider: Optional[str] = None,
+        coding_language: Optional[str] = None,
+    ) -> list[DerivedAnswer]:
+        """Answer each question independently, WITHOUT seeing its answer options.
+
+        This is the first half of MCQ truthfulness verification. The options are
+        deliberately absent from the prompt: a verifier shown four choices will
+        endorse one of them even when all four are wrong, which is exactly the
+        failure this feature exists to catch. Matching the derived answers
+        against the options happens afterwards, in MCQVerificationService.
+
+        One LLM call for the whole batch (sharded only above _VERIFY_BATCH_MAX),
+        on the JSON path (70B). Never call this per question. On any failure it
+        returns an empty list, and the caller keeps every question unchanged.
+        """
+        if not questions:
+            return []
+
+        if len(questions) <= _VERIFY_BATCH_MAX:
+            return await self._derive_mcq_answers_shard(
+                questions, source_content, variant, provider, coding_language, base_index=0
+            )
+
+        # Fan-out over disjoint shards of the same batch — not a retry loop and
+        # not a provider loop, so this does not violate the no-calls-in-loops
+        # rule. Capped concurrency so a large test does not spike a
+        # rate-limited provider.
+        semaphore = asyncio.Semaphore(_VERIFY_SHARD_CONCURRENCY)
+
+        async def _bounded_shard(shard_questions: list[str], base_index: int) -> list[DerivedAnswer]:
+            async with semaphore:
+                return await self._derive_mcq_answers_shard(
+                    shard_questions, source_content, variant, provider, coding_language, base_index
+                )
+
+        shard_tasks = [
+            _bounded_shard(questions[start:start + _VERIFY_BATCH_MAX], start)
+            for start in range(0, len(questions), _VERIFY_BATCH_MAX)
+        ]
+        shard_results = await asyncio.gather(*shard_tasks, return_exceptions=True)
+        merged: list[DerivedAnswer] = []
+        for result in shard_results:
+            if isinstance(result, BaseException):
+                logger.warning("MCQ verification: a derivation shard raised: %s", result)
+                continue
+            merged.extend(result)
+        return merged
+
+    _VERIFY_ADJUDICATE_INSTRUCTIONS = (
+        "You are given, for each numbered item, a QUESTION, a fixed CORRECT ANSWER, and a "
+        "list of CANDIDATES. Decide which candidate (if any) states the same answer as the "
+        "fixed CORRECT ANSWER.\n\n"
+        "RULES:\n"
+        "- The CORRECT ANSWER is fixed and is NOT up for debate. Do not re-answer the "
+        "question yourself. Do not pick the closest candidate out of politeness.\n"
+        "- Wording, notation, and paraphrase differences still count as the same answer. A "
+        "different value, a different concept, or an answer that is only partially right "
+        "does NOT count as the same answer.\n"
+        "- If NO candidate states the fixed answer, return matched_option: -1 for that item. "
+        "This is a valid and expected answer; do not force a match onto the closest "
+        "candidate when none actually states it.\n\n"
+    )
+
+    def _build_adjudicate_mcq_prompt(self, items: list[dict[str, object]]) -> str:
+        blocks: list[str] = []
+        for item in items:
+            options = item.get("options") or []
+            options_lines = "\n".join(f"  {i}. {opt}" for i, opt in enumerate(options))  # type: ignore[arg-type]
+            blocks.append(
+                f"ITEM {item['index']}\n"
+                f"QUESTION: {item.get('question', '')}\n"
+                f"CORRECT ANSWER: {item.get('answer', '')}\n"
+                f"CANDIDATES:\n{options_lines}\n"
+            )
+        items_block = "\n".join(blocks)
+        return (
+            f"{self._VERIFY_ADJUDICATE_INSTRUCTIONS}"
+            f"{items_block}\n\n"
+            "Return JSON only with this exact shape, one object per item, matched_option "
+            "being the candidate's number above or -1 when none of them state the fixed "
+            "answer:\n"
+            '{"matches": [{"index": 0, "matched_option": 2}]}'
+        )
+
+    async def _adjudicate_mcq_matches_shard(
+        self,
+        items: list[dict[str, object]],
+        provider: Optional[str],
+    ) -> dict[int, int]:
+        prompt = self._build_adjudicate_mcq_prompt(items)
+        try:
+            data = await self._complete_json(prompt, provider=provider)
+        except Exception as exc:
+            logger.warning(
+                "MCQ verification: adjudication call failed for %d item(s): %s",
+                len(items), exc,
+            )
+            return {}
+
+        raw_matches = data.get("matches")
+        if not isinstance(raw_matches, list):
+            return {}
+
+        option_counts = {int(item["index"]): len(item.get("options") or []) for item in items}  # type: ignore[arg-type]
+        results: dict[int, int] = {}
+        for entry in raw_matches:
+            if not isinstance(entry, dict):
+                continue
+            try:
+                index = int(entry.get("index"))  # type: ignore[arg-type]
+                matched = int(entry.get("matched_option"))  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                continue
+            if index not in option_counts or index in results:
+                continue
+            if matched < -1 or matched >= option_counts[index]:
+                continue
+            results[index] = matched
+        return results
+
+    async def adjudicate_mcq_matches(
+        self,
+        items: list[dict[str, object]],
+        provider: Optional[str] = None,
+    ) -> dict[int, int]:
+        """Decide which option (if any) expresses an already-derived answer.
+
+        Runs for EVERY verified question, with the derived answer fixed before
+        the call and passed in, so the options cannot influence what the
+        verifier believes is true; this call only asks "which of these strings
+        says that, if any". Returns a mapping of batch index to matched option
+        index, where -1 means no option expresses the derived answer. Missing
+        keys mean "undecided", and the caller keeps those questions unchanged.
+        One call for the whole batch, sharded only above _VERIFY_BATCH_MAX.
+        """
+        if not items:
+            return {}
+
+        if len(items) <= _VERIFY_BATCH_MAX:
+            return await self._adjudicate_mcq_matches_shard(items, provider)
+
+        semaphore = asyncio.Semaphore(_VERIFY_SHARD_CONCURRENCY)
+
+        async def _bounded_shard(shard_items: list[dict[str, object]]) -> dict[int, int]:
+            async with semaphore:
+                return await self._adjudicate_mcq_matches_shard(shard_items, provider)
+
+        shard_tasks = [
+            _bounded_shard(items[start:start + _VERIFY_BATCH_MAX])
+            for start in range(0, len(items), _VERIFY_BATCH_MAX)
+        ]
+        shard_results = await asyncio.gather(*shard_tasks, return_exceptions=True)
+        merged: dict[int, int] = {}
+        for result in shard_results:
+            if isinstance(result, BaseException):
+                logger.warning("MCQ verification: an adjudication shard raised: %s", result)
+                continue
+            merged.update(result)
+        return merged
 
     async def generate_flashcards(
         self,
