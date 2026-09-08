@@ -972,10 +972,13 @@ class LLMService:
                 for item in mcq_raw:
                     if self._is_valid_mcq(item):
                         options = [str(o) for o in item["options"]][:4]  # type: ignore[index]
+                        index = self._coerce_correct_index(item, len(options))  # type: ignore[arg-type]
+                        if index is None:
+                            continue
                         mcq.append(GeneratedMCQ(
                             question_text=str(item.get("question_text", "")),  # type: ignore[union-attr]
                             options=options,
-                            correct_index=max(0, min(3, int(item.get("correct_index", 0)))),  # type: ignore[union-attr]
+                            correct_index=index,
                         ))
             if isinstance(frq_raw, list):
                 for item in frq_raw:
@@ -4701,6 +4704,16 @@ Return only the JSON object."""
         # the padded option, so this only ever degrades quality, never correctness.
         if isinstance(options, list) and len(options) == 3:
             item["options"] = list(options) + ["None of the above"]
+        # An aliased answer key (answer / correct / correct_answer) sometimes carries the
+        # option TEXT instead of an index. Convert it to an index on an exact match after
+        # whitespace stripping only — anything fuzzier belongs in MCQ verification, not here.
+        raw_index = item.get("correct_index")
+        if isinstance(raw_index, str) and isinstance(options, list):
+            stripped = raw_index.strip()
+            for position, option in enumerate(options):
+                if str(option).strip() == stripped:
+                    item["correct_index"] = position
+                    break
         return item
 
     def _normalize_frq_item(self, item: object) -> object:
@@ -4789,6 +4802,35 @@ Return only the JSON object."""
         is_computation = bool(self._MATH_FRQ_COMPUTE_RE.search(question))
         return has_math or is_computation
 
+    @staticmethod
+    def _coerce_correct_index(item: dict, option_count: int) -> Optional[int]:
+        """Return a valid 0-based correct_index, or None when the model's value
+        cannot be trusted.
+
+        The previous code clamped with max(0, min(3, ...)), so "correct_index": 7
+        silently became 3 and a missing key silently became 0. Either turns an
+        otherwise-fine question into a confidently wrong answer key. Rejecting is
+        correct: the generation paths already refill dropped slots through the
+        existing top-up logic.
+        """
+        raw = item.get("correct_index")
+        if isinstance(raw, bool):
+            return None
+        if isinstance(raw, str):
+            stripped = raw.strip()
+            # Some models answer with the option letter instead of the index.
+            if len(stripped) == 1 and stripped.upper() in "ABCD":
+                index = ord(stripped.upper()) - ord("A")
+                return index if 0 <= index < option_count else None
+            if not stripped.lstrip("-").isdigit():
+                return None
+            raw = stripped
+        try:
+            index = int(raw)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return None
+        return index if 0 <= index < option_count else None
+
     # Safety net: even with prompt rules forbidding it, a provider may still leak the internal
     # RAG grounding labels (file names, "[Source: ...]", "Chunk 69") into generated question text.
     # These patterns strip those references so the student never sees them.
@@ -4831,10 +4873,13 @@ Return only the JSON object."""
             return None
         raw_options = [str(o) for o in item["options"]][:4]  # type: ignore[index]
         options = [normalize_latex(o) for o in raw_options]
+        index = self._coerce_correct_index(item, len(options))  # type: ignore[arg-type]
+        if index is None:
+            return None
         return GeneratedMCQ(
             question_text=self._strip_source_references(normalize_latex(str(item.get("question_text", "Study question")))),  # type: ignore[union-attr]
             options=options,
-            correct_index=max(0, min(3, int(item.get("correct_index", 0)))),  # type: ignore[union-attr]
+            correct_index=index,
         )
 
     def _build_frq_from_item(self, item: object, math_mode: bool = False) -> Optional[GeneratedFRQ]:
