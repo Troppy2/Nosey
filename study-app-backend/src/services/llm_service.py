@@ -2171,6 +2171,90 @@ Return JSON only with these exact keys:
             merged.update(result)
         return merged
 
+    async def regenerate_mcqs_for_topics(
+        self,
+        notes: str,
+        removed_questions: list[str],
+        count: int,
+        test_type: str = "MCQ_only",
+        variant: str = "prose",
+        difficulty: str = "mixed",
+        topic_focus: Optional[str] = None,
+        custom_instructions: Optional[str] = None,
+        coding_language: Optional[str] = None,
+        prior_questions: Optional[list[str]] = None,
+        provider: Optional[str] = None,
+    ) -> list[GeneratedMCQ]:
+        """Regenerate MCQs covering the same material as questions that failed
+        verification.
+
+        Called at most ONCE per generation, after verification, and never from
+        inside a provider loop or a retry loop (this is the entirety of the
+        step 7 repair round in the MCQ verification plan). The removed
+        questions are passed in so the replacements cover the same concepts
+        (coverage is the point of repairing rather than backfilling from
+        spares) while explicitly not repeating their wording. Returns [] on
+        any failure, which leaves the holes unfilled rather than filling them
+        with junk.
+
+        Deliberately does NOT tell the model the previous questions were wrong
+        or hallucinated; models over-correct on that framing into trivially
+        easy questions. It is framed as coverage, never as a correction.
+        """
+        if count <= 0:
+            return []
+
+        if variant == "math":
+            prompt = self._build_math_generation_prompt(
+                notes, count, 0, test_type, difficulty=difficulty, topic_focus=topic_focus,
+                custom_instructions=custom_instructions,
+            )
+        elif variant == "coding":
+            prompt = self._build_coding_generation_prompt(
+                notes, count, 0, test_type, coding_language or "Python", difficulty=difficulty,
+                topic_focus=topic_focus, custom_instructions=custom_instructions,
+            )
+        else:
+            prompt = self._build_source_context_generation_prompt(
+                notes, count, 0, test_type, difficulty=difficulty, topic_focus=topic_focus,
+                custom_instructions=custom_instructions,
+            )
+
+        cleaned_removed = [q.strip() for q in removed_questions if q and q.strip()]
+        if cleaned_removed:
+            coverage_lines = "\n".join(f"- {q}" for q in cleaned_removed[:_VERIFY_BATCH_MAX])
+            prompt = (
+                f"{prompt}\n\n"
+                "COVER THESE SAME CONCEPTS:\n"
+                f"{coverage_lines}\n\n"
+                "Write NEW questions on the same concepts as the questions listed above. Do "
+                "not reuse their wording. Each question must have exactly one option that is "
+                "unambiguously correct according to the source material."
+            )
+
+        # Avoid colliding with either the questions that survived verification or
+        # the ones being replaced.
+        novelty_seen = list(prior_questions or []) + cleaned_removed
+        novelty_block = self._build_novelty_block(novelty_seen)
+        if novelty_block:
+            prompt = f"{prompt}\n\n{novelty_block}"
+
+        try:
+            # One provider attempt via _complete_json. When the caller passes
+            # provider="auto" (or None, which normalizes to "auto"),
+            # _complete_json already walks every candidate provider
+            # internally; that is sufficient and is not a loop this method
+            # owns, so no additional retry or top-up happens here.
+            data = await self._complete_json(prompt, provider=provider)
+        except Exception as exc:
+            logger.warning("MCQ repair: regeneration call failed for %d question(s): %s", count, exc)
+            return []
+
+        mcq, _ = self._parse_generated_test(
+            data, count, 0, notes, math_mode=(variant == "math"), allow_fallback=False,
+        )
+        return mcq
+
     async def generate_flashcards(
         self,
         content: str,

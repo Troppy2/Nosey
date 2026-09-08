@@ -721,3 +721,255 @@ class TestVerifyGeneratedMcqs:
         result, stats = await service.verify_generated_mcqs(questions, "notes")
         assert result == questions
         assert "verification_error" in stats
+
+
+# ── Step 6: regenerate_mcqs_for_topics (the repair generation call) ─────────
+
+class TestRegenerateMcqsForTopics:
+
+    async def test_zero_count_returns_empty_without_calling_provider(self) -> None:
+        llm = LLMService()
+        llm._complete_json = AsyncMock()  # type: ignore[method-assign]
+        result = await llm.regenerate_mcqs_for_topics("notes", ["Old Q?"], count=0)
+        assert result == []
+        llm._complete_json.assert_not_called()
+
+    async def test_happy_path_parses_replacements(self) -> None:
+        llm = LLMService()
+        llm._complete_json = AsyncMock(return_value={
+            "mcq": [
+                {"question_text": "New Q1?", "options": ["A", "B", "C", "D"], "correct_index": 0},
+                {"question_text": "New Q2?", "options": ["A", "B", "C", "D"], "correct_index": 1},
+            ],
+            "frq": [],
+        })
+        result = await llm.regenerate_mcqs_for_topics("notes text", ["Old Q1?", "Old Q2?"], count=2)
+        assert len(result) == 2
+        assert result[0].question_text == "New Q1?"
+
+    async def test_provider_exception_returns_empty(self) -> None:
+        llm = LLMService()
+        llm._complete_json = AsyncMock(side_effect=Exception("provider down"))
+        result = await llm.regenerate_mcqs_for_topics("notes", ["Old Q?"], count=1)
+        assert result == []
+
+    async def test_malformed_json_returns_empty(self) -> None:
+        llm = LLMService()
+        llm._complete_json = AsyncMock(return_value={"wrong_key": "oops"})
+        result = await llm.regenerate_mcqs_for_topics("notes", ["Old Q?"], count=1)
+        assert result == []
+
+    async def test_prompt_does_not_call_it_wrong_or_hallucinated(self) -> None:
+        # Models over-correct on "these were wrong" framing into trivially easy
+        # questions; the prompt must frame the repair as coverage, never as a
+        # correction. The shared prompt builder legitimately says "wrong
+        # answer options" (distractor guidance) elsewhere, so this checks for
+        # the specific accusatory framing, not the bare word "wrong".
+        llm = LLMService()
+        captured: list[str] = []
+
+        async def capture(prompt: str, provider=None):
+            captured.append(prompt)
+            return {"mcq": [], "frq": []}
+
+        llm._complete_json = capture  # type: ignore[method-assign]
+        await llm.regenerate_mcqs_for_topics("notes", ["Old Q?"], count=1)
+        assert len(captured) == 1
+        lowered = captured[0].lower()
+        assert "hallucinat" not in lowered
+        assert "were wrong" not in lowered
+        assert "incorrect answer" not in lowered
+        assert "failed verification" not in lowered
+        # The framing must be coverage: same concepts, new wording.
+        assert "cover these same concepts" in lowered
+
+    async def test_math_variant_uses_math_prompt_builder(self) -> None:
+        llm = LLMService()
+        captured: list[str] = []
+
+        async def capture(prompt: str, provider=None):
+            captured.append(prompt)
+            return {"mcq": [], "frq": []}
+
+        llm._complete_json = capture  # type: ignore[method-assign]
+        await llm.regenerate_mcqs_for_topics("notes", ["Old Q?"], count=1, variant="math")
+        # The math prompt builder includes the KaTeX rendering rules block.
+        assert "KATEX" in captured[0]
+
+
+# ── Step 6: the repair round in verify_generated_mcqs ────────────────────────
+
+def _outcome(kept, dropped_keys=None, questionable_keys=None, stats=None) -> VerificationOutcome:
+    return VerificationOutcome(
+        kept=kept,
+        dropped_keys=dropped_keys or [],
+        questionable_keys=questionable_keys or [],
+        stats=stats or {"calls": 2},
+    )
+
+
+def _verifiable_from(index: int, question: GeneratedMCQ) -> VerifiableMCQ:
+    return VerifiableMCQ(key=index, question_text=question.question_text, options=question.options, correct_index=question.correct_index)
+
+
+class TestRepairRound:
+
+    def _service(self) -> MCQVerificationService:
+        return MCQVerificationService(llm=LLMService())
+
+    async def test_surplus_covers_drop_skips_repair_entirely(self) -> None:
+        # 3 generated (over-generation), 1 dropped, 2 survive >= the 2 requested:
+        # the shortfall is zero, so regenerate_mcqs_for_topics must never fire.
+        questions = [_generated_mcq(f"Q{i}?", 0) for i in range(3)]
+        service = self._service()
+        outcome = _outcome(kept=[_verifiable_from(1, questions[1]), _verifiable_from(2, questions[2])], dropped_keys=[0])
+        service.verify_and_resolve = AsyncMock(return_value=outcome)  # type: ignore[method-assign]
+        service._llm.regenerate_mcqs_for_topics = AsyncMock()  # type: ignore[method-assign]
+
+        result, stats = await service.verify_generated_mcqs(questions, "notes", requested_count=2)
+
+        service._llm.regenerate_mcqs_for_topics.assert_not_called()
+        assert len(result) == 2
+        assert stats["repaired"] == 0
+        assert stats["repair_failed"] == 0
+
+    async def test_two_drops_no_surplus_triggers_one_repair_call(self) -> None:
+        questions = [_generated_mcq(f"Q{i}?", 0) for i in range(2)]
+        service = self._service()
+        main_outcome = _outcome(kept=[], dropped_keys=[0, 1], stats={"calls": 2})
+        replacements = [_generated_mcq("New Q0?", 0), _generated_mcq("New Q1?", 1)]
+        repair_outcome = _outcome(
+            kept=[_verifiable_from(0, replacements[0]), _verifiable_from(1, replacements[1])],
+            stats={"calls": 2},
+        )
+        service.verify_and_resolve = AsyncMock(side_effect=[main_outcome, repair_outcome])  # type: ignore[method-assign]
+        service._llm.regenerate_mcqs_for_topics = AsyncMock(return_value=replacements)  # type: ignore[method-assign]
+
+        result, stats = await service.verify_generated_mcqs(questions, "notes", requested_count=2)
+
+        service._llm.regenerate_mcqs_for_topics.assert_awaited_once()
+        assert service._llm.regenerate_mcqs_for_topics.call_args.kwargs["count"] == 2
+        assert service.verify_and_resolve.await_count == 2
+        assert len(result) == 2
+        assert stats["repaired"] == 2
+        # 2 (main) + 1 (repair generation) + 2 (repair verify) = 5, the bound
+        # this service contributes toward the plan's 6-call worst case (the
+        # 6th being the original generation call, made by the caller before
+        # verify_generated_mcqs is ever invoked).
+        assert stats["calls"] == 5
+
+    async def test_failed_replacement_leaves_hole_empty_and_is_never_re_repaired(self) -> None:
+        questions = [_generated_mcq("Q0?", 0)]
+        service = self._service()
+        main_outcome = _outcome(kept=[], dropped_keys=[0])
+        replacement = [_generated_mcq("New Q0?", 0)]
+        # The replacement itself verifies as a drop (adjudicator/matcher rejects it).
+        repair_outcome = _outcome(kept=[], dropped_keys=[0])
+        service.verify_and_resolve = AsyncMock(side_effect=[main_outcome, repair_outcome])  # type: ignore[method-assign]
+        service._llm.regenerate_mcqs_for_topics = AsyncMock(return_value=replacement)  # type: ignore[method-assign]
+
+        result, stats = await service.verify_generated_mcqs(questions, "notes", requested_count=1)
+
+        assert result == []  # hole stays empty
+        assert stats["repaired"] == 0
+        assert stats["repair_failed"] == 1
+        # Only two verify_and_resolve calls total: no second repair attempt.
+        assert service.verify_and_resolve.await_count == 2
+
+    async def test_replacement_verifying_questionable_counts_as_failed_repair(self) -> None:
+        # Asymmetry vs originals: a replacement that verifies "questionable"
+        # is treated as a failed repair, not kept, because repairing a repair
+        # would be a second round.
+        questions = [_generated_mcq("Q0?", 0)]
+        service = self._service()
+        main_outcome = _outcome(kept=[], dropped_keys=[0])
+        replacement = [_generated_mcq("New Q0?", 0)]
+        repair_verifiable = _verifiable_from(0, replacement[0])
+        repair_outcome = _outcome(kept=[repair_verifiable], questionable_keys=[0])
+        service.verify_and_resolve = AsyncMock(side_effect=[main_outcome, repair_outcome])  # type: ignore[method-assign]
+        service._llm.regenerate_mcqs_for_topics = AsyncMock(return_value=replacement)  # type: ignore[method-assign]
+
+        result, stats = await service.verify_generated_mcqs(questions, "notes", requested_count=1)
+
+        assert result == []
+        assert stats["repair_failed"] == 1
+        assert stats["repaired"] == 0
+
+    async def test_questionable_original_replaced_by_clean_repair(self) -> None:
+        questions = [_generated_mcq("Q0?", 0), _generated_mcq("Q1?", 0)]
+        service = self._service()
+        # Q0 kept normally, Q1 kept but flagged questionable.
+        main_outcome = _outcome(
+            kept=[_verifiable_from(0, questions[0]), _verifiable_from(1, questions[1])],
+            questionable_keys=[1],
+        )
+        replacement = [_generated_mcq("Better Q1?", 2)]
+        repair_outcome = _outcome(kept=[_verifiable_from(0, replacement[0])])
+        service.verify_and_resolve = AsyncMock(side_effect=[main_outcome, repair_outcome])  # type: ignore[method-assign]
+        service._llm.regenerate_mcqs_for_topics = AsyncMock(return_value=replacement)  # type: ignore[method-assign]
+
+        result, stats = await service.verify_generated_mcqs(questions, "notes", requested_count=2)
+
+        assert len(result) == 2
+        assert result[1].question_text == "Better Q1?"
+        assert stats["repaired"] == 1
+
+    async def test_questionable_original_kept_when_replacement_fails(self) -> None:
+        questions = [_generated_mcq("Q0?", 0)]
+        service = self._service()
+        main_outcome = _outcome(kept=[_verifiable_from(0, questions[0])], questionable_keys=[0])
+        replacement = [_generated_mcq("Try2?", 0)]
+        repair_outcome = _outcome(kept=[], dropped_keys=[0])
+        service.verify_and_resolve = AsyncMock(side_effect=[main_outcome, repair_outcome])  # type: ignore[method-assign]
+        service._llm.regenerate_mcqs_for_topics = AsyncMock(return_value=replacement)  # type: ignore[method-assign]
+
+        result, stats = await service.verify_generated_mcqs(questions, "notes", requested_count=1)
+
+        assert len(result) == 1
+        assert result[0].question_text == "Q0?"  # original survives unchanged
+        assert stats["repair_failed"] == 1
+
+    async def test_distrusted_batch_skips_repair(self) -> None:
+        questions = [_generated_mcq(f"Q{i}?", 0) for i in range(4)]
+        service = self._service()
+        outcome = _outcome(
+            kept=[_verifiable_from(i, q) for i, q in enumerate(questions)],
+            stats={"distrusted": True, "calls": 2},
+        )
+        service.verify_and_resolve = AsyncMock(return_value=outcome)  # type: ignore[method-assign]
+        service._llm.regenerate_mcqs_for_topics = AsyncMock()  # type: ignore[method-assign]
+
+        result, stats = await service.verify_generated_mcqs(questions, "notes", requested_count=4)
+
+        service._llm.regenerate_mcqs_for_topics.assert_not_called()
+        assert len(result) == 4
+
+    async def test_repair_disabled_flag_skips_repair(self, monkeypatch) -> None:
+        monkeypatch.setattr("src.services.mcq_verification_service.settings.mcq_verification_repair_enabled", False)
+        questions = [_generated_mcq("Q0?", 0)]
+        service = self._service()
+        outcome = _outcome(kept=[], dropped_keys=[0])
+        service.verify_and_resolve = AsyncMock(return_value=outcome)  # type: ignore[method-assign]
+        service._llm.regenerate_mcqs_for_topics = AsyncMock()  # type: ignore[method-assign]
+
+        result, stats = await service.verify_generated_mcqs(questions, "notes", requested_count=1)
+
+        service._llm.regenerate_mcqs_for_topics.assert_not_called()
+        assert result == []
+
+    async def test_repair_queue_capped_at_five_drops_before_questionables(self) -> None:
+        # 8 dropped, 2 questionable, requested_count high enough that the
+        # shortfall alone exceeds the cap: only 5 drops enter the queue and
+        # zero questionables get a slot.
+        questions = [_generated_mcq(f"Q{i}?", 0) for i in range(10)]
+        service = self._service()
+        main_outcome = _outcome(kept=[], dropped_keys=list(range(8)), questionable_keys=[8, 9])
+        replacements = [_generated_mcq(f"New{i}?", 0) for i in range(5)]
+        repair_outcome = _outcome(kept=[_verifiable_from(i, r) for i, r in enumerate(replacements)])
+        service.verify_and_resolve = AsyncMock(side_effect=[main_outcome, repair_outcome])  # type: ignore[method-assign]
+        service._llm.regenerate_mcqs_for_topics = AsyncMock(return_value=replacements)  # type: ignore[method-assign]
+
+        result, stats = await service.verify_generated_mcqs(questions, "notes", requested_count=10)
+
+        assert service._llm.regenerate_mcqs_for_topics.call_args.kwargs["count"] == 5
+        assert stats["repaired"] == 5
