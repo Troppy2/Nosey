@@ -27,7 +27,7 @@ import asyncio
 import re
 import time
 import unicodedata
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from difflib import SequenceMatcher
 from fractions import Fraction
 from math import ceil
@@ -47,6 +47,15 @@ _MIN_RECORRECT_CONFIDENCE = 0.6
 # ── batch-level safety caps ───────────────────────────────────────────────────
 _MAX_DROP_FRACTION = 0.5
 _MIN_BATCH_FOR_DROPS = 3
+
+# ── the repair round (plan step 7) ────────────────────────────────────────────
+# _MAX_REPAIR_ROUNDS is a documentation constant, not a loop bound: the code
+# below runs the repair block exactly once, with no while and no recursion.
+# A repair round that cannot trigger a repair round cannot loop, whatever the
+# notes contain, which is the direct answer to the todo's rejection of a
+# refill call (extra latency, extra quota, risk of looping).
+_MAX_REPAIR_ROUNDS = 1
+_MAX_REPAIR_ITEMS = 5
 
 # ── matcher thresholds ────────────────────────────────────────────────────────
 _SUBSTRING_LENGTH_FLOOR = 0.6
@@ -280,6 +289,13 @@ class VerificationOutcome:
     kept: list[VerifiableMCQ]
     dropped_keys: list[object]
     stats: dict[str, object]
+    # Keys of items kept specifically on a "questionable" verdict (suspected but
+    # not confidently condemned). Empty by default so existing call sites and
+    # tests built before the repair round need no changes. The repair round
+    # (step 7) uses this to find questionable originals worth replacing, and to
+    # treat a REPLACEMENT that itself verifies questionable as a failed repair
+    # rather than a keep, per the plan's asymmetry between originals and repairs.
+    questionable_keys: list[object] = field(default_factory=list)
 
 
 class MCQVerificationService:
@@ -421,6 +437,7 @@ class MCQVerificationService:
 
         kept: list[VerifiableMCQ] = []
         dropped_keys: list[object] = []
+        questionable_keys: list[object] = []
         for item, (verdict, new_index) in zip(items, verdicts):
             if verdict == "drop":
                 dropped_keys.append(item.key)
@@ -431,6 +448,7 @@ class MCQVerificationService:
                 stats["kept"] = int(stats["kept"]) + 1
             elif verdict == "questionable":
                 kept.append(item)
+                questionable_keys.append(item.key)
                 stats["questionable"] = int(stats["questionable"]) + 1
                 stats["kept"] = int(stats["kept"]) + 1
             else:
@@ -438,7 +456,9 @@ class MCQVerificationService:
                 stats["kept"] = int(stats["kept"]) + 1
 
         stats["duration_ms"] = int((time.monotonic() - start) * 1000)
-        return VerificationOutcome(kept=kept, dropped_keys=dropped_keys, stats=stats)
+        return VerificationOutcome(
+            kept=kept, dropped_keys=dropped_keys, questionable_keys=questionable_keys, stats=stats,
+        )
 
     async def verify_generated_mcqs(
         self,
@@ -448,17 +468,20 @@ class MCQVerificationService:
         provider: Optional[str] = None,
         requested_count: Optional[int] = None,
         coding_language: Optional[str] = None,
+        test_type: str = "MCQ_only",
+        difficulty: str = "mixed",
+        topic_focus: Optional[str] = None,
+        custom_instructions: Optional[str] = None,
+        prior_questions: Optional[list[str]] = None,
     ) -> tuple[list[GeneratedMCQ], dict[str, object]]:
         """Thin GeneratedMCQ <-> VerifiableMCQ wrapper for callers that hold a
         plain list of GeneratedMCQ in memory and have not persisted anything
         yet (integration point A: synchronous test creation). Applies the
-        verification timeout, trims the surviving list to requested_count
-        (generation order preserved, surplus dropped from the tail), and never
-        raises: any internal failure returns the original questions unchanged.
-
-        The step 7 repair round is not wired in here yet. Until it lands, a
-        hole left by a drop is filled only from whatever over-generation
-        surplus is already present in `questions`.
+        verification timeout, runs the ONE-ROUND repair (see the module-level
+        _MAX_REPAIR_ROUNDS comment) when the surplus cannot cover the losses,
+        trims the surviving list to requested_count (generation order
+        preserved, surplus dropped from the tail), and never raises: any
+        internal failure returns the original questions unchanged.
         """
         if not questions:
             return questions, {"verified": 0}
@@ -481,18 +504,121 @@ class MCQVerificationService:
             )
             return questions, {"verified": len(questions), "verification_error": str(exc)}
 
+        # slots: original index -> the surviving question (recorrected if
+        # needed), or None where the item was dropped. Keyed on the original
+        # index (not list position) so a later repair can target a specific
+        # questionable original for replacement without a value search.
+        slots: dict[int, Optional[GeneratedMCQ]] = {}
         kept_by_key = {item.key: item for item in outcome.kept}
-        result: list[GeneratedMCQ] = []
         for index, question in enumerate(questions):
             verified_item = kept_by_key.get(index)
             if verified_item is None:
-                continue  # dropped
-            if verified_item.correct_index != question.correct_index:
-                result.append(replace(question, correct_index=verified_item.correct_index))
+                slots[index] = None
+            elif verified_item.correct_index != question.correct_index:
+                slots[index] = replace(question, correct_index=verified_item.correct_index)
             else:
-                result.append(question)
+                slots[index] = question
+
+        stats: dict[str, object] = dict(outcome.stats)
+        stats["repaired"] = 0
+        stats["repair_failed"] = 0
+
+        repair_enabled = settings.mcq_verification_enabled and settings.mcq_verification_repair_enabled
+        surviving_count = sum(1 for value in slots.values() if value is not None)
+        if (
+            repair_enabled
+            and not outcome.stats.get("distrusted", False)
+            and requested_count is not None
+            and requested_count > 0
+        ):
+            # Drops the surplus already backfilled need no repair; only a real
+            # shortfall does. Questionable originals are queued regardless of
+            # surplus, since they are a quality concern, not a count concern.
+            shortfall = max(0, requested_count - surviving_count)
+            repair_drop_keys = list(outcome.dropped_keys)[:min(shortfall, _MAX_REPAIR_ITEMS)]
+            remaining_budget = max(0, _MAX_REPAIR_ITEMS - len(repair_drop_keys))
+            repair_questionable_keys = [
+                key for key in outcome.questionable_keys if slots.get(key) is not None
+            ][:remaining_budget]
+
+            repair_targets = repair_drop_keys + repair_questionable_keys
+            repair_count = len(repair_targets)
+            if repair_count > 0:
+                removed_texts = [items[key].question_text for key in repair_targets]
+                surviving_texts = [q.question_text for q in slots.values() if q is not None]
+
+                replacements: list[GeneratedMCQ] = []
+                try:
+                    replacements = await self._llm.regenerate_mcqs_for_topics(
+                        notes=source_content,
+                        removed_questions=removed_texts,
+                        count=repair_count,
+                        test_type=test_type,
+                        variant=variant,
+                        difficulty=difficulty,
+                        topic_focus=topic_focus,
+                        custom_instructions=custom_instructions,
+                        coding_language=coding_language,
+                        prior_questions=list(prior_questions or []) + surviving_texts,
+                        provider=provider,
+                    )
+                except Exception as exc:
+                    logger.warning("MCQ repair round: regeneration call failed: %s", exc)
+
+                stats["calls"] = int(stats.get("calls", 0)) + 1  # the repair generation call
+
+                good_replacement_keys: set[int] = set()
+                verified_replacements: dict[int, VerifiableMCQ] = {}
+                if replacements:
+                    repair_items = [
+                        VerifiableMCQ(
+                            key=i, question_text=r.question_text, options=r.options, correct_index=r.correct_index,
+                        )
+                        for i, r in enumerate(replacements)
+                    ]
+                    try:
+                        repair_outcome = await asyncio.wait_for(
+                            self.verify_and_resolve(
+                                repair_items, source_content, variant=variant, provider=provider,
+                                coding_language=coding_language,
+                            ),
+                            timeout=settings.mcq_verification_timeout_seconds,
+                        )
+                        stats["calls"] = int(stats["calls"]) + int(repair_outcome.stats.get("calls", 0))
+                        verified_replacements = {item.key: item for item in repair_outcome.kept}
+                        # A replacement that itself verifies questionable is a
+                        # failed repair too (never re-repaired), unlike an
+                        # original: repairing a repair would be a second round.
+                        good_replacement_keys = (
+                            set(verified_replacements.keys()) - set(repair_outcome.questionable_keys)
+                        )
+                    except Exception as exc:
+                        logger.warning("MCQ repair round: verifying replacements failed: %s", exc)
+
+                next_new_slot = max(slots.keys(), default=-1) + 1
+                for position, target_key in enumerate(repair_targets):
+                    is_drop_hole = position < len(repair_drop_keys)
+                    if position in good_replacement_keys:
+                        fixed = verified_replacements[position]
+                        replacement_mcq = GeneratedMCQ(
+                            question_text=fixed.question_text, options=fixed.options,
+                            correct_index=fixed.correct_index,
+                        )
+                        if is_drop_hole:
+                            slots[next_new_slot] = replacement_mcq
+                            next_new_slot += 1
+                        else:
+                            slots[target_key] = replacement_mcq  # supersedes the questionable original
+                        stats["repaired"] = int(stats["repaired"]) + 1
+                    else:
+                        # Drop hole: stays empty. Questionable slot: the original
+                        # stays exactly where it already is. Either way, never
+                        # re-repaired (_MAX_REPAIR_ROUNDS = 1).
+                        stats["repair_failed"] = int(stats["repair_failed"]) + 1
+
+        result = [slots[key] for key in sorted(slots.keys()) if slots[key] is not None]
 
         if requested_count is not None and requested_count > 0 and len(result) > requested_count:
             result = result[:requested_count]
 
-        return result, outcome.stats
+        return result, stats

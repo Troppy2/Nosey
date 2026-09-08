@@ -221,6 +221,10 @@ class TestService:
                     provider=active_provider,
                     requested_count=requested_mcq_case1,
                     coding_language=coding_language,
+                    test_type=test_type,
+                    difficulty=difficulty,
+                    topic_focus=topic_focus,
+                    custom_instructions=custom_instructions,
                 )
                 generation_meta["mcq_verification"] = verify_stats
         elif practice_test_file is not None:
@@ -303,6 +307,10 @@ class TestService:
                     provider=active_provider,
                     requested_count=count_mcq,
                     coding_language=coding_language,
+                    test_type=test_type,
+                    difficulty=difficulty,
+                    topic_focus=topic_focus,
+                    custom_instructions=custom_instructions,
                 )
                 generation_meta["mcq_verification"] = verify_stats
 
