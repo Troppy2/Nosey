@@ -23,6 +23,7 @@ addition to MCQVerificationService, not a rewrite of it.
 """
 from __future__ import annotations
 
+import asyncio
 import re
 import time
 import unicodedata
@@ -33,7 +34,7 @@ from math import ceil
 from typing import Optional
 
 from src.config import settings
-from src.services.llm_service import DerivedAnswer, LLMService
+from src.services.llm_service import DerivedAnswer, GeneratedMCQ, LLMService
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -438,3 +439,60 @@ class MCQVerificationService:
 
         stats["duration_ms"] = int((time.monotonic() - start) * 1000)
         return VerificationOutcome(kept=kept, dropped_keys=dropped_keys, stats=stats)
+
+    async def verify_generated_mcqs(
+        self,
+        questions: list[GeneratedMCQ],
+        source_content: str,
+        variant: str = "prose",
+        provider: Optional[str] = None,
+        requested_count: Optional[int] = None,
+        coding_language: Optional[str] = None,
+    ) -> tuple[list[GeneratedMCQ], dict[str, object]]:
+        """Thin GeneratedMCQ <-> VerifiableMCQ wrapper for callers that hold a
+        plain list of GeneratedMCQ in memory and have not persisted anything
+        yet (integration point A: synchronous test creation). Applies the
+        verification timeout, trims the surviving list to requested_count
+        (generation order preserved, surplus dropped from the tail), and never
+        raises: any internal failure returns the original questions unchanged.
+
+        The step 7 repair round is not wired in here yet. Until it lands, a
+        hole left by a drop is filled only from whatever over-generation
+        surplus is already present in `questions`.
+        """
+        if not questions:
+            return questions, {"verified": 0}
+
+        items = [
+            VerifiableMCQ(key=index, question_text=q.question_text, options=q.options, correct_index=q.correct_index)
+            for index, q in enumerate(questions)
+        ]
+        try:
+            outcome = await asyncio.wait_for(
+                self.verify_and_resolve(
+                    items, source_content, variant=variant, provider=provider, coding_language=coding_language,
+                ),
+                timeout=settings.mcq_verification_timeout_seconds,
+            )
+        except Exception as exc:
+            logger.warning(
+                "MCQ verification failed or timed out; keeping all %d question(s) unchanged: %s",
+                len(questions), exc,
+            )
+            return questions, {"verified": len(questions), "verification_error": str(exc)}
+
+        kept_by_key = {item.key: item for item in outcome.kept}
+        result: list[GeneratedMCQ] = []
+        for index, question in enumerate(questions):
+            verified_item = kept_by_key.get(index)
+            if verified_item is None:
+                continue  # dropped
+            if verified_item.correct_index != question.correct_index:
+                result.append(replace(question, correct_index=verified_item.correct_index))
+            else:
+                result.append(question)
+
+        if requested_count is not None and requested_count > 0 and len(result) > requested_count:
+            result = result[:requested_count]
+
+        return result, outcome.stats
