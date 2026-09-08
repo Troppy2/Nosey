@@ -14296,9 +14296,19 @@ select.lc-custom-input {
    Matching game
    ============================================================ */
 .match-screen {
-  max-width: 1000px;
+  /* The board is the page. A matching board you have to scroll is broken by
+     definition: you cannot hunt for a pair you cannot see. So the screen is
+     locked to the viewport and the board takes whatever the rail and the
+     reading strip do not, rather than the board growing and the page
+     scrolling. Nothing in here is allowed to overflow. */
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 0.6rem;
+  height: 100dvh;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 1.25rem 1.25rem 2.5rem;
+  padding: 0.9rem 1rem 1rem;
+  overflow: hidden;
 }
 
 .match-loading {
@@ -14324,93 +14334,75 @@ select.lc-custom-input {
   }
 }
 
-/* Header + HUD */
-.match-header {
-  margin-bottom: 1.25rem;
-}
-
-.match-header-row {
+/* Rail: the entire game chrome on one line. The old header stacked a back
+   button, an eyebrow, a serif h1, a round pill and a three-item HUD, which cost
+   roughly 140px of height that the board needed more. */
+.match-rail {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
-}
-
-.match-header-title {
-  flex: 1;
+  gap: 0.7rem;
   min-width: 0;
+  font-size: 0.85rem;
 }
 
-.match-header-title .eyebrow {
-  color: var(--warning);
+.match-rail-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  color: var(--green-dark);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: var(--white);
 }
 
-.match-header-title h1 {
-  margin: 0.1rem 0 0;
-  font-family: var(--font-serif);
-  font-size: 1.5rem;
-  white-space: nowrap;
+.match-rail-back:hover {
+  background: var(--green-lightest);
+}
+
+.match-rail-deck {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.match-round-pill {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.3rem;
-  padding: 0.4rem 0.8rem;
-  border-radius: var(--radius-pill);
-  background: rgba(217, 119, 6, 0.12);
-  color: var(--warning);
-  font-weight: 700;
-  font-size: 0.85rem;
   white-space: nowrap;
-  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--ink);
 }
 
-.match-round-pill span {
-  font-size: 0.72rem;
-  opacity: 0.75;
-}
-
-.match-hud {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.4rem;
-  margin: 1rem 0 0.75rem;
-}
-
-.match-hud-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
+.match-rail-round,
+.match-rail-stat {
+  flex: none;
   color: var(--muted);
-  font-size: 0.85rem;
+  white-space: nowrap;
 }
 
-.match-hud-item svg {
-  color: var(--green-dark);
-}
-
-.match-hud-value {
+.match-rail-stat {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   color: var(--ink);
-  font-size: 0.95rem;
 }
 
-.match-hud-unit {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.match-rail-stat--quiet {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.match-rail-spacer {
+  flex: 1 1 auto;
 }
 
 .match-progress {
-  height: 6px;
+  height: 5px;
 }
 
 /* Board */
 .match-board-wrap {
   position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 0;
   transition: opacity var(--transition-normal), filter var(--transition-normal);
 }
 
@@ -14419,23 +14411,29 @@ select.lc-custom-input {
   filter: saturate(0.6);
 }
 
+/* The board fills its row exactly. Columns come from the tile count via
+   --match-cols, chosen so the count always divides evenly and no ragged final
+   row appears. Rows are 1fr of the remaining height, so tiles shrink to fit the
+   viewport instead of pushing the page taller. */
 .match-board {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.7rem;
+  grid-template-columns: repeat(var(--match-cols, 4), minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 0.55rem;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  /* Ceilings, not sizes: 1fr rows still shrink the tiles when the viewport is
+     short, these just stop them growing into billboards when it is tall. */
+  max-width: calc(var(--match-cols, 4) * 13rem);
+  max-height: calc(var(--match-rows, 3) * 12rem);
+  margin: auto;
 }
 
-@media (min-width: 620px) {
+
+@media (min-width: 720px) {
   .match-board {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.85rem;
-  }
-}
-
-@media (min-width: 900px) {
-  .match-board[data-count="16"],
-  .match-board[data-count="20"] {
-    grid-template-columns: repeat(4, 1fr);
+    gap: 0.7rem;
   }
 }
 
@@ -14443,9 +14441,11 @@ select.lc-custom-input {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  min-height: 96px;
-  padding: 0.7rem 0.75rem;
+  gap: 0.3rem;
+  /* No min-height: the grid row decides how tall a tile is. A floor here is
+     what made the board overflow the viewport. */
+  min-height: 0;
+  padding: 0.6rem 0.65rem;
   border-radius: var(--radius-xl);
   border: 1.5px solid var(--border);
   background: var(--white);
@@ -14459,8 +14459,8 @@ select.lc-custom-input {
 /* Two tile families so the columns read as two things to pair: terms sit on a
    warm cream tint, definitions on white with a green edge. */
 .match-tile--front {
-  background: var(--green-lightest);
-  border-color: var(--green-light);
+  background: var(--green-light);
+  border-color: var(--green-light-mid);
 }
 
 .match-tile--back {
@@ -14479,8 +14479,8 @@ select.lc-custom-input {
 }
 
 .match-tile.is-selected {
-  border-color: var(--warning);
-  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.22);
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.3);
   transform: translateY(-2px);
 }
 
@@ -14541,10 +14541,9 @@ select.lc-custom-input {
 }
 
 .match-tile-side {
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  flex: none;
+  font-size: 0.68rem;
+  font-weight: 600;
   color: var(--muted);
 }
 
@@ -14553,10 +14552,20 @@ select.lc-custom-input {
 }
 
 .match-tile-text {
-  font-size: 0.88rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  font-size: 0.85rem;
   line-height: 1.35;
-  max-height: 5.4em;
-  overflow-y: auto;
+  /* Fades the last line rather than cutting it mid-stroke, so a clipped
+     definition reads as "there is more" instead of as a rendering fault. */
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 1.1em), transparent 100%);
+}
+
+@supports not (mask-image: linear-gradient(#000, #000)) {
+  .match-tile-text {
+    mask-image: none;
+  }
 }
 
 .match-tile-text .kojo-markdown > *:first-child {
@@ -14597,12 +14606,54 @@ select.lc-custom-input {
   }
 }
 
-.match-hint {
-  margin: 1.1rem 0 0;
-  text-align: center;
-  color: var(--muted);
+/* Reading strip. Doubles as the hint line, so showing a clipped definition in
+   full costs no extra chrome and no layout shift: the row is always there. */
+.match-strip {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  /* A reserved height, not a range. If the strip grew when a tile was selected
+     the board above it would resize and every tile would jump under the
+     player's finger mid-move. */
+  height: 4.25rem;
+  /* Scrollable only as a last resort for a pathologically long definition, and
+     never showing scrollbar chrome: visible scrollbars are what this redesign
+     set out to remove. */
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 0.45rem 0.7rem;
   font-size: 0.85rem;
+  text-align: center;
+  justify-content: center;
+  color: var(--muted);
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
+
+.match-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.match-strip.is-reading {
+  justify-content: flex-start;
+  text-align: left;
+  color: var(--ink);
+  background: var(--green-lightest);
+}
+
+.match-strip-side {
+  flex: none;
+  font-weight: 600;
+  color: var(--green-dark);
+}
+
+.match-strip-text {
+  min-width: 0;
+}
+
+.match-strip-text .kojo-markdown > *:first-child { margin-top: 0; }
+.match-strip-text .kojo-markdown > *:last-child { margin-bottom: 0; }
+.match-strip-text .kojo-md-p { margin: 0.15rem 0; }
 
 /* Results */
 .match-results {
@@ -24220,4 +24271,296 @@ button.lc-official-link:disabled:hover {
   flex: 1 1 220px;
   min-width: 0;
   margin-bottom: 0;
+}
+
+/* ── Matching: setup screen ──
+   The front door to the mode. It exists because the game used to just start,
+   auto-planning rounds from the whole class, which left no way to drill the
+   cards you actually keep missing. Deliberately NOT the board's layout: this
+   one is allowed to scroll, because it is a form, not a game. */
+.match-setup-screen {
+  min-height: 100dvh;
+  padding: clamp(1rem, 4vh, 2.5rem) 1rem 2.5rem;
+}
+
+.match-setup {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.match-setup-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 1.4rem;
+}
+
+.match-setup-folder {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--green-dark);
+}
+
+.match-setup-title {
+  margin: 0 0 1.2rem;
+  font-family: var(--font-serif);
+  font-size: clamp(1.5rem, 4vw, 1.9rem);
+  line-height: 1.25;
+  color: var(--ink);
+}
+
+.match-deck-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.7rem;
+}
+
+.match-deck {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.9rem 1rem;
+  text-align: left;
+  background: var(--white);
+  border: 1.5px solid var(--green-light);
+  border-radius: var(--radius-xl);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.match-deck:hover:not(:disabled) {
+  border-color: var(--green-mid);
+  transform: translateY(-1px);
+}
+
+.match-deck:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.match-deck.is-active {
+  background: var(--green-lightest);
+  border-color: var(--green-dark);
+}
+
+.match-deck-icon {
+  color: var(--green-dark);
+}
+
+.match-deck-title {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.match-deck-blurb {
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.match-deck-count {
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--green-dark);
+}
+
+/* Card picker */
+.match-picker {
+  margin-top: 0.8rem;
+  border: 1px solid var(--green-light);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.match-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.55rem 0.8rem;
+  font-size: 0.8rem;
+  color: var(--green-dark);
+  background: var(--green-lightest);
+  border-bottom: 1px solid var(--green-light);
+}
+
+.match-picker-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.match-picker-actions button {
+  padding: 0;
+  font: inherit;
+  color: var(--green-dark);
+  text-decoration: underline;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.match-picker-list {
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.4rem;
+  list-style: none;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.match-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--ink);
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.match-picker-item:hover {
+  background: var(--green-lightest);
+}
+
+.match-picker-item.is-on {
+  background: var(--green-lightest);
+  border-color: var(--green-light-mid);
+}
+
+.match-picker-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 17px;
+  height: 17px;
+  color: var(--white);
+  border: 1.5px solid var(--green-light-mid);
+  border-radius: var(--radius-xs);
+  background: var(--white);
+}
+
+.match-picker-item.is-on .match-picker-check {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+}
+
+.match-picker-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.match-picker-flag {
+  flex: none;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.7rem;
+  color: var(--accent-danger-strong);
+  background: var(--accent-danger-tint);
+  border-radius: var(--radius-pill);
+}
+
+/* Board size */
+.match-size {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-top: 1.2rem;
+}
+
+.match-size-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.match-size-options {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.match-size-btn {
+  width: 38px;
+  height: 34px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--green-dark);
+  background: var(--white);
+  border: 1.5px solid var(--green-light);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.match-size-btn.is-active {
+  color: var(--white);
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+}
+
+.match-setup-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem;
+  margin-top: 1.4rem;
+}
+
+.match-setup-note {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+/* Matching on a phone.
+   columnsForTiles() picks the column count from the tile count alone, which is
+   right on a laptop and wrong on a 390px screen, where 10 tiles would become
+   five 78px columns. Portrait is always two columns and the board fills the
+   space instead of obeying the desktop ceilings. Uses the shared mobile-shell
+   query (rules-gotchas 11a) rather than a fresh max-width breakpoint, so a
+   zoomed-out phone cannot fall into the desktop layout. */
+@media (max-width: 760px), (hover: none) and (pointer: coarse) and (max-width: 1100px) {
+  .match-screen {
+    gap: 0.5rem;
+    padding: 0.6rem 0.7rem 0.7rem;
+    padding-top: calc(0.6rem + env(safe-area-inset-top));
+    padding-bottom: calc(0.7rem + env(safe-area-inset-bottom));
+  }
+
+  .match-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+    max-width: none;
+    max-height: none;
+  }
+
+  .match-tile {
+    padding: 0.5rem 0.55rem;
+  }
+
+  .match-tile-text {
+    font-size: 0.8rem;
+  }
+
+  /* The round counter is the first thing to go: the deck name and the clock
+     are what a player actually glances at mid-game. */
+  .match-rail-round {
+    display: none;
+  }
+
+  /* Taller on a phone: the strip is where a clipped definition is actually
+     read, and at this width that takes more lines. The board shrinks to pay
+     for it, which is the right trade. */
+  .match-strip {
+    height: 6.5rem;
+  }
 }

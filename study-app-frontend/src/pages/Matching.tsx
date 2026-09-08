@@ -1,4 +1,5 @@
-import { ArrowLeft, Puzzle, RotateCcw, Timer, Trophy, Zap } from "lucide-react";
+import { ArrowLeft, Check, ListChecks, Puzzle, RotateCcw, Sparkles, Target, Trophy } from "lucide-react";
+import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -17,17 +18,60 @@ type Tile = {
   text: string;
 };
 
-type Phase = "loading" | "playing" | "roundClear" | "complete";
+type Phase = "loading" | "setup" | "playing" | "roundClear" | "complete";
+type DeckId = "struggling" | "unseen" | "all" | "custom";
 
 const MISMATCH_MS = 700;
 const ROUND_CLEAR_MS = 950;
 
-// Split every card in the folder into rounds of 6 to 10 pairs so the player
-// works through the whole deck. Cards arrive sorted easiest first, so later
-// rounds naturally hold the harder cards (difficulty ramps as you progress).
-function planRoundSizes(total: number): number[] {
-  if (total <= 10) return total > 0 ? [total] : [];
-  const rounds = Math.ceil(total / 10);
+/** Board sizes, in pairs. A board must fit the viewport without scrolling, so
+ *  this is a hard ceiling rather than a suggestion: 6 pairs is 12 tiles, which
+ *  is the most that stays readable at laptop height. */
+const BOARD_SIZES = [4, 5, 6] as const;
+const DEFAULT_BOARD_SIZE = 5;
+
+/** A card counts as struggling on evidence, not on one unlucky tap: it has to
+ *  have been attempted at least twice and missed more than half the time.
+ *  Never-attempted cards are not struggling, they are unseen, and they get
+ *  their own deck. */
+const STRUGGLING_MIN_ATTEMPTS = 2;
+const STRUGGLING_MAX_RATE = 0.5;
+
+/** Tile counts are always even and bounded by BOARD_SIZES, so the column count
+ *  can be chosen to divide evenly and never leave a ragged final row. */
+const COLUMNS_FOR_TILES: Record<number, number> = { 4: 2, 6: 3, 8: 4, 10: 5, 12: 4 };
+
+function columnsForTiles(count: number): number {
+  return COLUMNS_FOR_TILES[count] ?? Math.max(2, Math.ceil(Math.sqrt(count)));
+}
+
+/** Grid shape as CSS custom properties. The board's size ceilings are derived
+ *  from these, so the tiles stay card-shaped instead of stretching to fill a
+ *  tall viewport. */
+function boardVars(tileCount: number): Record<string, number> {
+  const cols = columnsForTiles(tileCount);
+  return { "--match-cols": cols, "--match-rows": Math.max(1, Math.ceil(tileCount / cols)) };
+}
+
+function isStruggling(card: Flashcard): boolean {
+  return (
+    card.attempt_count >= STRUGGLING_MIN_ATTEMPTS &&
+    card.success_rate != null &&
+    card.success_rate < STRUGGLING_MAX_RATE
+  );
+}
+
+function isUnseen(card: Flashcard): boolean {
+  return card.attempt_count === 0;
+}
+
+// Split a deck into rounds of at most `size` pairs. Sizes are balanced rather
+// than greedy, so a 11-card deck at size 5 gives 6 + 5 instead of 5 + 5 + 1,
+// and no round is left as a lonely single pair.
+function planRoundSizes(total: number, size: number): number[] {
+  if (total <= 0) return [];
+  if (total <= size) return [total];
+  const rounds = Math.ceil(total / size);
   const base = Math.floor(total / rounds);
   let remainder = total % rounds;
   const sizes: number[] = [];
@@ -54,14 +98,28 @@ function formatTime(ms: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
+/** Plain-text preview of a card front, for the picker list. */
+function preview(text: string, max = 90): string {
+  const flat = text.replace(/[#*_`>\[\]]/g, "").replace(/\s+/g, " ").trim();
+  return flat.length > max ? `${flat.slice(0, max - 1)}...` : flat;
+}
+
 export default function Matching() {
   const { folderId } = useParams();
   const numericFolderId = folderId ? Number(folderId) : null;
   const { betaMode } = useSettings();
 
   const [folder, setFolder] = useState<Folder | null>(null);
-  const [rounds, setRounds] = useState<Flashcard[][]>([]);
+  const [allCards, setAllCards] = useState<Flashcard[]>([]);
   const [phase, setPhase] = useState<Phase>("loading");
+
+  // Setup choices.
+  const [deckId, setDeckId] = useState<DeckId>("struggling");
+  const [boardSize, setBoardSize] = useState<number>(DEFAULT_BOARD_SIZE);
+  const [customIds, setCustomIds] = useState<Set<number>>(new Set());
+
+  // Run state.
+  const [rounds, setRounds] = useState<Flashcard[][]>([]);
   const [roundIndex, setRoundIndex] = useState(0);
   const [tiles, setTiles] = useState<Tile[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -69,22 +127,82 @@ export default function Matching() {
   const [mismatchKeys, setMismatchKeys] = useState<string[]>([]);
   const [moves, setMoves] = useState(0);
   const [firstTryMatches, setFirstTryMatches] = useState(0);
-  const [totalCards, setTotalCards] = useState(0);
+  const [deckCount, setDeckCount] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [finalTime, setFinalTime] = useState(0);
   const [bestTime, setBestTime] = useState<number | null>(null);
   const [newRecord, setNewRecord] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [missedIds, setMissedIds] = useState<number[]>([]);
 
   const startRef = useRef(0);
   const selectStartRef = useRef(0);
   const mistakesRef = useRef<Record<number, number>>({});
+  // Missed cards for the whole run, not just the current round, so the results
+  // screen can offer to drill exactly what went wrong.
+  const runMissesRef = useRef<Set<number>>(new Set());
   const lockRef = useRef(false);
 
   const bestKey = numericFolderId != null ? scopeKey(`nosey_matching_best_${numericFolderId}`) : "";
+  const sizeKey = scopeKey("nosey_matching_board_size");
 
-  // Build the tile board for a round: one front tile and one back tile per card,
-  // all shuffled together.
+  const struggling = useMemo(() => allCards.filter(isStruggling), [allCards]);
+  const unseen = useMemo(() => allCards.filter(isUnseen), [allCards]);
+
+  const decks = useMemo(
+    () => [
+      {
+        id: "struggling" as DeckId,
+        title: "Cards you keep missing",
+        blurb: "Attempted twice or more, right less than half the time. Worst first.",
+        icon: Target,
+        count: struggling.length,
+      },
+      {
+        id: "unseen" as DeckId,
+        title: "Cards you have not tried",
+        blurb: "Never attempted in any mode.",
+        icon: Sparkles,
+        count: unseen.length,
+      },
+      {
+        id: "all" as DeckId,
+        title: "The whole class",
+        blurb: "Every card, easiest first so it ramps up.",
+        icon: Puzzle,
+        count: allCards.length,
+      },
+      {
+        id: "custom" as DeckId,
+        title: "Pick them yourself",
+        blurb: "Choose exactly which cards go on the board.",
+        icon: ListChecks,
+        count: customIds.size,
+      },
+    ],
+    [struggling.length, unseen.length, allCards.length, customIds.size],
+  );
+
+  const buildDeck = useCallback(
+    (id: DeckId): Flashcard[] => {
+      switch (id) {
+        case "struggling":
+          // Worst success rate first, so the hardest cards are seen while the
+          // player is still fresh.
+          return [...struggling].sort((a, b) => (a.success_rate ?? 0) - (b.success_rate ?? 0));
+        case "unseen":
+          return shuffle(unseen);
+        case "custom":
+          return shuffle(allCards.filter((c) => customIds.has(c.id)));
+        case "all":
+        default:
+          // Easiest first so difficulty ramps across rounds.
+          return [...allCards].sort((a, b) => a.difficulty - b.difficulty);
+      }
+    },
+    [allCards, struggling, unseen, customIds],
+  );
+
   const buildTiles = useCallback((cards: Flashcard[]): Tile[] => {
     const next: Tile[] = [];
     for (const card of cards) {
@@ -108,7 +226,37 @@ export default function Matching() {
     [buildTiles],
   );
 
-  // Load folder + cards, plan the rounds, kick off round one.
+  // Start a run from an explicit list of cards.
+  const startRun = useCallback(
+    (cards: Flashcard[]) => {
+      const sizes = planRoundSizes(cards.length, boardSize);
+      const built: Flashcard[][] = [];
+      let cursor = 0;
+      for (const size of sizes) {
+        built.push(shuffle(cards.slice(cursor, cursor + size)));
+        cursor += size;
+      }
+      setRounds(built);
+      setDeckCount(cards.length);
+      setRoundIndex(0);
+      setMoves(0);
+      setFirstTryMatches(0);
+      setNewRecord(false);
+      setMissedIds([]);
+      runMissesRef.current = new Set();
+      startRef.current = Date.now();
+      setElapsed(0);
+      if (built.length === 0) {
+        setPhase("setup");
+        return;
+      }
+      startRound(0, built);
+    },
+    [boardSize, startRound],
+  );
+
+  // Load the class and its cards, then stop at the setup screen. The game no
+  // longer auto-starts: choosing the deck is the point.
   useEffect(() => {
     if (numericFolderId == null) return;
     let active = true;
@@ -117,35 +265,21 @@ export default function Matching() {
       .then(([folders, cards]) => {
         if (!active) return;
         setFolder(folders.find((f) => f.id === numericFolderId) ?? null);
-        // Easiest first so difficulty ramps up across rounds.
-        const ordered = [...cards].sort((a, b) => a.difficulty - b.difficulty);
-        const sizes = planRoundSizes(ordered.length);
-        const built: Flashcard[][] = [];
-        let cursor = 0;
-        for (const size of sizes) {
-          built.push(shuffle(ordered.slice(cursor, cursor + size)));
-          cursor += size;
-        }
-        setRounds(built);
-        setTotalCards(ordered.length);
+        setAllCards(cards);
         const storedBest = localStorage.getItem(bestKey);
         setBestTime(storedBest !== null ? Number(storedBest) : null);
-        if (built.length === 0) {
-          setPhase("complete");
-          return;
-        }
-        setRoundIndex(0);
-        setMoves(0);
-        setFirstTryMatches(0);
-        setNewRecord(false);
-        startRef.current = Date.now();
-        setElapsed(0);
-        startRound(0, built);
+        const storedSize = Number(localStorage.getItem(sizeKey));
+        if (BOARD_SIZES.includes(storedSize as (typeof BOARD_SIZES)[number])) setBoardSize(storedSize);
+        // Land on a deck that actually has cards in it.
+        const strugglingCount = cards.filter(isStruggling).length;
+        const unseenCount = cards.filter(isUnseen).length;
+        setDeckId(strugglingCount >= 2 ? "struggling" : unseenCount >= 2 ? "unseen" : "all");
+        setPhase("setup");
       })
       .catch((err) => {
         if (!active) return;
         setLoadError(err instanceof Error ? err.message : "Could not load this class.");
-        setPhase("complete");
+        setPhase("setup");
       });
     return () => {
       active = false;
@@ -153,12 +287,10 @@ export default function Matching() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [numericFolderId]);
 
-  // Live timer, frozen once the game completes.
+  // Live timer, frozen once the run completes.
   useEffect(() => {
-    if (phase === "loading" || phase === "complete") return;
-    const id = window.setInterval(() => {
-      setElapsed(Date.now() - startRef.current);
-    }, 200);
+    if (phase === "loading" || phase === "setup" || phase === "complete") return;
+    const id = window.setInterval(() => setElapsed(Date.now() - startRef.current), 200);
     return () => window.clearInterval(id);
   }, [phase]);
 
@@ -166,6 +298,7 @@ export default function Matching() {
     const total = Date.now() - startRef.current;
     setFinalTime(total);
     setElapsed(total);
+    setMissedIds([...runMissesRef.current]);
     setPhase("complete");
     if (bestTime == null || total < bestTime) {
       setBestTime(total);
@@ -173,19 +306,6 @@ export default function Matching() {
       if (bestKey) localStorage.setItem(bestKey, String(total));
     }
   }, [bestTime, bestKey]);
-
-  const handlePlayAgain = useCallback(() => {
-    // Reshuffle the same deck into fresh rounds and reset the run.
-    const reshuffled = rounds.map((round) => shuffle(round));
-    setRounds(reshuffled);
-    setRoundIndex(0);
-    setMoves(0);
-    setFirstTryMatches(0);
-    setNewRecord(false);
-    startRef.current = Date.now();
-    setElapsed(0);
-    startRound(0, reshuffled);
-  }, [rounds, startRound]);
 
   const advanceRound = useCallback(() => {
     const next = roundIndex + 1;
@@ -222,7 +342,6 @@ export default function Matching() {
     setMoves((m) => m + 1);
 
     if (first.cardId === tile.cardId) {
-      // Correct pair. Record it as a flashcard attempt for the difficulty system.
       const clean = (mistakesRef.current[tile.cardId] ?? 0) === 0;
       if (clean) setFirstTryMatches((n) => n + 1);
       if (numericFolderId != null) {
@@ -244,9 +363,10 @@ export default function Matching() {
       return;
     }
 
-    // Wrong pair. Flash both, penalize both cards, then reset.
     mistakesRef.current[first.cardId] = (mistakesRef.current[first.cardId] ?? 0) + 1;
     mistakesRef.current[tile.cardId] = (mistakesRef.current[tile.cardId] ?? 0) + 1;
+    runMissesRef.current.add(first.cardId);
+    runMissesRef.current.add(tile.cardId);
     lockRef.current = true;
     setMismatchKeys([first.key, tile.key]);
     window.setTimeout(() => {
@@ -256,29 +376,34 @@ export default function Matching() {
     }, MISMATCH_MS);
   }
 
-  const accuracy = totalCards > 0 ? Math.round((firstTryMatches / totalCards) * 100) : 0;
+  const accuracy = deckCount > 0 ? Math.round((firstTryMatches / deckCount) * 100) : 0;
   const roundCount = rounds.length;
+  const activeDeck = decks.find((d) => d.id === deckId);
+  const selectedTile = selectedKey ? tiles.find((t) => t.key === selectedKey) ?? null : null;
 
   if (numericFolderId == null) return <Navigate to="/flashcards" replace />;
   if (!betaMode) return <Navigate to={`/flashcards/${numericFolderId}`} replace />;
 
-  // The board itself is the loading state: face-down tiles shimmering in the
-  // real board grid while the deck shuffles, under the spinning puzzle piece.
   if (phase === "loading") {
     return (
-      <div className="page page-narrow">
-        <div className="match-loading match-loading--with-board">
-          <Puzzle size={30} />
-          <p className="muted">Shuffling the board.</p>
+      <div className="match-screen">
+        <div className="match-rail">
+          <Skeleton width="140px" height="1rem" />
         </div>
-        <div className="match-board" data-count={12} role="status" aria-label="Shuffling the board">
-          {Array.from({ length: 12 }, (_, i) => (
-            <div className="skel-match-tile" key={i} aria-hidden="true">
-              <Skeleton width={`${[64, 48, 72, 44, 58, 68, 40, 62, 52, 70, 46, 60][i]}%`} height="0.8rem" />
-              <Skeleton width="34%" height="0.65rem" />
-            </div>
-          ))}
+        <div className="progress-track match-progress">
+          <div className="progress-fill" style={{ width: "0%" }} />
         </div>
+        <div className="match-board-wrap">
+          <div className="match-board" style={boardVars(10) as unknown as CSSProperties} role="status" aria-label="Loading">
+            {Array.from({ length: 10 }, (_, i) => (
+              <div className="skel-match-tile" key={i} aria-hidden="true">
+                <Skeleton width={`${[64, 48, 72, 44, 58, 68, 40, 62, 52, 70][i]}%`} height="0.8rem" />
+                <Skeleton width="34%" height="0.65rem" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <p className="match-strip muted">Loading your cards.</p>
       </div>
     );
   }
@@ -300,13 +425,13 @@ export default function Matching() {
     );
   }
 
-  if (phase === "complete" && totalCards === 0) {
+  if (phase === "setup" && allCards.length < 2) {
     return (
       <div className="page page-narrow">
         <EmptyState
           icon={<Puzzle />}
-          title="Nothing to match yet"
-          body="This class has no flashcards. Add or generate some, then come back to play."
+          title="Not enough cards to match"
+          body="Matching needs at least two flashcards in this class. Add or generate some, then come back."
           action={
             <Link to={`/flashcards/${numericFolderId}`}>
               <Button>Back to modes</Button>
@@ -317,7 +442,141 @@ export default function Matching() {
     );
   }
 
+  // ---------------- Setup ----------------
+  if (phase === "setup") {
+    const chosen = buildDeck(deckId);
+    const canStart = chosen.length >= 2;
+    const roundPlan = planRoundSizes(chosen.length, boardSize);
+
+    return (
+      <div className="match-setup-screen">
+        <div className="match-setup">
+          <div className="match-setup-head">
+            <Link
+              className="flash-back-btn"
+              to={`/flashcards/${numericFolderId}`}
+              aria-label="Back to modes"
+              title="Back to modes"
+            >
+              <ArrowLeft size={18} />
+            </Link>
+            <p className="match-setup-folder">{folder?.name ?? "Matching"}</p>
+          </div>
+
+          <h1 className="match-setup-title">What do you want to drill?</h1>
+
+          <div className="match-deck-grid">
+            {decks.map((deck) => {
+              const Icon = deck.icon;
+              const isPicker = deck.id === "custom";
+              const empty = deck.count < 2 && !isPicker;
+              return (
+                <button
+                  key={deck.id}
+                  type="button"
+                  className={`match-deck${deckId === deck.id ? " is-active" : ""}`}
+                  disabled={empty}
+                  onClick={() => setDeckId(deck.id)}
+                >
+                  <Icon size={18} className="match-deck-icon" />
+                  <span className="match-deck-title">{deck.title}</span>
+                  <span className="match-deck-blurb">{deck.blurb}</span>
+                  <span className="match-deck-count">
+                    {empty
+                      ? "Nothing here yet"
+                      : isPicker && deck.count === 0
+                        ? "Choose cards"
+                        : `${deck.count} card${deck.count === 1 ? "" : "s"}`}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {deckId === "custom" ? (
+            <div className="match-picker">
+              <div className="match-picker-head">
+                <span>
+                  {customIds.size} of {allCards.length} chosen
+                </span>
+                <div className="match-picker-actions">
+                  <button type="button" onClick={() => setCustomIds(new Set(allCards.map((c) => c.id)))}>
+                    Select all
+                  </button>
+                  <button type="button" onClick={() => setCustomIds(new Set())}>
+                    Clear
+                  </button>
+                </div>
+              </div>
+              {/* The only scrolling surface in the whole mode, and it is a list,
+                  not the board. */}
+              <ul className="match-picker-list">
+                {allCards.map((card) => {
+                  const on = customIds.has(card.id);
+                  return (
+                    <li key={card.id}>
+                      <button
+                        type="button"
+                        className={`match-picker-item${on ? " is-on" : ""}`}
+                        onClick={() =>
+                          setCustomIds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(card.id)) next.delete(card.id);
+                            else next.add(card.id);
+                            return next;
+                          })
+                        }
+                        aria-pressed={on}
+                      >
+                        <span className="match-picker-check">{on ? <Check size={13} /> : null}</span>
+                        <span className="match-picker-text">{preview(card.front)}</span>
+                        {isStruggling(card) ? <span className="match-picker-flag">missed</span> : null}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
+
+          <div className="match-size">
+            <span className="match-size-label">Pairs on the board</span>
+            <div className="match-size-options" role="group" aria-label="Pairs on the board">
+              {BOARD_SIZES.map((size) => (
+                <button
+                  key={size}
+                  type="button"
+                  className={`match-size-btn${boardSize === size ? " is-active" : ""}`}
+                  aria-pressed={boardSize === size}
+                  onClick={() => {
+                    setBoardSize(size);
+                    localStorage.setItem(sizeKey, String(size));
+                  }}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="match-setup-foot">
+            <Button disabled={!canStart} onClick={() => startRun(chosen)}>
+              Start matching
+            </Button>
+            <p className="match-setup-note">
+              {canStart
+                ? `${chosen.length} cards, ${roundPlan.length} round${roundPlan.length === 1 ? "" : "s"}.`
+                : "Choose at least two cards."}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---------------- Results ----------------
   if (phase === "complete") {
+    const missedCards = allCards.filter((c) => missedIds.includes(c.id));
     return (
       <div className="page page-narrow">
         <Card className="match-results">
@@ -326,8 +585,8 @@ export default function Matching() {
           </span>
           <h1>Board cleared</h1>
           <p className="muted">
-            You matched all {totalCards} card{totalCards === 1 ? "" : "s"} across {roundCount} round
-            {roundCount === 1 ? "" : "s"}.
+            {deckCount} card{deckCount === 1 ? "" : "s"} from {activeDeck?.title.toLowerCase() ?? "your deck"},
+            across {roundCount} round{roundCount === 1 ? "" : "s"}.
           </p>
 
           {newRecord ? <span className="match-record-flag">New best time</span> : null}
@@ -352,8 +611,17 @@ export default function Matching() {
           </div>
 
           <div className="button-row">
-            <Button icon={<RotateCcw size={18} />} onClick={handlePlayAgain}>
-              Play again
+            {missedCards.length >= 2 ? (
+              <Button icon={<Target size={18} />} onClick={() => startRun(shuffle(missedCards))}>
+                Drill the {missedCards.length} you missed
+              </Button>
+            ) : (
+              <Button icon={<RotateCcw size={18} />} onClick={() => startRun(buildDeck(deckId))}>
+                Play again
+              </Button>
+            )}
+            <Button variant="secondary" onClick={() => setPhase("setup")}>
+              Change deck
             </Button>
             <Link to={`/flashcards/${numericFolderId}`}>
               <Button variant="secondary">Back to modes</Button>
@@ -364,57 +632,40 @@ export default function Matching() {
     );
   }
 
+  // ---------------- Board ----------------
   const roundSize = rounds[roundIndex]?.length ?? 0;
   const clearedThisRound = matchedCards.size;
 
   return (
     <div className="match-screen">
-      <header className="match-header">
-        <div className="match-header-row">
-          <Link
-            className="flash-back-btn"
-            to={`/flashcards/${numericFolderId}`}
-            aria-label="Back to modes"
-            title="Back to modes"
-          >
-            <ArrowLeft size={18} />
-          </Link>
-          <div className="match-header-title">
-            <span className="eyebrow">Matching</span>
-            <h1>{folder?.name ?? "Matching"}</h1>
-          </div>
-          <div className="match-round-pill">
-            Round {roundIndex + 1}
-            <span>/ {roundCount}</span>
-          </div>
-        </div>
-
-        <div className="match-hud">
-          <span className="match-hud-item">
-            <Timer size={15} />
-            <span className="match-hud-value">{formatTime(elapsed)}</span>
-          </span>
-          <span className="match-hud-item">
-            <Zap size={15} />
-            <span className="match-hud-value">{moves}</span>
-            <span className="match-hud-unit">moves</span>
-          </span>
-          <span className="match-hud-item">
-            <Trophy size={15} />
-            <span className="match-hud-value">{bestTime != null ? formatTime(bestTime) : "-"}</span>
-            <span className="match-hud-unit">best</span>
-          </span>
-        </div>
-        <div className="progress-track match-progress">
-          <div
-            className="progress-fill"
-            style={{ width: `${roundSize ? (clearedThisRound / roundSize) * 100 : 0}%` }}
-          />
-        </div>
+      {/* One thin rail. Every pixel not spent here is a pixel the board gets. */}
+      <header className="match-rail">
+        <Link
+          className="match-rail-back"
+          to={`/flashcards/${numericFolderId}`}
+          aria-label="Back to modes"
+          title="Back to modes"
+        >
+          <ArrowLeft size={17} />
+        </Link>
+        <span className="match-rail-deck">{activeDeck?.title ?? "Matching"}</span>
+        <span className="match-rail-round">
+          Round {roundIndex + 1} of {roundCount}
+        </span>
+        <span className="match-rail-spacer" />
+        <span className="match-rail-stat">{formatTime(elapsed)}</span>
+        <span className="match-rail-stat match-rail-stat--quiet">{moves} moves</span>
       </header>
 
+      <div className="progress-track match-progress">
+        <div
+          className="progress-fill"
+          style={{ width: `${roundSize ? (clearedThisRound / roundSize) * 100 : 0}%` }}
+        />
+      </div>
+
       <main className={`match-board-wrap ${phase === "roundClear" ? "is-clearing" : ""}`}>
-        <div className="match-board" data-count={tiles.length}>
+        <div className="match-board" style={boardVars(tiles.length) as unknown as CSSProperties}>
           {tiles.map((tile) => {
             const isMatched = matchedCards.has(tile.cardId);
             const isSelected = selectedKey === tile.key;
@@ -445,7 +696,20 @@ export default function Matching() {
         ) : null}
       </main>
 
-      <p className="match-hint">Tap a term, then tap its matching definition.</p>
+      {/* The hint line doubles as the reader: tiles clamp long definitions, and
+          the one you have selected is shown here in full. */}
+      <div className={`match-strip${selectedTile ? " is-reading" : ""}`} aria-live="polite">
+        {selectedTile ? (
+          <>
+            <span className="match-strip-side">{selectedTile.side === "front" ? "Term" : "Definition"}</span>
+            <span className="match-strip-text">
+              <MarkdownContent content={selectedTile.text} />
+            </span>
+          </>
+        ) : (
+          <span className="muted">Tap a term, then tap its matching definition.</span>
+        )}
+      </div>
     </div>
   );
 }
