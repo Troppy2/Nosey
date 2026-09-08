@@ -8,13 +8,16 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.datastructures import UploadFile
 
+from src.config import settings
 from src.database import async_session_maker, get_session
 from src.limiter import limiter
 from src.dependencies import get_current_user
 from src.models.folder import Folder
 from src.models.folder_file import FolderFile
+from src.models.question import Question
 from src.models.test import Test
 from src.models.user import User
+from src.models.user_attempt import UserAttempt
 from src.repositories.test_repository import TestRepository
 from src.repositories.usage_event_repository import UsageEventRepository
 from src.schemas.test_schema import (
@@ -33,6 +36,7 @@ from src.services.file_service import FileService
 from src.services.grading_service import GradingService
 from src.services.kojo_context_cache import invalidate_folder
 from src.services.llm_service import LLMService
+from src.services.mcq_verification_service import MCQVerificationService, VerifiableMCQ, inflated_mcq_count
 from src.services.test_service import TestService
 from src.utils.exceptions import LLMException, ResourceNotFoundException, StudyAppException
 from src.utils.logger import get_logger
@@ -95,6 +99,171 @@ async def _persist_generated(
         await repo.add_frq_question(test_id, item.question_text, display_order, item.expected_answer)
         display_order += 1
     return display_order
+
+
+async def _verify_persisted_mcqs(
+    test_id: int,
+    source_content: str,
+    variant: str,
+    provider: Optional[str],
+    requested_mcq: int,
+    coding_language: Optional[str],
+    test_type: str,
+    difficulty: str,
+    topic_focus: Optional[str],
+    custom_instructions: Optional[str],
+) -> None:
+    """MCQ truthfulness verification reconciliation phase, run AFTER every
+    question has already been persisted (streamed or blob) and BEFORE the
+    test flips to "ready". The streamed path can never take a question back
+    once emitted (rule 6a), so verification here works directly against the
+    database rather than against an in-memory list: read the current rows,
+    close the session, do all LLM work with no session open, then apply the
+    result in a second session with a single commit.
+
+    Best effort: this function can raise (a DB error mid-write, for example),
+    and the caller wraps this call in its own try/except so a failure here
+    always leaves the test exactly as generated, never blocks it from
+    reaching "ready". MCQVerificationService.verify_and_repair is itself
+    fail-open for every LLM failure or timeout.
+    """
+    if requested_mcq <= 0:
+        return
+
+    # Read phase: no session held across the LLM work below.
+    async with async_session_maker() as session:
+        repo = TestRepository(session)
+        test = await repo.get_with_questions(test_id)
+        if test is None:
+            return  # deleted mid-generation; delete-as-cancel
+
+        mcq_rows = [q for q in test.questions if q.question_type == "MCQ"]
+        items: list[VerifiableMCQ] = []
+        for question in mcq_rows:
+            correct_positions = [i for i, opt in enumerate(question.mcq_options) if opt.is_correct]
+            if len(correct_positions) != 1:
+                continue  # zero or multiple correct options: skip, not repaired here
+            items.append(VerifiableMCQ(
+                key=question.id,
+                question_text=question.question_text,
+                options=[opt.option_text for opt in question.mcq_options],
+                correct_index=correct_positions[0],
+            ))
+
+    if not items:
+        return
+
+    # LLM work: no session open. Up to six calls in the worst case (see the
+    # plan's repair round), never inside a provider or retry loop.
+    verifier = MCQVerificationService()
+    kept, dropped_keys, new_items, stats = await verifier.verify_and_repair(
+        items, source_content, variant=variant, provider=provider, coding_language=coding_language,
+        requested_count=requested_mcq, test_type=test_type, difficulty=difficulty,
+        topic_focus=topic_focus, custom_instructions=custom_instructions,
+    )
+    logger.info("MCQ verification for test_id=%s: %s", test_id, stats)
+
+    if not dropped_keys and not new_items and stats.get("recorrected", 0) == 0:
+        return  # nothing to write
+
+    # Write phase: one session, one commit.
+    async with async_session_maker() as session:
+        test = await session.get(Test, test_id)
+        if test is None:
+            return  # deleted mid-verification; delete-as-cancel
+
+        repo = TestRepository(session)
+        test_with_qs = await repo.get_with_questions(test_id)
+        if test_with_qs is None:
+            return
+        mcq_by_id: dict[int, Question] = {
+            q.id: q for q in test_with_qs.questions if q.question_type == "MCQ"
+        }
+
+        has_attempts = bool(
+            await session.scalar(select(UserAttempt.id).where(UserAttempt.test_id == test_id).limit(1))
+        )
+
+        kept_by_key = {item.key: item for item in kept}
+
+        # 1. Recorrections. Always safe, even with attempts: it fixes the key
+        # for future attempts and does not change which questions exist.
+        for question_id, question in mcq_by_id.items():
+            verified = kept_by_key.get(question_id)
+            if verified is None:
+                continue
+            current_correct = next(
+                (i for i, opt in enumerate(question.mcq_options) if opt.is_correct), None
+            )
+            if current_correct != verified.correct_index:
+                new_options = [
+                    (opt.option_text, i == verified.correct_index)
+                    for i, opt in enumerate(question.mcq_options)
+                ]
+                await repo.update_mcq_options(question, new_options)
+
+        if has_attempts:
+            # Never change the question set once a student has answered
+            # something: no deletes, no supersedes, no repair inserts.
+            if dropped_keys or new_items:
+                logger.info(
+                    "MCQ verification: test_id=%s has attempts; skipping %d drop(s) and "
+                    "%d repair insert(s), recorrections only",
+                    test_id, len(dropped_keys), len(new_items),
+                )
+            await session.commit()
+            return
+
+        # 2. Drops (true drops plus superseded questionable originals).
+        surviving_spares: list[Question] = []
+        for question_id, question in mcq_by_id.items():
+            if question_id in dropped_keys:
+                await repo.delete_question(question)
+            else:
+                surviving_spares.append(question)
+
+        # 3. Repair inserts, at the tail, before resequencing.
+        next_order = await repo.get_max_display_order(test_id) + 1
+        inserted_questions: list[Question] = []
+        for new_item in new_items:
+            options = [
+                (option_text, index == new_item.correct_index)
+                for index, option_text in enumerate(new_item.options)
+            ]
+            inserted = await repo.add_mcq_question(test_id, new_item.question_text, next_order, options)
+            inserted_questions.append(inserted)
+            next_order += 1
+
+        # 4. Surplus trim: spares before repairs. A repaired question covers
+        # material the test would otherwise have lost; a spare does not.
+        surplus = (len(surviving_spares) + len(inserted_questions)) - requested_mcq
+        if surplus > 0:
+            spares_desc = sorted(surviving_spares, key=lambda q: q.display_order, reverse=True)
+            for question in spares_desc[:surplus]:
+                await repo.delete_question(question)
+            remaining_surplus = surplus - len(spares_desc[:surplus])
+            if remaining_surplus > 0:
+                repairs_desc = sorted(inserted_questions, key=lambda q: q.display_order, reverse=True)
+                for question in repairs_desc[:remaining_surplus]:
+                    await repo.delete_question(question)
+
+        # 5. Resequence display_order over every remaining question (any type)
+        # so the take-test screen has no gaps.
+        await session.flush()
+        remaining_stmt = (
+            select(Question).where(Question.test_id == test_id).order_by(Question.display_order)
+        )
+        remaining_questions = list((await session.scalars(remaining_stmt)).all())
+        for index, question in enumerate(remaining_questions, start=1):
+            question.display_order = index
+
+        # 6. expected_question_count reflects the final total. A drop
+        # legitimately lowers it; leaving it high strands the student on a
+        # spinner slot that never resolves (GH #35).
+        if test is not None:
+            test.expected_question_count = len(remaining_questions)
+
+        await session.commit()
 
 
 # Number of questions in the first streamed batch. Kept small so the very first
@@ -202,8 +371,13 @@ async def _generate_questions_background(
     try:
         # Effective MCQ/FRQ counts after applying test-type rules. Used to decide
         # the streaming split and the first-batch sizes.
-        eff_mcq = 0 if test_type == "FRQ_only" else count_mcq
+        eff_mcq_requested = 0 if test_type == "FRQ_only" else count_mcq
         eff_frq = 0 if test_type in ("MCQ_only", "Extreme") else count_frq
+        # Over-generate MCQs so MCQ verification (below) has slack to absorb
+        # drops without the test coming up short. expected_question_count (set
+        # by the route handler) always uses the un-inflated request; only the
+        # count actually GENERATED here is inflated.
+        eff_mcq = inflated_mcq_count(eff_mcq_requested)
         total_main = eff_mcq + eff_frq
 
         # Stream in two phases (small first batch, then the rest) only when the test
@@ -274,7 +448,7 @@ async def _generate_questions_background(
                 if leftover_mcq or leftover_frq:
                     display_order = await persist_batch(leftover_mcq, leftover_frq, display_order)
         else:
-            mcq_questions, frq_questions = await run_generation(count_mcq, count_frq, prior_questions)
+            mcq_questions, frq_questions = await run_generation(eff_mcq, count_frq, prior_questions)
             display_order = await persist_batch(mcq_questions, frq_questions, display_order)
 
         # Extra (beta) question types. Isolated and best-effort: a failure here
@@ -316,6 +490,34 @@ async def _generate_questions_background(
                 logger.warning(
                     "Extra question types failed for test_id=%s (test still valid): %s",
                     test_id, extra_exc,
+                )
+
+        # MCQ truthfulness verification. Runs after every question is persisted
+        # (streamed questions cannot be taken back, rule 6a, so this is a
+        # reconciliation phase against the database) and BEFORE the test flips
+        # to "ready", so a student never sees a verified-bad question in a
+        # finished test. Best effort: any failure leaves the test exactly as
+        # generated (see MCQVerificationService.verify_and_repair). Excluded
+        # for the parse-practice-test-only path: its answer key comes from the
+        # source document the student supplied, not model invention.
+        if settings.mcq_verification_enabled and not is_parse_only:
+            try:
+                await _verify_persisted_mcqs(
+                    test_id=test_id,
+                    source_content=notes_content or practice_test_content,
+                    variant=("math" if is_math_mode else "coding" if is_coding_mode else "prose"),
+                    provider=provider,
+                    requested_mcq=eff_mcq_requested,
+                    coding_language=coding_language,
+                    test_type=test_type,
+                    difficulty=difficulty,
+                    topic_focus=topic_focus,
+                    custom_instructions=custom_instructions,
+                )
+            except Exception as verify_exc:
+                logger.warning(
+                    "MCQ verification failed for test_id=%s (test kept as generated): %s",
+                    test_id, verify_exc,
                 )
 
         async with async_session_maker() as session:
