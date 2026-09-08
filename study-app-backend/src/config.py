@@ -56,6 +56,15 @@ class Settings(BaseSettings):
     llm_generation_timeout_seconds: int = Field(default=180, alias="LLM_GENERATION_TIMEOUT_SECONDS")
     llm_uncertainty_threshold: float = Field(default=0.6, alias="LLM_UNCERTAINTY_THRESHOLD")
     llm_provider: str = Field(default="auto", alias="LLM_PROVIDER")
+    # MCQ truthfulness verification (see .claude/todos-features/mcq-verification-implementation-plan.md).
+    # mcq_verification_enabled is the full bypass: false means zero behavior change, zero extra
+    # calls, no over-generation. mcq_verification_repair_enabled is the intermediate lever: it
+    # sheds the most expensive part (the regenerate-and-reverify round) while checking still runs.
+    mcq_verification_enabled: bool = Field(default=True, alias="MCQ_VERIFICATION_ENABLED")
+    mcq_verification_repair_enabled: bool = Field(default=True, alias="MCQ_VERIFICATION_REPAIR_ENABLED")
+    mcq_verification_modules_enabled: bool = Field(default=True, alias="MCQ_VERIFICATION_MODULES_ENABLED")
+    mcq_verification_overgen_ratio: float = Field(default=1.3, alias="MCQ_VERIFICATION_OVERGEN_RATIO")
+    mcq_verification_timeout_seconds: int = Field(default=60, alias="MCQ_VERIFICATION_TIMEOUT_SECONDS")
     qdrant_url: Optional[str] = Field(default=None, alias="QDRANT_URL")
     qdrant_api_key: Optional[str] = Field(default=None, alias="QDRANT_API_KEY")
     qdrant_collection: str = Field(default="nosey_rag", alias="QDRANT_COLLECTION")

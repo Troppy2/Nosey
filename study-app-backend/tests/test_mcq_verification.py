@@ -585,3 +585,38 @@ class TestVerifyAndResolveOrchestration:
         outcome = await service.verify_and_resolve(items, "notes")
         llm.adjudicate_mcq_matches.assert_not_called()
         assert len(outcome.kept) == 1
+
+
+# ── Step 4: over-generation config ────────────────────────────────────────────
+
+from src.services.mcq_verification_service import inflated_mcq_count  # noqa: E402
+
+
+class TestInflatedMcqCount:
+
+    def test_disabled_returns_request_unchanged(self, monkeypatch) -> None:
+        monkeypatch.setattr("src.services.mcq_verification_service.settings.mcq_verification_enabled", False)
+        assert inflated_mcq_count(10) == 10
+
+    def test_zero_or_negative_returns_unchanged(self) -> None:
+        assert inflated_mcq_count(0) == 0
+        assert inflated_mcq_count(-5) == -5
+
+    def test_default_ratio_inflates_within_plus_five_cap(self, monkeypatch) -> None:
+        monkeypatch.setattr("src.services.mcq_verification_service.settings.mcq_verification_enabled", True)
+        monkeypatch.setattr("src.services.mcq_verification_service.settings.mcq_verification_overgen_ratio", 1.3)
+        # 10 * 1.3 = 13, within the +5 cap.
+        assert inflated_mcq_count(10) == 13
+
+    def test_large_request_capped_at_plus_five(self, monkeypatch) -> None:
+        monkeypatch.setattr("src.services.mcq_verification_service.settings.mcq_verification_enabled", True)
+        monkeypatch.setattr("src.services.mcq_verification_service.settings.mcq_verification_overgen_ratio", 1.3)
+        # 40 * 1.3 = 52, but the +5 cap wins first: 40 + 5 = 45.
+        assert inflated_mcq_count(40) == 45
+
+    def test_never_exceeds_fifty(self, monkeypatch) -> None:
+        monkeypatch.setattr("src.services.mcq_verification_service.settings.mcq_verification_enabled", True)
+        monkeypatch.setattr("src.services.mcq_verification_service.settings.mcq_verification_overgen_ratio", 2.0)
+        # A request already at the 50 ceiling cannot inflate further.
+        assert inflated_mcq_count(50) == 50
+        assert inflated_mcq_count(48) <= 50
