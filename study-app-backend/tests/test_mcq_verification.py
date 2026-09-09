@@ -502,6 +502,17 @@ class TestDecisionTableUnit:
         assert verdict == "recorrect"
         assert index == 2
 
+    def test_veto_present_but_confidence_too_low_does_not_recorrect(self) -> None:
+        # The veto path downgrades a drop that would otherwise have been
+        # proposed; it must not fire below the confidence that would have
+        # proposed that drop in the first place. Low-confidence derivation
+        # plus a veto hit should fall through to questionable, not recorrect.
+        item = _verifiable("q1", correct_index=0)
+        derived = _derived(0, "matches option 2", 0.5)
+        verdict, index = MCQVerificationService._resolve_item(item, derived, matched=-1, veto_index=2)
+        assert verdict == "questionable"
+        assert index is None
+
     def test_derivable_false_keeps_regardless_of_everything_else(self) -> None:
         item = _verifiable("q1", correct_index=0)
         derived = _derived(0, "", 0.9, derivable=False)

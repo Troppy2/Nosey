@@ -344,7 +344,7 @@ class MCQVerificationService:
             return "keep", None
 
         if matched == -1:
-            if veto_index is not None:
+            if veto_index is not None and derived.confidence >= _MIN_DROP_CONFIDENCE:
                 return "recorrect", veto_index
             if derived.confidence >= _MIN_DROP_CONFIDENCE:
                 return "drop", None
