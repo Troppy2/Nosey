@@ -833,6 +833,46 @@ class TestRepairRound:
     def _service(self) -> MCQVerificationService:
         return MCQVerificationService(llm=LLMService())
 
+    async def test_duration_ms_covers_the_whole_repair_round_not_just_the_first_pass(self) -> None:
+        # Regression: duration_ms used to be inherited unchanged from the
+        # initial verify_and_resolve outcome, so a repair round's own real
+        # latency (a generation call plus a second verify_and_resolve) never
+        # showed up in the reported number. Caught live: a call that actually
+        # took ~8.3s wall time was self-reporting ~3.8s whenever repair fired.
+        questions = [_generated_mcq("Q0?", 0)]
+        service = self._service()
+        main_outcome = _outcome(kept=[], dropped_keys=[0], stats={"calls": 2, "duration_ms": 50})
+        replacement = [_generated_mcq("New Q0?", 0)]
+
+        async def fake_regenerate(**kwargs):
+            await asyncio.sleep(0.05)
+            return replacement
+
+        service._llm.regenerate_mcqs_for_topics = fake_regenerate  # type: ignore[method-assign]
+
+        # verify_and_resolve is called twice: once for the main pass (fast,
+        # from main_outcome), once for the repair verification (slow).
+        call_count = 0
+
+        async def verify_and_resolve_side_effect(items, source_content, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return main_outcome
+            await asyncio.sleep(0.05)
+            return _outcome(kept=[_verifiable_from(0, replacement[0])], stats={"calls": 2})
+
+        service.verify_and_resolve = verify_and_resolve_side_effect  # type: ignore[method-assign]
+
+        result, stats = await service.verify_generated_mcqs(questions, "notes", requested_count=1)
+
+        # Both sleeps (0.05s regeneration + 0.05s repair verification) must be
+        # reflected: at least 90ms, comfortably more than the inherited
+        # main-pass-only value would ever report.
+        assert stats["duration_ms"] >= 90
+        assert len(result) == 1
+        assert result[0].question_text == "New Q0?"
+
     async def test_surplus_covers_drop_skips_repair_entirely(self) -> None:
         # 3 generated (over-generation), 1 dropped, 2 survive >= the 2 requested:
         # the shortfall is zero, so regenerate_mcqs_for_topics must never fire.

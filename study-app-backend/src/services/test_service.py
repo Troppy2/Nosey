@@ -26,8 +26,11 @@ from src.services.kojo_context_cache import invalidate_folder
 from src.services.llm_service import LLMService
 from src.services.mcq_verification_service import MCQVerificationService, inflated_mcq_count
 from src.utils.exceptions import ResourceNotFoundException, ValidationException
+from src.utils.logger import get_logger
 from src.utils.validators import VALID_TEST_TYPES
 from typing import Optional
+
+logger = get_logger(__name__)
 
 
 class TestService:
@@ -226,6 +229,7 @@ class TestService:
                     topic_focus=topic_focus,
                     custom_instructions=custom_instructions,
                 )
+                logger.info("MCQ verification for test_id=%s: %s", test.id, verify_stats)
                 generation_meta["mcq_verification"] = verify_stats
         elif practice_test_file is not None:
             # CASE 2: Practice test only (no study content) - EXTRACT questions from test
@@ -312,6 +316,7 @@ class TestService:
                     topic_focus=topic_focus,
                     custom_instructions=custom_instructions,
                 )
+                logger.info("MCQ verification for test_id=%s: %s", test.id, verify_stats)
                 generation_meta["mcq_verification"] = verify_stats
 
         display_order = 1
