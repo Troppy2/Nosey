@@ -4429,6 +4429,156 @@
 }
 
 /* ── File manager ── */
+/* Bulk-selection layer. Sits flush above the existing file list: the rows
+   below are untouched, this is just a thin control strip. Tight vertical
+   rhythm on the 4px grid so it never reads as a separate panel. */
+.file-manager-select-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0 8px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+/* Selection is a real toggle in brand green, not a stock checkbox. This is
+   the one deliberately bold element in the strip; everything else stays quiet. */
+.file-manager-select-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 13px 6px 9px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--green-light);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.file-manager-select-toggle:hover {
+  border-color: var(--green-mid);
+}
+
+.file-manager-select-toggle[data-active="true"] {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+  color: var(--white);
+}
+
+/* Check glyph inside the toggle. Draws from `currentColor` so it inverts
+   cleanly when the toggle fills with green. */
+.file-manager-select-toggle .fm-check {
+  width: 15px;
+  height: 15px;
+  border-radius: var(--radius-xs);
+  border: 1.5px solid currentColor;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.file-manager-select-toggle .fm-check svg {
+  display: none;
+}
+
+.file-manager-select-toggle .fm-check.is-checked,
+.file-manager-select-toggle .fm-check.is-indeterminate {
+  background: currentColor;
+}
+
+.file-manager-select-toggle .fm-check.is-checked svg,
+.file-manager-select-toggle .fm-check.is-indeterminate svg {
+  display: block;
+  stroke: var(--green-lightest);
+}
+
+.file-manager-select-toggle[data-active="true"] .fm-check.is-checked svg,
+.file-manager-select-toggle[data-active="true"] .fm-check.is-indeterminate svg {
+  stroke: var(--green-dark);
+}
+
+.file-manager-bulk-delete {
+  flex-shrink: 0;
+  min-height: 32px;
+  padding: 5px 13px;
+  font-size: 0.82rem;
+}
+
+/* Per-row checkbox: same sage box as the toggle glyph, replacing the OS default. */
+.file-manager-row input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 1.5px solid var(--green-mid);
+  border-radius: var(--radius-xs);
+  background: var(--white);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.file-manager-row input[type="checkbox"]:checked {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.file-manager-row input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+/* Undo strip: same height and rhythm as the select bar so swapping one for
+   the other never shifts the list. Slides in once, as a response to the
+   delete action. */
+.file-manager-undo-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+  padding: 7px 8px 7px 13px;
+  border-radius: var(--radius-md);
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light);
+  font-size: 0.82rem;
+  color: var(--ink);
+  animation: fm-undo-in 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes fm-undo-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .file-manager-undo-bar { animation: none; }
+}
+
+.file-manager-undo-btn {
+  flex-shrink: 0;
+  padding: 5px 15px;
+  border-radius: var(--radius-pill);
+  background: var(--green-dark);
+  color: var(--white);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.file-manager-undo-btn:hover {
+  background: var(--green-dark-mid);
+}
+
 .file-manager-list {
   display: flex;
   flex-direction: column;

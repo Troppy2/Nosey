@@ -1,4 +1,4 @@
-import { AlertCircle, FileText, Loader2, StickyNote, Trash2, Upload, X } from "lucide-react";
+import { AlertCircle, Check, FileText, Loader2, Minus, StickyNote, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type FolderFile, type SkippedFile, addFolderTextNote, deleteFolderFile, fetchFolderFiles, uploadFolderFiles } from "../lib/api";
 import { Button } from "./Button";
@@ -10,6 +10,9 @@ import { SkeletonList } from "./Skeletons";
 
 const MAX_FILE_SIZE_MB = 100;
 const MAX_TOTAL_SIZE_MB = 300;
+// How long the "N files deleted , Undo" window stays open before the deletes
+// are actually sent to the server. Nothing leaves the client until it elapses.
+const UNDO_WINDOW_MS = 6000;
 const ALLOWED_TYPES = [
   "application/pdf",
   "text/plain",
@@ -47,6 +50,13 @@ export function FileManager({ folderId, onClose }: Props) {
   const [noteContent, setNoteContent] = useState("");
   const [isSavingNote, setIsSavingNote] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Bulk select + deferred ("undo"-able) delete. `selectedIds` is the checkbox
+  // selection; `pendingDelete` holds the ids scheduled for deletion and the
+  // timer that will fire the actual DELETE calls once the undo window closes.
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [pendingIds, setPendingIds] = useState<number[]>([]);
+  const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetchFolderFiles(folderId).then((data) => {
@@ -138,7 +148,83 @@ export function FileManager({ folderId, onClose }: Props) {
     }
   }
 
-  const usedBytes = (files ?? []).reduce((sum, file) => sum + file.size_bytes, 0);
+  // Only "ready" files can be bulk-selected: files still extracting text or in an
+  // error state are left out so Select All never sweeps up an in-flight upload.
+  const readyFiles = (files ?? []).filter((f) => f.upload_status === "ready");
+  // Rows hidden from the list while their undo window is open.
+  const pendingSet = new Set(pendingIds);
+  const visibleFiles = (files ?? []).filter((f) => !pendingSet.has(f.id));
+  const selectableIds = readyFiles.filter((f) => !pendingSet.has(f.id)).map((f) => f.id);
+  const selectedCount = selectableIds.filter((id) => selectedIds.has(id)).length;
+  const allSelected = selectableIds.length > 0 && selectedCount === selectableIds.length;
+  const someSelected = selectedCount > 0;
+
+  function toggleOne(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setSelectedIds((prev) => {
+      if (selectableIds.every((id) => prev.has(id))) return new Set();
+      return new Set(selectableIds);
+    });
+  }
+
+  function commitPending(ids: number[]) {
+    if (pendingTimerRef.current) {
+      clearTimeout(pendingTimerRef.current);
+      pendingTimerRef.current = null;
+    }
+    setPendingIds([]);
+    if (ids.length === 0) return;
+    Promise.allSettled(ids.map((id) => deleteFolderFile(folderId, id))).then((results) => {
+      const failed = results.filter((r) => r.status === "rejected").length;
+      setFiles((prev) => (prev ?? []).filter((f) => !ids.includes(f.id)));
+      if (failed > 0) {
+        setError(`${failed} file${failed === 1 ? "" : "s"} could not be deleted. Refresh and try again.`);
+        fetchFolderFiles(folderId).then(setFiles).catch(() => {});
+      }
+    });
+  }
+
+  function startBulkDelete() {
+    const ids = selectableIds.filter((id) => selectedIds.has(id));
+    if (ids.length === 0) return;
+    // Flush any earlier pending batch first so its rows do not resurface.
+    if (pendingIds.length > 0) commitPending(pendingIds);
+    setSelectedIds(new Set());
+    setPendingIds(ids);
+    pendingTimerRef.current = setTimeout(() => commitPending(ids), UNDO_WINDOW_MS);
+  }
+
+  function undoBulkDelete() {
+    if (pendingTimerRef.current) {
+      clearTimeout(pendingTimerRef.current);
+      pendingTimerRef.current = null;
+    }
+    setPendingIds([]);
+  }
+
+  // On unmount (modal close), send any still-pending deletes immediately rather
+  // than dropping them on the floor.
+  const pendingRef = useRef<number[]>([]);
+  pendingRef.current = pendingIds;
+  useEffect(() => {
+    return () => {
+      if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current);
+      const ids = pendingRef.current;
+      if (ids.length > 0) {
+        Promise.allSettled(ids.map((id) => deleteFolderFile(folderId, id)));
+      }
+    };
+  }, [folderId]);
+
+  const usedBytes = visibleFiles.reduce((sum, file) => sum + file.size_bytes, 0);
 
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
@@ -277,19 +363,75 @@ export function FileManager({ folderId, onClose }: Props) {
           </div>
         )}
 
+        {/* Undo bar: shown while a bulk-delete batch is inside its undo window. */}
+        {pendingIds.length > 0 && (
+          <div className="file-manager-undo-bar">
+            <span>
+              {pendingIds.length} file{pendingIds.length === 1 ? "" : "s"} deleted
+            </span>
+            <button type="button" className="file-manager-undo-btn" onClick={undoBulkDelete}>
+              Undo
+            </button>
+          </div>
+        )}
+
+        {/* Select-all controls: only rendered when there is something selectable. */}
+        {!isLoading && selectableIds.length > 0 && (
+          <div className="file-manager-select-bar">
+            <button
+              type="button"
+              className="file-manager-select-toggle"
+              data-active={someSelected ? "true" : "false"}
+              aria-pressed={allSelected}
+              onClick={toggleAll}
+            >
+              <span
+                className={`fm-check${allSelected ? " is-checked" : someSelected ? " is-indeterminate" : ""}`}
+                aria-hidden="true"
+              >
+                {allSelected ? <Check size={11} strokeWidth={3} /> : someSelected ? <Minus size={11} strokeWidth={3} /> : null}
+              </span>
+              {someSelected ? `${selectedCount} selected` : "Select all"}
+            </button>
+            {someSelected && (
+              <Button
+                variant="danger-outline"
+                icon={<Trash2 size={14} />}
+                className="file-manager-bulk-delete"
+                onClick={startBulkDelete}
+              >
+                Delete selected
+              </Button>
+            )}
+          </div>
+        )}
+
         {/* File list */}
         <div style={{ overflowY: "auto", flex: 1 }}>
           {isLoading ? (
             <SkeletonList rows={3} label="Loading your files" />
-          ) : (files ?? []).length === 0 ? (
+          ) : visibleFiles.length === 0 ? (
             <div style={{ textAlign: "center", padding: "32px 0", color: "var(--muted)" }}>
               <FileText size={32} style={{ opacity: 0.3, marginBottom: 8 }} />
               <p style={{ margin: 0, fontSize: "0.875rem" }}>No files uploaded yet.</p>
             </div>
           ) : (
             <div className="file-manager-list">
-              {(files ?? []).map((f) => (
+              {visibleFiles.map((f) => {
+                const selectable = f.upload_status === "ready";
+                return (
                 <div key={f.id} className="file-manager-row">
+                  {selectable ? (
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(f.id)}
+                      onChange={() => toggleOne(f.id)}
+                      aria-label={`Select ${f.file_name}`}
+                      style={{ flexShrink: 0, cursor: "pointer" }}
+                    />
+                  ) : (
+                    <span style={{ width: 13, flexShrink: 0 }} />
+                  )}
                   <FileText size={16} style={{ color: "var(--green-dark)", flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ margin: 0, fontWeight: 600, fontSize: "0.875rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -322,7 +464,8 @@ export function FileManager({ folderId, onClose }: Props) {
                     <Trash2 size={15} />
                   </button>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
