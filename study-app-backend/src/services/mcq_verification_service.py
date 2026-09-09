@@ -520,6 +520,14 @@ class MCQVerificationService:
         if not items:
             return [], [], [], {"verified": 0}
 
+        # duration_ms is overwritten at the end to cover the WHOLE call
+        # (including the repair round), not just the initial verify_and_resolve.
+        # Caught live: a repair round that added ~3.7s of its own real latency
+        # was invisible in the stats because this used to be left as
+        # verify_and_resolve's own duration_ms, silently under-reporting total
+        # verification latency by roughly half whenever repair fired.
+        start = time.monotonic()
+
         try:
             outcome = await asyncio.wait_for(
                 self.verify_and_resolve(
@@ -532,7 +540,11 @@ class MCQVerificationService:
                 "MCQ verification failed or timed out; keeping all %d item(s) unchanged: %s",
                 len(items), exc,
             )
-            return list(items), [], [], {"verified": len(items), "verification_error": str(exc)}
+            return list(items), [], [], {
+                "verified": len(items),
+                "verification_error": str(exc),
+                "duration_ms": int((time.monotonic() - start) * 1000),
+            }
 
         kept_by_key = {item.key: item for item in outcome.kept}
         # Preserve the ORIGINAL relative order, not outcome.kept's order.
@@ -638,6 +650,7 @@ class MCQVerificationService:
                         # re-repaired (_MAX_REPAIR_ROUNDS = 1).
                         stats["repair_failed"] = int(stats["repair_failed"]) + 1
 
+        stats["duration_ms"] = int((time.monotonic() - start) * 1000)
         return kept, dropped_keys, new_items, stats
 
     async def verify_generated_mcqs(
