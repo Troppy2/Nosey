@@ -24714,3 +24714,79 @@ button.lc-official-link:disabled:hover {
     height: 6.5rem;
   }
 }
+
+/* ── File Manager: View parsed text ──────────────────────────────────────────
+   Pill sits left of the trash button on ready rows; the modal stacks above the
+   File Manager modal (both use .modal-backdrop). */
+.file-view-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.file-view-pill:hover {
+  border-color: var(--green-dark-mid);
+}
+
+.file-view-pill:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.file-view-backdrop {
+  z-index: 1010;
+}
+
+.modal-card.file-view-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(820px, 96vw);
+  max-height: 86vh;
+  gap: 12px;
+}
+
+.file-view-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.file-view-title {
+  margin: 2px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-view-body {
+  flex: 1;
+  min-height: 120px;
+  overflow: auto;
+  padding: 16px 18px;
+  background: var(--white);
+  border: 1px solid var(--green-light);
+  border-radius: var(--radius-md);
+  overflow-wrap: anywhere;
+}
+
+.file-view-code {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  white-space: pre;
+}
+
+.file-view-note {
+  margin: 0;
+}

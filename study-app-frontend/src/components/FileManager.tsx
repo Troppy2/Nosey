@@ -1,8 +1,9 @@
-import { AlertCircle, Check, FileText, Loader2, Minus, StickyNote, Trash2, Upload, X } from "lucide-react";
+import { AlertCircle, Check, Eye, FileText, Loader2, Minus, StickyNote, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type FolderFile, type SkippedFile, addFolderTextNote, deleteFolderFile, fetchFolderFiles, uploadFolderFiles } from "../lib/api";
 import { Button } from "./Button";
 import { ConfirmModal } from "./ConfirmModal";
+import { FileContentModal } from "./FileContentModal";
 import { FormError } from "./FormError";
 import { InlineLoading } from "./Loaders";
 import { ProgressBar } from "./Progress";
@@ -45,6 +46,7 @@ export function FileManager({ folderId, onClose }: Props) {
   const [skippedFiles, setSkippedFiles] = useState<SkippedFile[]>([]);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<FolderFile | null>(null);
+  const [viewingFile, setViewingFile] = useState<FolderFile | null>(null);
   const [mode, setMode] = useState<"upload" | "paste">("upload");
   const [noteTitle, setNoteTitle] = useState("");
   const [noteContent, setNoteContent] = useState("");
@@ -453,6 +455,17 @@ export function FileManager({ folderId, onClose }: Props) {
                       )}
                     </p>
                   </div>
+                  {selectable ? (
+                    <button
+                      type="button"
+                      className="file-view-pill"
+                      aria-label={`View parsed text of ${f.file_name}`}
+                      onClick={() => setViewingFile(f)}
+                    >
+                      <Eye size={13} />
+                      View
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="row-action-btn"
@@ -479,6 +492,15 @@ export function FileManager({ folderId, onClose }: Props) {
           danger
           onConfirm={() => { void handleDelete(confirmDelete.id); setConfirmDelete(null); }}
           onCancel={() => setConfirmDelete(null)}
+        />
+      ) : null}
+
+      {viewingFile ? (
+        <FileContentModal
+          folderId={folderId}
+          fileId={viewingFile.id}
+          fileName={viewingFile.file_name}
+          onClose={() => setViewingFile(null)}
         />
       ) : null}
     </div>
