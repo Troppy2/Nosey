@@ -1316,6 +1316,20 @@ export async function fetchFolderFiles(folderId: number): Promise<FolderFile[]> 
   }
 }
 
+export interface FolderFileContent {
+  id: number;
+  file_name: string;
+  file_type: string;
+  content: string;
+  truncated: boolean;
+  shown_chars: number;
+  total_chars: number;
+}
+
+export async function fetchFolderFileContent(folderId: number, fileId: number): Promise<FolderFileContent> {
+  return request<FolderFileContent>(`/folders/${folderId}/files/${fileId}/content`);
+}
+
 export interface SkippedFile {
   file_name: string;
   reason: string;

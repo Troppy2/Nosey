@@ -169,6 +169,52 @@ async def list_folder_files(
     return [FolderFileResponse.model_validate(r) for r in rows]
 
 
+# The viewer only needs enough text to confirm the right file was parsed.
+# Capping the payload keeps multi-MB PDFs from freezing the browser tab.
+MAX_VIEW_CONTENT_CHARS = 200_000
+
+
+class FolderFileContentResponse(BaseModel):
+    id: int
+    file_name: str
+    file_type: str
+    content: str
+    truncated: bool
+    # Both counts are computed server-side: JS string length counts UTF-16
+    # units, so emoji would skew a client-side count.
+    shown_chars: int
+    total_chars: int
+
+
+@router.get("/{folder_id}/files/{file_id}/content", response_model=FolderFileContentResponse)
+async def get_folder_file_content(
+    folder_id: int,
+    file_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> FolderFileContentResponse:
+    await _get_owned_folder(folder_id, user, session)
+    record = await session.scalar(
+        select(FolderFile).where(FolderFile.id == file_id, FolderFile.folder_id == folder_id)
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="File not found")
+    if record.upload_status in ("processing", "error"):
+        raise HTTPException(status_code=400, detail="This file has no parsed text to show yet.")
+
+    content = record.content or ""
+    shown = content[:MAX_VIEW_CONTENT_CHARS]
+    return FolderFileContentResponse(
+        id=record.id,
+        file_name=record.file_name,
+        file_type=record.file_type,
+        content=shown,
+        truncated=len(content) > MAX_VIEW_CONTENT_CHARS,
+        shown_chars=len(shown),
+        total_chars=len(content),
+    )
+
+
 @router.post(
     "/{folder_id}/files",
     response_model=UploadResult,
