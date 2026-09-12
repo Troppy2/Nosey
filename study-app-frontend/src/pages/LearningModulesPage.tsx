@@ -645,7 +645,7 @@ export default function LearningModulesPage() {
             className="lm-file-input"
             type="file"
             multiple
-            accept=".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml"
+            accept=".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.ml,.mli,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml"
             onChange={(e) => {
               addPendingFiles(e.target.files);
               e.target.value = "";

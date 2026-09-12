@@ -284,7 +284,7 @@ export function FileManager({ folderId, onClose }: Props) {
           <input
             ref={inputRef}
             type="file"
-            accept=".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml"
+            accept=".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.ml,.mli,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml"
             multiple
             disabled={isUploading}
             style={{ display: "none" }}

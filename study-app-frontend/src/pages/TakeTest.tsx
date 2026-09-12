@@ -29,6 +29,14 @@ import { applyTextHighlights, clearTextHighlights, getSelectionSignature, HIGHLI
 import { useSettings } from "../lib/useSettings";
 import type { DraftAttemptAnswer, Question, SubmittedAnswer, TestTake } from "../lib/types";
 
+// Monaco ids that differ from the lowercased display name. Monaco has no OCaml
+// grammar, so it borrows F# (same ML family) for highlighting.
+const MONACO_LANGUAGE_IDS: Record<string, string> = {
+  "c++": "cpp",
+  "c#": "csharp",
+  ocaml: "fsharp",
+};
+
 // ── Test tools (beta) localStorage helpers ──────────────────────────────────
 function loadToolJson<T>(key: string, fallback: T): T {
   try {
@@ -920,7 +928,7 @@ export default function TakeTest() {
                   <div className="code-editor-frame">
                     <Editor
                       height="320px"
-                      language={codingLanguage.toLowerCase()}
+                      language={MONACO_LANGUAGE_IDS[codingLanguage.toLowerCase()] ?? codingLanguage.toLowerCase()}
                       value={answers[question.id] ?? ""}
                       onChange={(val) => setAnswers({ ...answers, [question.id]: val ?? "" })}
                       theme="vs-dark"

@@ -6,7 +6,7 @@ VALID_QUESTION_TYPES = {"MCQ", "FRQ"}
 ALLOWED_FILE_TYPES = {
     "pdf", "txt", "md", "docx", "html", "htm", "pptx",
     "py", "js", "ts", "tsx", "jsx", "java", "c", "cpp", "h", "hpp",
-    "cs", "go", "rs", "swift", "kt", "scala", "rb", "php", "sql", "json", "xml", "yaml", "yml",
+    "cs", "go", "rs", "swift", "kt", "ml", "mli", "scala", "rb", "php", "sql", "json", "xml", "yaml", "yml",
 }
 MAX_UPLOAD_FILE_SIZE_BYTES = 40 * 1024 * 1024  # 40 MB per file
 MAX_UPLOAD_TOTAL_SIZE_BYTES = 120 * 1024 * 1024  # 120 MB across uploaded files
