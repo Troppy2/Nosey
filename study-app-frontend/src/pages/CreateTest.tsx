@@ -21,6 +21,7 @@ export default function CreateTest() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [folderId, setFolderId] = useState<number | null>(null);
   const [title, setTitle] = useState("");
+  const [titleCleared, setTitleCleared] = useState(false);
   const [testType, setTestType] = useState("mixed");
   const [files, setFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -309,8 +310,11 @@ export default function CreateTest() {
           <Card className="form-panel">
             <TextInput
               label="Test title"
-              value={title || "Untitled Test"}
-              onChange={(e) => setTitle(e.target.value)}
+              value={title || (titleCleared ? "" : "Untitled Test")}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                if (!e.target.value) setTitleCleared(true);
+              }}
               placeholder="Midterm Practice"
             />
             <SelectInput
