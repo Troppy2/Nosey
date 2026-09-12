@@ -402,7 +402,7 @@ export default function CreateTest() {
                       value={codingLanguage}
                       onChange={(e) => setCodingLanguage(e.target.value)}
                     >
-                      {["Python", "JavaScript", "TypeScript", "Java", "C++", "C", "C#", "Go", "Rust", "Swift", "Kotlin", "SQL"].map((lang) => (
+                      {["Python", "JavaScript", "TypeScript", "Java", "C++", "C", "C#", "Go", "Rust", "Swift", "Kotlin", "OCaml", "SQL"].map((lang) => (
                         <option key={lang} value={lang}>{lang}</option>
                       ))}
                     </select>
@@ -598,7 +598,7 @@ export default function CreateTest() {
                       <input
                         ref={practiceTestInputRef}
                         type="file"
-                        accept=".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml"
+                        accept=".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.ml,.mli,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml"
                         style={{ display: "none" }}
                         onChange={(e) => acceptPracticeTestFile(e.target.files?.[0])}
                       />
@@ -638,7 +638,7 @@ export default function CreateTest() {
           >
             <input
               aria-label="Upload notes files"
-              accept=".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml"
+              accept=".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.ml,.mli,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml"
               multiple
               onChange={(event) => acceptFiles(event.target.files ?? undefined)}
               type="file"

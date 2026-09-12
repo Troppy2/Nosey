@@ -61,7 +61,7 @@ _PDF_PAGE_CAP = 100
 
 _CODE_FILE_TYPES = {
     "py", "js", "ts", "tsx", "jsx", "java", "c", "cpp", "h", "hpp",
-    "cs", "go", "rs", "swift", "kt", "scala", "rb", "php", "sql", "json", "xml", "yaml", "yml",
+    "cs", "go", "rs", "swift", "kt", "ml", "mli", "scala", "rb", "php", "sql", "json", "xml", "yaml", "yml",
 }
 
 
