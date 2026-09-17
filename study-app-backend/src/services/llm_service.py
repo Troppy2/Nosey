@@ -2332,6 +2332,37 @@ Return JSON only with these exact keys:
             f"with the rules above): {text}\n\n"
         )
 
+    async def _complete_module_json(
+        self,
+        prompt: str,
+        provider: Optional[str],
+        parse: Callable[[dict[str, object]], Any],
+    ) -> Any:
+        """One module-authoring call with real provider fallback.
+
+        Module builds run detached from the request, so a single failing
+        provider must not fail the whole track. _complete_json(provider=X) is a
+        single attempt when X is specific, and on "auto" it accepts well-formed
+        JSON even when it is unusable (no modules, empty lesson). Here each
+        candidate (the user's pick first, then the auto chain) gets exactly one
+        call, and a response only counts once `parse` accepts it. `parse`
+        raises LLMException to reject a response. Never re-raises mid-loop.
+        """
+        from src.utils.exceptions import LLMException
+
+        candidates = await self._candidate_providers(provider)
+        if not candidates:
+            raise LLMException(_AI_SERVICES_UNAVAILABLE_MESSAGE)
+
+        last_error: Optional[Exception] = None
+        for candidate in candidates:
+            try:
+                return parse(await self._complete_json(prompt, provider=candidate))
+            except Exception as exc:
+                last_error = exc
+                logger.warning("%s module generation failed; trying next provider: %s", candidate, exc)
+        raise LLMException(str(last_error) or _AI_SERVICES_UNAVAILABLE_MESSAGE) from last_error
+
     # Notation spoken the way a teacher says it, never as raw symbols. Same
     # ruleset the article's tts_script prompt uses; kept in one place because
     # both episode prompts and any future format need it identically.
@@ -2390,20 +2421,23 @@ Return JSON only with these exact keys:
             f"{self._module_instructions_block(custom_instructions)}"
             f"NOTES:\n{notes[:12000]}"
         )
-        data = await self._complete_json(prompt, provider=provider)
-        raw_modules = data.get("modules")
-        outline: list[dict[str, str]] = []
-        if isinstance(raw_modules, list):
-            for item in raw_modules:
-                if not isinstance(item, dict):
-                    continue
-                title = str(item.get("title") or "").strip()
-                summary = str(item.get("summary") or "").strip()
-                if title:
-                    outline.append({"title": title[:255], "summary": summary[:2000]})
-        if not outline:
-            raise LLMException("The AI could not build a module outline from these notes. Try again.")
-        return outline[:count]
+
+        def _parse(data: dict[str, object]) -> list[dict[str, str]]:
+            raw_modules = data.get("modules")
+            outline: list[dict[str, str]] = []
+            if isinstance(raw_modules, list):
+                for item in raw_modules:
+                    if not isinstance(item, dict):
+                        continue
+                    title = str(item.get("title") or "").strip()
+                    summary = str(item.get("summary") or "").strip()
+                    if title:
+                        outline.append({"title": title[:255], "summary": summary[:2000]})
+            if not outline:
+                raise LLMException("The AI could not build a module outline from these notes. Try again.")
+            return outline[:count]
+
+        return await self._complete_module_json(prompt, provider, _parse)
 
     @staticmethod
     def _parse_module_quiz(raw_questions: object, quiz_count: int) -> list[dict[str, object]]:
@@ -2481,19 +2515,21 @@ Return JSON only with these exact keys:
             f"{self._module_instructions_block(custom_instructions)}"
             f"NOTES:\n{notes[:12000]}"
         )
-        data = await self._complete_json(prompt, provider=provider)
 
-        lesson = str(data.get("lesson") or "").strip()
-        if not lesson:
-            raise LLMException("The AI returned an empty lesson. Try again.")
+        def _parse(data: dict[str, object]) -> dict[str, object]:
+            lesson = str(data.get("lesson") or "").strip()
+            if not lesson:
+                raise LLMException("The AI returned an empty lesson. Try again.")
 
-        tts_script = str(data.get("tts_script") or "").strip()
+            tts_script = str(data.get("tts_script") or "").strip()
 
-        quiz = self._parse_module_quiz(data.get("questions"), count)
-        if not quiz:
-            raise LLMException("The AI could not build a quiz for this lesson. Try again.")
+            quiz = self._parse_module_quiz(data.get("questions"), count)
+            if not quiz:
+                raise LLMException("The AI could not build a quiz for this lesson. Try again.")
 
-        return {"lesson": lesson, "tts_script": tts_script, "quiz": quiz}
+            return {"lesson": lesson, "tts_script": tts_script, "quiz": quiz}
+
+        return await self._complete_module_json(prompt, provider, _parse)
 
     async def regenerate_module_support(
         self,
@@ -2538,15 +2574,17 @@ Return JSON only with these exact keys:
             f"{self._module_instructions_block(custom_instructions)}"
             f"ARTICLE ({module_title}):\n{lesson_content[:24000]}"
         )
-        data = await self._complete_json(prompt, provider=provider)
 
-        tts_script = str(data.get("tts_script") or "").strip()
+        def _parse(data: dict[str, object]) -> dict[str, object]:
+            tts_script = str(data.get("tts_script") or "").strip()
 
-        quiz = self._parse_module_quiz(data.get("questions"), count)
-        if not quiz:
-            raise LLMException("The AI could not rebuild the quiz from your edited lesson. Try again.")
+            quiz = self._parse_module_quiz(data.get("questions"), count)
+            if not quiz:
+                raise LLMException("The AI could not rebuild the quiz from your edited lesson. Try again.")
 
-        return {"tts_script": tts_script, "quiz": quiz}
+            return {"tts_script": tts_script, "quiz": quiz}
+
+        return await self._complete_module_json(prompt, provider, _parse)
 
     # Speakers allowed per format. Anything else is dropped, because the frontend
     # maps each speaker key to a voice and an unknown key would silently collapse
