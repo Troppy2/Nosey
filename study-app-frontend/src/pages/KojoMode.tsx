@@ -1875,7 +1875,10 @@ export default function KojoMode() {
                 </span>
               )}
               {view === "chat" && !isGeneralMode && (
-                <span className="chat-mode-folder-pill">{selectedFolder?.name ?? "-"}</span>
+                <span className="chat-mode-folder-pill" title={selectedFolder?.name}>
+                  <FolderOpen size={11} aria-hidden="true" />
+                  <span className="chat-mode-folder-pill-name">{selectedFolder?.name ?? "-"}</span>
+                </span>
               )}
             </div>
           </div>
@@ -1888,7 +1891,7 @@ export default function KojoMode() {
                 aria-label="Open documents"
               >
                 <Files size={14} />
-                <span>docs</span>
+                <span className="chat-mode-docs-label">docs</span>
                 {sessionFiles.length + createdTests.length + createdArtifacts.length > 0 && (
                   <span className="chat-mode-docs-count">{sessionFiles.length + createdTests.length + createdArtifacts.length}</span>
                 )}
