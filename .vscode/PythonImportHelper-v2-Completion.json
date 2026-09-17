@@ -1084,6 +1084,14 @@
         "documentation": {}
     },
     {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
         "label": "Awaitable",
         "importPath": "typing",
         "description": "typing",
@@ -2424,6 +2432,62 @@
         "documentation": {}
     },
     {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
         "label": "statistics",
         "kind": 6,
         "isExtraImport": true,
@@ -2919,6 +2983,38 @@
         "description": "qdrant_client.models",
         "isExtraImport": true,
         "detail": "qdrant_client.models",
+        "documentation": {}
+    },
+    {
+        "label": "settings",
+        "importPath": "src.config",
+        "description": "src.config",
+        "isExtraImport": true,
+        "detail": "src.config",
+        "documentation": {}
+    },
+    {
+        "label": "settings",
+        "importPath": "src.config",
+        "description": "src.config",
+        "isExtraImport": true,
+        "detail": "src.config",
+        "documentation": {}
+    },
+    {
+        "label": "settings",
+        "importPath": "src.config",
+        "description": "src.config",
+        "isExtraImport": true,
+        "detail": "src.config",
+        "documentation": {}
+    },
+    {
+        "label": "settings",
+        "importPath": "src.config",
+        "description": "src.config",
+        "isExtraImport": true,
+        "detail": "src.config",
         "documentation": {}
     },
     {
@@ -4349,63 +4445,15 @@
         "documentation": {}
     },
     {
-        "label": "async_session_maker",
-        "importPath": "src.database",
-        "description": "src.database",
+        "label": "select",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
         "isExtraImport": true,
-        "detail": "src.database",
+        "detail": "sqlalchemy",
         "documentation": {}
     },
     {
         "label": "async_session_maker",
-        "importPath": "src.database",
-        "description": "src.database",
-        "isExtraImport": true,
-        "detail": "src.database",
-        "documentation": {}
-    },
-    {
-        "label": "get_session",
-        "importPath": "src.database",
-        "description": "src.database",
-        "isExtraImport": true,
-        "detail": "src.database",
-        "documentation": {}
-    },
-    {
-        "label": "get_session",
-        "importPath": "src.database",
-        "description": "src.database",
-        "isExtraImport": true,
-        "detail": "src.database",
-        "documentation": {}
-    },
-    {
-        "label": "get_session",
-        "importPath": "src.database",
-        "description": "src.database",
-        "isExtraImport": true,
-        "detail": "src.database",
-        "documentation": {}
-    },
-    {
-        "label": "get_session",
-        "importPath": "src.database",
-        "description": "src.database",
-        "isExtraImport": true,
-        "detail": "src.database",
-        "documentation": {}
-    },
-    {
-        "label": "get_session",
-        "importPath": "src.database",
-        "description": "src.database",
-        "isExtraImport": true,
-        "detail": "src.database",
-        "documentation": {}
-    },
-    {
-        "label": "get_session",
         "importPath": "src.database",
         "description": "src.database",
         "isExtraImport": true,
@@ -4422,22 +4470,6 @@
     },
     {
         "label": "get_session",
-        "importPath": "src.database",
-        "description": "src.database",
-        "isExtraImport": true,
-        "detail": "src.database",
-        "documentation": {}
-    },
-    {
-        "label": "get_session",
-        "importPath": "src.database",
-        "description": "src.database",
-        "isExtraImport": true,
-        "detail": "src.database",
-        "documentation": {}
-    },
-    {
-        "label": "async_session_maker",
         "importPath": "src.database",
         "description": "src.database",
         "isExtraImport": true,
@@ -4509,6 +4541,78 @@
         "documentation": {}
     },
     {
+        "label": "async_session_maker",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
+        "label": "get_session",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
+        "label": "get_session",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
+        "label": "get_session",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
+        "label": "get_session",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
+        "label": "get_session",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
+        "label": "async_session_maker",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
+        "label": "get_session",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
+        "label": "get_session",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
         "label": "get_session",
         "importPath": "src.database",
         "description": "src.database",
@@ -4597,6 +4701,38 @@
         "documentation": {}
     },
     {
+        "label": "Folder",
+        "importPath": "src.models.folder",
+        "description": "src.models.folder",
+        "isExtraImport": true,
+        "detail": "src.models.folder",
+        "documentation": {}
+    },
+    {
+        "label": "Folder",
+        "importPath": "src.models.folder",
+        "description": "src.models.folder",
+        "isExtraImport": true,
+        "detail": "src.models.folder",
+        "documentation": {}
+    },
+    {
+        "label": "Folder",
+        "importPath": "src.models.folder",
+        "description": "src.models.folder",
+        "isExtraImport": true,
+        "detail": "src.models.folder",
+        "documentation": {}
+    },
+    {
+        "label": "Folder",
+        "importPath": "src.models.folder",
+        "description": "src.models.folder",
+        "isExtraImport": true,
+        "detail": "src.models.folder",
+        "documentation": {}
+    },
+    {
         "label": "FileService",
         "importPath": "src.services.file_service",
         "description": "src.services.file_service",
@@ -4766,6 +4902,30 @@
     },
     {
         "label": "LLMService",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "LLMService",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "DerivedAnswer",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "GeneratedMCQ",
         "importPath": "src.services.llm_service",
         "description": "src.services.llm_service",
         "isExtraImport": true,
@@ -4830,6 +4990,22 @@
     },
     {
         "label": "LLMService",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "GeneratedFRQ",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "GeneratedMCQ",
         "importPath": "src.services.llm_service",
         "description": "src.services.llm_service",
         "isExtraImport": true,
@@ -4877,6 +5053,30 @@
         "documentation": {}
     },
     {
+        "label": "DerivedAnswer",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "GeneratedMCQ",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "LLMService",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
         "label": "LLMService",
         "importPath": "src.services.llm_service",
         "description": "src.services.llm_service",
@@ -4938,6 +5138,38 @@
         "description": "sqlalchemy.exc",
         "isExtraImport": true,
         "detail": "sqlalchemy.exc",
+        "documentation": {}
+    },
+    {
+        "label": "LearningTrack",
+        "importPath": "src.models.learning_module",
+        "description": "src.models.learning_module",
+        "isExtraImport": true,
+        "detail": "src.models.learning_module",
+        "documentation": {}
+    },
+    {
+        "label": "LearningModule",
+        "importPath": "src.models.learning_module",
+        "description": "src.models.learning_module",
+        "isExtraImport": true,
+        "detail": "src.models.learning_module",
+        "documentation": {}
+    },
+    {
+        "label": "LearningTrack",
+        "importPath": "src.models.learning_module",
+        "description": "src.models.learning_module",
+        "isExtraImport": true,
+        "detail": "src.models.learning_module",
+        "documentation": {}
+    },
+    {
+        "label": "LearningModule",
+        "importPath": "src.models.learning_module",
+        "description": "src.models.learning_module",
+        "isExtraImport": true,
+        "detail": "src.models.learning_module",
         "documentation": {}
     },
     {
@@ -5229,6 +5461,22 @@
         "documentation": {}
     },
     {
+        "label": "async_sessionmaker",
+        "importPath": "sqlalchemy.ext.asyncio",
+        "description": "sqlalchemy.ext.asyncio",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.ext.asyncio",
+        "documentation": {}
+    },
+    {
+        "label": "create_async_engine",
+        "importPath": "sqlalchemy.ext.asyncio",
+        "description": "sqlalchemy.ext.asyncio",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.ext.asyncio",
+        "documentation": {}
+    },
+    {
         "label": "AsyncSession",
         "importPath": "sqlalchemy.ext.asyncio",
         "description": "sqlalchemy.ext.asyncio",
@@ -5733,6 +5981,14 @@
         "documentation": {}
     },
     {
+        "label": "Base",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
         "label": "# noqa: F401\r\n    conversation_file",
         "importPath": "src.models",
         "description": "src.models",
@@ -5957,11 +6213,19 @@
         "documentation": {}
     },
     {
-        "label": "Test",
-        "importPath": "src.models.test",
-        "description": "src.models.test",
+        "label": "Question",
+        "importPath": "src.models.question",
+        "description": "src.models.question",
         "isExtraImport": true,
-        "detail": "src.models.test",
+        "detail": "src.models.question",
+        "documentation": {}
+    },
+    {
+        "label": "Question",
+        "importPath": "src.models.question",
+        "description": "src.models.question",
+        "isExtraImport": true,
+        "detail": "src.models.question",
         "documentation": {}
     },
     {
@@ -6010,6 +6274,62 @@
         "description": "src.models.test",
         "isExtraImport": true,
         "detail": "src.models.test",
+        "documentation": {}
+    },
+    {
+        "label": "Test",
+        "importPath": "src.models.test",
+        "description": "src.models.test",
+        "isExtraImport": true,
+        "detail": "src.models.test",
+        "documentation": {}
+    },
+    {
+        "label": "Test",
+        "importPath": "src.models.test",
+        "description": "src.models.test",
+        "isExtraImport": true,
+        "detail": "src.models.test",
+        "documentation": {}
+    },
+    {
+        "label": "Test",
+        "importPath": "src.models.test",
+        "description": "src.models.test",
+        "isExtraImport": true,
+        "detail": "src.models.test",
+        "documentation": {}
+    },
+    {
+        "label": "User",
+        "importPath": "src.models.user",
+        "description": "src.models.user",
+        "isExtraImport": true,
+        "detail": "src.models.user",
+        "documentation": {}
+    },
+    {
+        "label": "User",
+        "importPath": "src.models.user",
+        "description": "src.models.user",
+        "isExtraImport": true,
+        "detail": "src.models.user",
+        "documentation": {}
+    },
+    {
+        "label": "User",
+        "importPath": "src.models.user",
+        "description": "src.models.user",
+        "isExtraImport": true,
+        "detail": "src.models.user",
+        "documentation": {}
+    },
+    {
+        "label": "User",
+        "importPath": "src.models.user",
+        "description": "src.models.user",
+        "isExtraImport": true,
+        "detail": "src.models.user",
         "documentation": {}
     },
     {
@@ -7599,6 +7919,22 @@
         "documentation": {}
     },
     {
+        "label": "UserAttempt",
+        "importPath": "src.models.user_attempt",
+        "description": "src.models.user_attempt",
+        "isExtraImport": true,
+        "detail": "src.models.user_attempt",
+        "documentation": {}
+    },
+    {
+        "label": "UserAttempt",
+        "importPath": "src.models.user_attempt",
+        "description": "src.models.user_attempt",
+        "isExtraImport": true,
+        "detail": "src.models.user_attempt",
+        "documentation": {}
+    },
+    {
         "label": "BaseRepository",
         "importPath": "src.repositories.base_repository",
         "description": "src.repositories.base_repository",
@@ -7772,6 +8108,14 @@
         "description": "src.models.frq_answer",
         "isExtraImport": true,
         "detail": "src.models.frq_answer",
+        "documentation": {}
+    },
+    {
+        "label": "MCQOption",
+        "importPath": "src.models.mcq_option",
+        "description": "src.models.mcq_option",
+        "isExtraImport": true,
+        "detail": "src.models.mcq_option",
         "documentation": {}
     },
     {
@@ -9624,6 +9968,14 @@
         "documentation": {}
     },
     {
+        "label": "LLMException",
+        "importPath": "src.utils.exceptions",
+        "description": "src.utils.exceptions",
+        "isExtraImport": true,
+        "detail": "src.utils.exceptions",
+        "documentation": {}
+    },
+    {
         "label": "can_submit_scratch_pad_work",
         "importPath": "src.utils.provider_policy",
         "description": "src.utils.provider_policy",
@@ -9935,6 +10287,22 @@
         "description": "src.services.kojo_context_cache",
         "isExtraImport": true,
         "detail": "src.services.kojo_context_cache",
+        "documentation": {}
+    },
+    {
+        "label": "get_logger",
+        "importPath": "src.utils.logger",
+        "description": "src.utils.logger",
+        "isExtraImport": true,
+        "detail": "src.utils.logger",
+        "documentation": {}
+    },
+    {
+        "label": "get_logger",
+        "importPath": "src.utils.logger",
+        "description": "src.utils.logger",
+        "isExtraImport": true,
+        "detail": "src.utils.logger",
         "documentation": {}
     },
     {
@@ -10523,6 +10891,14 @@
         "documentation": {}
     },
     {
+        "label": "ceil",
+        "importPath": "math",
+        "description": "math",
+        "isExtraImport": true,
+        "detail": "math",
+        "documentation": {}
+    },
+    {
         "label": "sqrt",
         "importPath": "math",
         "description": "math",
@@ -10656,6 +11032,126 @@
         "description": "src.schemas.learning_module_schema",
         "isExtraImport": true,
         "detail": "src.schemas.learning_module_schema",
+        "documentation": {}
+    },
+    {
+        "label": "MCQVerificationService",
+        "importPath": "src.services.mcq_verification_service",
+        "description": "src.services.mcq_verification_service",
+        "isExtraImport": true,
+        "detail": "src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "MCQVerificationService",
+        "importPath": "src.services.mcq_verification_service",
+        "description": "src.services.mcq_verification_service",
+        "isExtraImport": true,
+        "detail": "src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "VerifiableMCQ",
+        "importPath": "src.services.mcq_verification_service",
+        "description": "src.services.mcq_verification_service",
+        "isExtraImport": true,
+        "detail": "src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "inflated_mcq_count",
+        "importPath": "src.services.mcq_verification_service",
+        "description": "src.services.mcq_verification_service",
+        "isExtraImport": true,
+        "detail": "src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "MCQVerificationService",
+        "importPath": "src.services.mcq_verification_service",
+        "description": "src.services.mcq_verification_service",
+        "isExtraImport": true,
+        "detail": "src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "inflated_mcq_count",
+        "importPath": "src.services.mcq_verification_service",
+        "description": "src.services.mcq_verification_service",
+        "isExtraImport": true,
+        "detail": "src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "inflated_mcq_count",
+        "importPath": "src.services.mcq_verification_service",
+        "description": "src.services.mcq_verification_service",
+        "isExtraImport": true,
+        "detail": "src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "inflated_mcq_count",
+        "importPath": "src.services.mcq_verification_service",
+        "description": "src.services.mcq_verification_service",
+        "isExtraImport": true,
+        "detail": "src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "# noqa: E402\r\n    MCQVerificationService",
+        "importPath": "src.services.mcq_verification_service",
+        "description": "src.services.mcq_verification_service",
+        "isExtraImport": true,
+        "detail": "src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "VerifiableMCQ",
+        "importPath": "src.services.mcq_verification_service",
+        "description": "src.services.mcq_verification_service",
+        "isExtraImport": true,
+        "detail": "src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "answers_match",
+        "importPath": "src.services.mcq_verification_service",
+        "description": "src.services.mcq_verification_service",
+        "isExtraImport": true,
+        "detail": "src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "veto_drop",
+        "importPath": "src.services.mcq_verification_service",
+        "description": "src.services.mcq_verification_service",
+        "isExtraImport": true,
+        "detail": "src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "inflated_mcq_count",
+        "importPath": "src.services.mcq_verification_service",
+        "description": "src.services.mcq_verification_service",
+        "isExtraImport": true,
+        "detail": "src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "VerificationOutcome",
+        "importPath": "src.services.mcq_verification_service",
+        "description": "src.services.mcq_verification_service",
+        "isExtraImport": true,
+        "detail": "src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "VerifiableMCQ",
+        "importPath": "src.services.mcq_verification_service",
+        "description": "src.services.mcq_verification_service",
+        "isExtraImport": true,
+        "detail": "src.services.mcq_verification_service",
         "documentation": {}
     },
     {
@@ -12096,12 +12592,60 @@
         "documentation": {}
     },
     {
+        "label": "field",
+        "importPath": "dataclasses",
+        "description": "dataclasses",
+        "isExtraImport": true,
+        "detail": "dataclasses",
+        "documentation": {}
+    },
+    {
+        "label": "replace",
+        "importPath": "dataclasses",
+        "description": "dataclasses",
+        "isExtraImport": true,
+        "detail": "dataclasses",
+        "documentation": {}
+    },
+    {
+        "label": "dataclass",
+        "importPath": "dataclasses",
+        "description": "dataclasses",
+        "isExtraImport": true,
+        "detail": "dataclasses",
+        "documentation": {}
+    },
+    {
+        "label": "replace",
+        "importPath": "dataclasses",
+        "description": "dataclasses",
+        "isExtraImport": true,
+        "detail": "dataclasses",
+        "documentation": {}
+    },
+    {
         "label": "difflib",
         "kind": 6,
         "isExtraImport": true,
         "importPath": "difflib",
         "description": "difflib",
         "detail": "difflib",
+        "documentation": {}
+    },
+    {
+        "label": "SequenceMatcher",
+        "importPath": "difflib",
+        "description": "difflib",
+        "isExtraImport": true,
+        "detail": "difflib",
+        "documentation": {}
+    },
+    {
+        "label": "Fraction",
+        "importPath": "fractions",
+        "description": "fractions",
+        "isExtraImport": true,
+        "detail": "fractions",
         "documentation": {}
     },
     {
@@ -12395,6 +12939,23 @@
         "documentation": {}
     },
     {
+        "label": "pytest_asyncio",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "pytest_asyncio",
+        "description": "pytest_asyncio",
+        "detail": "pytest_asyncio",
+        "documentation": {}
+    },
+    {
+        "label": "StaticPool",
+        "importPath": "sqlalchemy.pool",
+        "description": "sqlalchemy.pool",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.pool",
+        "documentation": {}
+    },
+    {
         "label": "string",
         "kind": 6,
         "isExtraImport": true,
@@ -12484,6 +13045,30 @@
         "documentation": {}
     },
     {
+        "label": "MagicMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "patch",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "AsyncMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
         "label": "patch",
         "importPath": "unittest.mock",
         "description": "unittest.mock",
@@ -12540,6 +13125,62 @@
         "documentation": {}
     },
     {
+        "label": "patch",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "AsyncMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "MagicMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "patch",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "AsyncMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "AsyncMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "MagicMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
         "label": "MagicMock",
         "importPath": "unittest.mock",
         "description": "unittest.mock",
@@ -12573,6 +13214,22 @@
     },
     {
         "label": "MagicMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "AsyncMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "patch",
         "importPath": "unittest.mock",
         "description": "unittest.mock",
         "isExtraImport": true,
@@ -18090,6 +18747,15 @@
         "documentation": {}
     },
     {
+        "label": "FolderFileContentResponse",
+        "kind": 6,
+        "importPath": "study-app-backend.src.routes.folder_files",
+        "description": "study-app-backend.src.routes.folder_files",
+        "peekOfCode": "class FolderFileContentResponse(BaseModel):\n    id: int\n    file_name: str\n    file_type: str\n    content: str\n    truncated: bool\n    # Both counts are computed server-side: JS string length counts UTF-16\n    # units, so emoji would skew a client-side count.\n    shown_chars: int\n    total_chars: int",
+        "detail": "study-app-backend.src.routes.folder_files",
+        "documentation": {}
+    },
+    {
         "label": "TextNoteRequest",
         "kind": 6,
         "importPath": "study-app-backend.src.routes.folder_files",
@@ -18122,6 +18788,15 @@
         "importPath": "study-app-backend.src.routes.folder_files",
         "description": "study-app-backend.src.routes.folder_files",
         "peekOfCode": "router = APIRouter(prefix=\"/folders\", tags=[\"folder-files\"])\nclass FolderFileResponse(BaseModel):\n    id: int\n    folder_id: int\n    file_name: str\n    file_type: str\n    size_bytes: int\n    upload_status: Optional[str] = None\n    upload_error: Optional[str] = None\n    uploaded_at: datetime",
+        "detail": "study-app-backend.src.routes.folder_files",
+        "documentation": {}
+    },
+    {
+        "label": "MAX_VIEW_CONTENT_CHARS",
+        "kind": 5,
+        "importPath": "study-app-backend.src.routes.folder_files",
+        "description": "study-app-backend.src.routes.folder_files",
+        "peekOfCode": "MAX_VIEW_CONTENT_CHARS = 200_000\nclass FolderFileContentResponse(BaseModel):\n    id: int\n    file_name: str\n    file_type: str\n    content: str\n    truncated: bool\n    # Both counts are computed server-side: JS string length counts UTF-16\n    # units, so emoji would skew a client-side count.\n    shown_chars: int",
         "detail": "study-app-backend.src.routes.folder_files",
         "documentation": {}
     },
@@ -20065,7 +20740,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.file_service",
         "description": "study-app-backend.src.services.file_service",
-        "peekOfCode": "_PDF_PAGE_CAP = 100\n_CODE_FILE_TYPES = {\n    \"py\", \"js\", \"ts\", \"tsx\", \"jsx\", \"java\", \"c\", \"cpp\", \"h\", \"hpp\",\n    \"cs\", \"go\", \"rs\", \"swift\", \"kt\", \"scala\", \"rb\", \"php\", \"sql\", \"json\", \"xml\", \"yaml\", \"yml\",\n}\ndef _preferred_pdf_workers() -> int:\n    return max(1, min(os.cpu_count() or 1, 4))\ndef _chunk_page_indexes(page_count: int, worker_count: int) -> list[list[int]]:\n    if page_count <= 0:\n        return []",
+        "peekOfCode": "_PDF_PAGE_CAP = 100\n_CODE_FILE_TYPES = {\n    \"py\", \"js\", \"ts\", \"tsx\", \"jsx\", \"java\", \"c\", \"cpp\", \"h\", \"hpp\",\n    \"cs\", \"go\", \"rs\", \"swift\", \"kt\", \"ml\", \"mli\", \"scala\", \"rb\", \"php\", \"sql\", \"json\", \"xml\", \"yaml\", \"yml\",\n}\ndef _preferred_pdf_workers() -> int:\n    return max(1, min(os.cpu_count() or 1, 4))\ndef _chunk_page_indexes(page_count: int, worker_count: int) -> list[list[int]]:\n    if page_count <= 0:\n        return []",
         "detail": "study-app-backend.src.services.file_service",
         "documentation": {}
     },
@@ -20074,7 +20749,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.file_service",
         "description": "study-app-backend.src.services.file_service",
-        "peekOfCode": "_CODE_FILE_TYPES = {\n    \"py\", \"js\", \"ts\", \"tsx\", \"jsx\", \"java\", \"c\", \"cpp\", \"h\", \"hpp\",\n    \"cs\", \"go\", \"rs\", \"swift\", \"kt\", \"scala\", \"rb\", \"php\", \"sql\", \"json\", \"xml\", \"yaml\", \"yml\",\n}\ndef _preferred_pdf_workers() -> int:\n    return max(1, min(os.cpu_count() or 1, 4))\ndef _chunk_page_indexes(page_count: int, worker_count: int) -> list[list[int]]:\n    if page_count <= 0:\n        return []\n    worker_count = max(1, min(worker_count, page_count))",
+        "peekOfCode": "_CODE_FILE_TYPES = {\n    \"py\", \"js\", \"ts\", \"tsx\", \"jsx\", \"java\", \"c\", \"cpp\", \"h\", \"hpp\",\n    \"cs\", \"go\", \"rs\", \"swift\", \"kt\", \"ml\", \"mli\", \"scala\", \"rb\", \"php\", \"sql\", \"json\", \"xml\", \"yaml\", \"yml\",\n}\ndef _preferred_pdf_workers() -> int:\n    return max(1, min(os.cpu_count() or 1, 4))\ndef _chunk_page_indexes(page_count: int, worker_count: int) -> list[list[int]]:\n    if page_count <= 0:\n        return []\n    worker_count = max(1, min(worker_count, page_count))",
         "detail": "study-app-backend.src.services.file_service",
         "documentation": {}
     },
@@ -20493,6 +21168,15 @@
         "documentation": {}
     },
     {
+        "label": "DerivedAnswer",
+        "kind": 6,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "class DerivedAnswer:\n    \"\"\"One question answered independently of its answer options.\n    index is the position of the question in the batch that was sent. answer is\n    the verifier's own answer in its own words. derivable is False when the\n    source content does not support answering the question at all, in which case\n    the caller must keep the question unchanged rather than drop it. confidence\n    is the verifier's confidence in its OWN answer, mirroring\n    ComplexityGrade.confidence.\n    \"\"\"\n    index: int",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
         "label": "_ExtractedTerm",
         "kind": 6,
         "importPath": "study-app-backend.src.services.llm_service",
@@ -20623,7 +21307,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "_RETRIEVAL_CHUNK_OVERLAP_WORDS = 40\n_RETRIEVAL_TOP_K = 6\n_RETRIEVAL_CONTEXT_SENTENCES = 3\n_RETRIEVAL_MAX_QUERY_REWRITES = 4\n_RETRIEVAL_STAGE_MULTIPLIER = 2\n_RETRIEVAL_EMBED_CACHE_SIZE = 4096\n_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n# Server-side duplicate detection (GH #34): a generated question whose normalized",
+        "peekOfCode": "_RETRIEVAL_CHUNK_OVERLAP_WORDS = 40\n_RETRIEVAL_TOP_K = 6\n_RETRIEVAL_CONTEXT_SENTENCES = 3\n_RETRIEVAL_MAX_QUERY_REWRITES = 4\n_RETRIEVAL_STAGE_MULTIPLIER = 2\n_RETRIEVAL_EMBED_CACHE_SIZE = 4096\n_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n# ── MCQ truthfulness verification ────────────────────────────────────────────",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -20632,7 +21316,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "_RETRIEVAL_TOP_K = 6\n_RETRIEVAL_CONTEXT_SENTENCES = 3\n_RETRIEVAL_MAX_QUERY_REWRITES = 4\n_RETRIEVAL_STAGE_MULTIPLIER = 2\n_RETRIEVAL_EMBED_CACHE_SIZE = 4096\n_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n# Server-side duplicate detection (GH #34): a generated question whose normalized\n# text matches a prior question exactly, or with a SequenceMatcher ratio at or above",
+        "peekOfCode": "_RETRIEVAL_TOP_K = 6\n_RETRIEVAL_CONTEXT_SENTENCES = 3\n_RETRIEVAL_MAX_QUERY_REWRITES = 4\n_RETRIEVAL_STAGE_MULTIPLIER = 2\n_RETRIEVAL_EMBED_CACHE_SIZE = 4096\n_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n# ── MCQ truthfulness verification ────────────────────────────────────────────\n_VERIFY_CHAR_LIMIT = 8_000  # matches _GENERATE_CHAR_LIMIT",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -20641,7 +21325,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "_RETRIEVAL_CONTEXT_SENTENCES = 3\n_RETRIEVAL_MAX_QUERY_REWRITES = 4\n_RETRIEVAL_STAGE_MULTIPLIER = 2\n_RETRIEVAL_EMBED_CACHE_SIZE = 4096\n_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n# Server-side duplicate detection (GH #34): a generated question whose normalized\n# text matches a prior question exactly, or with a SequenceMatcher ratio at or above\n# this threshold, is treated as a repeat and dropped.",
+        "peekOfCode": "_RETRIEVAL_CONTEXT_SENTENCES = 3\n_RETRIEVAL_MAX_QUERY_REWRITES = 4\n_RETRIEVAL_STAGE_MULTIPLIER = 2\n_RETRIEVAL_EMBED_CACHE_SIZE = 4096\n_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n# ── MCQ truthfulness verification ────────────────────────────────────────────\n_VERIFY_CHAR_LIMIT = 8_000  # matches _GENERATE_CHAR_LIMIT\n_VERIFY_QUESTION_CHAR_LIMIT = 400  # matches the ceiling _is_valid_mcq enforces",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -20650,7 +21334,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "_RETRIEVAL_MAX_QUERY_REWRITES = 4\n_RETRIEVAL_STAGE_MULTIPLIER = 2\n_RETRIEVAL_EMBED_CACHE_SIZE = 4096\n_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n# Server-side duplicate detection (GH #34): a generated question whose normalized\n# text matches a prior question exactly, or with a SequenceMatcher ratio at or above\n# this threshold, is treated as a repeat and dropped.\n_DUP_SIMILARITY_THRESHOLD = 0.9",
+        "peekOfCode": "_RETRIEVAL_MAX_QUERY_REWRITES = 4\n_RETRIEVAL_STAGE_MULTIPLIER = 2\n_RETRIEVAL_EMBED_CACHE_SIZE = 4096\n_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n# ── MCQ truthfulness verification ────────────────────────────────────────────\n_VERIFY_CHAR_LIMIT = 8_000  # matches _GENERATE_CHAR_LIMIT\n_VERIFY_QUESTION_CHAR_LIMIT = 400  # matches the ceiling _is_valid_mcq enforces\n_VERIFY_ANSWER_CHAR_LIMIT = 300",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -20659,7 +21343,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "_RETRIEVAL_STAGE_MULTIPLIER = 2\n_RETRIEVAL_EMBED_CACHE_SIZE = 4096\n_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n# Server-side duplicate detection (GH #34): a generated question whose normalized\n# text matches a prior question exactly, or with a SequenceMatcher ratio at or above\n# this threshold, is treated as a repeat and dropped.\n_DUP_SIMILARITY_THRESHOLD = 0.9\n# Cap on how many prior questions each candidate is fuzzily compared against.",
+        "peekOfCode": "_RETRIEVAL_STAGE_MULTIPLIER = 2\n_RETRIEVAL_EMBED_CACHE_SIZE = 4096\n_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n# ── MCQ truthfulness verification ────────────────────────────────────────────\n_VERIFY_CHAR_LIMIT = 8_000  # matches _GENERATE_CHAR_LIMIT\n_VERIFY_QUESTION_CHAR_LIMIT = 400  # matches the ceiling _is_valid_mcq enforces\n_VERIFY_ANSWER_CHAR_LIMIT = 300\n_VERIFY_BATCH_MAX = 12  # shard above this so one call stays within the token budget",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -20668,7 +21352,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "_RETRIEVAL_EMBED_CACHE_SIZE = 4096\n_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n# Server-side duplicate detection (GH #34): a generated question whose normalized\n# text matches a prior question exactly, or with a SequenceMatcher ratio at or above\n# this threshold, is treated as a repeat and dropped.\n_DUP_SIMILARITY_THRESHOLD = 0.9\n# Cap on how many prior questions each candidate is fuzzily compared against.\n_PRIOR_DUP_MAX_KEYS = 200",
+        "peekOfCode": "_RETRIEVAL_EMBED_CACHE_SIZE = 4096\n_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n# ── MCQ truthfulness verification ────────────────────────────────────────────\n_VERIFY_CHAR_LIMIT = 8_000  # matches _GENERATE_CHAR_LIMIT\n_VERIFY_QUESTION_CHAR_LIMIT = 400  # matches the ceiling _is_valid_mcq enforces\n_VERIFY_ANSWER_CHAR_LIMIT = 300\n_VERIFY_BATCH_MAX = 12  # shard above this so one call stays within the token budget\n_VERIFY_SHARD_CONCURRENCY = 3",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -20677,7 +21361,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n# Server-side duplicate detection (GH #34): a generated question whose normalized\n# text matches a prior question exactly, or with a SequenceMatcher ratio at or above\n# this threshold, is treated as a repeat and dropped.\n_DUP_SIMILARITY_THRESHOLD = 0.9\n# Cap on how many prior questions each candidate is fuzzily compared against.\n_PRIOR_DUP_MAX_KEYS = 200\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (",
+        "peekOfCode": "_RETRIEVAL_RESULT_CACHE_SIZE = 512\n_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n# ── MCQ truthfulness verification ────────────────────────────────────────────\n_VERIFY_CHAR_LIMIT = 8_000  # matches _GENERATE_CHAR_LIMIT\n_VERIFY_QUESTION_CHAR_LIMIT = 400  # matches the ceiling _is_valid_mcq enforces\n_VERIFY_ANSWER_CHAR_LIMIT = 300\n_VERIFY_BATCH_MAX = 12  # shard above this so one call stays within the token budget\n_VERIFY_SHARD_CONCURRENCY = 3\n# Server-side duplicate detection (GH #34): a generated question whose normalized",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -20686,7 +21370,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n# Server-side duplicate detection (GH #34): a generated question whose normalized\n# text matches a prior question exactly, or with a SequenceMatcher ratio at or above\n# this threshold, is treated as a repeat and dropped.\n_DUP_SIMILARITY_THRESHOLD = 0.9\n# Cap on how many prior questions each candidate is fuzzily compared against.\n_PRIOR_DUP_MAX_KEYS = 200\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"",
+        "peekOfCode": "_MAP_REDUCE_MAX_DOCS = 6\n_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n# ── MCQ truthfulness verification ────────────────────────────────────────────\n_VERIFY_CHAR_LIMIT = 8_000  # matches _GENERATE_CHAR_LIMIT\n_VERIFY_QUESTION_CHAR_LIMIT = 400  # matches the ceiling _is_valid_mcq enforces\n_VERIFY_ANSWER_CHAR_LIMIT = 300\n_VERIFY_BATCH_MAX = 12  # shard above this so one call stays within the token budget\n_VERIFY_SHARD_CONCURRENCY = 3\n# Server-side duplicate detection (GH #34): a generated question whose normalized\n# text matches a prior question exactly, or with a SequenceMatcher ratio at or above",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -20695,7 +21379,52 @@
         "kind": 5,
         "importPath": "study-app-backend.src.services.llm_service",
         "description": "study-app-backend.src.services.llm_service",
-        "peekOfCode": "_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n# Server-side duplicate detection (GH #34): a generated question whose normalized\n# text matches a prior question exactly, or with a SequenceMatcher ratio at or above\n# this threshold, is treated as a repeat and dropped.\n_DUP_SIMILARITY_THRESHOLD = 0.9\n# Cap on how many prior questions each candidate is fuzzily compared against.\n_PRIOR_DUP_MAX_KEYS = 200\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)",
+        "peekOfCode": "_SAME_PROVIDER_TOPUP_ATTEMPTS = 2\n# ── MCQ truthfulness verification ────────────────────────────────────────────\n_VERIFY_CHAR_LIMIT = 8_000  # matches _GENERATE_CHAR_LIMIT\n_VERIFY_QUESTION_CHAR_LIMIT = 400  # matches the ceiling _is_valid_mcq enforces\n_VERIFY_ANSWER_CHAR_LIMIT = 300\n_VERIFY_BATCH_MAX = 12  # shard above this so one call stays within the token budget\n_VERIFY_SHARD_CONCURRENCY = 3\n# Server-side duplicate detection (GH #34): a generated question whose normalized\n# text matches a prior question exactly, or with a SequenceMatcher ratio at or above\n# this threshold, is treated as a repeat and dropped.",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_VERIFY_CHAR_LIMIT",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "_VERIFY_CHAR_LIMIT = 8_000  # matches _GENERATE_CHAR_LIMIT\n_VERIFY_QUESTION_CHAR_LIMIT = 400  # matches the ceiling _is_valid_mcq enforces\n_VERIFY_ANSWER_CHAR_LIMIT = 300\n_VERIFY_BATCH_MAX = 12  # shard above this so one call stays within the token budget\n_VERIFY_SHARD_CONCURRENCY = 3\n# Server-side duplicate detection (GH #34): a generated question whose normalized\n# text matches a prior question exactly, or with a SequenceMatcher ratio at or above\n# this threshold, is treated as a repeat and dropped.\n_DUP_SIMILARITY_THRESHOLD = 0.9\n# Cap on how many prior questions each candidate is fuzzily compared against.",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_VERIFY_QUESTION_CHAR_LIMIT",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "_VERIFY_QUESTION_CHAR_LIMIT = 400  # matches the ceiling _is_valid_mcq enforces\n_VERIFY_ANSWER_CHAR_LIMIT = 300\n_VERIFY_BATCH_MAX = 12  # shard above this so one call stays within the token budget\n_VERIFY_SHARD_CONCURRENCY = 3\n# Server-side duplicate detection (GH #34): a generated question whose normalized\n# text matches a prior question exactly, or with a SequenceMatcher ratio at or above\n# this threshold, is treated as a repeat and dropped.\n_DUP_SIMILARITY_THRESHOLD = 0.9\n# Cap on how many prior questions each candidate is fuzzily compared against.\n_PRIOR_DUP_MAX_KEYS = 200",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_VERIFY_ANSWER_CHAR_LIMIT",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "_VERIFY_ANSWER_CHAR_LIMIT = 300\n_VERIFY_BATCH_MAX = 12  # shard above this so one call stays within the token budget\n_VERIFY_SHARD_CONCURRENCY = 3\n# Server-side duplicate detection (GH #34): a generated question whose normalized\n# text matches a prior question exactly, or with a SequenceMatcher ratio at or above\n# this threshold, is treated as a repeat and dropped.\n_DUP_SIMILARITY_THRESHOLD = 0.9\n# Cap on how many prior questions each candidate is fuzzily compared against.\n_PRIOR_DUP_MAX_KEYS = 200\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_VERIFY_BATCH_MAX",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "_VERIFY_BATCH_MAX = 12  # shard above this so one call stays within the token budget\n_VERIFY_SHARD_CONCURRENCY = 3\n# Server-side duplicate detection (GH #34): a generated question whose normalized\n# text matches a prior question exactly, or with a SequenceMatcher ratio at or above\n# this threshold, is treated as a repeat and dropped.\n_DUP_SIMILARITY_THRESHOLD = 0.9\n# Cap on how many prior questions each candidate is fuzzily compared against.\n_PRIOR_DUP_MAX_KEYS = 200\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"",
+        "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_VERIFY_SHARD_CONCURRENCY",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.llm_service",
+        "description": "study-app-backend.src.services.llm_service",
+        "peekOfCode": "_VERIFY_SHARD_CONCURRENCY = 3\n# Server-side duplicate detection (GH #34): a generated question whose normalized\n# text matches a prior question exactly, or with a SequenceMatcher ratio at or above\n# this threshold, is treated as a repeat and dropped.\n_DUP_SIMILARITY_THRESHOLD = 0.9\n# Cap on how many prior questions each candidate is fuzzily compared against.\n_PRIOR_DUP_MAX_KEYS = 200\n_AI_SERVICES_UNAVAILABLE_MESSAGE = (\n    \"An error has occurred. Test generation can't happen right now because AI services are unavailable.\"\n)",
         "detail": "study-app-backend.src.services.llm_service",
         "documentation": {}
     },
@@ -20751,6 +21480,375 @@
         "description": "study-app-backend.src.services.llm_service",
         "peekOfCode": "_LATEX_BACKSLASH_FIX_RE = re.compile(\n    r\"(?<!\\\\)\\\\(\"\n    r\"frac|forall\"\n    r\"|tfrac|textbf|textit|text|theta|Theta|times|tanh|tan|tau|tilde|triangle|top|to|therefore\"\n    r\"|nabla|neq|nleftarrow|nrightarrow|notin|nexists|nu|ne|ni\"\n    r\"|rightarrow|Rightarrow|rho|rangle|rfloor|rceil|right|Re\"\n    r\"|binom|bmatrix|beta|boxed|bullet|bigcup|bigcap|bigoplus|bigotimes|bigg|big|bar\"\n    r\"|upsilon|underline|underbrace|uparrow|updownarrow\"\n    r\")(?![a-zA-Z])\"\n)",
         "detail": "study-app-backend.src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "VerifiableMCQ",
+        "kind": 6,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "class VerifiableMCQ:\n    \"\"\"Adapter so the service works on any MCQ-shaped object without\n    special-casing GeneratedMCQ, a DB row, or a module quiz dict. key is the\n    caller's own handle (a list position, a DB row id, ...) and is returned\n    unchanged so the caller can map results back to its own objects.\"\"\"\n    key: object\n    question_text: str\n    options: list[str]\n    correct_index: int\n@dataclass(frozen=True)",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "VerificationOutcome",
+        "kind": 6,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "class VerificationOutcome:\n    kept: list[VerifiableMCQ]\n    dropped_keys: list[object]\n    stats: dict[str, object]\n    # Keys of items kept specifically on a \"questionable\" verdict (suspected but\n    # not confidently condemned). Empty by default so existing call sites and\n    # tests built before the repair round need no changes. The repair round\n    # (step 7) uses this to find questionable originals worth replacing, and to\n    # treat a REPLACEMENT that itself verifies questionable as a failed repair\n    # rather than a keep, per the plan's asymmetry between originals and repairs.",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "MCQVerificationService",
+        "kind": 6,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "class MCQVerificationService:\n    \"\"\"Stateless orchestrator: derive, adjudicate, veto, decide, cap.\"\"\"\n    def __init__(self, llm: Optional[LLMService] = None) -> None:\n        self._llm = llm if llm is not None else LLMService()\n    @staticmethod\n    def _resolve_item(\n        original: VerifiableMCQ,\n        derived: Optional[DerivedAnswer],\n        matched: Optional[int],\n        veto_index: Optional[int],",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "normalize_answer_text",
+        "kind": 2,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "def normalize_answer_text(text: str, case_sensitive: bool = False, strip_markdown_emphasis: bool = True) -> str:\n    \"\"\"Normalize a derived answer or an option for comparison.\n    Applied identically to the derived answer and to every option, so the\n    output only needs to compare equal (or nearly equal) when the two\n    genuinely state the same thing. See the plan's \"Normalization pipeline\"\n    for the numbered steps this implements in order.\n    strip_markdown_emphasis is False for the math variant: `*` is markdown\n    bold in prose but multiplication in math (\"3*x\"), and stripping it would\n    silently turn \"3*x\" into \"3x\", a different expression, before the math\n    normalizer ever gets to convert \\\\cdot / \\\\times into the same symbol.",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "parse_numeric",
+        "kind": 2,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "def parse_numeric(text: str) -> Optional[Fraction]:\n    \"\"\"Extract a numeric value when the (already-normalized) string is\n    entirely a number, decimal, signed number, simple fraction, LaTeX\n    \\\\frac{a}{b}, or a spelled-out number word. None if it is not numeric.\"\"\"\n    if not text:\n        return None\n    candidate = text.strip()\n    word_value = _NUMBER_WORDS.get(candidate.lower())\n    if word_value is not None:\n        return Fraction(word_value)",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "strings_match",
+        "kind": 2,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "def strings_match(left: str, right: str) -> bool:\n    \"\"\"The string comparison ladder, first hit wins. Both inputs are already\n    normalized (see normalize_answer_text).\"\"\"\n    if not left or not right:\n        return False\n    if left == right:\n        return True\n    shorter, longer = (left, right) if len(left) <= len(right) else (right, left)\n    if shorter in longer and len(shorter) >= _SUBSTRING_LENGTH_FLOOR * len(longer):\n        return True",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "answers_match",
+        "kind": 2,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "def answers_match(derived_answer: str, option: str, variant: str = \"prose\") -> bool:\n    \"\"\"True when the derived answer and one option state the same thing.\n    Tries numeric comparison first (so \"$\\\\frac{1}{2}$\" matches \"0.5\"), then\n    falls back to the string ladder. The coding variant compares case\n    sensitively, since program output is case sensitive.\n    \"\"\"\n    case_sensitive = variant == \"coding\"\n    strip_markdown_emphasis = variant != \"math\"  # \"*\" is multiplication in math, not bold\n    normalized_answer = normalize_answer_text(\n        derived_answer, case_sensitive=case_sensitive, strip_markdown_emphasis=strip_markdown_emphasis,",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "inflated_mcq_count",
+        "kind": 2,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "def inflated_mcq_count(requested: int) -> int:\n    \"\"\"How many MCQs to actually GENERATE so verification has slack to absorb\n    drops. Applied by the caller before generation; the request count itself\n    (requested) is always what is used for expected_question_count and for\n    the final trim, never this inflated value.\n    Bounded to at most +5 over the request, so a 50-question test does not\n    balloon the generation prompt, and capped at the 50-question ceiling the\n    rest of the pipeline already enforces.\n    \"\"\"\n    if not settings.mcq_verification_enabled or requested <= 0:",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "veto_drop",
+        "kind": 2,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "def veto_drop(derived_answer: str, options: list[str], variant: str = \"prose\") -> Optional[int]:\n    \"\"\"The drop-veto matcher. Returns an option index ONLY when exactly one\n    option clearly states the derived answer; otherwise returns None (no\n    veto). This function can never assert \"no option matches\" — it is silent\n    in that case, never a drop verdict. See the module docstring.\n    \"\"\"\n    matches = [index for index, option in enumerate(options) if answers_match(derived_answer, option, variant)]\n    if len(matches) == 1:\n        return matches[0]\n    return None",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "logger",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "logger = get_logger(__name__)\n# ── confidence thresholds (plan section \"Step 5\") ────────────────────────────\n_MIN_DROP_CONFIDENCE = 0.7\n_QUESTIONABLE_FLOOR = 0.4\n_MIN_RECORRECT_CONFIDENCE = 0.6\n# ── batch-level safety caps ───────────────────────────────────────────────────\n_MAX_DROP_FRACTION = 0.5\n_MIN_BATCH_FOR_DROPS = 3\n# ── the repair round (plan step 7) ────────────────────────────────────────────\n# _MAX_REPAIR_ROUNDS is a documentation constant, not a loop bound: the code",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_MIN_DROP_CONFIDENCE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_MIN_DROP_CONFIDENCE = 0.7\n_QUESTIONABLE_FLOOR = 0.4\n_MIN_RECORRECT_CONFIDENCE = 0.6\n# ── batch-level safety caps ───────────────────────────────────────────────────\n_MAX_DROP_FRACTION = 0.5\n_MIN_BATCH_FOR_DROPS = 3\n# ── the repair round (plan step 7) ────────────────────────────────────────────\n# _MAX_REPAIR_ROUNDS is a documentation constant, not a loop bound: the code\n# below runs the repair block exactly once, with no while and no recursion.\n# A repair round that cannot trigger a repair round cannot loop, whatever the",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_QUESTIONABLE_FLOOR",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_QUESTIONABLE_FLOOR = 0.4\n_MIN_RECORRECT_CONFIDENCE = 0.6\n# ── batch-level safety caps ───────────────────────────────────────────────────\n_MAX_DROP_FRACTION = 0.5\n_MIN_BATCH_FOR_DROPS = 3\n# ── the repair round (plan step 7) ────────────────────────────────────────────\n# _MAX_REPAIR_ROUNDS is a documentation constant, not a loop bound: the code\n# below runs the repair block exactly once, with no while and no recursion.\n# A repair round that cannot trigger a repair round cannot loop, whatever the\n# notes contain, which is the direct answer to the todo's rejection of a",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_MIN_RECORRECT_CONFIDENCE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_MIN_RECORRECT_CONFIDENCE = 0.6\n# ── batch-level safety caps ───────────────────────────────────────────────────\n_MAX_DROP_FRACTION = 0.5\n_MIN_BATCH_FOR_DROPS = 3\n# ── the repair round (plan step 7) ────────────────────────────────────────────\n# _MAX_REPAIR_ROUNDS is a documentation constant, not a loop bound: the code\n# below runs the repair block exactly once, with no while and no recursion.\n# A repair round that cannot trigger a repair round cannot loop, whatever the\n# notes contain, which is the direct answer to the todo's rejection of a\n# refill call (extra latency, extra quota, risk of looping).",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_MAX_DROP_FRACTION",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_MAX_DROP_FRACTION = 0.5\n_MIN_BATCH_FOR_DROPS = 3\n# ── the repair round (plan step 7) ────────────────────────────────────────────\n# _MAX_REPAIR_ROUNDS is a documentation constant, not a loop bound: the code\n# below runs the repair block exactly once, with no while and no recursion.\n# A repair round that cannot trigger a repair round cannot loop, whatever the\n# notes contain, which is the direct answer to the todo's rejection of a\n# refill call (extra latency, extra quota, risk of looping).\n_MAX_REPAIR_ROUNDS = 1\n_MAX_REPAIR_ITEMS = 5",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_MIN_BATCH_FOR_DROPS",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_MIN_BATCH_FOR_DROPS = 3\n# ── the repair round (plan step 7) ────────────────────────────────────────────\n# _MAX_REPAIR_ROUNDS is a documentation constant, not a loop bound: the code\n# below runs the repair block exactly once, with no while and no recursion.\n# A repair round that cannot trigger a repair round cannot loop, whatever the\n# notes contain, which is the direct answer to the todo's rejection of a\n# refill call (extra latency, extra quota, risk of looping).\n_MAX_REPAIR_ROUNDS = 1\n_MAX_REPAIR_ITEMS = 5\n# ── matcher thresholds ────────────────────────────────────────────────────────",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_MAX_REPAIR_ROUNDS",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_MAX_REPAIR_ROUNDS = 1\n_MAX_REPAIR_ITEMS = 5\n# ── matcher thresholds ────────────────────────────────────────────────────────\n_SUBSTRING_LENGTH_FLOOR = 0.6\n_DICE_MATCH_THRESHOLD = 0.85\n_SEQUENCE_MATCH_THRESHOLD = 0.9\n_SEQUENCE_MATCH_MAX_LEN = 40\n_STOPWORDS = frozenset({\n    \"the\", \"a\", \"an\", \"of\", \"is\", \"are\", \"to\", \"in\", \"for\", \"and\", \"or\", \"that\", \"it\",\n})",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_MAX_REPAIR_ITEMS",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_MAX_REPAIR_ITEMS = 5\n# ── matcher thresholds ────────────────────────────────────────────────────────\n_SUBSTRING_LENGTH_FLOOR = 0.6\n_DICE_MATCH_THRESHOLD = 0.85\n_SEQUENCE_MATCH_THRESHOLD = 0.9\n_SEQUENCE_MATCH_MAX_LEN = 40\n_STOPWORDS = frozenset({\n    \"the\", \"a\", \"an\", \"of\", \"is\", \"are\", \"to\", \"in\", \"for\", \"and\", \"or\", \"that\", \"it\",\n})\n_NUMBER_WORDS = {",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_SUBSTRING_LENGTH_FLOOR",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_SUBSTRING_LENGTH_FLOOR = 0.6\n_DICE_MATCH_THRESHOLD = 0.85\n_SEQUENCE_MATCH_THRESHOLD = 0.9\n_SEQUENCE_MATCH_MAX_LEN = 40\n_STOPWORDS = frozenset({\n    \"the\", \"a\", \"an\", \"of\", \"is\", \"are\", \"to\", \"in\", \"for\", \"and\", \"or\", \"that\", \"it\",\n})\n_NUMBER_WORDS = {\n    \"zero\": 0, \"one\": 1, \"two\": 2, \"three\": 3, \"four\": 4, \"five\": 5, \"six\": 6,\n    \"seven\": 7, \"eight\": 8, \"nine\": 9, \"ten\": 10, \"eleven\": 11, \"twelve\": 12,",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_DICE_MATCH_THRESHOLD",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_DICE_MATCH_THRESHOLD = 0.85\n_SEQUENCE_MATCH_THRESHOLD = 0.9\n_SEQUENCE_MATCH_MAX_LEN = 40\n_STOPWORDS = frozenset({\n    \"the\", \"a\", \"an\", \"of\", \"is\", \"are\", \"to\", \"in\", \"for\", \"and\", \"or\", \"that\", \"it\",\n})\n_NUMBER_WORDS = {\n    \"zero\": 0, \"one\": 1, \"two\": 2, \"three\": 3, \"four\": 4, \"five\": 5, \"six\": 6,\n    \"seven\": 7, \"eight\": 8, \"nine\": 9, \"ten\": 10, \"eleven\": 11, \"twelve\": 12,\n    \"thirteen\": 13, \"fourteen\": 14, \"fifteen\": 15, \"sixteen\": 16, \"seventeen\": 17,",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_SEQUENCE_MATCH_THRESHOLD",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_SEQUENCE_MATCH_THRESHOLD = 0.9\n_SEQUENCE_MATCH_MAX_LEN = 40\n_STOPWORDS = frozenset({\n    \"the\", \"a\", \"an\", \"of\", \"is\", \"are\", \"to\", \"in\", \"for\", \"and\", \"or\", \"that\", \"it\",\n})\n_NUMBER_WORDS = {\n    \"zero\": 0, \"one\": 1, \"two\": 2, \"three\": 3, \"four\": 4, \"five\": 5, \"six\": 6,\n    \"seven\": 7, \"eight\": 8, \"nine\": 9, \"ten\": 10, \"eleven\": 11, \"twelve\": 12,\n    \"thirteen\": 13, \"fourteen\": 14, \"fifteen\": 15, \"sixteen\": 16, \"seventeen\": 17,\n    \"eighteen\": 18, \"nineteen\": 19, \"twenty\": 20, \"hundred\": 100, \"thousand\": 1000,",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_SEQUENCE_MATCH_MAX_LEN",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_SEQUENCE_MATCH_MAX_LEN = 40\n_STOPWORDS = frozenset({\n    \"the\", \"a\", \"an\", \"of\", \"is\", \"are\", \"to\", \"in\", \"for\", \"and\", \"or\", \"that\", \"it\",\n})\n_NUMBER_WORDS = {\n    \"zero\": 0, \"one\": 1, \"two\": 2, \"three\": 3, \"four\": 4, \"five\": 5, \"six\": 6,\n    \"seven\": 7, \"eight\": 8, \"nine\": 9, \"ten\": 10, \"eleven\": 11, \"twelve\": 12,\n    \"thirteen\": 13, \"fourteen\": 14, \"fifteen\": 15, \"sixteen\": 16, \"seventeen\": 17,\n    \"eighteen\": 18, \"nineteen\": 19, \"twenty\": 20, \"hundred\": 100, \"thousand\": 1000,\n}",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_STOPWORDS",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_STOPWORDS = frozenset({\n    \"the\", \"a\", \"an\", \"of\", \"is\", \"are\", \"to\", \"in\", \"for\", \"and\", \"or\", \"that\", \"it\",\n})\n_NUMBER_WORDS = {\n    \"zero\": 0, \"one\": 1, \"two\": 2, \"three\": 3, \"four\": 4, \"five\": 5, \"six\": 6,\n    \"seven\": 7, \"eight\": 8, \"nine\": 9, \"ten\": 10, \"eleven\": 11, \"twelve\": 12,\n    \"thirteen\": 13, \"fourteen\": 14, \"fifteen\": 15, \"sixteen\": 16, \"seventeen\": 17,\n    \"eighteen\": 18, \"nineteen\": 19, \"twenty\": 20, \"hundred\": 100, \"thousand\": 1000,\n}\n_MARKDOWN_STRIP_RE = re.compile(r\"[`*_]+\")",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_NUMBER_WORDS",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_NUMBER_WORDS = {\n    \"zero\": 0, \"one\": 1, \"two\": 2, \"three\": 3, \"four\": 4, \"five\": 5, \"six\": 6,\n    \"seven\": 7, \"eight\": 8, \"nine\": 9, \"ten\": 10, \"eleven\": 11, \"twelve\": 12,\n    \"thirteen\": 13, \"fourteen\": 14, \"fifteen\": 15, \"sixteen\": 16, \"seventeen\": 17,\n    \"eighteen\": 18, \"nineteen\": 19, \"twenty\": 20, \"hundred\": 100, \"thousand\": 1000,\n}\n_MARKDOWN_STRIP_RE = re.compile(r\"[`*_]+\")\n_LEADING_LIST_MARKER_RE = re.compile(r\"^\\s*(?:[-*]|\\d+[.)])\\s+\")\n_LEADING_OPTION_LABEL_RE = re.compile(r\"^\\s*\\(?([A-Da-d])[).]\\s+\")\n_LATEX_DELIM_RE = re.compile(r\"\\$+\")",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_MARKDOWN_STRIP_RE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_MARKDOWN_STRIP_RE = re.compile(r\"[`*_]+\")\n_LEADING_LIST_MARKER_RE = re.compile(r\"^\\s*(?:[-*]|\\d+[.)])\\s+\")\n_LEADING_OPTION_LABEL_RE = re.compile(r\"^\\s*\\(?([A-Da-d])[).]\\s+\")\n_LATEX_DELIM_RE = re.compile(r\"\\$+\")\n_LATEX_LEFT_RIGHT_RE = re.compile(r\"\\\\left|\\\\right\")\n_LATEX_SPACING_RE = re.compile(r\"\\\\[!,;]\")\n_LATEX_DFRAC_TFRAC_RE = re.compile(r\"\\\\[dt]frac\")\n_LATEX_CDOT_TIMES_RE = re.compile(r\"\\\\cdot|\\\\times\")\n_LATEX_BRACED_POWER_RE = re.compile(r\"\\^\\{(\\d+)\\}\")\n_TRAILING_PUNCT_RE = re.compile(r\"[.,;:!?]+$\")",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_LEADING_LIST_MARKER_RE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_LEADING_LIST_MARKER_RE = re.compile(r\"^\\s*(?:[-*]|\\d+[.)])\\s+\")\n_LEADING_OPTION_LABEL_RE = re.compile(r\"^\\s*\\(?([A-Da-d])[).]\\s+\")\n_LATEX_DELIM_RE = re.compile(r\"\\$+\")\n_LATEX_LEFT_RIGHT_RE = re.compile(r\"\\\\left|\\\\right\")\n_LATEX_SPACING_RE = re.compile(r\"\\\\[!,;]\")\n_LATEX_DFRAC_TFRAC_RE = re.compile(r\"\\\\[dt]frac\")\n_LATEX_CDOT_TIMES_RE = re.compile(r\"\\\\cdot|\\\\times\")\n_LATEX_BRACED_POWER_RE = re.compile(r\"\\^\\{(\\d+)\\}\")\n_TRAILING_PUNCT_RE = re.compile(r\"[.,;:!?]+$\")\n_SURROUNDING_QUOTES_RE = re.compile(r\"^[\\\"'“”‘’(\\[]+|[\\\"'“”‘’)\\]]+$\")",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_LEADING_OPTION_LABEL_RE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_LEADING_OPTION_LABEL_RE = re.compile(r\"^\\s*\\(?([A-Da-d])[).]\\s+\")\n_LATEX_DELIM_RE = re.compile(r\"\\$+\")\n_LATEX_LEFT_RIGHT_RE = re.compile(r\"\\\\left|\\\\right\")\n_LATEX_SPACING_RE = re.compile(r\"\\\\[!,;]\")\n_LATEX_DFRAC_TFRAC_RE = re.compile(r\"\\\\[dt]frac\")\n_LATEX_CDOT_TIMES_RE = re.compile(r\"\\\\cdot|\\\\times\")\n_LATEX_BRACED_POWER_RE = re.compile(r\"\\^\\{(\\d+)\\}\")\n_TRAILING_PUNCT_RE = re.compile(r\"[.,;:!?]+$\")\n_SURROUNDING_QUOTES_RE = re.compile(r\"^[\\\"'“”‘’(\\[]+|[\\\"'“”‘’)\\]]+$\")\n_ASSIGNMENT_PREFIX_RE = re.compile(r\"^(?:x|y|z|f\\(x\\)|answer|result)\\s*=\\s*(?=\\S)\", re.IGNORECASE)",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_LATEX_DELIM_RE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_LATEX_DELIM_RE = re.compile(r\"\\$+\")\n_LATEX_LEFT_RIGHT_RE = re.compile(r\"\\\\left|\\\\right\")\n_LATEX_SPACING_RE = re.compile(r\"\\\\[!,;]\")\n_LATEX_DFRAC_TFRAC_RE = re.compile(r\"\\\\[dt]frac\")\n_LATEX_CDOT_TIMES_RE = re.compile(r\"\\\\cdot|\\\\times\")\n_LATEX_BRACED_POWER_RE = re.compile(r\"\\^\\{(\\d+)\\}\")\n_TRAILING_PUNCT_RE = re.compile(r\"[.,;:!?]+$\")\n_SURROUNDING_QUOTES_RE = re.compile(r\"^[\\\"'“”‘’(\\[]+|[\\\"'“”‘’)\\]]+$\")\n_ASSIGNMENT_PREFIX_RE = re.compile(r\"^(?:x|y|z|f\\(x\\)|answer|result)\\s*=\\s*(?=\\S)\", re.IGNORECASE)\n_LEADING_ARTICLE_RE = re.compile(r\"^(?:the|a|an)\\s+\", re.IGNORECASE)",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_LATEX_LEFT_RIGHT_RE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_LATEX_LEFT_RIGHT_RE = re.compile(r\"\\\\left|\\\\right\")\n_LATEX_SPACING_RE = re.compile(r\"\\\\[!,;]\")\n_LATEX_DFRAC_TFRAC_RE = re.compile(r\"\\\\[dt]frac\")\n_LATEX_CDOT_TIMES_RE = re.compile(r\"\\\\cdot|\\\\times\")\n_LATEX_BRACED_POWER_RE = re.compile(r\"\\^\\{(\\d+)\\}\")\n_TRAILING_PUNCT_RE = re.compile(r\"[.,;:!?]+$\")\n_SURROUNDING_QUOTES_RE = re.compile(r\"^[\\\"'“”‘’(\\[]+|[\\\"'“”‘’)\\]]+$\")\n_ASSIGNMENT_PREFIX_RE = re.compile(r\"^(?:x|y|z|f\\(x\\)|answer|result)\\s*=\\s*(?=\\S)\", re.IGNORECASE)\n_LEADING_ARTICLE_RE = re.compile(r\"^(?:the|a|an)\\s+\", re.IGNORECASE)\n_WHITESPACE_RE = re.compile(r\"\\s+\")",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_LATEX_SPACING_RE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_LATEX_SPACING_RE = re.compile(r\"\\\\[!,;]\")\n_LATEX_DFRAC_TFRAC_RE = re.compile(r\"\\\\[dt]frac\")\n_LATEX_CDOT_TIMES_RE = re.compile(r\"\\\\cdot|\\\\times\")\n_LATEX_BRACED_POWER_RE = re.compile(r\"\\^\\{(\\d+)\\}\")\n_TRAILING_PUNCT_RE = re.compile(r\"[.,;:!?]+$\")\n_SURROUNDING_QUOTES_RE = re.compile(r\"^[\\\"'“”‘’(\\[]+|[\\\"'“”‘’)\\]]+$\")\n_ASSIGNMENT_PREFIX_RE = re.compile(r\"^(?:x|y|z|f\\(x\\)|answer|result)\\s*=\\s*(?=\\S)\", re.IGNORECASE)\n_LEADING_ARTICLE_RE = re.compile(r\"^(?:the|a|an)\\s+\", re.IGNORECASE)\n_WHITESPACE_RE = re.compile(r\"\\s+\")\n_PLAIN_FRACTION_RE = re.compile(r\"^([+-]?\\d+)\\s*/\\s*(\\d+)$\")",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_LATEX_DFRAC_TFRAC_RE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_LATEX_DFRAC_TFRAC_RE = re.compile(r\"\\\\[dt]frac\")\n_LATEX_CDOT_TIMES_RE = re.compile(r\"\\\\cdot|\\\\times\")\n_LATEX_BRACED_POWER_RE = re.compile(r\"\\^\\{(\\d+)\\}\")\n_TRAILING_PUNCT_RE = re.compile(r\"[.,;:!?]+$\")\n_SURROUNDING_QUOTES_RE = re.compile(r\"^[\\\"'“”‘’(\\[]+|[\\\"'“”‘’)\\]]+$\")\n_ASSIGNMENT_PREFIX_RE = re.compile(r\"^(?:x|y|z|f\\(x\\)|answer|result)\\s*=\\s*(?=\\S)\", re.IGNORECASE)\n_LEADING_ARTICLE_RE = re.compile(r\"^(?:the|a|an)\\s+\", re.IGNORECASE)\n_WHITESPACE_RE = re.compile(r\"\\s+\")\n_PLAIN_FRACTION_RE = re.compile(r\"^([+-]?\\d+)\\s*/\\s*(\\d+)$\")\n_LATEX_FRAC_RE = re.compile(r\"^\\\\frac\\{([+-]?\\d+)\\}\\{(\\d+)\\}$\")",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_LATEX_CDOT_TIMES_RE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_LATEX_CDOT_TIMES_RE = re.compile(r\"\\\\cdot|\\\\times\")\n_LATEX_BRACED_POWER_RE = re.compile(r\"\\^\\{(\\d+)\\}\")\n_TRAILING_PUNCT_RE = re.compile(r\"[.,;:!?]+$\")\n_SURROUNDING_QUOTES_RE = re.compile(r\"^[\\\"'“”‘’(\\[]+|[\\\"'“”‘’)\\]]+$\")\n_ASSIGNMENT_PREFIX_RE = re.compile(r\"^(?:x|y|z|f\\(x\\)|answer|result)\\s*=\\s*(?=\\S)\", re.IGNORECASE)\n_LEADING_ARTICLE_RE = re.compile(r\"^(?:the|a|an)\\s+\", re.IGNORECASE)\n_WHITESPACE_RE = re.compile(r\"\\s+\")\n_PLAIN_FRACTION_RE = re.compile(r\"^([+-]?\\d+)\\s*/\\s*(\\d+)$\")\n_LATEX_FRAC_RE = re.compile(r\"^\\\\frac\\{([+-]?\\d+)\\}\\{(\\d+)\\}$\")\n_PLAIN_NUMBER_RE = re.compile(r\"^[+-]?\\d+(?:\\.\\d+)?$\")",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_LATEX_BRACED_POWER_RE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_LATEX_BRACED_POWER_RE = re.compile(r\"\\^\\{(\\d+)\\}\")\n_TRAILING_PUNCT_RE = re.compile(r\"[.,;:!?]+$\")\n_SURROUNDING_QUOTES_RE = re.compile(r\"^[\\\"'“”‘’(\\[]+|[\\\"'“”‘’)\\]]+$\")\n_ASSIGNMENT_PREFIX_RE = re.compile(r\"^(?:x|y|z|f\\(x\\)|answer|result)\\s*=\\s*(?=\\S)\", re.IGNORECASE)\n_LEADING_ARTICLE_RE = re.compile(r\"^(?:the|a|an)\\s+\", re.IGNORECASE)\n_WHITESPACE_RE = re.compile(r\"\\s+\")\n_PLAIN_FRACTION_RE = re.compile(r\"^([+-]?\\d+)\\s*/\\s*(\\d+)$\")\n_LATEX_FRAC_RE = re.compile(r\"^\\\\frac\\{([+-]?\\d+)\\}\\{(\\d+)\\}$\")\n_PLAIN_NUMBER_RE = re.compile(r\"^[+-]?\\d+(?:\\.\\d+)?$\")\ndef normalize_answer_text(text: str, case_sensitive: bool = False, strip_markdown_emphasis: bool = True) -> str:",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_TRAILING_PUNCT_RE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_TRAILING_PUNCT_RE = re.compile(r\"[.,;:!?]+$\")\n_SURROUNDING_QUOTES_RE = re.compile(r\"^[\\\"'“”‘’(\\[]+|[\\\"'“”‘’)\\]]+$\")\n_ASSIGNMENT_PREFIX_RE = re.compile(r\"^(?:x|y|z|f\\(x\\)|answer|result)\\s*=\\s*(?=\\S)\", re.IGNORECASE)\n_LEADING_ARTICLE_RE = re.compile(r\"^(?:the|a|an)\\s+\", re.IGNORECASE)\n_WHITESPACE_RE = re.compile(r\"\\s+\")\n_PLAIN_FRACTION_RE = re.compile(r\"^([+-]?\\d+)\\s*/\\s*(\\d+)$\")\n_LATEX_FRAC_RE = re.compile(r\"^\\\\frac\\{([+-]?\\d+)\\}\\{(\\d+)\\}$\")\n_PLAIN_NUMBER_RE = re.compile(r\"^[+-]?\\d+(?:\\.\\d+)?$\")\ndef normalize_answer_text(text: str, case_sensitive: bool = False, strip_markdown_emphasis: bool = True) -> str:\n    \"\"\"Normalize a derived answer or an option for comparison.",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_SURROUNDING_QUOTES_RE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_SURROUNDING_QUOTES_RE = re.compile(r\"^[\\\"'“”‘’(\\[]+|[\\\"'“”‘’)\\]]+$\")\n_ASSIGNMENT_PREFIX_RE = re.compile(r\"^(?:x|y|z|f\\(x\\)|answer|result)\\s*=\\s*(?=\\S)\", re.IGNORECASE)\n_LEADING_ARTICLE_RE = re.compile(r\"^(?:the|a|an)\\s+\", re.IGNORECASE)\n_WHITESPACE_RE = re.compile(r\"\\s+\")\n_PLAIN_FRACTION_RE = re.compile(r\"^([+-]?\\d+)\\s*/\\s*(\\d+)$\")\n_LATEX_FRAC_RE = re.compile(r\"^\\\\frac\\{([+-]?\\d+)\\}\\{(\\d+)\\}$\")\n_PLAIN_NUMBER_RE = re.compile(r\"^[+-]?\\d+(?:\\.\\d+)?$\")\ndef normalize_answer_text(text: str, case_sensitive: bool = False, strip_markdown_emphasis: bool = True) -> str:\n    \"\"\"Normalize a derived answer or an option for comparison.\n    Applied identically to the derived answer and to every option, so the",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_ASSIGNMENT_PREFIX_RE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_ASSIGNMENT_PREFIX_RE = re.compile(r\"^(?:x|y|z|f\\(x\\)|answer|result)\\s*=\\s*(?=\\S)\", re.IGNORECASE)\n_LEADING_ARTICLE_RE = re.compile(r\"^(?:the|a|an)\\s+\", re.IGNORECASE)\n_WHITESPACE_RE = re.compile(r\"\\s+\")\n_PLAIN_FRACTION_RE = re.compile(r\"^([+-]?\\d+)\\s*/\\s*(\\d+)$\")\n_LATEX_FRAC_RE = re.compile(r\"^\\\\frac\\{([+-]?\\d+)\\}\\{(\\d+)\\}$\")\n_PLAIN_NUMBER_RE = re.compile(r\"^[+-]?\\d+(?:\\.\\d+)?$\")\ndef normalize_answer_text(text: str, case_sensitive: bool = False, strip_markdown_emphasis: bool = True) -> str:\n    \"\"\"Normalize a derived answer or an option for comparison.\n    Applied identically to the derived answer and to every option, so the\n    output only needs to compare equal (or nearly equal) when the two",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_LEADING_ARTICLE_RE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_LEADING_ARTICLE_RE = re.compile(r\"^(?:the|a|an)\\s+\", re.IGNORECASE)\n_WHITESPACE_RE = re.compile(r\"\\s+\")\n_PLAIN_FRACTION_RE = re.compile(r\"^([+-]?\\d+)\\s*/\\s*(\\d+)$\")\n_LATEX_FRAC_RE = re.compile(r\"^\\\\frac\\{([+-]?\\d+)\\}\\{(\\d+)\\}$\")\n_PLAIN_NUMBER_RE = re.compile(r\"^[+-]?\\d+(?:\\.\\d+)?$\")\ndef normalize_answer_text(text: str, case_sensitive: bool = False, strip_markdown_emphasis: bool = True) -> str:\n    \"\"\"Normalize a derived answer or an option for comparison.\n    Applied identically to the derived answer and to every option, so the\n    output only needs to compare equal (or nearly equal) when the two\n    genuinely state the same thing. See the plan's \"Normalization pipeline\"",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_WHITESPACE_RE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_WHITESPACE_RE = re.compile(r\"\\s+\")\n_PLAIN_FRACTION_RE = re.compile(r\"^([+-]?\\d+)\\s*/\\s*(\\d+)$\")\n_LATEX_FRAC_RE = re.compile(r\"^\\\\frac\\{([+-]?\\d+)\\}\\{(\\d+)\\}$\")\n_PLAIN_NUMBER_RE = re.compile(r\"^[+-]?\\d+(?:\\.\\d+)?$\")\ndef normalize_answer_text(text: str, case_sensitive: bool = False, strip_markdown_emphasis: bool = True) -> str:\n    \"\"\"Normalize a derived answer or an option for comparison.\n    Applied identically to the derived answer and to every option, so the\n    output only needs to compare equal (or nearly equal) when the two\n    genuinely state the same thing. See the plan's \"Normalization pipeline\"\n    for the numbered steps this implements in order.",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_PLAIN_FRACTION_RE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_PLAIN_FRACTION_RE = re.compile(r\"^([+-]?\\d+)\\s*/\\s*(\\d+)$\")\n_LATEX_FRAC_RE = re.compile(r\"^\\\\frac\\{([+-]?\\d+)\\}\\{(\\d+)\\}$\")\n_PLAIN_NUMBER_RE = re.compile(r\"^[+-]?\\d+(?:\\.\\d+)?$\")\ndef normalize_answer_text(text: str, case_sensitive: bool = False, strip_markdown_emphasis: bool = True) -> str:\n    \"\"\"Normalize a derived answer or an option for comparison.\n    Applied identically to the derived answer and to every option, so the\n    output only needs to compare equal (or nearly equal) when the two\n    genuinely state the same thing. See the plan's \"Normalization pipeline\"\n    for the numbered steps this implements in order.\n    strip_markdown_emphasis is False for the math variant: `*` is markdown",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_LATEX_FRAC_RE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_LATEX_FRAC_RE = re.compile(r\"^\\\\frac\\{([+-]?\\d+)\\}\\{(\\d+)\\}$\")\n_PLAIN_NUMBER_RE = re.compile(r\"^[+-]?\\d+(?:\\.\\d+)?$\")\ndef normalize_answer_text(text: str, case_sensitive: bool = False, strip_markdown_emphasis: bool = True) -> str:\n    \"\"\"Normalize a derived answer or an option for comparison.\n    Applied identically to the derived answer and to every option, so the\n    output only needs to compare equal (or nearly equal) when the two\n    genuinely state the same thing. See the plan's \"Normalization pipeline\"\n    for the numbered steps this implements in order.\n    strip_markdown_emphasis is False for the math variant: `*` is markdown\n    bold in prose but multiplication in math (\"3*x\"), and stripping it would",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_PLAIN_NUMBER_RE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_PLAIN_NUMBER_RE = re.compile(r\"^[+-]?\\d+(?:\\.\\d+)?$\")\ndef normalize_answer_text(text: str, case_sensitive: bool = False, strip_markdown_emphasis: bool = True) -> str:\n    \"\"\"Normalize a derived answer or an option for comparison.\n    Applied identically to the derived answer and to every option, so the\n    output only needs to compare equal (or nearly equal) when the two\n    genuinely state the same thing. See the plan's \"Normalization pipeline\"\n    for the numbered steps this implements in order.\n    strip_markdown_emphasis is False for the math variant: `*` is markdown\n    bold in prose but multiplication in math (\"3*x\"), and stripping it would\n    silently turn \"3*x\" into \"3x\", a different expression, before the math",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
+        "documentation": {}
+    },
+    {
+        "label": "_SPACED_OPERATOR_RE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.mcq_verification_service",
+        "description": "study-app-backend.src.services.mcq_verification_service",
+        "peekOfCode": "_SPACED_OPERATOR_RE = re.compile(r\"\\s*([*^+\\-])\\s*\")\ndef _normalize_math_expression(text: str) -> str:\n    \"\"\"Extra math-only normalization, applied on top of normalize_answer_text\n    (plan section 4.2). Kept separate so the prose ladder is unaffected.\"\"\"\n    normalized = _LATEX_CDOT_TIMES_RE.sub(\"*\", text)\n    normalized = _LATEX_BRACED_POWER_RE.sub(r\"^\\1\", normalized)\n    # \\cdot and \\times normally carry surrounding spaces (\"3 \\cdot x\"), but a\n    # plain-text option writing the same thing rarely does (\"3*x\"). Collapse\n    # spacing around * and ^ so the two compare equal.\n    normalized = _SPACED_OPERATOR_RE.sub(r\"\\1\", normalized)",
+        "detail": "study-app-backend.src.services.mcq_verification_service",
         "documentation": {}
     },
     {
@@ -21294,6 +22392,15 @@
         "documentation": {}
     },
     {
+        "label": "logger",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.test_service",
+        "description": "study-app-backend.src.services.test_service",
+        "peekOfCode": "logger = get_logger(__name__)\nclass TestService:\n    def __init__(\n        self,\n        llm_service: Optional[LLMService] = None,\n        file_service: Optional[FileService] = None,\n    ) -> None:\n        self.llm_service = llm_service or LLMService()\n        self.file_service = file_service or FileService()\n    def _summarize_note_file_name(self, filenames: list[str], fallback: str) -> str:",
+        "detail": "study-app-backend.src.services.test_service",
+        "documentation": {}
+    },
+    {
         "label": "StudyAppException",
         "kind": 6,
         "importPath": "study-app-backend.src.utils.exceptions",
@@ -21433,7 +22540,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.utils.validators",
         "description": "study-app-backend.src.utils.validators",
-        "peekOfCode": "VALID_TEST_TYPES = {\"MCQ_only\", \"FRQ_only\", \"mixed\", \"Extreme\"}\nVALID_QUESTION_TYPES = {\"MCQ\", \"FRQ\"}\nALLOWED_FILE_TYPES = {\n    \"pdf\", \"txt\", \"md\", \"docx\", \"html\", \"htm\", \"pptx\",\n    \"py\", \"js\", \"ts\", \"tsx\", \"jsx\", \"java\", \"c\", \"cpp\", \"h\", \"hpp\",\n    \"cs\", \"go\", \"rs\", \"swift\", \"kt\", \"scala\", \"rb\", \"php\", \"sql\", \"json\", \"xml\", \"yaml\", \"yml\",\n}\nMAX_UPLOAD_FILE_SIZE_BYTES = 40 * 1024 * 1024  # 40 MB per file\nMAX_UPLOAD_TOTAL_SIZE_BYTES = 120 * 1024 * 1024  # 120 MB across uploaded files\ndef normalize_file_extension(filename: Optional[str]) -> str:",
+        "peekOfCode": "VALID_TEST_TYPES = {\"MCQ_only\", \"FRQ_only\", \"mixed\", \"Extreme\"}\nVALID_QUESTION_TYPES = {\"MCQ\", \"FRQ\"}\nALLOWED_FILE_TYPES = {\n    \"pdf\", \"txt\", \"md\", \"docx\", \"html\", \"htm\", \"pptx\",\n    \"py\", \"js\", \"ts\", \"tsx\", \"jsx\", \"java\", \"c\", \"cpp\", \"h\", \"hpp\",\n    \"cs\", \"go\", \"rs\", \"swift\", \"kt\", \"ml\", \"mli\", \"scala\", \"rb\", \"php\", \"sql\", \"json\", \"xml\", \"yaml\", \"yml\",\n}\nMAX_UPLOAD_FILE_SIZE_BYTES = 40 * 1024 * 1024  # 40 MB per file\nMAX_UPLOAD_TOTAL_SIZE_BYTES = 120 * 1024 * 1024  # 120 MB across uploaded files\ndef normalize_file_extension(filename: Optional[str]) -> str:",
         "detail": "study-app-backend.src.utils.validators",
         "documentation": {}
     },
@@ -21442,7 +22549,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.utils.validators",
         "description": "study-app-backend.src.utils.validators",
-        "peekOfCode": "VALID_QUESTION_TYPES = {\"MCQ\", \"FRQ\"}\nALLOWED_FILE_TYPES = {\n    \"pdf\", \"txt\", \"md\", \"docx\", \"html\", \"htm\", \"pptx\",\n    \"py\", \"js\", \"ts\", \"tsx\", \"jsx\", \"java\", \"c\", \"cpp\", \"h\", \"hpp\",\n    \"cs\", \"go\", \"rs\", \"swift\", \"kt\", \"scala\", \"rb\", \"php\", \"sql\", \"json\", \"xml\", \"yaml\", \"yml\",\n}\nMAX_UPLOAD_FILE_SIZE_BYTES = 40 * 1024 * 1024  # 40 MB per file\nMAX_UPLOAD_TOTAL_SIZE_BYTES = 120 * 1024 * 1024  # 120 MB across uploaded files\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:",
+        "peekOfCode": "VALID_QUESTION_TYPES = {\"MCQ\", \"FRQ\"}\nALLOWED_FILE_TYPES = {\n    \"pdf\", \"txt\", \"md\", \"docx\", \"html\", \"htm\", \"pptx\",\n    \"py\", \"js\", \"ts\", \"tsx\", \"jsx\", \"java\", \"c\", \"cpp\", \"h\", \"hpp\",\n    \"cs\", \"go\", \"rs\", \"swift\", \"kt\", \"ml\", \"mli\", \"scala\", \"rb\", \"php\", \"sql\", \"json\", \"xml\", \"yaml\", \"yml\",\n}\nMAX_UPLOAD_FILE_SIZE_BYTES = 40 * 1024 * 1024  # 40 MB per file\nMAX_UPLOAD_TOTAL_SIZE_BYTES = 120 * 1024 * 1024  # 120 MB across uploaded files\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:",
         "detail": "study-app-backend.src.utils.validators",
         "documentation": {}
     },
@@ -21451,7 +22558,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.utils.validators",
         "description": "study-app-backend.src.utils.validators",
-        "peekOfCode": "ALLOWED_FILE_TYPES = {\n    \"pdf\", \"txt\", \"md\", \"docx\", \"html\", \"htm\", \"pptx\",\n    \"py\", \"js\", \"ts\", \"tsx\", \"jsx\", \"java\", \"c\", \"cpp\", \"h\", \"hpp\",\n    \"cs\", \"go\", \"rs\", \"swift\", \"kt\", \"scala\", \"rb\", \"php\", \"sql\", \"json\", \"xml\", \"yaml\", \"yml\",\n}\nMAX_UPLOAD_FILE_SIZE_BYTES = 40 * 1024 * 1024  # 40 MB per file\nMAX_UPLOAD_TOTAL_SIZE_BYTES = 120 * 1024 * 1024  # 120 MB across uploaded files\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"",
+        "peekOfCode": "ALLOWED_FILE_TYPES = {\n    \"pdf\", \"txt\", \"md\", \"docx\", \"html\", \"htm\", \"pptx\",\n    \"py\", \"js\", \"ts\", \"tsx\", \"jsx\", \"java\", \"c\", \"cpp\", \"h\", \"hpp\",\n    \"cs\", \"go\", \"rs\", \"swift\", \"kt\", \"ml\", \"mli\", \"scala\", \"rb\", \"php\", \"sql\", \"json\", \"xml\", \"yaml\", \"yml\",\n}\nMAX_UPLOAD_FILE_SIZE_BYTES = 40 * 1024 * 1024  # 40 MB per file\nMAX_UPLOAD_TOTAL_SIZE_BYTES = 120 * 1024 * 1024  # 120 MB across uploaded files\ndef normalize_file_extension(filename: Optional[str]) -> str:\n    if not filename or \".\" not in filename:\n        return \"\"",
         "detail": "study-app-backend.src.utils.validators",
         "documentation": {}
     },
@@ -21676,7 +22783,16 @@
         "kind": 6,
         "importPath": "study-app-backend.tests.test_create_test",
         "description": "study-app-backend.tests.test_create_test",
-        "peekOfCode": "class TestCreateTestService:\n    \"\"\"\n    Tests for TestService.create_test() with all external dependencies mocked.\n    Verifies routing logic (notes vs practice-test path), question storage,\n    and validation error handling.\n    \"\"\"\n    def _make_upload_file(self, name: str = \"notes.txt\", content: bytes = b\"Study content.\") -> MagicMock:\n        f = MagicMock()\n        f.filename = name\n        f.read = AsyncMock(return_value=content)",
+        "peekOfCode": "class TestCreateTestService:\n    \"\"\"\n    Tests for TestService.create_test() with all external dependencies mocked.\n    Verifies routing logic (notes vs practice-test path), question storage,\n    and validation error handling.\n    MCQ verification is disabled for every test in this class: create_test()\n    instantiates its own MCQVerificationService (and, inside that, its own\n    LLMService) rather than reusing the mocked svc.llm_service, so an enabled\n    verifier here would make a real provider-candidate check per test. That\n    behavior (derive/adjudicate calls, the decision table, the veto matcher)",
+        "detail": "study-app-backend.tests.test_create_test",
+        "documentation": {}
+    },
+    {
+        "label": "TestCreateTestMcqVerificationWiring",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_create_test",
+        "description": "study-app-backend.tests.test_create_test",
+        "peekOfCode": "class TestCreateTestMcqVerificationWiring:\n    \"\"\"MCQ verification IS enabled here (unlike TestCreateTestService, which\n    disables it to stay fast/focused). These tests prove create_test() wires\n    MCQVerificationService in on the notes and practice-test-template paths,\n    that its result replaces mcq_questions before persistence, and that the\n    requested (not inflated) count is what generate_test_questions is asked to\n    over-generate from.\n    \"\"\"\n    def _make_upload_file(self, name: str = \"notes.txt\", content: bytes = b\"Study content.\") -> MagicMock:\n        f = MagicMock()",
         "detail": "study-app-backend.tests.test_create_test",
         "documentation": {}
     },
@@ -21744,6 +22860,33 @@
         "documentation": {}
     },
     {
+        "label": "TestGenerateQuestionsBackgroundVerificationWiring",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_generate_questions_background_wiring",
+        "description": "study-app-backend.tests.test_generate_questions_background_wiring",
+        "peekOfCode": "class TestGenerateQuestionsBackgroundVerificationWiring:\n    async def test_non_streaming_path_calls_verification_once_with_raw_count(\n        self, db_session_maker, monkeypatch,\n    ):\n        from src.routes.tests import _generate_questions_background\n        monkeypatch.setattr(\"src.routes.tests.settings.mcq_verification_enabled\", True)\n        test_id = await _seed_bare_test(db_session_maker)\n        llm = _make_llm_mock(_fake_generate_test_questions())\n        with (\n            patch(\"src.routes.tests.async_session_maker\", db_session_maker),",
+        "detail": "study-app-backend.tests.test_generate_questions_background_wiring",
+        "documentation": {}
+    },
+    {
+        "label": "pytestmark",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_generate_questions_background_wiring",
+        "description": "study-app-backend.tests.test_generate_questions_background_wiring",
+        "peekOfCode": "pytestmark = pytest.mark.asyncio\n_seed_counter = 0\nasync def _seed_bare_test(session_maker, test_type: str = \"MCQ_only\") -> int:\n    global _seed_counter\n    _seed_counter += 1\n    async with session_maker() as session:\n        user = User(email=f\"u{_seed_counter}@example.com\", google_id=f\"g{_seed_counter}\")\n        session.add(user)\n        await session.flush()\n        folder = Folder(user_id=user.id, name=\"F1\")",
+        "detail": "study-app-backend.tests.test_generate_questions_background_wiring",
+        "documentation": {}
+    },
+    {
+        "label": "_seed_counter",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_generate_questions_background_wiring",
+        "description": "study-app-backend.tests.test_generate_questions_background_wiring",
+        "peekOfCode": "_seed_counter = 0\nasync def _seed_bare_test(session_maker, test_type: str = \"MCQ_only\") -> int:\n    global _seed_counter\n    _seed_counter += 1\n    async with session_maker() as session:\n        user = User(email=f\"u{_seed_counter}@example.com\", google_id=f\"g{_seed_counter}\")\n        session.add(user)\n        await session.flush()\n        folder = Folder(user_id=user.id, name=\"F1\")\n        session.add(folder)",
+        "detail": "study-app-backend.tests.test_generate_questions_background_wiring",
+        "documentation": {}
+    },
+    {
         "label": "test_open_strictness_prompt_allows_general_knowledge",
         "kind": 2,
         "importPath": "study-app-backend.tests.test_kojo_strictness",
@@ -21786,6 +22929,60 @@
         "description": "study-app-backend.tests.test_kojo_strictness",
         "peekOfCode": "def test_no_interviewer_mode_leaves_prompt_persona_free() -> None:\n    \"\"\"The general study chat sends no interviewer_mode: the prompt must be\n    unchanged (no persona block leaks into non-KojoCode chats).\"\"\"\n    prompt = _build_prompt(\n        notes=\"[notes.md]\\nA transaction is a logical unit of work.\",\n        user_message=\"Explain ACID\",\n        history=[],\n    )\n    assert \"INTERVIEWER PERSONA\" not in prompt\n    assert \"OUTRANKS\" not in prompt",
         "detail": "study-app-backend.tests.test_kojo_strictness",
+        "documentation": {}
+    },
+    {
+        "label": "TestLearningModuleProviderFallback",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_learning_modules_provider_fallback",
+        "description": "study-app-backend.tests.test_learning_modules_provider_fallback",
+        "peekOfCode": "class TestLearningModuleProviderFallback:\n    async def test_kojo_card_pinned_ollama_failure_falls_back_and_track_is_ready(\n        self, db_session_maker, monkeypatch,\n    ):\n        \"\"\"The real Kojo scenario: provider=\"ollama\" (the chat setting default)\n        and Ollama cannot handle the request.\"\"\"\n        track, module, calls = await _run_build(\n            db_session_maker, monkeypatch, \"ollama\",\n            {\n                \"ollama\": LLMException(\"Ollama returned an unexpected response format that couldn't be parsed as JSON.\"),",
+        "detail": "study-app-backend.tests.test_learning_modules_provider_fallback",
+        "documentation": {}
+    },
+    {
+        "label": "pytestmark",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_learning_modules_provider_fallback",
+        "description": "study-app-backend.tests.test_learning_modules_provider_fallback",
+        "peekOfCode": "pytestmark = pytest.mark.asyncio\nOUTLINE = {\"modules\": [{\"title\": \"Module 1\", \"summary\": \"Covers X\"}]}\nCONTENT = {\n    \"lesson\": \"## Lesson\\nBody.\",\n    \"tts_script\": \"Lesson. Body.\",\n    \"questions\": [{\"question\": \"Q1?\", \"options\": [\"A\", \"B\", \"C\", \"D\"], \"correct_index\": 0}],\n}\nasync def _seed_track(session_maker, provider: str | None) -> tuple[int, int]:\n    async with session_maker() as session:\n        user = User(email=\"u@example.com\", google_id=\"g1\")",
+        "detail": "study-app-backend.tests.test_learning_modules_provider_fallback",
+        "documentation": {}
+    },
+    {
+        "label": "OUTLINE",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_learning_modules_provider_fallback",
+        "description": "study-app-backend.tests.test_learning_modules_provider_fallback",
+        "peekOfCode": "OUTLINE = {\"modules\": [{\"title\": \"Module 1\", \"summary\": \"Covers X\"}]}\nCONTENT = {\n    \"lesson\": \"## Lesson\\nBody.\",\n    \"tts_script\": \"Lesson. Body.\",\n    \"questions\": [{\"question\": \"Q1?\", \"options\": [\"A\", \"B\", \"C\", \"D\"], \"correct_index\": 0}],\n}\nasync def _seed_track(session_maker, provider: str | None) -> tuple[int, int]:\n    async with session_maker() as session:\n        user = User(email=\"u@example.com\", google_id=\"g1\")\n        session.add(user)",
+        "detail": "study-app-backend.tests.test_learning_modules_provider_fallback",
+        "documentation": {}
+    },
+    {
+        "label": "CONTENT",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_learning_modules_provider_fallback",
+        "description": "study-app-backend.tests.test_learning_modules_provider_fallback",
+        "peekOfCode": "CONTENT = {\n    \"lesson\": \"## Lesson\\nBody.\",\n    \"tts_script\": \"Lesson. Body.\",\n    \"questions\": [{\"question\": \"Q1?\", \"options\": [\"A\", \"B\", \"C\", \"D\"], \"correct_index\": 0}],\n}\nasync def _seed_track(session_maker, provider: str | None) -> tuple[int, int]:\n    async with session_maker() as session:\n        user = User(email=\"u@example.com\", google_id=\"g1\")\n        session.add(user)\n        await session.flush()",
+        "detail": "study-app-backend.tests.test_learning_modules_provider_fallback",
+        "documentation": {}
+    },
+    {
+        "label": "TestModuleGenerationVerificationWiring",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_learning_modules_verification_wiring",
+        "description": "study-app-backend.tests.test_learning_modules_verification_wiring",
+        "peekOfCode": "class TestModuleGenerationVerificationWiring:\n    async def test_quiz_count_inflated_when_modules_verification_enabled(self, db_session_maker, monkeypatch):\n        from src.routes.learning_modules import _generate_track_background, QUIZ_QUESTION_COUNT\n        monkeypatch.setattr(\"src.routes.learning_modules.settings.mcq_verification_enabled\", True)\n        monkeypatch.setattr(\"src.routes.learning_modules.settings.mcq_verification_modules_enabled\", True)\n        track_id, folder_id = await _seed_track(db_session_maker)\n        llm = _fake_llm()\n        fake_file_service = MagicMock()\n        fake_file_service.get_folder_files_content = AsyncMock(return_value=\"folder notes\")\n        with (",
+        "detail": "study-app-backend.tests.test_learning_modules_verification_wiring",
+        "documentation": {}
+    },
+    {
+        "label": "pytestmark",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_learning_modules_verification_wiring",
+        "description": "study-app-backend.tests.test_learning_modules_verification_wiring",
+        "peekOfCode": "pytestmark = pytest.mark.asyncio\nasync def _seed_track(session_maker, module_count: int = 1) -> tuple[int, int]:\n    \"\"\"Seed a User/Folder/LearningTrack with `module_count` empty module shells\n    (as phase 1 of the real background task would have already created).\n    Returns (track_id, folder_id).\"\"\"\n    async with session_maker() as session:\n        user = User(email=\"u@example.com\", google_id=\"g1\")\n        session.add(user)\n        await session.flush()\n        folder = Folder(user_id=user.id, name=\"F1\")",
+        "detail": "study-app-backend.tests.test_learning_modules_verification_wiring",
         "documentation": {}
     },
     {
@@ -22005,6 +23202,132 @@
         "documentation": {}
     },
     {
+        "label": "TestCoerceCorrectIndex",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_mcq_verification",
+        "description": "study-app-backend.tests.test_mcq_verification",
+        "peekOfCode": "class TestCoerceCorrectIndex:\n    \"\"\"LLMService._coerce_correct_index: reject, never clamp.\"\"\"\n    def test_rejects_out_of_range_high(self) -> None:\n        assert LLMService._coerce_correct_index({\"correct_index\": 7}, 4) is None\n    def test_rejects_negative(self) -> None:\n        assert LLMService._coerce_correct_index({\"correct_index\": -1}, 4) is None\n    def test_rejects_none(self) -> None:\n        assert LLMService._coerce_correct_index({\"correct_index\": None}, 4) is None\n    def test_rejects_missing_key(self) -> None:\n        assert LLMService._coerce_correct_index({}, 4) is None",
+        "detail": "study-app-backend.tests.test_mcq_verification",
+        "documentation": {}
+    },
+    {
+        "label": "TestBuildMcqFromItem",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_mcq_verification",
+        "description": "study-app-backend.tests.test_mcq_verification",
+        "peekOfCode": "class TestBuildMcqFromItem:\n    \"\"\"_build_mcq_from_item must return None rather than a coerced wrong answer.\"\"\"\n    def test_out_of_range_index_is_rejected(self) -> None:\n        llm = LLMService()\n        result = llm._build_mcq_from_item(_mcq_item(7))\n        assert result is None\n    def test_negative_index_is_rejected(self) -> None:\n        llm = LLMService()\n        result = llm._build_mcq_from_item(_mcq_item(-1))\n        assert result is None",
+        "detail": "study-app-backend.tests.test_mcq_verification",
+        "documentation": {}
+    },
+    {
+        "label": "TestNormalizeMcqItemAliasText",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_mcq_verification",
+        "description": "study-app-backend.tests.test_mcq_verification",
+        "peekOfCode": "class TestNormalizeMcqItemAliasText:\n    \"\"\"_normalize_mcq_item: an aliased answer key holding option TEXT (not an\n    index) must resolve to that option's index on an exact match only.\"\"\"\n    def test_correct_answer_alias_with_matching_option_text(self) -> None:\n        llm = LLMService()\n        item = {\n            \"question_text\": \"What is the answer?\",\n            \"options\": [\"Alpha\", \"Beta\", \"Gamma\", \"Delta\"],\n            \"correct_answer\": \"Gamma\",\n        }",
+        "detail": "study-app-backend.tests.test_mcq_verification",
+        "documentation": {}
+    },
+    {
+        "label": "TestDeriveMcqAnswers",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_mcq_verification",
+        "description": "study-app-backend.tests.test_mcq_verification",
+        "peekOfCode": "class TestDeriveMcqAnswers:\n    async def test_empty_questions_returns_empty_without_calling_provider(self) -> None:\n        llm = LLMService()\n        llm._complete_json = AsyncMock()  # type: ignore[method-assign]\n        result = await llm.derive_mcq_answers([], \"some notes\")\n        assert result == []\n        llm._complete_json.assert_not_called()\n    async def test_single_batch_happy_path(self) -> None:\n        llm = LLMService()\n        llm._complete_json = AsyncMock(return_value={",
+        "detail": "study-app-backend.tests.test_mcq_verification",
+        "documentation": {}
+    },
+    {
+        "label": "TestAdjudicateMcqMatches",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_mcq_verification",
+        "description": "study-app-backend.tests.test_mcq_verification",
+        "peekOfCode": "class TestAdjudicateMcqMatches:\n    async def test_empty_items_returns_empty_without_calling_provider(self) -> None:\n        llm = LLMService()\n        llm._complete_json = AsyncMock()  # type: ignore[method-assign]\n        result = await llm.adjudicate_mcq_matches([])\n        assert result == {}\n        llm._complete_json.assert_not_called()\n    async def test_happy_path_match(self) -> None:\n        llm = LLMService()\n        llm._complete_json = AsyncMock(return_value={\"matches\": [{\"index\": 0, \"matched_option\": 2}]})",
+        "detail": "study-app-backend.tests.test_mcq_verification",
+        "documentation": {}
+    },
+    {
+        "label": "TestMatcherLadder",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_mcq_verification",
+        "description": "study-app-backend.tests.test_mcq_verification",
+        "peekOfCode": "class TestMatcherLadder:\n    \"\"\"These assert the VETO outcome (or its absence), never a drop — the\n    matcher can only ever save a question, per the module's one-way-valve\n    design.\"\"\"\n    def test_three_way_match_yields_no_veto(self) -> None:\n        # \"4\" matches three of the four options: the matcher cannot say which\n        # one was meant, so it must stay silent rather than guess.\n        assert veto_drop(\"4\", [\"4\", \"8\", \"x = 4\", \"four\"]) is None\n    def test_assignment_prefix_matches_bare_value(self) -> None:\n        assert answers_match(\"x = 4\", \"4\") is True",
+        "detail": "study-app-backend.tests.test_mcq_verification",
+        "documentation": {}
+    },
+    {
+        "label": "TestDecisionTableUnit",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_mcq_verification",
+        "description": "study-app-backend.tests.test_mcq_verification",
+        "peekOfCode": "class TestDecisionTableUnit:\n    \"\"\"Directly exercises MCQVerificationService._resolve_item, the single\n    source of truth for the decision table, independent of the LLM calls.\"\"\"\n    def test_matched_equals_stored_key_keeps_unchanged(self) -> None:\n        item = _verifiable(\"q1\", correct_index=1)\n        derived = _derived(0, \"B\", 0.9)\n        verdict, index = MCQVerificationService._resolve_item(item, derived, matched=1, veto_index=None)\n        assert verdict == \"keep\"\n    def test_matched_differs_high_confidence_recorrects(self) -> None:\n        item = _verifiable(\"q1\", correct_index=0)",
+        "detail": "study-app-backend.tests.test_mcq_verification",
+        "documentation": {}
+    },
+    {
+        "label": "TestVerifyAndResolveOrchestration",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_mcq_verification",
+        "description": "study-app-backend.tests.test_mcq_verification",
+        "peekOfCode": "class TestVerifyAndResolveOrchestration:\n    \"\"\"End-to-end through verify_and_resolve with the LLM calls mocked, so the\n    sharding/caps/stats plumbing is exercised together with the decision table.\"\"\"\n    def _service_with(self, derive_return, adjudicate_return) -> MCQVerificationService:\n        llm = LLMService()\n        llm.derive_mcq_answers = AsyncMock(return_value=derive_return)  # type: ignore[method-assign]\n        llm.adjudicate_mcq_matches = AsyncMock(return_value=adjudicate_return)  # type: ignore[method-assign]\n        return MCQVerificationService(llm=llm)\n    async def test_empty_items_short_circuits(self) -> None:\n        service = self._service_with([], {})",
+        "detail": "study-app-backend.tests.test_mcq_verification",
+        "documentation": {}
+    },
+    {
+        "label": "TestInflatedMcqCount",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_mcq_verification",
+        "description": "study-app-backend.tests.test_mcq_verification",
+        "peekOfCode": "class TestInflatedMcqCount:\n    def test_disabled_returns_request_unchanged(self, monkeypatch) -> None:\n        monkeypatch.setattr(\"src.services.mcq_verification_service.settings.mcq_verification_enabled\", False)\n        assert inflated_mcq_count(10) == 10\n    def test_zero_or_negative_returns_unchanged(self) -> None:\n        assert inflated_mcq_count(0) == 0\n        assert inflated_mcq_count(-5) == -5\n    def test_default_ratio_inflates_within_plus_five_cap(self, monkeypatch) -> None:\n        monkeypatch.setattr(\"src.services.mcq_verification_service.settings.mcq_verification_enabled\", True)\n        monkeypatch.setattr(\"src.services.mcq_verification_service.settings.mcq_verification_overgen_ratio\", 1.3)",
+        "detail": "study-app-backend.tests.test_mcq_verification",
+        "documentation": {}
+    },
+    {
+        "label": "TestVerifyGeneratedMcqs",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_mcq_verification",
+        "description": "study-app-backend.tests.test_mcq_verification",
+        "peekOfCode": "class TestVerifyGeneratedMcqs:\n    async def test_empty_input_short_circuits(self) -> None:\n        service = MCQVerificationService(llm=LLMService())\n        result, stats = await service.verify_generated_mcqs([], \"notes\")\n        assert result == []\n        assert stats == {\"verified\": 0}\n    async def test_kept_questions_pass_through_unchanged(self) -> None:\n        questions = [_generated_mcq(\"Q1?\", 0), _generated_mcq(\"Q2?\", 1)]\n        service = MCQVerificationService(llm=LLMService())\n        async def fake_verify_and_resolve(items, source_content, **kwargs):",
+        "detail": "study-app-backend.tests.test_mcq_verification",
+        "documentation": {}
+    },
+    {
+        "label": "TestRegenerateMcqsForTopics",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_mcq_verification",
+        "description": "study-app-backend.tests.test_mcq_verification",
+        "peekOfCode": "class TestRegenerateMcqsForTopics:\n    async def test_zero_count_returns_empty_without_calling_provider(self) -> None:\n        llm = LLMService()\n        llm._complete_json = AsyncMock()  # type: ignore[method-assign]\n        result = await llm.regenerate_mcqs_for_topics(\"notes\", [\"Old Q?\"], count=0)\n        assert result == []\n        llm._complete_json.assert_not_called()\n    async def test_happy_path_parses_replacements(self) -> None:\n        llm = LLMService()\n        llm._complete_json = AsyncMock(return_value={",
+        "detail": "study-app-backend.tests.test_mcq_verification",
+        "documentation": {}
+    },
+    {
+        "label": "TestRepairRound",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_mcq_verification",
+        "description": "study-app-backend.tests.test_mcq_verification",
+        "peekOfCode": "class TestRepairRound:\n    def _service(self) -> MCQVerificationService:\n        return MCQVerificationService(llm=LLMService())\n    async def test_duration_ms_covers_the_whole_repair_round_not_just_the_first_pass(self) -> None:\n        # Regression: duration_ms used to be inherited unchanged from the\n        # initial verify_and_resolve outcome, so a repair round's own real\n        # latency (a generation call plus a second verify_and_resolve) never\n        # showed up in the reported number. Caught live: a call that actually\n        # took ~8.3s wall time was self-reporting ~3.8s whenever repair fired.\n        questions = [_generated_mcq(\"Q0?\", 0)]",
+        "detail": "study-app-backend.tests.test_mcq_verification",
+        "documentation": {}
+    },
+    {
+        "label": "TestDeriveMcqAnswersVariantFraming",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_mcq_verification",
+        "description": "study-app-backend.tests.test_mcq_verification",
+        "peekOfCode": "class TestDeriveMcqAnswersVariantFraming:\n    async def _capture_prompt(self, **derive_kwargs) -> str:\n        llm = LLMService()\n        captured: list[str] = []\n        async def capture(prompt: str, provider=None):\n            captured.append(prompt)\n            return {\"answers\": []}\n        llm._complete_json = capture  # type: ignore[method-assign]\n        await llm.derive_mcq_answers([\"Q1?\"], \"source material\", **derive_kwargs)\n        assert len(captured) == 1",
+        "detail": "study-app-backend.tests.test_mcq_verification",
+        "documentation": {}
+    },
+    {
+        "label": "TestVerifyModuleQuiz",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_mcq_verification",
+        "description": "study-app-backend.tests.test_mcq_verification",
+        "peekOfCode": "class TestVerifyModuleQuiz:\n    def _service(self) -> MCQVerificationService:\n        return MCQVerificationService(llm=LLMService())\n    async def test_empty_quiz_short_circuits(self) -> None:\n        service = self._service()\n        result, stats = await service.verify_module_quiz([], \"lesson\", requested_count=5)\n        assert result == []\n        assert stats == {\"verified\": 0}\n    async def test_non_four_option_quiz_is_not_rejected(self) -> None:\n        # Module quizzes allow 2-6 options (_parse_module_quiz), unlike the",
+        "detail": "study-app-backend.tests.test_mcq_verification",
+        "documentation": {}
+    },
+    {
         "label": "TestRAGDiagnostics",
         "kind": 6,
         "importPath": "study-app-backend.tests.test_rag_diagnostics",
@@ -22119,6 +23442,24 @@
         "description": "study-app-backend.tests.test_tts_script_e2e",
         "peekOfCode": "FORBIDDEN_IN_SPEECH = [\n    (\"LaTeX delimiter $\", re.compile(r\"\\$\")),\n    (\"code fence ```\", re.compile(r\"```\")),\n    (\"markdown heading #\", re.compile(r\"^#{1,6}\\s\", re.MULTILINE)),\n    (\"LaTeX command backslash\", re.compile(r\"\\\\[a-zA-Z]+\")),\n    (\"raw Big-O notation like O(n)\", re.compile(r\"\\bO\\([^)]*\\)\")),\n    (\"caret exponent like n^2\", re.compile(r\"\\w\\^\\{?\\w\")),\n    (\"bracket indexing like arr[i]\", re.compile(r\"\\w\\[\\w+\\]\")),\n]\ndef _assert_speakable(script: str, source: str) -> None:",
         "detail": "study-app-backend.tests.test_tts_script_e2e",
+        "documentation": {}
+    },
+    {
+        "label": "TestVerifyPersistedMcqs",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_verify_persisted_mcqs",
+        "description": "study-app-backend.tests.test_verify_persisted_mcqs",
+        "peekOfCode": "class TestVerifyPersistedMcqs:\n    async def test_zero_requested_mcq_is_a_noop(self, db_session_maker):\n        from src.routes.tests import _verify_persisted_mcqs\n        test_id = await _seed_test_with_mcqs(db_session_maker, [(\"Q1?\", 0)])\n        with patch(\"src.routes.tests.async_session_maker\", db_session_maker):\n            await _verify_persisted_mcqs(\n                test_id=test_id, source_content=\"notes\", variant=\"prose\", provider=None,\n                requested_mcq=0, coding_language=None, test_type=\"MCQ_only\", difficulty=\"mixed\",\n                topic_focus=None, custom_instructions=None,\n            )",
+        "detail": "study-app-backend.tests.test_verify_persisted_mcqs",
+        "documentation": {}
+    },
+    {
+        "label": "pytestmark",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_verify_persisted_mcqs",
+        "description": "study-app-backend.tests.test_verify_persisted_mcqs",
+        "peekOfCode": "pytestmark = pytest.mark.asyncio\n# db_session_maker fixture lives in conftest.py, shared with\n# test_generate_questions_background_wiring.py.\nasync def _seed_test_with_mcqs(\n    session_maker, mcq_texts_and_correct: list[tuple[str, int]], with_attempt: bool = False,\n) -> int:\n    \"\"\"Seed a User/Folder/TestRow plus one MCQ question per (text, correct_index)\n    pair, each with 4 options \"A\"/\"B\"/\"C\"/\"D\". Returns the test id.\"\"\"\n    async with session_maker() as session:\n        user = User(email=\"u@example.com\", google_id=\"g1\")",
+        "detail": "study-app-backend.tests.test_verify_persisted_mcqs",
         "documentation": {}
     },
     {
