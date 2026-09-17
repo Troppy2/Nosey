@@ -24790,3 +24790,81 @@ button.lc-official-link:disabled:hover {
 .file-view-note {
   margin: 0;
 }
+
+/* -- Kojo chat header: stacked title block ---------------------------------- */
+/* The folder used to sit inline as a non-shrinking pill beside the chat name, so
+   on a phone it ate the row and crushed the name to one letter. The name and its
+   folder now stack: each gets the full width of the title column and ellipses on
+   its own, and the folder reads as a quiet sub-line rather than a second chip. */
+.chat-mode-shell .chat-mode-title-wrap {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1px;
+}
+
+.chat-mode-shell .chat-mode-title-wrap .chat-mode-title {
+  max-width: 100%;
+  font-size: 0.9rem;
+  line-height: 1.25;
+}
+
+.chat-mode-shell .chat-mode-title-wrap .chat-mode-folder-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-width: 0;
+  flex-shrink: 1;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--k-accent);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.chat-mode-shell .chat-mode-folder-pill svg {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.chat-mode-folder-pill-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .chat-mode-shell .chat-mode-header {
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .chat-mode-shell .chat-mode-header-left {
+    gap: 8px;
+  }
+
+  .chat-mode-shell .chat-mode-header-actions {
+    gap: 4px;
+  }
+
+  /* Icon + count is enough on a phone; the word costs the title its room. */
+  .chat-mode-docs-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .chat-mode-shell .chat-mode-docs-btn {
+    min-width: 38px;
+    height: 38px;
+    justify-content: center;
+    padding: 0 8px;
+  }
+}
