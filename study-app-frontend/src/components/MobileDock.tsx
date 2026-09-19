@@ -22,6 +22,7 @@ const IMMERSIVE_PATTERNS = [
   /^\/flashcards\/[^/]+\/episode\/[^/]+$/,
   /^\/kojo\/chat$/,
   /^\/leetcode$/,
+  /^\/system-design\/[^/]+\/(visualizer|project)$/,
   /^\/mock-interview\/[^/]+\/stage\d$/,
 ];
 
