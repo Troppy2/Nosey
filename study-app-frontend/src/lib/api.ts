@@ -57,6 +57,11 @@ import type {
   SlashCommandInput,
   SubmittedAnswer,
   SurveyFeature,
+  SystemDesignClientSubModule,
+  SystemDesignProgress,
+  SystemDesignQuizGradePayload,
+  SystemDesignQuizResult,
+  SystemDesignSubmission,
   TestBlueprint,
   TestSummary,
   TestTake,
@@ -2216,4 +2221,48 @@ export async function submitSurvey(payload: {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+// ── System Design mode ────────────────────────────────────────────────────────
+
+export async function getSystemDesignProgress(): Promise<SystemDesignProgress> {
+  return request<SystemDesignProgress>("/system-design/progress");
+}
+
+export async function markSystemDesignSubModule(
+  conceptId: string,
+  subModule: SystemDesignClientSubModule,
+  done: boolean,
+): Promise<void> {
+  await request(`/system-design/progress/${encodeURIComponent(conceptId)}`, {
+    method: "PUT",
+    body: JSON.stringify({ subModule, done }),
+  });
+}
+
+export async function getSystemDesignSubmission(exerciseId: string): Promise<SystemDesignSubmission> {
+  return request<SystemDesignSubmission>(
+    `/system-design/submissions/${encodeURIComponent(exerciseId)}`,
+  );
+}
+
+export async function putSystemDesignSubmission(
+  exerciseId: string,
+  files: Record<string, string>,
+  ranPassed: boolean,
+): Promise<void> {
+  await request(`/system-design/submissions/${encodeURIComponent(exerciseId)}`, {
+    method: "PUT",
+    body: JSON.stringify({ files, ranPassed }),
+  });
+}
+
+export async function gradeSystemDesignQuiz(
+  conceptId: string,
+  payload: SystemDesignQuizGradePayload,
+): Promise<SystemDesignQuizResult> {
+  return request<SystemDesignQuizResult>(
+    `/system-design/quiz/${encodeURIComponent(conceptId)}/grade`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
 }

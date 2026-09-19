@@ -26,7 +26,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from src.config import settings
 from src.limiter import limiter
-from src.routes import admin, attempts, auth, flashcards, folder_files, folders, health, job_descriptions, kojo, learning_modules, leetcode, mock_interview, slash_commands, surveys, tests
+from src.routes import admin, attempts, auth, flashcards, folder_files, folders, health, job_descriptions, kojo, learning_modules, leetcode, mock_interview, slash_commands, surveys, system_design, tests
 from src.utils.validators import MAX_UPLOAD_TOTAL_SIZE_BYTES
 
 _MAX_REQUEST_BODY_BYTES = MAX_UPLOAD_TOTAL_SIZE_BYTES
@@ -102,3 +102,4 @@ app.include_router(job_descriptions.router)
 app.include_router(slash_commands.router)
 app.include_router(surveys.router)
 app.include_router(learning_modules.router)
+app.include_router(system_design.router)
