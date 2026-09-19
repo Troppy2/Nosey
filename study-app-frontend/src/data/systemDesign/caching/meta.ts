@@ -15,9 +15,10 @@ export const caching: Concept = {
   title: "Caching",
   blurb: "Why a fast copy of the truth is worth having, and what it costs you when it is wrong.",
   notes: normalizeSource(notesRaw),
-  // Set by the owner once a video is chosen. The sub-module and its checkbox
-  // work either way.
-  video: null,
+  video: {
+    title: "Cache Systems Every Developer Should Know",
+    youtubeId: "dGAgxozNWFE",
+  },
 
   visualizer: {
     kind: "visualizer",
