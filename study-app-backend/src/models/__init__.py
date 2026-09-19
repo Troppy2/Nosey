@@ -29,6 +29,7 @@ from src.models.note import Note
 from src.models.question import Question
 from src.models.slash_command import SlashCommand
 from src.models.survey_response import SurveyResponse
+from src.models.system_design import SDConceptProgress, SDQuizAttempt, SDSubmission
 from src.models.test import Test
 from src.models.usage_event import UsageEvent
 from src.models.user import User
@@ -62,6 +63,9 @@ __all__ = [
     "LearningTrack",
     "MCQOption",
     "MockInterviewSession",
+    "SDConceptProgress",
+    "SDQuizAttempt",
+    "SDSubmission",
     "Note",
     "Question",
     "SlashCommand",
