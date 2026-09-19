@@ -923,3 +923,68 @@ export type AdminSurveysResponse = {
   summary: AdminSurveySummary[];
   recent: AdminSurveyRecent[];
 };
+
+// ── System Design mode ────────────────────────────────────────────────────────
+
+export type SystemDesignSubModule = "notes" | "video" | "visualizer" | "project" | "quiz";
+
+/** The two sub-modules a client may assert directly. The other three are earned:
+ *  visualizer and project by a passing Pyodide run, quiz by a graded attempt. */
+export type SystemDesignClientSubModule = "notes" | "video";
+
+export type SystemDesignProgressEntry = {
+  notesDone: boolean;
+  videoDone: boolean;
+  visualizerDone: boolean;
+  projectDone: boolean;
+  quizDone: boolean;
+  quizBestScore: number | null;
+  completedAt: string | null;
+};
+
+export type SystemDesignProgress = {
+  concepts: Record<string, SystemDesignProgressEntry>;
+};
+
+export type SystemDesignSubmission = {
+  files: Record<string, string>;
+  lastRunPassed: boolean;
+  passedAt: string | null;
+};
+
+export type SystemDesignMcqResult = {
+  id: string;
+  chosenIndex: number;
+  correctIndex: number;
+};
+
+export type SystemDesignFrqSubmission = {
+  id: string;
+  prompt: string;
+  rubric: string;
+  answer: string;
+};
+
+export type SystemDesignQuizGradePayload = {
+  notes: string;
+  mcq: SystemDesignMcqResult[];
+  frq: SystemDesignFrqSubmission[];
+};
+
+export type SystemDesignFrqFeedback = {
+  id: string;
+  isCorrect: boolean;
+  feedback: string;
+  confidence: number;
+  flaggedUncertain: boolean;
+};
+
+export type SystemDesignQuizResult = {
+  mcqScore: number;
+  frqScore: number;
+  totalScore: number;
+  passed: boolean;
+  graderDegraded: boolean;
+  frqFeedback: SystemDesignFrqFeedback[];
+  conceptCompleted: boolean;
+};

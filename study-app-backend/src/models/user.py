@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from src.models.job_description import UserJobDescription
     from src.models.mock_interview import MockInterviewSession
     from src.models.slash_command import SlashCommand
+    from src.models.system_design import SDConceptProgress, SDQuizAttempt, SDSubmission
     from src.models.user_attempt import UserAttempt
 
 
@@ -105,6 +106,15 @@ class User(Base, TimestampMixin):
     )
     lc_solution_articles: Mapped[list[LCSolutionArticle]] = relationship(
         "LCSolutionArticle", back_populates="user", cascade="all, delete-orphan"
+    )
+    sd_concept_progress: Mapped[list[SDConceptProgress]] = relationship(
+        "SDConceptProgress", back_populates="user", cascade="all, delete-orphan"
+    )
+    sd_submissions: Mapped[list[SDSubmission]] = relationship(
+        "SDSubmission", back_populates="user", cascade="all, delete-orphan"
+    )
+    sd_quiz_attempts: Mapped[list[SDQuizAttempt]] = relationship(
+        "SDQuizAttempt", back_populates="user", cascade="all, delete-orphan"
     )
     mock_interview_sessions: Mapped[list[MockInterviewSession]] = relationship(
         "MockInterviewSession", back_populates="user", cascade="all, delete-orphan"
