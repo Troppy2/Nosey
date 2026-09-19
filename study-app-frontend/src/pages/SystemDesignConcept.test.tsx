@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { caching } from "../data/systemDesign/caching/meta";
+import type { ConceptVideo } from "../data/systemDesign/types";
 import SystemDesignConcept from "./SystemDesignConcept";
 
 const settings = { betaMode: true };
@@ -18,6 +19,25 @@ vi.mock("../components/episodeSpeech", async () => {
     "../components/episodeSpeech",
   );
   return { ...actual, speechCapability: () => speech };
+});
+
+// Both shipping concepts carry a video, so the "no link bundled" branch needs a
+// concept that does not. Overriding the registry keeps that branch covered
+// without pinning the test to whatever content currently has an empty field.
+const videoOverride: { value: ConceptVideo | null | undefined } = { value: undefined };
+
+vi.mock("../data/systemDesign", async () => {
+  const actual = await vi.importActual<typeof import("../data/systemDesign")>(
+    "../data/systemDesign",
+  );
+  return {
+    ...actual,
+    getConcept: (id: string) => {
+      const concept = actual.getConcept(id);
+      if (!concept || videoOverride.value === undefined) return concept;
+      return { ...concept, video: videoOverride.value };
+    },
+  };
 });
 
 vi.mock("../lib/api", () => ({
@@ -57,6 +77,7 @@ function renderConcept(conceptId = caching.id) {
 beforeEach(() => {
   settings.betaMode = true;
   speech.usable = true;
+  videoOverride.value = undefined;
   mockedProgress.mockReset();
   mockedMark.mockReset();
   mockedGrade.mockReset();
@@ -98,8 +119,16 @@ describe("SystemDesignConcept page", () => {
     await waitFor(() => expect(mockedMark).toHaveBeenCalledWith(caching.id, "video", true));
   });
 
+  it("embeds the bundled video without cookies and without a title of its own", async () => {
+    renderConcept();
+    const frame = (await screen.findByTitle(caching.video!.title)) as HTMLIFrameElement;
+    expect(frame.getAttribute("src")).toBe(
+      `https://www.youtube-nocookie.com/embed/${caching.video!.youtubeId}`,
+    );
+  });
+
   it("keeps the video checkbox usable when no video is set", async () => {
-    expect(caching.video).toBeNull();
+    videoOverride.value = null;
     renderConcept();
     expect(await screen.findByText(/no video is bundled with this concept yet/i)).toBeTruthy();
     fireEvent.click(await screen.findByLabelText(/i watched this/i));

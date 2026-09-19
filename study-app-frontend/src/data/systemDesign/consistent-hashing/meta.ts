@@ -15,7 +15,10 @@ export const consistentHashing: Concept = {
   title: "Consistent Hashing",
   blurb: "How to split a keyspace across machines so that adding one does not move everything.",
   notes: normalizeSource(notesRaw),
-  video: null,
+  video: {
+    title: "Consistent Hashing | Algorithms You Should Know #1",
+    youtubeId: "UF9Iqmg94tk",
+  },
 
   visualizer: {
     kind: "visualizer",
