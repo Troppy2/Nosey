@@ -1,3 +1,12 @@
+import {
+  SD_WORK_DIR,
+  buildHarnessFiles,
+  computeOk,
+  normalizeSimEvents,
+  parseTestResults,
+} from "./sdHarness";
+import type { SimEvent, TestCaseResult } from "./sdHarness";
+
 export type SerializedValue =
   | { type: 'none' }
   | { type: 'bool'; value: boolean }
@@ -546,4 +555,157 @@ _json.dumps(_TRACE_RESULT)
       error: error instanceof Error ? error.message : "Tracer failed.",
     };
   }
+}
+
+// ── System Design mode: multi-file exercise runner ────────────────────────────
+
+export type { SimEvent, TestCaseResult } from "./sdHarness";
+
+export type MultiFileTestResult = {
+  ok: boolean;
+  cases: TestCaseResult[];
+  stdout: string;
+  /** Events the learner's code emitted through the sim module. [] if unused. */
+  events: SimEvent[];
+  /** A harness-level failure (syntax error, import error), not a failing assertion. */
+  error?: string;
+};
+
+/**
+ * Run a System Design exercise: the learner's files plus a hidden test module,
+ * all inside the browser. Nothing here executes on the backend.
+ *
+ * Thin on purpose. Every decision (what to write, in what order, how to read the
+ * results back) lives in sdHarness.ts where it is unit tested without Pyodide.
+ */
+export async function runPythonMultiFile(args: {
+  files: Record<string, string>;
+  testModule: string;
+  mockPackages?: Record<string, string>;
+  entryTest?: string;
+}): Promise<MultiFileTestResult> {
+  let harnessFiles;
+  try {
+    harnessFiles = buildHarnessFiles(args);
+  } catch (error) {
+    return {
+      ok: false,
+      cases: [],
+      stdout: "",
+      events: [],
+      error: error instanceof Error ? error.message : "Could not prepare the exercise files.",
+    };
+  }
+
+  const pyodide = await loadPyodideInstance();
+  const entryTest = args.entryTest || "run_tests";
+
+  const driver = `
+import contextlib
+import importlib
+import io
+import json
+import os
+import shutil
+import sys
+import time
+import traceback
+
+WORK_DIR = ${JSON.stringify(SD_WORK_DIR)}
+ENTRY = ${JSON.stringify(entryTest)}
+FILES = json.loads(${JSON.stringify(JSON.stringify(harnessFiles))})
+
+# The Pyodide instance is shared across the whole app and across runs, so the
+# workspace is rebuilt from scratch every time. Without the sys.modules purge a
+# second run would silently reuse the first run's module objects and the learner
+# would see stale results from code they had already changed.
+if os.path.isdir(WORK_DIR):
+    shutil.rmtree(WORK_DIR, ignore_errors=True)
+os.makedirs(WORK_DIR, exist_ok=True)
+
+for _name in list(sys.modules):
+    _origin = getattr(sys.modules[_name], "__file__", None) or ""
+    if _origin.startswith(WORK_DIR + os.sep) or _origin.startswith(WORK_DIR + "/"):
+        del sys.modules[_name]
+
+for _entry in FILES:
+    with open(_entry["path"], "w", encoding="utf-8") as _handle:
+        _handle.write(_entry["contents"])
+
+if WORK_DIR in sys.path:
+    sys.path.remove(WORK_DIR)
+sys.path.insert(0, WORK_DIR)
+importlib.invalidate_caches()
+
+_TIME_LIMIT = 10.0
+
+def _timeout_tracer(deadline):
+    def _trace(frame, event, arg):
+        if time.time() > deadline:
+            raise TimeoutError("Time limit exceeded (10s). Check for an infinite loop.")
+        return _trace
+    return _trace
+
+def _jsonable(value):
+    if isinstance(value, (list, tuple)):
+        return [list(item) if isinstance(item, tuple) else item for item in value]
+    return value
+
+RESULT = {"cases": None, "stdout": "", "events": [], "error": None}
+_buffer = io.StringIO()
+
+try:
+    with contextlib.redirect_stdout(_buffer), contextlib.redirect_stderr(_buffer):
+        import sim
+        sim.reset()
+        _tests = importlib.import_module("_sd_tests")
+        _entry_fn = getattr(_tests, ENTRY, None)
+        if not callable(_entry_fn):
+            raise AttributeError("The exercise tests are missing a " + ENTRY + "() function.")
+        sys.settrace(_timeout_tracer(time.time() + _TIME_LIMIT))
+        try:
+            RESULT["cases"] = _jsonable(_entry_fn())
+        finally:
+            sys.settrace(None)
+        RESULT["events"] = sim.events()
+except BaseException:
+    sys.settrace(None)
+    RESULT["error"] = traceback.format_exc()
+    try:
+        RESULT["events"] = sys.modules["sim"].events() if "sim" in sys.modules else []
+    except Exception:
+        RESULT["events"] = []
+
+RESULT["stdout"] = _buffer.getvalue()
+json.dumps(RESULT, default=repr)
+`;
+
+  let raw: { cases?: unknown; stdout?: unknown; events?: unknown; error?: unknown };
+  try {
+    raw = JSON.parse(String(await pyodide.runPythonAsync(driver)));
+  } catch (error) {
+    return {
+      ok: false,
+      cases: [],
+      stdout: "",
+      events: [],
+      error: error instanceof Error ? error.message : "The Python runner failed to start.",
+    };
+  }
+
+  const events = normalizeSimEvents(raw.events);
+  const stdout = typeof raw.stdout === "string" ? raw.stdout : "";
+
+  if (raw.error) {
+    return { ok: false, cases: [], stdout, events, error: String(raw.error) };
+  }
+
+  const parsed = parseTestResults(raw.cases);
+  return {
+    ok: computeOk(parsed),
+    cases: parsed.cases,
+    stdout,
+    events,
+    ...(parsed.error ? { error: parsed.error } : {}),
+  };
 }
