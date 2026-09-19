@@ -5474,6 +5474,12 @@ export default function LeetCodeMode() {
               <Users size={16} />
               Mock Interview
             </Link>
+            {betaMode ? (
+              <Link to="/system-design" className="lc-official-link">
+                <Network size={16} />
+                System Design
+              </Link>
+            ) : null}
             <a className="lc-official-link" href="https://leetcode.com/problemset/" target="_blank" rel="noreferrer">
               <ExternalLink size={16} />
               Open LeetCode

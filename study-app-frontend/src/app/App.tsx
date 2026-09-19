@@ -38,6 +38,9 @@ import Results from "../pages/Results";
 import TakeTest from "../pages/TakeTest";
 import AdminPanel from "../pages/AdminPanel";
 import Settings from "../pages/Settings";
+import SystemDesign from "../pages/SystemDesign";
+import SystemDesignConcept from "../pages/SystemDesignConcept";
+import SystemDesignWorkspace from "../pages/SystemDesignWorkspace";
 
 // Dependency imports for tracking the last visited path
 import { useLocation } from "react-router-dom";
@@ -109,6 +112,12 @@ export default function App() {
           <Route path="/flashcards/:folderId/episode/:moduleId" element={<EpisodePlayer />} />
           <Route path="/folders/:folderId/flashcards/manage" element={<FlashcardsManage />} />
           <Route path="/leetcode" element={<SignedInRoute><LeetCodeMode /></SignedInRoute>} />
+          <Route path="/system-design" element={<SignedInRoute><SystemDesign /></SignedInRoute>} />
+          <Route path="/system-design/:conceptId" element={<SignedInRoute><SystemDesignConcept /></SignedInRoute>} />
+          <Route
+            path="/system-design/:conceptId/:exerciseKind"
+            element={<SignedInRoute><SystemDesignWorkspace /></SignedInRoute>}
+          />
           <Route path="/mock-interview" element={<MockInterviewSetup />} />
           <Route path="/mock-interview/history" element={<MockInterviewHistory />} />
           <Route path="/mock-interview/:sessionId/resume" element={<MockInterviewResume />} />
