@@ -4508,7 +4508,12 @@
   font-size: 0.82rem;
 }
 
-/* Per-row checkbox: same sage box as the toggle glyph, replacing the OS default. */
+/* The app's checkbox: the same sage box as the file-manager toggle glyph,
+   replacing the OS default. Reach for .checkbox-input on any new checkbox so
+   there is one drawn box in the product rather than one per feature. The
+   file-manager selector stays alongside it so those rows keep working without
+   a markup change. */
+.checkbox-input,
 .file-manager-row input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;
@@ -4523,6 +4528,7 @@
   transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
+.checkbox-input:checked,
 .file-manager-row input[type="checkbox"]:checked {
   background: var(--green-dark);
   border-color: var(--green-dark);
@@ -4531,6 +4537,7 @@
   background-position: center;
 }
 
+.checkbox-input:focus-visible,
 .file-manager-row input[type="checkbox"]:focus-visible {
   outline: 2px solid var(--green-dark);
   outline-offset: 2px;
