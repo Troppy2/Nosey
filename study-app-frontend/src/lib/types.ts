@@ -323,12 +323,26 @@ export type CheckpointAnswerResult = {
   best_score: number;
 };
 
+// Why the correct option is correct, revealed only once the quiz is graded.
+// option_explanations is either empty or exactly as long as that question's
+// options, so it can be indexed by a canonical option index without a guard.
+// lesson_section is the verbatim "##" heading covering the question, or "".
+export type QuizExplanation = {
+  explanation: string;
+  option_explanations: string[];
+  lesson_section: string;
+};
+
 export type QuizAttemptResult = {
   score: number;
   total: number;
   passed: boolean;
   correct_indices: number[];
   best_score: number;
+  // Parallel to correct_indices. Absent or empty on modules that predate
+  // explanations and whose backfill could not run; the graded quiz then
+  // renders exactly as it did before this field existed.
+  explanations?: QuizExplanation[];
 };
 
 export type TestCreationParams = {

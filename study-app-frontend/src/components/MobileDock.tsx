@@ -20,6 +20,11 @@ const IMMERSIVE_PATTERNS = [
   /^\/flashcards\/[^/]+\/review$/,
   /^\/flashcards\/[^/]+\/matching$/,
   /^\/flashcards\/[^/]+\/episode\/[^/]+$/,
+  // The article lesson owns the bottom edge for its audio player, so the nav
+  // dock would be a second pill stacked under it. The page's own back button
+  // (to the track) is the way out. The hub route one segment shorter,
+  // /flashcards/:id/modules, deliberately does NOT match.
+  /^\/flashcards\/[^/]+\/modules\/[^/]+$/,
   /^\/kojo\/chat$/,
   /^\/leetcode$/,
   /^\/system-design\/[^/]+\/(visualizer|project)$/,

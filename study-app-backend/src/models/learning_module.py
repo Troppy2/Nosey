@@ -115,9 +115,13 @@ class LearningModule(Base, TimestampMixin):
     # for tracks generated before this column existed; the frontend falls back
     # to stripping markdown from lesson_content when absent.
     tts_script: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    # JSON array of {"question": str, "options": [str], "correct_index": int}.
-    # Correct answers are stripped before this reaches the client; grading is
-    # done server-side on quiz submit.
+    # JSON array of {"question": str, "options": [str], "correct_index": int}
+    # plus the optional post-grading keys {"explanation": str,
+    # "option_explanations": [str], "lesson_section": str}. The explanation keys
+    # are absent on modules built before they existed and are backfilled lazily
+    # on the first quiz submit (see submit_quiz_attempt), so nothing may assume
+    # they are present. Correct answers AND explanations are stripped before
+    # this reaches the client; grading is done server-side on quiz submit.
     quiz_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # One optional user-attached video link, embedded at the bottom of the
     # article. Display only; never fed to the LLM.

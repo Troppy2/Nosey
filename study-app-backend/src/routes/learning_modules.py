@@ -32,6 +32,7 @@ from src.schemas.learning_module_schema import (
     ModuleEpisodeResponse,
     QuizAttemptRequest,
     QuizAttemptResponse,
+    QuizExplanation,
     QuizQuestionPublic,
     UpdateLearningModuleRequest,
     UpdateModuleVideoRequest,
@@ -54,6 +55,13 @@ PASS_RATIO = 0.8
 # as the article quiz, so _pass_threshold and the pass semantics are shared.
 CHECKPOINT_COUNT = QUIZ_QUESTION_COUNT
 
+# Max wall-clock the lazy explanation backfill may take before quiz grading
+# returns without it. Grading is deterministic and already committed by the
+# time this runs, so a slow provider degrades to "no explanations shown", never
+# to a failed or delayed grade. Same shape as _OCR_TIMEOUT_SECONDS in
+# grading_service.py: a module-level constant, never service state.
+_EXPLANATION_BACKFILL_TIMEOUT_SECONDS = 45
+
 # Strong references to detached generation tasks, mirroring routes/tests.py:
 # generation is spawned with asyncio.create_task (NOT FastAPI BackgroundTasks)
 # so the POST's HTTP connection is freed as soon as the 201 returns.
@@ -72,6 +80,50 @@ def _hash_notes(notes: str) -> str:
 
 def _pass_threshold(total: int) -> int:
     return max(1, math.ceil(total * PASS_RATIO))
+
+
+async def _attach_quiz_explanations(
+    quiz: list[dict],
+    lesson_content: str,
+    module_title: str,
+    provider: Optional[str],
+    custom_instructions: Optional[str],
+    llm: Optional[LLMService] = None,
+) -> list[dict]:
+    """Merge generated answer explanations into a quiz, in place of nothing.
+
+    Never raises and never partially corrupts the quiz: on any failure the quiz
+    is returned exactly as passed in, so a module keeps a working (if silent)
+    quiz. Callers therefore need no try/except of their own.
+
+    Only empty keys are filled, so re-running this over a quiz that already has
+    explanations leaves the existing text alone.
+    """
+    if not quiz or not lesson_content:
+        return quiz
+    try:
+        explanations = await (llm or LLMService()).generate_quiz_explanations(
+            lesson_content,
+            quiz,
+            module_title,
+            provider=provider,
+            custom_instructions=custom_instructions,
+        )
+    except Exception as exc:
+        logger.warning("Quiz explanation generation failed (quiz kept without explanations): %s", exc)
+        return quiz
+
+    merged: list[dict] = []
+    for item, extra in zip(quiz, explanations):
+        if not extra.get("explanation"):
+            merged.append(item)
+            continue
+        merged.append({**item, **extra})
+    # zip stops at the shorter list; _parse_quiz_explanations guarantees equal
+    # length, but a future caller passing a hand-built list should not silently
+    # lose the tail of its quiz.
+    merged.extend(quiz[len(merged):])
+    return merged
 
 
 async def _mark_track_failed(track_id: int, message: str) -> None:
@@ -229,6 +281,19 @@ async def _generate_track_background(
                         "Module quiz verification failed for module_id=%s (quiz kept as generated): %s",
                         module_id, verify_exc,
                     )
+            # After verification, so explanations describe the questions that
+            # are actually stored, including any the verifier repaired or
+            # replaced. A separate call from generate_module_content on
+            # purpose: that one already fills its token budget with the lesson
+            # and the narration script.
+            quiz = await _attach_quiz_explanations(
+                quiz,
+                str(content["lesson"]),
+                item["title"],
+                provider,
+                custom_instructions,
+                llm=llm,
+            )
             async with async_session_maker() as session:
                 module = await session.get(LearningModule, module_id)
                 if module is None:
@@ -755,6 +820,15 @@ async def update_module_lesson(
                     module_id, verify_exc,
                 )
 
+        # Explanations are rebuilt from the edited lesson alongside the quiz,
+        # since the old ones cite an article that no longer exists. Failure
+        # here leaves the new quiz explanation-free rather than failing the
+        # save, and the lazy backfill on first submit picks it up.
+        quiz = await _attach_quiz_explanations(
+            quiz, lesson, module.title, support_provider,
+            track.custom_instructions if track else None,
+        )
+
         # The row may have been deleted mid-call (track rebuild/delete).
         module = await session.get(LearningModule, module.id)
         if module is None:
@@ -810,7 +884,36 @@ async def submit_quiz_attempt(
             module.best_score = score
         if passed:
             module.passed = True
+        # Commit the grade BEFORE any LLM work. Scoring is deterministic and
+        # must never depend on, or be delayed past, a provider call.
         await session.commit()
+
+        # Lazy backfill for modules built before explanations existed (and for
+        # any question the verifier replaced without one). Bounded and
+        # swallowed: the student gets their score either way. On success the
+        # merged quiz is persisted, so this costs one call once per module.
+        if module.lesson_content and any(not q.get("explanation") for q in quiz):
+            track = await session.get(LearningTrack, module.track_id)
+            try:
+                quiz = await asyncio.wait_for(
+                    _attach_quiz_explanations(
+                        quiz,
+                        module.lesson_content,
+                        module.title,
+                        track.provider if track else None,
+                        track.custom_instructions if track else None,
+                    ),
+                    timeout=_EXPLANATION_BACKFILL_TIMEOUT_SECONDS,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Quiz explanation backfill failed for module_id=%s (score returned without it): %s",
+                    module_id, exc,
+                )
+            else:
+                if any(q.get("explanation") for q in quiz):
+                    module.quiz_json = json.dumps(quiz)
+                    await session.commit()
 
         return QuizAttemptResponse(
             score=score,
@@ -818,6 +921,14 @@ async def submit_quiz_attempt(
             passed=module.passed,
             correct_indices=correct_indices,
             best_score=module.best_score or score,
+            explanations=[
+                QuizExplanation(
+                    explanation=str(q.get("explanation") or ""),
+                    option_explanations=[str(o) for o in q.get("option_explanations") or []],
+                    lesson_section=str(q.get("lesson_section") or ""),
+                )
+                for q in quiz
+            ],
         )
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
