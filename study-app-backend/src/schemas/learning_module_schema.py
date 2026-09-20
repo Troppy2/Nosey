@@ -85,6 +85,20 @@ class QuizAttemptRequest(BaseModel):
     answers: list[int]
 
 
+class QuizExplanation(BaseModel):
+    """Why the correct option is correct, revealed only after grading.
+
+    option_explanations is either empty or exactly as long as that question's
+    options: a partial list would pair rationales with the wrong options.
+    lesson_section is the verbatim "##" heading covering the question, used by
+    the client to offer a jump back into the article; "" when there is none.
+    """
+
+    explanation: str = ""
+    option_explanations: list[str] = []
+    lesson_section: str = ""
+
+
 class QuizAttemptResponse(BaseModel):
     score: int
     total: int
@@ -92,6 +106,10 @@ class QuizAttemptResponse(BaseModel):
     # 0-based correct option index per question, revealed after grading.
     correct_indices: list[int]
     best_score: int
+    # Parallel to correct_indices. Empty when the module predates explanations
+    # and the lazy backfill could not run or failed; the client then renders the
+    # graded quiz exactly as it did before this field existed.
+    explanations: list[QuizExplanation] = []
 
 
 class EpisodeTurn(BaseModel):

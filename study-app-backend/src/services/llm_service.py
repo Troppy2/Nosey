@@ -357,6 +357,47 @@ _LATEX_BACKSLASH_FIX_RE = re.compile(
 )
 
 
+def _extract_json_object(raw: str) -> Optional[str]:
+    """Return the first complete top-level JSON object in `raw`, or None.
+
+    Replaces a regex that could only handle one level of nesting. That regex
+    truncated any payload with LaTeX braces inside a NESTED object (a module
+    quiz question containing $\text{Range}$, say), which made json.loads fail
+    and sent the Ollama path into its corrupting escape fallbacks. See the
+    comment in _complete_ollama.
+
+    Braces inside string literals are ignored, which is the whole point: LaTeX
+    lives in the strings. Escape sequences are skipped so a \\" inside a value
+    does not look like the end of the string.
+    """
+    start = raw.find("{")
+    if start == -1:
+        return None
+
+    depth = 0
+    in_string = False
+    escaped = False
+    for index in range(start, len(raw)):
+        char = raw[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return raw[start : index + 1]
+    return None
+
+
 class LLMService:
     _embed_cache: OrderedDict[str, list[float]] = OrderedDict()
     _retrieval_cache: OrderedDict[str, tuple[str, dict[str, object]]] = OrderedDict()
@@ -2583,6 +2624,130 @@ Return JSON only with these exact keys:
                 raise LLMException("The AI could not rebuild the quiz from your edited lesson. Try again.")
 
             return {"tts_script": tts_script, "quiz": quiz}
+
+        return await self._complete_module_json(prompt, provider, _parse)
+
+    @staticmethod
+    def _parse_quiz_explanations(
+        raw_explanations: object, quiz: list[dict[str, object]]
+    ) -> list[dict[str, object]]:
+        """Validate the explanations array, one entry per quiz question.
+
+        Deliberately lenient, unlike _parse_module_quiz. Explanations are an
+        enhancement on top of a quiz that already works, so a malformed entry is
+        dropped to an empty one rather than failing the whole module. The result
+        is always exactly len(quiz) long and index-aligned with it, so callers
+        can zip without a length check.
+
+        option_explanations is all-or-nothing per question: a list whose length
+        does not match that question's options is discarded, because a
+        misaligned rationale would be shown against the wrong option, which is
+        worse than showing none.
+        """
+        by_index: dict[int, dict[str, object]] = {}
+        if isinstance(raw_explanations, list):
+            for position, item in enumerate(raw_explanations):
+                if not isinstance(item, dict):
+                    continue
+                # Trust an explicit index when the model supplies one, since a
+                # model that drops a question would otherwise shift every
+                # later explanation onto the wrong question.
+                try:
+                    index = int(item.get("index", position))  # type: ignore[arg-type]
+                except (TypeError, ValueError):
+                    index = position
+                if not 0 <= index < len(quiz):
+                    continue
+
+                options = quiz[index].get("options")
+                option_count = len(options) if isinstance(options, list) else 0
+                raw_options = item.get("option_explanations")
+                option_explanations: list[str] = []
+                if isinstance(raw_options, list) and len(raw_options) == option_count:
+                    option_explanations = [str(o or "").strip() for o in raw_options]
+                    if not any(option_explanations):
+                        option_explanations = []
+
+                by_index[index] = {
+                    "explanation": str(item.get("explanation") or "").strip(),
+                    "option_explanations": option_explanations,
+                    "lesson_section": str(item.get("lesson_section") or "").strip(),
+                }
+
+        return [
+            by_index.get(i, {"explanation": "", "option_explanations": [], "lesson_section": ""})
+            for i in range(len(quiz))
+        ]
+
+    async def generate_quiz_explanations(
+        self,
+        lesson_content: str,
+        quiz: list[dict[str, object]],
+        module_title: str,
+        provider: Optional[str] = None,
+        custom_instructions: Optional[str] = None,
+    ) -> list[dict[str, object]]:
+        """Write the per-question answer explanations for a module quiz.
+
+        A dedicated call rather than another key on generate_module_content:
+        that call already writes the lesson AND the full narration script
+        against _JSON_MAX_TOKENS, and the extra rationale tokens would risk
+        truncating tts_script (a silent quality regression) or failing the whole
+        module build.
+
+        Takes the FINISHED quiz, so it also covers questions the MCQ verifier
+        repaired or replaced. Returns a list index-aligned with `quiz`, each
+        {explanation, option_explanations, lesson_section}; entries the model
+        omitted come back empty rather than missing.
+        """
+        if not quiz:
+            return []
+
+        from src.utils.exceptions import LLMException
+
+        rendered = json.dumps(
+            [
+                {
+                    "index": index,
+                    "question": item.get("question", ""),
+                    "options": item.get("options", []),
+                    "correct_index": item.get("correct_index", 0),
+                }
+                for index, item in enumerate(quiz)
+            ],
+            ensure_ascii=False,
+        )
+        prompt = (
+            "A student has just answered the quiz below, which was written from the lesson article "
+            "that follows it. Write the answer explanations they see when they get one wrong.\n\n"
+            "Return ONE JSON object with a single key \"explanations\": an array with exactly one "
+            f"object per question, {len(quiz)} in total, in the same order. Each object has:\n"
+            "- \"index\": the question's index, copied from the quiz below.\n"
+            "- \"explanation\": one or two sentences on why the correct option is correct. Explain "
+            "the underlying idea, do not just restate the option text.\n"
+            "- \"option_explanations\": an array with exactly one short sentence per option, in the "
+            "same order as that question's options. The entry at correct_index says why that option "
+            "is right; every other entry says why that option is wrong, naming the specific "
+            "misunderstanding it represents.\n"
+            "- \"lesson_section\": the text of the lesson's \"##\" heading that covers this question, "
+            "copied verbatim including the \"##\". Use \"\" if no single section covers it.\n\n"
+            "Ground every explanation in the lesson article; never introduce facts it does not "
+            "contain. Write for a student who just got the question wrong: plain, direct, no praise "
+            "and no filler. If an explanation contains math, write it as LaTeX delimited with $...$ "
+            "(inline only, no $$ blocks). Use backtick code spans for identifiers or short code.\n\n"
+            f"{self._module_instructions_block(custom_instructions)}"
+            f"QUIZ:\n{rendered}\n\n"
+            f"LESSON ARTICLE ({module_title}):\n{lesson_content[:24000]}"
+        )
+
+        def _parse(data: dict[str, object]) -> list[dict[str, object]]:
+            raw = data.get("explanations")
+            if not isinstance(raw, list):
+                # Rejecting the response sends _complete_module_json to the next
+                # provider, which is worth one retry; an empty list would be
+                # accepted as a valid (useless) answer.
+                raise LLMException("The AI did not return quiz explanations.")
+            return self._parse_quiz_explanations(raw, quiz)
 
         return await self._complete_module_json(prompt, provider, _parse)
 
@@ -4985,28 +5150,32 @@ Return only the JSON object."""
 
             # Otherwise raw_resp is likely a string. Try safe parsing with several fallbacks.
             raw_text = "" if raw_resp is None else str(raw_resp)
+            # _loads_json is the ONLY repair allowed here. It already does the
+            # surgical thing: escape just the backslashes that are not valid
+            # JSON escapes, leaving real "\\n" newline escapes intact.
+            #
+            # There used to be two extra fallbacks below this, and they are why
+            # Ollama (and only Ollama) produced lessons rendered as one blob of
+            # literal "\\n" with the LaTeX mangled:
+            #   raw.encode().decode("unicode_escape")  ate \\t and \\n globally
+            #   raw.replace("\\", "\\\\")           doubled EVERY backslash, so a real
+            #                                          newline escape became the
+            #                                          two characters \\n in the value
+            # Both could "succeed" on a structurally broken payload and hand
+            # back silently corrupted prose, which then got persisted. Failing
+            # here is strictly better: _complete_module_json catches it and
+            # moves to the next provider.
             try:
                 return self._loads_json(raw_text)
-            except Exception:
-                # Try decoding common escaped sequences (handles things like "\\n" vs "\\\\n").
-                try:
-                    fixed = raw_text.encode("utf-8").decode("unicode_escape")
-                    return self._loads_json(fixed)
-                except Exception:
-                    # Last resort: escape lone backslashes and try again.
-                    try:
-                        escaped = raw_text.replace("\\", "\\\\")
-                        return self._loads_json(escaped)
-                    except Exception as exc:
-                        # Log helpful debug info and re-raise a user-friendly error.
-                        logger.warning(
-                            "Ollama response JSON parsing failed; payload keys=%s; response_preview=%s",
-                            list(payload.keys()),
-                            (raw_text[:1000] + "...") if len(raw_text) > 1000 else raw_text,
-                        )
-                        raise LLMException(
-                            "Ollama returned an unexpected response format that couldn't be parsed as JSON."
-                        ) from exc
+            except Exception as exc:
+                logger.warning(
+                    "Ollama response JSON parsing failed; payload keys=%s; response_preview=%s",
+                    list(payload.keys()),
+                    (raw_text[:1000] + "...") if len(raw_text) > 1000 else raw_text,
+                )
+                raise LLMException(
+                    "Ollama returned an unexpected response format that couldn't be parsed as JSON."
+                ) from exc
         except httpx.ConnectError:
             raise LLMException(
                 f"Ollama is not running at {settings.ollama_base_url}. "
@@ -5070,10 +5239,9 @@ Return only the JSON object."""
         except json.JSONDecodeError:
             pass
 
-        # Try to extract JSON object {... }
-        match = re.search(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", raw, flags=re.DOTALL)
-        if match:
-            extracted = match.group(0)
+        # Try to extract the JSON object out of any surrounding prose.
+        extracted = _extract_json_object(raw)
+        if extracted:
             try:
                 parsed = json.loads(extracted)
                 if isinstance(parsed, dict):
@@ -5083,7 +5251,7 @@ Return only the JSON object."""
                 pass
 
         # Try escaping bare backslashes for LaTeX
-        for candidate in [raw] + ([extracted] if match else []):
+        for candidate in [raw] + ([extracted] if extracted else []):
             escaped = re.sub(r'\\(?!["\\/bfnrtu0-9])', r'\\\\', candidate)
             try:
                 parsed = json.loads(escaped)

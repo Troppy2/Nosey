@@ -65,6 +65,14 @@
   --dock-gap: 24px;
   --dock-clearance: calc(var(--dock-height) + var(--dock-gap));
 
+  /* Lesson audio player. A second fixed pill that stacks ABOVE the nav dock on
+     a phone, so the lesson page needs both clearances. Derived from its own
+     parts for the same reason the dock's is. */
+  --lm-player-rail-height: 52px;
+  --lm-player-pad-bottom: 12px;
+  --lm-player-height: calc(var(--lm-player-rail-height) + var(--lm-player-pad-bottom) + env(safe-area-inset-bottom));
+  --lm-player-clearance: calc(var(--lm-player-height) + 20px);
+
   /* Radius scale.
      Was 20 distinct values across 551 declarations, with 6/7, 8/9, 10/11 and
      12/13/14/15/16 all in play at once: differences too small to read as

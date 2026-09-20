@@ -15170,16 +15170,12 @@ a.lm-module-row:focus-visible {
 /* Lesson page: podcast-style narration player. The script is a spoken rewrite
    of the article (notation in words), not a word-for-word read, so playback is
    a player at the top instead of a follow-along text highlight. */
-.lm-audio-player {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  padding: 0.7rem 0.9rem;
-  margin-bottom: 1rem;
-  border-radius: var(--radius-xl);
-  background: var(--green-lightest);
-  border: 1px solid var(--green-light);
-}
+/* ── Shared audio-control classes ───────────────────────────────────────────
+   These belong to the EPISODE player (EpisodePlayer.tsx) now. The article
+   lesson player used to share them, but it is a fixed dock with different
+   sizing and a custom-painted seek bar, so it was moved to its own .lm-dock-*
+   namespace at the end of this file rather than fighting these rules with
+   overrides. Do not re-point the article player at these. */
 
 .lm-audio-toggle {
   display: grid;
@@ -15278,15 +15274,6 @@ a.lm-module-row:focus-visible {
   box-shadow: var(--shadow-sm);
 }
 
-/* Speed pills wrap under the progress row on narrow screens. */
-@media (max-width: 560px) {
-  .lm-audio-player {
-    flex-wrap: wrap;
-  }
-  .lm-audio-rates {
-    margin-left: 52px;
-  }
-}
 
 /* Pencil dropdown: edit article / change voice */
 .lm-menu-wrap {
@@ -25750,4 +25737,394 @@ a.sd-chip.is-done:hover {
 @media (prefers-reduced-motion: reduce) {
   .sd-card { transition: none; }
   .sd-card:hover { transform: none; }
+}
+
+/* ── Learning module quiz: answer explanations ──────────────────────────────
+   Shown only under a question the student got wrong. Mirrors the episode
+   player's .lm-checkpoint-explain surface so the two quiz formats read the
+   same, with the per-option rows added. */
+.lm-quiz-explain {
+  margin-top: 0.85rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--radius-lg);
+  background: var(--green-lightest);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.lm-quiz-explain > :first-child { margin-top: 0; }
+.lm-quiz-explain p { margin: 0; }
+
+.lm-quiz-explain-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--border);
+}
+
+.lm-quiz-explain-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-size: 0.86rem;
+}
+
+.lm-quiz-explain-label {
+  flex: none;
+  font-weight: 600;
+}
+
+.lm-quiz-explain-row.is-correct .lm-quiz-explain-label { color: var(--success); }
+.lm-quiz-explain-row.is-wrong .lm-quiz-explain-label { color: var(--error); }
+
+.lm-quiz-explain-review {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.7rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--green-dark);
+  font-size: 0.83rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.lm-quiz-explain-review:hover { opacity: 0.8; }
+
+/* ── Lesson audio player: fixed dock pill ────────────────────────────────────
+   Deliberately a visual sibling of MobileDock rather than its own look: the
+   rail below copies .dock-rail's recipe, so a phone shows two stacked pills
+   that read as one system instead of two competing floating widgets.
+
+   It is fixed because the complaint it fixes is "I have to scroll up to pause".
+   For the same reason it does NOT copy the dock's scroll-hide: a control that
+   disappears while you read is the bug, not the feature. When the nav dock
+   slides away beneath it, this stays put and a gap opens below it. A stable
+   control is worth more than a tight edge.
+
+   Its own namespace (.lm-dock-*), not the shared .lm-audio-* classes the
+   episode player uses: the sizing, the layout and the seek painting all differ,
+   and overriding a shared base in two directions is how those rules rot. */
+.lm-audio-player {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 110;
+  display: flex;
+  justify-content: center;
+  padding: 0 12px calc(var(--lm-player-pad-bottom) + env(safe-area-inset-bottom));
+  /* Let clicks through either side of the pill on a wide screen. */
+  pointer-events: none;
+}
+
+.lm-dock-rail {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: min(760px, 100%);
+  height: var(--lm-player-rail-height);
+  padding: 0 0.5rem 0 0.35rem;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(16px);
+  pointer-events: auto;
+}
+
+.lm-dock-toggle {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--green-dark);
+  color: var(--white);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.lm-dock-toggle:hover { background: var(--green-dark-mid); }
+.lm-dock-toggle:focus-visible { outline: 2px solid var(--green-dark); outline-offset: 2px; }
+
+/* The seek bar, fully custom. A native range input only lets accent-color
+   paint the fill and the thumb, so the unfilled half rendered in the browser's
+   default grey: the one non-green surface on an all-green page. */
+.lm-dock-seek {
+  flex: 1;
+  min-width: 0;
+  height: 20px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* WebKit has no ::-moz-range-progress equivalent, so the filled portion is a
+   hard-stop gradient at --seek-pct, set inline from React. */
+.lm-dock-seek::-webkit-slider-runnable-track,
+.lm-dock-speed-range::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(
+    to right,
+    var(--green-dark) var(--seek-pct, 0%),
+    var(--green-light) var(--seek-pct, 0%)
+  );
+}
+
+.lm-dock-seek::-webkit-slider-thumb,
+.lm-dock-speed-range::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  /* (track height - thumb height) / 2 centres the thumb on the track. */
+  margin-top: -4px;
+  border-radius: var(--radius-pill);
+  background: var(--green-dark);
+  border: 2px solid var(--white);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Firefox paints the fill itself and ignores the gradient above. */
+.lm-dock-seek::-moz-range-track,
+.lm-dock-speed-range::-moz-range-track {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--green-light);
+}
+
+.lm-dock-seek::-moz-range-progress,
+.lm-dock-speed-range::-moz-range-progress {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--green-dark);
+}
+
+.lm-dock-seek::-moz-range-thumb,
+.lm-dock-speed-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  background: var(--green-dark);
+  border: 2px solid var(--white);
+  box-shadow: var(--shadow-sm);
+}
+
+.lm-dock-seek:focus-visible,
+.lm-dock-speed-range:focus-visible { outline: 2px solid var(--green-dark); outline-offset: 2px; }
+
+/* Tabular figures: without them the digits change width as the clock ticks and
+   the bar next to it visibly twitches. */
+.lm-dock-clock {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.lm-dock-restart {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-pill);
+  background: var(--white);
+  color: var(--green-dark);
+  cursor: pointer;
+}
+
+.lm-dock-restart:hover { border-color: var(--green-dark); }
+
+
+
+
+
+/* Hidden while the quiz is on screen, so the pill never sits on top of the
+   questions. Slides down rather than vanishing, same gesture as the nav dock's
+   scroll-hide. Narration keeps playing: this is a layout state, not a
+   playback one. */
+.lm-audio-player[data-hidden="true"] {
+  transform: translateY(120%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The rail re-enables pointer events for itself, so hiding the positioner is
+   not enough on its own: without this the invisible pill still swallows taps
+   over the first quiz question. Same rule MobileDock needs for .dock-rail. */
+.lm-audio-player[data-hidden="true"] .lm-dock-rail {
+  pointer-events: none;
+}
+
+.lm-audio-player {
+  transition: transform var(--transition-normal), opacity var(--transition-normal);
+}
+
+/* ── Speed: a chip that opens a slider ──────────────────────────────────────
+   One control at every width. Presets could not offer 1.7x, and five inline
+   buttons never fit a one-row dock on a phone. */
+.lm-dock-speed {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.lm-dock-rate-chip {
+  display: grid;
+  place-items: center;
+  min-width: 46px;
+  height: 32px;
+  padding: 0 0.45rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-pill);
+  background: var(--white);
+  color: var(--green-dark);
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.lm-dock-rate-chip:hover { border-color: var(--green-dark); }
+
+.lm-dock-rate-chip.is-open {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+  color: var(--white);
+}
+
+.lm-dock-speed-pop {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  z-index: 1;
+  width: 210px;
+  padding: 0.7rem 0.8rem 0.55rem;
+  background: var(--white);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+}
+
+.lm-dock-speed-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lm-dock-speed-reset {
+  border: none;
+  background: transparent;
+  color: var(--green-dark);
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.lm-dock-speed-reset:disabled {
+  color: var(--muted);
+  opacity: 0.5;
+  cursor: default;
+  text-decoration: none;
+}
+
+.lm-dock-speed-range {
+  width: 100%;
+  height: 20px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.lm-dock-speed-scale {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.lm-dock-speed-scale strong {
+  font-size: 0.8rem;
+  color: var(--green-dark);
+}
+
+/* The article must not end underneath the pill. Both classes are chained on
+   one element deliberately: .shell--mobile .page in mobile-shell.css sets the
+   same property at the same specificity and is imported later, so an unchained
+   selector here silently loses. */
+.page.lm-lesson-page.is-docked { padding-bottom: var(--lm-player-clearance); }
+
+/* Same query as useMobileShell.ts, so the markup and the styling can never
+   disagree about which rate control is showing. */
+@media (max-width: 760px), (hover: none) and (pointer: coarse) and (max-width: 1100px) {
+  /* The player owns the bottom edge here: this route is registered in
+     IMMERSIVE_PATTERNS (MobileDock.tsx), so the nav dock never renders on it
+     and there is nothing to stack above. Getting back to the track is the
+     header's own back button. */
+  /* Sit exactly where the nav rail used to: same bottom padding token it used,
+     so the pill lands in the position the thumb already expects rather than
+     floating a couple of pixels above it. */
+  .lm-audio-player {
+    padding-bottom: calc(var(--dock-pad-bottom) + env(safe-area-inset-bottom));
+  }
+
+  .lm-dock-rail { gap: 0.5rem; }
+
+  /* .shell--mobile .page reserves --dock-clearance for every mobile page, but
+     no dock renders on this one, so that band would be dead space. Replace it
+     with the player's own clearance, or with plain bottom padding mirroring
+     the shell's top padding when the player is not showing (edit mode, or no
+     speech synthesis). */
+  .shell--mobile .page.lm-lesson-page {
+    padding-bottom: clamp(20px, 5vw, 28px);
+  }
+
+  .shell--mobile .page.lm-lesson-page.is-docked {
+    padding-bottom: var(--lm-player-clearance);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lm-dock-toggle,
+  .lm-dock-rate-chip,
+  .lm-audio-player { transition: none; }
+}
+
+/* Reformat button: always present in the lesson header, emphasised only when
+   the article actually shows the mangled-escape damage. Not gated on that
+   detector, because the repair is idempotent and a false negative would hide
+   the fix exactly when it is needed. */
+.lm-reformat-btn.is-needed {
+  border-color: var(--accent-caution);
+  color: var(--accent-caution);
+  background: var(--accent-caution-tint);
 }
