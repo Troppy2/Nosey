@@ -3,6 +3,8 @@ import "katex/dist/katex.min.css";
 import { Check, Copy } from "lucide-react";
 import React, { useState } from "react";
 
+import { repairMathDelimiters } from "../lib/repairMathDelimiters";
+
 // ── KaTeX ─────────────────────────────────────────────────────────────────────
 
 function rkx(src: string, display: boolean): string {
@@ -18,14 +20,57 @@ function rkx(src: string, display: boolean): string {
 // *italic* or **bold** gets replaced with a placeholder, so the markdown
 // tokenizer never sees the dollar signs. Placeholders are substituted back
 // when rendering leaf text nodes.
+//
+// This is ONE left-to-right scan rather than a series of global replaces,
+// because the order in which a stretch of text is claimed decides whether the
+// result is right. Code has to be claimed before math (otherwise `echo $HOME
+// and $USER` loses everything between the two dollars), and $$ has to be
+// claimed before $ (otherwise a display block reads as two inline ones).
 
-interface MathEntry { display: boolean; src: string }
+export interface MathEntry { display: boolean; src: string }
 
 // Use ASCII control chars as delimiters , can't appear in LLM text output.
 const PH_RE = /\x00M:(\d+):\x00/g;
 const ph = (id: number) => `\x00M:${id}:\x00`;
 
-function extractMath(raw: string): [string, MathEntry[]] {
+// Alternatives are tried in this order at every position, so the list itself
+// is the priority order described above.
+const SCAN_RE = new RegExp(
+  [
+    "```[\\s\\S]*?```",         // fenced code block
+    "`[^`\\n]*`",               // inline code span
+    "\\\\\\$",                  // escaped dollar
+    "\\$\\$[\\s\\S]*?\\$\\$",   // $$ ... $$
+    "\\\\\\[[\\s\\S]*?\\\\\\]", // \[ ... \]
+    "\\\\\\([\\s\\S]*?\\\\\\)", // \( ... \)
+    "\\$[^$\\n]+\\$",           // $ ... $
+  ].join("|"),
+  "g",
+);
+
+// Display math is a single expression. A paragraph break, a markdown heading
+// or a code fence inside one means the opening $$ never had a partner and got
+// paired with an unrelated $$ further down, swallowing the prose in between.
+// That is what turned a lesson into one red KaTeX error block, so refuse it.
+function isPlausibleDisplayMath(body: string): boolean {
+  if (!body.trim()) return false;
+  if (/\n[ \t]*\n/.test(body)) return false;
+  if (/^[ \t]*#{1,6} /m.test(body)) return false;
+  return !body.includes("```");
+}
+
+// Real inline math is written tight ($x$) or evenly padded ($ x $). Two
+// unrelated dollar amounts are neither: "costs $5 and the tax is $2" opens
+// tight and closes on a space, so the padding is asymmetric.
+function isPlausibleInlineMath(body: string): boolean {
+  if (!body.trim()) return false;
+  return /^\s/.test(body) === /\s$/.test(body);
+}
+
+// Exported so tests can assert on exactly what is handed to KaTeX. The
+// rendered output is HTML only (no MathML annotation), so the extracted
+// sources are not otherwise readable back off the DOM.
+export function extractMath(raw: string): [string, MathEntry[]] {
   const reg: MathEntry[] = [];
   const add = (display: boolean, src: string): string => {
     const id = reg.length;
@@ -33,21 +78,38 @@ function extractMath(raw: string): [string, MathEntry[]] {
     return ph(id);
   };
 
-  // Protect \$ so it isn't consumed by the $...$ pass
-  let out = raw.replace(/\\\$/g, "\x01DS\x01");
+  let out = "";
+  let last = 0;
+  SCAN_RE.lastIndex = 0;
 
-  // Block: \[...\]  and  $$...$$  (multi-line safe , [\s\S]*? is non-greedy)
-  out = out.replace(/\\\[([\s\S]*?)\\\]/g, (_, s) => add(true, s));
-  out = out.replace(/\$\$([\s\S]*?)\$\$/g, (_, s) => add(true, s));
+  for (let m = SCAN_RE.exec(raw); m !== null; m = SCAN_RE.exec(raw)) {
+    const tok = m[0];
+    out += raw.slice(last, m.index);
+    last = m.index + tok.length;
 
-  // Inline: \(...\)  and  $...$
-  out = out.replace(/\\\(([\s\S]*?)\\\)/g, (_, s) => add(false, s));
-  out = out.replace(/\$([^$\n]+?)\$/g, (_, s) => add(false, s));
+    // Code is content, not math, and passes through untouched.
+    if (tok.startsWith("`")) { out += tok; continue; }
+    // An escaped dollar was never a delimiter; emit the literal character.
+    if (tok === "\\$") { out += "$"; continue; }
 
-  // Restore escaped dollars as literal $
-  out = out.replace(/\x01DS\x01/g, "$");
+    const display = tok.startsWith("$$") || tok.startsWith("\\[");
+    const openLen = tok.startsWith("$") ? (display ? 2 : 1) : 2;
+    const body = tok.slice(openLen, tok.length - openLen);
 
-  return [out, reg];
+    if (display ? isPlausibleDisplayMath(body) : isPlausibleInlineMath(body)) {
+      out += add(display, body);
+      continue;
+    }
+
+    // Not math after all. Emit just the opening delimiter and resume scanning
+    // immediately after it, so a later delimiter can still find its real
+    // partner instead of the whole run being lost.
+    out += tok.slice(0, openLen);
+    last = m.index + openLen;
+    SCAN_RE.lastIndex = last;
+  }
+
+  return [out + raw.slice(last), reg];
 }
 
 // ── Auto-wrap: undelimited math lines ─────────────────────────────────────────
@@ -70,16 +132,22 @@ function looksLikeProse(line: string): boolean {
 }
 
 function autoWrapMath(text: string, reg: MathEntry[]): string {
+  let inFence = false;
   return text
     .split("\n")
     .map((line) => {
+      if (line.startsWith("```")) {
+        inFence = !inFence;
+        return line;
+      }
+      // Code is content: a line of a code block is never auto-wrapped as math.
+      if (inFence) return line;
       // Skip lines that already have math placeholders, are empty,
       // are markdown structural elements, or look like prose.
       if (
         line.includes("\x00M:") ||
         line.trim() === "" ||
         line.startsWith("#") ||
-        line.startsWith("```") ||
         /^[-*+] /.test(line) ||
         /^\d+\.\s/.test(line) ||
         line.startsWith("|")
@@ -99,9 +167,14 @@ function autoWrapMath(text: string, reg: MathEntry[]): string {
 }
 
 // ── Inline tokenizer ──────────────────────────────────────────────────────────
-// Splits text on math placeholders FIRST, then applies markdown patterns
-// (bold, italic, code) within each non-math chunk. This naturally handles
-// math nested inside bold/italic without any special casing.
+// Scans markdown emphasis across the WHOLE line first, then resolves math
+// placeholders inside each resulting text run.
+//
+// The order is the point. Splitting on placeholders first puts the ** that
+// opens a run and the ** that closes it into two different chunks whenever
+// there is math between them, so "**value $x^2$ matters**" never closes and
+// renders its asterisks literally. A placeholder is an inert run of control
+// characters and digits, so the emphasis scanner passes over it safely.
 
 type Seg =
   | { k: "text"; v: string }
@@ -178,19 +251,24 @@ function scanEmphasis(chunk: string): Seg[] {
 function tokenizeInline(text: string, reg: MathEntry[]): Seg[] {
   const segs: Seg[] = [];
 
-  // split() on a regex with a capturing group interleaves matched IDs into the array
-  const parts = text.split(PH_RE);
-
-  for (let i = 0; i < parts.length; i++) {
-    if (i % 2 === 1) {
-      const entry = reg[parseInt(parts[i], 10)];
-      if (entry) segs.push({ k: "math", entry });
+  for (const seg of scanEmphasis(text)) {
+    // Bold and italic runs are re-tokenized by Inline's recursion, and a code
+    // span is literal by definition, so only plain text is split here.
+    if (seg.k !== "text") {
+      segs.push(seg);
       continue;
     }
 
-    const chunk = parts[i];
-    if (!chunk) continue;
-    segs.push(...scanEmphasis(chunk));
+    // split() on a regex with a capturing group interleaves matched IDs into the array
+    const parts = seg.v.split(PH_RE);
+    for (let i = 0; i < parts.length; i++) {
+      if (i % 2 === 1) {
+        const entry = reg[parseInt(parts[i], 10)];
+        if (entry) segs.push({ k: "math", entry });
+        continue;
+      }
+      if (parts[i]) segs.push({ k: "text", v: parts[i] });
+    }
   }
 
   return segs;
@@ -205,8 +283,13 @@ function Inline({ text, reg, pk }: { text: string; reg: MathEntry[]; pk: string 
         const key = `${pk}-${i}`;
         if (seg.k === "math") {
           const html = rkx(seg.entry.src, seg.entry.display);
+          // A <span> even for display maths, because this renders inside <p>,
+          // <h4> and table cells. A <div> there is invalid nesting, and the
+          // browser recovers by closing the <p> early and splitting the
+          // paragraph around it, which visibly scrambles the article.
+          // .math-block already carries display: block, so this looks the same.
           return seg.entry.display
-            ? <div key={key} className="math-block" dangerouslySetInnerHTML={{ __html: html }} />
+            ? <span key={key} className="math-block" dangerouslySetInnerHTML={{ __html: html }} />
             : <span key={key} className="math-inline" dangerouslySetInnerHTML={{ __html: html }} />;
         }
         if (seg.k === "bold") return <strong key={key}><Inline text={seg.v} reg={reg} pk={`${key}b`} /></strong>;
@@ -312,9 +395,14 @@ function CodeBlock({ lang, src, enableCopy }: { lang: string; src: string; enabl
 export function MarkdownContent({ content, enableCodeCopy = false }: { content: string; enableCodeCopy?: boolean }) {
   // Step 0: reflow malformed code fences onto their own lines
   const fenced = normalizeFences(content);
-  // Step 1: extract math into placeholders
-  const [withPlaceholders, reg] = extractMath(fenced);
-  // Step 2: auto-wrap bare LaTeX lines that have no delimiters
+  // Step 1: restore LaTeX environments that were deleted before storage. Every
+  // surface renders through this component, so content damaged by the old
+  // normalize_latex comes back correctly wherever it appears, with no per-page
+  // wiring and nothing for the reader to press.
+  const repaired = repairMathDelimiters(fenced);
+  // Step 2: extract math into placeholders
+  const [withPlaceholders, reg] = extractMath(repaired);
+  // Step 3: auto-wrap bare LaTeX lines that have no delimiters
   const normalized = autoWrapMath(withPlaceholders, reg);
 
   const nodes: React.ReactNode[] = [];

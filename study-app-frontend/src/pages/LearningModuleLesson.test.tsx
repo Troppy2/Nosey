@@ -27,7 +27,7 @@ vi.mock("../lib/api", async () => {
 vi.mock("../lib/useSettings", () => ({ useSettings: () => ({ betaMode: true }) }));
 
 import { fetchTrackForModule, updateModuleLesson } from "../lib/api";
-import LearningModuleLesson from "./LearningModuleLesson";
+import LearningModuleLesson, { splitLessonBlocks } from "./LearningModuleLesson";
 
 const BS = "\\";
 
@@ -218,5 +218,61 @@ describe("LearningModuleLesson", () => {
     const { container } = renderPage();
     await waitFor(() => expect(screen.getByLabelText("Listen to this lesson")).toBeTruthy());
     expect(container.querySelector(".lm-audio-player")?.getAttribute("data-hidden")).toBe("false");
+  });
+});
+
+// Each block is rendered by its own MarkdownContent, so a block boundary is
+// also a parser boundary. A $$...$$ block cut in half leaves one unbalanced
+// delimiter in each fragment, and neither half renders as maths.
+describe("splitLessonBlocks", () => {
+  const B = "\\"; // one backslash, spelled out so the source stays readable
+
+  it("splits ordinary prose on blank lines", () => {
+    expect(splitLessonBlocks("One.\n\nTwo.\n\nThree.")).toEqual(["One.", "Two.", "Three."]);
+  });
+
+  it("keeps a fenced code block whole across its blank lines", () => {
+    const blocks = splitLessonBlocks("Intro.\n\n```python\nx = 1\n\ny = 2\n```\n\nEnd.");
+    expect(blocks).toHaveLength(3);
+    expect(blocks[1]).toBe("```python\nx = 1\n\ny = 2\n```");
+  });
+
+  it("keeps a display-math block whole across its blank lines", () => {
+    const article = [
+      "Intro prose.",
+      "",
+      "$$",
+      B + "begin{aligned}",
+      "x &= 1 " + B + B,
+      "",
+      "y &= 2",
+      B + "end{aligned}",
+      "$$",
+      "",
+      "Closing prose.",
+    ].join("\n");
+
+    const blocks = splitLessonBlocks(article);
+    expect(blocks).toHaveLength(3);
+    expect(blocks[0]).toBe("Intro prose.");
+    expect(blocks[2]).toBe("Closing prose.");
+    // Both delimiters must stay together in the one block.
+    expect((blocks[1].match(/\$\$/g) ?? []).length).toBe(2);
+    expect(blocks[1]).toContain(B + "begin{aligned}");
+    expect(blocks[1]).toContain(B + "end{aligned}");
+  });
+
+  it("keeps a single-line display-math block on its own", () => {
+    const article = "Before.\n\n$$" + B + "frac{a}{b}$$\n\nAfter.";
+    expect(splitLessonBlocks(article)).toEqual(["Before.", "$$" + B + "frac{a}{b}$$", "After."]);
+  });
+
+  it("recovers at the next heading when a display delimiter is never closed", () => {
+    // An unbalanced $$ must not swallow the remainder of the article into one
+    // unsplittable block.
+    const article = "Intro.\n\n$$\n\nStray.\n\n## A heading\n\nMore prose.";
+    const blocks = splitLessonBlocks(article);
+    expect(blocks).toContain("## A heading");
+    expect(blocks).toContain("More prose.");
   });
 });

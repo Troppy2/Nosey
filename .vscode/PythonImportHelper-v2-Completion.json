@@ -588,6 +588,22 @@
         "documentation": {}
     },
     {
+        "label": "TYPE_CHECKING",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
         "label": "Optional",
         "importPath": "typing",
         "description": "typing",
@@ -701,6 +717,22 @@
     },
     {
         "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Any",
         "importPath": "typing",
         "description": "typing",
         "isExtraImport": true,
@@ -964,6 +996,14 @@
         "documentation": {}
     },
     {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
         "label": "Callable",
         "importPath": "typing",
         "description": "typing",
@@ -1140,7 +1180,7 @@
         "documentation": {}
     },
     {
-        "label": "List",
+        "label": "Optional",
         "importPath": "typing",
         "description": "typing",
         "isExtraImport": true,
@@ -1148,7 +1188,7 @@
         "documentation": {}
     },
     {
-        "label": "Tuple",
+        "label": "List",
         "importPath": "typing",
         "description": "typing",
         "isExtraImport": true,
@@ -2488,6 +2528,126 @@
         "documentation": {}
     },
     {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
         "label": "statistics",
         "kind": 6,
         "isExtraImport": true,
@@ -2586,78 +2746,6 @@
         "documentation": {}
     },
     {
-        "label": "date",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "timedelta",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "timezone",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "timedelta",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
         "label": "datetime",
         "importPath": "datetime",
         "description": "datetime",
@@ -2667,118 +2755,6 @@
     },
     {
         "label": "date",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "date",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "date",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "timedelta",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "timezone",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "date",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
-        "importPath": "datetime",
-        "description": "datetime",
-        "isExtraImport": true,
-        "detail": "datetime",
-        "documentation": {}
-    },
-    {
-        "label": "datetime",
         "importPath": "datetime",
         "description": "datetime",
         "isExtraImport": true,
@@ -2850,6 +2826,214 @@
         "documentation": {}
     },
     {
+        "label": "timedelta",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "date",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "date",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "date",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "timedelta",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "date",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "timedelta",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
         "label": "datetime",
         "importPath": "datetime",
         "description": "datetime",
@@ -2891,6 +3075,22 @@
     },
     {
         "label": "timedelta",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
         "importPath": "datetime",
         "description": "datetime",
         "isExtraImport": true,
@@ -3885,6 +4085,78 @@
         "documentation": {}
     },
     {
+        "label": "DateTime",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "ForeignKey",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "Index",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "Integer",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "String",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "Text",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "UniqueConstraint",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "text",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "Boolean",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
         "label": "ForeignKey",
         "importPath": "sqlalchemy",
         "description": "sqlalchemy",
@@ -4237,6 +4509,14 @@
         "documentation": {}
     },
     {
+        "label": "select",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
         "label": "Select",
         "importPath": "sqlalchemy",
         "description": "sqlalchemy",
@@ -4453,63 +4733,23 @@
         "documentation": {}
     },
     {
-        "label": "async_session_maker",
-        "importPath": "src.database",
-        "description": "src.database",
+        "label": "select",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
         "isExtraImport": true,
-        "detail": "src.database",
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "select",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
         "documentation": {}
     },
     {
         "label": "async_session_maker",
-        "importPath": "src.database",
-        "description": "src.database",
-        "isExtraImport": true,
-        "detail": "src.database",
-        "documentation": {}
-    },
-    {
-        "label": "get_session",
-        "importPath": "src.database",
-        "description": "src.database",
-        "isExtraImport": true,
-        "detail": "src.database",
-        "documentation": {}
-    },
-    {
-        "label": "get_session",
-        "importPath": "src.database",
-        "description": "src.database",
-        "isExtraImport": true,
-        "detail": "src.database",
-        "documentation": {}
-    },
-    {
-        "label": "get_session",
-        "importPath": "src.database",
-        "description": "src.database",
-        "isExtraImport": true,
-        "detail": "src.database",
-        "documentation": {}
-    },
-    {
-        "label": "get_session",
-        "importPath": "src.database",
-        "description": "src.database",
-        "isExtraImport": true,
-        "detail": "src.database",
-        "documentation": {}
-    },
-    {
-        "label": "get_session",
-        "importPath": "src.database",
-        "description": "src.database",
-        "isExtraImport": true,
-        "detail": "src.database",
-        "documentation": {}
-    },
-    {
-        "label": "get_session",
         "importPath": "src.database",
         "description": "src.database",
         "isExtraImport": true,
@@ -4526,22 +4766,6 @@
     },
     {
         "label": "get_session",
-        "importPath": "src.database",
-        "description": "src.database",
-        "isExtraImport": true,
-        "detail": "src.database",
-        "documentation": {}
-    },
-    {
-        "label": "get_session",
-        "importPath": "src.database",
-        "description": "src.database",
-        "isExtraImport": true,
-        "detail": "src.database",
-        "documentation": {}
-    },
-    {
-        "label": "async_session_maker",
         "importPath": "src.database",
         "description": "src.database",
         "isExtraImport": true,
@@ -4613,11 +4837,107 @@
         "documentation": {}
     },
     {
+        "label": "async_session_maker",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
         "label": "get_session",
         "importPath": "src.database",
         "description": "src.database",
         "isExtraImport": true,
         "detail": "src.database",
+        "documentation": {}
+    },
+    {
+        "label": "get_session",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
+        "label": "get_session",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
+        "label": "get_session",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
+        "label": "get_session",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
+        "label": "get_session",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
+        "label": "async_session_maker",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
+        "label": "get_session",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
+        "label": "get_session",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
+        "label": "get_session",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
+        "label": "get_session",
+        "importPath": "src.database",
+        "description": "src.database",
+        "isExtraImport": true,
+        "detail": "src.database",
+        "documentation": {}
+    },
+    {
+        "label": "Folder",
+        "importPath": "src.models.folder",
+        "description": "src.models.folder",
+        "isExtraImport": true,
+        "detail": "src.models.folder",
         "documentation": {}
     },
     {
@@ -4965,6 +5285,14 @@
         "documentation": {}
     },
     {
+        "label": "LLMService",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
         "label": "GeneratedFRQ",
         "importPath": "src.services.llm_service",
         "description": "src.services.llm_service",
@@ -5006,6 +5334,22 @@
     },
     {
         "label": "GeneratedMCQ",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "LLMService",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
+        "isExtraImport": true,
+        "detail": "src.services.llm_service",
+        "documentation": {}
+    },
+    {
+        "label": "_extract_json_object",
         "importPath": "src.services.llm_service",
         "description": "src.services.llm_service",
         "isExtraImport": true,
@@ -5109,11 +5453,11 @@
         "documentation": {}
     },
     {
-        "label": "IntegrityError",
-        "importPath": "sqlalchemy.exc",
-        "description": "sqlalchemy.exc",
+        "label": "LLMService",
+        "importPath": "src.services.llm_service",
+        "description": "src.services.llm_service",
         "isExtraImport": true,
-        "detail": "sqlalchemy.exc",
+        "detail": "src.services.llm_service",
         "documentation": {}
     },
     {
@@ -5138,6 +5482,38 @@
         "description": "sqlalchemy.exc",
         "isExtraImport": true,
         "detail": "sqlalchemy.exc",
+        "documentation": {}
+    },
+    {
+        "label": "IntegrityError",
+        "importPath": "sqlalchemy.exc",
+        "description": "sqlalchemy.exc",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.exc",
+        "documentation": {}
+    },
+    {
+        "label": "IntegrityError",
+        "importPath": "sqlalchemy.exc",
+        "description": "sqlalchemy.exc",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.exc",
+        "documentation": {}
+    },
+    {
+        "label": "LearningTrack",
+        "importPath": "src.models.learning_module",
+        "description": "src.models.learning_module",
+        "isExtraImport": true,
+        "detail": "src.models.learning_module",
+        "documentation": {}
+    },
+    {
+        "label": "LearningModule",
+        "importPath": "src.models.learning_module",
+        "description": "src.models.learning_module",
+        "isExtraImport": true,
+        "detail": "src.models.learning_module",
         "documentation": {}
     },
     {
@@ -5437,7 +5813,7 @@
         "documentation": {}
     },
     {
-        "label": "async_sessionmaker",
+        "label": "AsyncSession",
         "importPath": "sqlalchemy.ext.asyncio",
         "description": "sqlalchemy.ext.asyncio",
         "isExtraImport": true,
@@ -5445,7 +5821,7 @@
         "documentation": {}
     },
     {
-        "label": "create_async_engine",
+        "label": "AsyncSession",
         "importPath": "sqlalchemy.ext.asyncio",
         "description": "sqlalchemy.ext.asyncio",
         "isExtraImport": true,
@@ -5485,127 +5861,31 @@
         "documentation": {}
     },
     {
-        "label": "Base",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
+        "label": "async_sessionmaker",
+        "importPath": "sqlalchemy.ext.asyncio",
+        "description": "sqlalchemy.ext.asyncio",
         "isExtraImport": true,
-        "detail": "src.models.base",
+        "detail": "sqlalchemy.ext.asyncio",
         "documentation": {}
     },
     {
-        "label": "BIGINT_ID",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
+        "label": "create_async_engine",
+        "importPath": "sqlalchemy.ext.asyncio",
+        "description": "sqlalchemy.ext.asyncio",
         "isExtraImport": true,
-        "detail": "src.models.base",
+        "detail": "sqlalchemy.ext.asyncio",
         "documentation": {}
     },
     {
-        "label": "Base",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
+        "label": "AsyncSession",
+        "importPath": "sqlalchemy.ext.asyncio",
+        "description": "sqlalchemy.ext.asyncio",
         "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
-        "label": "BIGINT_ID",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
+        "detail": "sqlalchemy.ext.asyncio",
         "documentation": {}
     },
     {
         "label": "Base",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
-        "label": "TimestampMixin",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
-        "label": "BIGINT_ID",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
-        "label": "Base",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
-        "label": "TimestampMixin",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
-        "label": "BIGINT_ID",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
-        "label": "Base",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
-        "label": "BIGINT_ID",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
-        "label": "Base",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
-        "label": "BIGINT_ID",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
-        "label": "Base",
-        "importPath": "src.models.base",
-        "description": "src.models.base",
-        "isExtraImport": true,
-        "detail": "src.models.base",
-        "documentation": {}
-    },
-    {
-        "label": "TimestampMixin",
         "importPath": "src.models.base",
         "description": "src.models.base",
         "isExtraImport": true,
@@ -5693,6 +5973,126 @@
         "documentation": {}
     },
     {
+        "label": "BIGINT_ID",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "BIGINT_ID",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "TimestampMixin",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "BIGINT_ID",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "BIGINT_ID",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "TimestampMixin",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "BIGINT_ID",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "TimestampMixin",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "BIGINT_ID",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
         "label": "TimestampMixin",
         "importPath": "src.models.base",
         "description": "src.models.base",
@@ -5790,6 +6190,30 @@
     },
     {
         "label": "Base",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "BIGINT_ID",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
+        "importPath": "src.models.base",
+        "description": "src.models.base",
+        "isExtraImport": true,
+        "detail": "src.models.base",
+        "documentation": {}
+    },
+    {
+        "label": "TimestampMixin",
         "importPath": "src.models.base",
         "description": "src.models.base",
         "isExtraImport": true,
@@ -6485,6 +6909,62 @@
         "documentation": {}
     },
     {
+        "label": "User",
+        "importPath": "src.models.user",
+        "description": "src.models.user",
+        "isExtraImport": true,
+        "detail": "src.models.user",
+        "documentation": {}
+    },
+    {
+        "label": "User",
+        "importPath": "src.models.user",
+        "description": "src.models.user",
+        "isExtraImport": true,
+        "detail": "src.models.user",
+        "documentation": {}
+    },
+    {
+        "label": "User",
+        "importPath": "src.models.user",
+        "description": "src.models.user",
+        "isExtraImport": true,
+        "detail": "src.models.user",
+        "documentation": {}
+    },
+    {
+        "label": "User",
+        "importPath": "src.models.user",
+        "description": "src.models.user",
+        "isExtraImport": true,
+        "detail": "src.models.user",
+        "documentation": {}
+    },
+    {
+        "label": "User",
+        "importPath": "src.models.user",
+        "description": "src.models.user",
+        "isExtraImport": true,
+        "detail": "src.models.user",
+        "documentation": {}
+    },
+    {
+        "label": "User",
+        "importPath": "src.models.user",
+        "description": "src.models.user",
+        "isExtraImport": true,
+        "detail": "src.models.user",
+        "documentation": {}
+    },
+    {
+        "label": "User",
+        "importPath": "src.models.user",
+        "description": "src.models.user",
+        "isExtraImport": true,
+        "detail": "src.models.user",
+        "documentation": {}
+    },
+    {
         "label": "DraftAttemptAnswer",
         "importPath": "src.schemas.attempt_schema",
         "description": "src.schemas.attempt_schema",
@@ -6709,6 +7189,22 @@
         "documentation": {}
     },
     {
+        "label": "FRQGrade",
+        "importPath": "src.schemas.attempt_schema",
+        "description": "src.schemas.attempt_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
+        "label": "FRQGrade",
+        "importPath": "src.schemas.attempt_schema",
+        "description": "src.schemas.attempt_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.attempt_schema",
+        "documentation": {}
+    },
+    {
         "label": "GradingService",
         "importPath": "src.services.grading_service",
         "description": "src.services.grading_service",
@@ -6804,6 +7300,14 @@
         "description": "PIL",
         "isExtraImport": true,
         "detail": "PIL",
+        "documentation": {}
+    },
+    {
+        "label": "op",
+        "importPath": "alembic",
+        "description": "alembic",
+        "isExtraImport": true,
+        "detail": "alembic",
         "documentation": {}
     },
     {
@@ -7751,6 +8255,30 @@
         "documentation": {}
     },
     {
+        "label": "relationship",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.orm",
+        "documentation": {}
+    },
+    {
+        "label": "Mapped",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.orm",
+        "documentation": {}
+    },
+    {
+        "label": "mapped_column",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.orm",
+        "documentation": {}
+    },
+    {
         "label": "Mapped",
         "importPath": "sqlalchemy.orm",
         "description": "sqlalchemy.orm",
@@ -7832,6 +8360,14 @@
     },
     {
         "label": "mapped_column",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.orm",
+        "documentation": {}
+    },
+    {
+        "label": "selectinload",
         "importPath": "sqlalchemy.orm",
         "description": "sqlalchemy.orm",
         "isExtraImport": true,
@@ -7932,6 +8468,14 @@
         "description": "src.models.user_attempt",
         "isExtraImport": true,
         "detail": "src.models.user_attempt",
+        "documentation": {}
+    },
+    {
+        "label": "BaseRepository",
+        "importPath": "src.repositories.base_repository",
+        "description": "src.repositories.base_repository",
+        "isExtraImport": true,
+        "detail": "src.repositories.base_repository",
         "documentation": {}
     },
     {
@@ -8100,6 +8644,70 @@
         "description": "src.models.survey_response",
         "isExtraImport": true,
         "detail": "src.models.survey_response",
+        "documentation": {}
+    },
+    {
+        "label": "SDConceptProgress",
+        "importPath": "src.models.system_design",
+        "description": "src.models.system_design",
+        "isExtraImport": true,
+        "detail": "src.models.system_design",
+        "documentation": {}
+    },
+    {
+        "label": "SDQuizAttempt",
+        "importPath": "src.models.system_design",
+        "description": "src.models.system_design",
+        "isExtraImport": true,
+        "detail": "src.models.system_design",
+        "documentation": {}
+    },
+    {
+        "label": "SDSubmission",
+        "importPath": "src.models.system_design",
+        "description": "src.models.system_design",
+        "isExtraImport": true,
+        "detail": "src.models.system_design",
+        "documentation": {}
+    },
+    {
+        "label": "SDConceptProgress",
+        "importPath": "src.models.system_design",
+        "description": "src.models.system_design",
+        "isExtraImport": true,
+        "detail": "src.models.system_design",
+        "documentation": {}
+    },
+    {
+        "label": "SDConceptProgress",
+        "importPath": "src.models.system_design",
+        "description": "src.models.system_design",
+        "isExtraImport": true,
+        "detail": "src.models.system_design",
+        "documentation": {}
+    },
+    {
+        "label": "SDQuizAttempt",
+        "importPath": "src.models.system_design",
+        "description": "src.models.system_design",
+        "isExtraImport": true,
+        "detail": "src.models.system_design",
+        "documentation": {}
+    },
+    {
+        "label": "SDSubmission",
+        "importPath": "src.models.system_design",
+        "description": "src.models.system_design",
+        "isExtraImport": true,
+        "detail": "src.models.system_design",
+        "documentation": {}
+    },
+    {
+        "label": "SDQuizAttempt",
+        "importPath": "src.models.system_design",
+        "description": "src.models.system_design",
+        "isExtraImport": true,
+        "detail": "src.models.system_design",
         "documentation": {}
     },
     {
@@ -8776,6 +9384,46 @@
         "documentation": {}
     },
     {
+        "label": "Response",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "status",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "APIRouter",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "Depends",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "HTTPException",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
         "label": "Request",
         "importPath": "fastapi",
         "description": "fastapi",
@@ -9200,6 +9848,30 @@
         "documentation": {}
     },
     {
+        "label": "BaseModel",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "ConfigDict",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "Field",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
         "label": "Field",
         "importPath": "pydantic",
         "description": "pydantic",
@@ -9217,6 +9889,22 @@
     },
     {
         "label": "get_admin_user",
+        "importPath": "src.dependencies",
+        "description": "src.dependencies",
+        "isExtraImport": true,
+        "detail": "src.dependencies",
+        "documentation": {}
+    },
+    {
+        "label": "get_current_user",
+        "importPath": "src.dependencies",
+        "description": "src.dependencies",
+        "isExtraImport": true,
+        "detail": "src.dependencies",
+        "documentation": {}
+    },
+    {
+        "label": "get_current_user",
         "importPath": "src.dependencies",
         "description": "src.dependencies",
         "isExtraImport": true,
@@ -9824,6 +10512,30 @@
         "documentation": {}
     },
     {
+        "label": "LLMException",
+        "importPath": "src.utils.exceptions",
+        "description": "src.utils.exceptions",
+        "isExtraImport": true,
+        "detail": "src.utils.exceptions",
+        "documentation": {}
+    },
+    {
+        "label": "ResourceNotFoundException",
+        "importPath": "src.utils.exceptions",
+        "description": "src.utils.exceptions",
+        "isExtraImport": true,
+        "detail": "src.utils.exceptions",
+        "documentation": {}
+    },
+    {
+        "label": "StudyAppException",
+        "importPath": "src.utils.exceptions",
+        "description": "src.utils.exceptions",
+        "isExtraImport": true,
+        "detail": "src.utils.exceptions",
+        "documentation": {}
+    },
+    {
         "label": "ValidationException",
         "importPath": "src.utils.exceptions",
         "description": "src.utils.exceptions",
@@ -9913,6 +10625,30 @@
     },
     {
         "label": "ResourceNotFoundException",
+        "importPath": "src.utils.exceptions",
+        "description": "src.utils.exceptions",
+        "isExtraImport": true,
+        "detail": "src.utils.exceptions",
+        "documentation": {}
+    },
+    {
+        "label": "LLMException",
+        "importPath": "src.utils.exceptions",
+        "description": "src.utils.exceptions",
+        "isExtraImport": true,
+        "detail": "src.utils.exceptions",
+        "documentation": {}
+    },
+    {
+        "label": "ValidationException",
+        "importPath": "src.utils.exceptions",
+        "description": "src.utils.exceptions",
+        "isExtraImport": true,
+        "detail": "src.utils.exceptions",
+        "documentation": {}
+    },
+    {
+        "label": "ValidationException",
         "importPath": "src.utils.exceptions",
         "description": "src.utils.exceptions",
         "isExtraImport": true,
@@ -9961,6 +10697,30 @@
     },
     {
         "label": "LLMException",
+        "importPath": "src.utils.exceptions",
+        "description": "src.utils.exceptions",
+        "isExtraImport": true,
+        "detail": "src.utils.exceptions",
+        "documentation": {}
+    },
+    {
+        "label": "LLMException",
+        "importPath": "src.utils.exceptions",
+        "description": "src.utils.exceptions",
+        "isExtraImport": true,
+        "detail": "src.utils.exceptions",
+        "documentation": {}
+    },
+    {
+        "label": "LLMException",
+        "importPath": "src.utils.exceptions",
+        "description": "src.utils.exceptions",
+        "isExtraImport": true,
+        "detail": "src.utils.exceptions",
+        "documentation": {}
+    },
+    {
+        "label": "ValidationException",
         "importPath": "src.utils.exceptions",
         "description": "src.utils.exceptions",
         "isExtraImport": true,
@@ -10045,6 +10805,14 @@
         "isExtraImport": true,
         "importPath": "httpx",
         "description": "httpx",
+        "detail": "httpx",
+        "documentation": {}
+    },
+    {
+        "label": "AsyncClient",
+        "importPath": "httpx",
+        "description": "httpx",
+        "isExtraImport": true,
         "detail": "httpx",
         "documentation": {}
     },
@@ -10287,6 +11055,22 @@
         "description": "src.services.kojo_context_cache",
         "isExtraImport": true,
         "detail": "src.services.kojo_context_cache",
+        "documentation": {}
+    },
+    {
+        "label": "get_logger",
+        "importPath": "src.utils.logger",
+        "description": "src.utils.logger",
+        "isExtraImport": true,
+        "detail": "src.utils.logger",
+        "documentation": {}
+    },
+    {
+        "label": "get_logger",
+        "importPath": "src.utils.logger",
+        "description": "src.utils.logger",
+        "isExtraImport": true,
+        "detail": "src.utils.logger",
         "documentation": {}
     },
     {
@@ -11011,6 +11795,14 @@
         "documentation": {}
     },
     {
+        "label": "QuizExplanation",
+        "importPath": "src.schemas.learning_module_schema",
+        "description": "src.schemas.learning_module_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.learning_module_schema",
+        "documentation": {}
+    },
+    {
         "label": "QuizQuestionPublic",
         "importPath": "src.schemas.learning_module_schema",
         "description": "src.schemas.learning_module_schema",
@@ -11028,6 +11820,14 @@
     },
     {
         "label": "UpdateModuleVideoRequest",
+        "importPath": "src.schemas.learning_module_schema",
+        "description": "src.schemas.learning_module_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.learning_module_schema",
+        "documentation": {}
+    },
+    {
+        "label": "QuizAttemptRequest",
         "importPath": "src.schemas.learning_module_schema",
         "description": "src.schemas.learning_module_schema",
         "isExtraImport": true,
@@ -12099,6 +12899,230 @@
         "documentation": {}
     },
     {
+        "label": "CLIENT_SUB_MODULES",
+        "importPath": "src.schemas.system_design_schema",
+        "description": "src.schemas.system_design_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDProgressResponse",
+        "importPath": "src.schemas.system_design_schema",
+        "description": "src.schemas.system_design_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDQuizGradeRequest",
+        "importPath": "src.schemas.system_design_schema",
+        "description": "src.schemas.system_design_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDQuizGradeResponse",
+        "importPath": "src.schemas.system_design_schema",
+        "description": "src.schemas.system_design_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDSubmissionResponse",
+        "importPath": "src.schemas.system_design_schema",
+        "description": "src.schemas.system_design_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDSubmissionSaveRequest",
+        "importPath": "src.schemas.system_design_schema",
+        "description": "src.schemas.system_design_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDSubModuleRequest",
+        "importPath": "src.schemas.system_design_schema",
+        "description": "src.schemas.system_design_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDFrqFeedback",
+        "importPath": "src.schemas.system_design_schema",
+        "description": "src.schemas.system_design_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDQuizGradeRequest",
+        "importPath": "src.schemas.system_design_schema",
+        "description": "src.schemas.system_design_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDQuizGradeResponse",
+        "importPath": "src.schemas.system_design_schema",
+        "description": "src.schemas.system_design_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "CONCEPT_ID_PATTERN",
+        "importPath": "src.schemas.system_design_schema",
+        "description": "src.schemas.system_design_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "EXERCISE_ID_PATTERN",
+        "importPath": "src.schemas.system_design_schema",
+        "description": "src.schemas.system_design_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "MAX_FILE_NAME_LENGTH",
+        "importPath": "src.schemas.system_design_schema",
+        "description": "src.schemas.system_design_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "MAX_FILES_PER_SUBMISSION",
+        "importPath": "src.schemas.system_design_schema",
+        "description": "src.schemas.system_design_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "MAX_SUBMISSION_BYTES",
+        "importPath": "src.schemas.system_design_schema",
+        "description": "src.schemas.system_design_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SUB_MODULES",
+        "importPath": "src.schemas.system_design_schema",
+        "description": "src.schemas.system_design_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDProgressDTO",
+        "importPath": "src.schemas.system_design_schema",
+        "description": "src.schemas.system_design_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDSubmissionResponse",
+        "importPath": "src.schemas.system_design_schema",
+        "description": "src.schemas.system_design_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDFrqSubmission",
+        "importPath": "src.schemas.system_design_schema",
+        "description": "src.schemas.system_design_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDMcqResult",
+        "importPath": "src.schemas.system_design_schema",
+        "description": "src.schemas.system_design_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDQuizGradeRequest",
+        "importPath": "src.schemas.system_design_schema",
+        "description": "src.schemas.system_design_schema",
+        "isExtraImport": true,
+        "detail": "src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SystemDesignQuizService",
+        "importPath": "src.services.system_design_quiz_service",
+        "description": "src.services.system_design_quiz_service",
+        "isExtraImport": true,
+        "detail": "src.services.system_design_quiz_service",
+        "documentation": {}
+    },
+    {
+        "label": "SystemDesignQuizService",
+        "importPath": "src.services.system_design_quiz_service",
+        "description": "src.services.system_design_quiz_service",
+        "isExtraImport": true,
+        "detail": "src.services.system_design_quiz_service",
+        "documentation": {}
+    },
+    {
+        "label": "SystemDesignService",
+        "importPath": "src.services.system_design_service",
+        "description": "src.services.system_design_service",
+        "isExtraImport": true,
+        "detail": "src.services.system_design_service",
+        "documentation": {}
+    },
+    {
+        "label": "SystemDesignService",
+        "importPath": "src.services.system_design_service",
+        "description": "src.services.system_design_service",
+        "isExtraImport": true,
+        "detail": "src.services.system_design_service",
+        "documentation": {}
+    },
+    {
+        "label": "validate_concept_id",
+        "importPath": "src.services.system_design_service",
+        "description": "src.services.system_design_service",
+        "isExtraImport": true,
+        "detail": "src.services.system_design_service",
+        "documentation": {}
+    },
+    {
+        "label": "SystemDesignService",
+        "importPath": "src.services.system_design_service",
+        "description": "src.services.system_design_service",
+        "isExtraImport": true,
+        "detail": "src.services.system_design_service",
+        "documentation": {}
+    },
+    {
+        "label": "SystemDesignService",
+        "importPath": "src.services.system_design_service",
+        "description": "src.services.system_design_service",
+        "isExtraImport": true,
+        "detail": "src.services.system_design_service",
+        "documentation": {}
+    },
+    {
         "label": "UploadFile",
         "importPath": "starlette.datastructures",
         "description": "starlette.datastructures",
@@ -12463,6 +13487,14 @@
         "documentation": {}
     },
     {
+        "label": "SimpleNamespace",
+        "importPath": "types",
+        "description": "types",
+        "isExtraImport": true,
+        "detail": "types",
+        "documentation": {}
+    },
+    {
         "label": "pdfplumber",
         "kind": 6,
         "isExtraImport": true,
@@ -12549,6 +13581,14 @@
         "description": "src.repositories.kojo_repository",
         "isExtraImport": true,
         "detail": "src.repositories.kojo_repository",
+        "documentation": {}
+    },
+    {
+        "label": "normalize_latex",
+        "importPath": "src.utils.latex_utils",
+        "description": "src.utils.latex_utils",
+        "isExtraImport": true,
+        "detail": "src.utils.latex_utils",
         "documentation": {}
     },
     {
@@ -12678,6 +13718,46 @@
         "description": "src.repositories.user_memory_repository",
         "isExtraImport": true,
         "detail": "src.repositories.user_memory_repository",
+        "documentation": {}
+    },
+    {
+        "label": "SystemDesignRepository",
+        "importPath": "src.repositories.system_design_repository",
+        "description": "src.repositories.system_design_repository",
+        "isExtraImport": true,
+        "detail": "src.repositories.system_design_repository",
+        "documentation": {}
+    },
+    {
+        "label": "SystemDesignRepository",
+        "importPath": "src.repositories.system_design_repository",
+        "description": "src.repositories.system_design_repository",
+        "isExtraImport": true,
+        "detail": "src.repositories.system_design_repository",
+        "documentation": {}
+    },
+    {
+        "label": "SystemDesignRepository",
+        "importPath": "src.repositories.system_design_repository",
+        "description": "src.repositories.system_design_repository",
+        "isExtraImport": true,
+        "detail": "src.repositories.system_design_repository",
+        "documentation": {}
+    },
+    {
+        "label": "SystemDesignRepository",
+        "importPath": "src.repositories.system_design_repository",
+        "description": "src.repositories.system_design_repository",
+        "isExtraImport": true,
+        "detail": "src.repositories.system_design_repository",
+        "documentation": {}
+    },
+    {
+        "label": "SystemDesignRepository",
+        "importPath": "src.repositories.system_design_repository",
+        "description": "src.repositories.system_design_repository",
+        "isExtraImport": true,
+        "detail": "src.repositories.system_design_repository",
         "documentation": {}
     },
     {
@@ -12924,6 +14004,14 @@
     },
     {
         "label": "surveys",
+        "importPath": "src.routes",
+        "description": "src.routes",
+        "isExtraImport": true,
+        "detail": "src.routes",
+        "documentation": {}
+    },
+    {
+        "label": "system_design",
         "importPath": "src.routes",
         "description": "src.routes",
         "isExtraImport": true,
@@ -13181,6 +14269,22 @@
         "documentation": {}
     },
     {
+        "label": "AsyncMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "patch",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
         "label": "MagicMock",
         "importPath": "unittest.mock",
         "description": "unittest.mock",
@@ -13214,6 +14318,38 @@
     },
     {
         "label": "MagicMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "AsyncMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "patch",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "AsyncMock",
+        "importPath": "unittest.mock",
+        "description": "unittest.mock",
+        "isExtraImport": true,
+        "detail": "unittest.mock",
+        "documentation": {}
+    },
+    {
+        "label": "patch",
         "importPath": "unittest.mock",
         "description": "unittest.mock",
         "isExtraImport": true,
@@ -13243,6 +14379,14 @@
         "importPath": "pytest",
         "description": "pytest",
         "detail": "pytest",
+        "documentation": {}
+    },
+    {
+        "label": "app",
+        "importPath": "src.main",
+        "description": "src.main",
+        "isExtraImport": true,
+        "detail": "src.main",
         "documentation": {}
     },
     {
@@ -13326,6 +14470,104 @@
         "importPath": "parse_tfm",
         "description": "parse_tfm",
         "detail": "parse_tfm",
+        "documentation": {}
+    },
+    {
+        "label": "sim",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "sim",
+        "description": "sim",
+        "detail": "sim",
+        "documentation": {}
+    },
+    {
+        "label": "SlowStore",
+        "importPath": "store",
+        "description": "store",
+        "isExtraImport": true,
+        "detail": "store",
+        "documentation": {}
+    },
+    {
+        "label": "SlowStore",
+        "importPath": "store",
+        "description": "store",
+        "isExtraImport": true,
+        "detail": "store",
+        "documentation": {}
+    },
+    {
+        "label": "SlowStore",
+        "importPath": "store",
+        "description": "store",
+        "isExtraImport": true,
+        "detail": "store",
+        "documentation": {}
+    },
+    {
+        "label": "CacheClient",
+        "importPath": "cache_client",
+        "description": "cache_client",
+        "isExtraImport": true,
+        "detail": "cache_client",
+        "documentation": {}
+    },
+    {
+        "label": "LRUCache",
+        "importPath": "cache",
+        "description": "cache",
+        "isExtraImport": true,
+        "detail": "cache",
+        "documentation": {}
+    },
+    {
+        "label": "bisect",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "bisect",
+        "description": "bisect",
+        "detail": "bisect",
+        "documentation": {}
+    },
+    {
+        "label": "HashRing",
+        "importPath": "hashring",
+        "description": "hashring",
+        "isExtraImport": true,
+        "detail": "hashring",
+        "documentation": {}
+    },
+    {
+        "label": "HashRing",
+        "importPath": "hashring",
+        "description": "hashring",
+        "isExtraImport": true,
+        "detail": "hashring",
+        "documentation": {}
+    },
+    {
+        "label": "HashRing",
+        "importPath": "hashring",
+        "description": "hashring",
+        "isExtraImport": true,
+        "detail": "hashring",
+        "documentation": {}
+    },
+    {
+        "label": "HashRing",
+        "importPath": "hashring",
+        "description": "hashring",
+        "isExtraImport": true,
+        "detail": "hashring",
+        "documentation": {}
+    },
+    {
+        "label": "ShardedStore",
+        "importPath": "sharded_store",
+        "description": "sharded_store",
+        "isExtraImport": true,
+        "detail": "sharded_store",
         "documentation": {}
     },
     {
@@ -17903,6 +19145,60 @@
     {
         "label": "upgrade",
         "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.055_add_system_design_mode",
+        "description": "study-app-backend.src.migrations.versions.055_add_system_design_mode",
+        "peekOfCode": "def upgrade() -> None:\n    op.create_table(\n        \"sd_concept_progress\",\n        sa.Column(\"id\", sa.BigInteger(), autoincrement=True, nullable=False),\n        sa.Column(\"user_id\", sa.BigInteger(), nullable=False),\n        sa.Column(\"concept_id\", sa.String(80), nullable=False),\n        sa.Column(\"notes_done\", sa.Boolean(), nullable=False, server_default=sa.text(\"false\")),\n        sa.Column(\"video_done\", sa.Boolean(), nullable=False, server_default=sa.text(\"false\")),\n        sa.Column(\"visualizer_done\", sa.Boolean(), nullable=False, server_default=sa.text(\"false\")),\n        sa.Column(\"project_done\", sa.Boolean(), nullable=False, server_default=sa.text(\"false\")),",
+        "detail": "study-app-backend.src.migrations.versions.055_add_system_design_mode",
+        "documentation": {}
+    },
+    {
+        "label": "downgrade",
+        "kind": 2,
+        "importPath": "study-app-backend.src.migrations.versions.055_add_system_design_mode",
+        "description": "study-app-backend.src.migrations.versions.055_add_system_design_mode",
+        "peekOfCode": "def downgrade() -> None:\n    op.drop_index(\"ix_sd_quiz_attempts_user_concept\", table_name=\"sd_quiz_attempts\")\n    op.drop_index(\"ix_sd_quiz_attempts_user_id\", table_name=\"sd_quiz_attempts\")\n    op.drop_table(\"sd_quiz_attempts\")\n    op.drop_index(\"ix_sd_submissions_user_id\", table_name=\"sd_submissions\")\n    op.drop_table(\"sd_submissions\")\n    op.drop_index(\"ix_sd_concept_progress_user_id\", table_name=\"sd_concept_progress\")\n    op.drop_table(\"sd_concept_progress\")",
+        "detail": "study-app-backend.src.migrations.versions.055_add_system_design_mode",
+        "documentation": {}
+    },
+    {
+        "label": "revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.055_add_system_design_mode",
+        "description": "study-app-backend.src.migrations.versions.055_add_system_design_mode",
+        "peekOfCode": "revision = \"055_add_system_design_mode\"\ndown_revision = \"054_add_preferred_name\"\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.create_table(\n        \"sd_concept_progress\",\n        sa.Column(\"id\", sa.BigInteger(), autoincrement=True, nullable=False),\n        sa.Column(\"user_id\", sa.BigInteger(), nullable=False),\n        sa.Column(\"concept_id\", sa.String(80), nullable=False),",
+        "detail": "study-app-backend.src.migrations.versions.055_add_system_design_mode",
+        "documentation": {}
+    },
+    {
+        "label": "down_revision",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.055_add_system_design_mode",
+        "description": "study-app-backend.src.migrations.versions.055_add_system_design_mode",
+        "peekOfCode": "down_revision = \"054_add_preferred_name\"\nbranch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.create_table(\n        \"sd_concept_progress\",\n        sa.Column(\"id\", sa.BigInteger(), autoincrement=True, nullable=False),\n        sa.Column(\"user_id\", sa.BigInteger(), nullable=False),\n        sa.Column(\"concept_id\", sa.String(80), nullable=False),\n        sa.Column(\"notes_done\", sa.Boolean(), nullable=False, server_default=sa.text(\"false\")),",
+        "detail": "study-app-backend.src.migrations.versions.055_add_system_design_mode",
+        "documentation": {}
+    },
+    {
+        "label": "branch_labels",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.055_add_system_design_mode",
+        "description": "study-app-backend.src.migrations.versions.055_add_system_design_mode",
+        "peekOfCode": "branch_labels = None\ndepends_on = None\ndef upgrade() -> None:\n    op.create_table(\n        \"sd_concept_progress\",\n        sa.Column(\"id\", sa.BigInteger(), autoincrement=True, nullable=False),\n        sa.Column(\"user_id\", sa.BigInteger(), nullable=False),\n        sa.Column(\"concept_id\", sa.String(80), nullable=False),\n        sa.Column(\"notes_done\", sa.Boolean(), nullable=False, server_default=sa.text(\"false\")),\n        sa.Column(\"video_done\", sa.Boolean(), nullable=False, server_default=sa.text(\"false\")),",
+        "detail": "study-app-backend.src.migrations.versions.055_add_system_design_mode",
+        "documentation": {}
+    },
+    {
+        "label": "depends_on",
+        "kind": 5,
+        "importPath": "study-app-backend.src.migrations.versions.055_add_system_design_mode",
+        "description": "study-app-backend.src.migrations.versions.055_add_system_design_mode",
+        "peekOfCode": "depends_on = None\ndef upgrade() -> None:\n    op.create_table(\n        \"sd_concept_progress\",\n        sa.Column(\"id\", sa.BigInteger(), autoincrement=True, nullable=False),\n        sa.Column(\"user_id\", sa.BigInteger(), nullable=False),\n        sa.Column(\"concept_id\", sa.String(80), nullable=False),\n        sa.Column(\"notes_done\", sa.Boolean(), nullable=False, server_default=sa.text(\"false\")),\n        sa.Column(\"video_done\", sa.Boolean(), nullable=False, server_default=sa.text(\"false\")),\n        sa.Column(\"visualizer_done\", sa.Boolean(), nullable=False, server_default=sa.text(\"false\")),",
+        "detail": "study-app-backend.src.migrations.versions.055_add_system_design_mode",
+        "documentation": {}
+    },
+    {
+        "label": "upgrade",
+        "kind": 2,
         "importPath": "study-app-backend.src.migrations.versions.30e3a0b7d13b_add_admin_fields_and_usage_events",
         "description": "study-app-backend.src.migrations.versions.30e3a0b7d13b_add_admin_fields_and_usage_events",
         "peekOfCode": "def upgrade() -> None:\n    # ### commands auto generated by Alembic - please adjust! ###\n    op.create_table('usage_events',\n    sa.Column('id', sa.BigInteger().with_variant(sa.Integer(), 'sqlite'), autoincrement=True, nullable=False),\n    sa.Column('user_id', sa.BigInteger().with_variant(sa.Integer(), 'sqlite'), nullable=False),\n    sa.Column('feature', sa.String(length=50), nullable=False),\n    sa.Column('duration_ms', sa.Integer(), nullable=False),\n    sa.Column('estimated_tokens', sa.Integer(), nullable=True),\n    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),\n    sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),",
@@ -18396,6 +19692,33 @@
         "documentation": {}
     },
     {
+        "label": "SDConceptProgress",
+        "kind": 6,
+        "importPath": "study-app-backend.src.models.system_design",
+        "description": "study-app-backend.src.models.system_design",
+        "peekOfCode": "class SDConceptProgress(Base, TimestampMixin):\n    \"\"\"Per-user completion state for one System Design concept.\n    There is no concept table: the content is bundled with the frontend, so\n    concept_id is an opaque string the client sends (shape-validated only). A\n    concept counts as complete when all five sub-modules are done, which is what\n    completed_at records.\n    \"\"\"\n    __tablename__ = \"sd_concept_progress\"\n    __table_args__ = (\n        UniqueConstraint(\"user_id\", \"concept_id\", name=\"uq_sd_progress_user_concept\"),",
+        "detail": "study-app-backend.src.models.system_design",
+        "documentation": {}
+    },
+    {
+        "label": "SDSubmission",
+        "kind": 6,
+        "importPath": "study-app-backend.src.models.system_design",
+        "description": "study-app-backend.src.models.system_design",
+        "peekOfCode": "class SDSubmission(Base, TimestampMixin):\n    \"\"\"Autosave plus last-run result for one exercise (visualizer or project).\n    exercise_id is \"<conceptId>:<visualizer|project>\". Code runs entirely in the\n    browser under Pyodide, so this row holds what the learner typed and whether\n    the hidden tests passed, never anything the server executed.\n    \"\"\"\n    __tablename__ = \"sd_submissions\"\n    __table_args__ = (\n        UniqueConstraint(\"user_id\", \"exercise_id\", name=\"uq_sd_submission_user_exercise\"),\n    )",
+        "detail": "study-app-backend.src.models.system_design",
+        "documentation": {}
+    },
+    {
+        "label": "SDQuizAttempt",
+        "kind": 6,
+        "importPath": "study-app-backend.src.models.system_design",
+        "description": "study-app-backend.src.models.system_design",
+        "peekOfCode": "class SDQuizAttempt(Base, TimestampMixin):\n    \"\"\"One graded quiz submission. Append-only history: the durable flag is\n    quiz_done on the progress row, and quiz_best_score its best total_score.\"\"\"\n    __tablename__ = \"sd_quiz_attempts\"\n    id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)\n    user_id: Mapped[int] = mapped_column(\n        BIGINT_ID, ForeignKey(\"users.id\", ondelete=\"CASCADE\"), nullable=False, index=True\n    )\n    concept_id: Mapped[str] = mapped_column(String(80), nullable=False)\n    # [{id, chosenIndex, correct}]",
+        "detail": "study-app-backend.src.models.system_design",
+        "documentation": {}
+    },
+    {
         "label": "Test",
         "kind": 6,
         "importPath": "study-app-backend.src.models.test",
@@ -18519,6 +19842,15 @@
         "description": "study-app-backend.src.repositories.survey_repository",
         "peekOfCode": "class SurveyRepository(BaseRepository[SurveyResponse]):\n    async def create(\n        self,\n        user_id: int,\n        feature: str,\n        rating: int,\n        comment: Optional[str] = None,\n    ) -> SurveyResponse:\n        response = SurveyResponse(\n            user_id=user_id,",
         "detail": "study-app-backend.src.repositories.survey_repository",
+        "documentation": {}
+    },
+    {
+        "label": "SystemDesignRepository",
+        "kind": 6,
+        "importPath": "study-app-backend.src.repositories.system_design_repository",
+        "description": "study-app-backend.src.repositories.system_design_repository",
+        "peekOfCode": "class SystemDesignRepository(BaseRepository[SDConceptProgress]):\n    \"\"\"All System Design DB access. Nothing here commits: the callers own the\n    transaction boundary, which keeps a progress flip and a submission save in\n    the same unit of work.\"\"\"\n    # ── progress ──────────────────────────────────────────────────────────────\n    async def get_progress(self, user_id: int) -> dict[str, SDConceptProgress]:\n        rows = (\n            await self.session.execute(\n                select(SDConceptProgress).where(SDConceptProgress.user_id == user_id)\n            )",
+        "detail": "study-app-backend.src.repositories.system_design_repository",
         "documentation": {}
     },
     {
@@ -18859,7 +20191,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.routes.learning_modules",
         "description": "study-app-backend.src.routes.learning_modules",
-        "peekOfCode": "router = APIRouter(tags=[\"learning-modules\"])\nlogger = get_logger(__name__)\n# Questions per module quiz and the pass bar (80%, so 4/5).\nQUIZ_QUESTION_COUNT = 5\nPASS_RATIO = 0.8\n# Checkpoints per episode and the pass bar: same count and same 80% threshold\n# as the article quiz, so _pass_threshold and the pass semantics are shared.\nCHECKPOINT_COUNT = QUIZ_QUESTION_COUNT\n# Strong references to detached generation tasks, mirroring routes/tests.py:\n# generation is spawned with asyncio.create_task (NOT FastAPI BackgroundTasks)",
+        "peekOfCode": "router = APIRouter(tags=[\"learning-modules\"])\nlogger = get_logger(__name__)\n# Questions per module quiz and the pass bar (80%, so 4/5).\nQUIZ_QUESTION_COUNT = 5\nPASS_RATIO = 0.8\n# Checkpoints per episode and the pass bar: same count and same 80% threshold\n# as the article quiz, so _pass_threshold and the pass semantics are shared.\nCHECKPOINT_COUNT = QUIZ_QUESTION_COUNT\n# Max wall-clock the lazy explanation backfill may take before quiz grading\n# returns without it. Grading is deterministic and already committed by the",
         "detail": "study-app-backend.src.routes.learning_modules",
         "documentation": {}
     },
@@ -18868,7 +20200,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.routes.learning_modules",
         "description": "study-app-backend.src.routes.learning_modules",
-        "peekOfCode": "logger = get_logger(__name__)\n# Questions per module quiz and the pass bar (80%, so 4/5).\nQUIZ_QUESTION_COUNT = 5\nPASS_RATIO = 0.8\n# Checkpoints per episode and the pass bar: same count and same 80% threshold\n# as the article quiz, so _pass_threshold and the pass semantics are shared.\nCHECKPOINT_COUNT = QUIZ_QUESTION_COUNT\n# Strong references to detached generation tasks, mirroring routes/tests.py:\n# generation is spawned with asyncio.create_task (NOT FastAPI BackgroundTasks)\n# so the POST's HTTP connection is freed as soon as the 201 returns.",
+        "peekOfCode": "logger = get_logger(__name__)\n# Questions per module quiz and the pass bar (80%, so 4/5).\nQUIZ_QUESTION_COUNT = 5\nPASS_RATIO = 0.8\n# Checkpoints per episode and the pass bar: same count and same 80% threshold\n# as the article quiz, so _pass_threshold and the pass semantics are shared.\nCHECKPOINT_COUNT = QUIZ_QUESTION_COUNT\n# Max wall-clock the lazy explanation backfill may take before quiz grading\n# returns without it. Grading is deterministic and already committed by the\n# time this runs, so a slow provider degrades to \"no explanations shown\", never",
         "detail": "study-app-backend.src.routes.learning_modules",
         "documentation": {}
     },
@@ -18877,7 +20209,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.routes.learning_modules",
         "description": "study-app-backend.src.routes.learning_modules",
-        "peekOfCode": "QUIZ_QUESTION_COUNT = 5\nPASS_RATIO = 0.8\n# Checkpoints per episode and the pass bar: same count and same 80% threshold\n# as the article quiz, so _pass_threshold and the pass semantics are shared.\nCHECKPOINT_COUNT = QUIZ_QUESTION_COUNT\n# Strong references to detached generation tasks, mirroring routes/tests.py:\n# generation is spawned with asyncio.create_task (NOT FastAPI BackgroundTasks)\n# so the POST's HTTP connection is freed as soon as the 201 returns.\n_track_tasks: set[asyncio.Task] = set()\ndef _spawn_track_generation(coro) -> None:",
+        "peekOfCode": "QUIZ_QUESTION_COUNT = 5\nPASS_RATIO = 0.8\n# Checkpoints per episode and the pass bar: same count and same 80% threshold\n# as the article quiz, so _pass_threshold and the pass semantics are shared.\nCHECKPOINT_COUNT = QUIZ_QUESTION_COUNT\n# Max wall-clock the lazy explanation backfill may take before quiz grading\n# returns without it. Grading is deterministic and already committed by the\n# time this runs, so a slow provider degrades to \"no explanations shown\", never\n# to a failed or delayed grade. Same shape as _OCR_TIMEOUT_SECONDS in\n# grading_service.py: a module-level constant, never service state.",
         "detail": "study-app-backend.src.routes.learning_modules",
         "documentation": {}
     },
@@ -18886,7 +20218,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.routes.learning_modules",
         "description": "study-app-backend.src.routes.learning_modules",
-        "peekOfCode": "PASS_RATIO = 0.8\n# Checkpoints per episode and the pass bar: same count and same 80% threshold\n# as the article quiz, so _pass_threshold and the pass semantics are shared.\nCHECKPOINT_COUNT = QUIZ_QUESTION_COUNT\n# Strong references to detached generation tasks, mirroring routes/tests.py:\n# generation is spawned with asyncio.create_task (NOT FastAPI BackgroundTasks)\n# so the POST's HTTP connection is freed as soon as the 201 returns.\n_track_tasks: set[asyncio.Task] = set()\ndef _spawn_track_generation(coro) -> None:\n    task = asyncio.create_task(coro)",
+        "peekOfCode": "PASS_RATIO = 0.8\n# Checkpoints per episode and the pass bar: same count and same 80% threshold\n# as the article quiz, so _pass_threshold and the pass semantics are shared.\nCHECKPOINT_COUNT = QUIZ_QUESTION_COUNT\n# Max wall-clock the lazy explanation backfill may take before quiz grading\n# returns without it. Grading is deterministic and already committed by the\n# time this runs, so a slow provider degrades to \"no explanations shown\", never\n# to a failed or delayed grade. Same shape as _OCR_TIMEOUT_SECONDS in\n# grading_service.py: a module-level constant, never service state.\n_EXPLANATION_BACKFILL_TIMEOUT_SECONDS = 45",
         "detail": "study-app-backend.src.routes.learning_modules",
         "documentation": {}
     },
@@ -18895,7 +20227,16 @@
         "kind": 5,
         "importPath": "study-app-backend.src.routes.learning_modules",
         "description": "study-app-backend.src.routes.learning_modules",
-        "peekOfCode": "CHECKPOINT_COUNT = QUIZ_QUESTION_COUNT\n# Strong references to detached generation tasks, mirroring routes/tests.py:\n# generation is spawned with asyncio.create_task (NOT FastAPI BackgroundTasks)\n# so the POST's HTTP connection is freed as soon as the 201 returns.\n_track_tasks: set[asyncio.Task] = set()\ndef _spawn_track_generation(coro) -> None:\n    task = asyncio.create_task(coro)\n    _track_tasks.add(task)\n    task.add_done_callback(_track_tasks.discard)\ndef _hash_notes(notes: str) -> str:",
+        "peekOfCode": "CHECKPOINT_COUNT = QUIZ_QUESTION_COUNT\n# Max wall-clock the lazy explanation backfill may take before quiz grading\n# returns without it. Grading is deterministic and already committed by the\n# time this runs, so a slow provider degrades to \"no explanations shown\", never\n# to a failed or delayed grade. Same shape as _OCR_TIMEOUT_SECONDS in\n# grading_service.py: a module-level constant, never service state.\n_EXPLANATION_BACKFILL_TIMEOUT_SECONDS = 45\n# Strong references to detached generation tasks, mirroring routes/tests.py:\n# generation is spawned with asyncio.create_task (NOT FastAPI BackgroundTasks)\n# so the POST's HTTP connection is freed as soon as the 201 returns.",
+        "detail": "study-app-backend.src.routes.learning_modules",
+        "documentation": {}
+    },
+    {
+        "label": "_EXPLANATION_BACKFILL_TIMEOUT_SECONDS",
+        "kind": 5,
+        "importPath": "study-app-backend.src.routes.learning_modules",
+        "description": "study-app-backend.src.routes.learning_modules",
+        "peekOfCode": "_EXPLANATION_BACKFILL_TIMEOUT_SECONDS = 45\n# Strong references to detached generation tasks, mirroring routes/tests.py:\n# generation is spawned with asyncio.create_task (NOT FastAPI BackgroundTasks)\n# so the POST's HTTP connection is freed as soon as the 201 returns.\n_track_tasks: set[asyncio.Task] = set()\ndef _spawn_track_generation(coro) -> None:\n    task = asyncio.create_task(coro)\n    _track_tasks.add(task)\n    task.add_done_callback(_track_tasks.discard)\ndef _hash_notes(notes: str) -> str:",
         "detail": "study-app-backend.src.routes.learning_modules",
         "documentation": {}
     },
@@ -19149,6 +20490,24 @@
         "description": "study-app-backend.src.routes.surveys",
         "peekOfCode": "router = APIRouter(prefix=\"/surveys\", tags=[\"surveys\"])\n@router.post(\"\", status_code=status.HTTP_201_CREATED)\nasync def submit_survey(\n    data: SurveyCreate,\n    session: AsyncSession = Depends(get_session),\n    user: User = Depends(get_current_user),\n) -> dict:\n    repo = SurveyRepository(session)\n    await repo.create(\n        user_id=user.id,",
         "detail": "study-app-backend.src.routes.surveys",
+        "documentation": {}
+    },
+    {
+        "label": "logger",
+        "kind": 5,
+        "importPath": "study-app-backend.src.routes.system_design",
+        "description": "study-app-backend.src.routes.system_design",
+        "peekOfCode": "logger = get_logger(__name__)\nrouter = APIRouter(prefix=\"/system-design\", tags=[\"system-design\"])\ndef _http_error(exc: Exception, fallback: str) -> HTTPException:\n    \"\"\"Map service exceptions onto HTTP. Every handler funnels through this so an\n    unhandled error still leaves as an HTTPException: raw 500s bypass\n    CORSMiddleware and reach the browser without CORS headers or a detail field.\n    \"\"\"\n    if isinstance(exc, HTTPException):\n        return exc\n    if isinstance(exc, ResourceNotFoundException):",
+        "detail": "study-app-backend.src.routes.system_design",
+        "documentation": {}
+    },
+    {
+        "label": "router",
+        "kind": 5,
+        "importPath": "study-app-backend.src.routes.system_design",
+        "description": "study-app-backend.src.routes.system_design",
+        "peekOfCode": "router = APIRouter(prefix=\"/system-design\", tags=[\"system-design\"])\ndef _http_error(exc: Exception, fallback: str) -> HTTPException:\n    \"\"\"Map service exceptions onto HTTP. Every handler funnels through this so an\n    unhandled error still leaves as an HTTPException: raw 500s bypass\n    CORSMiddleware and reach the browser without CORS headers or a detail field.\n    \"\"\"\n    if isinstance(exc, HTTPException):\n        return exc\n    if isinstance(exc, ResourceNotFoundException):\n        return HTTPException(status_code=404, detail=str(exc))",
+        "detail": "study-app-backend.src.routes.system_design",
         "documentation": {}
     },
     {
@@ -19768,7 +21127,16 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.learning_module_schema",
         "description": "study-app-backend.src.schemas.learning_module_schema",
-        "peekOfCode": "class QuizAttemptRequest(BaseModel):\n    # Selected option index per question, in question order. -1 = unanswered.\n    answers: list[int]\nclass QuizAttemptResponse(BaseModel):\n    score: int\n    total: int\n    passed: bool\n    # 0-based correct option index per question, revealed after grading.\n    correct_indices: list[int]\n    best_score: int",
+        "peekOfCode": "class QuizAttemptRequest(BaseModel):\n    # Selected option index per question, in question order. -1 = unanswered.\n    answers: list[int]\nclass QuizExplanation(BaseModel):\n    \"\"\"Why the correct option is correct, revealed only after grading.\n    option_explanations is either empty or exactly as long as that question's\n    options: a partial list would pair rationales with the wrong options.\n    lesson_section is the verbatim \"##\" heading covering the question, used by\n    the client to offer a jump back into the article; \"\" when there is none.\n    \"\"\"",
+        "detail": "study-app-backend.src.schemas.learning_module_schema",
+        "documentation": {}
+    },
+    {
+        "label": "QuizExplanation",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.learning_module_schema",
+        "description": "study-app-backend.src.schemas.learning_module_schema",
+        "peekOfCode": "class QuizExplanation(BaseModel):\n    \"\"\"Why the correct option is correct, revealed only after grading.\n    option_explanations is either empty or exactly as long as that question's\n    options: a partial list would pair rationales with the wrong options.\n    lesson_section is the verbatim \"##\" heading covering the question, used by\n    the client to offer a jump back into the article; \"\" when there is none.\n    \"\"\"\n    explanation: str = \"\"\n    option_explanations: list[str] = []\n    lesson_section: str = \"\"",
         "detail": "study-app-backend.src.schemas.learning_module_schema",
         "documentation": {}
     },
@@ -19777,7 +21145,7 @@
         "kind": 6,
         "importPath": "study-app-backend.src.schemas.learning_module_schema",
         "description": "study-app-backend.src.schemas.learning_module_schema",
-        "peekOfCode": "class QuizAttemptResponse(BaseModel):\n    score: int\n    total: int\n    passed: bool\n    # 0-based correct option index per question, revealed after grading.\n    correct_indices: list[int]\n    best_score: int\nclass EpisodeTurn(BaseModel):\n    # \"host\" or \"expert\" for podcast, \"lecturer\" for a lecture.\n    speaker: str",
+        "peekOfCode": "class QuizAttemptResponse(BaseModel):\n    score: int\n    total: int\n    passed: bool\n    # 0-based correct option index per question, revealed after grading.\n    correct_indices: list[int]\n    best_score: int\n    # Parallel to correct_indices. Empty when the module predates explanations\n    # and the lazy backfill could not run or failed; the client then renders the\n    # graded quiz exactly as it did before this field existed.",
         "detail": "study-app-backend.src.schemas.learning_module_schema",
         "documentation": {}
     },
@@ -20580,6 +21948,150 @@
         "description": "study-app-backend.src.schemas.survey_schema",
         "peekOfCode": "SurveyFeature = Literal[\"flashcards\", \"testing\", \"kojo\"]\nclass SurveyCreate(BaseModel):\n    feature: SurveyFeature\n    rating: int = Field(..., ge=1, le=5)\n    comment: Optional[str] = Field(default=None, max_length=1000)\n    @field_validator(\"comment\")\n    @classmethod\n    def clean_comment(cls, value: Optional[str]) -> Optional[str]:\n        if value is None:\n            return None",
         "detail": "study-app-backend.src.schemas.survey_schema",
+        "documentation": {}
+    },
+    {
+        "label": "_CamelModel",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.system_design_schema",
+        "description": "study-app-backend.src.schemas.system_design_schema",
+        "peekOfCode": "class _CamelModel(BaseModel):\n    \"\"\"Frontend-facing JSON is camelCase; the Python attributes stay snake_case.\"\"\"\n    model_config = ConfigDict(populate_by_name=True)\nclass SDProgressDTO(_CamelModel):\n    notes_done: bool = Field(default=False, alias=\"notesDone\")\n    video_done: bool = Field(default=False, alias=\"videoDone\")\n    visualizer_done: bool = Field(default=False, alias=\"visualizerDone\")\n    project_done: bool = Field(default=False, alias=\"projectDone\")\n    quiz_done: bool = Field(default=False, alias=\"quizDone\")\n    quiz_best_score: Optional[int] = Field(default=None, alias=\"quizBestScore\")",
+        "detail": "study-app-backend.src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDProgressDTO",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.system_design_schema",
+        "description": "study-app-backend.src.schemas.system_design_schema",
+        "peekOfCode": "class SDProgressDTO(_CamelModel):\n    notes_done: bool = Field(default=False, alias=\"notesDone\")\n    video_done: bool = Field(default=False, alias=\"videoDone\")\n    visualizer_done: bool = Field(default=False, alias=\"visualizerDone\")\n    project_done: bool = Field(default=False, alias=\"projectDone\")\n    quiz_done: bool = Field(default=False, alias=\"quizDone\")\n    quiz_best_score: Optional[int] = Field(default=None, alias=\"quizBestScore\")\n    completed_at: Optional[datetime] = Field(default=None, alias=\"completedAt\")\nclass SDProgressResponse(_CamelModel):\n    concepts: dict[str, SDProgressDTO] = Field(default_factory=dict)",
+        "detail": "study-app-backend.src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDProgressResponse",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.system_design_schema",
+        "description": "study-app-backend.src.schemas.system_design_schema",
+        "peekOfCode": "class SDProgressResponse(_CamelModel):\n    concepts: dict[str, SDProgressDTO] = Field(default_factory=dict)\nclass SDSubModuleRequest(_CamelModel):\n    sub_module: str = Field(..., alias=\"subModule\", max_length=40)\n    done: bool\nclass SDSubmissionResponse(_CamelModel):\n    files: dict[str, str] = Field(default_factory=dict)\n    last_run_passed: bool = Field(default=False, alias=\"lastRunPassed\")\n    passed_at: Optional[datetime] = Field(default=None, alias=\"passedAt\")\nclass SDSubmissionSaveRequest(_CamelModel):",
+        "detail": "study-app-backend.src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDSubModuleRequest",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.system_design_schema",
+        "description": "study-app-backend.src.schemas.system_design_schema",
+        "peekOfCode": "class SDSubModuleRequest(_CamelModel):\n    sub_module: str = Field(..., alias=\"subModule\", max_length=40)\n    done: bool\nclass SDSubmissionResponse(_CamelModel):\n    files: dict[str, str] = Field(default_factory=dict)\n    last_run_passed: bool = Field(default=False, alias=\"lastRunPassed\")\n    passed_at: Optional[datetime] = Field(default=None, alias=\"passedAt\")\nclass SDSubmissionSaveRequest(_CamelModel):\n    files: dict[str, str] = Field(default_factory=dict)\n    ran_passed: bool = Field(default=False, alias=\"ranPassed\")",
+        "detail": "study-app-backend.src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDSubmissionResponse",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.system_design_schema",
+        "description": "study-app-backend.src.schemas.system_design_schema",
+        "peekOfCode": "class SDSubmissionResponse(_CamelModel):\n    files: dict[str, str] = Field(default_factory=dict)\n    last_run_passed: bool = Field(default=False, alias=\"lastRunPassed\")\n    passed_at: Optional[datetime] = Field(default=None, alias=\"passedAt\")\nclass SDSubmissionSaveRequest(_CamelModel):\n    files: dict[str, str] = Field(default_factory=dict)\n    ran_passed: bool = Field(default=False, alias=\"ranPassed\")\n# ── quiz grading (implemented in PR 6) ────────────────────────────────────────\nclass SDMcqResult(_CamelModel):\n    id: str = Field(..., max_length=80)",
+        "detail": "study-app-backend.src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDSubmissionSaveRequest",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.system_design_schema",
+        "description": "study-app-backend.src.schemas.system_design_schema",
+        "peekOfCode": "class SDSubmissionSaveRequest(_CamelModel):\n    files: dict[str, str] = Field(default_factory=dict)\n    ran_passed: bool = Field(default=False, alias=\"ranPassed\")\n# ── quiz grading (implemented in PR 6) ────────────────────────────────────────\nclass SDMcqResult(_CamelModel):\n    id: str = Field(..., max_length=80)\n    chosen_index: int = Field(..., alias=\"chosenIndex\", ge=-1, le=3)\n    correct_index: int = Field(..., alias=\"correctIndex\", ge=0, le=3)\nclass SDFrqSubmission(_CamelModel):\n    id: str = Field(..., max_length=80)",
+        "detail": "study-app-backend.src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDMcqResult",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.system_design_schema",
+        "description": "study-app-backend.src.schemas.system_design_schema",
+        "peekOfCode": "class SDMcqResult(_CamelModel):\n    id: str = Field(..., max_length=80)\n    chosen_index: int = Field(..., alias=\"chosenIndex\", ge=-1, le=3)\n    correct_index: int = Field(..., alias=\"correctIndex\", ge=0, le=3)\nclass SDFrqSubmission(_CamelModel):\n    id: str = Field(..., max_length=80)\n    prompt: str = Field(..., max_length=4000)\n    rubric: str = Field(..., max_length=4000)\n    answer: str = Field(default=\"\", max_length=8000)\nclass SDQuizGradeRequest(_CamelModel):",
+        "detail": "study-app-backend.src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDFrqSubmission",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.system_design_schema",
+        "description": "study-app-backend.src.schemas.system_design_schema",
+        "peekOfCode": "class SDFrqSubmission(_CamelModel):\n    id: str = Field(..., max_length=80)\n    prompt: str = Field(..., max_length=4000)\n    rubric: str = Field(..., max_length=4000)\n    answer: str = Field(default=\"\", max_length=8000)\nclass SDQuizGradeRequest(_CamelModel):\n    notes: str = Field(default=\"\", max_length=60000)\n    mcq: list[SDMcqResult] = Field(default_factory=list)\n    frq: list[SDFrqSubmission] = Field(default_factory=list)\nclass SDFrqFeedback(_CamelModel):",
+        "detail": "study-app-backend.src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDQuizGradeRequest",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.system_design_schema",
+        "description": "study-app-backend.src.schemas.system_design_schema",
+        "peekOfCode": "class SDQuizGradeRequest(_CamelModel):\n    notes: str = Field(default=\"\", max_length=60000)\n    mcq: list[SDMcqResult] = Field(default_factory=list)\n    frq: list[SDFrqSubmission] = Field(default_factory=list)\nclass SDFrqFeedback(_CamelModel):\n    id: str\n    is_correct: bool = Field(alias=\"isCorrect\")\n    feedback: str = \"\"\n    confidence: float = 0.0\n    flagged_uncertain: bool = Field(default=False, alias=\"flaggedUncertain\")",
+        "detail": "study-app-backend.src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDFrqFeedback",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.system_design_schema",
+        "description": "study-app-backend.src.schemas.system_design_schema",
+        "peekOfCode": "class SDFrqFeedback(_CamelModel):\n    id: str\n    is_correct: bool = Field(alias=\"isCorrect\")\n    feedback: str = \"\"\n    confidence: float = 0.0\n    flagged_uncertain: bool = Field(default=False, alias=\"flaggedUncertain\")\nclass SDQuizGradeResponse(_CamelModel):\n    mcq_score: int = Field(alias=\"mcqScore\")\n    frq_score: int = Field(alias=\"frqScore\")\n    total_score: int = Field(alias=\"totalScore\")",
+        "detail": "study-app-backend.src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "SDQuizGradeResponse",
+        "kind": 6,
+        "importPath": "study-app-backend.src.schemas.system_design_schema",
+        "description": "study-app-backend.src.schemas.system_design_schema",
+        "peekOfCode": "class SDQuizGradeResponse(_CamelModel):\n    mcq_score: int = Field(alias=\"mcqScore\")\n    frq_score: int = Field(alias=\"frqScore\")\n    total_score: int = Field(alias=\"totalScore\")\n    passed: bool\n    grader_degraded: bool = Field(default=False, alias=\"graderDegraded\")\n    frq_feedback: list[SDFrqFeedback] = Field(default_factory=list, alias=\"frqFeedback\")\n    concept_completed: bool = Field(default=False, alias=\"conceptCompleted\")",
+        "detail": "study-app-backend.src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "CONCEPT_ID_PATTERN",
+        "kind": 5,
+        "importPath": "study-app-backend.src.schemas.system_design_schema",
+        "description": "study-app-backend.src.schemas.system_design_schema",
+        "peekOfCode": "CONCEPT_ID_PATTERN = re.compile(r\"^[a-z0-9-]{1,80}$\")\nEXERCISE_ID_PATTERN = re.compile(r\"^[a-z0-9-]{1,80}:(visualizer|project)$\")\n# Every sub-module of a concept, in display order. All five must be done for the\n# concept to count as complete.\nSUB_MODULES: tuple[str, ...] = (\"notes\", \"video\", \"visualizer\", \"project\", \"quiz\")\n# The only two a client may assert directly. visualizer and project are earned by\n# a passing Pyodide run, quiz by a graded attempt, so they have their own routes.\nCLIENT_SUB_MODULES: frozenset[str] = frozenset({\"notes\", \"video\"})\n# Autosave guards. A workspace is a handful of small Python files; anything past\n# these is a client bug or an abuse attempt, not a learner.",
+        "detail": "study-app-backend.src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "EXERCISE_ID_PATTERN",
+        "kind": 5,
+        "importPath": "study-app-backend.src.schemas.system_design_schema",
+        "description": "study-app-backend.src.schemas.system_design_schema",
+        "peekOfCode": "EXERCISE_ID_PATTERN = re.compile(r\"^[a-z0-9-]{1,80}:(visualizer|project)$\")\n# Every sub-module of a concept, in display order. All five must be done for the\n# concept to count as complete.\nSUB_MODULES: tuple[str, ...] = (\"notes\", \"video\", \"visualizer\", \"project\", \"quiz\")\n# The only two a client may assert directly. visualizer and project are earned by\n# a passing Pyodide run, quiz by a graded attempt, so they have their own routes.\nCLIENT_SUB_MODULES: frozenset[str] = frozenset({\"notes\", \"video\"})\n# Autosave guards. A workspace is a handful of small Python files; anything past\n# these is a client bug or an abuse attempt, not a learner.\nMAX_FILES_PER_SUBMISSION = 20",
+        "detail": "study-app-backend.src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "MAX_FILES_PER_SUBMISSION",
+        "kind": 5,
+        "importPath": "study-app-backend.src.schemas.system_design_schema",
+        "description": "study-app-backend.src.schemas.system_design_schema",
+        "peekOfCode": "MAX_FILES_PER_SUBMISSION = 20\nMAX_FILE_NAME_LENGTH = 120\nMAX_SUBMISSION_BYTES = 200_000\nclass _CamelModel(BaseModel):\n    \"\"\"Frontend-facing JSON is camelCase; the Python attributes stay snake_case.\"\"\"\n    model_config = ConfigDict(populate_by_name=True)\nclass SDProgressDTO(_CamelModel):\n    notes_done: bool = Field(default=False, alias=\"notesDone\")\n    video_done: bool = Field(default=False, alias=\"videoDone\")\n    visualizer_done: bool = Field(default=False, alias=\"visualizerDone\")",
+        "detail": "study-app-backend.src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "MAX_FILE_NAME_LENGTH",
+        "kind": 5,
+        "importPath": "study-app-backend.src.schemas.system_design_schema",
+        "description": "study-app-backend.src.schemas.system_design_schema",
+        "peekOfCode": "MAX_FILE_NAME_LENGTH = 120\nMAX_SUBMISSION_BYTES = 200_000\nclass _CamelModel(BaseModel):\n    \"\"\"Frontend-facing JSON is camelCase; the Python attributes stay snake_case.\"\"\"\n    model_config = ConfigDict(populate_by_name=True)\nclass SDProgressDTO(_CamelModel):\n    notes_done: bool = Field(default=False, alias=\"notesDone\")\n    video_done: bool = Field(default=False, alias=\"videoDone\")\n    visualizer_done: bool = Field(default=False, alias=\"visualizerDone\")\n    project_done: bool = Field(default=False, alias=\"projectDone\")",
+        "detail": "study-app-backend.src.schemas.system_design_schema",
+        "documentation": {}
+    },
+    {
+        "label": "MAX_SUBMISSION_BYTES",
+        "kind": 5,
+        "importPath": "study-app-backend.src.schemas.system_design_schema",
+        "description": "study-app-backend.src.schemas.system_design_schema",
+        "peekOfCode": "MAX_SUBMISSION_BYTES = 200_000\nclass _CamelModel(BaseModel):\n    \"\"\"Frontend-facing JSON is camelCase; the Python attributes stay snake_case.\"\"\"\n    model_config = ConfigDict(populate_by_name=True)\nclass SDProgressDTO(_CamelModel):\n    notes_done: bool = Field(default=False, alias=\"notesDone\")\n    video_done: bool = Field(default=False, alias=\"videoDone\")\n    visualizer_done: bool = Field(default=False, alias=\"visualizerDone\")\n    project_done: bool = Field(default=False, alias=\"projectDone\")\n    quiz_done: bool = Field(default=False, alias=\"quizDone\")",
+        "detail": "study-app-backend.src.schemas.system_design_schema",
         "documentation": {}
     },
     {
@@ -22383,6 +23895,105 @@
         "documentation": {}
     },
     {
+        "label": "SystemDesignQuizService",
+        "kind": 6,
+        "importPath": "study-app-backend.src.services.system_design_quiz_service",
+        "description": "study-app-backend.src.services.system_design_quiz_service",
+        "peekOfCode": "class SystemDesignQuizService:\n    \"\"\"The single LLM touchpoint of System Design mode: grading the five FRQs.\n    Isolated in its own service so the only provider loop involved is the one\n    inside LLMService.grade_frq_answer. The gather below is NOT a provider loop\n    and must never be wrapped in one: each call already falls back across\n    providers on its own, and retrying here would multiply quota use.\n    \"\"\"\n    async def grade(\n        self,\n        user_id: int,",
+        "detail": "study-app-backend.src.services.system_design_quiz_service",
+        "documentation": {}
+    },
+    {
+        "label": "logger",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.system_design_quiz_service",
+        "description": "study-app-backend.src.services.system_design_quiz_service",
+        "peekOfCode": "logger = get_logger(__name__)\n# Every concept ships exactly five written questions, so a request with any\n# other number is a client bug, not something to score partially.\nREQUIRED_FRQ_COUNT = 5\n# Both gates have to clear. The weights frontload the written answers, which are\n# the part that actually shows understanding.\nMCQ_PASS_SCORE = 80\nFRQ_PASS_SCORE = 60\nFRQ_WEIGHT = 0.6\nMCQ_WEIGHT = 0.4",
+        "detail": "study-app-backend.src.services.system_design_quiz_service",
+        "documentation": {}
+    },
+    {
+        "label": "REQUIRED_FRQ_COUNT",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.system_design_quiz_service",
+        "description": "study-app-backend.src.services.system_design_quiz_service",
+        "peekOfCode": "REQUIRED_FRQ_COUNT = 5\n# Both gates have to clear. The weights frontload the written answers, which are\n# the part that actually shows understanding.\nMCQ_PASS_SCORE = 80\nFRQ_PASS_SCORE = 60\nFRQ_WEIGHT = 0.6\nMCQ_WEIGHT = 0.4\nclass SystemDesignQuizService:\n    \"\"\"The single LLM touchpoint of System Design mode: grading the five FRQs.\n    Isolated in its own service so the only provider loop involved is the one",
+        "detail": "study-app-backend.src.services.system_design_quiz_service",
+        "documentation": {}
+    },
+    {
+        "label": "MCQ_PASS_SCORE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.system_design_quiz_service",
+        "description": "study-app-backend.src.services.system_design_quiz_service",
+        "peekOfCode": "MCQ_PASS_SCORE = 80\nFRQ_PASS_SCORE = 60\nFRQ_WEIGHT = 0.6\nMCQ_WEIGHT = 0.4\nclass SystemDesignQuizService:\n    \"\"\"The single LLM touchpoint of System Design mode: grading the five FRQs.\n    Isolated in its own service so the only provider loop involved is the one\n    inside LLMService.grade_frq_answer. The gather below is NOT a provider loop\n    and must never be wrapped in one: each call already falls back across\n    providers on its own, and retrying here would multiply quota use.",
+        "detail": "study-app-backend.src.services.system_design_quiz_service",
+        "documentation": {}
+    },
+    {
+        "label": "FRQ_PASS_SCORE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.system_design_quiz_service",
+        "description": "study-app-backend.src.services.system_design_quiz_service",
+        "peekOfCode": "FRQ_PASS_SCORE = 60\nFRQ_WEIGHT = 0.6\nMCQ_WEIGHT = 0.4\nclass SystemDesignQuizService:\n    \"\"\"The single LLM touchpoint of System Design mode: grading the five FRQs.\n    Isolated in its own service so the only provider loop involved is the one\n    inside LLMService.grade_frq_answer. The gather below is NOT a provider loop\n    and must never be wrapped in one: each call already falls back across\n    providers on its own, and retrying here would multiply quota use.\n    \"\"\"",
+        "detail": "study-app-backend.src.services.system_design_quiz_service",
+        "documentation": {}
+    },
+    {
+        "label": "FRQ_WEIGHT",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.system_design_quiz_service",
+        "description": "study-app-backend.src.services.system_design_quiz_service",
+        "peekOfCode": "FRQ_WEIGHT = 0.6\nMCQ_WEIGHT = 0.4\nclass SystemDesignQuizService:\n    \"\"\"The single LLM touchpoint of System Design mode: grading the five FRQs.\n    Isolated in its own service so the only provider loop involved is the one\n    inside LLMService.grade_frq_answer. The gather below is NOT a provider loop\n    and must never be wrapped in one: each call already falls back across\n    providers on its own, and retrying here would multiply quota use.\n    \"\"\"\n    async def grade(",
+        "detail": "study-app-backend.src.services.system_design_quiz_service",
+        "documentation": {}
+    },
+    {
+        "label": "MCQ_WEIGHT",
+        "kind": 5,
+        "importPath": "study-app-backend.src.services.system_design_quiz_service",
+        "description": "study-app-backend.src.services.system_design_quiz_service",
+        "peekOfCode": "MCQ_WEIGHT = 0.4\nclass SystemDesignQuizService:\n    \"\"\"The single LLM touchpoint of System Design mode: grading the five FRQs.\n    Isolated in its own service so the only provider loop involved is the one\n    inside LLMService.grade_frq_answer. The gather below is NOT a provider loop\n    and must never be wrapped in one: each call already falls back across\n    providers on its own, and retrying here would multiply quota use.\n    \"\"\"\n    async def grade(\n        self,",
+        "detail": "study-app-backend.src.services.system_design_quiz_service",
+        "documentation": {}
+    },
+    {
+        "label": "SystemDesignService",
+        "kind": 6,
+        "importPath": "study-app-backend.src.services.system_design_service",
+        "description": "study-app-backend.src.services.system_design_service",
+        "peekOfCode": "class SystemDesignService:\n    \"\"\"Progress and autosave orchestration for System Design mode.\n    Stateless and instantiated per request. Deliberately contains no LLM call:\n    the feature's single LLM touchpoint is FRQ grading, which lives in\n    SystemDesignQuizService so provider fallback stays isolated.\n    \"\"\"\n    # ── reads ─────────────────────────────────────────────────────────────────\n    async def get_progress(self, user_id: int, session: AsyncSession) -> dict[str, SDProgressDTO]:\n        rows = await SystemDesignRepository(session).get_progress(user_id)\n        return {concept_id: self._to_dto(row) for concept_id, row in rows.items()}",
+        "detail": "study-app-backend.src.services.system_design_service",
+        "documentation": {}
+    },
+    {
+        "label": "validate_concept_id",
+        "kind": 2,
+        "importPath": "study-app-backend.src.services.system_design_service",
+        "description": "study-app-backend.src.services.system_design_service",
+        "peekOfCode": "def validate_concept_id(concept_id: str) -> str:\n    if not CONCEPT_ID_PATTERN.match(concept_id or \"\"):\n        raise ValidationException(\"Invalid concept id\")\n    return concept_id\ndef validate_exercise_id(exercise_id: str) -> str:\n    if not EXERCISE_ID_PATTERN.match(exercise_id or \"\"):\n        raise ValidationException(\"Invalid exercise id\")\n    return exercise_id\ndef split_exercise_id(exercise_id: str) -> tuple[str, str]:\n    \"\"\"\"<conceptId>:<visualizer|project>\" -> (conceptId, kind).\"\"\"",
+        "detail": "study-app-backend.src.services.system_design_service",
+        "documentation": {}
+    },
+    {
+        "label": "validate_exercise_id",
+        "kind": 2,
+        "importPath": "study-app-backend.src.services.system_design_service",
+        "description": "study-app-backend.src.services.system_design_service",
+        "peekOfCode": "def validate_exercise_id(exercise_id: str) -> str:\n    if not EXERCISE_ID_PATTERN.match(exercise_id or \"\"):\n        raise ValidationException(\"Invalid exercise id\")\n    return exercise_id\ndef split_exercise_id(exercise_id: str) -> tuple[str, str]:\n    \"\"\"\"<conceptId>:<visualizer|project>\" -> (conceptId, kind).\"\"\"\n    validate_exercise_id(exercise_id)\n    concept_id, _, kind = exercise_id.partition(\":\")\n    return concept_id, kind\nclass SystemDesignService:",
+        "detail": "study-app-backend.src.services.system_design_service",
+        "documentation": {}
+    },
+    {
+        "label": "split_exercise_id",
+        "kind": 2,
+        "importPath": "study-app-backend.src.services.system_design_service",
+        "description": "study-app-backend.src.services.system_design_service",
+        "peekOfCode": "def split_exercise_id(exercise_id: str) -> tuple[str, str]:\n    \"\"\"\"<conceptId>:<visualizer|project>\" -> (conceptId, kind).\"\"\"\n    validate_exercise_id(exercise_id)\n    concept_id, _, kind = exercise_id.partition(\":\")\n    return concept_id, kind\nclass SystemDesignService:\n    \"\"\"Progress and autosave orchestration for System Design mode.\n    Stateless and instantiated per request. Deliberately contains no LLM call:\n    the feature's single LLM touchpoint is FRQ grading, which lives in\n    SystemDesignQuizService so provider fallback stays isolated.",
+        "detail": "study-app-backend.src.services.system_design_service",
+        "documentation": {}
+    },
+    {
         "label": "TestService",
         "kind": 6,
         "importPath": "study-app-backend.src.services.test_service",
@@ -22459,7 +24070,43 @@
         "kind": 2,
         "importPath": "study-app-backend.src.utils.latex_utils",
         "description": "study-app-backend.src.utils.latex_utils",
-        "peekOfCode": "def normalize_latex(text: str) -> str:\n    \"\"\"Normalize common LaTeX usage in free text.\n    Heuristics applied:\n    - Convert `\\\\[...]` -> `$$...$$`, `\\\\(...)` -> `$...$`, and environments to display math\n    - Wrap bare LaTeX command sequences (e.g. `\\frac{a}{b}`, `\\sqrt{x}`) in `$...$` when they are\n      not already inside `$...$` or `$$...$$`.\n    This is intentionally conservative: it avoids attempting full TeX parsing and focuses on\n    common cases that cause inconsistent rendering in the app.\n    \"\"\"\n    if not text:",
+        "peekOfCode": "def normalize_latex(text: str) -> str:\n    \"\"\"Normalize common LaTeX usage in free text.\n    - `\\\\[...\\\\]` becomes `$$...$$` and `\\\\(...\\\\)` becomes `$...$`.\n    - A bare LaTeX command or environment in prose is wrapped in delimiters.\n    - Math that is already delimited, and anything inside a code fence or a\n      backtick span, is returned byte for byte unchanged.\n    \"\"\"\n    if not text:\n        return text\n    out: List[str] = []",
+        "detail": "study-app-backend.src.utils.latex_utils",
+        "documentation": {}
+    },
+    {
+        "label": "_SPAN_RE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.utils.latex_utils",
+        "description": "study-app-backend.src.utils.latex_utils",
+        "peekOfCode": "_SPAN_RE = re.compile(\n    r\"(?P<fence>```[\\s\\S]*?```)\"\n    r\"|(?P<code>`[^`\\n]*`)\"\n    r\"|(?P<display>\\$\\$[\\s\\S]*?\\$\\$)\"\n    r\"|(?P<bracket_display>\\\\\\[[\\s\\S]*?\\\\\\])\"\n    r\"|(?P<inline>\\$(?:[^$\\n])+?\\$)\"\n    r\"|(?P<bracket_inline>\\\\\\([\\s\\S]*?\\\\\\))\"\n)\n# A complete LaTeX environment. Kept whole and wrapped in display delimiters\n# when it turns up outside math; never unwrapped, never stripped.",
+        "detail": "study-app-backend.src.utils.latex_utils",
+        "documentation": {}
+    },
+    {
+        "label": "_ENVIRONMENT_RE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.utils.latex_utils",
+        "description": "study-app-backend.src.utils.latex_utils",
+        "peekOfCode": "_ENVIRONMENT_RE = re.compile(r\"\\\\begin\\{([a-zA-Z*]+)\\}[\\s\\S]*?\\\\end\\{\\1\\}\")\n_BARE_SYMBOLS = (\n    r\"alpha|beta|gamma|delta|epsilon|varepsilon|zeta|eta|theta|vartheta\"\n    r\"|iota|kappa|lambda|mu|nu|xi|pi|varpi|rho|varrho|sigma|varsigma\"\n    r\"|tau|upsilon|phi|varphi|chi|psi|omega\"\n    r\"|Alpha|Beta|Gamma|Delta|Epsilon|Zeta|Eta|Theta|Iota|Kappa|Lambda\"\n    r\"|Mu|Nu|Xi|Pi|Rho|Sigma|Tau|Upsilon|Phi|Chi|Psi|Omega\"\n    r\"|pm|mp|times|div|cdot|circ|bullet|star|infty|nabla|partial\"\n    r\"|forall|exists|in|notin|subset|supset|subseteq|supseteq|cup|cap\"\n    r\"|leq|geq|neq|approx|equiv|sim|propto|perp|parallel\"",
+        "detail": "study-app-backend.src.utils.latex_utils",
+        "documentation": {}
+    },
+    {
+        "label": "_BARE_SYMBOLS",
+        "kind": 5,
+        "importPath": "study-app-backend.src.utils.latex_utils",
+        "description": "study-app-backend.src.utils.latex_utils",
+        "peekOfCode": "_BARE_SYMBOLS = (\n    r\"alpha|beta|gamma|delta|epsilon|varepsilon|zeta|eta|theta|vartheta\"\n    r\"|iota|kappa|lambda|mu|nu|xi|pi|varpi|rho|varrho|sigma|varsigma\"\n    r\"|tau|upsilon|phi|varphi|chi|psi|omega\"\n    r\"|Alpha|Beta|Gamma|Delta|Epsilon|Zeta|Eta|Theta|Iota|Kappa|Lambda\"\n    r\"|Mu|Nu|Xi|Pi|Rho|Sigma|Tau|Upsilon|Phi|Chi|Psi|Omega\"\n    r\"|pm|mp|times|div|cdot|circ|bullet|star|infty|nabla|partial\"\n    r\"|forall|exists|in|notin|subset|supset|subseteq|supseteq|cup|cap\"\n    r\"|leq|geq|neq|approx|equiv|sim|propto|perp|parallel\"\n    r\"|to|rightarrow|leftarrow|Rightarrow|Leftarrow|leftrightarrow|Leftrightarrow\"",
+        "detail": "study-app-backend.src.utils.latex_utils",
+        "documentation": {}
+    },
+    {
+        "label": "_COMMAND_RE",
+        "kind": 5,
+        "importPath": "study-app-backend.src.utils.latex_utils",
+        "description": "study-app-backend.src.utils.latex_utils",
+        "peekOfCode": "_COMMAND_RE = re.compile(\n    r\"(\\\\(?!begin\\b|end\\b)[a-zA-Z@]+(?:\\s*\\{[^}]*\\})+(?:[_\\^](?:\\{[^}]*\\}|[^\\s\\\\]))*\"\n    r\"|\\\\(?:\" + _BARE_SYMBOLS + r\")(?![a-zA-Z{]))\"\n)\ndef _wrap_prose(segment: str) -> str:\n    \"\"\"Add delimiters to undelimited LaTeX in a stretch of ordinary prose.\n    Environments are wrapped whole in $$...$$. Everything else that looks like\n    a command gets $...$. Text with no LaTeX in it comes back unchanged.\n    \"\"\"\n    if not segment:",
         "detail": "study-app-backend.src.utils.latex_utils",
         "documentation": {}
     },
@@ -22648,7 +24295,7 @@
         "kind": 5,
         "importPath": "study-app-backend.src.main",
         "description": "study-app-backend.src.main",
-        "peekOfCode": "_socket.getaddrinfo = _prefer_ipv4\nfrom fastapi import FastAPI\nfrom fastapi.middleware.cors import CORSMiddleware\nfrom slowapi import _rate_limit_exceeded_handler\nfrom slowapi.errors import RateLimitExceeded\nfrom starlette.responses import JSONResponse\nfrom starlette.types import ASGIApp, Receive, Scope, Send\nfrom src.config import settings\nfrom src.limiter import limiter\nfrom src.routes import admin, attempts, auth, flashcards, folder_files, folders, health, job_descriptions, kojo, learning_modules, leetcode, mock_interview, slash_commands, surveys, tests",
+        "peekOfCode": "_socket.getaddrinfo = _prefer_ipv4\nfrom fastapi import FastAPI\nfrom fastapi.middleware.cors import CORSMiddleware\nfrom slowapi import _rate_limit_exceeded_handler\nfrom slowapi.errors import RateLimitExceeded\nfrom starlette.responses import JSONResponse\nfrom starlette.types import ASGIApp, Receive, Scope, Send\nfrom src.config import settings\nfrom src.limiter import limiter\nfrom src.routes import admin, attempts, auth, flashcards, folder_files, folders, health, job_descriptions, kojo, learning_modules, leetcode, mock_interview, slash_commands, surveys, system_design, tests",
         "detail": "study-app-backend.src.main",
         "documentation": {}
     },
@@ -22887,6 +24534,69 @@
         "documentation": {}
     },
     {
+        "label": "TestExtractJsonObject",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_json_escape_corruption",
+        "description": "study-app-backend.tests.test_json_escape_corruption",
+        "peekOfCode": "class TestExtractJsonObject:\n    \"\"\"Link 2: brace balancing must ignore braces inside string literals.\"\"\"\n    def test_extracts_a_plain_object_from_prose(self):\n        assert _extract_json_object(wire('{\"a\": 1}')) == '{\"a\": 1}'\n    def test_survives_latex_braces_inside_a_nested_object(self):\n        # The exact case the old one-level regex truncated.\n        extracted = _extract_json_object(wire(MODULE_BODY))\n        assert extracted is not None\n        assert extracted.endswith(\"}\")\n        assert json.loads(extracted)[\"questions\"][0][\"correct_index\"] == 0",
+        "detail": "study-app-backend.tests.test_json_escape_corruption",
+        "documentation": {}
+    },
+    {
+        "label": "TestLessonSurvivesProseWrappedJson",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_json_escape_corruption",
+        "description": "study-app-backend.tests.test_json_escape_corruption",
+        "peekOfCode": "class TestLessonSurvivesProseWrappedJson:\n    \"\"\"Links 1 to 4 together, through the public parser.\"\"\"\n    svc = LLMService()\n    def test_module_payload_parses_with_real_newlines_and_intact_latex(self):\n        parsed = self.svc._loads_json(wire(MODULE_BODY))\n        lesson = parsed[\"lesson\"]\n        # The actual bug: real newlines, never the two-character sequence.\n        assert \"\\n\" in lesson\n        assert B + \"n\" not in lesson, \"newlines came back as literal backslash-n\"\n        # Markdown structure survived, so it renders as headed sections rather",
+        "detail": "study-app-backend.tests.test_json_escape_corruption",
+        "documentation": {}
+    },
+    {
+        "label": "TestOllamaNoLongerRepairsByCorrupting",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_json_escape_corruption",
+        "description": "study-app-backend.tests.test_json_escape_corruption",
+        "peekOfCode": "class TestOllamaNoLongerRepairsByCorrupting:\n    \"\"\"Link 3: the two crude fallbacks are gone for good.\n    They are the difference between \"this provider failed, try the next one\"\n    and \"this provider returned prose that looks fine and is quietly ruined\".\n    \"\"\"\n    def test_source_does_not_reapply_the_corrupting_transforms(self):\n        import inspect\n        from src.services import llm_service\n        source = inspect.getsource(llm_service.LLMService._complete_ollama)\n        # Strip comments: the explanation of the old bug names both transforms.",
+        "detail": "study-app-backend.tests.test_json_escape_corruption",
+        "documentation": {}
+    },
+    {
+        "label": "TestTheOldFallbackWouldHaveCorruptedThis",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_json_escape_corruption",
+        "description": "study-app-backend.tests.test_json_escape_corruption",
+        "peekOfCode": "class TestTheOldFallbackWouldHaveCorruptedThis:\n    \"\"\"Pins the mechanism itself, so the bug cannot be reintroduced as a\n    'harmless' retry without this test explaining what it costs.\"\"\"\n    def test_doubling_every_backslash_turns_newline_escapes_into_literal_text(self):\n        body = '{\"lesson\": \"a' + B + 'nb\"}'\n        assert json.loads(body)[\"lesson\"] == \"a\\nb\"\n        corrupted = json.loads(body.replace(B, B + B))[\"lesson\"]\n        assert corrupted == \"a\" + B + \"nb\"\n        assert \"\\n\" not in corrupted",
+        "detail": "study-app-backend.tests.test_json_escape_corruption",
+        "documentation": {}
+    },
+    {
+        "label": "wire",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_json_escape_corruption",
+        "description": "study-app-backend.tests.test_json_escape_corruption",
+        "peekOfCode": "def wire(body: str) -> str:\n    \"\"\"A model reply: a JSON object buried in conversational prose.\"\"\"\n    return f\"Sure, here is the module:\\n{body}\\nHope this helps!\"\n# The shape generate_module_content actually asks for: lesson + tts_script +\n# nested question objects, with LaTeX in both the lesson and a question.\nMODULE_BODY = (\n    '{\"lesson\": \"# Measures of Spread' + B + 'n' + B + 'nIn statistics.' + B + 'n' + B + 'n'\n    '## The Range' + B + 'n' + B + 'n$$' + B + B + 'text{Max} - ' + B + B + 'text{Min}$$\",'\n    '\"tts_script\": \"Measures of spread.\",'\n    '\"questions\": [{\"question\": \"What is $' + B + B + 'text{Range}$?\",'",
+        "detail": "study-app-backend.tests.test_json_escape_corruption",
+        "documentation": {}
+    },
+    {
+        "label": "B",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_json_escape_corruption",
+        "description": "study-app-backend.tests.test_json_escape_corruption",
+        "peekOfCode": "B = chr(92)  # a single backslash, spelled out so the test source stays readable\ndef wire(body: str) -> str:\n    \"\"\"A model reply: a JSON object buried in conversational prose.\"\"\"\n    return f\"Sure, here is the module:\\n{body}\\nHope this helps!\"\n# The shape generate_module_content actually asks for: lesson + tts_script +\n# nested question objects, with LaTeX in both the lesson and a question.\nMODULE_BODY = (\n    '{\"lesson\": \"# Measures of Spread' + B + 'n' + B + 'nIn statistics.' + B + 'n' + B + 'n'\n    '## The Range' + B + 'n' + B + 'n$$' + B + B + 'text{Max} - ' + B + B + 'text{Min}$$\",'\n    '\"tts_script\": \"Measures of spread.\",'",
+        "detail": "study-app-backend.tests.test_json_escape_corruption",
+        "documentation": {}
+    },
+    {
+        "label": "MODULE_BODY",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_json_escape_corruption",
+        "description": "study-app-backend.tests.test_json_escape_corruption",
+        "peekOfCode": "MODULE_BODY = (\n    '{\"lesson\": \"# Measures of Spread' + B + 'n' + B + 'nIn statistics.' + B + 'n' + B + 'n'\n    '## The Range' + B + 'n' + B + 'n$$' + B + B + 'text{Max} - ' + B + B + 'text{Min}$$\",'\n    '\"tts_script\": \"Measures of spread.\",'\n    '\"questions\": [{\"question\": \"What is $' + B + B + 'text{Range}$?\",'\n    '\"options\": [\"Max minus min\", \"The mean\"], \"correct_index\": 0}]}'\n)\nclass TestExtractJsonObject:\n    \"\"\"Link 2: brace balancing must ignore braces inside string literals.\"\"\"\n    def test_extracts_a_plain_object_from_prose(self):",
+        "detail": "study-app-backend.tests.test_json_escape_corruption",
+        "documentation": {}
+    },
+    {
         "label": "test_open_strictness_prompt_allows_general_knowledge",
         "kind": 2,
         "importPath": "study-app-backend.tests.test_kojo_strictness",
@@ -22929,6 +24639,285 @@
         "description": "study-app-backend.tests.test_kojo_strictness",
         "peekOfCode": "def test_no_interviewer_mode_leaves_prompt_persona_free() -> None:\n    \"\"\"The general study chat sends no interviewer_mode: the prompt must be\n    unchanged (no persona block leaks into non-KojoCode chats).\"\"\"\n    prompt = _build_prompt(\n        notes=\"[notes.md]\\nA transaction is a logical unit of work.\",\n        user_message=\"Explain ACID\",\n        history=[],\n    )\n    assert \"INTERVIEWER PERSONA\" not in prompt\n    assert \"OUTRANKS\" not in prompt",
         "detail": "study-app-backend.tests.test_kojo_strictness",
+        "documentation": {}
+    },
+    {
+        "label": "display_delimiter_count",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def display_delimiter_count(text: str) -> int:\n    return text.count(\"$$\")\ndef display_blocks(text: str) -> list[str]:\n    return re.findall(r\"\\$\\$(.*?)\\$\\$\", text, flags=re.S)\n# ── The reported failure ─────────────────────────────────────────────────────\nVECTOR_LESSON = r\"\"\"The coefficient vector is:\n$$\\mathbf{c} = \\begin{bmatrix} 1 \\\\ 2 \\\\ 3 \\end{bmatrix}$$\n(constant term first). This vector *encodes* the polynomial completely.\n## Computing the Derivative\nThe derivative $f'(x) = 6x + 2$ has coefficients $[2, 6]$. You can derive this",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "display_blocks",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def display_blocks(text: str) -> list[str]:\n    return re.findall(r\"\\$\\$(.*?)\\$\\$\", text, flags=re.S)\n# ── The reported failure ─────────────────────────────────────────────────────\nVECTOR_LESSON = r\"\"\"The coefficient vector is:\n$$\\mathbf{c} = \\begin{bmatrix} 1 \\\\ 2 \\\\ 3 \\end{bmatrix}$$\n(constant term first). This vector *encodes* the polynomial completely.\n## Computing the Derivative\nThe derivative $f'(x) = 6x + 2$ has coefficients $[2, 6]$. You can derive this\nusing a **differentiation matrix** $D$:\n$$D = \\begin{bmatrix} 0 & 1 & 0 \\\\ 0 & 0 & 2 \\end{bmatrix}$$",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_matrix_environment_inside_display_math_is_left_intact",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_matrix_environment_inside_display_math_is_left_intact():\n    out = normalize_latex(VECTOR_LESSON)\n    assert r\"\\begin{bmatrix}\" in out\n    assert r\"\\end{bmatrix}\" in out\n    assert r\"$$\\mathbf{c} = \\begin{bmatrix} 1 \\\\ 2 \\\\ 3 \\end{bmatrix}$$\" in out\ndef test_matrix_lesson_keeps_its_delimiters_balanced():\n    out = normalize_latex(VECTOR_LESSON)\n    assert display_delimiter_count(out) % 2 == 0, f\"odd number of $$ in:\\n{out}\"\ndef test_matrix_lesson_does_not_swallow_prose_into_math():\n    # The visible symptom: the prose after the first matrix ended up inside a",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_matrix_lesson_keeps_its_delimiters_balanced",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_matrix_lesson_keeps_its_delimiters_balanced():\n    out = normalize_latex(VECTOR_LESSON)\n    assert display_delimiter_count(out) % 2 == 0, f\"odd number of $$ in:\\n{out}\"\ndef test_matrix_lesson_does_not_swallow_prose_into_math():\n    # The visible symptom: the prose after the first matrix ended up inside a\n    # display-math block, which KaTeX rendered as a red error.\n    out = normalize_latex(VECTOR_LESSON)\n    assert \"(constant term first). This vector *encodes* the polynomial completely.\" in out\n    assert \"\\n## Computing the Derivative\\n\" in out\n    for block in display_blocks(out):",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_matrix_lesson_does_not_swallow_prose_into_math",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_matrix_lesson_does_not_swallow_prose_into_math():\n    # The visible symptom: the prose after the first matrix ended up inside a\n    # display-math block, which KaTeX rendered as a red error.\n    out = normalize_latex(VECTOR_LESSON)\n    assert \"(constant term first). This vector *encodes* the polynomial completely.\" in out\n    assert \"\\n## Computing the Derivative\\n\" in out\n    for block in display_blocks(out):\n        assert \"\\n\\n\" not in block, f\"prose paragraph captured as math: {block!r}\"\n        assert not re.search(r\"^#{1,6} \", block, flags=re.M), f\"heading captured as math: {block!r}\"\ndef test_normalize_latex_is_a_no_op_on_the_vector_lesson():",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_normalize_latex_is_a_no_op_on_the_vector_lesson",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_normalize_latex_is_a_no_op_on_the_vector_lesson():\n    # Nothing in this article needs normalizing, so it must come back untouched.\n    assert normalize_latex(VECTOR_LESSON) == VECTOR_LESSON\ndef test_no_triple_dollar_runs_are_produced():\n    assert \"$$$\" not in normalize_latex(VECTOR_LESSON)\n# ── Other environments ───────────────────────────────────────────────────────\n@pytest.mark.parametrize(\n    \"env\",\n    [\"bmatrix\", \"pmatrix\", \"vmatrix\", \"matrix\", \"cases\", \"aligned\", \"array\", \"align*\"],\n)",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_no_triple_dollar_runs_are_produced",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_no_triple_dollar_runs_are_produced():\n    assert \"$$$\" not in normalize_latex(VECTOR_LESSON)\n# ── Other environments ───────────────────────────────────────────────────────\n@pytest.mark.parametrize(\n    \"env\",\n    [\"bmatrix\", \"pmatrix\", \"vmatrix\", \"matrix\", \"cases\", \"aligned\", \"array\", \"align*\"],\n)\ndef test_environments_inside_display_math_survive(env):\n    src = r\"$$\\begin{%s} a & b \\\\ c & d \\end{%s}$$\" % (env, env)\n    assert normalize_latex(src) == src",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_environments_inside_display_math_survive",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_environments_inside_display_math_survive(env):\n    src = r\"$$\\begin{%s} a & b \\\\ c & d \\end{%s}$$\" % (env, env)\n    assert normalize_latex(src) == src\ndef test_environment_inside_inline_math_survives():\n    src = r\"The system $\\begin{cases} x = 1 \\\\ y = 2 \\end{cases}$ holds.\"\n    assert normalize_latex(src) == src\ndef test_bare_environment_outside_math_is_wrapped_not_stripped():\n    src = \"Here it is:\\n\" + r\"\\begin{bmatrix} 1 \\\\ 2 \\end{bmatrix}\" + \"\\nand that is all.\"\n    out = normalize_latex(src)\n    assert r\"\\begin{bmatrix}\" in out",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_environment_inside_inline_math_survives",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_environment_inside_inline_math_survives():\n    src = r\"The system $\\begin{cases} x = 1 \\\\ y = 2 \\end{cases}$ holds.\"\n    assert normalize_latex(src) == src\ndef test_bare_environment_outside_math_is_wrapped_not_stripped():\n    src = \"Here it is:\\n\" + r\"\\begin{bmatrix} 1 \\\\ 2 \\end{bmatrix}\" + \"\\nand that is all.\"\n    out = normalize_latex(src)\n    assert r\"\\begin{bmatrix}\" in out\n    assert r\"\\end{bmatrix}\" in out\n    assert r\"$$\\begin{bmatrix} 1 \\\\ 2 \\end{bmatrix}$$\" in out\ndef test_multiline_bare_environment_is_wrapped_whole():",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_bare_environment_outside_math_is_wrapped_not_stripped",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_bare_environment_outside_math_is_wrapped_not_stripped():\n    src = \"Here it is:\\n\" + r\"\\begin{bmatrix} 1 \\\\ 2 \\end{bmatrix}\" + \"\\nand that is all.\"\n    out = normalize_latex(src)\n    assert r\"\\begin{bmatrix}\" in out\n    assert r\"\\end{bmatrix}\" in out\n    assert r\"$$\\begin{bmatrix} 1 \\\\ 2 \\end{bmatrix}$$\" in out\ndef test_multiline_bare_environment_is_wrapped_whole():\n    src = \"Given:\\n\" + r\"\\begin{aligned}\" + \"\\nx &= 1 \" + r\"\\\\\" + \"\\ny &= 2\\n\" + r\"\\end{aligned}\" + \"\\nDone.\"\n    out = normalize_latex(src)\n    assert out.count(\"$$\") == 2",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_multiline_bare_environment_is_wrapped_whole",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_multiline_bare_environment_is_wrapped_whole():\n    src = \"Given:\\n\" + r\"\\begin{aligned}\" + \"\\nx &= 1 \" + r\"\\\\\" + \"\\ny &= 2\\n\" + r\"\\end{aligned}\" + \"\\nDone.\"\n    out = normalize_latex(src)\n    assert out.count(\"$$\") == 2\n    assert r\"\\begin{aligned}\" in out and r\"\\end{aligned}\" in out\n# ── Bracket delimiters ───────────────────────────────────────────────────────\ndef test_bracket_display_math_becomes_double_dollar():\n    assert normalize_latex(r\"\\[x^2 + y^2\\]\") == \"$$x^2 + y^2$$\"\ndef test_bracket_inline_math_becomes_single_dollar():\n    assert normalize_latex(r\"value \\(x^2\\) here\") == \"value $x^2$ here\"",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_bracket_display_math_becomes_double_dollar",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_bracket_display_math_becomes_double_dollar():\n    assert normalize_latex(r\"\\[x^2 + y^2\\]\") == \"$$x^2 + y^2$$\"\ndef test_bracket_inline_math_becomes_single_dollar():\n    assert normalize_latex(r\"value \\(x^2\\) here\") == \"value $x^2$ here\"\ndef test_bracket_display_math_containing_a_matrix_keeps_the_matrix():\n    out = normalize_latex(r\"\\[\\begin{bmatrix} 1 \\\\ 2 \\end{bmatrix}\\]\")\n    assert out == r\"$$\\begin{bmatrix} 1 \\\\ 2 \\end{bmatrix}$$\"\ndef test_bracket_delimiters_inside_existing_display_math_are_not_reprocessed():\n    src = r\"$$\\left[ \\frac{a}{b} \\right]$$\"\n    assert normalize_latex(src) == src",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_bracket_inline_math_becomes_single_dollar",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_bracket_inline_math_becomes_single_dollar():\n    assert normalize_latex(r\"value \\(x^2\\) here\") == \"value $x^2$ here\"\ndef test_bracket_display_math_containing_a_matrix_keeps_the_matrix():\n    out = normalize_latex(r\"\\[\\begin{bmatrix} 1 \\\\ 2 \\end{bmatrix}\\]\")\n    assert out == r\"$$\\begin{bmatrix} 1 \\\\ 2 \\end{bmatrix}$$\"\ndef test_bracket_delimiters_inside_existing_display_math_are_not_reprocessed():\n    src = r\"$$\\left[ \\frac{a}{b} \\right]$$\"\n    assert normalize_latex(src) == src\n# ── Code must never be treated as math ───────────────────────────────────────\ndef test_fenced_code_block_is_untouched():",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_bracket_display_math_containing_a_matrix_keeps_the_matrix",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_bracket_display_math_containing_a_matrix_keeps_the_matrix():\n    out = normalize_latex(r\"\\[\\begin{bmatrix} 1 \\\\ 2 \\end{bmatrix}\\]\")\n    assert out == r\"$$\\begin{bmatrix} 1 \\\\ 2 \\end{bmatrix}$$\"\ndef test_bracket_delimiters_inside_existing_display_math_are_not_reprocessed():\n    src = r\"$$\\left[ \\frac{a}{b} \\right]$$\"\n    assert normalize_latex(src) == src\n# ── Code must never be treated as math ───────────────────────────────────────\ndef test_fenced_code_block_is_untouched():\n    src = (\n        \"Example:\\n\"",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_bracket_delimiters_inside_existing_display_math_are_not_reprocessed",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_bracket_delimiters_inside_existing_display_math_are_not_reprocessed():\n    src = r\"$$\\left[ \\frac{a}{b} \\right]$$\"\n    assert normalize_latex(src) == src\n# ── Code must never be treated as math ───────────────────────────────────────\ndef test_fenced_code_block_is_untouched():\n    src = (\n        \"Example:\\n\"\n        \"```latex\\n\"\n        + r\"\\begin{bmatrix} 1 \\\\ 2 \\end{bmatrix}\" + \"\\n\"\n        + r\"\\frac{a}{b}\" + \"\\n\"",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_fenced_code_block_is_untouched",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_fenced_code_block_is_untouched():\n    src = (\n        \"Example:\\n\"\n        \"```latex\\n\"\n        + r\"\\begin{bmatrix} 1 \\\\ 2 \\end{bmatrix}\" + \"\\n\"\n        + r\"\\frac{a}{b}\" + \"\\n\"\n        \"```\\n\"\n        \"Done.\\n\"\n    )\n    assert normalize_latex(src) == src",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_shell_code_block_with_dollar_variables_is_untouched",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_shell_code_block_with_dollar_variables_is_untouched():\n    src = \"```bash\\necho $HOME and $USER\\n```\\n\"\n    assert normalize_latex(src) == src\ndef test_inline_code_span_is_untouched():\n    src = r\"Call `\\frac{a}{b}` to format it.\"\n    assert normalize_latex(src) == src\ndef test_code_fence_does_not_leak_into_following_prose():\n    src = \"```python\\nx = 1\\n```\\n\" + r\"Then \\theta is the angle.\"\n    out = normalize_latex(src)\n    assert \"```python\\nx = 1\\n```\\n\" in out",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_inline_code_span_is_untouched",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_inline_code_span_is_untouched():\n    src = r\"Call `\\frac{a}{b}` to format it.\"\n    assert normalize_latex(src) == src\ndef test_code_fence_does_not_leak_into_following_prose():\n    src = \"```python\\nx = 1\\n```\\n\" + r\"Then \\theta is the angle.\"\n    out = normalize_latex(src)\n    assert \"```python\\nx = 1\\n```\\n\" in out\n    assert r\"$\\theta$\" in out\n# ── Existing behaviour that must keep working ────────────────────────────────\ndef test_bare_latex_command_in_prose_is_wrapped():",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_code_fence_does_not_leak_into_following_prose",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_code_fence_does_not_leak_into_following_prose():\n    src = \"```python\\nx = 1\\n```\\n\" + r\"Then \\theta is the angle.\"\n    out = normalize_latex(src)\n    assert \"```python\\nx = 1\\n```\\n\" in out\n    assert r\"$\\theta$\" in out\n# ── Existing behaviour that must keep working ────────────────────────────────\ndef test_bare_latex_command_in_prose_is_wrapped():\n    out = normalize_latex(r\"The derivative is \\frac{dy}{dx} today.\")\n    assert r\"$\\frac{dy}{dx}$\" in out\ndef test_bare_greek_letter_in_prose_is_wrapped():",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_bare_latex_command_in_prose_is_wrapped",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_bare_latex_command_in_prose_is_wrapped():\n    out = normalize_latex(r\"The derivative is \\frac{dy}{dx} today.\")\n    assert r\"$\\frac{dy}{dx}$\" in out\ndef test_bare_greek_letter_in_prose_is_wrapped():\n    out = normalize_latex(r\"Let \\theta be the angle.\")\n    assert r\"$\\theta$\" in out\ndef test_existing_inline_math_is_not_double_wrapped():\n    src = r\"The derivative is $\\frac{dy}{dx}$ today.\"\n    assert normalize_latex(src) == src\ndef test_existing_display_math_is_not_double_wrapped():",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_bare_greek_letter_in_prose_is_wrapped",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_bare_greek_letter_in_prose_is_wrapped():\n    out = normalize_latex(r\"Let \\theta be the angle.\")\n    assert r\"$\\theta$\" in out\ndef test_existing_inline_math_is_not_double_wrapped():\n    src = r\"The derivative is $\\frac{dy}{dx}$ today.\"\n    assert normalize_latex(src) == src\ndef test_existing_display_math_is_not_double_wrapped():\n    src = r\"$$\\frac{dy}{dx} = 3t^{2} + 1$$\"\n    assert normalize_latex(src) == src\ndef test_plain_markdown_is_unchanged():",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_existing_inline_math_is_not_double_wrapped",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_existing_inline_math_is_not_double_wrapped():\n    src = r\"The derivative is $\\frac{dy}{dx}$ today.\"\n    assert normalize_latex(src) == src\ndef test_existing_display_math_is_not_double_wrapped():\n    src = r\"$$\\frac{dy}{dx} = 3t^{2} + 1$$\"\n    assert normalize_latex(src) == src\ndef test_plain_markdown_is_unchanged():\n    src = (\n        \"# Title\\n\\n\"\n        \"Some **bold** and *italic* prose.\\n\\n\"",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_existing_display_math_is_not_double_wrapped",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_existing_display_math_is_not_double_wrapped():\n    src = r\"$$\\frac{dy}{dx} = 3t^{2} + 1$$\"\n    assert normalize_latex(src) == src\ndef test_plain_markdown_is_unchanged():\n    src = (\n        \"# Title\\n\\n\"\n        \"Some **bold** and *italic* prose.\\n\\n\"\n        \"- item one\\n\"\n        \"- item two\\n\\n\"\n        \"| a | b |\\n| - | - |\\n| 1 | 2 |\\n\"",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_plain_markdown_is_unchanged",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_plain_markdown_is_unchanged():\n    src = (\n        \"# Title\\n\\n\"\n        \"Some **bold** and *italic* prose.\\n\\n\"\n        \"- item one\\n\"\n        \"- item two\\n\\n\"\n        \"| a | b |\\n| - | - |\\n| 1 | 2 |\\n\"\n    )\n    assert normalize_latex(src) == src\ndef test_empty_input_is_passed_through():",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_empty_input_is_passed_through",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_empty_input_is_passed_through():\n    assert normalize_latex(\"\") == \"\"\ndef test_heading_and_list_items_with_math_are_preserved():\n    src = \"## The $\\\\theta$ section\\n\\n- first $x^2$\\n- second $y^2$\\n\"\n    assert normalize_latex(src) == src\ndef test_multiple_display_blocks_on_one_line_stay_separate():\n    src = r\"$$a$$ and $$b$$\"\n    assert normalize_latex(src) == src\n@pytest.mark.parametrize(\n    \"src\",",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_heading_and_list_items_with_math_are_preserved",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_heading_and_list_items_with_math_are_preserved():\n    src = \"## The $\\\\theta$ section\\n\\n- first $x^2$\\n- second $y^2$\\n\"\n    assert normalize_latex(src) == src\ndef test_multiple_display_blocks_on_one_line_stay_separate():\n    src = r\"$$a$$ and $$b$$\"\n    assert normalize_latex(src) == src\n@pytest.mark.parametrize(\n    \"src\",\n    [\n        VECTOR_LESSON,",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_multiple_display_blocks_on_one_line_stay_separate",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_multiple_display_blocks_on_one_line_stay_separate():\n    src = r\"$$a$$ and $$b$$\"\n    assert normalize_latex(src) == src\n@pytest.mark.parametrize(\n    \"src\",\n    [\n        VECTOR_LESSON,\n        r\"\\[\\begin{bmatrix} 1 \\\\ 2 \\end{bmatrix}\\]\",\n        r\"The derivative is \\frac{dy}{dx} today.\",\n        r\"Let \\theta be the angle and \\alpha the other.\",",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "test_normalize_latex_is_idempotent",
+        "kind": 2,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "def test_normalize_latex_is_idempotent(src):\n    once = normalize_latex(src)\n    assert normalize_latex(once) == once",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "VECTOR_LESSON",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "VECTOR_LESSON = r\"\"\"The coefficient vector is:\n$$\\mathbf{c} = \\begin{bmatrix} 1 \\\\ 2 \\\\ 3 \\end{bmatrix}$$\n(constant term first). This vector *encodes* the polynomial completely.\n## Computing the Derivative\nThe derivative $f'(x) = 6x + 2$ has coefficients $[2, 6]$. You can derive this\nusing a **differentiation matrix** $D$:\n$$D = \\begin{bmatrix} 0 & 1 & 0 \\\\ 0 & 0 & 2 \\end{bmatrix}$$\n\"\"\"\ndef test_matrix_environment_inside_display_math_is_left_intact():\n    out = normalize_latex(VECTOR_LESSON)",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "$$\\mathbf{c}",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "$$\\mathbf{c} = \\begin{bmatrix} 1 \\\\ 2 \\\\ 3 \\end{bmatrix}$$\n(constant term first). This vector *encodes* the polynomial completely.\n## Computing the Derivative\nThe derivative $f'(x) = 6x + 2$ has coefficients $[2, 6]$. You can derive this\nusing a **differentiation matrix** $D$:\n$$D = \\begin{bmatrix} 0 & 1 & 0 \\\\ 0 & 0 & 2 \\end{bmatrix}$$\n\"\"\"\ndef test_matrix_environment_inside_display_math_is_left_intact():\n    out = normalize_latex(VECTOR_LESSON)\n    assert r\"\\begin{bmatrix}\" in out",
+        "detail": "study-app-backend.tests.test_latex_normalization",
+        "documentation": {}
+    },
+    {
+        "label": "$$D",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_latex_normalization",
+        "description": "study-app-backend.tests.test_latex_normalization",
+        "peekOfCode": "$$D = \\begin{bmatrix} 0 & 1 & 0 \\\\ 0 & 0 & 2 \\end{bmatrix}$$\n\"\"\"\ndef test_matrix_environment_inside_display_math_is_left_intact():\n    out = normalize_latex(VECTOR_LESSON)\n    assert r\"\\begin{bmatrix}\" in out\n    assert r\"\\end{bmatrix}\" in out\n    assert r\"$$\\mathbf{c} = \\begin{bmatrix} 1 \\\\ 2 \\\\ 3 \\end{bmatrix}$$\" in out\ndef test_matrix_lesson_keeps_its_delimiters_balanced():\n    out = normalize_latex(VECTOR_LESSON)\n    assert display_delimiter_count(out) % 2 == 0, f\"odd number of $$ in:\\n{out}\"",
+        "detail": "study-app-backend.tests.test_latex_normalization",
         "documentation": {}
     },
     {
@@ -23328,6 +25317,33 @@
         "documentation": {}
     },
     {
+        "label": "TestParseQuizExplanations",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_quiz_explanations",
+        "description": "study-app-backend.tests.test_quiz_explanations",
+        "peekOfCode": "class TestParseQuizExplanations:\n    def test_well_formed_response_is_kept_intact(self):\n        parsed = LLMService._parse_quiz_explanations(\n            [_explanation(0, 4), _explanation(1, 3)], QUIZ\n        )\n        assert len(parsed) == 2\n        assert parsed[0][\"explanation\"] == \"Because of reason 0.\"\n        assert parsed[0][\"option_explanations\"] == [\"note 0\", \"note 1\", \"note 2\", \"note 3\"]\n        assert parsed[1][\"option_explanations\"] == [\"note 0\", \"note 1\", \"note 2\"]\n        assert parsed[0][\"lesson_section\"] == \"## Section One\"",
+        "detail": "study-app-backend.tests.test_quiz_explanations",
+        "documentation": {}
+    },
+    {
+        "label": "TestQuizExplanationBackfill",
+        "kind": 6,
+        "importPath": "study-app-backend.tests.test_quiz_explanations",
+        "description": "study-app-backend.tests.test_quiz_explanations",
+        "peekOfCode": "class TestQuizExplanationBackfill:\n    async def test_score_returned_when_generation_raises(self, db_session_maker):\n        \"\"\"An LLM failure must cost the explanations, never the grade.\"\"\"\n        module_id, user_id = await _seed_module(db_session_maker, QUIZ)\n        with patch.object(\n            LLMService, \"generate_quiz_explanations\", AsyncMock(side_effect=RuntimeError(\"provider down\"))\n        ):\n            result = await _submit(db_session_maker, module_id, user_id, [0, 2])\n        assert result.score == 2\n        assert result.total == 2",
+        "detail": "study-app-backend.tests.test_quiz_explanations",
+        "documentation": {}
+    },
+    {
+        "label": "QUIZ",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_quiz_explanations",
+        "description": "study-app-backend.tests.test_quiz_explanations",
+        "peekOfCode": "QUIZ = [\n    {\"question\": \"Q1?\", \"options\": [\"A\", \"B\", \"C\", \"D\"], \"correct_index\": 0},\n    {\"question\": \"Q2?\", \"options\": [\"A\", \"B\", \"C\"], \"correct_index\": 2},\n]\ndef _explanation(index: int, option_count: int) -> dict:\n    return {\n        \"index\": index,\n        \"explanation\": f\"Because of reason {index}.\",\n        \"option_explanations\": [f\"note {i}\" for i in range(option_count)],\n        \"lesson_section\": \"## Section One\",",
+        "detail": "study-app-backend.tests.test_quiz_explanations",
+        "documentation": {}
+    },
+    {
         "label": "TestRAGDiagnostics",
         "kind": 6,
         "importPath": "study-app-backend.tests.test_rag_diagnostics",
@@ -23388,6 +25404,24 @@
         "description": "study-app-backend.tests.test_realistic_scenario",
         "peekOfCode": "p = Process(target=worker)\np.start()\n```\n### Process Communication\nProcesses communicate through:\n- **Queues**: Thread-safe FIFO queues\n- **Pipes**: Bidirectional communication\n- **Shared Memory**: Via multiprocessing.Value and Array\n## Chapter 4: Practical Considerations\n### When to Use Threads",
         "detail": "study-app-backend.tests.test_realistic_scenario",
+        "documentation": {}
+    },
+    {
+        "label": "GRADER",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_sd_quiz_service",
+        "description": "study-app-backend.tests.test_sd_quiz_service",
+        "peekOfCode": "GRADER = \"src.services.llm_service.LLMService.grade_frq_answer\"\nasync def _make_user(session, email: str = \"quiz@example.com\") -> User:\n    user = User(email=email, google_id=f\"google-{email}\")\n    session.add(user)\n    await session.commit()\n    return user\ndef _request(mcq_correct: int = 3, frq_count: int = 5) -> SDQuizGradeRequest:\n    mcq = [\n        SDMcqResult(id=f\"m{i}\", chosen_index=0 if i < mcq_correct else 1, correct_index=0)\n        for i in range(3)",
+        "detail": "study-app-backend.tests.test_sd_quiz_service",
+        "documentation": {}
+    },
+    {
+        "label": "ALL_SUB_MODULES",
+        "kind": 5,
+        "importPath": "study-app-backend.tests.test_sd_service",
+        "description": "study-app-backend.tests.test_sd_service",
+        "peekOfCode": "ALL_SUB_MODULES = (\"notes\", \"video\", \"visualizer\", \"project\", \"quiz\")\nasync def _make_user(session, email: str = \"svc@example.com\") -> User:\n    user = User(email=email, google_id=f\"google-{email}\")\n    session.add(user)\n    await session.commit()\n    return user\nasync def _row(session, user_id: int, concept_id: str = \"caching\"):\n    return (await SystemDesignRepository(session).get_progress(user_id)).get(concept_id)\nasync def test_completed_at_is_null_until_all_five_submodules_done(db_session_maker) -> None:\n    async with db_session_maker() as session:",
+        "detail": "study-app-backend.tests.test_sd_service",
         "documentation": {}
     },
     {
@@ -23730,6 +25764,231 @@
         "description": "study-app-frontend.node_modules.katex.src.metrics.parse_tfm",
         "peekOfCode": "def read_tfm_file(file_name):\n    with open(file_name, 'rb') as f:\n        reader = TfmReader(f)\n        # file_size\n        reader.read_halfword()\n        header_size = reader.read_halfword()\n        start_char = reader.read_halfword()\n        end_char = reader.read_halfword()\n        width_table_size = reader.read_halfword()\n        height_table_size = reader.read_halfword()",
         "detail": "study-app-frontend.node_modules.katex.src.metrics.parse_tfm",
+        "documentation": {}
+    },
+    {
+        "label": "CacheClient",
+        "kind": 6,
+        "importPath": "study-app-frontend.src.data.systemDesign.caching.project.starter.cache_client",
+        "description": "study-app-frontend.src.data.systemDesign.caching.project.starter.cache_client",
+        "peekOfCode": "class CacheClient:\n    def __init__(self, store, capacity, ttl):\n        self.store = store\n        self.capacity = capacity\n        self.ttl = ttl\n        # Suggested shape: {key: (value, expires_at)}, ordered by recency.\n        raise NotImplementedError(\"CacheClient.__init__\")\n    def get(self, key, now):\n        \"\"\"Return the value for key as of logical time now.\n        A live cached entry is returned without touching the store: record",
+        "detail": "study-app-frontend.src.data.systemDesign.caching.project.starter.cache_client",
+        "documentation": {}
+    },
+    {
+        "label": "SlowStore",
+        "kind": 6,
+        "importPath": "study-app-frontend.src.data.systemDesign.caching.project.starter.store",
+        "description": "study-app-frontend.src.data.systemDesign.caching.project.starter.store",
+        "peekOfCode": "class SlowStore:\n    def __init__(self, data=None):\n        self._data = dict(data or {})\n        self.reads = 0\n    def read(self, key):\n        self.reads += 1\n        sim.record(\"store_read\", key=key)\n        return self._data.get(key)\n    def write(self, key, value):\n        self._data[key] = value",
+        "detail": "study-app-frontend.src.data.systemDesign.caching.project.starter.store",
+        "documentation": {}
+    },
+    {
+        "label": "run_tests",
+        "kind": 2,
+        "importPath": "study-app-frontend.src.data.systemDesign.caching.project.tests",
+        "description": "study-app-frontend.src.data.systemDesign.caching.project.tests",
+        "peekOfCode": "def run_tests():\n    results = [\n        _case(\"reads through to the store on the first get\", _reads_through_on_the_first_get),\n        _case(\"serves a second get from the cache\", _serves_a_second_get_from_the_cache),\n        _case(\"reads through again once the TTL expires\", _re_reads_after_the_ttl_expires),\n        _case(\"caches a missing key so it is not re-read\", _caches_a_missing_key),\n        _case(\"invalidate forces the next get to read through\", _invalidate_forces_a_re_read),\n        _case(\"a store write is invisible until expiry\", _a_write_is_invisible_until_the_entry_goes_away),\n        _case(\"evicts the least recently used entry\", _evicts_the_least_recently_used_entry),\n        _case(\"a hit refreshes recency\", _a_hit_refreshes_recency),",
+        "detail": "study-app-frontend.src.data.systemDesign.caching.project.tests",
+        "documentation": {}
+    },
+    {
+        "label": "CacheClient",
+        "kind": 6,
+        "importPath": "study-app-frontend.src.data.systemDesign.caching.project._reference",
+        "description": "study-app-frontend.src.data.systemDesign.caching.project._reference",
+        "peekOfCode": "class CacheClient:\n    def __init__(self, store, capacity, ttl):\n        self.store = store\n        self.capacity = capacity\n        self.ttl = ttl\n        self._entries = {}\n    def get(self, key, now):\n        sim.tick()\n        if key in self._entries:\n            value, expires_at = self._entries[key]",
+        "detail": "study-app-frontend.src.data.systemDesign.caching.project._reference",
+        "documentation": {}
+    },
+    {
+        "label": "LRUCache",
+        "kind": 6,
+        "importPath": "study-app-frontend.src.data.systemDesign.caching.visualizer.starter.cache",
+        "description": "study-app-frontend.src.data.systemDesign.caching.visualizer.starter.cache",
+        "peekOfCode": "class LRUCache:\n    def __init__(self, capacity):\n        self.capacity = capacity\n        # Your storage goes here. An ordered mapping is the easy route:\n        # dict preserves insertion order, and dict.pop + reinsert moves a key\n        # to the most recently used end.\n        raise NotImplementedError(\"LRUCache.__init__\")\n    def get(self, key):\n        \"\"\"Return the value for key, or None when it is not cached.\n        Call sim.tick() once. Record \"cache_hit\" with the key on a hit and",
+        "detail": "study-app-frontend.src.data.systemDesign.caching.visualizer.starter.cache",
+        "documentation": {}
+    },
+    {
+        "label": "run_tests",
+        "kind": 2,
+        "importPath": "study-app-frontend.src.data.systemDesign.caching.visualizer.tests",
+        "description": "study-app-frontend.src.data.systemDesign.caching.visualizer.tests",
+        "peekOfCode": "def run_tests():\n    results = [\n        _case(\"returns None for a key that was never cached\", _missing_on_an_empty_cache),\n        _case(\"returns a value that was put\", _stores_and_returns_a_value),\n        _case(\"updating a key does not grow the cache\", _updating_a_key_does_not_grow_the_cache),\n        _case(\"evicts the least recently used key\", _evicts_the_least_recently_used_key),\n        _case(\"a hit refreshes recency\", _a_hit_refreshes_recency),\n        _case(\"keys_by_recency lists least recent first\", _keys_by_recency_is_least_recent_first),\n        _case(\"records cache_hit and cache_miss\", _records_hits_and_misses),\n        _case(\"records evict with the key that left\", _records_an_eviction),",
+        "detail": "study-app-frontend.src.data.systemDesign.caching.visualizer.tests",
+        "documentation": {}
+    },
+    {
+        "label": "LRUCache",
+        "kind": 6,
+        "importPath": "study-app-frontend.src.data.systemDesign.caching.visualizer._reference",
+        "description": "study-app-frontend.src.data.systemDesign.caching.visualizer._reference",
+        "peekOfCode": "class LRUCache:\n    def __init__(self, capacity):\n        self.capacity = capacity\n        self._entries = {}\n    def get(self, key):\n        sim.tick()\n        if key not in self._entries:\n            sim.record(\"cache_miss\", key=key)\n            return None\n        value = self._entries.pop(key)",
+        "detail": "study-app-frontend.src.data.systemDesign.caching.visualizer._reference",
+        "documentation": {}
+    },
+    {
+        "label": "HashRing",
+        "kind": 6,
+        "importPath": "study-app-frontend.src.data.systemDesign.consistent-hashing.project.starter.hashring",
+        "description": "study-app-frontend.src.data.systemDesign.consistent-hashing.project.starter.hashring",
+        "peekOfCode": "class HashRing:\n    def __init__(self, replicas=100):\n        self.replicas = replicas\n        self._positions = []\n        self._owners = {}\n    def add_node(self, name):\n        sim.tick()\n        for index in range(self.replicas):\n            position = ring_hash(\"{}-{}\".format(name, index))\n            if position in self._owners:",
+        "detail": "study-app-frontend.src.data.systemDesign.consistent-hashing.project.starter.hashring",
+        "documentation": {}
+    },
+    {
+        "label": "ring_hash",
+        "kind": 2,
+        "importPath": "study-app-frontend.src.data.systemDesign.consistent-hashing.project.starter.hashring",
+        "description": "study-app-frontend.src.data.systemDesign.consistent-hashing.project.starter.hashring",
+        "peekOfCode": "def ring_hash(value):\n    return int(hashlib.md5(str(value).encode(\"utf-8\")).hexdigest(), 16)\nclass HashRing:\n    def __init__(self, replicas=100):\n        self.replicas = replicas\n        self._positions = []\n        self._owners = {}\n    def add_node(self, name):\n        sim.tick()\n        for index in range(self.replicas):",
+        "detail": "study-app-frontend.src.data.systemDesign.consistent-hashing.project.starter.hashring",
+        "documentation": {}
+    },
+    {
+        "label": "ShardedStore",
+        "kind": 6,
+        "importPath": "study-app-frontend.src.data.systemDesign.consistent-hashing.project.starter.sharded_store",
+        "description": "study-app-frontend.src.data.systemDesign.consistent-hashing.project.starter.sharded_store",
+        "peekOfCode": "class ShardedStore:\n    def __init__(self, ring):\n        self.ring = ring\n        # Suggested shape: {node_name: {key: value}}, one bucket per node, so\n        # you can find a node's keys without scanning the whole keyspace.\n        raise NotImplementedError(\"ShardedStore.__init__\")\n    def put(self, key, value):\n        \"\"\"Store the value on the node the ring routes the key to.\n        Record \"store_put\" with the key and the node. A put with no nodes on the\n        ring is a no-op: record \"dropped\" with the key and store nothing.",
+        "detail": "study-app-frontend.src.data.systemDesign.consistent-hashing.project.starter.sharded_store",
+        "documentation": {}
+    },
+    {
+        "label": "run_tests",
+        "kind": 2,
+        "importPath": "study-app-frontend.src.data.systemDesign.consistent-hashing.project.tests",
+        "description": "study-app-frontend.src.data.systemDesign.consistent-hashing.project.tests",
+        "peekOfCode": "def run_tests():\n    results = [\n        _case(\"stores a value and reads it back\", _stores_and_reads_back),\n        _case(\"an unstored key reads as None\", _unknown_key_reads_as_none),\n        _case(\"keys live on the node the ring picks\", _a_key_lives_on_the_node_the_ring_picks),\n        _case(\"a store with no nodes drops writes\", _a_store_with_no_nodes_drops_writes),\n        _case(\n            \"adding a node moves only the keys it now owns\",\n            _adding_a_node_moves_only_the_keys_it_now_owns,\n        ),",
+        "detail": "study-app-frontend.src.data.systemDesign.consistent-hashing.project.tests",
+        "documentation": {}
+    },
+    {
+        "label": "ShardedStore",
+        "kind": 6,
+        "importPath": "study-app-frontend.src.data.systemDesign.consistent-hashing.project._reference",
+        "description": "study-app-frontend.src.data.systemDesign.consistent-hashing.project._reference",
+        "peekOfCode": "class ShardedStore:\n    def __init__(self, ring):\n        self.ring = ring\n        self._shards = {name: {} for name in ring.nodes()}\n    def put(self, key, value):\n        node = self.ring.get_node(key)\n        if node is None:\n            sim.record(\"dropped\", key=key)\n            return\n        self._shards.setdefault(node, {})[key] = value",
+        "detail": "study-app-frontend.src.data.systemDesign.consistent-hashing.project._reference",
+        "documentation": {}
+    },
+    {
+        "label": "HashRing",
+        "kind": 6,
+        "importPath": "study-app-frontend.src.data.systemDesign.consistent-hashing.visualizer.starter.hashring",
+        "description": "study-app-frontend.src.data.systemDesign.consistent-hashing.visualizer.starter.hashring",
+        "peekOfCode": "class HashRing:\n    def __init__(self, replicas=100):\n        self.replicas = replicas\n        # Suggested shape: a sorted list of virtual-node positions, plus a map\n        # from position to the physical node name that owns it.\n        raise NotImplementedError(\"HashRing.__init__\")\n    def add_node(self, name):\n        \"\"\"Place self.replicas virtual nodes for name.\n        Position i is ring_hash(\"{name}-{i}\"). Call sim.tick() once and record\n        \"add_node\" with the name and the number of virtual nodes now on the ring.",
+        "detail": "study-app-frontend.src.data.systemDesign.consistent-hashing.visualizer.starter.hashring",
+        "documentation": {}
+    },
+    {
+        "label": "ring_hash",
+        "kind": 2,
+        "importPath": "study-app-frontend.src.data.systemDesign.consistent-hashing.visualizer.starter.hashring",
+        "description": "study-app-frontend.src.data.systemDesign.consistent-hashing.visualizer.starter.hashring",
+        "peekOfCode": "def ring_hash(value):\n    \"\"\"A stable 128-bit position on the ring for any string.\"\"\"\n    return int(hashlib.md5(str(value).encode(\"utf-8\")).hexdigest(), 16)\nclass HashRing:\n    def __init__(self, replicas=100):\n        self.replicas = replicas\n        # Suggested shape: a sorted list of virtual-node positions, plus a map\n        # from position to the physical node name that owns it.\n        raise NotImplementedError(\"HashRing.__init__\")\n    def add_node(self, name):",
+        "detail": "study-app-frontend.src.data.systemDesign.consistent-hashing.visualizer.starter.hashring",
+        "documentation": {}
+    },
+    {
+        "label": "run_tests",
+        "kind": 2,
+        "importPath": "study-app-frontend.src.data.systemDesign.consistent-hashing.visualizer.tests",
+        "description": "study-app-frontend.src.data.systemDesign.consistent-hashing.visualizer.tests",
+        "peekOfCode": "def run_tests():\n    results = [\n        _case(\"an empty ring routes to None\", _empty_ring_routes_nowhere),\n        _case(\"a single node owns every key\", _one_node_owns_everything),\n        _case(\"the same key always routes to the same node\", _routing_is_stable),\n        _case(\"keys spread across every node\", _keys_spread_across_nodes),\n        _case(\"adding a node moves only a fraction of keys\", _adding_a_node_moves_few_keys),\n        _case(\"removing a node moves only its own keys\", _removing_a_node_only_moves_its_own_keys),\n        _case(\"more virtual nodes spread keys more evenly\", _more_replicas_spread_more_evenly),\n        _case(\"records add_node and remove_node\", _records_ring_membership_changes),",
+        "detail": "study-app-frontend.src.data.systemDesign.consistent-hashing.visualizer.tests",
+        "documentation": {}
+    },
+    {
+        "label": "HashRing",
+        "kind": 6,
+        "importPath": "study-app-frontend.src.data.systemDesign.consistent-hashing.visualizer._reference",
+        "description": "study-app-frontend.src.data.systemDesign.consistent-hashing.visualizer._reference",
+        "peekOfCode": "class HashRing:\n    def __init__(self, replicas=100):\n        self.replicas = replicas\n        self._positions = []\n        self._owners = {}\n    def add_node(self, name):\n        sim.tick()\n        for index in range(self.replicas):\n            position = ring_hash(\"{}-{}\".format(name, index))\n            if position in self._owners:",
+        "detail": "study-app-frontend.src.data.systemDesign.consistent-hashing.visualizer._reference",
+        "documentation": {}
+    },
+    {
+        "label": "ring_hash",
+        "kind": 2,
+        "importPath": "study-app-frontend.src.data.systemDesign.consistent-hashing.visualizer._reference",
+        "description": "study-app-frontend.src.data.systemDesign.consistent-hashing.visualizer._reference",
+        "peekOfCode": "def ring_hash(value):\n    return int(hashlib.md5(str(value).encode(\"utf-8\")).hexdigest(), 16)\nclass HashRing:\n    def __init__(self, replicas=100):\n        self.replicas = replicas\n        self._positions = []\n        self._owners = {}\n    def add_node(self, name):\n        sim.tick()\n        for index in range(self.replicas):",
+        "detail": "study-app-frontend.src.data.systemDesign.consistent-hashing.visualizer._reference",
+        "documentation": {}
+    },
+    {
+        "label": "reset",
+        "kind": 2,
+        "importPath": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "description": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "peekOfCode": "def reset():\n    \"\"\"Clear the buffer. The JS harness calls this before every run.\"\"\"\n    _EVENTS.clear()\n    _CLOCK[0] = 0\ndef tick(n=1):\n    \"\"\"Advance logical time by n steps.\"\"\"\n    _CLOCK[0] += n\ndef now():\n    \"\"\"The current logical time.\"\"\"\n    return _CLOCK[0]",
+        "detail": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "documentation": {}
+    },
+    {
+        "label": "tick",
+        "kind": 2,
+        "importPath": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "description": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "peekOfCode": "def tick(n=1):\n    \"\"\"Advance logical time by n steps.\"\"\"\n    _CLOCK[0] += n\ndef now():\n    \"\"\"The current logical time.\"\"\"\n    return _CLOCK[0]\ndef record(kind, **payload):\n    \"\"\"Log one thing that happened, e.g. sim.record(\"cache_hit\", key=\"a\").\"\"\"\n    _EVENTS.append({\"t\": _CLOCK[0], \"kind\": str(kind), \"payload\": dict(payload)})\ndef snapshot(label, **state):",
+        "detail": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "documentation": {}
+    },
+    {
+        "label": "now",
+        "kind": 2,
+        "importPath": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "description": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "peekOfCode": "def now():\n    \"\"\"The current logical time.\"\"\"\n    return _CLOCK[0]\ndef record(kind, **payload):\n    \"\"\"Log one thing that happened, e.g. sim.record(\"cache_hit\", key=\"a\").\"\"\"\n    _EVENTS.append({\"t\": _CLOCK[0], \"kind\": str(kind), \"payload\": dict(payload)})\ndef snapshot(label, **state):\n    \"\"\"Log the state of the system at this moment, rendered as a state block.\"\"\"\n    _EVENTS.append({\"t\": _CLOCK[0], \"kind\": \"snapshot\", \"payload\": {\"label\": label, **state}})\ndef events():",
+        "detail": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "documentation": {}
+    },
+    {
+        "label": "record",
+        "kind": 2,
+        "importPath": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "description": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "peekOfCode": "def record(kind, **payload):\n    \"\"\"Log one thing that happened, e.g. sim.record(\"cache_hit\", key=\"a\").\"\"\"\n    _EVENTS.append({\"t\": _CLOCK[0], \"kind\": str(kind), \"payload\": dict(payload)})\ndef snapshot(label, **state):\n    \"\"\"Log the state of the system at this moment, rendered as a state block.\"\"\"\n    _EVENTS.append({\"t\": _CLOCK[0], \"kind\": \"snapshot\", \"payload\": {\"label\": label, **state}})\ndef events():\n    return list(_EVENTS)",
+        "detail": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "documentation": {}
+    },
+    {
+        "label": "snapshot",
+        "kind": 2,
+        "importPath": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "description": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "peekOfCode": "def snapshot(label, **state):\n    \"\"\"Log the state of the system at this moment, rendered as a state block.\"\"\"\n    _EVENTS.append({\"t\": _CLOCK[0], \"kind\": \"snapshot\", \"payload\": {\"label\": label, **state}})\ndef events():\n    return list(_EVENTS)",
+        "detail": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "documentation": {}
+    },
+    {
+        "label": "events",
+        "kind": 2,
+        "importPath": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "description": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "peekOfCode": "def events():\n    return list(_EVENTS)",
+        "detail": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "documentation": {}
+    },
+    {
+        "label": "_EVENTS",
+        "kind": 5,
+        "importPath": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "description": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "peekOfCode": "_EVENTS = []\n_CLOCK = [0]\ndef reset():\n    \"\"\"Clear the buffer. The JS harness calls this before every run.\"\"\"\n    _EVENTS.clear()\n    _CLOCK[0] = 0\ndef tick(n=1):\n    \"\"\"Advance logical time by n steps.\"\"\"\n    _CLOCK[0] += n\ndef now():",
+        "detail": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "documentation": {}
+    },
+    {
+        "label": "_CLOCK",
+        "kind": 5,
+        "importPath": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "description": "study-app-frontend.src.data.systemDesign._shared.sim",
+        "peekOfCode": "_CLOCK = [0]\ndef reset():\n    \"\"\"Clear the buffer. The JS harness calls this before every run.\"\"\"\n    _EVENTS.clear()\n    _CLOCK[0] = 0\ndef tick(n=1):\n    \"\"\"Advance logical time by n steps.\"\"\"\n    _CLOCK[0] += n\ndef now():\n    \"\"\"The current logical time.\"\"\"",
+        "detail": "study-app-frontend.src.data.systemDesign._shared.sim",
         "documentation": {}
     }
 ]

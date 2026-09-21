@@ -35,16 +35,37 @@ import { useSettings } from "../lib/useSettings";
 import type { LearningTrack, QuizAttemptResult } from "../lib/types";
 
 // Splits a markdown lesson into paragraph-level blocks (keeping fenced code
-// blocks intact) so each block can be rendered separately and highlighted
-// while the TTS reads it.
-function splitLessonBlocks(markdown: string): string[] {
+// blocks and display-math blocks intact) so each block can be rendered
+// separately and highlighted while the TTS reads it.
+//
+// Each block is rendered by its own MarkdownContent, so a block boundary is
+// also a parser boundary. Cutting a $$...$$ block in half therefore hands the
+// renderer two fragments with one unbalanced delimiter each, and neither half
+// renders as maths. A display block is allowed to contain a blank line, so
+// blank lines alone cannot decide where to cut.
+export function splitLessonBlocks(markdown: string): string[] {
   const lines = markdown.split("\n");
   const blocks: string[] = [];
   let current: string[] = [];
   let inFence = false;
+  let inMath = false;
   for (const line of lines) {
     if (/^\s*```/.test(line)) inFence = !inFence;
-    if (!inFence && line.trim() === "") {
+    if (!inFence) {
+      // A heading can never appear inside display maths. Seeing one means the
+      // opening $$ was never closed, so end the run here and start a fresh
+      // block rather than swallow the rest of the article into this one.
+      if (inMath && /^\s*#{1,6}\s/.test(line)) {
+        inMath = false;
+        if (current.length) {
+          blocks.push(current.join("\n"));
+          current = [];
+        }
+      } else if ((line.match(/\$\$/g) ?? []).length % 2 === 1) {
+        inMath = !inMath;
+      }
+    }
+    if (!inFence && !inMath && line.trim() === "") {
       if (current.length) {
         blocks.push(current.join("\n"));
         current = [];
