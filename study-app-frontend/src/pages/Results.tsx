@@ -184,7 +184,7 @@ export default function Results() {
       {hasMath && (
         <Card className="math-mode-notice">
           <Calculator size={18} />
-          <span>Math mode , tap any question to see the full worked solution and step-by-step breakdown.</span>
+          <span>Math mode, tap any question to see the full worked solution and step-by-step breakdown.</span>
         </Card>
       )}
 
@@ -258,8 +258,10 @@ export default function Results() {
                 <div key={a.question_id} className="targeted-topic-item">
                   <XCircle size={15} className="targeted-topic-icon" />
                   <span className="targeted-topic-text">
-                    {(a.question_text ?? `Question ${i + 1}`).slice(0, 110)}
-                    {(a.question_text?.length ?? 0) > 110 ? "…" : ""}
+                    {/* Rendered, not sliced: a hard character cut lands in the
+                        middle of a $...$ pair on math questions and leaves raw
+                        LaTeX on screen. CSS line-clamps the overflow instead. */}
+                    <MarkdownContent content={a.question_text ?? `Question ${i + 1}`} />
                   </span>
                 </div>
               ))}
