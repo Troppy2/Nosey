@@ -6,6 +6,7 @@ import { FormError } from "../components/FormError";
 import { Card } from "../components/Card";
 import { ConfirmModal, RenameModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
+import { MarkdownContent } from "../components/MarkdownContent";
 import { SkeletonFolderMiniGrid, SkeletonStatGrid, SkeletonTestRows, SkeletonWeakStack } from "../components/Skeletons";
 import { PullToRefreshIndicator } from "../components/PullToRefreshIndicator";
 import { deleteTest, fetchFlashcards, fetchFolders, fetchTests, getGreetingName, getResumableTests, scopeKey, updateTest } from "../lib/api";
@@ -574,7 +575,12 @@ export default function Dashboard() {
                       >
                         <Card tone="dark" interactive className="weak-card">
                           <span className="pill dark-pill">Difficulty {card.difficulty}</span>
-                          <h3>{card.front}</h3>
+                          {/* role=heading rather than <h3>: MarkdownContent
+                              emits block elements, which are not valid inside
+                              a heading element. */}
+                          <div role="heading" aria-level={3} className="weak-card-front">
+                            <MarkdownContent content={card.front} />
+                          </div>
                           <p>{Math.round((card.success_rate ?? 0) * 100)}% recall rate</p>
                         </Card>
                       </Link>

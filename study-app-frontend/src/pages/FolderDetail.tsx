@@ -8,6 +8,7 @@ import { Card } from "../components/Card";
 import { ConfirmModal, RenameModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
 import { FileManager } from "../components/FileManager";
+import { MarkdownContent } from "../components/MarkdownContent";
 import { Skeleton, SkeletonTestRows } from "../components/Skeletons";
 import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, regenerateTest, reindexFolderFiles, scopeKey, updateFolder, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
@@ -514,7 +515,9 @@ export default function FolderDetail() {
               {flashcards.slice(0, 6).map((card) => (
                 <div key={card.id} className="flashcard-preview-card card">
                   <span className="eyebrow">Front</span>
-                  <p>{card.front}</p>
+                  <div className="flashcard-preview-front">
+                    <MarkdownContent content={card.front} />
+                  </div>
                 </div>
               ))}
             </div>
