@@ -32,6 +32,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Folder, KojoClearedConversation, KojoMemory, SlashCommand } from "../lib/types";
 import SlashCommandManager from "../components/SlashCommandManager";
 import { ToggleSwitch } from "../components/ToggleSwitch";
+import { UsageMeters } from "../components/UsageMeters";
 
 const GENERATION_PROVIDER_OPTIONS = [
   { value: "auto", label: "Auto" },
@@ -337,6 +338,13 @@ export default function Settings() {
             <Sparkles size={18} />
             <span>Use the guest session to try the full flow before connecting a real account.</span>
           </div>
+        ) : null}
+
+        {user ? (
+          <>
+            <h2 className="settings-group-title">Usage</h2>
+            <UsageMeters />
+          </>
         ) : null}
 
         <h2 className="settings-group-title">AI &amp; models</h2>
