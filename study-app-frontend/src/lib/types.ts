@@ -1002,3 +1002,20 @@ export type SystemDesignQuizResult = {
   frqFeedback: SystemDesignFrqFeedback[];
   conceptCompleted: boolean;
 };
+
+// Per-account usage in the rolling window (GET /usage/limits). resets_at is
+// UTC ISO: when the oldest counted use ages out and frees capacity.
+export type UsageFeature = {
+  feature: "test" | "flashcard" | "kojo";
+  used: number;
+  limit: number;
+  unit: "tests" | "cards" | "tokens";
+  resets_at: string | null;
+};
+
+export type UsageLimits = {
+  exempt: boolean;
+  limits_enabled: boolean;
+  window_hours: number;
+  features: UsageFeature[];
+};
