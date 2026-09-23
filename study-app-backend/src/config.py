@@ -65,6 +65,13 @@ class Settings(BaseSettings):
     mcq_verification_modules_enabled: bool = Field(default=True, alias="MCQ_VERIFICATION_MODULES_ENABLED")
     mcq_verification_overgen_ratio: float = Field(default=1.3, alias="MCQ_VERIFICATION_OVERGEN_RATIO")
     mcq_verification_timeout_seconds: int = Field(default=60, alias="MCQ_VERIFICATION_TIMEOUT_SECONDS")
+    # Per-user usage limits (rolling window). Exempt: guests, admins, beta users.
+    # usage_limits_enabled=false is the full kill switch; token tracking keeps running.
+    usage_limits_enabled: bool = Field(default=True, alias="USAGE_LIMITS_ENABLED")
+    usage_window_hours: int = Field(default=5, alias="USAGE_WINDOW_HOURS")
+    test_limit_per_window: int = Field(default=5, alias="TEST_LIMIT_PER_WINDOW")
+    flashcard_limit_per_window: int = Field(default=50, alias="FLASHCARD_LIMIT_PER_WINDOW")
+    kojo_token_limit_per_window: int = Field(default=150_000, alias="KOJO_TOKEN_LIMIT_PER_WINDOW")
     qdrant_url: Optional[str] = Field(default=None, alias="QDRANT_URL")
     qdrant_api_key: Optional[str] = Field(default=None, alias="QDRANT_API_KEY")
     qdrant_collection: str = Field(default="nosey_rag", alias="QDRANT_COLLECTION")

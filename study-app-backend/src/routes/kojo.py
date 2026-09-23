@@ -12,6 +12,7 @@ from src.dependencies import get_current_user
 from src.models.user import User
 from src.repositories.usage_event_repository import UsageEventRepository
 from src.utils.provider_policy import resolve_request_provider
+from src.utils.usage_context import bind_usage
 from src.schemas.kojo_schema import (
     ConversationFileDTO,
     KojoActionCardDTO,
@@ -36,12 +37,27 @@ from src.limiter import limiter
 from src.services.kojo_service import KojoService
 from src.services.llm_service import LLMService
 from src.services.memory_service import MemoryService, is_stale
+from src.services.quota_service import KojoSlot, QuotaService
 from src.utils.exceptions import LLMException, ResourceNotFoundException, ValidationException
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/kojo", tags=["kojo"])
+
+
+async def _kojo_gate(session: AsyncSession, user: User, feature: str) -> KojoSlot:
+    """Enforce the Kojo limits and attribute this request's LLM tokens to
+    `feature` (must start with "kojo_" to count, see KOJO_FEATURE_PREFIX).
+
+    SECURITY: returns an in-flight slot (429 when the user or device already
+    has too many Kojo requests running, or the token budget is spent). The
+    caller MUST release it when the answer is done: in a finally for plain
+    routes, in the stream generator's finally for SSE routes.
+    """
+    slot = await QuotaService().acquire_kojo(session, user)
+    bind_usage(user.id, feature)
+    return slot
 
 
 @router.get("/providers/status")
@@ -106,40 +122,44 @@ async def kojo_chat(
     if user.age is not None and user.age < 15:
         raise HTTPException(status_code=403, detail="Kojo chat is not available for users under 15")
     provider = resolve_request_provider(user, body.provider)
-    _t0 = time.monotonic()
+    slot = await _kojo_gate(session, user, "kojo_chat")
     try:
-        result = await KojoService().chat(
-            user_id=user.id,
-            folder_id=folder_id,
-            user_message=body.message,
-            provider=provider,
-            strictness=body.strictness,
-            conversation_id=body.conversation_id,
-            custom_instruction=body.custom_instruction,
-            session=session,
-        )
-        duration_ms = int((time.monotonic() - _t0) * 1000)
+        _t0 = time.monotonic()
         try:
-            await UsageEventRepository(session).log_event(
-                user.id, "kojo_chat", duration_ms, provider=provider
+            result = await KojoService().chat(
+                user_id=user.id,
+                folder_id=folder_id,
+                user_message=body.message,
+                provider=provider,
+                strictness=body.strictness,
+                conversation_id=body.conversation_id,
+                custom_instruction=body.custom_instruction,
+                session=session,
             )
-            await session.commit()
-        except Exception:
-            pass
-        return result
-    except ResourceNotFoundException as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except LLMException as exc:
-        duration_ms = int((time.monotonic() - _t0) * 1000)
-        try:
-            await UsageEventRepository(session).log_event(
-                user.id, "kojo_chat", duration_ms, provider=provider,
-                success=False, error_type="LLMException"
-            )
-            await session.commit()
-        except Exception:
-            pass
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+            duration_ms = int((time.monotonic() - _t0) * 1000)
+            try:
+                await UsageEventRepository(session).log_event(
+                    user.id, "kojo_chat", duration_ms, provider=provider
+                )
+                await session.commit()
+            except Exception:
+                pass
+            return result
+        except ResourceNotFoundException as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except LLMException as exc:
+            duration_ms = int((time.monotonic() - _t0) * 1000)
+            try:
+                await UsageEventRepository(session).log_event(
+                    user.id, "kojo_chat", duration_ms, provider=provider,
+                    success=False, error_type="LLMException"
+                )
+                await session.commit()
+            except Exception:
+                pass
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+    finally:
+        slot.release()
 
 
 def _sse(event: dict) -> str:
@@ -167,8 +187,10 @@ async def kojo_chat_stream(
         raise HTTPException(status_code=403, detail="Kojo chat is not available for users under 15")
 
     provider = resolve_request_provider(user, body.provider)
+    slot = await _kojo_gate(session, user, "kojo_chat")
 
     async def event_stream() -> AsyncIterator[str]:
+        bind_usage(user.id, "kojo_chat")
         _t0 = time.monotonic()
         success = True
         error_type = None
@@ -199,6 +221,7 @@ async def kojo_chat_stream(
             yield _sse({"type": "error", "message": "Kojo failed to respond. Try again."})
             logger.warning("Kojo stream unexpected error: %s", exc)
         finally:
+            slot.release()
             duration_ms = int((time.monotonic() - _t0) * 1000)
             try:
                 await UsageEventRepository(session).log_event(
@@ -261,12 +284,16 @@ async def restore_conversation(
 
 
 @router.post("/folders/{folder_id}/test-blueprint", response_model=TestBlueprintResponse)
+@limiter.limit("20/minute")
 async def test_blueprint(
+    request: Request,
+    response: Response,
     folder_id: int,
     body: TestBlueprintRequest,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> TestBlueprintResponse:
+    slot = await _kojo_gate(session, user, "kojo_action")
     try:
         return await KojoService().propose_test_blueprint(
             user_id=user.id,
@@ -279,6 +306,8 @@ async def test_blueprint(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except LLMException as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    finally:
+        slot.release()
 
 
 @router.post("/folders/{folder_id}/conversation/files", response_model=list[ConversationFileDTO])
@@ -411,22 +440,36 @@ async def general_chat(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> KojoChatResponse:
+    slot = await _kojo_gate(session, user, "kojo_general")
     try:
-        return await KojoService().general_chat(
-            user_id=user.id,
-            conversation_id=conversation_id,
-            user_message=body.message,
-            provider=resolve_request_provider(user, body.provider),
-            strictness=body.strictness,
-            custom_instruction=body.custom_instruction,
-            context=body.context,
-            interviewer_mode=body.interviewer_mode,
-            session=session,
-        )
-    except ResourceNotFoundException as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except LLMException as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        _t0 = time.monotonic()
+        try:
+            result = await KojoService().general_chat(
+                user_id=user.id,
+                conversation_id=conversation_id,
+                user_message=body.message,
+                provider=resolve_request_provider(user, body.provider),
+                strictness=body.strictness,
+                custom_instruction=body.custom_instruction,
+                context=body.context,
+                interviewer_mode=body.interviewer_mode,
+                session=session,
+            )
+            try:
+                await UsageEventRepository(session).log_event(
+                    user.id, "kojo_general", int((time.monotonic() - _t0) * 1000),
+                    provider=resolve_request_provider(user, body.provider),
+                )
+                await session.commit()
+            except Exception:
+                pass
+            return result
+        except ResourceNotFoundException as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except LLMException as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+    finally:
+        slot.release()
 
 
 @router.post("/conversations/{conversation_id}/chat/stream")
@@ -440,8 +483,13 @@ async def general_chat_stream(
     user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     provider = resolve_request_provider(user, body.provider)
+    slot = await _kojo_gate(session, user, "kojo_general")
 
     async def event_stream() -> AsyncIterator[str]:
+        bind_usage(user.id, "kojo_general")
+        _t0 = time.monotonic()
+        success = True
+        error_type = None
         try:
             async for event in KojoService().general_chat_stream(
                 user_id=user.id,
@@ -457,12 +505,29 @@ async def general_chat_stream(
             ):
                 yield _sse(event)
         except ResourceNotFoundException as exc:
+            success = False
+            error_type = "ResourceNotFoundException"
             yield _sse({"type": "error", "message": str(exc)})
         except LLMException as exc:
+            success = False
+            error_type = "LLMException"
             yield _sse({"type": "error", "message": str(exc)})
         except Exception as exc:  # noqa: BLE001
+            success = False
+            error_type = "Exception"
             yield _sse({"type": "error", "message": "Kojo failed to respond. Try again."})
             logger.warning("Kojo general stream unexpected error: %s", exc)
+        finally:
+            slot.release()
+            duration_ms = int((time.monotonic() - _t0) * 1000)
+            try:
+                await UsageEventRepository(session).log_event(
+                    user.id, "kojo_general", duration_ms, provider=provider,
+                    success=success, error_type=error_type,
+                )
+                await session.commit()
+            except Exception:
+                pass
 
     return StreamingResponse(event_stream(), media_type="text/event-stream", headers=_SSE_HEADERS)
 
@@ -481,8 +546,10 @@ async def regenerate_stream(
         raise HTTPException(status_code=403, detail="Kojo chat is not available for users under 15")
 
     provider = resolve_request_provider(user, body.provider)
+    slot = await _kojo_gate(session, user, "kojo_regenerate")
 
     async def event_stream() -> AsyncIterator[str]:
+        bind_usage(user.id, "kojo_regenerate")
         _t0 = time.monotonic()
         success = True
         error_type = None
@@ -511,6 +578,7 @@ async def regenerate_stream(
             yield _sse({"type": "error", "message": "Kojo failed to regenerate a response. Try again."})
             logger.warning("Kojo regenerate stream unexpected error: %s", exc)
         finally:
+            slot.release()
             duration_ms = int((time.monotonic() - _t0) * 1000)
             try:
                 await UsageEventRepository(session).log_event(
@@ -547,6 +615,7 @@ async def refresh_memory(
     user: User = Depends(get_current_user),
 ) -> KojoMemoryDTO:
     provider = resolve_request_provider(user, None)
+    bind_usage(user.id, "memory_refresh")
     memory = await MemoryService().ensure_fresh(user.id, session, provider=provider, force=force)
     return KojoMemoryDTO(
         content=memory.content or None,
@@ -565,6 +634,7 @@ async def propose_action_card(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> KojoActionCardDTO:
+    slot = await _kojo_gate(session, user, "kojo_action")
     try:
         return await KojoService().propose_action(
             user_id=user.id,
@@ -581,6 +651,8 @@ async def propose_action_card(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except LLMException as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    finally:
+        slot.release()
 
 
 @router.get("/conversations/{conversation_id}/action-cards", response_model=list[KojoActionCardDTO])

@@ -23,10 +23,12 @@ from src.models.lc_sync import (
     LCStruggleEvent,
 )
 from src.models.learning_module import LearningModule, LearningTrack
+from src.models.llm_token_usage import LLMTokenUsage
 from src.models.mcq_option import MCQOption
 from src.models.mock_interview import MockInterviewSession
 from src.models.note import Note
 from src.models.question import Question
+from src.models.quota_charge import QuotaCharge
 from src.models.slash_command import SlashCommand
 from src.models.survey_response import SurveyResponse
 from src.models.system_design import SDConceptProgress, SDQuizAttempt, SDSubmission
@@ -61,6 +63,7 @@ __all__ = [
     "LCStruggleEvent",
     "LearningModule",
     "LearningTrack",
+    "LLMTokenUsage",
     "MCQOption",
     "MockInterviewSession",
     "SDConceptProgress",
@@ -68,6 +71,7 @@ __all__ = [
     "SDSubmission",
     "Note",
     "Question",
+    "QuotaCharge",
     "SlashCommand",
     "SurveyResponse",
     "Test",
