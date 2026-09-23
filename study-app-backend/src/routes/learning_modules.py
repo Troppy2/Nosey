@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from src.config import settings
 from src.database import async_session_maker, get_session
-from src.dependencies import get_current_user
+from src.dependencies import get_beta_user, get_current_user
 from src.limiter import limiter
 from src.models.folder import Folder
 from src.models.learning_module import LearningModule, LearningTrack
@@ -44,7 +44,9 @@ from src.utils.exceptions import LLMException, ResourceNotFoundException, StudyA
 from src.utils.logger import get_logger
 from src.utils.provider_policy import resolve_request_provider
 
-router = APIRouter(tags=["learning-modules"])
+# SECURITY: beta-only feature, enforced server-side (see dependencies.get_beta_user).
+# It is excluded from usage limits, so basic users must not be able to reach it.
+router = APIRouter(tags=["learning-modules"], dependencies=[Depends(get_beta_user)])
 logger = get_logger(__name__)
 
 # Questions per module quiz and the pass bar (80%, so 4/5).
