@@ -13,7 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_session
-from src.dependencies import get_current_user
+from src.dependencies import get_beta_user, get_current_user
 from src.models.lc_sync import (
     LCActivityDate,
     LCBankProblem,
@@ -113,7 +113,9 @@ logger = get_logger(__name__)
 # unsolved Medium/Hard from the verified + custom catalog) and sends it on create.
 STREAK_CHALLENGE_FALLBACK_SLUG = "trapping-rain-water"
 
-router = APIRouter(prefix="/leetcode", tags=["leetcode"])
+# SECURITY: beta-only feature, enforced server-side (see dependencies.get_beta_user).
+# It is excluded from usage limits, so basic users must not be able to reach it.
+router = APIRouter(prefix="/leetcode", tags=["leetcode"], dependencies=[Depends(get_beta_user)])
 
 
 @router.get("/problems/{title_slug}", response_model=LeetCodeProblemResponse)

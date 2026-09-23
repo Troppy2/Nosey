@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_session
-from src.dependencies import get_current_user
+from src.dependencies import get_beta_user, get_current_user
 from src.models.mock_interview import MockInterviewSession
 from src.models.user import User
 from src.schemas.mock_interview_schema import (
@@ -44,7 +44,9 @@ from src.services.llm_service import LLMService
 from src.utils.exceptions import LLMException, ValidationException
 from src.utils.provider_policy import resolve_request_provider
 
-router = APIRouter(prefix="/mock-interview", tags=["mock-interview"])
+# SECURITY: beta-only feature, enforced server-side (see dependencies.get_beta_user).
+# It is excluded from usage limits, so basic users must not be able to reach it.
+router = APIRouter(prefix="/mock-interview", tags=["mock-interview"], dependencies=[Depends(get_beta_user)])
 
 # Canonical session lifecycle. A session moves forward only; the frontend
 # resumes from its own localStorage snapshot, while these values let the

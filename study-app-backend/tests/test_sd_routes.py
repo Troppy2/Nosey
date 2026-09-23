@@ -22,7 +22,8 @@ from src.utils.exceptions import LLMException
 @pytest_asyncio.fixture
 async def client(db_session_maker):
     session = db_session_maker()
-    user = User(email="routes@example.com", google_id="google-routes")
+    # System Design is beta-only, enforced server-side by get_beta_user.
+    user = User(email="routes@example.com", google_id="google-routes", is_beta=True)
     session.add(user)
     await session.commit()
 
@@ -175,3 +176,32 @@ async def test_unhandled_service_error_returns_json_not_a_bare_500(client) -> No
 
     assert response.status_code == 500
     assert "detail" in response.json()
+
+
+async def test_endpoints_reject_basic_users(db_session_maker) -> None:
+    """Beta-only is a server-side boundary, not just a hidden nav item."""
+    session = db_session_maker()
+    user = User(email="basic@example.com", google_id="google-basic", is_beta=False, is_admin=False)
+    session.add(user)
+    await session.commit()
+
+    async def _override_session():
+        yield session
+
+    async def _override_user():
+        return user
+
+    app.dependency_overrides[get_session] = _override_session
+    app.dependency_overrides[get_current_user] = _override_user
+    try:
+        async with AsyncClient(app=app, base_url="http://test") as http_client:
+            assert (await http_client.get("/system-design/progress")).status_code == 403
+            assert (
+                await http_client.post("/system-design/quiz/caching/grade", json={})
+            ).status_code == 403
+            assert (await http_client.post("/leetcode/hint", json={})).status_code == 403
+            assert (await http_client.post("/mock-interview/parse-jd", json={})).status_code == 403
+            assert (await http_client.post("/folders/1/learning-track", json={})).status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+        await session.close()

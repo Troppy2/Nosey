@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_session
-from src.dependencies import get_current_user
+from src.dependencies import get_beta_user, get_current_user
 from src.models.user import User
 from src.schemas.system_design_schema import (
     CLIENT_SUB_MODULES,
@@ -22,7 +22,9 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-router = APIRouter(prefix="/system-design", tags=["system-design"])
+# SECURITY: beta-only feature, enforced server-side (see dependencies.get_beta_user).
+# It is excluded from usage limits, so basic users must not be able to reach it.
+router = APIRouter(prefix="/system-design", tags=["system-design"], dependencies=[Depends(get_beta_user)])
 
 
 def _http_error(exc: Exception, fallback: str) -> HTTPException:
