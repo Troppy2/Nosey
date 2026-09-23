@@ -11,10 +11,14 @@ from src.models.user import User
 from src.repositories.user_repository import UserRepository
 from src.services.auth_service import AuthService
 from src.utils.exceptions import ValidationException
+from src.services.quota_service import is_exempt, normalize_device_id
+from src.utils.provider_policy import user_can_override_provider
+from src.utils.usage_context import bind_usage
 
 
 async def get_current_user(
     authorization: Optional[str] = Header(default=None),
+    x_device_id: Optional[str] = Header(default=None),
     session: AsyncSession = Depends(get_session),
 ) -> User:
     if authorization is None:
@@ -29,9 +33,27 @@ async def get_current_user(
         user = await user_repo.get_by_id(user_id)
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
+        # Attribute any LLM tokens this request spends to the user (and, for
+        # usage-limited users, the device, so per-device limits see them).
+        # Limited routes (tests, flashcards, Kojo) re-bind with a feature name.
+        limited = not is_exempt(user)
+        bind_usage(user.id, device_id=normalize_device_id(x_device_id) if limited else None)
         return user
     except (jwt.InvalidTokenError, ValidationException):
         raise HTTPException(status_code=401, detail="Invalid token")
+
+
+async def get_beta_user(user: User = Depends(get_current_user)) -> User:
+    """Server-side gate for beta features (admins and beta users only).
+
+    SECURITY: beta features are excluded from the per-user usage limits on the
+    assumption that basic users cannot reach them. The frontend hides them via
+    betaMode, but that is UX only; this dependency is the actual boundary. Put
+    it on every route (or router) of a beta feature that can spend LLM tokens.
+    """
+    if not user_can_override_provider(user):
+        raise HTTPException(status_code=403, detail="This feature is only available to beta users.")
+    return user
 
 
 async def get_admin_user(

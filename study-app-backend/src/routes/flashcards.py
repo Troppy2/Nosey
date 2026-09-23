@@ -3,11 +3,12 @@ import time
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database import get_session
+from src.database import async_session_maker, get_session
 from src.dependencies import get_current_user
 from src.models.user import User
 from src.repositories.usage_event_repository import UsageEventRepository
 from src.utils.provider_policy import resolve_request_provider
+from src.utils.usage_context import bind_usage
 from src.schemas.flashcard_schema import (
     FlashcardAttemptCreate,
     FlashcardCreate,
@@ -17,10 +18,26 @@ from src.schemas.flashcard_schema import (
 )
 from src.limiter import limiter
 from src.services.flashcard_service import FlashcardService
+from src.services.quota_service import QuotaService
 from src.utils.exceptions import ResourceNotFoundException, StudyAppException
 from typing import Optional
 
 router = APIRouter(tags=["flashcards"])
+
+
+async def _settle_flashcard_quota(charge_id: Optional[int], produced: int) -> None:
+    """Trim the usage charge to the cards actually produced (0 refunds it).
+
+    Uses its own session: on the failure path the request session may be in a
+    rolled-back state. Never raises.
+    """
+    if charge_id is None:
+        return
+    try:
+        async with async_session_maker() as quota_session:
+            await QuotaService().settle_charge(quota_session, charge_id, produced)
+    except Exception:
+        pass
 
 
 @router.get("/flashcards", response_model=list[FlashcardResponse])
@@ -61,6 +78,10 @@ async def generate_flashcards(
     user: User = Depends(get_current_user),
 ) -> list[FlashcardResponse]:
     provider = resolve_request_provider(user, data.provider)
+    # Usage limit: clamps the count to what is left in the window, 429 at zero.
+    count, charge_id = await QuotaService().charge_flashcards(session, user, data.count)
+    bind_usage(user.id, "flashcard_generation")
+    produced = 0
     _t0 = time.monotonic()
     try:
         service = FlashcardService()
@@ -69,7 +90,7 @@ async def generate_flashcards(
                 folder_id,
                 data.test_id or 0,
                 user.id,
-                data.count,
+                count,
                 session,
                 provider=provider,
                 enable_fallback=data.enable_fallback,
@@ -79,7 +100,7 @@ async def generate_flashcards(
                 folder_id,
                 user.id,
                 data.prompt or "",
-                data.count,
+                count,
                 session,
                 provider=provider,
                 enable_fallback=data.enable_fallback,
@@ -92,11 +113,14 @@ async def generate_flashcards(
             await session.commit()
         except Exception:
             pass
+        produced = len(result)
         return result
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except StudyAppException as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        await _settle_flashcard_quota(charge_id, produced)
 
 
 @router.get("/folders/{folder_id}/flashcards", response_model=list[FlashcardResponse])
@@ -155,20 +179,38 @@ async def generate_flashcards_from_file(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> list[FlashcardResponse]:
+    provider = resolve_request_provider(user, provider)
+    # Usage limit: clamps the count to what is left in the window, 429 at zero.
+    count, charge_id = await QuotaService().charge_flashcards(session, user, count)
+    bind_usage(user.id, "flashcard_generation")
+    produced = 0
+    _t0 = time.monotonic()
     try:
-        return await FlashcardService().generate_from_file(
+        result = await FlashcardService().generate_from_file(
             folder_id,
             user.id,
             notes_files,
             count,
             session,
-            provider=resolve_request_provider(user, provider),
+            provider=provider,
             enable_fallback=enable_fallback,
         )
+        duration_ms = int((time.monotonic() - _t0) * 1000)
+        try:
+            await UsageEventRepository(session).log_event(
+                user.id, "flashcard_generation", duration_ms, provider=provider
+            )
+            await session.commit()
+        except Exception:
+            pass
+        produced = len(result)
+        return result
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except StudyAppException as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        await _settle_flashcard_quota(charge_id, produced)
 
 
 @router.patch("/folders/{folder_id}/flashcards/{flashcard_id}", response_model=FlashcardResponse)

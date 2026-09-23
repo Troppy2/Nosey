@@ -37,10 +37,12 @@ from src.services.grading_service import GradingService
 from src.services.kojo_context_cache import invalidate_folder
 from src.services.llm_service import LLMService
 from src.services.mcq_verification_service import MCQVerificationService, VerifiableMCQ, inflated_mcq_count
+from src.services.quota_service import QuotaService
 from src.services.test_service import TestService
 from src.utils.exceptions import LLMException, ResourceNotFoundException, StudyAppException
 from src.utils.logger import get_logger
 from src.utils.provider_policy import resolve_request_provider
+from src.utils.usage_context import bind_usage
 from src.utils.validators import MAX_UPLOAD_TOTAL_SIZE_BYTES
 
 router = APIRouter(tags=["tests"])
@@ -63,6 +65,25 @@ def _spawn_generation(coro) -> None:
     task = asyncio.create_task(coro)
     _generation_tasks.add(task)
     task.add_done_callback(_generation_tasks.discard)
+
+
+async def _settle_test_quota(quota_charge_id: Optional[int], test_id: int, generated: int) -> None:
+    """Refund the test usage charge only when the LLM produced zero questions.
+
+    SECURITY: `generated` is counted by the background task itself as questions
+    come back from the LLM, BEFORE they are written. It must never be derived
+    from the Question rows in the database: the user can delete those rows (or
+    the whole test) mid-generation, after reading them via GET /tests/{id}/edit,
+    which would turn every generation into a refund and bypass the limit.
+    A partial test keeps its charge. Never raises.
+    """
+    if quota_charge_id is None or generated > 0:
+        return
+    try:
+        async with async_session_maker() as session:
+            await QuotaService().refund(session, quota_charge_id)
+    except Exception as exc:
+        logger.warning("Test quota refund failed for test_id=%s: %s", test_id, exc)
 
 
 class _BytesUploadFile:
@@ -291,6 +312,7 @@ async def _generate_questions_background(
     count_ms: int = 0,
     count_rank: int = 0,
     prior_questions: Optional[list[str]] = None,
+    quota_charge_id: Optional[int] = None,
 ) -> None:
     """Run LLM generation and save questions; called as a FastAPI background task.
 
@@ -302,6 +324,12 @@ async def _generate_questions_background(
     and made the folder page hang on its loading spinner while a test generated.
     """
     _t0 = time.monotonic()
+    # Questions the LLM returned, counted before persistence. Drives the quota
+    # refund decision (see _settle_test_quota). Only ever incremented.
+    generated = 0
+    # Re-bind explicitly: the spawning request already bound this, but the task
+    # must stay attributed even if it is ever launched from another context.
+    bind_usage(user_id, "test_generation")
     llm = LLMService()
 
     # Dispatch a single generation call for the requested MCQ/FRQ counts. The three
@@ -362,6 +390,8 @@ async def _generate_questions_background(
     # Persist one MCQ/FRQ batch in a short-lived session, then release the
     # connection. Commits so pollers (separate sessions) see the batch immediately.
     async def persist_batch(mcq, frq, start_order: int) -> int:
+        nonlocal generated
+        generated += len(mcq) + len(frq)
         async with async_session_maker() as session:
             repo = TestRepository(session)
             next_order = await _persist_generated(repo, test_id, mcq, frq, start_order)
@@ -416,7 +446,8 @@ async def _generate_questions_background(
                 persisted_keys: set[str] = set()
 
                 async def persist_streamed_question(kind: str, item) -> None:
-                    nonlocal display_order
+                    nonlocal display_order, generated
+                    generated += 1
                     async with async_session_maker() as q_session:
                         q_repo = TestRepository(q_session)
                         if kind == "mcq":
@@ -466,6 +497,7 @@ async def _generate_questions_background(
                     custom_instructions=custom_instructions,
                     provider=provider,
                 )
+                generated += len(tf_questions) + len(ms_questions) + len(rank_questions)
                 async with async_session_maker() as session:
                     repo = TestRepository(session)
                     for tf_item in tf_questions:
@@ -554,6 +586,8 @@ async def _generate_questions_background(
             except Exception:
                 pass
             await err_session.commit()
+    finally:
+        await _settle_test_quota(quota_charge_id, test_id, generated)
 
 
 async def _extract_and_generate_background(
@@ -578,6 +612,7 @@ async def _extract_and_generate_background(
     count_tf: int = 0,
     count_ms: int = 0,
     count_rank: int = 0,
+    quota_charge_id: Optional[int] = None,
 ) -> None:
     """Extract uploaded files, persist notes, then run generation.
 
@@ -646,6 +681,8 @@ async def _extract_and_generate_background(
                 test.generation_status = "failed"
                 test.generation_error = f"Could not read your files: {exc}"[:500]
             await err_session.commit()
+        # Extraction failed before any LLM call, so nothing was generated.
+        await _settle_test_quota(quota_charge_id, test_id, generated=0)
         return
 
     # Generation opens its own session and manages status (ready/failed) + streaming.
@@ -669,6 +706,7 @@ async def _extract_and_generate_background(
         count_ms=count_ms,
         count_rank=count_rank,
         prior_questions=prior_questions,
+        quota_charge_id=quota_charge_id,
     )
 
 
@@ -786,6 +824,10 @@ async def create_test(
         eff_mcq = 0 if test_type == "FRQ_only" else count_mcq
         eff_frq = 0 if test_type in ("MCQ_only", "Extreme") else count_frq
 
+        # Usage limit: raises 429 at the cap, before anything is created.
+        quota_charge_id = await QuotaService().charge_test(session, user)
+        bind_usage(user.id, "test_generation")
+
         repo = TestRepository(session)
         test = await repo.create(
             folder_id,
@@ -829,6 +871,7 @@ async def create_test(
                 count_tf=count_tf,
                 count_ms=count_ms,
                 count_rank=count_rank,
+                quota_charge_id=quota_charge_id,
             )
         )
 
@@ -900,6 +943,11 @@ async def regenerate_test(
 
         count_frq = data.count_frq if test.test_type != "Extreme" else 0
 
+        # Usage limit: raises 429 at the cap, before stale questions are cleared.
+        # charge_test commits, so re-load nothing: `test` stays attached (expire_on_commit=False).
+        quota_charge_id = await QuotaService().charge_test(session, user, ref_id=test.id)
+        bind_usage(user.id, "test_generation")
+
         # Clear stale questions (blank placeholders or a partial prior run) before regenerating.
         for question in list(test.questions):
             await repo.delete_question(question)
@@ -943,6 +991,7 @@ async def regenerate_test(
                 count_ms=data.count_ms,
                 count_rank=data.count_rank,
                 prior_questions=prior_questions,
+                quota_charge_id=quota_charge_id,
             )
         )
 
