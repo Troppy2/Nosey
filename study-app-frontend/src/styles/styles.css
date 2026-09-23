@@ -26219,3 +26219,147 @@ a.sd-chip.is-done:hover {
   color: var(--accent-caution);
   background: var(--accent-caution-tint);
 }
+
+/* ── Usage meters (Settings > Usage) ───────────────────────────────────── */
+.usage-meters {
+  display: grid;
+  gap: 12px;
+}
+
+.usage-intro {
+  margin: 0;
+  max-width: 62ch;
+}
+
+.usage-unlimited {
+  justify-self: start;
+}
+
+.usage-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 14px;
+  background: var(--white);
+}
+
+.usage-row {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+}
+
+.usage-row + .usage-row {
+  border-top: 1px solid var(--green-light);
+}
+
+.usage-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.usage-row-name {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.usage-row-count {
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.usage-row-of,
+.usage-row-unit {
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--green-dark);
+}
+
+.usage-row-foot {
+  margin: 0;
+}
+
+.usage-pips {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 6px;
+}
+
+.usage-pip {
+  height: 10px;
+  border-radius: 3px;
+  background: var(--green-lightest);
+  box-shadow: inset 0 0 0 1px var(--green-light-mid);
+  transition: background var(--transition-normal);
+}
+
+.usage-pip--used {
+  background: var(--green-dark);
+  box-shadow: none;
+}
+
+.usage-bar {
+  position: relative;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--green-lightest);
+  box-shadow: inset 0 0 0 1px var(--green-light-mid);
+}
+
+.usage-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--green-dark);
+  transition: width var(--transition-normal);
+}
+
+.usage-row--near .usage-bar-fill,
+.usage-row--near .usage-pip--used {
+  background: var(--accent-caution);
+}
+
+.usage-row--full .usage-bar-fill,
+.usage-row--full .usage-pip--used {
+  background: var(--accent-danger);
+}
+
+.usage-row--full .usage-row-foot {
+  color: var(--accent-danger-strong);
+}
+
+.usage-loading {
+  height: 180px;
+  border-radius: 14px;
+  background: var(--green-lightest);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .usage-pip,
+  .usage-bar-fill {
+    transition: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .usage-row {
+    padding: 12px;
+  }
+
+  .usage-row-count {
+    font-size: 1.15rem;
+  }
+}
