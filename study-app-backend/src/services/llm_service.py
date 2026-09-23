@@ -25,6 +25,14 @@ from src.services.rag_service import HybridRAGService
 from src.utils.logger import get_logger
 from src.utils.latex_utils import normalize_latex
 from src.utils.serialization import safe_serialize_payload
+from src.utils.usage_context import (
+    StreamUsage,
+    record_parsed_usage,
+    usage_from_anthropic,
+    usage_from_gemini,
+    usage_from_ollama,
+    usage_from_openai,
+)
 from typing import Any, AsyncIterator, Awaitable, Callable, Optional
 
 logger = get_logger(__name__)
@@ -4120,149 +4128,189 @@ Return only the JSON object."""
 
     async def _stream_text_groq(self, prompt: str) -> AsyncIterator[str]:
         prompt_body = self._prepare_llm_payload(prompt, "groq")
-        async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
-            async with client.stream(
-                "POST",
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {settings.groq_api_key}",
-                    "Content-Type": "application/json; charset=utf-8",
-                },
-                json={
-                    "model": "llama-3.3-70b-versatile",
-                    "messages": [{"role": "user", "content": prompt_body}],
-                    "temperature": 0.2,
-                    "max_tokens": _JSON_MAX_TOKENS,
-                    # NOTE: no response_format here; Groq's JSON mode rejects
-                    # streaming. The extractor tolerates prose around the JSON.
-                    "stream": True,
-                },
-            ) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if not line.startswith("data:"):
-                        continue
-                    data = line[len("data:"):].strip()
-                    if not data or data == "[DONE]":
-                        continue
-                    try:
-                        event = json.loads(data)
-                    except json.JSONDecodeError:
-                        continue
-                    choices = event.get("choices") or []
-                    delta = (choices[0].get("delta") or {}) if choices else {}
-                    text = delta.get("content")
-                    if text:
-                        yield str(text)
+        usage = StreamUsage("groq", "llama-3.3-70b-versatile", prompt_body)
+        try:
+            async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
+                async with client.stream(
+                    "POST",
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {settings.groq_api_key}",
+                        "Content-Type": "application/json; charset=utf-8",
+                    },
+                    json={
+                        "model": "llama-3.3-70b-versatile",
+                        "messages": [{"role": "user", "content": prompt_body}],
+                        "temperature": 0.2,
+                        "max_tokens": _JSON_MAX_TOKENS,
+                        # NOTE: no response_format here; Groq's JSON mode rejects
+                        # streaming. The extractor tolerates prose around the JSON.
+                        "stream": True,
+                    },
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if not line.startswith("data:"):
+                            continue
+                        data = line[len("data:"):].strip()
+                        if not data or data == "[DONE]":
+                            continue
+                        try:
+                            event = json.loads(data)
+                        except json.JSONDecodeError:
+                            continue
+                        usage.set_both(usage_from_openai(event))
+                        choices = event.get("choices") or []
+                        delta = (choices[0].get("delta") or {}) if choices else {}
+                        text = delta.get("content")
+                        if text:
+                            usage.add_text(text)
+                            yield str(text)
+        except Exception:
+            usage.finish(success=False)
+            raise
+        finally:
+            usage.finish()
 
     async def _stream_text_anthropic(self, prompt: str) -> AsyncIterator[str]:
         prompt_body = self._prepare_llm_payload(prompt, "claude")
-        async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
-            async with client.stream(
-                "POST",
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": settings.anthropic_api_key or "",
-                    "anthropic-version": "2023-06-01",
-                    "Content-Type": "application/json; charset=utf-8",
-                },
-                json={
-                    "model": settings.anthropic_model,
-                    "max_tokens": _JSON_MAX_TOKENS,
-                    "temperature": 0.1,
-                    "system": "You MUST respond with ONLY valid JSON. No text before or after. No markdown. No backticks. No explanation. Start with { or [. End with } or ]. Every response must be valid JSON that can be parsed by json.loads().",
-                    "messages": [{"role": "user", "content": prompt_body}],
-                    "stream": True,
-                },
-            ) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if not line.startswith("data:"):
-                        continue
-                    data = line[len("data:"):].strip()
-                    if not data:
-                        continue
-                    try:
-                        event = json.loads(data)
-                    except json.JSONDecodeError:
-                        continue
-                    if event.get("type") == "content_block_delta":
-                        delta = event.get("delta") or {}
-                        text = delta.get("text")
-                        if text:
-                            yield str(text)
+        usage = StreamUsage("claude", settings.anthropic_model, prompt_body)
+        try:
+            async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
+                async with client.stream(
+                    "POST",
+                    "https://api.anthropic.com/v1/messages",
+                    headers={
+                        "x-api-key": settings.anthropic_api_key or "",
+                        "anthropic-version": "2023-06-01",
+                        "Content-Type": "application/json; charset=utf-8",
+                    },
+                    json={
+                        "model": settings.anthropic_model,
+                        "max_tokens": _JSON_MAX_TOKENS,
+                        "temperature": 0.1,
+                        "system": "You MUST respond with ONLY valid JSON. No text before or after. No markdown. No backticks. No explanation. Start with { or [. End with } or ]. Every response must be valid JSON that can be parsed by json.loads().",
+                        "messages": [{"role": "user", "content": prompt_body}],
+                        "stream": True,
+                    },
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if not line.startswith("data:"):
+                            continue
+                        data = line[len("data:"):].strip()
+                        if not data:
+                            continue
+                        try:
+                            event = json.loads(data)
+                        except json.JSONDecodeError:
+                            continue
+                        etype = event.get("type")
+                        if etype == "message_start":
+                            usage.set_input((usage_from_anthropic(event.get("message")) or (0, 0))[0])
+                        elif etype == "message_delta":
+                            usage.set_output(int((event.get("usage") or {}).get("output_tokens") or 0))
+                        if etype == "content_block_delta":
+                            delta = event.get("delta") or {}
+                            text = delta.get("text")
+                            if text:
+                                usage.add_text(text)
+                                yield str(text)
+        except Exception:
+            usage.finish(success=False)
+            raise
+        finally:
+            usage.finish()
 
     async def _stream_text_gemini(self, prompt: str) -> AsyncIterator[str]:
         prompt_body = self._prepare_llm_payload(prompt, "gemini")
-        async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
-            async with client.stream(
-                "POST",
-                f"https://generativelanguage.googleapis.com/v1beta/models/{settings.google_ai_model}:streamGenerateContent",
-                params={"key": settings.google_ai_api_key, "alt": "sse"},
-                headers={"Content-Type": "application/json; charset=utf-8"},
-                json={
-                    "contents": [{"parts": [{"text": prompt_body}]}],
-                    "generationConfig": {
-                        "maxOutputTokens": _JSON_MAX_TOKENS,
-                        "temperature": 0.2,
-                        "responseMimeType": "application/json",
+        usage = StreamUsage("gemini", settings.google_ai_model, prompt_body)
+        try:
+            async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
+                async with client.stream(
+                    "POST",
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{settings.google_ai_model}:streamGenerateContent",
+                    params={"key": settings.google_ai_api_key, "alt": "sse"},
+                    headers={"Content-Type": "application/json; charset=utf-8"},
+                    json={
+                        "contents": [{"parts": [{"text": prompt_body}]}],
+                        "generationConfig": {
+                            "maxOutputTokens": _JSON_MAX_TOKENS,
+                            "temperature": 0.2,
+                            "responseMimeType": "application/json",
+                        },
                     },
-                },
-            ) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if not line.startswith("data:"):
-                        continue
-                    data = line[len("data:"):].strip()
-                    if not data:
-                        continue
-                    try:
-                        event = json.loads(data)
-                    except json.JSONDecodeError:
-                        continue
-                    candidates = event.get("candidates") or []
-                    if not candidates:
-                        continue
-                    parts = ((candidates[0].get("content") or {}).get("parts")) or []
-                    for part in parts:
-                        text = part.get("text")
-                        if text:
-                            yield str(text)
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if not line.startswith("data:"):
+                            continue
+                        data = line[len("data:"):].strip()
+                        if not data:
+                            continue
+                        try:
+                            event = json.loads(data)
+                        except json.JSONDecodeError:
+                            continue
+                        usage.set_both(usage_from_gemini(event))
+                        candidates = event.get("candidates") or []
+                        if not candidates:
+                            continue
+                        parts = ((candidates[0].get("content") or {}).get("parts")) or []
+                        for part in parts:
+                            text = part.get("text")
+                            if text:
+                                usage.add_text(text)
+                                yield str(text)
+        except Exception:
+            usage.finish(success=False)
+            raise
+        finally:
+            usage.finish()
 
     async def _stream_text_ollama(self, prompt: str) -> AsyncIterator[str]:
         prompt_body = self._prepare_llm_payload(prompt, "ollama")
         headers = {"Content-Type": "application/json; charset=utf-8"}
         if settings.ollama_api_key:
             headers["Authorization"] = f"Bearer {settings.ollama_api_key}"
-        async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
-            async with client.stream(
-                "POST",
-                f"{settings.ollama_base_url.rstrip('/')}/api/generate",
-                headers=headers,
-                json={
-                    "model": settings.ollama_model,
-                    "prompt": prompt_body,
-                    "stream": True,
-                    "format": "json",
-                    "options": {
-                        "num_predict": _JSON_MAX_TOKENS,
-                        "num_ctx": settings.ollama_num_ctx,
+        usage = StreamUsage("ollama", settings.ollama_model, prompt_body)
+        try:
+            async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
+                async with client.stream(
+                    "POST",
+                    f"{settings.ollama_base_url.rstrip('/')}/api/generate",
+                    headers=headers,
+                    json={
+                        "model": settings.ollama_model,
+                        "prompt": prompt_body,
+                        "stream": True,
+                        "format": "json",
+                        "options": {
+                            "num_predict": _JSON_MAX_TOKENS,
+                            "num_ctx": settings.ollama_num_ctx,
+                        },
                     },
-                },
-            ) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if not line.strip():
-                        continue
-                    try:
-                        event = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    text = event.get("response")
-                    if text:
-                        yield str(text)
-                    if event.get("done"):
-                        break
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if not line.strip():
+                            continue
+                        try:
+                            event = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        usage.set_both(usage_from_ollama(event))
+                        text = event.get("response")
+                        if text:
+                            usage.add_text(text)
+                            yield str(text)
+                        if event.get("done"):
+                            break
+        except Exception:
+            usage.finish(success=False)
+            raise
+        finally:
+            usage.finish()
 
     async def _stream_llm_text(self, provider: str, prompt: str) -> AsyncIterator[str]:
         from src.utils.exceptions import LLMException
@@ -4585,143 +4633,183 @@ Return only the JSON object."""
 
     async def _stream_text_kojo_groq(self, prompt: str) -> AsyncIterator[str]:
         prompt_body = self._prepare_llm_payload(prompt, "groq")
-        async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
-            async with client.stream(
-                "POST",
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {settings.groq_api_key}",
-                    "Content-Type": "application/json; charset=utf-8",
-                },
-                json={
-                    "model": "llama-3.1-8b-instant",
-                    "messages": [{"role": "user", "content": prompt_body}],
-                    "temperature": 0.7,
-                    "max_tokens": settings.llm_max_tokens,
-                    "stream": True,
-                },
-            ) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if not line.startswith("data:"):
-                        continue
-                    data = line[len("data:"):].strip()
-                    if not data or data == "[DONE]":
-                        continue
-                    try:
-                        event = json.loads(data)
-                    except json.JSONDecodeError:
-                        continue
-                    choices = event.get("choices") or []
-                    delta = (choices[0].get("delta") or {}) if choices else {}
-                    text = delta.get("content")
-                    if text:
-                        yield str(text)
+        usage = StreamUsage("groq", "llama-3.1-8b-instant", prompt_body)
+        try:
+            async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
+                async with client.stream(
+                    "POST",
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {settings.groq_api_key}",
+                        "Content-Type": "application/json; charset=utf-8",
+                    },
+                    json={
+                        "model": "llama-3.1-8b-instant",
+                        "messages": [{"role": "user", "content": prompt_body}],
+                        "temperature": 0.7,
+                        "max_tokens": settings.llm_max_tokens,
+                        "stream": True,
+                    },
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if not line.startswith("data:"):
+                            continue
+                        data = line[len("data:"):].strip()
+                        if not data or data == "[DONE]":
+                            continue
+                        try:
+                            event = json.loads(data)
+                        except json.JSONDecodeError:
+                            continue
+                        usage.set_both(usage_from_openai(event))
+                        choices = event.get("choices") or []
+                        delta = (choices[0].get("delta") or {}) if choices else {}
+                        text = delta.get("content")
+                        if text:
+                            usage.add_text(text)
+                            yield str(text)
+        except Exception:
+            usage.finish(success=False)
+            raise
+        finally:
+            usage.finish()
 
     async def _stream_text_kojo_anthropic(self, prompt: str) -> AsyncIterator[str]:
         prompt_body = self._prepare_llm_payload(prompt, "claude")
-        async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
-            async with client.stream(
-                "POST",
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": settings.anthropic_api_key or "",
-                    "anthropic-version": "2023-06-01",
-                    "Content-Type": "application/json; charset=utf-8",
-                },
-                json={
-                    "model": settings.anthropic_model,
-                    "max_tokens": settings.llm_max_tokens,
-                    "messages": [{"role": "user", "content": prompt_body}],
-                    "stream": True,
-                },
-            ) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if not line.startswith("data:"):
-                        continue
-                    data = line[len("data:"):].strip()
-                    if not data:
-                        continue
-                    try:
-                        event = json.loads(data)
-                    except json.JSONDecodeError:
-                        continue
-                    if event.get("type") == "content_block_delta":
-                        delta = event.get("delta") or {}
-                        text = delta.get("text")
-                        if text:
-                            yield str(text)
+        usage = StreamUsage("claude", settings.anthropic_model, prompt_body)
+        try:
+            async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
+                async with client.stream(
+                    "POST",
+                    "https://api.anthropic.com/v1/messages",
+                    headers={
+                        "x-api-key": settings.anthropic_api_key or "",
+                        "anthropic-version": "2023-06-01",
+                        "Content-Type": "application/json; charset=utf-8",
+                    },
+                    json={
+                        "model": settings.anthropic_model,
+                        "max_tokens": settings.llm_max_tokens,
+                        "messages": [{"role": "user", "content": prompt_body}],
+                        "stream": True,
+                    },
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if not line.startswith("data:"):
+                            continue
+                        data = line[len("data:"):].strip()
+                        if not data:
+                            continue
+                        try:
+                            event = json.loads(data)
+                        except json.JSONDecodeError:
+                            continue
+                        etype = event.get("type")
+                        if etype == "message_start":
+                            usage.set_input((usage_from_anthropic(event.get("message")) or (0, 0))[0])
+                        elif etype == "message_delta":
+                            usage.set_output(int((event.get("usage") or {}).get("output_tokens") or 0))
+                        if etype == "content_block_delta":
+                            delta = event.get("delta") or {}
+                            text = delta.get("text")
+                            if text:
+                                usage.add_text(text)
+                                yield str(text)
+        except Exception:
+            usage.finish(success=False)
+            raise
+        finally:
+            usage.finish()
 
     async def _stream_text_kojo_gemini(self, prompt: str) -> AsyncIterator[str]:
         prompt_body = self._prepare_llm_payload(prompt, "gemini")
-        async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
-            async with client.stream(
-                "POST",
-                f"https://generativelanguage.googleapis.com/v1beta/models/{settings.google_ai_model}:streamGenerateContent",
-                params={"key": settings.google_ai_api_key, "alt": "sse"},
-                headers={"Content-Type": "application/json; charset=utf-8"},
-                json={
-                    "contents": [{"parts": [{"text": prompt_body}]}],
-                    "generationConfig": {
-                        "maxOutputTokens": settings.llm_max_tokens,
-                        "temperature": 0.7,
+        usage = StreamUsage("gemini", settings.google_ai_model, prompt_body)
+        try:
+            async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
+                async with client.stream(
+                    "POST",
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{settings.google_ai_model}:streamGenerateContent",
+                    params={"key": settings.google_ai_api_key, "alt": "sse"},
+                    headers={"Content-Type": "application/json; charset=utf-8"},
+                    json={
+                        "contents": [{"parts": [{"text": prompt_body}]}],
+                        "generationConfig": {
+                            "maxOutputTokens": settings.llm_max_tokens,
+                            "temperature": 0.7,
+                        },
                     },
-                },
-            ) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if not line.startswith("data:"):
-                        continue
-                    data = line[len("data:"):].strip()
-                    if not data:
-                        continue
-                    try:
-                        event = json.loads(data)
-                    except json.JSONDecodeError:
-                        continue
-                    candidates = event.get("candidates") or []
-                    if not candidates:
-                        continue
-                    parts = ((candidates[0].get("content") or {}).get("parts")) or []
-                    for part in parts:
-                        text = part.get("text")
-                        if text:
-                            yield str(text)
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if not line.startswith("data:"):
+                            continue
+                        data = line[len("data:"):].strip()
+                        if not data:
+                            continue
+                        try:
+                            event = json.loads(data)
+                        except json.JSONDecodeError:
+                            continue
+                        usage.set_both(usage_from_gemini(event))
+                        candidates = event.get("candidates") or []
+                        if not candidates:
+                            continue
+                        parts = ((candidates[0].get("content") or {}).get("parts")) or []
+                        for part in parts:
+                            text = part.get("text")
+                            if text:
+                                usage.add_text(text)
+                                yield str(text)
+        except Exception:
+            usage.finish(success=False)
+            raise
+        finally:
+            usage.finish()
 
     async def _stream_text_kojo_ollama(self, prompt: str) -> AsyncIterator[str]:
         prompt_body = self._prepare_llm_payload(prompt, "ollama")
         headers = {"Content-Type": "application/json; charset=utf-8"}
         if settings.ollama_api_key:
             headers["Authorization"] = f"Bearer {settings.ollama_api_key}"
-        async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
-            async with client.stream(
-                "POST",
-                f"{settings.ollama_base_url.rstrip('/')}/api/generate",
-                headers=headers,
-                json={
-                    "model": settings.ollama_model,
-                    "prompt": prompt_body,
-                    "stream": True,
-                    "options": {
-                        "num_predict": settings.llm_max_tokens,
-                        "num_ctx": settings.ollama_num_ctx,
+        usage = StreamUsage("ollama", settings.ollama_model, prompt_body)
+        try:
+            async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
+                async with client.stream(
+                    "POST",
+                    f"{settings.ollama_base_url.rstrip('/')}/api/generate",
+                    headers=headers,
+                    json={
+                        "model": settings.ollama_model,
+                        "prompt": prompt_body,
+                        "stream": True,
+                        "options": {
+                            "num_predict": settings.llm_max_tokens,
+                            "num_ctx": settings.ollama_num_ctx,
+                        },
                     },
-                },
-            ) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if not line.strip():
-                        continue
-                    try:
-                        event = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    text = event.get("response")
-                    if text:
-                        yield str(text)
-                    if event.get("done"):
-                        break
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if not line.strip():
+                            continue
+                        try:
+                            event = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        usage.set_both(usage_from_ollama(event))
+                        text = event.get("response")
+                        if text:
+                            usage.add_text(text)
+                            yield str(text)
+                        if event.get("done"):
+                            break
+        except Exception:
+            usage.finish(success=False)
+            raise
+        finally:
+            usage.finish()
 
     async def stream_kojo(
         self, prompt: str, provider: Optional[str] = None
@@ -4804,7 +4892,9 @@ Return only the JSON object."""
                     },
                 )
                 response.raise_for_status()
-            return str(response.json()["candidates"][0]["content"]["parts"][0]["text"]).strip()
+            payload = response.json()
+            record_parsed_usage("gemini", settings.google_ai_model, usage_from_gemini(payload))
+            return str(payload["candidates"][0]["content"]["parts"][0]["text"]).strip()
         return await self._with_retry(_do, "DeepSeek")
 
     async def check_providers_status(self) -> dict:
@@ -4859,7 +4949,9 @@ Return only the JSON object."""
                     },
                 )
                 response.raise_for_status()
-            return str(response.json().get("response", "")).strip()
+            payload = response.json()
+            record_parsed_usage("ollama", settings.ollama_model, usage_from_ollama(payload))
+            return str(payload.get("response", "")).strip()
         except httpx.ConnectError:
             raise LLMException(
                 f"Ollama is not running at {settings.ollama_base_url}. "
@@ -4895,7 +4987,9 @@ Return only the JSON object."""
                     },
                 )
                 response.raise_for_status()
-            return str(response.json()["choices"][0]["message"]["content"]).strip()
+            payload = response.json()
+            record_parsed_usage("groq", "llama-3.1-8b-instant", usage_from_openai(payload))
+            return str(payload["choices"][0]["message"]["content"]).strip()
         return await self._with_retry(_do, "Groq")
 
     async def _complete_text_anthropic(self, prompt: str) -> str:
@@ -4916,7 +5010,9 @@ Return only the JSON object."""
                     },
                 )
                 response.raise_for_status()
-            return str(response.json()["content"][0]["text"]).strip()
+            payload = response.json()
+            record_parsed_usage("claude", settings.anthropic_model, usage_from_anthropic(payload))
+            return str(payload["content"][0]["text"]).strip()
         return await self._with_retry(_do, "Claude")
 
     async def _complete_vision_anthropic(self, image_b64: str, media_type: str, prompt: str) -> str:
@@ -4969,6 +5065,7 @@ Return only the JSON object."""
                 )
                 response.raise_for_status()
             resp_data = response.json()
+            record_parsed_usage("claude", settings.anthropic_model, usage_from_anthropic(resp_data))
             if resp_data.get("stop_reason") == "max_tokens":
                 raise ValueError("Claude vision response was truncated (max_tokens reached)")
             content = resp_data.get("content")
@@ -5012,6 +5109,7 @@ Return only the JSON object."""
                 )
                 response.raise_for_status()
             resp_data = response.json()
+            record_parsed_usage("claude", settings.anthropic_model, usage_from_anthropic(resp_data))
             if resp_data.get("stop_reason") == "max_tokens":
                 raise ValueError("Claude response was truncated (max_tokens reached) — response incomplete for JSON generation")
             if not resp_data.get("content") or not isinstance(resp_data["content"], list) or len(resp_data["content"]) == 0:
@@ -5091,7 +5189,9 @@ Return only the JSON object."""
                     },
                 )
                 response.raise_for_status()
-            content = str(response.json()["candidates"][0]["content"]["parts"][0]["text"]).strip()
+            payload = response.json()
+            record_parsed_usage("gemini", settings.google_ai_model, usage_from_gemini(payload))
+            content = str(payload["candidates"][0]["content"]["parts"][0]["text"]).strip()
             return self._loads_json(content)
         return await self._with_retry(_do, "DeepSeek")
 
@@ -5119,6 +5219,7 @@ Return only the JSON object."""
                 )
                 response.raise_for_status()
                 payload = response.json()
+            record_parsed_usage("ollama", settings.ollama_model, usage_from_ollama(payload))
 
             # Ollama responses vary in shape. "response" may be a string, a dict, or nested.
             raw_resp = payload.get("response")
@@ -5213,6 +5314,7 @@ Return only the JSON object."""
                 )
                 response.raise_for_status()
                 payload = response.json()
+            record_parsed_usage("groq", "llama-3.3-70b-versatile", usage_from_openai(payload))
             content = payload["choices"][0]["message"]["content"]
             return self._loads_json(str(content))
         return await self._with_retry(_do, "Groq")
