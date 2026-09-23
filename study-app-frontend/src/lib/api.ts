@@ -65,8 +65,10 @@ import type {
   TestBlueprint,
   TestSummary,
   TestTake,
+  UsageLimits,
 } from "./types";
 import { reportBackendHttpFailure, reportBackendNetworkFailure } from "./backendStatus";
+import { getDeviceId } from "./deviceId";
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "https://noesy.onrender.com";
 const TOKEN_KEY = "nosey_access_token";
@@ -136,8 +138,12 @@ type RequestOptions = RequestInit & {
 // (AbortError from a stream/stop button) pass through untouched, they say
 // nothing about the server.
 async function guardedFetch(url: string, init: RequestInit): Promise<Response> {
+  // Every backend call carries the device id: usage limits are enforced per
+  // device as well as per account (see lib/deviceId.ts).
+  const headers = new Headers(init.headers);
+  headers.set("X-Device-Id", getDeviceId());
   try {
-    const response = await fetch(url, init);
+    const response = await fetch(url, { ...init, headers });
     reportBackendHttpFailure(response.status);
     return response;
   } catch (err) {
@@ -1114,6 +1120,11 @@ export async function kojoChatGeneral(
     method: "POST",
     body: JSON.stringify(body),
   });
+}
+
+// The signed-in account's own usage against its rolling-window limits.
+export async function fetchUsageLimits(): Promise<UsageLimits> {
+  return request<UsageLimits>("/usage/limits");
 }
 
 // Weekly user memory: a short server-generated recap of what the student has
