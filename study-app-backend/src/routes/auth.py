@@ -49,7 +49,9 @@ async def google_auth(
 
 
 @router.post("/guest", response_model=AuthResponse)
-@limiter.limit("5/minute")
+# Guests are usage-limited per account and per device; the hourly cap is the
+# backstop against scripts that mint guest accounts with fresh device ids.
+@limiter.limit("5/minute;30/hour")
 async def guest_auth(
     request: Request,
     response: Response,
