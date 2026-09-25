@@ -72,6 +72,9 @@ class Settings(BaseSettings):
     test_limit_per_window: int = Field(default=5, alias="TEST_LIMIT_PER_WINDOW")
     flashcard_limit_per_window: int = Field(default=50, alias="FLASHCARD_LIMIT_PER_WINDOW")
     kojo_token_limit_per_window: int = Field(default=150_000, alias="KOJO_TOKEN_LIMIT_PER_WINDOW")
+    # Optional JSON override of the admin cost-estimate price table (USD per 1M
+    # tokens, [input, output]); see services/token_analytics_service.py.
+    llm_pricing_json: Optional[str] = Field(default=None, alias="LLM_PRICING_JSON")
     qdrant_url: Optional[str] = Field(default=None, alias="QDRANT_URL")
     qdrant_api_key: Optional[str] = Field(default=None, alias="QDRANT_API_KEY")
     qdrant_collection: str = Field(default="nosey_rag", alias="QDRANT_COLLECTION")
