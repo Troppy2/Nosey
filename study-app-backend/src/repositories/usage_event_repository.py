@@ -5,6 +5,7 @@ from typing import Optional
 
 from sqlalchemy import case, func, select, text
 
+from src.models.llm_token_usage import LLMTokenUsage
 from src.models.usage_event import UsageEvent
 from src.repositories.base_repository import BaseRepository
 
@@ -34,14 +35,13 @@ class UsageEventRepository(BaseRepository[UsageEvent]):
         return event
 
     async def get_total_tokens(self) -> int:
-        result = await self.session.scalar(
-            select(func.sum(UsageEvent.estimated_tokens))
-        )
-        return int(result or 0)
+        """All-time real provider tokens (input + output) from llm_token_usage.
 
-    async def get_tokens_by_user(self, user_id: int) -> int:
+        usage_events.estimated_tokens was never populated; token counts live in
+        llm_token_usage, written by utils.usage_context for every provider call.
+        """
         result = await self.session.scalar(
-            select(func.sum(UsageEvent.estimated_tokens)).where(UsageEvent.user_id == user_id)
+            select(func.sum(LLMTokenUsage.input_tokens + LLMTokenUsage.output_tokens))
         )
         return int(result or 0)
 
@@ -62,22 +62,6 @@ class UsageEventRepository(BaseRepository[UsageEvent]):
         result = await self.session.scalar(select(func.count()).select_from(UsageEvent))
         return int(result or 0)
 
-    async def get_tokens_per_user(self) -> list[dict]:
-        result = await self.session.execute(
-            select(
-                UsageEvent.user_id,
-                func.sum(UsageEvent.estimated_tokens).label("total_tokens"),
-                func.count(UsageEvent.id).label("call_count"),
-            ).group_by(UsageEvent.user_id)
-        )
-        return [
-            {
-                "user_id": row.user_id,
-                "total_tokens": int(row.total_tokens or 0),
-                "call_count": row.call_count,
-            }
-            for row in result.all()
-        ]
 
     async def get_feature_stats(self) -> list[dict]:
         """Per-feature: call count, error count, avg response time, sorted by call_count desc."""
