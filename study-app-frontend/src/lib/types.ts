@@ -681,6 +681,7 @@ export type LeetCodeComplexityCheckResponse = {
 
 export type ProviderStatus = {
   gemini: boolean;
+  minimax: boolean;
   groq: boolean;
   claude: boolean;
   ollama: boolean;

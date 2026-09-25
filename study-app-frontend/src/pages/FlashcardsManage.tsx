@@ -103,6 +103,7 @@ export default function FlashcardsManage() {
     ((generationProvider === "groq" && !providerStatus.groq) ||
       (generationProvider === "gemini" && !providerStatus.gemini) ||
       (generationProvider === "claude" && !providerStatus.claude) ||
+      (generationProvider === "minimax" && !providerStatus.minimax) ||
       (generationProvider === "ollama" && !providerStatus.ollama));
   const effectiveProvider = providerUnavailable ? "auto" : generationProvider;
 

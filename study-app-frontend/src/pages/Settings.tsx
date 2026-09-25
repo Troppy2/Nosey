@@ -37,7 +37,8 @@ import { UsageMeters } from "../components/UsageMeters";
 const GENERATION_PROVIDER_OPTIONS = [
   { value: "auto", label: "Auto" },
   { value: "groq", label: "Groq" },
-  { value: "gemini", label: "DeepSeek" },
+  { value: "minimax", label: "MiniMax (OpenRouter)" },
+  { value: "gemini", label: "Gemini" },
   { value: "claude", label: "Anthropic (Claude)" },
   { value: "ollama", label: "Ollama" },
 ];
