@@ -401,12 +401,6 @@ export type FeatureTiming = {
   call_count: number;
 };
 
-export type TokenUsageRow = {
-  user_id: ID;
-  total_tokens: number;
-  call_count: number;
-};
-
 export type FeatureStat = {
   feature: string;
   call_count: number;
@@ -441,7 +435,6 @@ export type AdminStats = {
   total_tokens_used: number;
   active_users_7d: number;
   feature_timings: FeatureTiming[];
-  tokens_per_user: TokenUsageRow[];
   feature_stats: FeatureStat[];
   provider_stats: ProviderStat[];
   daily_counts: DailyCount[];
@@ -1019,4 +1012,25 @@ export type UsageLimits = {
   limits_enabled: boolean;
   window_hours: number;
   features: UsageFeature[];
+};
+
+// Admin token analytics (GET /admin/token-usage), from real provider counts.
+export type TokenBucket = {
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  cost_usd: number;
+  calls: number;
+  estimated_calls: number;
+  unpriced_calls: number;
+};
+
+export type TokenWeek = TokenBucket & { week_start: string };
+
+export type TokenUsageReport = {
+  weeks: TokenWeek[];
+  this_week: TokenWeek;
+  last_7_days: TokenBucket;
+  by_feature: Array<TokenBucket & { feature: string }>;
+  by_provider: Array<TokenBucket & { provider: string }>;
 };

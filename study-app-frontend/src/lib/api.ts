@@ -65,6 +65,7 @@ import type {
   TestBlueprint,
   TestSummary,
   TestTake,
+  TokenUsageReport,
   UsageLimits,
 } from "./types";
 import { reportBackendHttpFailure, reportBackendNetworkFailure } from "./backendStatus";
@@ -2205,6 +2206,10 @@ export async function adminAuthenticate(): Promise<AdminTokenResponse> {
 
 export async function fetchAdminStats(): Promise<AdminStats> {
   return adminRequest<AdminStats>("/admin/stats");
+}
+
+export async function fetchAdminTokenUsage(): Promise<TokenUsageReport> {
+  return adminRequest<TokenUsageReport>("/admin/token-usage");
 }
 
 export async function fetchAdminUsers(): Promise<AdminUserRow[]> {
