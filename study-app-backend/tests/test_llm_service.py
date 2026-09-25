@@ -93,6 +93,8 @@ def fake_settings(groq_key: str | None = FAKE_KEY, timeout: int = 30, max_tokens
     s.ollama_base_url = "http://localhost:11434"
     s.ollama_model = "llama3.1:8b"
     s.llm_provider = "auto"
+    s.groq_json_model = "openai/gpt-oss-120b"
+    s.groq_chat_model = "openai/gpt-oss-20b"
     return s
 
 
@@ -356,7 +358,11 @@ class TestCompleteGroq:
                 await self.svc._complete_groq("prompt")
 
         body = mock_client.post.call_args.kwargs["json"]
-        assert body["model"] == "llama-3.3-70b-versatile"
+        # Model comes from settings (Groq retired the hardcoded Llama models).
+        assert body["model"] == "openai/gpt-oss-120b"
+        # gpt-oss is a reasoning model: reasoning stays out of the content.
+        assert body["reasoning_format"] == "hidden"
+        assert body["reasoning_effort"] == "low"
         assert body["response_format"] == {"type": "json_object"}
         assert body["temperature"] == 0.2
 
