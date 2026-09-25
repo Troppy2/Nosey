@@ -27,6 +27,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   claude: "Claude (Anthropic)",
   gemini: "Gemini (Google)",
   groq: "Groq (cloud)",
+  minimax: "MiniMax (OpenRouter)",
   ollama: "Ollama (local)",
 };
 
