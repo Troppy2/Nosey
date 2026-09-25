@@ -32,6 +32,12 @@ class Settings(BaseSettings):
     # generation prompt (terms + concepts + rules + format spec).
     ollama_num_ctx: int = Field(default=8192, alias="OLLAMA_NUM_CTX")
     groq_api_key: Optional[str] = Field(default=None, alias="GROQ_API_KEY")
+    # Groq retired llama-3.3-70b-versatile and llama-3.1-8b-instant (404
+    # model_not_found). Configurable so the next retirement is an env change,
+    # not a deploy. JSON = test/flashcard/module generation, chat = Kojo.
+    # A model must also be enabled for the project in the Groq console.
+    groq_json_model: str = Field(default="openai/gpt-oss-120b", alias="GROQ_JSON_MODEL")
+    groq_chat_model: str = Field(default="openai/gpt-oss-20b", alias="GROQ_CHAT_MODEL")
     google_ai_api_key: Optional[str] = Field(default=None, alias="GOOGLE_AI_API_KEY")
     google_ai_model: str = Field(default="gemini-2.0-flash", alias="GOOGLE_AI_MODEL")
     anthropic_api_key: Optional[str] = Field(default=None, alias="ANTHROPIC_API_KEY")
