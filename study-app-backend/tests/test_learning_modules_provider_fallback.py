@@ -85,6 +85,8 @@ async def _run_build(db_session_maker, monkeypatch, provider, responses):
     monkeypatch.setattr("src.services.llm_service.settings.groq_api_key", "test-groq")
     monkeypatch.setattr("src.services.llm_service.settings.google_ai_api_key", "")
     monkeypatch.setattr("src.services.llm_service.settings.anthropic_api_key", "")
+    # Isolate from a developer .env: a real OpenRouter key would add MiniMax to the chain.
+    monkeypatch.setattr("src.services.llm_service.settings.openrouter_api_key", "")
 
     track_id, folder_id = await _seed_track(db_session_maker, provider)
     fake_call, calls = _fake_provider(responses)
@@ -184,6 +186,8 @@ class TestLearningModuleProviderFallback:
         monkeypatch.setattr("src.services.llm_service.settings.groq_api_key", "test-groq")
         monkeypatch.setattr("src.services.llm_service.settings.google_ai_api_key", "")
         monkeypatch.setattr("src.services.llm_service.settings.anthropic_api_key", "")
+        # Isolate from a developer .env: a real OpenRouter key would add MiniMax to the chain.
+        monkeypatch.setattr("src.services.llm_service.settings.openrouter_api_key", "")
         fake_call, calls = _fake_provider({
             "ollama": LLMException("Ollama timed out."),
             "groq": {"outline": OUTLINE, "content": CONTENT},
