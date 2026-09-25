@@ -16,6 +16,7 @@ from src.repositories.user_repository import UserRepository
 from src.schemas.auth_schema import AdminTokenResponse
 from src.schemas.survey_schema import AdminSurveysResponse, SurveyFeatureSummary, SurveyRecentRow
 from src.services.auth_service import AuthService, ADMIN_TOKEN_TTL_SECONDS
+from src.services.token_analytics_service import TokenAnalyticsService
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -57,12 +58,6 @@ class FeatureTiming(BaseModel):
     call_count: int
 
 
-class TokenUsageRow(BaseModel):
-    user_id: int
-    total_tokens: int
-    call_count: int
-
-
 class FeatureStat(BaseModel):
     feature: str
     call_count: int
@@ -97,11 +92,40 @@ class AdminStatsResponse(BaseModel):
     total_tokens_used: int
     active_users_7d: int
     feature_timings: list[FeatureTiming]
-    tokens_per_user: list[TokenUsageRow]
     feature_stats: list[FeatureStat]
     provider_stats: list[ProviderStat]
     daily_counts: list[DailyCount]
     error_breakdown: list[ErrorBreakdownRow]
+
+
+class TokenBucketDTO(BaseModel):
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+    cost_usd: float
+    calls: int
+    estimated_calls: int
+    unpriced_calls: int
+
+
+class TokenWeekDTO(TokenBucketDTO):
+    week_start: str
+
+
+class TokenFeatureDTO(TokenBucketDTO):
+    feature: str
+
+
+class TokenProviderDTO(TokenBucketDTO):
+    provider: str
+
+
+class TokenUsageReportResponse(BaseModel):
+    weeks: list[TokenWeekDTO]
+    this_week: TokenWeekDTO
+    last_7_days: TokenBucketDTO
+    by_feature: list[TokenFeatureDTO]
+    by_provider: list[TokenProviderDTO]
 
 
 @router.post("/authenticate", response_model=AdminTokenResponse)
@@ -138,7 +162,6 @@ async def get_admin_stats(
         total_events,
         total_tokens,
         feature_timings,
-        tokens_per_user,
         feature_stats,
         provider_stats,
         daily_counts,
@@ -152,7 +175,6 @@ async def get_admin_stats(
         total_tokens_used=total_tokens,
         active_users_7d=active_users_7d,
         feature_timings=[FeatureTiming(**ft) for ft in feature_timings],
-        tokens_per_user=[TokenUsageRow(**tp) for tp in tokens_per_user],
         feature_stats=[FeatureStat(**fs) for fs in feature_stats],
         provider_stats=[ProviderStat(**ps) for ps in provider_stats],
         daily_counts=[DailyCount(**dc) for dc in daily_counts],
@@ -212,7 +234,6 @@ async def _gather_stats(user_repo: UserRepository, usage_repo: UsageEventReposit
         total_events,
         total_tokens,
         feature_timings,
-        tokens_per_user,
         feature_stats,
         provider_stats,
         daily_counts,
@@ -223,7 +244,6 @@ async def _gather_stats(user_repo: UserRepository, usage_repo: UsageEventReposit
         usage_repo.get_total_events(),
         usage_repo.get_total_tokens(),
         usage_repo.get_avg_duration_by_feature(),
-        usage_repo.get_tokens_per_user(),
         usage_repo.get_feature_stats(),
         usage_repo.get_provider_stats(),
         usage_repo.get_daily_counts(days=14),
@@ -235,10 +255,26 @@ async def _gather_stats(user_repo: UserRepository, usage_repo: UsageEventReposit
         total_events,
         total_tokens,
         feature_timings,
-        tokens_per_user,
         feature_stats,
         provider_stats,
         daily_counts,
         active_users_7d,
         error_breakdown,
+    )
+
+
+@router.get("/token-usage", response_model=TokenUsageReportResponse)
+async def get_token_usage(
+    admin_user: User = Depends(get_admin_user),
+    session: AsyncSession = Depends(get_session),
+) -> TokenUsageReportResponse:
+    """Real provider token usage: 12 calendar weeks (Mon-Sun UTC) plus this
+    week's split by feature and provider, with estimated USD cost."""
+    report = await TokenAnalyticsService().weekly_report(session)
+    return TokenUsageReportResponse(
+        weeks=[TokenWeekDTO(**week) for week in report.weeks],
+        this_week=TokenWeekDTO(**report.this_week),
+        last_7_days=TokenBucketDTO(**report.last_7_days),
+        by_feature=[TokenFeatureDTO(**row) for row in report.by_feature],
+        by_provider=[TokenProviderDTO(**row) for row in report.by_provider],
     )
