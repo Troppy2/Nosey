@@ -365,6 +365,25 @@ _LATEX_BACKSLASH_FIX_RE = re.compile(
 )
 
 
+# One JSON escape unit: a valid escape (\\ \" \/ \b \f \n \r \t \uXXXX) is
+# consumed WHOLE so its second character is never re-examined; anything else
+# after a backslash is invalid and gets the backslash doubled.
+_JSON_ESCAPE_RE = re.compile(r'\\(\\|["/bfnrt]|u[0-9a-fA-F]{4})|\\')
+
+
+def _escape_invalid_backslashes(raw: str) -> str:
+    """Double only the backslashes that do not start a valid JSON escape.
+
+    Models often mix correctly escaped LaTeX ("\\\\cdot") with bare LaTeX
+    ("\\ge") in one reply. The old per-backslash lookahead regex examined the
+    second backslash of a valid "\\\\" pair on its own, saw "c", and doubled
+    it, turning valid "\\\\cdot" into invalid "\\\\\\cdot", so the whole
+    payload failed to parse (reproduced with gemma4:31b module content,
+    2026-09-25). Matching escape units left to right fixes that.
+    """
+    return _JSON_ESCAPE_RE.sub(lambda m: m.group(0) if m.group(1) else "\\\\", raw)
+
+
 def _extract_json_object(raw: str) -> Optional[str]:
     """Return the first complete top-level JSON object in `raw`, or None.
 
@@ -5352,9 +5371,9 @@ Return only the JSON object."""
             except json.JSONDecodeError:
                 pass
 
-        # Try escaping bare backslashes for LaTeX
+        # Escape the backslashes that are not valid JSON escapes (bare LaTeX).
         for candidate in [raw] + ([extracted] if extracted else []):
-            escaped = re.sub(r'\\(?!["\\/bfnrtu0-9])', r'\\\\', candidate)
+            escaped = _escape_invalid_backslashes(candidate)
             try:
                 parsed = json.loads(escaped)
                 if isinstance(parsed, dict):
