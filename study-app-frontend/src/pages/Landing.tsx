@@ -141,7 +141,7 @@ export default function Landing() {
               </button>
             </div>
             <div className="privacy-modal-body">
-              <p className="muted small">Last updated: August 19, 2026</p>
+              <p className="muted small">Last updated: September 25, 2026</p>
 
               <p>
                 Nosey is an open source study tool. This page explains what we collect, how your
@@ -184,9 +184,18 @@ export default function Landing() {
                 </li>
                 <li>
                   <strong>Usage metrics.</strong> For each AI request we log which feature was
-                  used, how long it took, which provider answered, an estimated token count, and
-                  whether it succeeded. This is for cost and reliability monitoring. It does not
-                  include the content of the request.
+                  used, how long it took, which provider and model answered, the number of input
+                  and output tokens the provider reported, and whether it succeeded. We also record
+                  how many tests and flashcards you generate. This is used to enforce usage limits
+                  and to monitor cost and reliability. It does not include the content of the
+                  request.
+                </li>
+                <li>
+                  <strong>Device identifier.</strong> Your browser generates a random ID, stored in
+                  local storage and a first-party cookie, and sends it with each request. It
+                  contains no personal information and is not used for advertising. We use it only
+                  to apply usage limits per device, so that several accounts on one browser share
+                  one limit. Clearing your browser data creates a new one but limits will still be enforced.
                 </li>
               </ul>
 
@@ -204,25 +213,36 @@ export default function Landing() {
                 graded. Your name, email, and Google ID are <strong>not</strong> included in these
                 requests.
               </p>
-              <p><strong>Who receives it.</strong> We use four providers:</p>
+              <p><strong>Who receives it.</strong> We use these providers:</p>
               <ul>
                 <li>
                   <strong>Ollama Cloud</strong> (Gemma). Tried first by default for most requests.
                 </li>
                 <li>
-                  <strong>Groq</strong> (Llama 3.3 70B for generating questions and flashcards,
-                  Llama 3.1 8B for Kojo chat).
+                  <strong>Groq</strong> (OpenAI's open-weight gpt-oss models, hosted by Groq).
                 </li>
-                <li><strong>Google Gemini</strong> (Gemini 2.0 Flash).</li>
+                <li>
+                  <strong>OpenRouter</strong>, which forwards requests to <strong>MiniMax</strong>{" "}
+                  (MiniMax M3). OpenRouter passes your content to the company hosting the model, so
+                  both OpenRouter and that host receive it. MiniMax is based in China, and depending
+                  on which host OpenRouter selects, your content may be processed outside the
+                  United States.
+                </li>
                 <li><strong>Anthropic Claude</strong> (Claude Haiku).</li>
+                <li>
+                  <strong>Google Gemini</strong>. Not used by default. Only admin and beta users
+                  who select it manually send content to Google.
+                </li>
               </ul>
               <p>
                 <strong>Routing and fallback.</strong> By default Nosey runs in "auto" mode and
-                tries providers in order of cost, starting with Ollama Cloud and using Anthropic
-                last. If a provider fails, is rate limited, or times out, the same content is
-                re-sent to the next provider in the list. A single action can therefore send your
-                content to more than one provider before it succeeds. Admin and beta users can
-                override which provider is tried first. Everyone else is pinned to auto.
+                tries providers in order of cost: Ollama Cloud, then Groq, then MiniMax through
+                OpenRouter, and Anthropic last. If a provider fails, is rate limited, times out, or
+                returns an unusable answer, the same content is re-sent to the next provider in the
+                list. A single action can therefore send your content to more than one provider
+                before it succeeds. Admin and beta users can override which provider is tried
+                first. Everyone else is pinned to auto. The specific models may change as
+                providers retire them; we update this list when they do.
               </p>
               <p>
                 <strong>Provider retention is outside our control.</strong> Once your content
@@ -232,6 +252,7 @@ export default function Landing() {
                 confidential, do not put it into Nosey. Review each provider's policy directly:{" "}
                 <a href="https://ollama.com/privacy" target="_blank" rel="noopener noreferrer">Ollama</a>,{" "}
                 <a href="https://groq.com/privacy-policy/" target="_blank" rel="noopener noreferrer">Groq</a>,{" "}
+                <a href="https://openrouter.ai/privacy" target="_blank" rel="noopener noreferrer">OpenRouter</a>,{" "}
                 <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google</a>,{" "}
                 <a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener noreferrer">Anthropic</a>.
               </p>
@@ -307,9 +328,14 @@ export default function Landing() {
                 immediate and cannot be undone.
               </p>
               <p>
-                Deletion covers the note chunks in the vector index as well (see section 3). One
-                exception remains, stated plainly: content already sent to an AI provider is
-                subject to that provider's retention schedule and is beyond our reach.
+                Deletion covers the note chunks in the vector index as well (see section 3). Two
+                exceptions remain, stated plainly. First, content already sent to an AI provider is
+                subject to that provider's retention schedule and is beyond our reach. Second, the
+                usage metrics described in section 1 (feature, provider, model, token counts, test
+                and flashcard counts, account number, and device identifier) are kept after you
+                delete your account. They contain none of your content, and we keep them so usage
+                limits cannot be reset by deleting and recreating an account, and for cost
+                records.
               </p>
 
               <h3>9. Age requirement</h3>
@@ -364,7 +390,7 @@ export default function Landing() {
               <hr className="policy-divider" />
 
               <h2 className="policy-section-title" id="terms">Terms of Service</h2>
-              <p className="muted small">Last updated: August 19, 2026</p>
+              <p className="muted small">Last updated: September 25, 2026</p>
 
               <h3>1. Agreement</h3>
               <p>
@@ -445,8 +471,18 @@ export default function Landing() {
                 Nosey is offered with no uptime guarantee. It depends on third party AI providers
                 with their own rate limits and outages, so features may be slow, degraded, or
                 unavailable. We may change, suspend, or discontinue any part of the service at any
-                time. We are not obliged to keep your data indefinitely, but we will make a
-                reasonable effort to warn you before any planned shutdown.
+                time.
+              </p>
+              <p>
+                <strong>Usage limits.</strong> To keep the service free, AI features have usage
+                limits over a rolling window, applied per account and per device: currently test
+                generations, generated flashcards, and Kojo chat usage. You can see your current
+                usage in Settings. We may change these limits at any time. Admin and beta accounts
+                may have different limits.
+              </p>
+              <p>
+                We are not obliged to keep your data indefinitely, but we will make a reasonable
+                effort to warn you before any planned shutdown.
               </p>
 
               <h3>8. No warranty</h3>
