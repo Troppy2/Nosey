@@ -769,9 +769,9 @@ async def create_test(
         provider_aliases = {"google": "gemini", "anthropic": "claude"}
         if provider:
             provider = provider_aliases.get(provider, provider)
-            if provider not in ("auto", "groq", "gemini", "claude", "ollama"):
+            if provider not in ("auto", "groq", "gemini", "claude", "ollama", "minimax"):
                 raise StudyAppException(
-                    "provider must be auto, groq, google, anthropic, gemini, claude, or ollama"
+                    "provider must be auto, groq, google, anthropic, gemini, claude, ollama, or minimax"
                 )
         # Non-admin/non-beta users cannot pick a model: pin to the auto chain
         # (Ollama-first, Claude last). Enforced here so it also covers the
@@ -931,9 +931,9 @@ async def regenerate_test(
         if provider:
             provider = provider.strip().lower()
             provider = provider_aliases.get(provider, provider)
-            if provider not in ("auto", "groq", "gemini", "claude", "ollama"):
+            if provider not in ("auto", "groq", "gemini", "claude", "ollama", "minimax"):
                 raise StudyAppException(
-                    "provider must be auto, groq, google, anthropic, gemini, claude, or ollama"
+                    "provider must be auto, groq, google, anthropic, gemini, claude, ollama, or minimax"
                 )
         provider = resolve_request_provider(user, provider)
 

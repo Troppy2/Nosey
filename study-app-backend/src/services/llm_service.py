@@ -76,6 +76,43 @@ def _gemini_thinking_config(model: str) -> dict[str, object]:
     return {}
 
 
+_OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+
+def _openrouter_headers() -> dict[str, str]:
+    # HTTP-Referer / X-Title are OpenRouter's optional app attribution headers.
+    return {
+        "Authorization": f"Bearer {settings.openrouter_api_key or ''}",
+        "Content-Type": "application/json; charset=utf-8",
+        "HTTP-Referer": "https://nosey-eosin.vercel.app",
+        "X-Title": "Nosey",
+    }
+
+
+def _openrouter_body(prompt_body: str, *, temperature: float, max_tokens: int,
+                     json_mode: bool = False, stream: bool = False) -> dict[str, object]:
+    """OpenRouter chat body for the configured MiniMax model.
+
+    MiniMax M-series are reasoning models. reasoning.exclude keeps the thinking
+    out of `content` and out of streamed deltas (same goal as Groq's
+    reasoning_format=hidden); low effort keeps latency and billed tokens down.
+    OpenRouter reports usage (prompt/completion tokens, OpenAI shape) on the
+    response and on the final stream chunk, so usage_from_openai reads it.
+    """
+    body: dict[str, object] = {
+        "model": settings.openrouter_model,
+        "messages": [{"role": "user", "content": prompt_body}],
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "reasoning": {"effort": "low", "exclude": True},
+    }
+    if json_mode:
+        body["response_format"] = {"type": "json_object"}
+    if stream:
+        body["stream"] = True
+    return body
+
+
 def _gemini_headers() -> dict[str, str]:
     """The API key goes in a header, never the ?key= query string: httpx logs
     every request URL at INFO, which put the key in plain text in the logs."""
@@ -3522,8 +3559,12 @@ Return only the JSON object."""
 
         if settings.groq_api_key:
             providers.append("groq")
-        if settings.google_ai_api_key:
-            providers.append("gemini")
+        # MiniMax (OpenRouter) replaced Gemini in the auto chain on 2026-09-25:
+        # Gemini's flash models were retired or overloaded and its output quality
+        # was poor. Gemini is still callable when chosen explicitly (admin/beta),
+        # since the explicit pick is placed first below.
+        if settings.openrouter_api_key:
+            providers.append("minimax")
         if settings.anthropic_api_key:
             providers.append("claude")
 
@@ -4193,6 +4234,10 @@ Return only the JSON object."""
             return await self._complete_anthropic(prompt, max_tokens=max_tokens)
         if provider == "ollama":
             return await self._complete_ollama(prompt, max_tokens=max_tokens)
+        if provider == "minimax":
+            if not settings.openrouter_api_key:
+                raise LLMException("MiniMax is not configured. Add OPENROUTER_API_KEY.")
+            return await self._complete_minimax(prompt, max_tokens=max_tokens)
         raise LLMException(f"Unsupported LLM provider: {provider}")
 
     # ── Streamed generation (per-question arrival) ───────────────────────────
@@ -4407,6 +4452,10 @@ Return only the JSON object."""
             stream = self._stream_text_gemini(prompt)
         elif provider == "ollama":
             stream = self._stream_text_ollama(prompt)
+        elif provider == "minimax":
+            if not settings.openrouter_api_key:
+                raise LLMException("MiniMax is not configured. Add OPENROUTER_API_KEY.")
+            stream = self._stream_text_minimax(prompt)
         else:
             raise LLMException(f"Streaming is not supported for provider: {provider}")
         async for chunk in stream:
@@ -4661,6 +4710,7 @@ Return only the JSON object."""
             "groq": self._complete_text_groq,
             "ollama": self._complete_text_ollama,
             "claude": self._complete_text_anthropic,
+            "minimax": self._complete_text_minimax,
         }
 
         normalized = self._normalize_generation_provider(provider)
@@ -4908,6 +4958,7 @@ Return only the JSON object."""
             "groq": self._stream_text_kojo_groq,
             "ollama": self._stream_text_kojo_ollama,
             "claude": self._stream_text_kojo_anthropic,
+            "minimax": self._stream_text_kojo_minimax,
         }
 
         normalized = self._normalize_generation_provider(provider)
@@ -5000,6 +5051,7 @@ Return only the JSON object."""
                 pass
         return {
             "gemini": bool(settings.google_ai_api_key),
+            "minimax": bool(settings.openrouter_api_key),
             "groq": bool(settings.groq_api_key),
             "claude": bool(settings.anthropic_api_key),
             "ollama": ollama_ok,
@@ -5404,6 +5456,98 @@ Return only the JSON object."""
             content = payload["choices"][0]["message"]["content"]
             return self._loads_json(str(content))
         return await self._with_retry(_do, "Groq")
+
+    # -- MiniMax via OpenRouter --------------------------------------------------
+    # OpenAI-compatible, so these mirror the Groq functions. Streams skip
+    # OpenRouter's ": OPENROUTER PROCESSING" keep-alive comments (no "data:").
+
+    async def _complete_minimax(self, prompt: str, max_tokens: Optional[int] = None) -> dict[str, object]:
+        async def _do() -> dict[str, object]:
+            prompt_body = self._prepare_llm_payload(prompt, "minimax")
+            async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
+                response = await client.post(
+                    _OPENROUTER_URL,
+                    headers=_openrouter_headers(),
+                    json=_openrouter_body(
+                        prompt_body, temperature=0.2, max_tokens=max_tokens or _JSON_MAX_TOKENS, json_mode=True,
+                    ),
+                )
+                response.raise_for_status()
+                payload = response.json()
+            record_parsed_usage("minimax", settings.openrouter_model, usage_from_openai(payload))
+            content = payload["choices"][0]["message"]["content"]
+            return self._loads_json(str(content))
+        return await self._with_retry(_do, "MiniMax")
+
+    async def _complete_text_minimax(self, prompt: str) -> str:
+        async def _do() -> str:
+            prompt_body = self._prepare_llm_payload(prompt, "minimax")
+            async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
+                response = await client.post(
+                    _OPENROUTER_URL,
+                    headers=_openrouter_headers(),
+                    json=_openrouter_body(prompt_body, temperature=0.7, max_tokens=settings.llm_max_tokens),
+                )
+                response.raise_for_status()
+            payload = response.json()
+            record_parsed_usage("minimax", settings.openrouter_model, usage_from_openai(payload))
+            return str(payload["choices"][0]["message"]["content"] or "").strip()
+        return await self._with_retry(_do, "MiniMax")
+
+    async def _stream_openrouter(self, prompt: str, *, json_mode: bool, temperature: float,
+                                 max_tokens: int, timeout: int) -> AsyncIterator[str]:
+        prompt_body = self._prepare_llm_payload(prompt, "minimax")
+        usage = StreamUsage("minimax", settings.openrouter_model, prompt_body)
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                async with client.stream(
+                    "POST",
+                    _OPENROUTER_URL,
+                    headers=_openrouter_headers(),
+                    json=_openrouter_body(
+                        prompt_body, temperature=temperature, max_tokens=max_tokens,
+                        json_mode=json_mode, stream=True,
+                    ),
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if not line.startswith("data:"):
+                            continue
+                        data = line[len("data:"):].strip()
+                        if not data or data == "[DONE]":
+                            continue
+                        try:
+                            event = json.loads(data)
+                        except json.JSONDecodeError:
+                            continue
+                        usage.set_both(usage_from_openai(event))
+                        choices = event.get("choices") or []
+                        delta = (choices[0].get("delta") or {}) if choices else {}
+                        text = delta.get("content")
+                        if text:
+                            usage.add_text(text)
+                            yield str(text)
+        except Exception:
+            usage.finish(success=False)
+            raise
+        finally:
+            usage.finish()
+
+    async def _stream_text_minimax(self, prompt: str) -> AsyncIterator[str]:
+        """Streamed JSON generation (per-question test streaming)."""
+        async for chunk in self._stream_openrouter(
+            prompt, json_mode=True, temperature=0.2, max_tokens=_JSON_MAX_TOKENS,
+            timeout=settings.llm_generation_timeout_seconds,
+        ):
+            yield chunk
+
+    async def _stream_text_kojo_minimax(self, prompt: str) -> AsyncIterator[str]:
+        """Streamed plain-text Kojo chat."""
+        async for chunk in self._stream_openrouter(
+            prompt, json_mode=False, temperature=0.7, max_tokens=settings.llm_max_tokens,
+            timeout=settings.llm_timeout_seconds,
+        ):
+            yield chunk
 
     def _loads_json(self, raw: str) -> dict[str, object]:
         raw = raw.strip()
