@@ -47,6 +47,21 @@ _JSON_MAX_TOKENS = 8192
 # fell through to the next provider. Raised for that call only.
 _MODULE_CONTENT_MAX_TOKENS = 16384
 
+def _groq_reasoning_params(model: str) -> dict[str, object]:
+    """Reasoning controls for Groq's reasoning models.
+
+    gpt-oss and qwen3 think before answering. "hidden" keeps the reasoning out
+    of the content (and out of Kojo's streamed deltas); gpt-oss accepts only
+    low/medium/high effort, and low keeps latency and tokens down. Non-reasoning
+    models get nothing, since they reject these fields.
+    """
+    if model.startswith("openai/gpt-oss"):
+        return {"reasoning_effort": "low", "reasoning_format": "hidden"}
+    if model.startswith("qwen/qwen3"):
+        return {"reasoning_format": "hidden"}
+    return {}
+
+
 
 
 @dataclass(frozen=True)
@@ -4160,7 +4175,7 @@ Return only the JSON object."""
 
     async def _stream_text_groq(self, prompt: str) -> AsyncIterator[str]:
         prompt_body = self._prepare_llm_payload(prompt, "groq")
-        usage = StreamUsage("groq", "llama-3.3-70b-versatile", prompt_body)
+        usage = StreamUsage("groq", settings.groq_json_model, prompt_body)
         try:
             async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
                 async with client.stream(
@@ -4171,7 +4186,8 @@ Return only the JSON object."""
                         "Content-Type": "application/json; charset=utf-8",
                     },
                     json={
-                        "model": "llama-3.3-70b-versatile",
+                        "model": settings.groq_json_model,
+                        **_groq_reasoning_params(settings.groq_json_model),
                         "messages": [{"role": "user", "content": prompt_body}],
                         "temperature": 0.2,
                         "max_tokens": _JSON_MAX_TOKENS,
@@ -4665,7 +4681,7 @@ Return only the JSON object."""
 
     async def _stream_text_kojo_groq(self, prompt: str) -> AsyncIterator[str]:
         prompt_body = self._prepare_llm_payload(prompt, "groq")
-        usage = StreamUsage("groq", "llama-3.1-8b-instant", prompt_body)
+        usage = StreamUsage("groq", settings.groq_chat_model, prompt_body)
         try:
             async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
                 async with client.stream(
@@ -4676,7 +4692,8 @@ Return only the JSON object."""
                         "Content-Type": "application/json; charset=utf-8",
                     },
                     json={
-                        "model": "llama-3.1-8b-instant",
+                        "model": settings.groq_chat_model,
+                        **_groq_reasoning_params(settings.groq_chat_model),
                         "messages": [{"role": "user", "content": prompt_body}],
                         "temperature": 0.7,
                         "max_tokens": settings.llm_max_tokens,
@@ -5012,7 +5029,8 @@ Return only the JSON object."""
                         "Content-Type": "application/json; charset=utf-8",
                     },
                     json={
-                        "model": "llama-3.1-8b-instant",
+                        "model": settings.groq_chat_model,
+                        **_groq_reasoning_params(settings.groq_chat_model),
                         "messages": [{"role": "user", "content": prompt_body}],
                         "temperature": 0.7,
                         "max_tokens": settings.llm_max_tokens,
@@ -5020,7 +5038,7 @@ Return only the JSON object."""
                 )
                 response.raise_for_status()
             payload = response.json()
-            record_parsed_usage("groq", "llama-3.1-8b-instant", usage_from_openai(payload))
+            record_parsed_usage("groq", settings.groq_chat_model, usage_from_openai(payload))
             return str(payload["choices"][0]["message"]["content"]).strip()
         return await self._with_retry(_do, "Groq")
 
@@ -5342,7 +5360,8 @@ Return only the JSON object."""
                         "Content-Type": "application/json; charset=utf-8",
                     },
                     json={
-                        "model": "llama-3.3-70b-versatile",
+                        "model": settings.groq_json_model,
+                        **_groq_reasoning_params(settings.groq_json_model),
                         "messages": [{"role": "user", "content": prompt_body}],
                         "temperature": 0.2,
                         "max_tokens": max_tokens or _JSON_MAX_TOKENS,
@@ -5351,7 +5370,7 @@ Return only the JSON object."""
                 )
                 response.raise_for_status()
                 payload = response.json()
-            record_parsed_usage("groq", "llama-3.3-70b-versatile", usage_from_openai(payload))
+            record_parsed_usage("groq", settings.groq_json_model, usage_from_openai(payload))
             content = payload["choices"][0]["message"]["content"]
             return self._loads_json(str(content))
         return await self._with_retry(_do, "Groq")
