@@ -38,6 +38,14 @@ DEFAULT_PRICING: dict[str, tuple[float, float]] = {
     "gemini:gemini-2.0-flash-lite*": (0.075, 0.30),
     "gemini:gemini-2.0-flash*": (0.10, 0.40),
     "gemini:gemini-2.5-flash*": (0.30, 2.50),
+    # Models adopted after the 2026-09-25 retirements (Groq Llama, Gemini 2.0).
+    # Reference prices from OpenRouter's model list on that date; Groq's own
+    # pricing for gpt-oss may differ slightly.
+    "groq:openai/gpt-oss-120b": (0.15, 0.60),
+    "groq:openai/gpt-oss-20b": (0.018, 0.09),
+    "groq:qwen/qwen3*": (0.42, 3.00),
+    "gemini:gemini-3.1-flash-lite*": (0.25, 1.50),
+    "minimax:minimax/minimax-m3": (0.30, 1.20),
     "ollama:*": (0.0, 0.0),
 }
 
