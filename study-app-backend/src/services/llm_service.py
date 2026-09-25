@@ -41,6 +41,12 @@ logger = get_logger(__name__)
 # Do NOT use for Kojo/text completion — those are fine at the lower
 # settings.llm_max_tokens value and a global increase broke Kojo chat.
 _JSON_MAX_TOKENS = 8192
+# Module content bundles the lesson article, the full narration script and the
+# quiz into ONE JSON object: the longest structured output in the app. At 8192
+# Claude truncated long topics ("max_tokens reached") and the whole module build
+# fell through to the next provider. Raised for that call only.
+_MODULE_CONTENT_MAX_TOKENS = 16384
+
 
 
 @dataclass(frozen=True)
@@ -2405,6 +2411,7 @@ Return JSON only with these exact keys:
         prompt: str,
         provider: Optional[str],
         parse: Callable[[dict[str, object]], Any],
+        max_tokens: Optional[int] = None,
     ) -> Any:
         """One module-authoring call with real provider fallback.
 
@@ -2425,7 +2432,7 @@ Return JSON only with these exact keys:
         last_error: Optional[Exception] = None
         for candidate in candidates:
             try:
-                return parse(await self._complete_json(prompt, provider=candidate))
+                return parse(await self._complete_json(prompt, provider=candidate, max_tokens=max_tokens))
             except Exception as exc:
                 last_error = exc
                 logger.warning("%s module generation failed; trying next provider: %s", candidate, exc)
@@ -2597,7 +2604,9 @@ Return JSON only with these exact keys:
 
             return {"lesson": lesson, "tts_script": tts_script, "quiz": quiz}
 
-        return await self._complete_module_json(prompt, provider, _parse)
+        return await self._complete_module_json(
+            prompt, provider, _parse, max_tokens=_MODULE_CONTENT_MAX_TOKENS
+        )
 
     async def regenerate_module_support(
         self,
@@ -2652,7 +2661,9 @@ Return JSON only with these exact keys:
 
             return {"tts_script": tts_script, "quiz": quiz}
 
-        return await self._complete_module_json(prompt, provider, _parse)
+        return await self._complete_module_json(
+            prompt, provider, _parse, max_tokens=_MODULE_CONTENT_MAX_TOKENS
+        )
 
     @staticmethod
     def _parse_quiz_explanations(
@@ -4119,7 +4130,9 @@ Return only the JSON object."""
 
         return merged_mcq[:count_mcq], merged_frq[:count_frq]
 
-    async def _complete_json_for_provider(self, prompt: str, provider: str) -> dict[str, object]:
+    async def _complete_json_for_provider(
+        self, prompt: str, provider: str, max_tokens: Optional[int] = None
+    ) -> dict[str, object]:
         from src.utils.exceptions import LLMException
 
         if provider == "gemini":
@@ -4129,13 +4142,13 @@ Return only the JSON object."""
         if provider == "groq":
             if not settings.groq_api_key:
                 raise LLMException("Groq is not configured. Add your Groq API key in Settings.")
-            return await self._complete_groq(prompt)
+            return await self._complete_groq(prompt, max_tokens=max_tokens)
         if provider == "claude":
             if not settings.anthropic_api_key:
                 raise LLMException("Anthropic is not configured. Add your Anthropic API key in Settings.")
-            return await self._complete_anthropic(prompt)
+            return await self._complete_anthropic(prompt, max_tokens=max_tokens)
         if provider == "ollama":
-            return await self._complete_ollama(prompt)
+            return await self._complete_ollama(prompt, max_tokens=max_tokens)
         raise LLMException(f"Unsupported LLM provider: {provider}")
 
     # ── Streamed generation (per-question arrival) ───────────────────────────
@@ -5093,7 +5106,7 @@ Return only the JSON object."""
             return str(content[0]["text"]).strip()
         return await self._with_retry(_do, "Claude vision")
 
-    async def _complete_anthropic(self, prompt: str) -> dict[str, object]:
+    async def _complete_anthropic(self, prompt: str, max_tokens: Optional[int] = None) -> dict[str, object]:
         async def _do() -> dict[str, object]:
             # Haiku 4.5 has a 200K-token context window (~800K chars), so normal
             # generation prompts never need truncation. Do NOT front-slice the
@@ -5120,7 +5133,7 @@ Return only the JSON object."""
                     },
                     json={
                         "model": settings.anthropic_model,
-                        "max_tokens": _JSON_MAX_TOKENS,
+                        "max_tokens": max_tokens or _JSON_MAX_TOKENS,
                         "temperature": 0.1,
                         "system": "You MUST respond with ONLY valid JSON. No text before or after. No markdown. No backticks. No explanation. Start with { or [. End with } or ]. Every response must be valid JSON that can be parsed by json.loads().",
                         "messages": [{"role": "user", "content": actual_prompt}],
@@ -5141,12 +5154,16 @@ Return only the JSON object."""
             return self._loads_json(content)
         return await self._with_retry(_do, "Claude")
 
-    async def _complete_json(self, prompt: str, provider: Optional[str] = None) -> dict[str, object]:
+    async def _complete_json(
+        self, prompt: str, provider: Optional[str] = None, max_tokens: Optional[int] = None
+    ) -> dict[str, object]:
+        """max_tokens overrides _JSON_MAX_TOKENS for one call (module content
+        only); None keeps the default. Never pass less than 3000."""
         from src.utils.exceptions import LLMException
 
         normalized = self._normalize_generation_provider(provider)
         if normalized != "auto":
-            return await self._complete_json_for_provider(prompt, normalized)
+            return await self._complete_json_for_provider(prompt, normalized, max_tokens=max_tokens)
 
         candidates = await self._candidate_providers("auto")
         if not candidates:
@@ -5155,7 +5172,7 @@ Return only the JSON object."""
         last_error: Optional[Exception] = None
         for candidate in candidates:
             try:
-                return await self._complete_json_for_provider(prompt, candidate)
+                return await self._complete_json_for_provider(prompt, candidate, max_tokens=max_tokens)
             except Exception as exc:
                 last_error = exc
                 logger.warning("%s JSON generation failed; trying next provider: %s", candidate, exc)
@@ -5190,7 +5207,7 @@ Return only the JSON object."""
                 logger.warning("%s JSON generation failed; trying next provider: %s", candidate, exc)
         raise LLMException(_AI_SERVICES_UNAVAILABLE_MESSAGE) from last_error
 
-    async def _complete_gemini(self, prompt: str) -> dict[str, object]:
+    async def _complete_gemini(self, prompt: str, max_tokens: Optional[int] = None) -> dict[str, object]:
         async def _do() -> dict[str, object]:
             prompt_body = self._prepare_llm_payload(prompt, "gemini")
             async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
@@ -5202,6 +5219,7 @@ Return only the JSON object."""
                         "contents": [{"parts": [{"text": prompt_body}]}],
                         "generationConfig": {
                             "maxOutputTokens": _JSON_MAX_TOKENS,
+                            "maxOutputTokens": max_tokens or _JSON_MAX_TOKENS,
                             "temperature": 0.2,
                             "responseMimeType": "application/json",
                         },
@@ -5214,7 +5232,7 @@ Return only the JSON object."""
             return self._loads_json(content)
         return await self._with_retry(_do, "DeepSeek")
 
-    async def _complete_ollama(self, prompt: str) -> dict[str, object]:
+    async def _complete_ollama(self, prompt: str, max_tokens: Optional[int] = None) -> dict[str, object]:
         from src.utils.exceptions import LLMException
         try:
             prompt_body = self._prepare_llm_payload(prompt, "ollama")
@@ -5231,7 +5249,7 @@ Return only the JSON object."""
                         "stream": False,
                         "format": "json",
                         "options": {
-                            "num_predict": _JSON_MAX_TOKENS,
+                            "num_predict": max_tokens or _JSON_MAX_TOKENS,
                             "num_ctx": settings.ollama_num_ctx,
                         },
                     },
@@ -5313,7 +5331,7 @@ Return only the JSON object."""
                 )
             raise LLMException(f"Ollama error ({exc.response.status_code})") from exc
 
-    async def _complete_groq(self, prompt: str) -> dict[str, object]:
+    async def _complete_groq(self, prompt: str, max_tokens: Optional[int] = None) -> dict[str, object]:
         async def _do() -> dict[str, object]:
             prompt_body = self._prepare_llm_payload(prompt, "groq")
             async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
@@ -5327,7 +5345,7 @@ Return only the JSON object."""
                         "model": "llama-3.3-70b-versatile",
                         "messages": [{"role": "user", "content": prompt_body}],
                         "temperature": 0.2,
-                        "max_tokens": _JSON_MAX_TOKENS,
+                        "max_tokens": max_tokens or _JSON_MAX_TOKENS,
                         "response_format": {"type": "json_object"},
                     },
                 )
