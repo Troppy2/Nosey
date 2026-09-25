@@ -47,6 +47,10 @@ _JSON_MAX_TOKENS = 8192
 # fell through to the next provider. Raised for that call only.
 _MODULE_CONTENT_MAX_TOKENS = 16384
 
+# HTTP statuses _with_retry backs off and retries: rate limit and overload.
+_TRANSIENT_STATUSES = frozenset({429, 503, 529})
+
+
 def _groq_reasoning_params(model: str) -> dict[str, object]:
     """Reasoning controls for Groq's reasoning models.
 
@@ -3468,14 +3472,22 @@ Example shape: {{"results": [{{"slug": "custom-abc", "topic": "graph", "subtopic
 Return only the JSON object."""
 
     async def _with_retry(self, fn, label: str):
-        """Retry a cloud LLM call on 429 with exponential backoff (max 3 attempts)."""
+        """Retry a cloud LLM call on a transient status with exponential backoff (max 3 attempts).
+
+        429 rate limit, 503 overloaded (Gemini "high demand"), 529 overloaded
+        (Anthropic). All clear within seconds, so a short backoff beats falling
+        through to the next provider.
+        """
         delay = 1.0
         for attempt in range(3):
             try:
                 return await fn()
             except httpx.HTTPStatusError as exc:
-                if exc.response.status_code == 429 and attempt < 2:
-                    logger.warning("%s rate-limited; retrying in %.0fs (attempt %d/3)", label, delay, attempt + 1)
+                if exc.response.status_code in _TRANSIENT_STATUSES and attempt < 2:
+                    logger.warning(
+                        "%s returned %d; retrying in %.0fs (attempt %d/3)",
+                        label, exc.response.status_code, delay, attempt + 1,
+                    )
                     await asyncio.sleep(delay)
                     delay *= 2
                     continue
