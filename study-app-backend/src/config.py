@@ -39,7 +39,11 @@ class Settings(BaseSettings):
     groq_json_model: str = Field(default="openai/gpt-oss-120b", alias="GROQ_JSON_MODEL")
     groq_chat_model: str = Field(default="openai/gpt-oss-20b", alias="GROQ_CHAT_MODEL")
     google_ai_api_key: Optional[str] = Field(default=None, alias="GOOGLE_AI_API_KEY")
-    google_ai_model: str = Field(default="gemini-2.0-flash", alias="GOOGLE_AI_MODEL")
+    # gemini-2.0-flash was retired (404) and gemini-2.5-flash is closed to new
+    # API users. gemini-3.8-flash exists but returned 503 "high demand" on every
+    # full-size request on 2026-09-25; flash-lite built modules reliably and is
+    # the cheapest. Override with GOOGLE_AI_MODEL (e.g. gemini-3.8-flash).
+    google_ai_model: str = Field(default="gemini-3.1-flash-lite", alias="GOOGLE_AI_MODEL")
     anthropic_api_key: Optional[str] = Field(default=None, alias="ANTHROPIC_API_KEY")
     anthropic_model: str = Field(default="claude-haiku-4-5-20251001", alias="ANTHROPIC_MODEL")
     environment: str = Field(default="production", alias="ENVIRONMENT")
