@@ -47,6 +47,7 @@ function formatProviderName(provider: string): string {
     claude: "Claude (Anthropic)",
     ollama: "Ollama (local)",
     gemini: "Gemini",
+    minimax: "MiniMax (OpenRouter)",
   };
   return map[provider.toLowerCase()] ?? provider;
 }
