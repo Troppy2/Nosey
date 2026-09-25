@@ -62,6 +62,23 @@ def _groq_reasoning_params(model: str) -> dict[str, object]:
     return {}
 
 
+def _gemini_thinking_config(model: str) -> dict[str, object]:
+    """Gemini 3 models think by default and those tokens come out of
+    maxOutputTokens, which can truncate a long JSON answer. "low" is the
+    smallest level gemini-3.8-flash accepts ("minimal" is rejected). Older
+    models reject thinkingLevel, so they get nothing."""
+    if model.startswith("gemini-3"):
+        return {"thinkingConfig": {"thinkingLevel": "low"}}
+    return {}
+
+
+def _gemini_headers() -> dict[str, str]:
+    """The API key goes in a header, never the ?key= query string: httpx logs
+    every request URL at INFO, which put the key in plain text in the logs."""
+    return {
+        "Content-Type": "application/json; charset=utf-8",
+        "x-goog-api-key": settings.google_ai_api_key or "",
+    }
 
 
 @dataclass(frozen=True)
@@ -4152,8 +4169,8 @@ Return only the JSON object."""
 
         if provider == "gemini":
             if not settings.google_ai_api_key:
-                raise LLMException("DeepSeek is not configured. Add your AI API key in Settings.")
-            return await self._complete_gemini(prompt)
+                raise LLMException("Gemini is not configured. Add GOOGLE_AI_API_KEY.")
+            return await self._complete_gemini(prompt, max_tokens=max_tokens)
         if provider == "groq":
             if not settings.groq_api_key:
                 raise LLMException("Groq is not configured. Add your Groq API key in Settings.")
@@ -4278,11 +4295,12 @@ Return only the JSON object."""
                 async with client.stream(
                     "POST",
                     f"https://generativelanguage.googleapis.com/v1beta/models/{settings.google_ai_model}:streamGenerateContent",
-                    params={"key": settings.google_ai_api_key, "alt": "sse"},
-                    headers={"Content-Type": "application/json; charset=utf-8"},
+                    params={"alt": "sse"},
+                    headers=_gemini_headers(),
                     json={
                         "contents": [{"parts": [{"text": prompt_body}]}],
                         "generationConfig": {
+                            **_gemini_thinking_config(settings.google_ai_model),
                             "maxOutputTokens": _JSON_MAX_TOKENS,
                             "temperature": 0.2,
                             "responseMimeType": "application/json",
@@ -4373,7 +4391,7 @@ Return only the JSON object."""
             stream = self._stream_text_anthropic(prompt)
         elif provider == "gemini":
             if not settings.google_ai_api_key:
-                raise LLMException("DeepSeek is not configured. Add your AI API key in Settings.")
+                raise LLMException("Gemini is not configured. Add GOOGLE_AI_API_KEY.")
             stream = self._stream_text_gemini(prompt)
         elif provider == "ollama":
             stream = self._stream_text_ollama(prompt)
@@ -4780,11 +4798,12 @@ Return only the JSON object."""
                 async with client.stream(
                     "POST",
                     f"https://generativelanguage.googleapis.com/v1beta/models/{settings.google_ai_model}:streamGenerateContent",
-                    params={"key": settings.google_ai_api_key, "alt": "sse"},
-                    headers={"Content-Type": "application/json; charset=utf-8"},
+                    params={"alt": "sse"},
+                    headers=_gemini_headers(),
                     json={
                         "contents": [{"parts": [{"text": prompt_body}]}],
                         "generationConfig": {
+                            **_gemini_thinking_config(settings.google_ai_model),
                             "maxOutputTokens": settings.llm_max_tokens,
                             "temperature": 0.7,
                         },
@@ -4930,11 +4949,11 @@ Return only the JSON object."""
             async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
                 response = await client.post(
                     f"https://generativelanguage.googleapis.com/v1beta/models/{settings.google_ai_model}:generateContent",
-                    params={"key": settings.google_ai_api_key},
-                    headers={"Content-Type": "application/json; charset=utf-8"},
+                    headers=_gemini_headers(),
                     json={
                         "contents": [{"parts": [{"text": prompt_body}]}],
                         "generationConfig": {
+                            **_gemini_thinking_config(settings.google_ai_model),
                             "maxOutputTokens": settings.llm_max_tokens,
                             "temperature": 0.7,
                         },
@@ -4944,7 +4963,7 @@ Return only the JSON object."""
             payload = response.json()
             record_parsed_usage("gemini", settings.google_ai_model, usage_from_gemini(payload))
             return str(payload["candidates"][0]["content"]["parts"][0]["text"]).strip()
-        return await self._with_retry(_do, "DeepSeek")
+        return await self._with_retry(_do, "Gemini")
 
     async def check_providers_status(self) -> dict:
         ollama_ok = False
@@ -5231,12 +5250,11 @@ Return only the JSON object."""
             async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
                 response = await client.post(
                     f"https://generativelanguage.googleapis.com/v1beta/models/{settings.google_ai_model}:generateContent",
-                    params={"key": settings.google_ai_api_key},
-                    headers={"Content-Type": "application/json; charset=utf-8"},
+                    headers=_gemini_headers(),
                     json={
                         "contents": [{"parts": [{"text": prompt_body}]}],
                         "generationConfig": {
-                            "maxOutputTokens": _JSON_MAX_TOKENS,
+                            **_gemini_thinking_config(settings.google_ai_model),
                             "maxOutputTokens": max_tokens or _JSON_MAX_TOKENS,
                             "temperature": 0.2,
                             "responseMimeType": "application/json",
@@ -5248,7 +5266,7 @@ Return only the JSON object."""
             record_parsed_usage("gemini", settings.google_ai_model, usage_from_gemini(payload))
             content = str(payload["candidates"][0]["content"]["parts"][0]["text"]).strip()
             return self._loads_json(content)
-        return await self._with_retry(_do, "DeepSeek")
+        return await self._with_retry(_do, "Gemini")
 
     async def _complete_ollama(self, prompt: str, max_tokens: Optional[int] = None) -> dict[str, object]:
         from src.utils.exceptions import LLMException
