@@ -40,7 +40,7 @@ class RenameConversationRequest(BaseModel):
 
 class KojoChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=80000)
-    provider: Optional[str] = Field(default=None, description="Optional LLM provider override: 'auto', 'groq', 'ollama', or 'gemini'")
+    provider: Optional[str] = Field(default=None, description="Optional LLM provider override: 'auto', 'groq', 'ollama', 'gemini', 'claude', or 'minimax'")
     strictness: Optional[str] = Field(default="medium", description="Constitution strictness: 'strict', 'medium', or 'none'")
     conversation_id: Optional[int] = Field(default=None, description="Specific conversation to continue; if omitted uses latest for folder")
     reasoning: Optional[bool] = Field(default=False, description="Stream a visible reasoning pass before the answer (streaming endpoints only)")
