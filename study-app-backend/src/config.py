@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     google_ai_model: str = Field(default="gemini-3.1-flash-lite", alias="GOOGLE_AI_MODEL")
     anthropic_api_key: Optional[str] = Field(default=None, alias="ANTHROPIC_API_KEY")
     anthropic_model: str = Field(default="claude-haiku-4-5-20251001", alias="ANTHROPIC_MODEL")
+    # MiniMax via OpenRouter (provider name "minimax"). Replaced Gemini in the
+    # auto chain on 2026-09-25. Model id is env config like the Groq ones.
+    openrouter_api_key: Optional[str] = Field(default=None, alias="OPENROUTER_API_KEY")
+    openrouter_model: str = Field(default="minimax/minimax-m3", alias="OPENROUTER_MODEL")
     environment: str = Field(default="production", alias="ENVIRONMENT")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     cors_origins: Any = Field(
