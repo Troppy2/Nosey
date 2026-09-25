@@ -26363,3 +26363,200 @@ a.sd-chip.is-done:hover {
     font-size: 1.15rem;
   }
 }
+
+/* ── Admin: token usage (AdminTokenUsage.tsx) ──────────────────────────── */
+.token-usage-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin-bottom: 12px;
+}
+
+.token-usage-head .admin-section-title {
+  margin: 0;
+}
+
+.token-usage-head p {
+  margin: 0;
+}
+
+.token-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.token-tile {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.token-tile-label,
+.token-tile-sub {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.token-tile-value {
+  margin: 4px 0 2px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.token-chart-card {
+  padding: 12px 16px 8px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.token-chart-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.token-legend {
+  display: flex;
+  gap: 16px;
+  font-size: 0.8rem;
+  color: var(--ink);
+}
+
+.token-legend > span {
+  display: inline-flex;
+  align-items: center;
+}
+
+.token-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+
+.token-view-toggle {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 0.78rem;
+  color: var(--green-dark);
+  cursor: pointer;
+}
+
+.token-view-toggle:hover {
+  border-color: var(--green-mid);
+}
+
+.token-view-toggle:focus-visible,
+.token-chart-svg rect:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.token-chart {
+  position: relative;
+}
+
+.token-chart-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.token-chart-grid {
+  stroke: var(--green-light);
+  stroke-width: 1;
+}
+
+.token-chart-baseline {
+  stroke: var(--green-light-mid);
+  stroke-width: 1;
+}
+
+.token-chart-axis {
+  font-size: 11px;
+  fill: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.token-chart-tooltip {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  min-width: 170px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--white);
+  box-shadow: var(--shadow-md);
+  font-size: 0.78rem;
+  color: var(--ink);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.token-chart-tooltip p {
+  margin: 0 0 2px;
+}
+
+.token-chart-tooltip strong {
+  float: right;
+  margin-left: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.token-chart-tooltip-title {
+  font-weight: 700;
+}
+
+.token-chart-tooltip-foot {
+  margin-top: 4px !important;
+  color: var(--muted);
+}
+
+.token-empty {
+  padding: 32px 0;
+  text-align: center;
+}
+
+.token-breakdowns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.token-breakdown-title {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.token-share-bar {
+  height: 100%;
+  border-radius: 3px;
+  background: #5b8a2e;
+}
+
+.token-loading {
+  height: 320px;
+  border-radius: var(--radius-md);
+  background: var(--green-lightest);
+}

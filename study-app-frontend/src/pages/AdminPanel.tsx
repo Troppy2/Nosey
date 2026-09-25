@@ -15,6 +15,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Spinner } from "../components/Loaders";
 import { SkeletonList, SkeletonStatGrid } from "../components/Skeletons";
+import { AdminTokenUsage } from "../components/AdminTokenUsage";
 import {
   adminAuthenticate,
   clearAdminToken,
@@ -316,9 +317,11 @@ export default function AdminPanel() {
             <div className="admin-stat-card">
               <Zap size={20} className="admin-stat-icon" />
               <p className="admin-stat-value">{stats.total_tokens_used.toLocaleString()}</p>
-              <p className="admin-stat-label">Tokens used (est.)</p>
+              <p className="admin-stat-label">Tokens used (all time)</p>
             </div>
           </section>
+
+          <AdminTokenUsage />
 
           {/* Feature usage ranked */}
           {stats.feature_stats.length > 0 ? (
@@ -488,32 +491,6 @@ export default function AdminPanel() {
             </section>
           ) : null}
 
-          {/* Token usage by user */}
-          {stats.tokens_per_user.some((r) => r.total_tokens > 0) ? (
-            <section className="admin-section">
-              <h2 className="admin-section-title">Token usage by user</h2>
-              <div className="admin-table-wrap">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>User ID</th>
-                      <th>Tokens (est.)</th>
-                      <th>API calls</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stats.tokens_per_user.map((row) => (
-                      <tr key={row.user_id}>
-                        <td>#{row.user_id}</td>
-                        <td>{row.total_tokens.toLocaleString()}</td>
-                        <td>{row.call_count.toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          ) : null}
         </>
       ) : loading ? (
         <>
