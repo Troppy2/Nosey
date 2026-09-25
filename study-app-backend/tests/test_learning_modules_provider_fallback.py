@@ -56,9 +56,16 @@ def _fake_provider(responses: dict[str, object]):
     """Per-provider fake of the network call. A value that is an Exception is
     raised; anything else is returned as the parsed JSON body."""
     calls: list[str] = []
+    # max_tokens per call kind ("outline" / "content"), so tests can check the
+    # module content call gets its raised budget.
+    budgets: dict[str, object] = {}
 
-    async def _call(prompt: str, provider: str) -> dict[str, object]:
+    async def _call(prompt: str, provider: str, max_tokens=None) -> dict[str, object]:
         calls.append(provider)
+        if "Split the material" in prompt:
+            budgets["outline"] = max_tokens
+        elif '"tts_script"' in prompt:
+            budgets["content"] = max_tokens  # lesson + narration + quiz bundle
         result = responses[provider]
         if isinstance(result, Exception):
             raise result
@@ -66,6 +73,7 @@ def _fake_provider(responses: dict[str, object]):
             return result["outline"]  # type: ignore[index]
         return result["content"]  # type: ignore[index]
 
+    _call.budgets = budgets  # type: ignore[attr-defined]
     return _call, calls
 
 
@@ -98,10 +106,24 @@ async def _run_build(db_session_maker, monkeypatch, provider, responses):
         module = (await session.scalars(
             select(LearningModule).where(LearningModule.track_id == track_id)
         )).first()
+    _run_build.last_budgets = fake_call.budgets  # type: ignore[attr-defined]
     return track, module, calls
 
 
 class TestLearningModuleProviderFallback:
+
+    async def test_module_content_uses_the_raised_token_budget(self, db_session_maker, monkeypatch):
+        """Lesson + narration + quiz in one JSON object truncated Claude at
+        8192 tokens; module content must request _MODULE_CONTENT_MAX_TOKENS,
+        while the short outline call keeps the default."""
+        from src.services.llm_service import _MODULE_CONTENT_MAX_TOKENS
+
+        track, _module, _calls = await _run_build(
+            db_session_maker, monkeypatch, "groq", {"groq": {"outline": OUTLINE, "content": CONTENT}},
+        )
+        assert track.status == "ready", track.error
+        assert _run_build.last_budgets["content"] == _MODULE_CONTENT_MAX_TOKENS
+        assert _run_build.last_budgets["outline"] is None
 
     async def test_kojo_card_pinned_ollama_failure_falls_back_and_track_is_ready(
         self, db_session_maker, monkeypatch,
