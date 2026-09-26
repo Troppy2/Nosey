@@ -8,7 +8,6 @@ import { EmptyState } from "../components/EmptyState";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { Skeleton } from "../components/Skeletons";
 import { fetchFlashcards, fetchFolders, recordFlashcardAttempt, scopeKey } from "../lib/api";
-import { useSettings } from "../lib/useSettings";
 import type { Flashcard, Folder } from "../lib/types";
 
 type Tile = {
@@ -107,7 +106,6 @@ function preview(text: string, max = 90): string {
 export default function Matching() {
   const { folderId } = useParams();
   const numericFolderId = folderId ? Number(folderId) : null;
-  const { betaMode } = useSettings();
 
   const [folder, setFolder] = useState<Folder | null>(null);
   const [allCards, setAllCards] = useState<Flashcard[]>([]);
@@ -382,7 +380,6 @@ export default function Matching() {
   const selectedTile = selectedKey ? tiles.find((t) => t.key === selectedKey) ?? null : null;
 
   if (numericFolderId == null) return <Navigate to="/flashcards" replace />;
-  if (!betaMode) return <Navigate to={`/flashcards/${numericFolderId}`} replace />;
 
   if (phase === "loading") {
     return (

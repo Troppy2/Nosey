@@ -118,17 +118,14 @@ export default function LearningModes() {
           title="Flashcards"
           blurb="Flip through your cards one at a time and rate how well you knew each one."
         />
-        {betaMode ? (
-          <ModeCard
-            to={`/flashcards/${selectedFolderId}/matching`}
-            disabled={!hasCards}
-            icon={<Puzzle size={26} />}
-            accent="var(--warning)"
-            title="Matching"
-            blurb="Race the clock to pair every term with its definition across timed rounds."
-            beta
-          />
-        ) : null}
+        <ModeCard
+          to={`/flashcards/${selectedFolderId}/matching`}
+          disabled={!hasCards}
+          icon={<Puzzle size={26} />}
+          accent="var(--warning)"
+          title="Matching"
+          blurb="Race the clock to pair every term with its definition across timed rounds."
+        />
         {betaMode ? (
           <ModeCard
             to={`/flashcards/${selectedFolderId}/modules`}
