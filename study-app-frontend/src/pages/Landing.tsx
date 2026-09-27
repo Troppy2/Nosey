@@ -120,7 +120,7 @@ export default function Landing() {
             target="_blank"
             rel="noopener noreferrer"
           >
-            Open source
+            GitHub
           </a>
           <button className="landing-footer-link landing-footer-btn" onClick={() => setPrivacyOpen(true)}>
             Privacy &amp; terms
