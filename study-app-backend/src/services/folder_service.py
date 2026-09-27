@@ -1,9 +1,18 @@
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.repositories.folder_repository import FolderRepository
 from src.schemas.folder_schema import FolderCreate, FolderResponse, FolderUpdate
 from src.services.kojo_context_cache import invalidate_folder
-from src.utils.exceptions import ResourceNotFoundException
+from src.utils.exceptions import ResourceNotFoundException, ValidationException
+
+
+def _duplicate_name_error(name: str) -> ValidationException:
+    # uq_folders_user_name also covers archived folders, which the main list hides.
+    return ValidationException(
+        f'You already have a folder named "{name}". '
+        "Check your archived folders or pick a different name."
+    )
 
 
 class FolderService:
@@ -28,13 +37,17 @@ class FolderService:
     async def create_folder(
         self, user_id: int, data: FolderCreate, session: AsyncSession
     ) -> FolderResponse:
-        folder = await FolderRepository(session).create(
-            user_id=user_id,
-            name=data.name,
-            subject=data.subject,
-            description=data.description,
-        )
-        await session.commit()
+        try:
+            folder = await FolderRepository(session).create(
+                user_id=user_id,
+                name=data.name,
+                subject=data.subject,
+                description=data.description,
+            )
+            await session.commit()
+        except IntegrityError as exc:
+            await session.rollback()
+            raise _duplicate_name_error(data.name) from exc
         return FolderResponse.model_validate(folder)
 
     async def get_folder(self, folder_id: int, user_id: int, session: AsyncSession) -> FolderResponse:
@@ -70,7 +83,11 @@ class FolderService:
             folder.is_archived = data.is_archived
         if data.avoid_repeat_questions is not None:
             folder.avoid_repeat_questions = data.avoid_repeat_questions
-        await session.commit()
+        try:
+            await session.commit()
+        except IntegrityError as exc:
+            await session.rollback()
+            raise _duplicate_name_error(data.name or "") from exc
         await session.refresh(folder)
         return FolderResponse.model_validate(folder)
 

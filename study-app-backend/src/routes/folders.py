@@ -62,6 +62,8 @@ async def update_folder(
         return await FolderService().update_folder(folder_id, user.id, data, session)
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except StudyAppException as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.delete("/{folder_id}", status_code=status.HTTP_204_NO_CONTENT)
