@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { repairMathDelimiters } from "./repairMathDelimiters";
+import { balanceDisplayDelimiters, repairMathDelimiters } from "./repairMathDelimiters";
 
 const B = "\\"; // one backslash, spelled out so the source stays readable
 const RS = B + B; // a LaTeX row separator
@@ -144,5 +144,39 @@ describe("repairMathDelimiters", () => {
     const fixed = repairMathDelimiters(article);
     expect(fixed).toContain("Intro prose here.");
     expect(fixed).toContain("Closing prose here.");
+  });
+});
+
+describe("balanceDisplayDelimiters", () => {
+  // The lesson from the 2026-09-27 report: a display equation closed with one
+  // dollar, followed by a correctly delimited one on the next line.
+  const LINE1 = "$$E(X) = (0 " + B + "times 0.41) + (4 " + B + "times 0.01)$";
+  const LINE2 = "$$E(X) = 0 + 0.37 + 0.04 = 0.88$$ The expected number is 0.88.";
+
+  it("closes a $$ ... $ line with $$", () => {
+    expect(balanceDisplayDelimiters(LINE1 + "\n" + LINE2)).toBe(
+      "$$E(X) = (0 " + B + "times 0.41) + (4 " + B + "times 0.01)$$\n" + LINE2,
+    );
+  });
+
+  it("closes a $ ... $$ line with $$", () => {
+    expect(balanceDisplayDelimiters("$x^2 + 1$$")).toBe("$$x^2 + 1$$");
+  });
+
+  it("runs as part of repairMathDelimiters", () => {
+    expect(repairMathDelimiters(LINE1 + "\n" + LINE2)).toContain("0.01)$$\n$$E(X)");
+  });
+
+  it("is idempotent and leaves balanced lines alone", () => {
+    const once = balanceDisplayDelimiters(LINE1 + "\n" + LINE2);
+    expect(balanceDisplayDelimiters(once)).toBe(once);
+    expect(balanceDisplayDelimiters("$$x$$\n$a$ and $b$")).toBe("$$x$$\n$a$ and $b$");
+  });
+
+  it("never touches code or prose", () => {
+    const code = "```bash\n$$HOME$\n```";
+    expect(balanceDisplayDelimiters(code)).toBe(code);
+    const prose = "$$ that costs about five dollars total $";
+    expect(balanceDisplayDelimiters(prose)).toBe(prose);
   });
 });

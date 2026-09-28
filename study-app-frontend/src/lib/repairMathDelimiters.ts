@@ -25,6 +25,13 @@
 // a pmatrix is a far smaller error than the paragraph of red KaTeX error text
 // the damage produces today.
 
+// A second, unrelated defect is repaired here too, because it has the same
+// symptom (a red KaTeX block with the prose after it scrambled): a display
+// equation closed with the wrong delimiter. Models writing many equations in
+// a row emit "$$ E(X) = ... $" on one line and "$$ ... $$" on the next. The
+// renderer then pairs the first $$ with the $$ that opens the second line.
+// See balanceDisplayDelimiters below.
+
 // Code is content and is never touched.
 const CODE_RE = /```[\s\S]*?```|`[^`\n]*`/g;
 
@@ -87,12 +94,44 @@ function repairSegment(segment: string): string {
   return out;
 }
 
+// A line holding one display equation with a mismatched closer: "$$ x $" or
+// "$ x $$". The body may not contain another unescaped $, so a line that is
+// already balanced ("$$ x $$") or holds two inline spans never matches.
+const HALF_OPEN_RE = /^(\s*)\$\$((?:\\.|[^$\\])+)\$(\s*)$/;
+const HALF_CLOSE_RE = /^(\s*)\$(?!\$)((?:\\.|[^$\\])+)\$\$(\s*)$/;
+
 /**
- * Restores the LaTeX environment on maths that was stored with it deleted.
+ * Closes a display equation that was opened with $$ and closed with $, or the
+ * reverse, when it sits on a line of its own. Anything less clear-cut is left
+ * alone: code, lines with backtick spans, and prose (so "costs $5 and $$" is
+ * never promoted to maths). Idempotent.
+ */
+export function balanceDisplayDelimiters(source: string): string {
+  if (!source || !source.includes("$$")) return source;
+  let inFence = false;
+  return source
+    .split("\n")
+    .map((line) => {
+      if (/^\s*```/.test(line)) {
+        inFence = !inFence;
+        return line;
+      }
+      if (inFence || line.includes("`")) return line;
+      const m = line.match(HALF_OPEN_RE) ?? line.match(HALF_CLOSE_RE);
+      if (!m || looksLikeProse(m[2])) return line;
+      return `${m[1]}$$${m[2]}$$${m[3]}`;
+    })
+    .join("\n");
+}
+
+/**
+ * Restores the LaTeX environment on maths that was stored with it deleted,
+ * and balances display equations closed with the wrong delimiter.
  * A no-op on undamaged content, and idempotent.
  */
 export function repairMathDelimiters(source: string): string {
   if (!source || !source.includes("$$")) return source;
+  source = balanceDisplayDelimiters(source);
 
   let out = "";
   let last = 0;

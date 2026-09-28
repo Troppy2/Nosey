@@ -415,3 +415,45 @@ describe("damaged maths is repaired at render time", () => {
     expect(r.code[0]).toBe("echo $HOME and $USER");
   });
 });
+
+describe("dense math from the 2026-09-27 report", () => {
+  const B = "\\";
+
+  it("keeps an escaped dollar inside inline math", () => {
+    expect(mathSourcesOf("in units of $" + B + "$5000$) here")).toEqual([B + "$5000"]);
+    expect(mathSourcesOf("profit is $0.5 " + B + "times " + B + "$5000 = " + B + "$2500$.")).toEqual([
+      "0.5 " + B + "times " + B + "$5000 = " + B + "$2500",
+    ]);
+  });
+
+  it("still treats an escaped dollar in prose as a literal", () => {
+    const [text, reg] = extractMath("costs " + B + "$5 and " + B + "$2 total");
+    expect(reg).toEqual([]);
+    expect(text).toBe("costs $5 and $2 total");
+  });
+
+  it("still accepts inline math nested in a text group of a display block", () => {
+    const src = "$$f(x) = " + B + "begin{cases} 1 & " + B + "text{if $x > 0$} " + B + B + " 0 & " + B + "text{otherwise} " + B + "end{cases}$$";
+    const sources = mathSourcesOf(src);
+    expect(sources).toHaveLength(1);
+    expect(sources[0].startsWith("f(x) = ")).toBe(true);
+  });
+
+  it("refuses a display capture holding a stray $", () => {
+    const src = "$$a + b$\n$$c = d$$ after";
+    expect(mathSourcesOf(src)).toEqual(["c = d"]);
+  });
+
+  it("renders a $$ ... $ line followed by another equation as two equations", () => {
+    const article =
+      "Calculation:\n\n$$E(X) = (0 " + B + "times 0.41) + (4 " + B + "times 0.01)$\n" +
+      "$$E(X) = 0 + 0.37 = 0.88$$ The expected number is 0.88.";
+    expect(mathSourcesOf(repairMathDelimiters(article))).toEqual([
+      "E(X) = (0 " + B + "times 0.41) + (4 " + B + "times 0.01)",
+      "E(X) = 0 + 0.37 = 0.88",
+    ]);
+    const { container } = render(<MarkdownContent content={article} />);
+    expect(container.querySelector(".katex-error")).toBeNull();
+    expect(container.textContent).not.toContain("$$");
+  });
+});
