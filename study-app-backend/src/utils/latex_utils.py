@@ -25,13 +25,15 @@ from typing import List
 # Spans that are already unambiguous and must survive byte for byte. Order is
 # significant: a fenced block is matched before anything inside it can be, and
 # $$...$$ is matched before $...$ so a display block is never read as two
-# inline ones.
+# inline ones. Inside math a backslash pairs with the next character, so an
+# escaped dollar ("$0.5 \times \$5000$") never closes the span early.
 _SPAN_RE = re.compile(
     r"(?P<fence>```[\s\S]*?```)"
     r"|(?P<code>`[^`\n]*`)"
-    r"|(?P<display>\$\$[\s\S]*?\$\$)"
+    r"|(?P<escaped>\\\$)"
+    r"|(?P<display>\$\$(?:\\[\s\S]|[^\\])*?\$\$)"
     r"|(?P<bracket_display>\\\[[\s\S]*?\\\])"
-    r"|(?P<inline>\$(?:[^$\n])+?\$)"
+    r"|(?P<inline>\$(?:\\[^\n]|[^$\n\\])+?\$)"
     r"|(?P<bracket_inline>\\\([\s\S]*?\\\))"
 )
 
@@ -64,6 +66,52 @@ _COMMAND_RE = re.compile(
 )
 
 
+# One display equation on a line of its own, closed with the wrong delimiter:
+# "$$ x $" or "$ x $$". The body may not hold another unescaped $, so a
+# balanced line or two inline spans never match.
+_HALF_OPEN_RE = re.compile(r"^(\s*)\$\$((?:\\.|[^$\\])+)\$(\s*)$")
+_HALF_CLOSE_RE = re.compile(r"^(\s*)\$(?!\$)((?:\\.|[^$\\])+)\$\$(\s*)$")
+
+_PROSE_CMD_RE = re.compile(r"\\[a-zA-Z]+")
+_PROSE_PUNCT_RE = re.compile(r"[{}^_()\[\]&$*=+\-/<>|\\]")
+_PROSE_WORD_RE = re.compile(r"[a-zA-Z]{4,}")
+
+
+def _looks_like_prose(text: str) -> bool:
+    """Three or more English words of four letters or more: a sentence, not maths."""
+    stripped = _PROSE_PUNCT_RE.sub(" ", _PROSE_CMD_RE.sub(" ", text))
+    return len(_PROSE_WORD_RE.findall(stripped)) >= 3
+
+
+def balance_display_delimiters(text: str) -> str:
+    """Close a display equation opened with $$ and closed with $, or the reverse.
+
+    Models writing many equations in a row emit "$$ E(X) = ... $" on one line
+    and "$$ ... $$" on the next. The renderer then pairs the first $$ with the
+    one that opens the next line and renders the pair as a red KaTeX error.
+    Only a line holding nothing but that one equation is touched; code, lines
+    with backtick spans, and prose are left alone. Mirrors
+    balanceDisplayDelimiters in the frontend's repairMathDelimiters.ts.
+    """
+    if not text or "$$" not in text:
+        return text
+    out: List[str] = []
+    in_fence = False
+    for line in text.split("\n"):
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+            out.append(line)
+            continue
+        if in_fence or "`" in line:
+            out.append(line)
+            continue
+        m = _HALF_OPEN_RE.match(line) or _HALF_CLOSE_RE.match(line)
+        if m and not _looks_like_prose(m.group(2)):
+            line = f"{m.group(1)}$${m.group(2)}$${m.group(3)}"
+        out.append(line)
+    return "\n".join(out)
+
+
 def _wrap_prose(segment: str) -> str:
     """Add delimiters to undelimited LaTeX in a stretch of ordinary prose.
 
@@ -88,11 +136,13 @@ def normalize_latex(text: str) -> str:
 
     - `\\[...\\]` becomes `$$...$$` and `\\(...\\)` becomes `$...$`.
     - A bare LaTeX command or environment in prose is wrapped in delimiters.
+    - A display equation closed with the wrong delimiter is balanced.
     - Math that is already delimited, and anything inside a code fence or a
       backtick span, is returned byte for byte unchanged.
     """
     if not text:
         return text
+    text = balance_display_delimiters(text)
 
     out: List[str] = []
     last = 0
@@ -106,7 +156,9 @@ def normalize_latex(text: str) -> str:
         elif kind == "bracket_inline":
             out.append("$" + match.group(0)[2:-2] + "$")
         else:
-            # fence, code, display and inline math all pass through verbatim.
+            # fence, code, an escaped \$, display and inline math all pass
+            # through verbatim. The escaped dollar is claimed here so it can
+            # never open a false inline span that swallows the real one.
             out.append(match.group(0))
         last = match.end()
 

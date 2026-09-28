@@ -35,15 +35,20 @@ const ph = (id: number) => `\x00M:${id}:\x00`;
 
 // Alternatives are tried in this order at every position, so the list itself
 // is the priority order described above.
+//
+// Inside math a backslash is consumed together with the character after it,
+// so an escaped dollar never closes the span. Models write money as
+// "$0.5 \times \$5000$"; without the pairing the span closed on the \$ and
+// KaTeX was handed "0.5 \times \", which it renders as red error text.
 const SCAN_RE = new RegExp(
   [
-    "```[\\s\\S]*?```",         // fenced code block
-    "`[^`\\n]*`",               // inline code span
-    "\\\\\\$",                  // escaped dollar
-    "\\$\\$[\\s\\S]*?\\$\\$",   // $$ ... $$
-    "\\\\\\[[\\s\\S]*?\\\\\\]", // \[ ... \]
-    "\\\\\\([\\s\\S]*?\\\\\\)", // \( ... \)
-    "\\$[^$\\n]+\\$",           // $ ... $
+    "```[\\s\\S]*?```",                        // fenced code block
+    "`[^`\\n]*`",                              // inline code span
+    "\\\\\\$",                                 // escaped dollar
+    "\\$\\$(?:\\\\[\\s\\S]|[^\\\\])*?\\$\\$",  // $$ ... $$
+    "\\\\\\[[\\s\\S]*?\\\\\\]",                // \[ ... \]
+    "\\\\\\([\\s\\S]*?\\\\\\)",                // \( ... \)
+    "\\$(?:\\\\[^\\n]|[^$\\n\\\\])+\\$",       // $ ... $
   ].join("|"),
   "g",
 );
@@ -52,10 +57,19 @@ const SCAN_RE = new RegExp(
 // or a code fence inside one means the opening $$ never had a partner and got
 // paired with an unrelated $$ further down, swallowing the prose in between.
 // That is what turned a lesson into one red KaTeX error block, so refuse it.
+//
+// An unescaped $ inside is the same failure on a smaller scale: the equation
+// was closed with one dollar ("$$ x $") and this capture ran on to the $$ that
+// opens the next equation. KaTeX cannot render a bare $ in math mode, so the
+// capture is always wrong. The exception is inline maths nested in a text
+// group ("\text{if $x > 0$}"), which KaTeX does render, so those are
+// removed before the check.
 function isPlausibleDisplayMath(body: string): boolean {
   if (!body.trim()) return false;
   if (/\n[ \t]*\n/.test(body)) return false;
   if (/^[ \t]*#{1,6} /m.test(body)) return false;
+  const outsideText = body.replace(/\\(?:text|mbox|textrm)\{[^{}]*\}/g, "").replace(/\\[\s\S]/g, "");
+  if (outsideText.includes("$")) return false;
   return !body.includes("```");
 }
 

@@ -2639,7 +2639,9 @@ Return JSON only with these exact keys:
             "3-5 sections under ## headings that develop the topic step by step, multiple concrete worked "
             "examples, and a brief recap of this module only. Stay strictly within this module's scope and "
             "ground every claim in the notes; do not pad with generic filler. If the material is mathematical, "
-            "write math as LaTeX using $...$ for inline and $$...$$ for display equations. If the material is "
+            "write math as LaTeX using $...$ for inline and $$...$$ for display equations. Every display "
+            "equation opens AND closes with $$. Never use a $ sign for money: write 'USD 5000' or "
+            "'5000 dollars'. If the material is "
             "code, use fenced code blocks with a language tag. Do not include a quiz or exercises.\n\n"
             "2. \"tts_script\": the same article rewritten as a spoken narration script. Plain prose only: no "
             "markdown syntax, no LaTeX, no code fences. Say every piece of notation the way a teacher says it "
@@ -2665,7 +2667,10 @@ Return JSON only with these exact keys:
         )
 
         def _parse(data: dict[str, object]) -> dict[str, object]:
-            lesson = str(data.get("lesson") or "").strip()
+            # normalize_latex is deterministic (no LLM call): it balances
+            # mismatched $$ ... $ delimiters and converts \[ \] / \( \) so the
+            # article is stored in the dialect the renderer understands.
+            lesson = normalize_latex(str(data.get("lesson") or "").strip())
             if not lesson:
                 raise LLMException("The AI returned an empty lesson. Try again.")
 

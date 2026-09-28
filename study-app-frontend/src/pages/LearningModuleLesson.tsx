@@ -28,7 +28,7 @@ import {
   updateModuleVideo,
 } from "../lib/api";
 import { markdownToSpeech, splitForSpeech } from "../components/episodeSpeech";
-import { looksMangled, repairLessonMarkdown } from "../lib/repairLessonMarkdown";
+import { looksMangled, repairLessonForDisplay, repairLessonFully } from "../lib/repairLessonMarkdown";
 import { isPermutationOf, shuffled, shuffledOptionOrder } from "../lib/shuffle";
 import { useMobileShell } from "../lib/useMobileShell";
 import { useSettings } from "../lib/useSettings";
@@ -391,8 +391,11 @@ export default function LearningModuleLesson() {
       ? track.modules[moduleIndex + 1]
       : null;
 
+  // Rendered through the deterministic repair so a lesson with broken maths
+  // delimiters or escape damage reads correctly as soon as it arrives. The
+  // stored text is untouched; Reformat is still how a repair gets saved.
   const lessonBlocks = useMemo(
-    () => (module?.lesson_content ? splitLessonBlocks(module.lesson_content) : []),
+    () => (module?.lesson_content ? splitLessonBlocks(repairLessonForDisplay(module.lesson_content)) : []),
     [module?.lesson_content],
   );
 
@@ -801,7 +804,7 @@ export default function LearningModuleLesson() {
   function startReformat() {
     if (!module?.lesson_content) return;
     stopSpeech();
-    setDraft(repairLessonMarkdown(module.lesson_content));
+    setDraft(repairLessonFully(module.lesson_content));
     setEditError(null);
     setEditing(true);
   }
