@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { looksMangled, repairLessonMarkdown } from "./repairLessonMarkdown";
+import { looksMangled, repairLessonForDisplay, repairLessonFully, repairLessonMarkdown } from "./repairLessonMarkdown";
 
 const B = "\\"; // one backslash, spelled out so the source stays readable
 
@@ -164,5 +164,40 @@ describe("looksMangled", () => {
 
   it("does not flag empty content", () => {
     expect(looksMangled("")).toBe(false);
+  });
+});
+
+describe("escaped dollars and automatic display repair", () => {
+  it("does not split math on an escaped dollar", () => {
+    const src = "Profit is $0.5 " + B + "times " + B + "$5000$." ;
+    expect(repairLessonMarkdown(src)).toBe(src);
+  });
+
+  it("repairLessonForDisplay balances delimiters without touching clean prose or math", () => {
+    const src = "Use the " + B + "n character.\n\n$$x = 1$\n$$" + B + "text{sum} = 2$$";
+    expect(repairLessonForDisplay(src)).toBe(
+      "Use the " + B + "n character.\n\n$$x = 1$$\n$$" + B + "text{sum} = 2$$",
+    );
+  });
+
+  it("repairLessonForDisplay restores control-character damage inside math", () => {
+    // "\times" read by json.loads as TAB + "imes".
+    expect(repairLessonForDisplay("Line.\n$x \times y$")).toBe("Line.\n$x " + B + "times y$");
+  });
+
+  it("repairLessonForDisplay keeps real line breaks in multi-line display math", () => {
+    const src = "Intro.\n\n$$\n" + B + "begin{aligned}\nu &= x^2 " + B + B + "\ni = 1\n" + B + "end{aligned}\n$$";
+    expect(repairLessonForDisplay(src)).toBe(src);
+  });
+
+  it("repairLessonForDisplay fully repairs a one-blob article", () => {
+    const src = "## Intro" + B + "n" + B + "nText.";
+    expect(repairLessonForDisplay(src)).toBe("## Intro\n\nText.");
+  });
+
+  it("repairLessonFully fixes escape damage and delimiters together", () => {
+    // "\times" read by json.loads as TAB + "imes", plus a $$ ... $ closer.
+    const src = "Intro.\n\n$$x \times y$\n$$z = 2$$";
+    expect(repairLessonFully(src)).toBe("Intro.\n\n$$x " + B + "times y$$\n$$z = 2$$");
   });
 });

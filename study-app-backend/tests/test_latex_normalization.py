@@ -19,7 +19,7 @@ import re
 
 import pytest
 
-from src.utils.latex_utils import normalize_latex
+from src.utils.latex_utils import balance_display_delimiters, normalize_latex
 
 
 def display_delimiter_count(text: str) -> int:
@@ -223,3 +223,46 @@ def test_multiple_display_blocks_on_one_line_stay_separate():
 def test_normalize_latex_is_idempotent(src):
     once = normalize_latex(src)
     assert normalize_latex(once) == once
+
+
+# ── Dense maths from the 2026-09-27 report ───────────────────────────────────
+# A display equation closed with one dollar, and money written as \$ inside
+# inline maths. Both rendered as red KaTeX error text.
+
+
+def test_balances_display_closed_with_single_dollar():
+    line1 = r"$$E(X) = (0 \times 0.41) + (4 \times 0.01)"
+    line2 = r"$$E(X) = 0.88$$ The expected value."
+    text = line1 + "$\n" + line2
+    assert balance_display_delimiters(text) == line1 + "$$\n" + line2
+    assert normalize_latex(text) == line1 + "$$\n" + line2
+
+
+def test_escaped_dollar_in_prose_does_not_open_math():
+    text = r"Revenue is \$5000, so $\text{profit} = 0.5 \times 5000$ here."
+    assert normalize_latex(text) == text
+    text = r"It costs \$5 then $\frac{a}{b}$ ok"
+    assert normalize_latex(text) == text
+
+
+def test_balances_display_opened_with_single_dollar():
+    assert balance_display_delimiters("$x^2 + 1$$") == "$$x^2 + 1$$"
+
+
+def test_balance_is_idempotent_and_leaves_balanced_text_alone():
+    text = "$$x$$\n$a$ and $b$"
+    assert balance_display_delimiters(text) == text
+    once = balance_display_delimiters("$$y = 2$")
+    assert balance_display_delimiters(once) == once
+
+
+def test_balance_never_touches_code_or_prose():
+    code = "```bash\n$$HOME$\n```"
+    assert balance_display_delimiters(code) == code
+    prose = "$$ that costs about five dollars total $"
+    assert balance_display_delimiters(prose) == prose
+
+
+def test_escaped_dollar_inside_inline_math_passes_through():
+    text = r"Profit is $0.5 \times \$5000 = \$2500$ and units of $\$5000$."
+    assert normalize_latex(text) == text
