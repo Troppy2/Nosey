@@ -17922,6 +17922,7 @@ button.kojo-blueprint-head:hover {
   font-family: var(--font-serif);
   font-size: 1.85rem;
   color: var(--k-ink);
+  overflow-wrap: anywhere;
 }
 
 .kojo-home-desc {
@@ -17970,6 +17971,9 @@ button.kojo-blueprint-head:hover {
 
 .kojo-home-recents {
   display: grid;
+  /* An implicit auto track grows to the titles' nowrap width, so the ellipsis
+     never engages and rows spill past the column. Pin the track instead. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 2px;
 }
 
