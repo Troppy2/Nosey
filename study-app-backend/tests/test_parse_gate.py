@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src.services import file_service
-from src.services.file_service import FileService
+from src.services.file_service import FileService, ParseTimeoutError
 from src.utils.exceptions import ValidationException
 
 
@@ -104,3 +104,47 @@ async def test_gate_is_released_after_a_parse_raises(monkeypatch: pytest.MonkeyP
 
     content, _ = await asyncio.wait_for(service.extract_from_file(_upload("b.pdf")), timeout=5)
     assert content == "parsed text"
+
+
+@pytest.mark.asyncio
+async def test_an_expired_parse_budget_stops_a_pdf_parse(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(file_service, "PARSE_DEADLINE_S", -1)
+    monkeypatch.setattr(file_service, "pymupdf4llm", None)
+    page = MagicMock()
+    page.get_text.return_value = "text"
+    doc = MagicMock(page_count=3)
+    doc.load_page.return_value = page
+    monkeypatch.setattr(file_service, "fitz", MagicMock(open=MagicMock(return_value=doc)))
+
+    with pytest.raises(ParseTimeoutError):
+        await FileService().extract_from_file(_upload("a.pdf"))
+
+    doc.load_page.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_hung_parse_releases_the_gate_after_the_grace_period(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    # A page stuck inside C code never reaches the between-pages deadline check.
+    # The caller must still get an error, and other uploads must not queue forever.
+    monkeypatch.setattr(file_service, "PARSE_DEADLINE_S", 0.05)
+    monkeypatch.setattr(file_service, "PARSE_HARD_STOP_GRACE_S", 0.05)
+    release = threading.Event()
+    service = FileService()
+
+    def hung_parse(*args, **kwargs) -> str:
+        release.wait(timeout=10)
+        return "too late"
+
+    monkeypatch.setattr(service, "_extract_pdf", hung_parse)
+    try:
+        with pytest.raises(ParseTimeoutError):
+            await asyncio.wait_for(service.extract_from_file(_upload("stuck.pdf")), timeout=5)
+
+        monkeypatch.setattr(service, "_extract_pdf", lambda *args, **kwargs: "next file")
+        content, _ = await asyncio.wait_for(service.extract_from_file(_upload("next.pdf")), timeout=5)
+        assert content == "next file"
+        assert any(record.levelname == "ERROR" and "hard stop" in record.getMessage() for record in caplog.records)
+    finally:
+        release.set()

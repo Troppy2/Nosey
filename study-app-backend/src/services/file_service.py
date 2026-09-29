@@ -3,12 +3,13 @@ from __future__ import annotations
 import asyncio
 import html as html_lib
 import re
+import time
 import unicodedata
 import weakref
 from collections import defaultdict
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Optional
+from typing import Callable, Optional
 
 import pdfplumber
 from fastapi import UploadFile
@@ -18,12 +19,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.folder import Folder
 from src.models.folder_file import FolderFile
 from src.utils.exceptions import ValidationException
+from src.utils.logger import get_logger
 from src.utils.validators import (
     ALLOWED_FILE_TYPES,
     MAX_UPLOAD_FILE_SIZE_BYTES,
     MAX_UPLOAD_TOTAL_SIZE_BYTES,
     normalize_file_extension,
 )
+
+logger = get_logger(__name__)
 
 try:
     import fitz  # type: ignore[import-not-found]
@@ -62,6 +66,20 @@ _MUPDF_STORE_FLUSH_EVERY = 25
 # Header levels come from font sizes, which stay consistent through a document, so
 # a sample of pages is enough and keeps the extra scan cheap on long PDFs.
 _HEADER_SAMPLE_PAGES = 30
+
+# Time budget for one parse, checked between pages. A 300-page PDF takes roughly
+# 5-8 minutes on Render's 0.1 CPU. The grace period covers a single page stuck in C
+# code, which the between-pages check cannot interrupt.
+PARSE_DEADLINE_S = 15 * 60
+PARSE_HARD_STOP_GRACE_S = 60
+
+
+class ParseTimeoutError(ValidationException):
+    """A parse ran out of time. The message is shown to the user."""
+
+    def __init__(self) -> None:
+        super().__init__("This file took too long to read. Try splitting it into smaller files.")
+
 
 _CODE_FILE_TYPES = {
     "py", "js", "ts", "tsx", "jsx", "java", "c", "cpp", "h", "hpp",
@@ -231,13 +249,21 @@ def _pymupdf_page_text(document, index: int, headers) -> str:
         return ""
 
 
-def _extract_with_pymupdf(document, progress: ParseProgress) -> PdfText:
+def _check_deadline(deadline: Optional[float], clock: Callable[[], float]) -> None:
+    if deadline is not None and clock() > deadline:
+        raise ParseTimeoutError()
+
+
+def _extract_with_pymupdf(
+    document, progress: ParseProgress, deadline: Optional[float], clock: Callable[[], float]
+) -> PdfText:
     page_count = int(document.page_count)
     to_read = min(page_count, PDF_PAGE_CAP)
     progress.pages_total = to_read
     headers = _identify_headers(document, to_read)
     parts: list[str] = []
     for index in range(to_read):
+        _check_deadline(deadline, clock)
         parts.append(_pymupdf_page_text(document, index, headers))
         progress.pages_done = index + 1
         if progress.pages_done % _MUPDF_STORE_FLUSH_EVERY == 0:
@@ -245,13 +271,16 @@ def _extract_with_pymupdf(document, progress: ParseProgress) -> PdfText:
     return PdfText(_join_extracted_chunks(parts), to_read, page_count)
 
 
-def _extract_with_pdfplumber(source: bytes | str, progress: ParseProgress) -> PdfText:
+def _extract_with_pdfplumber(
+    source: bytes | str, progress: ParseProgress, deadline: Optional[float], clock: Callable[[], float]
+) -> PdfText:
     with pdfplumber.open(source if isinstance(source, str) else BytesIO(source)) as pdf:
         page_count = len(pdf.pages)
         to_read = min(page_count, PDF_PAGE_CAP)
         progress.pages_total = to_read
         parts: list[str] = []
         for index in range(to_read):
+            _check_deadline(deadline, clock)
             page = pdf.pages[index]
             parts.append(page.extract_text() or "")
             # pdfplumber caches each page's parsed layout; drop it before the next page.
@@ -261,13 +290,19 @@ def _extract_with_pdfplumber(source: bytes | str, progress: ParseProgress) -> Pd
     return PdfText(_join_extracted_chunks(parts), to_read, page_count)
 
 
-def _extract_pdf_pages(source: bytes | str, progress: ParseProgress) -> PdfText:
+def _extract_pdf_pages(
+    source: bytes | str,
+    progress: ParseProgress,
+    deadline: Optional[float] = None,
+    clock: Callable[[], float] = time.monotonic,
+) -> PdfText:
     """Read a PDF one page at a time from a single open document.
 
     Runs in a worker thread and never starts processes: on Render's 512 MB box every
     extra process re-imports the PDF stack and holds its own copy of the file.
     PyMuPDF handles nearly every file (pymupdf4llm markdown per page, plain text as the
     per-page fallback); pdfplumber is only tried when PyMuPDF cannot open the file.
+    `deadline` is a `clock()` value, checked before each page.
     """
     document = None
     if fitz is not None:
@@ -278,12 +313,14 @@ def _extract_pdf_pages(source: bytes | str, progress: ParseProgress) -> PdfText:
 
     if document is None:
         try:
-            result = _extract_with_pdfplumber(source, progress)
+            result = _extract_with_pdfplumber(source, progress, deadline, clock)
+        except ParseTimeoutError:
+            raise
         except Exception as exc:
             raise ValidationException(f"PDF text extraction failed: {exc}") from exc
     else:
         try:
-            result = _extract_with_pymupdf(document, progress)
+            result = _extract_with_pymupdf(document, progress, deadline, clock)
         finally:
             document.close()
             _flush_mupdf_store()
@@ -291,6 +328,28 @@ def _extract_pdf_pages(source: bytes | str, progress: ParseProgress) -> PdfText:
     if not result.text:
         raise ValidationException("No text could be extracted from the PDF")
     return result
+
+
+def _discard_late_result(task: asyncio.Future) -> None:
+    # Retrieve the abandoned thread's outcome so asyncio does not log it as unhandled.
+    if not task.cancelled():
+        task.exception()
+
+
+async def _run_parse_thread(fn: Callable[..., str], *args) -> str:
+    """Run a parse in a worker thread, abandoning it after the hard stop.
+
+    The between-pages deadline ends almost every slow parse. A thread stuck inside one
+    C call cannot be killed, so past the grace period the caller gets the timeout error
+    and the parse gate is released; whatever the thread returns later is dropped.
+    """
+    task = asyncio.ensure_future(asyncio.to_thread(fn, *args))
+    done, _ = await asyncio.wait({task}, timeout=PARSE_DEADLINE_S + PARSE_HARD_STOP_GRACE_S)
+    if task in done:
+        return task.result()
+    task.add_done_callback(_discard_late_result)
+    logger.error("Parse thread still running past the hard stop; releasing the parse gate")
+    raise ParseTimeoutError()
 
 
 class FileService:
@@ -308,9 +367,13 @@ class FileService:
             raise ValidationException("Uploaded notes file is empty")
 
         async with _parse_gate():
-            return await asyncio.to_thread(self._parse_bytes, data, file_type), file_type
+            # The budget starts once the gate is ours, so time spent queued behind
+            # another parse does not count against this file.
+            deadline = time.monotonic() + PARSE_DEADLINE_S
+            text = await _run_parse_thread(self._parse_bytes, data, file_type, deadline)
+        return text, file_type
 
-    def _parse_bytes(self, data: bytes, file_type: str) -> str:
+    def _parse_bytes(self, data: bytes, file_type: str, deadline: Optional[float] = None) -> str:
         """Extract and clean text. Runs in a worker thread, inside the parse gate."""
         if file_type == "txt":
             return _clean_extracted_text(_decode_best_effort(data))
@@ -324,7 +387,7 @@ class FileService:
             return _clean_extracted_text(self._extract_code(data, file_type), preserve_code=True)
         if file_type == "docx":
             return _clean_extracted_text(self._extract_docx(data))
-        return _clean_extracted_text(self._extract_pdf(data))
+        return _clean_extracted_text(self._extract_pdf(data, deadline))
 
     async def extract_from_files(self, notes_files: list[UploadFile]) -> tuple[str, list[str]]:
         total_size_bytes = 0
@@ -442,5 +505,5 @@ class FileService:
         header = f"Code file ({file_type})"
         return f"{header}\n\n{text.strip()}"
 
-    def _extract_pdf(self, data: bytes) -> str:
-        return _extract_pdf_pages(data, ParseProgress()).text
+    def _extract_pdf(self, data: bytes, deadline: Optional[float] = None) -> str:
+        return _extract_pdf_pages(data, ParseProgress(), deadline=deadline).text

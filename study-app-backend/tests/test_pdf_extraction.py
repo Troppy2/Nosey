@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from src.services import file_service
-from src.services.file_service import PDF_PAGE_CAP, ParseProgress, _extract_pdf_pages
+from src.services.file_service import PDF_PAGE_CAP, ParseProgress, ParseTimeoutError, _extract_pdf_pages
 from src.utils.exceptions import ValidationException
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -207,3 +207,21 @@ def test_pdf_with_no_text_raises_validation_error_and_closes_the_document(monkey
         _extract_pdf_pages(b"%PDF-1.4", ParseProgress())
 
     assert doc.closed is True
+
+
+def test_pdf_parse_stops_between_pages_once_the_deadline_passes(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(file_service, "pymupdf4llm", None)
+    doc = _FakeDoc([f"page {i}" for i in range(10)])
+    _use_fake_fitz(monkeypatch, doc)
+    _no_pdfplumber(monkeypatch)
+    ticks = iter(range(0, 1000, 10))  # every clock read is 10 s later
+
+    with pytest.raises(ParseTimeoutError) as caught:
+        _extract_pdf_pages(b"%PDF-1.4", ParseProgress(), deadline=25.0, clock=lambda: float(next(ticks)))
+
+    # Checked before each page: reads at t=0, 10, 20 pass; t=30 is past the deadline.
+    assert doc.loaded == [0, 1, 2]
+    assert doc.closed is True
+    assert str(caught.value) == "This file took too long to read. Try splitting it into smaller files."
+    # Existing handlers map ValidationException to a 400 / an upload_error message.
+    assert isinstance(caught.value, ValidationException)
