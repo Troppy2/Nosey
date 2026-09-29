@@ -39,8 +39,12 @@ import { speechCapability } from "../components/episodeSpeech";
 import { useSettings } from "../lib/useSettings";
 import { toast } from "../lib/toast";
 import type { LearningTrack, TrackFormat } from "../lib/types";
+import { extractingProgressLabel } from "../lib/uploadStatus";
 
 const POLL_MS = 2500;
+// Matches the server's per-file parse budget (15 min): a 300-page PDF can take
+// several minutes on the free-tier backend, and the page shows its progress.
+const EXTRACT_WAIT_MS = 15 * 60_000;
 
 // Track hub for a folder's Learning Modules: create/regenerate a track, watch
 // it generate module by module (polling, same UX as streamed test generation),
@@ -86,6 +90,8 @@ export default function LearningModulesPage() {
   // pipeline as everywhere else), so they also benefit tests and flashcards.
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [genPhase, setGenPhase] = useState<"idle" | "uploading" | "extracting" | "starting">("idle");
+  // "Reading page 42 of 300" while the server parses the uploads, when it reports pages.
+  const [extractProgress, setExtractProgress] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   function addPendingFiles(list: FileList | null) {
@@ -167,9 +173,10 @@ export default function LearningModulesPage() {
         // the track build actually sees the new notes.
         setGenPhase("extracting");
         const ids = new Set(result.uploaded.map((f) => f.id));
-        const deadline = Date.now() + 120_000;
+        const deadline = Date.now() + EXTRACT_WAIT_MS;
         for (;;) {
           const mine = (await fetchFolderFiles(numericFolderId)).filter((f) => ids.has(f.id));
+          setExtractProgress(extractingProgressLabel(mine));
           if (!mine.some((f) => f.upload_status === "processing")) {
             const failed = mine.filter((f) => f.upload_status === "error");
             if (mine.length > 0 && failed.length === mine.length) {
@@ -201,6 +208,7 @@ export default function LearningModulesPage() {
     } finally {
       setBusy(false);
       setGenPhase("idle");
+      setExtractProgress(null);
     }
   }
 
@@ -700,8 +708,13 @@ export default function LearningModulesPage() {
             <LoadingNotice
               compact
               title={genPhase === "uploading" ? "Uploading your notes" : "Reading your files"}
-              estimate="The track build starts as soon as this finishes."
-              slowNote="Still reading. Large PDFs take a while. Keep this page open until it finishes."
+              estimate={extractProgress ?? "The track build starts as soon as this finishes."}
+              // Page progress already shows the wait is moving; the slow note is for when there is none.
+              slowNote={
+                extractProgress
+                  ? undefined
+                  : "Still reading. Large PDFs take a while. Keep this page open until it finishes."
+              }
               slowAfterMs={15000}
             />
           ) : null}
