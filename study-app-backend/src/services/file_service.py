@@ -510,6 +510,20 @@ class FileService:
 
         return "\n\n".join(sections), file_types
 
+    async def extract_from_paths(self, files: list[tuple[str, str]]) -> tuple[str, list[str]]:
+        """extract_from_files for uploads already saved to temp files: (path, name) pairs.
+
+        The caller has already checked the combined size while saving them. Files are
+        parsed in order; the parse gate would serialize them anyway.
+        """
+        sections: list[str] = []
+        file_types: list[str] = []
+        for index, (path, name) in enumerate(files, start=1):
+            result = await self.extract_from_path(path, name)
+            file_types.append(result.file_type)
+            sections.append(f"--- Document {index}: {name or 'notes'} ---\n{result.text}")
+        return "\n\n".join(sections), file_types
+
     async def get_folder_files_content(self, folder_id: int, user_id: int, session: AsyncSession) -> str:
         rows = await session.scalars(
             select(FolderFile)

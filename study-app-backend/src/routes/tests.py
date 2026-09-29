@@ -42,6 +42,7 @@ from src.services.test_service import TestService
 from src.utils.exceptions import LLMException, ResourceNotFoundException, StudyAppException
 from src.utils.logger import get_logger
 from src.utils.provider_policy import resolve_request_provider
+from src.utils.temp_uploads import UploadTooLargeError, remove_temp, save_upload_to_temp
 from src.utils.usage_context import bind_usage
 from src.utils.validators import MAX_UPLOAD_TOTAL_SIZE_BYTES
 
@@ -84,20 +85,6 @@ async def _settle_test_quota(quota_charge_id: Optional[int], test_id: int, gener
             await QuotaService().refund(session, quota_charge_id)
     except Exception as exc:
         logger.warning("Test quota refund failed for test_id=%s: %s", test_id, exc)
-
-
-class _BytesUploadFile:
-    """Minimal UploadFile stand-in backed by in-memory bytes."""
-
-    def __init__(self, data: bytes, filename: str) -> None:
-        self._data = data
-        self.filename = filename
-
-    async def read(self) -> bytes:
-        return self._data
-
-    async def seek(self, pos: int) -> None:
-        pass  # no-op; bytes are always fully available
 
 
 async def _persist_generated(
@@ -594,8 +581,8 @@ async def _extract_and_generate_background(
     test_id: int,
     user_id: int,
     folder_id: int,
-    notes_bytes: list[Tuple[bytes, str]],
-    practice_test_bytes: Optional[Tuple[bytes, str]],
+    notes_paths: list[Tuple[str, str]],
+    practice_test_path: Optional[Tuple[str, str]],
     use_folder_files: bool,
     avoid_repeat: bool,
     test_type: str,
@@ -619,21 +606,26 @@ async def _extract_and_generate_background(
     File extraction (PDF parsing) is CPU-heavy, so it is done here in the
     background rather than on the create_test request. That lets the create
     endpoint return immediately and the UI land in the folder right away.
+    The uploads arrive as (temp file path, name) pairs; the temp files are
+    removed as soon as extraction ends, whether it succeeded or not.
     """
     try:
         svc = FileService()
         # Extract file text first, holding NO DB connection (extraction can take
-        # several seconds and runs in a worker thread).
-        if notes_bytes:
-            mock_files = [_BytesUploadFile(d, n) for d, n in notes_bytes]
-            notes_content, _ = await svc.extract_from_files(mock_files)  # type: ignore[arg-type]
-        else:
+        # several minutes and runs in a worker thread).
+        try:
             notes_content = ""
+            if notes_paths:
+                notes_content, _ = await svc.extract_from_paths(notes_paths)
 
-        practice_test_content = ""
-        if practice_test_bytes is not None:
-            mock_pt = _BytesUploadFile(practice_test_bytes[0], practice_test_bytes[1])
-            practice_test_content, _ = await svc.extract_from_files([mock_pt])  # type: ignore[arg-type]
+            practice_test_content = ""
+            if practice_test_path is not None:
+                practice_test_content, _ = await svc.extract_from_paths([practice_test_path])
+        finally:
+            for path, _ in notes_paths:
+                remove_temp(path)
+            if practice_test_path is not None:
+                remove_temp(practice_test_path[0])
 
         # Short-lived session: folder-file read + note writes only, then released.
         async with async_session_maker() as session:
@@ -659,10 +651,10 @@ async def _extract_and_generate_background(
                 return
             test.notes_hash = notes_hash
             if combined_notes:
-                note_label = ", ".join(n for _, n in notes_bytes) or "folder files"
+                note_label = ", ".join(n for _, n in notes_paths) or "folder files"
                 await repo.add_note(test_id, note_label[:255], "combined", combined_notes)
             if practice_test_content:
-                pt_label = practice_test_bytes[1] if practice_test_bytes else "practice_test"
+                pt_label = practice_test_path[1] if practice_test_path else "practice_test"
                 await repo.add_note(test_id, pt_label[:255], "pdf", practice_test_content)
 
             prior_questions: list[str] = []
@@ -723,6 +715,11 @@ async def create_test(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> CreateTestResponse:
+    # Uploads streamed to temp files, as (path, name). Owned by this handler until
+    # the detached generation task is spawned, then by that task.
+    notes_paths: list[Tuple[str, str]] = []
+    practice_test_path: Optional[Tuple[str, str]] = None
+    handed_off = False
     try:
         form = await request.form()
         title = str(form.get("title", "")).strip()
@@ -797,21 +794,24 @@ async def create_test(
         if len(valid_files) != len(notes_files):
             raise StudyAppException("All uploaded documents must be valid files")
 
-        # ── Read file bytes NOW, before the request context ends ──────────────
-        notes_bytes: list[Tuple[bytes, str]] = []
-        total_size_bytes = 0
-        for upload in valid_files:
-            data = await upload.read()
-            total_size_bytes += len(data)
-            notes_bytes.append((data, upload.filename or "notes"))
+        # ── Stream uploads to temp files NOW, before the request context ends ──
+        # The bytes never sit in memory for the length of the background parse.
+        # The detached task removes the files after extraction; until it is
+        # spawned, the finally at the end of this handler does.
+        total_size_bytes: Optional[int] = 0
+        try:
+            for upload in valid_files:
+                saved = await save_upload_to_temp(upload, MAX_UPLOAD_TOTAL_SIZE_BYTES)
+                notes_paths.append((saved.path, upload.filename or "notes"))
+                total_size_bytes += saved.size
+            if practice_test_file is not None:
+                saved = await save_upload_to_temp(practice_test_file, MAX_UPLOAD_TOTAL_SIZE_BYTES)
+                practice_test_path = (saved.path, practice_test_file.filename or "practice_test")
+                total_size_bytes += saved.size
+        except UploadTooLargeError:
+            total_size_bytes = None  # a single file is already over the combined limit
 
-        pt_bytes: Optional[Tuple[bytes, str]] = None
-        if practice_test_file is not None:
-            pt_data = await practice_test_file.read()
-            pt_bytes = (pt_data, practice_test_file.filename or "practice_test")
-            total_size_bytes += len(pt_data)
-
-        if total_size_bytes > MAX_UPLOAD_TOTAL_SIZE_BYTES:
+        if total_size_bytes is None or total_size_bytes > MAX_UPLOAD_TOTAL_SIZE_BYTES:
             raise StudyAppException(
                 f"Combined uploaded files exceed the {MAX_UPLOAD_TOTAL_SIZE_BYTES // (1024 * 1024)} MB limit"
             )
@@ -853,9 +853,9 @@ async def create_test(
                 test_id=test.id,
                 user_id=user.id,
                 folder_id=folder_id,
-                notes_bytes=notes_bytes,
-                practice_test_bytes=pt_bytes,
-                use_folder_files=(not notes_bytes),
+                notes_paths=notes_paths,
+                practice_test_path=practice_test_path,
+                use_folder_files=(not notes_paths),
                 avoid_repeat=bool(getattr(folder, "avoid_repeat_questions", False)),
                 test_type=test_type,
                 count_mcq=count_mcq,
@@ -874,6 +874,7 @@ async def create_test(
                 quota_charge_id=quota_charge_id,
             )
         )
+        handed_off = True
 
         return CreateTestResponse(
             test_id=test.id,
@@ -889,6 +890,12 @@ async def create_test(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except StudyAppException as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        if not handed_off:
+            for path, _ in notes_paths:
+                remove_temp(path)
+            if practice_test_path is not None:
+                remove_temp(practice_test_path[0])
 
 
 @router.post("/tests/{test_id}/regenerate", response_model=CreateTestResponse)
