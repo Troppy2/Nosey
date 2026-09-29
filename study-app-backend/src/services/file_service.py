@@ -2,16 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import html as html_lib
-import os
 import re
 import unicodedata
-from concurrent.futures import ProcessPoolExecutor
 from collections import defaultdict
+from dataclasses import dataclass
 from io import BytesIO
-from itertools import repeat
-from multiprocessing import get_context
-from types import ModuleType
-from typing import Callable, Optional
+from typing import Optional
 
 import pdfplumber
 from fastapi import UploadFile
@@ -54,10 +50,17 @@ except ImportError:  # pragma: no cover - optional dependency
     Presentation = None  # type: ignore[assignment]
 
 
-# Hard cap on pages extracted from any PDF. Dense PDFs expand 5-10x in memory
-# during rendering; uncapped extraction OOMs the Render server before the file-size
-# check has any effect. 100 pages covers virtually all real study notes.
-_PDF_PAGE_CAP = 100
+# Hard cap on pages read from any PDF. Pages are parsed one at a time, so memory
+# stays flat as this grows; the cap bounds parse time on Render's 0.1 CPU instead.
+PDF_PAGE_CAP = 300
+
+# MuPDF keeps fonts and images in a global cache that can grow to 256 MB (half the
+# Render box), so it is flushed every few pages instead of only at the end.
+_MUPDF_STORE_FLUSH_EVERY = 25
+
+# Header levels come from font sizes, which stay consistent through a document, so
+# a sample of pages is enough and keeps the extra scan cheap on long PDFs.
+_HEADER_SAMPLE_PAGES = 30
 
 _CODE_FILE_TYPES = {
     "py", "js", "ts", "tsx", "jsx", "java", "c", "cpp", "h", "hpp",
@@ -65,17 +68,22 @@ _CODE_FILE_TYPES = {
 }
 
 
-def _preferred_pdf_workers() -> int:
-    return max(1, min(os.cpu_count() or 1, 4))
+@dataclass
+class ParseProgress:
+    """Page counters written by the parse thread and read by the event loop.
+
+    Plain int assignment is atomic under the GIL, so no lock is needed.
+    """
+
+    pages_done: int = 0
+    pages_total: Optional[int] = None
 
 
-def _chunk_page_indexes(page_count: int, worker_count: int) -> list[list[int]]:
-    if page_count <= 0:
-        return []
-
-    worker_count = max(1, min(worker_count, page_count))
-    chunk_size = max(1, (page_count + worker_count - 1) // worker_count)
-    return [list(range(start, min(start + chunk_size, page_count))) for start in range(0, page_count, chunk_size)]
+@dataclass
+class PdfText:
+    text: str
+    pages_read: int
+    page_count: int
 
 
 def _join_extracted_chunks(chunks: list[str]) -> str:
@@ -165,37 +173,106 @@ def _clean_extracted_text(text: str, preserve_code: bool = False) -> str:
     return _collapse_whitespace_lines(cleaned)
 
 
-def _extract_pdfplumber_chunk(data: bytes, page_indexes: list[int]) -> str:
-    with pdfplumber.open(BytesIO(data)) as pdf:
-        return _extract_pdfplumber_serial(pdf, page_indexes)
+def _flush_mupdf_store() -> None:
+    tools = getattr(fitz, "TOOLS", None)
+    if tools is not None:
+        tools.store_shrink(100)
 
 
-def _extract_pdfplumber_serial(pdf, page_indexes: list[int]) -> str:
-    pages = pdf.pages
-    parts: list[str] = []
-    for page_index in page_indexes:
-        if page_index < len(pages):
-            parts.append(pages[page_index].extract_text() or "")
-    return "\n".join(parts)
+def _open_pymupdf(source: bytes | str):
+    if isinstance(source, str):
+        return fitz.open(source, filetype="pdf")
+    return fitz.open(stream=source, filetype="pdf")
 
 
-def _extract_pymupdf_chunk(data: bytes, page_indexes: list[int]) -> str:
-    if fitz is None:
-        raise ImportError("PyMuPDF is not installed")
-
-    document = fitz.open(stream=data, filetype="pdf")
+def _identify_headers(document, pages_to_read: int):
+    if pymupdf4llm is None:
+        return None
     try:
-        return _extract_pymupdf_serial(document, page_indexes)
-    finally:
-        document.close()
+        sample = list(range(min(pages_to_read, _HEADER_SAMPLE_PAGES)))
+        return pymupdf4llm.IdentifyHeaders(document, pages=sample)
+    except Exception:
+        return None
 
 
-def _extract_pymupdf_serial(document, page_indexes: list[int]) -> str:
+def _pymupdf_page_text(document, index: int, headers) -> str:
+    # Markdown keeps headings and tables for the LLM. The shared hdr_info matters:
+    # without it, to_markdown re-scans every page of the document on each call.
+    if headers is not None:
+        try:
+            markdown = pymupdf4llm.to_markdown(
+                document, pages=[index], hdr_info=headers, ignore_images=True, show_progress=False
+            )
+            if markdown and markdown.strip():
+                return markdown
+        except Exception:
+            pass
+    try:
+        return document.load_page(index).get_text("text") or ""
+    except Exception:
+        return ""
+
+
+def _extract_with_pymupdf(document, progress: ParseProgress) -> PdfText:
+    page_count = int(document.page_count)
+    to_read = min(page_count, PDF_PAGE_CAP)
+    progress.pages_total = to_read
+    headers = _identify_headers(document, to_read)
     parts: list[str] = []
-    for page_index in page_indexes:
-        if page_index < document.page_count:
-            parts.append(document.load_page(page_index).get_text("text") or "")
-    return "\n".join(parts)
+    for index in range(to_read):
+        parts.append(_pymupdf_page_text(document, index, headers))
+        progress.pages_done = index + 1
+        if progress.pages_done % _MUPDF_STORE_FLUSH_EVERY == 0:
+            _flush_mupdf_store()
+    return PdfText(_join_extracted_chunks(parts), to_read, page_count)
+
+
+def _extract_with_pdfplumber(source: bytes | str, progress: ParseProgress) -> PdfText:
+    with pdfplumber.open(source if isinstance(source, str) else BytesIO(source)) as pdf:
+        page_count = len(pdf.pages)
+        to_read = min(page_count, PDF_PAGE_CAP)
+        progress.pages_total = to_read
+        parts: list[str] = []
+        for index in range(to_read):
+            page = pdf.pages[index]
+            parts.append(page.extract_text() or "")
+            # pdfplumber caches each page's parsed layout; drop it before the next page.
+            page.flush_cache()
+            page.get_textmap.cache_clear()
+            progress.pages_done = index + 1
+    return PdfText(_join_extracted_chunks(parts), to_read, page_count)
+
+
+def _extract_pdf_pages(source: bytes | str, progress: ParseProgress) -> PdfText:
+    """Read a PDF one page at a time from a single open document.
+
+    Runs in a worker thread and never starts processes: on Render's 512 MB box every
+    extra process re-imports the PDF stack and holds its own copy of the file.
+    PyMuPDF handles nearly every file (pymupdf4llm markdown per page, plain text as the
+    per-page fallback); pdfplumber is only tried when PyMuPDF cannot open the file.
+    """
+    document = None
+    if fitz is not None:
+        try:
+            document = _open_pymupdf(source)
+        except Exception:
+            document = None
+
+    if document is None:
+        try:
+            result = _extract_with_pdfplumber(source, progress)
+        except Exception as exc:
+            raise ValidationException(f"PDF text extraction failed: {exc}") from exc
+    else:
+        try:
+            result = _extract_with_pymupdf(document, progress)
+        finally:
+            document.close()
+            _flush_mupdf_store()
+
+    if not result.text:
+        raise ValidationException("No text could be extracted from the PDF")
+    return result
 
 
 class FileService:
@@ -348,75 +425,5 @@ class FileService:
         header = f"Code file ({file_type})"
         return f"{header}\n\n{text.strip()}"
 
-    def _extract_pdf_with_pymupdf4llm(self, data: bytes) -> str:
-        if pymupdf4llm is None:
-            raise ImportError("pymupdf4llm is not installed")
-        doc = fitz.open(stream=data, filetype="pdf")
-        pages = list(range(min(doc.page_count, _PDF_PAGE_CAP)))
-        md = pymupdf4llm.to_markdown(doc, pages=pages)
-        if not md or not md.strip():
-            raise ValueError("pymupdf4llm returned empty output")
-        return md
-
     def _extract_pdf(self, data: bytes) -> str:
-        attempts: list[tuple[str, Callable[[bytes], str]]] = []
-        if pymupdf4llm is not None and fitz is not None and isinstance(fitz, ModuleType):
-            attempts.append(("pymupdf4llm", self._extract_pdf_with_pymupdf4llm))
-        if fitz is not None:
-            attempts.append(("PyMuPDF", self._extract_pdf_with_pymupdf))
-        attempts.append(("pdfplumber", self._extract_pdf_with_pdfplumber))
-
-        last_error: Optional[Exception] = None
-        for engine_name, extractor in attempts:
-            try:
-                text = extractor(data)
-            except Exception as exc:
-                last_error = exc
-                continue
-
-            stripped = text.strip()
-            if stripped:
-                return stripped
-
-            last_error = ValidationException(f"{engine_name} could not extract any text from the PDF")
-
-        if last_error is not None:
-            raise ValidationException(f"PDF text extraction failed: {last_error}") from last_error
-        raise ValidationException("No text could be extracted from the PDF")
-
-    def _extract_pdf_with_pdfplumber(self, data: bytes) -> str:
-        with pdfplumber.open(BytesIO(data)) as pdf:
-            page_count = min(len(pdf.pages), _PDF_PAGE_CAP)
-            page_groups = _chunk_page_indexes(page_count, _preferred_pdf_workers())
-            if len(page_groups) <= 1:
-                return _extract_pdfplumber_serial(pdf, page_groups[0] if page_groups else list(range(page_count)))
-
-        return self._extract_pdf_in_parallel(data, page_count, _extract_pdfplumber_chunk)
-
-    def _extract_pdf_with_pymupdf(self, data: bytes) -> str:
-        if fitz is None:
-            raise ImportError("PyMuPDF is not installed")
-
-        document = fitz.open(stream=data, filetype="pdf")
-        try:
-            page_count = min(int(document.page_count), _PDF_PAGE_CAP)
-            page_groups = _chunk_page_indexes(page_count, _preferred_pdf_workers())
-            if len(page_groups) <= 1:
-                return _extract_pymupdf_serial(document, page_groups[0] if page_groups else list(range(page_count)))
-        finally:
-            document.close()
-
-        return self._extract_pdf_in_parallel(data, page_count, _extract_pymupdf_chunk)
-
-    def _extract_pdf_in_parallel(self, data: bytes, page_count: int, worker) -> str:
-        if page_count <= 0:
-            raise ValidationException("No text could be extracted from the PDF")
-
-        worker_count = _preferred_pdf_workers()
-        page_groups = _chunk_page_indexes(page_count, worker_count)
-        if len(page_groups) <= 1:
-            return worker(data, page_groups[0] if page_groups else list(range(page_count)))
-
-        with ProcessPoolExecutor(max_workers=len(page_groups), mp_context=get_context("spawn")) as executor:
-            chunks = list(executor.map(worker, repeat(data), page_groups))
-        return _join_extracted_chunks(list(chunks))
+        return _extract_pdf_pages(data, ParseProgress()).text
