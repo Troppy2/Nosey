@@ -17,6 +17,9 @@ def _prefer_ipv4(host, port, family=0, type=0, proto=0, flags=0):
 
 _socket.getaddrinfo = _prefer_ipv4
 
+from contextlib import asynccontextmanager, suppress
+from typing import AsyncIterator
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -27,6 +30,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from src.config import settings
 from src.limiter import limiter
 from src.routes import admin, attempts, auth, flashcards, folder_files, folders, health, job_descriptions, kojo, learning_modules, leetcode, mock_interview, slash_commands, surveys, system_design, tests, usage
+from src.services import upload_recovery
 from src.utils.validators import MAX_UPLOAD_TOTAL_SIZE_BYTES
 
 _MAX_REQUEST_BODY_BYTES = MAX_UPLOAD_TOTAL_SIZE_BYTES
@@ -70,7 +74,21 @@ class ContentSizeLimitMiddleware:
         await self.app(scope, receive, send)
 
 
-app = FastAPI(title="Study App", version="0.1.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # Upload parses run in this process and die with it. Fail their rows before
+    # serving any request (so a new upload is never swept), then keep sweeping.
+    await upload_recovery.recover_interrupted_uploads()
+    sweeper = asyncio.create_task(upload_recovery.run_periodic_sweep())
+    try:
+        yield
+    finally:
+        sweeper.cancel()
+        with suppress(asyncio.CancelledError):
+            await sweeper
+
+
+app = FastAPI(title="Study App", version="0.1.0", lifespan=lifespan)
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
