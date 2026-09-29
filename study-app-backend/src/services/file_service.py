@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import html as html_lib
+import os
 import re
 import time
 import unicodedata
@@ -9,7 +10,7 @@ import weakref
 from collections import defaultdict
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Callable, Optional
+from typing import Awaitable, Callable, Optional, TypeVar
 
 import pdfplumber
 from fastapi import UploadFile
@@ -120,6 +121,22 @@ class PdfText:
     text: str
     pages_read: int
     page_count: int
+
+
+@dataclass
+class ExtractionResult:
+    text: str
+    file_type: str
+    pages_read: Optional[int] = None
+    page_count: Optional[int] = None
+
+
+# How often parse progress is written while a parse runs (one small UPDATE each).
+_PROGRESS_POLL_S = 3.0
+
+_UNSUPPORTED_TYPE_MESSAGE = "Supported file types: PDF, DOCX, TXT, MD, HTML, PPTX, and common code files"
+
+T = TypeVar("T")
 
 
 def _join_extracted_chunks(chunks: list[str]) -> str:
@@ -336,29 +353,64 @@ def _discard_late_result(task: asyncio.Future) -> None:
         task.exception()
 
 
-async def _run_parse_thread(fn: Callable[..., str], *args) -> str:
+class _ProgressReporter:
+    """Awaits on_progress on the event loop whenever the page counters have moved.
+
+    The parse thread only writes plain ints; it never touches the loop or the DB.
+    """
+
+    def __init__(
+        self,
+        progress: ParseProgress,
+        on_progress: Optional[Callable[[ParseProgress], Awaitable[None]]],
+    ) -> None:
+        self._progress = progress
+        self._on_progress = on_progress
+        self._last: Optional[tuple[int, Optional[int]]] = None
+
+    async def report(self) -> None:
+        if self._on_progress is None:
+            return
+        snapshot = (self._progress.pages_done, self._progress.pages_total)
+        if snapshot == self._last:
+            return
+        self._last = snapshot
+        try:
+            await self._on_progress(ParseProgress(*snapshot))
+        except Exception as exc:
+            logger.warning("Could not record parse progress: %s", exc)
+
+
+async def _run_parse_thread(fn: Callable[..., T], *args, reporter: Optional[_ProgressReporter] = None) -> T:
     """Run a parse in a worker thread, abandoning it after the hard stop.
 
     The between-pages deadline ends almost every slow parse. A thread stuck inside one
     C call cannot be killed, so past the grace period the caller gets the timeout error
     and the parse gate is released; whatever the thread returns later is dropped.
+    With a reporter, progress is polled every _PROGRESS_POLL_S while the thread runs.
     """
     task = asyncio.ensure_future(asyncio.to_thread(fn, *args))
-    done, _ = await asyncio.wait({task}, timeout=PARSE_DEADLINE_S + PARSE_HARD_STOP_GRACE_S)
-    if task in done:
-        return task.result()
-    task.add_done_callback(_discard_late_result)
-    logger.error("Parse thread still running past the hard stop; releasing the parse gate")
-    raise ParseTimeoutError()
+    hard_stop = time.monotonic() + PARSE_DEADLINE_S + PARSE_HARD_STOP_GRACE_S
+    while True:
+        wait_s = max(0.0, hard_stop - time.monotonic())
+        if reporter is not None:
+            wait_s = min(wait_s, _PROGRESS_POLL_S)
+        done, _ = await asyncio.wait({task}, timeout=wait_s)
+        if reporter is not None:
+            await reporter.report()
+        if task in done:
+            return task.result()
+        if time.monotonic() >= hard_stop:
+            task.add_done_callback(_discard_late_result)
+            logger.error("Parse thread still running past the hard stop; releasing the parse gate")
+            raise ParseTimeoutError()
 
 
 class FileService:
     async def extract_from_file(self, notes_file: UploadFile) -> tuple[str, str]:
         file_type = normalize_file_extension(notes_file.filename)
         if file_type not in ALLOWED_FILE_TYPES:
-            raise ValidationException(
-                "Supported file types: PDF, DOCX, TXT, MD, HTML, PPTX, and common code files"
-            )
+            raise ValidationException(_UNSUPPORTED_TYPE_MESSAGE)
 
         data = await notes_file.read()
         if len(data) > MAX_UPLOAD_FILE_SIZE_BYTES:
@@ -372,6 +424,48 @@ class FileService:
             deadline = time.monotonic() + PARSE_DEADLINE_S
             text = await _run_parse_thread(self._parse_bytes, data, file_type, deadline)
         return text, file_type
+
+    async def extract_from_path(
+        self,
+        path: str,
+        file_name: str,
+        *,
+        on_progress: Optional[Callable[[ParseProgress], Awaitable[None]]] = None,
+    ) -> ExtractionResult:
+        """Parse a file already saved to disk (uploads are streamed to temp files).
+
+        PDFs are opened straight from the path, so the raw bytes never sit in memory.
+        on_progress is awaited once when the parse gets its slot (pages_done 0), then
+        whenever the page counters move, at most every _PROGRESS_POLL_S.
+        """
+        file_type = normalize_file_extension(file_name)
+        if file_type not in ALLOWED_FILE_TYPES:
+            raise ValidationException(_UNSUPPORTED_TYPE_MESSAGE)
+        size = os.path.getsize(path)
+        if size > MAX_UPLOAD_FILE_SIZE_BYTES:
+            raise ValidationException("Uploaded notes file is too large")
+        if size == 0:
+            raise ValidationException("Uploaded notes file is empty")
+
+        progress = ParseProgress()
+        reporter = _ProgressReporter(progress, on_progress)
+        async with _parse_gate():
+            await reporter.report()
+            deadline = time.monotonic() + PARSE_DEADLINE_S
+            return await _run_parse_thread(
+                self._parse_path, path, file_type, progress, deadline, reporter=reporter
+            )
+
+    def _parse_path(
+        self, path: str, file_type: str, progress: ParseProgress, deadline: float
+    ) -> ExtractionResult:
+        """Extract and clean text from a saved file. Runs in a worker thread."""
+        if file_type == "pdf":
+            pdf = _extract_pdf_pages(path, progress, deadline)
+            return ExtractionResult(_clean_extracted_text(pdf.text), file_type, pdf.pages_read, pdf.page_count)
+        with open(path, "rb") as handle:
+            data = handle.read()
+        return ExtractionResult(self._parse_bytes(data, file_type, deadline), file_type)
 
     def _parse_bytes(self, data: bytes, file_type: str, deadline: Optional[float] = None) -> str:
         """Extract and clean text. Runs in a worker thread, inside the parse gate."""
