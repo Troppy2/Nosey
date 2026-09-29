@@ -26568,3 +26568,19 @@ a.sd-chip.is-done:hover {
   border-radius: var(--radius-md);
   background: var(--green-lightest);
 }
+
+/* ── File Manager: upload recovery ───────────────────────────────────────────
+   Page-cap note under a ready row ("Read the first 300 of 812 pages."), and the
+   Re-upload pill (a .file-view-pill) on failed rows, disabled while one runs. */
+.file-manager-row-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 0 0;
+  font-size: 0.75rem;
+}
+
+.file-view-pill:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}

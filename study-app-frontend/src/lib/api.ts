@@ -1322,6 +1322,11 @@ export interface FolderFile {
   size_bytes: number;
   upload_status?: string | null;
   upload_error?: string | null;
+  /** Shown on a ready file, e.g. when only part of a long PDF was read. */
+  upload_note?: string | null;
+  /** Parse progress: pages_done stays null while the file waits for the parse slot. */
+  pages_done?: number | null;
+  pages_total?: number | null;
   uploaded_at: string;
 }
 
