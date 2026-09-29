@@ -329,3 +329,17 @@ def test_pdfplumber_fallback_reads_the_same_page_range(monkeypatch: pytest.Monke
 
     assert read == [4, 5, 6, 7]
     assert (result.text, result.pages_read, result.page_count) == ("p4\np5\np6\np7", 8, 10)
+
+
+def test_a_later_batch_counts_progress_from_its_first_page(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The row of a ready book must never flash back to page 0 when a batch starts.
+    monkeypatch.setattr(file_service, "pymupdf4llm", None)
+    doc = _FakeDoc([f"page {i}" for i in range(812)])
+    _use_fake_fitz(monkeypatch, doc)
+    _no_pdfplumber(monkeypatch)
+    progress = ParseProgress()
+
+    with pytest.raises(ParseTimeoutError):
+        _extract_pdf_pages(b"%PDF-1.4", progress, deadline=0.0, clock=lambda: 1.0, start=300, batch=300, max_pages=1500)
+
+    assert (progress.pages_done, progress.pages_total) == (300, 812)

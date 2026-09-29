@@ -297,6 +297,9 @@ def _extract_with_pymupdf(
 ) -> PdfText:
     page_count = int(document.page_count)
     stop = pages.stop(page_count)
+    # Counts are from the start of the book; set done first so a reader never sees
+    # a later batch at page 0.
+    progress.pages_done = pages.start
     progress.pages_total = pages.total(page_count)
     headers = _identify_headers(document, progress.pages_total)
     parts: list[str] = []
@@ -319,6 +322,9 @@ def _extract_with_pdfplumber(
     with pdfplumber.open(source if isinstance(source, str) else BytesIO(source)) as pdf:
         page_count = len(pdf.pages)
         stop = pages.stop(page_count)
+        # Counts are from the start of the book; set done first so a reader never sees
+        # a later batch at page 0.
+        progress.pages_done = pages.start
         progress.pages_total = pages.total(page_count)
         parts: list[str] = []
         for index in range(pages.start, stop):
