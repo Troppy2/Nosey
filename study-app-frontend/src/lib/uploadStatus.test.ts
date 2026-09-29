@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { FolderFile } from "./api";
-import { describeUploadStatus, extractingProgressLabel } from "./uploadStatus";
+import { describeUploadStatus, extractingProgressLabel, isUploadActive } from "./uploadStatus";
 
 function file(overrides: Partial<FolderFile>): FolderFile {
   return {
@@ -49,6 +49,11 @@ describe("describeUploadStatus", () => {
     expect(describeUploadStatus(file({}))).toBeNull();
   });
 
+  it("says a ready textbook is still reading its later pages", () => {
+    // Long PDFs are usable after the first batch; the rest is read in the background.
+    expect(describeUploadStatus(file({ pages_done: 419, pages_total: 812 }))).toBe("Reading more: page 420 of 812");
+  });
+
   it("shows the error for a failed file", () => {
     expect(describeUploadStatus(file({ upload_status: "error", upload_error: "Upload interrupted. Please try again." }))).toBe(
       "Upload interrupted. Please try again.",
@@ -74,5 +79,18 @@ describe("extractingProgressLabel", () => {
 
   it("is empty when nothing is processing", () => {
     expect(extractingProgressLabel([file({})])).toBeNull();
+  });
+});
+
+describe("isUploadActive", () => {
+  it("is true while the server is still reading a file", () => {
+    expect(isUploadActive(file({ upload_status: "processing" }))).toBe(true);
+    expect(isUploadActive(file({ pages_done: 300, pages_total: 812 }))).toBe(true);
+  });
+
+  it("is false once a file is fully read or failed", () => {
+    expect(isUploadActive(file({ pages_done: 812, pages_total: 812 }))).toBe(false);
+    expect(isUploadActive(file({}))).toBe(false);
+    expect(isUploadActive(file({ upload_status: "error", pages_done: 3, pages_total: 9 }))).toBe(false);
   });
 });
