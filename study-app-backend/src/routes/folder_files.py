@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 from datetime import datetime
 from typing import Optional
@@ -17,7 +18,9 @@ from src.models.user import User
 from src.repositories.usage_event_repository import UsageEventRepository
 from src.services.file_service import FileService, ParseProgress
 from src.services.kojo_context_cache import invalidate_folder
+from src.services.upload_recovery import stopped_reading_note
 from src.utils.logger import get_logger
+from src.utils.process_memory import process_rss_mb
 from src.utils.temp_uploads import UploadTooLargeError, remove_temp, save_upload_to_temp
 from src.utils.validators import (
     ALLOWED_FILE_TYPES,
@@ -80,6 +83,103 @@ async def _record_progress(file_id: int, progress: ParseProgress) -> None:
         await session.commit()
 
 
+# Long PDFs are read in batches of PDF_PAGE_CAP pages, up to this many pages in all.
+# The row is usable after the first batch; the rest is appended in the background.
+PDF_BOOK_MAX_PAGES = 1500
+
+# A batch starts only while the process is under this much resident memory (Render's
+# box is 512 MB). Otherwise it waits, and gives up after the retries.
+BATCH_MEMORY_CEILING_MB = 350
+BATCH_MEMORY_RETRIES = 3
+BATCH_MEMORY_RETRY_S = 60
+
+
+def _page_note(pages_read: int, page_count: int, stopped: bool) -> Optional[str]:
+    if pages_read >= page_count:
+        return None
+    if stopped:
+        return stopped_reading_note(pages_read, page_count)
+    return f"Read the first {pages_read} of {page_count} pages."
+
+
+async def _record_batch_progress(file_id: int, progress: ParseProgress) -> None:
+    # A later batch reports (0, None) when it gets the parse slot; the ready row
+    # keeps its counters until real pages move.
+    if progress.pages_total is None:
+        return
+    await _record_progress(file_id, progress)
+
+
+async def _wait_for_memory_headroom() -> bool:
+    for attempt in range(BATCH_MEMORY_RETRIES + 1):
+        used_mb = process_rss_mb()
+        if used_mb is None or used_mb < BATCH_MEMORY_CEILING_MB:
+            return True
+        logger.info("Next PDF batch waiting for memory: %.0f MB in use", used_mb)
+        if attempt < BATCH_MEMORY_RETRIES:
+            await asyncio.sleep(BATCH_MEMORY_RETRY_S)
+    return False
+
+
+async def _save_batch(
+    file_id: int, folder_id: int, text: str, pages_read: int, pages_total: int, note: Optional[str]
+) -> bool:
+    """Append one batch's text to a ready row. False when the row is gone."""
+    async with async_session_maker() as session:
+        record = await session.get(FolderFile, file_id)
+        if record is None:
+            return False
+        if text.strip():
+            record.content = f"{record.content}\n\n{text}" if record.content else text
+            record.content_hash = hashlib.sha256(record.content.encode("utf-8")).hexdigest()
+            record.size_bytes = len(record.content.encode("utf-8"))
+        # The boot sweep may have finalized this row during a deploy overlap; the
+        # instance still reading it wins, as with a late first-batch result.
+        record.upload_status = "ready"
+        record.upload_error = None
+        record.pages_done = pages_read
+        record.pages_total = pages_total
+        record.upload_note = note
+        await session.commit()
+    invalidate_folder(folder_id)
+    return True
+
+
+async def _read_remaining_batches(
+    file_id: int, path: str, file_name: str, folder_id: int, pages_read: int, page_count: int
+) -> None:
+    """Read the rest of a long PDF one batch at a time into its (already ready) row.
+
+    Each batch takes the parse gate on its own, so queued uploads run in between.
+    A batch that fails, or memory that stays high, stops reading: the row keeps
+    what was read and says how to get the rest.
+    """
+    total = min(page_count, PDF_BOOK_MAX_PAGES)
+    while pages_read < total:
+        stopped = not await _wait_for_memory_headroom()
+        batch = None
+        if not stopped:
+            try:
+                batch = await FileService().extract_from_path(
+                    path,
+                    file_name,
+                    on_progress=lambda progress: _record_batch_progress(file_id, progress),
+                    start_page=pages_read,
+                    max_pages=PDF_BOOK_MAX_PAGES,
+                )
+            except Exception as exc:
+                logger.warning("PDF batch from page %s failed for file_id=%s: %s", pages_read, file_id, exc)
+            stopped = batch is None or not batch.pages_read or batch.pages_read <= pages_read
+        if stopped:
+            await _save_batch(file_id, folder_id, "", pages_read, pages_read, _page_note(pages_read, page_count, True))
+            return
+        pages_read = batch.pages_read
+        done = pages_read >= total
+        note = _page_note(pages_read, page_count, stopped=False) if done else None
+        if not await _save_batch(file_id, folder_id, batch.text, pages_read, total, note):
+            return
+
+
 async def _extract_and_update(
     file_id: int,
     path: str,
@@ -94,9 +194,13 @@ async def _extract_and_update(
     """
     import time as _time
     _t0 = _time.monotonic()
+    read_more_from: Optional[int] = None
     try:
         result = await FileService().extract_from_path(
-            path, file_name, on_progress=lambda progress: _record_progress(file_id, progress)
+            path,
+            file_name,
+            on_progress=lambda progress: _record_progress(file_id, progress),
+            max_pages=PDF_BOOK_MAX_PAGES,
         )
         content = result.text
         content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
@@ -126,12 +230,15 @@ async def _extract_and_update(
                 # (deploy overlap); the real result wins.
                 record.upload_error = None
                 record.upload_note = None
-                if result.pages_read is not None:
-                    record.pages_done = record.pages_total = result.pages_read
-                    if result.page_count and result.page_count > result.pages_read:
-                        record.upload_note = (
-                            f"Read the first {result.pages_read} of {result.page_count} pages."
-                        )
+                if result.pages_read is not None and result.page_count is not None:
+                    # pages_done < pages_total on a ready row means "still reading more".
+                    total = min(result.page_count, PDF_BOOK_MAX_PAGES)
+                    record.pages_done = result.pages_read
+                    record.pages_total = max(total, result.pages_read)
+                    if result.pages_read < total:
+                        read_more_from = result.pages_read
+                    else:
+                        record.upload_note = _page_note(result.pages_read, result.page_count, stopped=False)
 
             duration_ms = int((_time.monotonic() - _t0) * 1000)
             success = record.upload_status == "ready"
@@ -149,6 +256,16 @@ async def _extract_and_update(
                 "Background extraction complete",
                 extra={"file_id": file_id, "file_name": file_name, "status": record.upload_status},
             )
+
+        if read_more_from is not None and result.page_count is not None:
+            try:
+                await _read_remaining_batches(
+                    file_id, path, file_name, folder_id, read_more_from, result.page_count
+                )
+            except Exception as exc:
+                # The row is ready with the pages read so far; the next boot sweep
+                # adds the note.
+                logger.warning("Reading later PDF batches failed for file_id=%s: %s", file_id, exc)
     except Exception as exc:
         logger.warning("Background extraction failed for file_id=%s: %s", file_id, exc)
         duration_ms = int((_time.monotonic() - _t0) * 1000)

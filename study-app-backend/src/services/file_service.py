@@ -238,11 +238,13 @@ def _open_pymupdf(source: bytes | str):
     return fitz.open(stream=source, filetype="pdf")
 
 
-def _identify_headers(document, pages_to_read: int):
+def _identify_headers(document, page_limit: int):
+    # Always sampled from the opening pages, so every batch of a book gets the same
+    # heading levels.
     if pymupdf4llm is None:
         return None
     try:
-        sample = list(range(min(pages_to_read, _HEADER_SAMPLE_PAGES)))
+        sample = list(range(min(page_limit, _HEADER_SAMPLE_PAGES)))
         return pymupdf4llm.IdentifyHeaders(document, pages=sample)
     except Exception:
         return None
@@ -271,32 +273,61 @@ def _check_deadline(deadline: Optional[float], clock: Callable[[], float]) -> No
         raise ParseTimeoutError()
 
 
+@dataclass(frozen=True)
+class _PageRange:
+    """Which pages one parse reads: [start, start + batch), never past max_pages."""
+
+    start: int
+    batch: int
+    max_pages: int
+
+    def total(self, page_count: int) -> int:
+        return min(page_count, self.max_pages)
+
+    def stop(self, page_count: int) -> int:
+        return min(self.start + self.batch, self.total(page_count))
+
+
 def _extract_with_pymupdf(
-    document, progress: ParseProgress, deadline: Optional[float], clock: Callable[[], float]
+    document,
+    pages: _PageRange,
+    progress: ParseProgress,
+    deadline: Optional[float],
+    clock: Callable[[], float],
 ) -> PdfText:
     page_count = int(document.page_count)
-    to_read = min(page_count, PDF_PAGE_CAP)
-    progress.pages_total = to_read
-    headers = _identify_headers(document, to_read)
+    stop = pages.stop(page_count)
+    # Counts are from the start of the book; set done first so a reader never sees
+    # a later batch at page 0.
+    progress.pages_done = pages.start
+    progress.pages_total = pages.total(page_count)
+    headers = _identify_headers(document, progress.pages_total)
     parts: list[str] = []
-    for index in range(to_read):
+    for index in range(pages.start, stop):
         _check_deadline(deadline, clock)
         parts.append(_pymupdf_page_text(document, index, headers))
         progress.pages_done = index + 1
-        if progress.pages_done % _MUPDF_STORE_FLUSH_EVERY == 0:
+        if (index + 1 - pages.start) % _MUPDF_STORE_FLUSH_EVERY == 0:
             _flush_mupdf_store()
-    return PdfText(_join_extracted_chunks(parts), to_read, page_count)
+    return PdfText(_join_extracted_chunks(parts), max(stop, pages.start), page_count)
 
 
 def _extract_with_pdfplumber(
-    source: bytes | str, progress: ParseProgress, deadline: Optional[float], clock: Callable[[], float]
+    source: bytes | str,
+    pages: _PageRange,
+    progress: ParseProgress,
+    deadline: Optional[float],
+    clock: Callable[[], float],
 ) -> PdfText:
     with pdfplumber.open(source if isinstance(source, str) else BytesIO(source)) as pdf:
         page_count = len(pdf.pages)
-        to_read = min(page_count, PDF_PAGE_CAP)
-        progress.pages_total = to_read
+        stop = pages.stop(page_count)
+        # Counts are from the start of the book; set done first so a reader never sees
+        # a later batch at page 0.
+        progress.pages_done = pages.start
+        progress.pages_total = pages.total(page_count)
         parts: list[str] = []
-        for index in range(to_read):
+        for index in range(pages.start, stop):
             _check_deadline(deadline, clock)
             page = pdf.pages[index]
             parts.append(page.extract_text() or "")
@@ -304,7 +335,7 @@ def _extract_with_pdfplumber(
             page.flush_cache()
             page.get_textmap.cache_clear()
             progress.pages_done = index + 1
-    return PdfText(_join_extracted_chunks(parts), to_read, page_count)
+    return PdfText(_join_extracted_chunks(parts), max(stop, pages.start), page_count)
 
 
 def _extract_pdf_pages(
@@ -312,6 +343,10 @@ def _extract_pdf_pages(
     progress: ParseProgress,
     deadline: Optional[float] = None,
     clock: Callable[[], float] = time.monotonic,
+    *,
+    start: int = 0,
+    batch: int = PDF_PAGE_CAP,
+    max_pages: int = PDF_PAGE_CAP,
 ) -> PdfText:
     """Read a PDF one page at a time from a single open document.
 
@@ -320,7 +355,13 @@ def _extract_pdf_pages(
     PyMuPDF handles nearly every file (pymupdf4llm markdown per page, plain text as the
     per-page fallback); pdfplumber is only tried when PyMuPDF cannot open the file.
     `deadline` is a `clock()` value, checked before each page.
+
+    Reads pages [start, start + batch), never past max_pages. Page counts in the
+    result and in `progress` are from the start of the book, so a later batch of a
+    long PDF reports e.g. pages_read 600 of 812. Only the first batch (start 0) must
+    find text; a later run of image-only pages just adds nothing.
     """
+    pages = _PageRange(start, batch, max_pages)
     document = None
     if fitz is not None:
         try:
@@ -330,19 +371,19 @@ def _extract_pdf_pages(
 
     if document is None:
         try:
-            result = _extract_with_pdfplumber(source, progress, deadline, clock)
+            result = _extract_with_pdfplumber(source, pages, progress, deadline, clock)
         except ParseTimeoutError:
             raise
         except Exception as exc:
             raise ValidationException(f"PDF text extraction failed: {exc}") from exc
     else:
         try:
-            result = _extract_with_pymupdf(document, progress, deadline, clock)
+            result = _extract_with_pymupdf(document, pages, progress, deadline, clock)
         finally:
             document.close()
             _flush_mupdf_store()
 
-    if not result.text:
+    if not result.text and start == 0:
         raise ValidationException("No text could be extracted from the PDF")
     return result
 
@@ -431,12 +472,17 @@ class FileService:
         file_name: str,
         *,
         on_progress: Optional[Callable[[ParseProgress], Awaitable[None]]] = None,
+        start_page: int = 0,
+        max_pages: int = PDF_PAGE_CAP,
     ) -> ExtractionResult:
         """Parse a file already saved to disk (uploads are streamed to temp files).
 
         PDFs are opened straight from the path, so the raw bytes never sit in memory.
         on_progress is awaited once when the parse gets its slot (pages_done 0), then
         whenever the page counters move, at most every _PROGRESS_POLL_S.
+
+        A PDF parse reads at most PDF_PAGE_CAP pages from start_page, never past
+        max_pages; folder uploads call this once per batch to read long books.
         """
         file_type = normalize_file_extension(file_name)
         if file_type not in ALLOWED_FILE_TYPES:
@@ -453,15 +499,23 @@ class FileService:
             await reporter.report()
             deadline = time.monotonic() + PARSE_DEADLINE_S
             return await _run_parse_thread(
-                self._parse_path, path, file_type, progress, deadline, reporter=reporter
+                self._parse_path,
+                path,
+                file_type,
+                progress,
+                deadline,
+                _PageRange(start_page, PDF_PAGE_CAP, max_pages),
+                reporter=reporter,
             )
 
     def _parse_path(
-        self, path: str, file_type: str, progress: ParseProgress, deadline: float
+        self, path: str, file_type: str, progress: ParseProgress, deadline: float, pages: _PageRange
     ) -> ExtractionResult:
         """Extract and clean text from a saved file. Runs in a worker thread."""
         if file_type == "pdf":
-            pdf = _extract_pdf_pages(path, progress, deadline)
+            pdf = _extract_pdf_pages(
+                path, progress, deadline, start=pages.start, batch=pages.batch, max_pages=pages.max_pages
+            )
             return ExtractionResult(_clean_extracted_text(pdf.text), file_type, pdf.pages_read, pdf.page_count)
         with open(path, "rb") as handle:
             data = handle.read()

@@ -21,7 +21,7 @@ def _saved_pdf(tmp_path: Path) -> str:
 def _fake_pdf_parser(pages: int, page_count: int, delay: float):
     """Stands in for _extract_pdf_pages: advances the counters like the real loop."""
 
-    def parse(source, progress: ParseProgress, deadline=None, clock=time.monotonic) -> PdfText:
+    def parse(source, progress: ParseProgress, deadline=None, clock=time.monotonic, **page_range) -> PdfText:
         progress.pages_total = pages
         for done in range(1, pages + 1):
             time.sleep(delay)
@@ -97,3 +97,33 @@ async def test_non_pdf_files_are_read_from_the_path(tmp_path) -> None:
     assert result.text == "Mitochondria make ATP.\nRibosomes make proteins."
     assert (result.file_type, result.pages_read, result.page_count) == ("txt", None, None)
     assert recorder.snapshots[0] == (0, None)
+
+
+async def test_a_later_batch_passes_its_page_range_to_the_pdf_reader(monkeypatch, tmp_path) -> None:
+    calls: list[dict] = []
+
+    def parse(source, progress, deadline=None, clock=time.monotonic, **pages) -> PdfText:
+        calls.append(pages)
+        return PdfText("", 600, 812)
+
+    monkeypatch.setattr(file_service, "_extract_pdf_pages", parse)
+
+    result = await FileService().extract_from_path(_saved_pdf(tmp_path), "book.pdf", start_page=300, max_pages=1500)
+
+    assert calls == [{"start": 300, "batch": file_service.PDF_PAGE_CAP, "max_pages": 1500}]
+    assert result == ExtractionResult("", "pdf", pages_read=600, page_count=812)
+
+
+async def test_a_plain_path_parse_still_stops_at_the_page_cap(monkeypatch, tmp_path) -> None:
+    # Test-create uploads are not batched: one parse of at most PDF_PAGE_CAP pages.
+    calls: list[dict] = []
+
+    def parse(source, progress, deadline=None, clock=time.monotonic, **pages) -> PdfText:
+        calls.append(pages)
+        return PdfText("Page text", 300, 812)
+
+    monkeypatch.setattr(file_service, "_extract_pdf_pages", parse)
+
+    await FileService().extract_from_path(_saved_pdf(tmp_path), "book.pdf")
+
+    assert calls == [{"start": 0, "batch": file_service.PDF_PAGE_CAP, "max_pages": file_service.PDF_PAGE_CAP}]
