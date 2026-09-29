@@ -4,9 +4,46 @@ This file describes how to start Ollama, the backend, and the frontend on Window
 
 ## Prerequisites
 - Install Ollama from https://ollama.com.
+- Install Docker Desktop with the WSL 2 backend if you plan to use the Docker setup.
 - Python 3.11, with a project virtualenv at `.venv` created from the project root.
 - Node.js and npm, or pnpm, for the frontend.
 - PowerShell 7 or Windows PowerShell 5.1.
+
+---
+
+## Start with Docker
+
+Docker CLI can be installed while the Docker engine is stopped. If `docker info`
+shows a `Client` section but fails in the `Server` section with a missing
+`dockerDesktopLinuxEngine` pipe, start Docker Desktop:
+
+```powershell
+docker desktop start
+```
+
+Wait for Docker Desktop to finish starting, then verify the engine:
+
+```powershell
+docker info
+```
+
+Start the database, backend, and frontend from any directory with the full
+Compose file path:
+
+```powershell
+docker compose -f "C:\Users\ijdar\Desktop\coding\Portfolion Projects\Nosey\docker-compose.yml" up -d --build
+```
+
+Open the app at `http://localhost` and the backend docs at
+`http://localhost:8000/docs`.
+
+Useful commands:
+
+```powershell
+docker compose -f "C:\Users\ijdar\Desktop\coding\Portfolion Projects\Nosey\docker-compose.yml" ps
+docker compose -f "C:\Users\ijdar\Desktop\coding\Portfolion Projects\Nosey\docker-compose.yml" logs -f
+docker compose -f "C:\Users\ijdar\Desktop\coding\Portfolion Projects\Nosey\docker-compose.yml" down
+```
 
 ---
 
