@@ -18,6 +18,7 @@ from src.models.user import User
 from src.repositories.usage_event_repository import UsageEventRepository
 from src.services.file_service import FileService, ParseProgress
 from src.services.kojo_context_cache import invalidate_folder
+from src.services.upload_recovery import stopped_reading_note
 from src.utils.logger import get_logger
 from src.utils.process_memory import process_rss_mb
 from src.utils.temp_uploads import UploadTooLargeError, remove_temp, save_upload_to_temp
@@ -97,10 +98,7 @@ def _page_note(pages_read: int, page_count: int, stopped: bool) -> Optional[str]
     if pages_read >= page_count:
         return None
     if stopped:
-        return (
-            f"Read the first {pages_read} of {page_count} pages. "
-            "Delete this file and upload it again to read the rest."
-        )
+        return stopped_reading_note(pages_read, page_count)
     return f"Read the first {pages_read} of {page_count} pages."
 
 
