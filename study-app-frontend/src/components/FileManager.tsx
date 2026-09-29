@@ -1,6 +1,7 @@
-import { AlertCircle, Check, Eye, FileText, Loader2, Minus, StickyNote, Trash2, Upload, X } from "lucide-react";
+import { AlertCircle, Check, Eye, FileText, Info, Loader2, Minus, RotateCcw, StickyNote, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type FolderFile, type SkippedFile, addFolderTextNote, deleteFolderFile, fetchFolderFiles, uploadFolderFiles } from "../lib/api";
+import { describeUploadStatus } from "../lib/uploadStatus";
 import { Button } from "./Button";
 import { ConfirmModal } from "./ConfirmModal";
 import { FileContentModal } from "./FileContentModal";
@@ -14,6 +15,8 @@ const MAX_TOTAL_SIZE_MB = 300;
 // How long the "N files deleted , Undo" window stays open before the deletes
 // are actually sent to the server. Nothing leaves the client until it elapses.
 const UNDO_WINDOW_MS = 6000;
+const ACCEPTED_EXTENSIONS =
+  ".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.ml,.mli,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml";
 const ALLOWED_TYPES = [
   "application/pdf",
   "text/plain",
@@ -52,6 +55,11 @@ export function FileManager({ folderId, onClose }: Props) {
   const [noteContent, setNoteContent] = useState("");
   const [isSavingNote, setIsSavingNote] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Re-upload of a failed file: the server keeps no copy of the original, so the
+  // user picks it again. One shared hidden input; the target is the failed row.
+  const reuploadInputRef = useRef<HTMLInputElement>(null);
+  const [reuploadTarget, setReuploadTarget] = useState<FolderFile | null>(null);
+  const [reuploadingId, setReuploadingId] = useState<number | null>(null);
 
   // Bulk select + deferred ("undo"-able) delete. `selectedIds` is the checkbox
   // selection; `pendingDelete` holds the ids scheduled for deletion and the
@@ -116,6 +124,40 @@ export function FileManager({ folderId, onClose }: Props) {
     } finally {
       setIsUploading(false);
       if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  function startReupload(failed: FolderFile) {
+    setReuploadTarget(failed);
+    reuploadInputRef.current?.click();
+  }
+
+  async function handleReupload(selected: FileList | null) {
+    const failed = reuploadTarget;
+    const file = selected?.[0];
+    if (!failed || !file) return;
+    setError(null);
+    setSkippedFiles([]);
+    setReuploadingId(failed.id);
+    try {
+      const result = await uploadFolderFiles(folderId, [file]);
+      if (result.skipped.length > 0) setSkippedFiles(result.skipped);
+      if (result.uploaded.length > 0) {
+        // The failed row goes only once its replacement is accepted.
+        try {
+          await deleteFolderFile(folderId, failed.id);
+          setFiles((prev) => [...result.uploaded, ...(prev ?? []).filter((f) => f.id !== failed.id)]);
+        } catch {
+          setFiles((prev) => [...result.uploaded, ...(prev ?? [])]);
+          setError(`Uploaded again, but the failed copy of ${failed.file_name} could not be removed.`);
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed.");
+    } finally {
+      setReuploadingId(null);
+      setReuploadTarget(null);
+      if (reuploadInputRef.current) reuploadInputRef.current.value = "";
     }
   }
 
@@ -284,7 +326,7 @@ export function FileManager({ folderId, onClose }: Props) {
           <input
             ref={inputRef}
             type="file"
-            accept=".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.ml,.mli,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml"
+            accept={ACCEPTED_EXTENSIONS}
             multiple
             disabled={isUploading}
             style={{ display: "none" }}
@@ -408,6 +450,15 @@ export function FileManager({ folderId, onClose }: Props) {
           </div>
         )}
 
+        <input
+          ref={reuploadInputRef}
+          type="file"
+          aria-label="Replacement file"
+          accept={ACCEPTED_EXTENSIONS}
+          style={{ display: "none" }}
+          onChange={(e) => void handleReupload(e.target.files)}
+        />
+
         {/* File list */}
         <div style={{ overflowY: "auto", flex: 1 }}>
           {isLoading ? (
@@ -443,18 +494,36 @@ export function FileManager({ folderId, onClose }: Props) {
                       {f.upload_status === "processing" ? (
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--green-dark)" }}>
                           <Loader2 size={11} className="spin" />
-                          Extracting text…
+                          {describeUploadStatus(f)}
                         </span>
                       ) : f.upload_status === "error" ? (
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--red, #e53e3e)" }} title={f.upload_error ?? undefined}>
                           <AlertCircle size={11} />
-                          {f.upload_error ?? "Upload failed"}
+                          {describeUploadStatus(f)}
                         </span>
                       ) : (
                         <>{f.file_type.toUpperCase()} · {formatBytes(f.size_bytes)} · {formatDate(f.uploaded_at)}</>
                       )}
                     </p>
+                    {f.upload_status === "ready" && f.upload_note ? (
+                      <p className="muted file-manager-row-note">
+                        <Info size={11} aria-hidden="true" />
+                        {f.upload_note}
+                      </p>
+                    ) : null}
                   </div>
+                  {f.upload_status === "error" ? (
+                    <button
+                      type="button"
+                      className="file-view-pill"
+                      aria-label={`Re-upload ${f.file_name}`}
+                      disabled={reuploadingId !== null}
+                      onClick={() => startReupload(f)}
+                    >
+                      {reuploadingId === f.id ? <Loader2 size={13} className="spin" /> : <RotateCcw size={13} />}
+                      Re-upload
+                    </button>
+                  ) : null}
                   {selectable ? (
                     <button
                       type="button"
