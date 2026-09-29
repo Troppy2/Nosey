@@ -11,6 +11,7 @@ import asyncio
 import hashlib
 import os
 import tempfile
+import time
 from dataclasses import dataclass
 from typing import Optional
 
@@ -61,6 +62,28 @@ async def save_upload_to_temp(upload: UploadFile, max_bytes: int) -> SavedUpload
         remove_temp(handle.name)
         raise
     return SavedUpload(path=handle.name, size=size, sha256=hasher.hexdigest())
+
+
+def cleanup_stale_temp_uploads(older_than_s: Optional[float] = None) -> int:
+    """Delete leftover upload temp files (all of them when older_than_s is None).
+
+    Returns how many were removed. Never touches files without our prefix.
+    """
+    directory = tempfile.gettempdir()
+    cutoff = None if older_than_s is None else time.time() - older_than_s
+    removed = 0
+    for name in os.listdir(directory):
+        if not name.startswith(TEMP_UPLOAD_PREFIX):
+            continue
+        path = os.path.join(directory, name)
+        try:
+            if cutoff is not None and os.path.getmtime(path) > cutoff:
+                continue
+            os.remove(path)
+            removed += 1
+        except OSError:
+            continue
+    return removed
 
 
 def remove_temp(path: Optional[str]) -> None:
