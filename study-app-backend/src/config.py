@@ -29,8 +29,10 @@ class Settings(BaseSettings):
     # Input context window for Ollama. Ollama silently truncates the prompt when it
     # exceeds num_ctx, which drops the trailing JSON-schema instructions and makes the
     # model emit empty or off-schema output. Set this high enough to hold a full
-    # generation prompt (terms + concepts + rules + format spec).
-    ollama_num_ctx: int = Field(default=8192, alias="OLLAMA_NUM_CTX")
+    # generation prompt (terms + concepts + rules + format spec). Long custom
+    # instructions unlock a 40k-char source window (~10k tokens) in llm_service, so
+    # 32768 is the floor for those prompts to arrive whole.
+    ollama_num_ctx: int = Field(default=32768, alias="OLLAMA_NUM_CTX")
     groq_api_key: Optional[str] = Field(default=None, alias="GROQ_API_KEY")
     # Groq retired llama-3.3-70b-versatile and llama-3.1-8b-instant (404
     # model_not_found). Configurable so the next retirement is an env change,
