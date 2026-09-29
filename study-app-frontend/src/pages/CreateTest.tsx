@@ -14,6 +14,8 @@ import type { Folder, ProviderStatus, TestCreationParams } from "../lib/types";
 
 const MAX_UPLOAD_FILE_SIZE_MB = 100;
 const MAX_UPLOAD_TOTAL_SIZE_MB = 300;
+// Matches _CUSTOM_INSTRUCTIONS_MAX in study-app-backend/src/routes/tests.py.
+const CUSTOM_INSTRUCTIONS_MAX = 10_000;
 
 export default function CreateTest() {
   const navigate = useNavigate();
@@ -474,13 +476,14 @@ export default function CreateTest() {
                     placeholder="e.g. Generate 5 word problems involving integration by parts, make all MCQ options close in value, include at least 2 proof questions…"
                     value={customInstructions}
                     onChange={(e) => setCustomInstructions(e.target.value)}
-                    maxLength={100000}
+                    maxLength={CUSTOM_INSTRUCTIONS_MAX}
                     style={{ resize: "vertical", fontFamily: "inherit" }}
                   />
                   <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.8rem" }}>
                     Natural language instructions that guide how questions are generated. Overrides topic focus when both are set.
                     <br />
-                    {countWords(customInstructions)} word{countWords(customInstructions) !== 1 ? "s" : ""} used.
+                    {countWords(customInstructions)} word{countWords(customInstructions) !== 1 ? "s" : ""} used,{" "}
+                    {customInstructions.length.toLocaleString()} / {CUSTOM_INSTRUCTIONS_MAX.toLocaleString()} characters.
                   </p>
                 </div>
 
@@ -599,7 +602,7 @@ export default function CreateTest() {
                       <input
                         ref={practiceTestInputRef}
                         type="file"
-                        accept=".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.ml,.mli,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml"
+                        accept=".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.ml,.mli,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml,.ipynb"
                         style={{ display: "none" }}
                         onChange={(e) => acceptPracticeTestFile(e.target.files?.[0])}
                       />
@@ -639,7 +642,7 @@ export default function CreateTest() {
           >
             <input
               aria-label="Upload notes files"
-              accept=".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.ml,.mli,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml"
+              accept=".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.ml,.mli,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml,.ipynb"
               multiple
               onChange={(event) => acceptFiles(event.target.files ?? undefined)}
               type="file"

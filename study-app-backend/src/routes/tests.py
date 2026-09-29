@@ -49,6 +49,10 @@ from src.utils.validators import MAX_UPLOAD_TOTAL_SIZE_BYTES
 router = APIRouter(tags=["tests"])
 logger = get_logger(__name__)
 
+# Matches the learning-module cap (LLMService._module_instructions_block). Long
+# exam-style prompts routinely run several thousand characters.
+_CUSTOM_INSTRUCTIONS_MAX = 10_000
+
 
 # Strong references to detached generation tasks. We deliberately do NOT use
 # FastAPI BackgroundTasks for generation: those run *inside* the ASGI response
@@ -760,7 +764,7 @@ async def create_test(
         coding_language_raw = form.get("coding_language")
         coding_language = str(coding_language_raw).strip()[:50] if coding_language_raw else "Python"
         custom_instructions_raw = form.get("custom_instructions")
-        custom_instructions = str(custom_instructions_raw).strip()[:500] if custom_instructions_raw else None
+        custom_instructions = str(custom_instructions_raw).strip()[:_CUSTOM_INSTRUCTIONS_MAX] if custom_instructions_raw else None
         provider_raw = form.get("provider")
         provider = str(provider_raw).strip().lower() if provider_raw else None
         provider_aliases = {"google": "gemini", "anthropic": "claude"}
@@ -991,7 +995,7 @@ async def regenerate_test(
                 topic_focus=(data.topic_focus.strip()[:200] if data.topic_focus else None),
                 is_coding_mode=test.is_coding_mode,
                 coding_language=test.coding_language or "Python",
-                custom_instructions=(data.custom_instructions.strip()[:500] if data.custom_instructions else None),
+                custom_instructions=(data.custom_instructions.strip()[:_CUSTOM_INSTRUCTIONS_MAX] if data.custom_instructions else None),
                 provider=provider,
                 enable_fallback=data.enable_fallback,
                 count_tf=data.count_tf,

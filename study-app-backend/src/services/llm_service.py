@@ -374,6 +374,18 @@ _RETRIEVAL_EMBEDDING_DIM = 384
 _RETRIEVAL_CHUNK_WORDS = 160
 _RETRIEVAL_CHUNK_OVERLAP_WORDS = 40
 _RETRIEVAL_TOP_K = 6
+# Long custom instructions (an exam-style prompt that names chapters, homework and
+# labs) unlock a much larger source window: at the default 8k chars / 6 chunks the
+# model sees ~3% of a textbook-sized folder and cannot follow a detailed scope.
+# 40k chars is ~10k tokens, which needs OLLAMA_NUM_CTX >= 32768 (config.py).
+_LONG_INSTRUCTIONS_THRESHOLD = 1000
+_GENERATE_CHAR_LIMIT_LONG = 40_000
+_RETRIEVAL_TOP_K_LONG = 24
+_EXERCISE_INTENT_RE = re.compile(r"\b(homework|hw|exercises?|problems?|exams?|midterms?|quiz)\b", re.IGNORECASE)
+_CHAPTER_RANGE_RE = re.compile(
+    r"\b(?:chapters?|chs?\.?)\s*(\d+)\s*(?:-|to|through|thru|\u2013)\s*(\d+)", re.IGNORECASE
+)
+_CHAPTER_LIST_RE = re.compile(r"\b(?:chapters?|chs?\.?)\s*((?:\d+\s*(?:,|and|&)?\s*)+)", re.IGNORECASE)
 _RETRIEVAL_CONTEXT_SENTENCES = 3
 _RETRIEVAL_MAX_QUERY_REWRITES = 4
 _RETRIEVAL_STAGE_MULTIPLIER = 2
@@ -613,8 +625,12 @@ class LLMService:
         )
         # Run CPU-bound RAG retrieval in a thread pool to avoid blocking the event loop
         loop = asyncio.get_event_loop()
+        retrieval_kwargs = self._retrieval_bias(custom_instructions)
         generation_notes, retrieval_meta = await loop.run_in_executor(
-            None, self._retrieve_relevant_context, notes, retrieval_query, _RETRIEVAL_TOP_K, owner_id
+            None,
+            lambda: self._retrieve_relevant_context(
+                notes, retrieval_query, owner_id=owner_id, **retrieval_kwargs  # type: ignore[arg-type]
+            ),
         )
         diagnostics: dict[str, object] = {
             "fallback_used": False,
@@ -675,7 +691,10 @@ class LLMService:
                     count_mcq=count_mcq,
                     count_frq=count_frq,
                     diagnostics=diagnostics,
-                    math_mode=True,
+                    # math_mode only selects the strict math validators (compute-only
+                    # FRQs) and the math fallback. Student instructions may ask for
+                    # proofs or definitions, which those validators would silently drop.
+                    math_mode=not (custom_instructions or "").strip(),
                     enable_fallback=enable_fallback,
                     prior_questions=prior_questions,
                     on_question=on_question,
@@ -816,10 +835,6 @@ class LLMService:
         }
         difficulty_line = f"DIFFICULTY: {difficulty_map.get(difficulty, difficulty_map['mixed'])}\n"
         topic_line = f'TOPIC FOCUS: Only ask about "{topic_focus}".\n' if topic_focus else ""
-        custom_line = (
-            f"CUSTOM INSTRUCTIONS (follow exactly): {custom_instructions}\n"
-            if custom_instructions else ""
-        )
 
         sections: list[str] = []
         example_keys: list[str] = []
@@ -855,14 +870,14 @@ class LLMService:
             "Do not invent facts and do not mention file names, sources, or chunk labels.\n\n"
             f"{difficulty_line}"
             f"{topic_line}"
-            f"{custom_line}"
             "\nQUESTION REQUIREMENTS:\n"
             f"{rules}\n\n"
+            f"{self._student_instructions_block(custom_instructions)}"
             "CRITICAL: Return ONLY valid JSON, no markdown, no text before or after. "
             "Include only the keys you were asked to generate. "
             "Response must match EXACTLY this shape:\n"
             f"{example}\n\n"
-            f"SOURCE MATERIAL:\n{self._strip_metadata(notes)[:_GENERATE_CHAR_LIMIT]}"
+            f"SOURCE MATERIAL:\n{self._strip_metadata(notes)[:self._context_budget(custom_instructions)[0]]}"
         )
 
     def _parse_extra_types(
@@ -975,6 +990,58 @@ class LLMService:
         # Extraction failed — treat raw sentences as concepts so generation still works.
         return _StudyContent(title="", terms=[], concepts=self._sentences(notes)[:40])
 
+    @staticmethod
+    def _context_budget(custom_instructions: Optional[str]) -> tuple[int, int]:
+        """(source char limit, retrieval top_k) for a generation request."""
+        if custom_instructions and len(custom_instructions) > _LONG_INSTRUCTIONS_THRESHOLD:
+            return _GENERATE_CHAR_LIMIT_LONG, _RETRIEVAL_TOP_K_LONG
+        return _GENERATE_CHAR_LIMIT, _RETRIEVAL_TOP_K
+
+    @staticmethod
+    def _chapter_scope(custom_instructions: Optional[str]) -> Optional[frozenset[int]]:
+        """Chapters the student scoped the test to: 'Chapters 1 through 4', 'ch 1-4',
+        'chapters 1, 2 and 3'. None when no scope is stated."""
+        text = custom_instructions or ""
+        chapters: set[int] = set()
+        for start, end in _CHAPTER_RANGE_RE.findall(text):
+            low, high = sorted((int(start), int(end)))
+            if high - low <= 50:
+                chapters.update(range(low, high + 1))
+        if not chapters:
+            for group in _CHAPTER_LIST_RE.findall(text):
+                chapters.update(int(n) for n in re.findall(r"\d+", group))
+        return frozenset(chapters) or None
+
+    def _retrieval_bias(self, custom_instructions: Optional[str]) -> dict[str, object]:
+        """Retrieval kwargs for exam-prep instructions (see rag_service.retrieve_context)."""
+        char_limit, top_k = self._context_budget(custom_instructions)
+        return {
+            "top_k": top_k,
+            "char_limit": char_limit,
+            "boost_exercises": bool(custom_instructions and _EXERCISE_INTENT_RE.search(custom_instructions)),
+            "chapter_scope": self._chapter_scope(custom_instructions),
+        }
+
+    @staticmethod
+    def _student_instructions_block(custom_instructions: Optional[str]) -> str:
+        """The student's own instructions, placed after every built-in rule so they win.
+
+        Mode rules (math-only computation, code-trace MCQs, banned question starters)
+        are defaults, not limits: a student who asks for proofs, definitions or
+        debugging tasks gets them.
+        """
+        text = (custom_instructions or "").strip()
+        if not text:
+            return ""
+        return (
+            "STUDENT INSTRUCTIONS (highest priority: where they conflict with ANY rule above, "
+            "including banned question types, required question starters, or the question style "
+            "for this mode, follow these instead. The JSON output format below still applies. "
+            "Question types the format cannot express (e.g. matching, fill-in-the-blank) must be "
+            "written as MCQ or FRQ that test the same thing.):\n"
+            f"{text}\n\n"
+        )
+
     def _build_generation_prompt(
         self,
         study: _StudyContent,
@@ -996,7 +1063,6 @@ class LLMService:
         difficulty_line = f"DIFFICULTY: {difficulty_map.get(difficulty, difficulty_map['mixed'])}\n\n"
 
         topic_line = f'TOPIC FOCUS: Only generate questions about "{topic_focus}".\n\n' if topic_focus else ""
-        custom_line = f"CUSTOM INSTRUCTIONS: {custom_instructions}\n\n" if custom_instructions else ""
 
         terms_block = ""
         if study.terms:
@@ -1038,12 +1104,12 @@ class LLMService:
             f"{context_header}"
             f"{difficulty_line}"
             f"{topic_line}"
-            f"{custom_line}"
             f"{terms_block}"
             f"{concepts_block}"
             f"{mcq_instructions}\n"
             f"{frq_instructions}\n"
             f"{self._code_formatting_guidance()}\n"
+            f"{self._student_instructions_block(custom_instructions)}"
             "CRITICAL: Return ONLY valid JSON. No markdown, no text before or after.\n"
             "Response must be EXACTLY this format:\n"
             '{"mcq": [{"question_text": "...", "options": ["a", "b", "c", "d"], "correct_index": 0}], "frq": [{"question_text": "...", "expected_answer": "..."}]}\n'
@@ -1066,11 +1132,6 @@ class LLMService:
             "mixed": "a mix of easy recall, medium application, and hard analysis questions",
         }
         topic_line = f'TOPIC FOCUS: Only generate questions about "{topic_focus}".\n\n' if topic_focus else ""
-        custom_line = (
-            "CUSTOM INSTRUCTIONS (these take priority, follow them exactly):\n"
-            f"{custom_instructions}\n\n"
-            if custom_instructions else ""
-        )
 
         mcq_instructions = ""
         if count_mcq > 0:
@@ -1100,13 +1161,13 @@ class LLMService:
             "file each fact came from so you do not merge unrelated facts. Never repeat these labels, file "
             "names, chunk numbers, or section names to the student. Questions must read as if asked directly "
             "about the subject, not about the documents.\n\n"
-            f"{custom_line}"
             f"DIFFICULTY: {difficulty_map.get(difficulty, difficulty_map['mixed'])}\n\n"
             f"{topic_line}"
-            f"SOURCE CONTEXT:\n{source_context[:_GENERATE_CHAR_LIMIT]}\n\n"
+            f"SOURCE CONTEXT:\n{source_context[:self._context_budget(custom_instructions)[0]]}\n\n"
             f"{mcq_instructions}\n"
             f"{frq_instructions}\n"
             f"{self._code_formatting_guidance()}\n"
+            f"{self._student_instructions_block(custom_instructions)}"
             "CRITICAL: Return ONLY valid JSON. No markdown, no text before or after.\n"
             "Response must be EXACTLY this format:\n"
             '{"mcq": [{"question_text": "...", "options": ["a", "b", "c", "d"], "correct_index": 0}], "frq": [{"question_text": "...", "expected_answer": "..."}]}\n'
@@ -1268,8 +1329,12 @@ class LLMService:
             custom_instructions=custom_instructions,
         )
         loop = asyncio.get_event_loop()
+        retrieval_kwargs = self._retrieval_bias(custom_instructions)
         source_context, retrieval_meta = await loop.run_in_executor(
-            None, self._retrieve_relevant_context, notes, retrieval_query, _RETRIEVAL_TOP_K, owner_id
+            None,
+            lambda: self._retrieve_relevant_context(
+                notes, retrieval_query, owner_id=owner_id, **retrieval_kwargs  # type: ignore[arg-type]
+            ),
         )
         study = await self._extract_study_content(source_context, provider=provider)
         
@@ -1313,7 +1378,6 @@ class LLMService:
             pattern_guidance += "\n"
         
         topic_line = f'TOPIC FOCUS: Only generate questions about "{topic_focus}".\n\n' if topic_focus else ""
-        custom_line = f"CUSTOM INSTRUCTIONS: {custom_instructions}\n\n" if custom_instructions else ""
         
         terms_block = ""
         if study.terms:
@@ -1357,13 +1421,13 @@ class LLMService:
             f"{context_header}"
             f"{difficulty_line}"
             f"{topic_line}"
-            f"{custom_line}"
             f"{pattern_guidance}"
-            f"SOURCE CONTEXT WITH FILE LABELS:\n{source_context[:_GENERATE_CHAR_LIMIT]}\n\n"
+            f"SOURCE CONTEXT WITH FILE LABELS:\n{source_context[:self._context_budget(custom_instructions)[0]]}\n\n"
             f"{terms_block}"
             f"{concepts_block}"
             f"{mcq_instructions}\n"
             f"{frq_instructions}\n"
+            f"{self._student_instructions_block(custom_instructions)}"
             "Return JSON only with keys mcq and frq.\n"
             "mcq items: {question_text, options: [4 strings], correct_index: 0-3}\n"
             "frq items: {question_text, expected_answer}\n"
@@ -1471,7 +1535,6 @@ If the notes do not support grading, set flagged_uncertain true and confidence 0
         }
         difficulty_line = f"DIFFICULTY: {difficulty_map.get(difficulty, difficulty_map['mixed'])}\n"
         topic_line = f'TOPIC FOCUS: Only generate problems about "{topic_focus}".\n' if topic_focus else ""
-        custom_line = f"CUSTOM INSTRUCTIONS: {custom_instructions}\n" if custom_instructions else ""
 
         mcq_block = ""
         if count_mcq > 0 and test_type != "FRQ_only":
@@ -1500,14 +1563,14 @@ If the notes do not support grading, set flagged_uncertain true and confidence 0
         return (
             f"You are generating {language} programming practice questions based on the following CS notes.\n\n"
             f"{difficulty_line}"
-            f"{topic_line}"
-            f"{custom_line}\n"
+            f"{topic_line}\n"
             f"{mcq_block}\n"
             f"{frq_block}\n"
+            f"{self._student_instructions_block(custom_instructions)}"
             "Return JSON only with keys mcq and frq.\n"
             "mcq items: {question_text (include code snippets where appropriate), options: [4 strings], correct_index: 0-3}\n"
             "frq items: {question_text, expected_answer}\n\n"
-            f"CS NOTES:\n{notes[:_GENERATE_CHAR_LIMIT]}"
+            f"CS NOTES:\n{notes[:self._context_budget(custom_instructions)[0]]}"
         )
 
     async def grade_code_answer(
@@ -1625,7 +1688,7 @@ Be lenient on minor syntax errors if the logic is correct. Accept equivalent sol
             "  - Do NOT write bare math like x^2 or x² — always wrap in $...$\n"
         )
         strict_math_rules = (
-            "STRICT CONTENT RULES:\n"
+            "CONTENT RULES (defaults: STUDENT INSTRUCTIONS below override any of these):\n"
             "  - Generate ONLY mathematical computation problems — the student must compute a specific numerical or algebraic answer\n"
             "  - Every question MUST require calculation or algebraic manipulation, not memorization or explanation\n"
             "  - ABSOLUTELY BANNED question types: 'Explain...', 'Describe...', 'What is the formula for...', 'How do you find...', 'Why does...', 'Define...'\n"
@@ -1668,22 +1731,21 @@ Be lenient on minor syntax errors if the logic is correct. Accept equivalent sol
         }
         difficulty_line = f"DIFFICULTY: {difficulty_map.get(difficulty, difficulty_map['mixed'])}\n"
         topic_line = f'TOPIC FOCUS: Only generate problems about "{topic_focus}".\n' if topic_focus else ""
-        custom_line = f"CUSTOM INSTRUCTIONS: {custom_instructions}\n" if custom_instructions else ""
 
         return (
             "You are generating math practice problems based on the following study notes.\n"
             "Create problems that test mathematical understanding and calculation skills.\n\n"
             f"{difficulty_line}"
             f"{topic_line}"
-            f"{custom_line}"
             f"{strict_math_rules}\n"
             f"{latex_rule}\n"
             f"{mcq_block}\n"
             f"{frq_block}\n"
+            f"{self._student_instructions_block(custom_instructions)}"
             "Return JSON only with keys mcq and frq.\n"
             "mcq items: {question_text, options: [4 strings], correct_index: 0-3}\n"
             "frq items: {question_text, expected_answer}\n\n"
-            f"MATH NOTES:\n{notes[:_GENERATE_CHAR_LIMIT]}"
+            f"MATH NOTES:\n{notes[:self._context_budget(custom_instructions)[0]]}"
         )
 
     async def grade_math_answer(
@@ -6050,8 +6112,19 @@ Return only the JSON object."""
         query: str,
         top_k: int = _RETRIEVAL_TOP_K,
         owner_id: Optional[int] = None,
+        char_limit: int = _GENERATE_CHAR_LIMIT,
+        boost_exercises: bool = False,
+        chapter_scope: Optional[frozenset[int]] = None,
     ) -> tuple[str, dict[str, object]]:
-        return self._rag.retrieve_context(notes, query, top_k=top_k, owner_id=owner_id)
+        return self._rag.retrieve_context(
+            notes,
+            query,
+            top_k=top_k,
+            owner_id=owner_id,
+            char_limit=char_limit,
+            boost_exercises=boost_exercises,
+            chapter_scope=chapter_scope,
+        )
 
     def _chunk_notes_for_retrieval(
         self,
