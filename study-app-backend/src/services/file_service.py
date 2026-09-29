@@ -4,6 +4,7 @@ import asyncio
 import html as html_lib
 import re
 import unicodedata
+import weakref
 from collections import defaultdict
 from dataclasses import dataclass
 from io import BytesIO
@@ -66,6 +67,23 @@ _CODE_FILE_TYPES = {
     "py", "js", "ts", "tsx", "jsx", "java", "c", "cpp", "h", "hpp",
     "cs", "go", "rs", "swift", "kt", "ml", "mli", "scala", "rb", "php", "sql", "json", "xml", "yaml", "yml",
 }
+
+
+# One file parse at a time across the whole process. On Render's free tier
+# (512 MB, 0.1 CPU) parallel parses add memory without adding speed. This is a
+# deliberate process-wide resource guard, not per-request service state. Keyed by
+# event loop because an asyncio.Semaphore binds to the loop that first waits on it.
+_parse_gates: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Semaphore] = (
+    weakref.WeakKeyDictionary()
+)
+
+
+def _parse_gate() -> asyncio.Semaphore:
+    loop = asyncio.get_running_loop()
+    gate = _parse_gates.get(loop)
+    if gate is None:
+        gate = _parse_gates[loop] = asyncio.Semaphore(1)
+    return gate
 
 
 @dataclass
@@ -289,25 +307,24 @@ class FileService:
         if not data:
             raise ValidationException("Uploaded notes file is empty")
 
+        async with _parse_gate():
+            return await asyncio.to_thread(self._parse_bytes, data, file_type), file_type
+
+    def _parse_bytes(self, data: bytes, file_type: str) -> str:
+        """Extract and clean text. Runs in a worker thread, inside the parse gate."""
         if file_type == "txt":
-            return _clean_extracted_text(_decode_best_effort(data)), file_type
+            return _clean_extracted_text(_decode_best_effort(data))
         if file_type == "md":
-            markdown = await asyncio.to_thread(self._extract_markdown, data)
-            return _clean_extracted_text(markdown), file_type
+            return _clean_extracted_text(self._extract_markdown(data))
         if file_type in {"html", "htm"}:
-            html_text = await asyncio.to_thread(self._extract_html, data)
-            return _clean_extracted_text(html_text), file_type
+            return _clean_extracted_text(self._extract_html(data))
         if file_type == "pptx":
-            slides_text = await asyncio.to_thread(self._extract_pptx, data)
-            return _clean_extracted_text(slides_text), file_type
+            return _clean_extracted_text(self._extract_pptx(data))
         if file_type in _CODE_FILE_TYPES:
-            code_text = await asyncio.to_thread(self._extract_code, data, file_type)
-            return _clean_extracted_text(code_text, preserve_code=True), file_type
+            return _clean_extracted_text(self._extract_code(data, file_type), preserve_code=True)
         if file_type == "docx":
-            docx_text = await asyncio.to_thread(self._extract_docx, data)
-            return _clean_extracted_text(docx_text), file_type
-        pdf_text = await asyncio.to_thread(self._extract_pdf, data)
-        return _clean_extracted_text(pdf_text), file_type
+            return _clean_extracted_text(self._extract_docx(data))
+        return _clean_extracted_text(self._extract_pdf(data))
 
     async def extract_from_files(self, notes_files: list[UploadFile]) -> tuple[str, list[str]]:
         total_size_bytes = 0
