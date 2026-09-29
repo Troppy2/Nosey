@@ -41,6 +41,9 @@ class FolderFileResponse(BaseModel):
     size_bytes: int
     upload_status: Optional[str] = None
     upload_error: Optional[str] = None
+    upload_note: Optional[str] = None
+    pages_done: Optional[int] = None
+    pages_total: Optional[int] = None
     uploaded_at: datetime
 
     model_config = {"from_attributes": True}
