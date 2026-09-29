@@ -29,6 +29,13 @@ class FolderFile(Base):
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     upload_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default=None)
     upload_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
+    # Shown on a ready row, e.g. when only the first PDF_PAGE_CAP pages were read.
+    upload_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
+    # Parse progress. pages_done stays NULL while the file waits for the parse slot.
+    pages_done: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=None)
+    pages_total: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=None)
+    # sha256 of the uploaded bytes, to reject an exact re-upload before parsing it.
+    raw_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, default=None)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
 
     folder: Mapped[Folder] = relationship("Folder", back_populates="files")
