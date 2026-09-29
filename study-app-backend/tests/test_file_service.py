@@ -12,9 +12,13 @@ from src.services.file_service import FileService
 class _FakePdfplumberPage:
     def __init__(self, text: str) -> None:
         self._text = text
+        self.get_textmap = SimpleNamespace(cache_clear=lambda: None)
 
     def extract_text(self) -> str:
         return self._text
+
+    def flush_cache(self) -> None:
+        return None
 
 
 class _FakePdfplumberDoc:
@@ -58,7 +62,7 @@ async def test_extract_from_file_uses_pymupdf_when_available(monkeypatch: pytest
     fake_fitz = SimpleNamespace(open=MagicMock(return_value=fake_doc))
 
     monkeypatch.setattr("src.services.file_service.fitz", fake_fitz)
-    monkeypatch.setattr("src.services.file_service.os.cpu_count", lambda: 1)
+    monkeypatch.setattr("src.services.file_service.pymupdf4llm", None)
     monkeypatch.setattr(
         "src.services.file_service.pdfplumber.open",
         MagicMock(side_effect=AssertionError("pdfplumber should not be used")),
@@ -84,7 +88,6 @@ async def test_extract_from_file_falls_back_to_pdfplumber_when_pymupdf_fails(
     fake_fitz = SimpleNamespace(open=MagicMock(side_effect=RuntimeError("boom")))
 
     monkeypatch.setattr("src.services.file_service.fitz", fake_fitz)
-    monkeypatch.setattr("src.services.file_service.os.cpu_count", lambda: 1)
     monkeypatch.setattr("src.services.file_service.pdfplumber.open", MagicMock(return_value=fake_pdf_doc))
 
     upload = MagicMock()
