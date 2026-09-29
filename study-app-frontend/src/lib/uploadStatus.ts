@@ -18,7 +18,28 @@ export function describeUploadStatus(file: UploadState): string | null {
     return "Extracting text…";
   }
   if (file.upload_status === "error") return file.upload_error ?? "Upload failed";
+  if (isReadingMore(file)) {
+    return `Reading more: page ${Math.min(file.pages_done! + 1, file.pages_total!)} of ${file.pages_total}`;
+  }
   return file.upload_note ?? null;
+}
+
+/**
+ * Long PDFs turn ready after their first batch of pages; the server keeps reading
+ * the rest into the same file while pages_done is below pages_total.
+ */
+export function isReadingMore(file: UploadState): boolean {
+  return (
+    file.upload_status === "ready" &&
+    file.pages_done != null &&
+    file.pages_total != null &&
+    file.pages_done < file.pages_total
+  );
+}
+
+/** The server is still working on this file, so its row should keep refreshing. */
+export function isUploadActive(file: UploadState): boolean {
+  return file.upload_status === "processing" || isReadingMore(file);
 }
 
 /**

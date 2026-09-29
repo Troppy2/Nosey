@@ -186,3 +186,82 @@ async def test_startup_does_not_wait_forever_on_a_hung_database(monkeypatch) -> 
             pass
 
     await asyncio.wait_for(enter_and_leave(), timeout=5)
+
+
+# --- books whose later batches died with the process (GH #121) ----------------------
+
+
+async def _add_book(db_session_maker, folder_id: int, pages_done: int, pages_total: int) -> int:
+    async with db_session_maker() as session:
+        row = FolderFile(
+            folder_id=folder_id,
+            file_name="textbook.pdf",
+            file_type="pdf",
+            size_bytes=1,
+            content="first batches",
+            content_hash="h",
+            upload_status="ready",
+            pages_done=pages_done,
+            pages_total=pages_total,
+        )
+        session.add(row)
+        await session.commit()
+        return row.id
+
+
+async def _book(db_session_maker, file_id: int) -> tuple:
+    async with db_session_maker() as session:
+        row = await session.get(FolderFile, file_id)
+        return row.upload_status, row.content, row.pages_done, row.pages_total, row.upload_note
+
+
+async def test_finalizing_keeps_what_a_dead_book_read_and_says_how_to_get_the_rest(db_session_maker, folder_id) -> None:
+    half_read = await _add_book(db_session_maker, folder_id, 600, 812)
+    whole = await _add_book(db_session_maker, folder_id, 300, 300)
+
+    async with db_session_maker() as session:
+        count = await upload_recovery.finalize_interrupted_books(session)
+
+    assert count == 1
+    assert await _book(db_session_maker, half_read) == (
+        "ready",
+        "first batches",
+        600,
+        600,
+        "Read the first 600 of 812 pages. Delete this file and upload it again to read the rest.",
+    )
+    assert await _book(db_session_maker, whole) == ("ready", "first batches", 300, 300, None)
+
+
+async def test_periodic_sweep_leaves_books_that_are_still_being_read(db_session_maker, folder_id, monkeypatch) -> None:
+    # A live instance may legitimately spend an hour on a textbook.
+    monkeypatch.setattr(upload_recovery, "async_session_maker", db_session_maker)
+    reading = await _add_book(db_session_maker, folder_id, 600, 812)
+
+    async def one_round(seconds: float) -> None:
+        if one_round.calls:
+            raise asyncio.CancelledError
+        one_round.calls += 1
+
+    one_round.calls = 0
+    with pytest.raises(asyncio.CancelledError):
+        await upload_recovery.run_periodic_sweep(interval_s=300, sleep=one_round)
+
+    assert await _book(db_session_maker, reading) == ("ready", "first batches", 600, 812, None)
+
+
+async def test_startup_finalizes_half_read_books(db_session_maker, folder_id, monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(upload_recovery, "async_session_maker", db_session_maker)
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    half_read = await _add_book(db_session_maker, folder_id, 300, 812)
+
+    async def idle_periodic_sweep() -> None:
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(upload_recovery, "run_periodic_sweep", idle_periodic_sweep)
+
+    async with app.router.lifespan_context(app):
+        status = await _book(db_session_maker, half_read)
+
+    assert status[2:4] == (300, 300)
+    assert status[4].startswith("Read the first 300 of 812 pages.")

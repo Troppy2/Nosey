@@ -1,8 +1,10 @@
 """Folder file upload route: temp-file handoff, duplicate checks, progress fields."""
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import tempfile
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -17,7 +19,8 @@ from src.models.folder import Folder
 from src.models.folder_file import FolderFile
 from src.models.user import User
 from src.routes import folder_files
-from src.services.file_service import ExtractionResult, FileService, ParseProgress
+from src.services import file_service
+from src.services.file_service import ExtractionResult, FileService, ParseProgress, ParseTimeoutError
 from src.utils.exceptions import ValidationException
 
 pytestmark = pytest.mark.asyncio
@@ -213,10 +216,11 @@ async def _row(db_session_maker, file_id: int) -> FolderFile:
 async def test_background_parse_records_progress_and_the_page_cap_note(
     background_db, seeded, tmp_path, monkeypatch
 ) -> None:
+    monkeypatch.setattr(folder_files, "PDF_BOOK_MAX_PAGES", 300)
     file_id = await _add_row(background_db, seeded.folder_id, file_name="long.pdf")
     seen: list[tuple] = []
 
-    async def fake_extract_from_path(self, path, file_name, *, on_progress=None):
+    async def fake_extract_from_path(self, path, file_name, *, on_progress=None, **page_range):
         await on_progress(ParseProgress(0, None))
         row = await _row(background_db, file_id)
         seen.append((row.upload_status, row.pages_done, row.pages_total))
@@ -246,7 +250,7 @@ async def test_background_parse_success_overrides_an_earlier_sweep(
     # instance is still parsing. The old instance's real result must win.
     file_id = await _add_row(background_db, seeded.folder_id)
 
-    async def fake_extract_from_path(self, path, file_name, *, on_progress=None):
+    async def fake_extract_from_path(self, path, file_name, *, on_progress=None, **page_range):
         async with background_db() as session:
             row = await session.get(FolderFile, file_id)
             row.upload_status = "error"
@@ -267,7 +271,7 @@ async def test_background_parse_failure_marks_the_row_and_removes_the_temp_file(
 ) -> None:
     file_id = await _add_row(background_db, seeded.folder_id)
 
-    async def failing_extract_from_path(self, path, file_name, *, on_progress=None):
+    async def failing_extract_from_path(self, path, file_name, *, on_progress=None, **page_range):
         raise ValidationException("No text could be extracted from the PDF")
 
     monkeypatch.setattr(FileService, "extract_from_path", failing_extract_from_path)
@@ -278,3 +282,192 @@ async def test_background_parse_failure_marks_the_row_and_removes_the_temp_file(
     row = await _row(background_db, file_id)
     assert (row.upload_status, row.upload_error) == ("error", "No text could be extracted from the PDF")
     assert not Path(path).exists()
+
+
+# --- batched reading of long PDFs (GH #121) -----------------------------------------
+
+STOPPED_NOTE = "Read the first {} of {} pages. Delete this file and upload it again to read the rest."
+
+
+class _FakeBook:
+    """Stands in for FileService.extract_from_path over a long PDF, one batch per call."""
+
+    def __init__(self, page_count: int, batch: int = 300, fail_at: int | None = None, during=None) -> None:
+        self.page_count = page_count
+        self.batch = batch
+        self.fail_at = fail_at
+        self.during = during  # async hook(start_page, on_progress) run inside each batch
+        self.calls: list[dict] = []
+
+    async def __call__(self, path, file_name, *, on_progress=None, start_page=0, max_pages=300):
+        self.calls.append({"start_page": start_page, "max_pages": max_pages})
+        if start_page == self.fail_at:
+            raise ParseTimeoutError()
+        if self.during is not None:
+            await self.during(start_page, on_progress)
+        end = min(start_page + self.batch, self.page_count, max_pages)
+        return ExtractionResult(f"pages {start_page}-{end}", "pdf", pages_read=end, page_count=self.page_count)
+
+
+@pytest.fixture
+def plenty_of_memory(monkeypatch):
+    monkeypatch.setattr(folder_files, "process_rss_mb", lambda: 200.0)
+
+
+async def test_long_pdf_is_ready_after_the_first_batch_then_read_in_batches(
+    background_db, seeded, tmp_path, monkeypatch, plenty_of_memory
+) -> None:
+    file_id = await _add_row(background_db, seeded.folder_id, file_name="textbook.pdf")
+    seen: list[tuple] = []
+
+    async def during(start_page, on_progress):
+        if start_page == 300:
+            row = await _row(background_db, file_id)
+            seen.append((row.upload_status, row.content, row.pages_done, row.pages_total, row.upload_note))
+            await on_progress(ParseProgress(0, None))  # the batch got its parse slot
+            await on_progress(ParseProgress(420, 812))
+            row = await _row(background_db, file_id)
+            seen.append((row.upload_status, row.pages_done, row.pages_total))
+
+    book = _FakeBook(812, during=during)
+    monkeypatch.setattr(FileService, "extract_from_path", book)
+    path = _temp_upload(tmp_path)
+
+    await folder_files._extract_and_update(file_id, path, "textbook.pdf", seeded.folder_id, seeded.user_id)
+
+    assert [c["start_page"] for c in book.calls] == [0, 300, 600]
+    assert all(c["max_pages"] == 1500 for c in book.calls)
+    # Usable after batch 1; "still reading" is a ready row with pages_done < pages_total.
+    assert seen == [("ready", "pages 0-300", 300, 812, None), ("ready", 420, 812)]
+    row = await _row(background_db, file_id)
+    assert row.upload_status == "ready"
+    assert row.content == "pages 0-300\n\npages 300-600\n\npages 600-812"
+    assert row.content_hash == hashlib.sha256(row.content.encode("utf-8")).hexdigest()
+    assert (row.pages_done, row.pages_total, row.upload_note) == (812, 812, None)
+    assert not Path(path).exists()
+
+
+async def test_a_book_past_the_page_ceiling_gets_the_cap_note(
+    background_db, seeded, tmp_path, monkeypatch, plenty_of_memory
+) -> None:
+    file_id = await _add_row(background_db, seeded.folder_id)
+    book = _FakeBook(2000)
+    monkeypatch.setattr(FileService, "extract_from_path", book)
+
+    await folder_files._extract_and_update(file_id, _temp_upload(tmp_path), "big.pdf", seeded.folder_id, seeded.user_id)
+
+    assert [c["start_page"] for c in book.calls] == [0, 300, 600, 900, 1200]
+    row = await _row(background_db, file_id)
+    assert (row.pages_done, row.pages_total) == (1500, 1500)
+    assert row.upload_note == "Read the first 1500 of 2000 pages."
+
+
+async def test_batches_wait_for_memory_then_carry_on(
+    background_db, seeded, tmp_path, monkeypatch
+) -> None:
+    file_id = await _add_row(background_db, seeded.folder_id)
+    readings = iter([420.0, 410.0, 200.0])
+    monkeypatch.setattr(folder_files, "process_rss_mb", lambda: next(readings, 200.0))
+    monkeypatch.setattr(folder_files, "BATCH_MEMORY_RETRY_S", 0)
+    book = _FakeBook(500)
+    monkeypatch.setattr(FileService, "extract_from_path", book)
+
+    await folder_files._extract_and_update(file_id, _temp_upload(tmp_path), "b.pdf", seeded.folder_id, seeded.user_id)
+
+    assert [c["start_page"] for c in book.calls] == [0, 300]
+    row = await _row(background_db, file_id)
+    assert (row.pages_done, row.pages_total, row.upload_note) == (500, 500, None)
+
+
+async def test_batches_stop_with_a_note_when_memory_stays_high(
+    background_db, seeded, tmp_path, monkeypatch
+) -> None:
+    file_id = await _add_row(background_db, seeded.folder_id)
+    monkeypatch.setattr(folder_files, "process_rss_mb", lambda: 480.0)
+    monkeypatch.setattr(folder_files, "BATCH_MEMORY_RETRY_S", 0)
+    book = _FakeBook(812)
+    monkeypatch.setattr(FileService, "extract_from_path", book)
+    path = _temp_upload(tmp_path)
+
+    await folder_files._extract_and_update(file_id, path, "b.pdf", seeded.folder_id, seeded.user_id)
+
+    assert [c["start_page"] for c in book.calls] == [0]
+    row = await _row(background_db, file_id)
+    assert (row.upload_status, row.content) == ("ready", "pages 0-300")
+    assert (row.pages_done, row.pages_total) == (300, 300)
+    assert row.upload_note == STOPPED_NOTE.format(300, 812)
+    assert not Path(path).exists()
+
+
+async def test_a_failed_later_batch_keeps_what_was_read(
+    background_db, seeded, tmp_path, monkeypatch, plenty_of_memory
+) -> None:
+    file_id = await _add_row(background_db, seeded.folder_id)
+    book = _FakeBook(1000, fail_at=600)
+    monkeypatch.setattr(FileService, "extract_from_path", book)
+
+    await folder_files._extract_and_update(file_id, _temp_upload(tmp_path), "b.pdf", seeded.folder_id, seeded.user_id)
+
+    row = await _row(background_db, file_id)
+    assert (row.upload_status, row.upload_error) == ("ready", None)
+    assert row.content == "pages 0-300\n\npages 300-600"
+    assert (row.pages_done, row.pages_total) == (600, 600)
+    assert row.upload_note == STOPPED_NOTE.format(600, 1000)
+
+
+async def test_deleting_the_file_mid_book_stops_reading(
+    background_db, seeded, tmp_path, monkeypatch, plenty_of_memory
+) -> None:
+    file_id = await _add_row(background_db, seeded.folder_id)
+
+    async def during(start_page, on_progress):
+        if start_page == 300:
+            async with background_db() as session:
+                await session.delete(await session.get(FolderFile, file_id))
+                await session.commit()
+
+    book = _FakeBook(1200, during=during)
+    monkeypatch.setattr(FileService, "extract_from_path", book)
+    path = _temp_upload(tmp_path)
+
+    await folder_files._extract_and_update(file_id, path, "b.pdf", seeded.folder_id, seeded.user_id)
+
+    assert [c["start_page"] for c in book.calls] == [0, 300]
+    assert await _row(background_db, file_id) is None
+    assert not Path(path).exists()
+
+
+async def test_a_queued_upload_is_read_between_batches(
+    background_db, seeded, tmp_path, monkeypatch, plenty_of_memory
+) -> None:
+    # The parse slot is released after every batch, so one textbook cannot hold
+    # it for an hour while other uploads wait.
+    monkeypatch.setattr(file_service, "PDF_PAGE_CAP", 2)
+    monkeypatch.setattr(folder_files, "PDF_BOOK_MAX_PAGES", 6)
+    order: list[tuple[str, int]] = []
+
+    def fake_pdf_pages(source, progress, deadline=None, clock=None, *, start=0, batch=2, max_pages=2):
+        name = Path(source).stem
+        order.append((name, start))
+        time.sleep(0.05)
+        count = 6 if name == "book" else 2
+        stop = min(start + batch, count, max_pages)
+        progress.pages_done, progress.pages_total = stop, min(count, max_pages)
+        return file_service.PdfText(f"{name} text {start}", stop, count)
+
+    monkeypatch.setattr(file_service, "_extract_pdf_pages", fake_pdf_pages)
+    book_id = await _add_row(background_db, seeded.folder_id, file_name="book.pdf")
+    notes_id = await _add_row(background_db, seeded.folder_id, file_name="notes.pdf")
+    book_path, notes_path = tmp_path / "book.pdf", tmp_path / "notes.pdf"
+    book_path.write_bytes(b"%PDF-1.4 book")
+    notes_path.write_bytes(b"%PDF-1.4 notes")
+
+    book_task = asyncio.create_task(
+        folder_files._extract_and_update(book_id, str(book_path), "book.pdf", seeded.folder_id, seeded.user_id)
+    )
+    await asyncio.sleep(0.02)  # the book's first batch holds the slot
+    await folder_files._extract_and_update(notes_id, str(notes_path), "notes.pdf", seeded.folder_id, seeded.user_id)
+    await book_task
+
+    assert order == [("book", 0), ("notes", 0), ("book", 2), ("book", 4)]
+    assert (await _row(background_db, book_id)).content == "book text 0\n\nbook text 2\n\nbook text 4"

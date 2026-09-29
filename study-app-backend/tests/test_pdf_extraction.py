@@ -225,3 +225,121 @@ def test_pdf_parse_stops_between_pages_once_the_deadline_passes(monkeypatch: pyt
     assert str(caught.value) == "This file took too long to read. Try splitting it into smaller files."
     # Existing handlers map ValidationException to a 400 / an upload_error message.
     assert isinstance(caught.value, ValidationException)
+
+
+# --- page ranges for batched reading (GH #121) ------------------------------------
+
+
+def test_a_later_batch_reads_only_its_page_range(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(file_service, "pymupdf4llm", None)
+    doc = _FakeDoc([f"page {i}" for i in range(812)])
+    _use_fake_fitz(monkeypatch, doc)
+    _no_pdfplumber(monkeypatch)
+    progress = ParseProgress()
+
+    result = _extract_pdf_pages(b"%PDF-1.4", progress, start=300, batch=300, max_pages=1500)
+
+    assert doc.loaded == list(range(300, 600))
+    assert result.text.startswith("page 300\n") and result.text.endswith("\npage 599")
+    # pages_read counts from the start of the book, so notes read "first 600 of 812".
+    assert (result.pages_read, result.page_count) == (600, 812)
+    assert (progress.pages_done, progress.pages_total) == (600, 812)
+    assert doc.closed is True
+
+
+def test_first_batch_reports_the_whole_book_as_the_total(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(file_service, "pymupdf4llm", None)
+    doc = _FakeDoc([f"page {i}" for i in range(812)])
+    _use_fake_fitz(monkeypatch, doc)
+    _no_pdfplumber(monkeypatch)
+    progress = ParseProgress()
+
+    result = _extract_pdf_pages(b"%PDF-1.4", progress, batch=300, max_pages=1500)
+
+    assert doc.loaded == list(range(300))
+    assert (result.pages_read, result.page_count) == (300, 812)
+    assert (progress.pages_done, progress.pages_total) == (300, 812)
+
+
+def test_batches_stop_at_the_page_ceiling(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(file_service, "pymupdf4llm", None)
+    doc = _FakeDoc([f"page {i}" for i in range(2000)])
+    _use_fake_fitz(monkeypatch, doc)
+    _no_pdfplumber(monkeypatch)
+    progress = ParseProgress()
+
+    result = _extract_pdf_pages(b"%PDF-1.4", progress, start=1200, batch=500, max_pages=1500)
+
+    assert doc.loaded == list(range(1200, 1500))
+    assert (result.pages_read, result.page_count) == (1500, 2000)
+    assert progress.pages_total == 1500
+
+
+def test_a_later_batch_without_text_is_not_an_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Only the first batch decides whether the file is readable at all; a run of
+    # scanned figure pages later in the book just adds nothing.
+    monkeypatch.setattr(file_service, "pymupdf4llm", None)
+    doc = _FakeDoc(["intro"] * 3 + [""] * 3)
+    _use_fake_fitz(monkeypatch, doc)
+    _no_pdfplumber(monkeypatch)
+
+    result = _extract_pdf_pages(b"%PDF-1.4", ParseProgress(), start=3, batch=3, max_pages=1500)
+
+    assert (result.text, result.pages_read) == ("", 6)
+
+
+def test_later_batches_detect_headers_from_the_same_opening_pages(monkeypatch: pytest.MonkeyPatch) -> None:
+    doc = _FakeDoc([f"p{i}" for i in range(400)])
+    _use_fake_fitz(monkeypatch, doc)
+    _no_pdfplumber(monkeypatch)
+    fake = _use_fake_pymupdf4llm(monkeypatch, lambda d, pages, **kwargs: f"# md {pages[0]}")
+
+    _extract_pdf_pages(b"%PDF-1.4", ParseProgress(), start=300, batch=300, max_pages=1500)
+
+    assert fake.IdentifyHeaders.call_args.kwargs["pages"] == list(range(30))
+    assert [c.kwargs["pages"] for c in fake.to_markdown.call_args_list] == [[i] for i in range(300, 400)]
+
+
+def test_pdfplumber_fallback_reads_the_same_page_range(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        file_service,
+        "fitz",
+        SimpleNamespace(open=MagicMock(side_effect=RuntimeError("cannot open broken document"))),
+    )
+    read: list[int] = []
+
+    class _PlumberPage:
+        def __init__(self, index: int) -> None:
+            self._index = index
+            self.get_textmap = SimpleNamespace(cache_clear=MagicMock())
+
+        def extract_text(self) -> str:
+            read.append(self._index)
+            return f"p{self._index}"
+
+        def flush_cache(self) -> None:
+            pass
+
+    plumber_doc = MagicMock()
+    plumber_doc.__enter__.return_value = SimpleNamespace(pages=[_PlumberPage(i) for i in range(10)])
+    plumber_doc.__exit__.return_value = False
+    monkeypatch.setattr(file_service.pdfplumber, "open", MagicMock(return_value=plumber_doc))
+
+    result = _extract_pdf_pages(b"%PDF-1.4", ParseProgress(), start=4, batch=4, max_pages=1500)
+
+    assert read == [4, 5, 6, 7]
+    assert (result.text, result.pages_read, result.page_count) == ("p4\np5\np6\np7", 8, 10)
+
+
+def test_a_later_batch_counts_progress_from_its_first_page(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The row of a ready book must never flash back to page 0 when a batch starts.
+    monkeypatch.setattr(file_service, "pymupdf4llm", None)
+    doc = _FakeDoc([f"page {i}" for i in range(812)])
+    _use_fake_fitz(monkeypatch, doc)
+    _no_pdfplumber(monkeypatch)
+    progress = ParseProgress()
+
+    with pytest.raises(ParseTimeoutError):
+        _extract_pdf_pages(b"%PDF-1.4", progress, deadline=0.0, clock=lambda: 1.0, start=300, batch=300, max_pages=1500)
+
+    assert (progress.pages_done, progress.pages_total) == (300, 812)

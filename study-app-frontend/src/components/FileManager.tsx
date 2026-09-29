@@ -1,7 +1,7 @@
 import { AlertCircle, Check, Eye, FileText, Info, Loader2, Minus, RotateCcw, StickyNote, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type FolderFile, type SkippedFile, addFolderTextNote, deleteFolderFile, fetchFolderFiles, uploadFolderFiles } from "../lib/api";
-import { describeUploadStatus } from "../lib/uploadStatus";
+import { describeUploadStatus, isReadingMore, isUploadActive } from "../lib/uploadStatus";
 import { Button } from "./Button";
 import { ConfirmModal } from "./ConfirmModal";
 import { FileContentModal } from "./FileContentModal";
@@ -75,10 +75,10 @@ export function FileManager({ folderId, onClose }: Props) {
     });
   }, [folderId]);
 
-  // Poll while any file is still processing
+  // Poll while any file is still processing or reading more pages
   useEffect(() => {
-    const hasProcessing = (files ?? []).some((f) => f.upload_status === "processing");
-    if (!hasProcessing) return;
+    const hasActive = (files ?? []).some(isUploadActive);
+    if (!hasActive) return;
     const id = setInterval(() => {
       fetchFolderFiles(folderId).then((data) => setFiles(data));
     }, 3000);
@@ -505,7 +505,12 @@ export function FileManager({ folderId, onClose }: Props) {
                         <>{f.file_type.toUpperCase()} · {formatBytes(f.size_bytes)} · {formatDate(f.uploaded_at)}</>
                       )}
                     </p>
-                    {f.upload_status === "ready" && f.upload_note ? (
+                    {isReadingMore(f) ? (
+                      <p className="muted file-manager-row-note">
+                        <Loader2 size={11} className="spin" aria-hidden="true" />
+                        {describeUploadStatus(f)}
+                      </p>
+                    ) : f.upload_status === "ready" && f.upload_note ? (
                       <p className="muted file-manager-row-note">
                         <Info size={11} aria-hidden="true" />
                         {f.upload_note}

@@ -106,3 +106,15 @@ describe("FileManager status lines", () => {
     expect(screen.getByText("Read the first 300 of 812 pages.")).toBeTruthy();
   });
 });
+
+describe("FileManager long PDFs", () => {
+  it("shows a ready textbook still reading more pages and keeps refreshing it", async () => {
+    const reading = row({ id: 21, file_name: "textbook.pdf", pages_done: 419, pages_total: 812 });
+    await openWith([reading]);
+
+    expect(screen.getByText("Reading more: page 420 of 812")).toBeTruthy();
+    vi.mocked(fetchFolderFiles).mockResolvedValue([{ ...reading, pages_done: 812, pages_total: 812 }]);
+    await waitFor(() => expect(screen.queryByText(/Reading more/)).toBeNull(), { timeout: 4500 });
+    expect(fetchFolderFiles).toHaveBeenCalledTimes(2);
+  });
+});

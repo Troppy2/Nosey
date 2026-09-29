@@ -8,6 +8,9 @@ workers), so a restart or crash loses them, and their rows would say
 - every SWEEP_INTERVAL_S, rows still "processing" STUCK_UPLOAD_THRESHOLD after
   upload are failed too (a deploy-overlap orphan, or a parse that hung).
 
+Long PDFs that were ready but still reading later batches (GH #121) are
+finalized at startup with what they had read.
+
 A parse that does finish later still writes its real result over the error.
 """
 from __future__ import annotations
@@ -16,7 +19,7 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Awaitable, Callable, Optional
 
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import async_session_maker
@@ -56,14 +59,48 @@ async def sweep_stuck_uploads(session: AsyncSession, older_than: Optional[timede
     return result.rowcount or 0
 
 
+def stopped_reading_note(pages_read: int, page_count: int) -> str:
+    """Note for a long PDF whose later batches stopped early. The raw file is gone."""
+    return (
+        f"Read the first {pages_read} of {page_count} pages. "
+        "Delete this file and upload it again to read the rest."
+    )
+
+
+async def finalize_interrupted_books(session: AsyncSession) -> int:
+    """At startup: long PDFs still reading more pages (ready, pages_done < pages_total)
+    lost their batch loop with the process. They keep what was read, with a note.
+
+    Startup only: a live instance may spend an hour on a textbook, so the periodic
+    sweep leaves these rows alone.
+    """
+    rows = await session.scalars(
+        select(FolderFile).where(
+            FolderFile.upload_status == "ready",
+            FolderFile.pages_done.is_not(None),
+            FolderFile.pages_total.is_not(None),
+            FolderFile.pages_done < FolderFile.pages_total,
+        )
+    )
+    books = list(rows.all())
+    for book in books:
+        book.upload_note = stopped_reading_note(book.pages_done, book.pages_total)
+        book.pages_total = book.pages_done
+    await session.commit()
+    return len(books)
+
+
 async def _recover_at_boot() -> None:
     async with async_session_maker() as session:
         failed = await sweep_stuck_uploads(session)
+        books = await finalize_interrupted_books(session)
     removed = cleanup_stale_temp_uploads()
-    if failed or removed:
+    if failed or books or removed:
         logger.warning(
-            "Upload recovery at startup: %d interrupted uploads failed, %d temp files removed",
+            "Upload recovery at startup: %d interrupted uploads failed, %d half-read PDFs finalized, "
+            "%d temp files removed",
             failed,
+            books,
             removed,
         )
 
