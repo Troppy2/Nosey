@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import hashlib
 from datetime import datetime
-from io import BytesIO
-
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
@@ -17,10 +15,11 @@ from src.models.folder import Folder
 from src.models.folder_file import FolderFile
 from src.models.user import User
 from src.repositories.usage_event_repository import UsageEventRepository
-from src.services.file_service import FileService
+from src.services.file_service import FileService, ParseProgress
 from src.services.kojo_context_cache import invalidate_folder
 from src.utils.exceptions import ValidationException
 from src.utils.logger import get_logger
+from src.utils.temp_uploads import UploadTooLargeError, remove_temp, save_upload_to_temp
 from src.utils.validators import (
     ALLOWED_FILE_TYPES,
     MAX_UPLOAD_FILE_SIZE_BYTES,
@@ -72,36 +71,38 @@ async def _get_owned_folder(
     return folder
 
 
-class _BytesUploadFile:
-    """Minimal UploadFile stand-in backed by in-memory bytes for background tasks."""
-
-    def __init__(self, data: bytes, filename: str) -> None:
-        self._data = data
-        self.filename = filename
-
-    async def read(self) -> bytes:
-        return self._data
+async def _record_progress(file_id: int, progress: ParseProgress) -> None:
+    async with async_session_maker() as session:
+        record = await session.get(FolderFile, file_id)
+        if record is None:
+            return
+        record.pages_done = progress.pages_done
+        record.pages_total = progress.pages_total
+        await session.commit()
 
 
 async def _extract_and_update(
     file_id: int,
-    data: bytes,
+    path: str,
     file_name: str,
-    file_type: str,
     folder_id: int,
     user_id: int,
 ) -> None:
-    """Background task: extract text from bytes and update the folder_file record."""
+    """Background task: parse the uploaded temp file and update the folder_file record.
+
+    No DB connection is held during the parse (it can take minutes); progress writes
+    and the final update each use a short session. The temp file is always removed.
+    """
     import time as _time
     _t0 = _time.monotonic()
-    async with async_session_maker() as session:
-        try:
-            svc = FileService()
-            mock_file = _BytesUploadFile(data, file_name)
-            content, _ = await svc.extract_from_file(mock_file)  # type: ignore[arg-type]
+    try:
+        result = await FileService().extract_from_path(
+            path, file_name, on_progress=lambda progress: _record_progress(file_id, progress)
+        )
+        content = result.text
+        content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
 
-            content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
-
+        async with async_session_maker() as session:
             duplicate = await session.scalar(
                 select(FolderFile).where(
                     FolderFile.folder_id == folder_id,
@@ -122,6 +123,16 @@ async def _extract_and_update(
                 record.content_hash = content_hash
                 record.size_bytes = len(content.encode("utf-8"))
                 record.upload_status = "ready"
+                # A sweep may have marked this row failed while it was still parsing
+                # (deploy overlap); the real result wins.
+                record.upload_error = None
+                record.upload_note = None
+                if result.pages_read is not None:
+                    record.pages_done = record.pages_total = result.pages_read
+                    if result.page_count and result.page_count > result.pages_read:
+                        record.upload_note = (
+                            f"Read the first {result.pages_read} of {result.page_count} pages."
+                        )
 
             duration_ms = int((_time.monotonic() - _t0) * 1000)
             success = record.upload_status == "ready"
@@ -139,22 +150,24 @@ async def _extract_and_update(
                 "Background extraction complete",
                 extra={"file_id": file_id, "file_name": file_name, "status": record.upload_status},
             )
-        except Exception as exc:
-            logger.warning("Background extraction failed for file_id=%s: %s", file_id, exc)
-            duration_ms = int((_time.monotonic() - _t0) * 1000)
-            async with async_session_maker() as err_session:
-                record = await err_session.get(FolderFile, file_id)
-                if record is not None:
-                    record.upload_status = "error"
-                    record.upload_error = str(exc)[:500]
-                try:
-                    await UsageEventRepository(err_session).log_event(
-                        user_id, "file_upload", duration_ms,
-                        success=False, error_type=type(exc).__name__[:50]
-                    )
-                except Exception:
-                    pass
-                await err_session.commit()
+    except Exception as exc:
+        logger.warning("Background extraction failed for file_id=%s: %s", file_id, exc)
+        duration_ms = int((_time.monotonic() - _t0) * 1000)
+        async with async_session_maker() as err_session:
+            record = await err_session.get(FolderFile, file_id)
+            if record is not None:
+                record.upload_status = "error"
+                record.upload_error = str(exc)[:500]
+            try:
+                await UsageEventRepository(err_session).log_event(
+                    user_id, "file_upload", duration_ms,
+                    success=False, error_type=type(exc).__name__[:50]
+                )
+            except Exception:
+                pass
+            await err_session.commit()
+    finally:
+        remove_temp(path)
 
 
 @router.get("/{folder_id}/files", response_model=list[FolderFileResponse])
@@ -241,61 +254,91 @@ async def upload_folder_files(
     created: list[FolderFileResponse] = []
     skipped: list[SkippedFile] = []
     pending_total_bytes = 0
+    # Temp files handed to background tasks; removed here if the request fails first.
+    queued_paths: list[str] = []
 
-    for upload in files:
-        name = upload.filename or "untitled"
-        file_type = normalize_file_extension(name)
+    try:
+        for upload in files:
+            name = upload.filename or "untitled"
+            file_type = normalize_file_extension(name)
 
-        if file_type not in ALLOWED_FILE_TYPES:
-            skipped.append(SkippedFile(
+            if file_type not in ALLOWED_FILE_TYPES:
+                skipped.append(SkippedFile(
+                    file_name=name,
+                    reason="Supported file types: PDF, DOCX, TXT, MD, HTML, PPTX, and common code files",
+                ))
+                continue
+
+            # Stream to a temp file NOW, before the request context ends. The bytes
+            # never sit in memory for the length of the background parse.
+            try:
+                saved = await save_upload_to_temp(upload, MAX_UPLOAD_FILE_SIZE_BYTES)
+            except UploadTooLargeError:
+                skipped.append(SkippedFile(
+                    file_name=name,
+                    reason=f"Exceeds {MAX_UPLOAD_FILE_SIZE_BYTES // (1024 * 1024)} MB per-file limit",
+                ))
+                continue
+            if saved.size == 0:
+                remove_temp(saved.path)
+                skipped.append(SkippedFile(file_name=name, reason="File is empty"))
+                continue
+            if current_total_bytes + pending_total_bytes + saved.size > MAX_UPLOAD_TOTAL_SIZE_BYTES:
+                remove_temp(saved.path)
+                skipped.append(SkippedFile(
+                    file_name=name,
+                    reason=f"Adding this file would exceed the {MAX_UPLOAD_TOTAL_SIZE_BYTES // (1024 * 1024)} MB folder limit",
+                ))
+                continue
+
+            # Reject an exact re-upload before it spends minutes in the single parse
+            # slot. Failed rows don't count, so re-uploading a failed file works.
+            duplicate = await session.scalar(
+                select(FolderFile).where(
+                    FolderFile.folder_id == folder_id,
+                    FolderFile.raw_hash == saved.sha256,
+                    FolderFile.upload_status.in_(("ready", "processing")),
+                )
+            )
+            if duplicate is not None:
+                remove_temp(saved.path)
+                skipped.append(SkippedFile(
+                    file_name=name,
+                    reason=f"Identical file already exists as '{duplicate.file_name}'",
+                ))
+                continue
+
+            pending_total_bytes += saved.size
+
+            # Insert a placeholder record immediately so the frontend can display it.
+            record = FolderFile(
+                folder_id=folder.id,
                 file_name=name,
-                reason="Supported file types: PDF, DOCX, TXT, MD, HTML, PPTX, and common code files",
-            ))
-            continue
+                file_type=file_type,
+                size_bytes=saved.size,
+                content="",
+                content_hash="",
+                raw_hash=saved.sha256,
+                upload_status="processing",
+            )
+            session.add(record)
+            await session.flush()
 
-        # Read bytes NOW before the request context ends.
-        data = await upload.read()
-        if not data:
-            skipped.append(SkippedFile(file_name=name, reason="File is empty"))
-            continue
-        if len(data) > MAX_UPLOAD_FILE_SIZE_BYTES:
-            skipped.append(SkippedFile(
-                file_name=name,
-                reason=f"Exceeds {MAX_UPLOAD_FILE_SIZE_BYTES // (1024 * 1024)} MB per-file limit",
-            ))
-            continue
-        if current_total_bytes + pending_total_bytes + len(data) > MAX_UPLOAD_TOTAL_SIZE_BYTES:
-            skipped.append(SkippedFile(
-                file_name=name,
-                reason=f"Adding this file would exceed the {MAX_UPLOAD_TOTAL_SIZE_BYTES // (1024 * 1024)} MB folder limit",
-            ))
-            continue
+            # Schedule text extraction in the background; user can navigate away.
+            queued_paths.append(saved.path)
+            background_tasks.add_task(_extract_and_update, record.id, saved.path, name, folder_id, user.id)
 
-        pending_total_bytes += len(data)
+            created.append(FolderFileResponse.model_validate(record))
+            logger.info(
+                "File queued for background extraction",
+                extra={"upload_filename": name, "file_type": file_type, "folder_id": folder_id},
+            )
 
-        # Insert a placeholder record immediately so the frontend can display it.
-        record = FolderFile(
-            folder_id=folder.id,
-            file_name=name,
-            file_type=file_type,
-            size_bytes=len(data),
-            content="",
-            content_hash="",
-            upload_status="processing",
-        )
-        session.add(record)
-        await session.flush()
-
-        # Schedule text extraction in the background — user can navigate away.
-        background_tasks.add_task(_extract_and_update, record.id, data, name, file_type, folder_id, user.id)
-
-        created.append(FolderFileResponse.model_validate(record))
-        logger.info(
-            "File queued for background extraction",
-            extra={"upload_filename": name, "file_type": file_type, "folder_id": folder_id},
-        )
-
-    await session.commit()
+        await session.commit()
+    except BaseException:
+        for path in queued_paths:
+            remove_temp(path)
+        raise
     if created:
         invalidate_folder(folder_id)
     return UploadResult(uploaded=created, skipped=skipped)
