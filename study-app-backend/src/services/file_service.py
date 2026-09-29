@@ -635,7 +635,7 @@ class FileService:
         text = re.sub(r"(?is)<(script|style|noscript).*?>.*?</\1>", " ", raw)
         text = re.sub(r"(?s)<[^>]+>", " ", text)
         return html_lib.unescape(text).strip()
-    def _extract_
+
     def _extract_pptx(self, data: bytes) -> str:
         if Presentation is None:
             raise ValidationException(
