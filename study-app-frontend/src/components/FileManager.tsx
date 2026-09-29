@@ -16,7 +16,7 @@ const MAX_TOTAL_SIZE_MB = 300;
 // are actually sent to the server. Nothing leaves the client until it elapses.
 const UNDO_WINDOW_MS = 6000;
 const ACCEPTED_EXTENSIONS =
-  ".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.ml,.mli,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml";
+  ".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.ml,.mli,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml,.ipynb";
 const ALLOWED_TYPES = [
   "application/pdf",
   "text/plain",
@@ -93,7 +93,7 @@ export function FileManager({ folderId, onClose }: Props) {
 
     Array.from(selected).forEach((f) => {
       const allowed =
-        ALLOWED_TYPES.includes(f.type) || /\.(pdf|txt|md|docx|pptx)$/i.test(f.name);
+        ALLOWED_TYPES.includes(f.type) || /\.(pdf|txt|md|docx|pptx|ipynb)$/i.test(f.name);
       if (!allowed) { errs.push(`${f.name}: unsupported type`); return; }
       if (f.size > MAX_FILE_SIZE_MB * 1024 * 1024) { errs.push(`${f.name}: exceeds ${MAX_FILE_SIZE_MB} MB`); return; }
       valid.push(f);

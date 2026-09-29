@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import html as html_lib
+import json
 import os
 import re
 import time
@@ -535,6 +536,8 @@ class FileService:
             return _clean_extracted_text(self._extract_code(data, file_type), preserve_code=True)
         if file_type == "docx":
             return _clean_extracted_text(self._extract_docx(data))
+        if file_type == "ipynb":
+            return _clean_extracted_text(self._extract_notebook(data), preserve_code=True)
         return _clean_extracted_text(self._extract_pdf(data, deadline))
 
     async def extract_from_files(self, notes_files: list[UploadFile]) -> tuple[str, list[str]]:
@@ -666,6 +669,35 @@ class FileService:
         text = _decode_best_effort(data)
         header = f"Code file ({file_type})"
         return f"{header}\n\n{text.strip()}"
+
+    def _extract_notebook(self, data: bytes) -> str:
+        """Jupyter notebook: markdown cells as prose, code cells fenced. Outputs are
+        dropped: they are noisy (tracebacks, long prints) and can hold base64 images."""
+        try:
+            notebook = json.loads(_decode_best_effort(data))
+        except ValueError as exc:
+            raise ValidationException("This notebook is not valid .ipynb JSON") from exc
+        if not isinstance(notebook, dict) or not isinstance(notebook.get("cells"), list):
+            raise ValidationException("This notebook has no cells")
+        language = str(
+            (notebook.get("metadata") or {}).get("language_info", {}).get("name") or "python"
+        )
+        parts: list[str] = []
+        for cell in notebook["cells"]:
+            if not isinstance(cell, dict):
+                continue
+            source = cell.get("source", "")
+            text = ("".join(source) if isinstance(source, list) else str(source)).strip()
+            if not text:
+                continue
+            if cell.get("cell_type") == "code":
+                parts.append(f"```{language}\n{text}\n```")
+            elif cell.get("cell_type") == "markdown":
+                parts.append(text)
+        result = "\n\n".join(parts).strip()
+        if not result:
+            raise ValidationException("No text could be extracted from the notebook")
+        return result
 
     def _extract_pdf(self, data: bytes, deadline: Optional[float] = None) -> str:
         return _extract_pdf_pages(data, ParseProgress(), deadline=deadline).text

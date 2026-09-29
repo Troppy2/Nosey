@@ -77,6 +77,14 @@ logger = get_logger(__name__)
 _DEFAULT_TOP_K = 6
 _STAGE_MULTIPLIER = 4
 _CONTEXT_CHAR_LIMIT = 8_000
+# Exam-prep retrieval bias (see retrieve_context). Rank-based so it works the same
+# whichever reranker (flashrank, cross-encoder, hybrid order) produced the ranking.
+_EXERCISE_BOOST = 1.5
+_OUT_OF_SCOPE_PENALTY = 0.4
+# "1.20 Storage and flops": numbered exercise headings as the HW guides title them.
+_EXERCISE_SECTION_RE = re.compile(r"^\s*\d+\.\d+\s")
+_EXERCISE_TEXT_RE = re.compile(r"\b(exercise|problem|homework|hw)\b", re.IGNORECASE)
+_CHAPTER_RE = re.compile(r"\bchapter\s+(\d+)\b", re.IGNORECASE)
 _CHUNK_SIZE = 1_200
 _CHUNK_OVERLAP = 180
 _CACHE_SIZE = 512
@@ -119,8 +127,16 @@ class HybridRAGService:
         top_k: int = _DEFAULT_TOP_K,
         source_filter: Optional[list[str]] = None,
         owner_id: Optional[int] = None,
+        char_limit: int = _CONTEXT_CHAR_LIMIT,
+        boost_exercises: bool = False,
+        chapter_scope: Optional[frozenset[int]] = None,
     ) -> tuple[str, dict[str, object]]:
         """Retrieve the most relevant note chunks for a query.
+
+        boost_exercises favors chunks that look like numbered homework/textbook
+        exercises; chapter_scope down-ranks (never drops) chunks from chapters
+        outside the scope. Both only reorder the reranked pool, so a wrong guess
+        costs relevance, never an empty context.
 
         owner_id stamps every point written to Qdrant with the account it belongs to so
         account deletion can purge them (see purge_owner). When it is None nothing is
@@ -133,6 +149,7 @@ class HybridRAGService:
                 f"{hashlib.sha256((notes or '').encode('utf-8', errors='ignore')).hexdigest()}"
                 f"::{query.lower()}::{top_k}::{','.join(sorted(source_filter or []))}"
                 f"::{owner_id if owner_id is not None else 'anon'}"
+                f"::{char_limit}::{int(boost_exercises)}::{','.join(map(str, sorted(chapter_scope or [])))}"
             ).encode("utf-8")
         ).hexdigest()
         cached = self._cache_get(cache_key)
@@ -160,7 +177,7 @@ class HybridRAGService:
             "retrieval_sources": [],
         }
         if not chunks:
-            result = ((notes or "")[:_CONTEXT_CHAR_LIMIT], meta)
+            result = ((notes or "")[:char_limit], meta)
             self._cache_set(cache_key, result)
             return result
 
@@ -170,16 +187,24 @@ class HybridRAGService:
         else:
             candidates = self._local_hybrid_candidates(chunks, query, top_k * _STAGE_MULTIPLIER)
 
-        selected = self._rerank(query, candidates, top_k)
-        selected = self._ensure_source_diversity(selected, candidates)
+        diversity_pool = candidates
+        if boost_exercises or chapter_scope:
+            ranked = self._rerank(query, candidates, len(candidates))
+            # The diversity pass draws from the biased order too, or it re-adds an
+            # out-of-scope chunk as a file's "representative".
+            diversity_pool = self._apply_exam_bias(ranked, boost_exercises, chapter_scope)
+            selected = diversity_pool[:top_k]
+        else:
+            selected = self._rerank(query, candidates, top_k)
+        selected = self._ensure_source_diversity(selected, diversity_pool)
         meta["retrieval_selected_chunks"] = len(selected)
         meta["retrieval_top_k"] = len(selected)
         meta["retrieval_sources"] = list(dict.fromkeys(chunk.source for chunk in selected))
 
         context = self.format_context(selected)
         if not context:
-            context = (notes or "")[:_CONTEXT_CHAR_LIMIT]
-        result = (context[:_CONTEXT_CHAR_LIMIT], meta)
+            context = (notes or "")[:char_limit]
+        result = (context[:char_limit], meta)
         self._cache_set(cache_key, result)
         return result
 
@@ -472,6 +497,31 @@ class HybridRAGService:
             extra={"owner_id": owner_id, "points_deleted": before},
         )
         return before
+
+    @staticmethod
+    def _apply_exam_bias(
+        ranked: list[RagChunk], boost_exercises: bool, chapter_scope: Optional[frozenset[int]]
+    ) -> list[RagChunk]:
+        """Re-sort a ranked list: exercise chunks up, out-of-scope chapters down."""
+        total = max(1, len(ranked))
+        scored: list[tuple[float, int, RagChunk]] = []
+        for position, chunk in enumerate(ranked):
+            score = 1.0 - position / total
+            leaf = chunk.section.split(">")[-1].strip() if chunk.section else ""
+            if boost_exercises and (
+                # Leaf only: the file name ("HW Guide") sits in every breadcrumb.
+                _EXERCISE_SECTION_RE.match(leaf) or _EXERCISE_TEXT_RE.search(leaf)
+            ):
+                score *= _EXERCISE_BOOST
+            if chapter_scope:
+                # The last "Chapter N" in the breadcrumb is the most specific one:
+                # "HW Guide (Chapters 1-4) > Chapter 1 - Vectors" -> 1.
+                chapters = _CHAPTER_RE.findall(chunk.section)
+                if chapters and int(chapters[-1]) not in chapter_scope:
+                    score *= _OUT_OF_SCOPE_PENALTY
+            scored.append((score, -position, chunk))
+        scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        return [chunk for _, _, chunk in scored]
 
     def _ensure_source_diversity(self, selected: list[RagChunk], pool: list[RagChunk]) -> list[RagChunk]:
         """Append one representative chunk for each source not already in selected.
