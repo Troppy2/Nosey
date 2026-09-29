@@ -466,12 +466,17 @@ class FileService:
         file_name: str,
         *,
         on_progress: Optional[Callable[[ParseProgress], Awaitable[None]]] = None,
+        start_page: int = 0,
+        max_pages: int = PDF_PAGE_CAP,
     ) -> ExtractionResult:
         """Parse a file already saved to disk (uploads are streamed to temp files).
 
         PDFs are opened straight from the path, so the raw bytes never sit in memory.
         on_progress is awaited once when the parse gets its slot (pages_done 0), then
         whenever the page counters move, at most every _PROGRESS_POLL_S.
+
+        A PDF parse reads at most PDF_PAGE_CAP pages from start_page, never past
+        max_pages; folder uploads call this once per batch to read long books.
         """
         file_type = normalize_file_extension(file_name)
         if file_type not in ALLOWED_FILE_TYPES:
@@ -488,15 +493,23 @@ class FileService:
             await reporter.report()
             deadline = time.monotonic() + PARSE_DEADLINE_S
             return await _run_parse_thread(
-                self._parse_path, path, file_type, progress, deadline, reporter=reporter
+                self._parse_path,
+                path,
+                file_type,
+                progress,
+                deadline,
+                _PageRange(start_page, PDF_PAGE_CAP, max_pages),
+                reporter=reporter,
             )
 
     def _parse_path(
-        self, path: str, file_type: str, progress: ParseProgress, deadline: float
+        self, path: str, file_type: str, progress: ParseProgress, deadline: float, pages: _PageRange
     ) -> ExtractionResult:
         """Extract and clean text from a saved file. Runs in a worker thread."""
         if file_type == "pdf":
-            pdf = _extract_pdf_pages(path, progress, deadline)
+            pdf = _extract_pdf_pages(
+                path, progress, deadline, start=pages.start, batch=pages.batch, max_pages=pages.max_pages
+            )
             return ExtractionResult(_clean_extracted_text(pdf.text), file_type, pdf.pages_read, pdf.page_count)
         with open(path, "rb") as handle:
             data = handle.read()
@@ -622,7 +635,7 @@ class FileService:
         text = re.sub(r"(?is)<(script|style|noscript).*?>.*?</\1>", " ", raw)
         text = re.sub(r"(?s)<[^>]+>", " ", text)
         return html_lib.unescape(text).strip()
-
+    def _extract_
     def _extract_pptx(self, data: bytes) -> str:
         if Presentation is None:
             raise ValidationException(
