@@ -17,7 +17,6 @@ from src.models.user import User
 from src.repositories.usage_event_repository import UsageEventRepository
 from src.services.file_service import FileService, ParseProgress
 from src.services.kojo_context_cache import invalidate_folder
-from src.utils.exceptions import ValidationException
 from src.utils.logger import get_logger
 from src.utils.temp_uploads import UploadTooLargeError, remove_temp, save_upload_to_temp
 from src.utils.validators import (
