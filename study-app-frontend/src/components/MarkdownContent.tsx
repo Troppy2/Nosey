@@ -4,6 +4,7 @@ import { Check, Copy } from "lucide-react";
 import React, { useState } from "react";
 
 import { repairMathDelimiters } from "../lib/repairMathDelimiters";
+import { VisualBlock, VisualPending, isVisualLang } from "./visuals/VisualBlock";
 
 // ── KaTeX ─────────────────────────────────────────────────────────────────────
 
@@ -458,8 +459,18 @@ export function MarkdownContent({ content, enableCodeCopy = false }: { content: 
       const code: string[] = [];
       i++;
       while (i < lines.length && !lines[i].startsWith("```")) { code.push(lines[i]); i++; }
+      const closed = i < lines.length;
       i++;
       const src = code.join("\n").trim();
+      // Declarative visual spec (graph/geometry/mermaid/chart). While the reply
+      // is still streaming the fence is unclosed, so show a placeholder instead
+      // of trying to parse half a spec.
+      if (isVisualLang(lang)) {
+        nodes.push(closed
+          ? <VisualBlock key={k++} lang={lang} src={src} />
+          : <VisualPending key={k++} lang={lang} />);
+        continue;
+      }
       // LLM sometimes wraps math in a code fence instead of $$ delimiters
       const looksLikeMath =
         !lang &&

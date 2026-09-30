@@ -457,3 +457,38 @@ describe("dense math from the 2026-09-27 report", () => {
     expect(container.textContent).not.toContain("$$");
   });
 });
+
+describe("visual blocks", () => {
+  it("routes graph/geometry/mermaid/chart fences to the visual renderer, not a code block", () => {
+    for (const lang of ["graph", "geometry", "mermaid", "chart"]) {
+      const { container, code } = md(`Here:\n\n\`\`\`${lang}\n{"data":[]}\n\`\`\`\n\nDone.`);
+      expect(container.querySelector(`.visual-block--${lang}`)).not.toBeNull();
+      expect(code).toHaveLength(0);
+      cleanup();
+    }
+  });
+
+  it("shows a pending placeholder while the fence is still unclosed (streaming)", () => {
+    const { container, text } = md('Plotting now:\n\n```graph\n{"data":[{"fn":"x^');
+    expect(container.querySelector(".visual-block-pending")).not.toBeNull();
+    expect(text).not.toContain('"fn"');
+  });
+
+  it("falls back to the raw spec with an error note when the JSON is invalid", async () => {
+    const { findByText, container } = render(<MarkdownContent content={'```graph\n{not json\n```'} />);
+    await findByText(/Couldn't render this graph/);
+    expect(container.querySelector("pre.kojo-code-block code")?.textContent).toBe("{not json");
+  });
+
+  it("rejects geometry element types outside the whitelist", async () => {
+    const spec = JSON.stringify({ elements: [{ type: "functiongraph", term: "alert(1)" }] });
+    const { findByText } = render(<MarkdownContent content={"```geometry\n" + spec + "\n```"} />);
+    await findByText(/unsupported element type "functiongraph"/);
+  });
+
+  it("leaves ordinary code fences alone", () => {
+    const { container, code } = md("```python\nprint(1)\n```");
+    expect(container.querySelector(".visual-block")).toBeNull();
+    expect(code).toEqual(["print(1)"]);
+  });
+});
