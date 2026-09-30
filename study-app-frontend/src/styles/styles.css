@@ -26584,3 +26584,53 @@ a.sd-chip.is-done:hover {
   cursor: not-allowed;
   opacity: 0.6;
 }
+
+/* ── Kojo visuals (graph / geometry / mermaid / chart blocks) ───────────── */
+.visual-block {
+  position: relative;
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border, rgba(113, 131, 85, 0.2));
+  border-radius: 12px;
+  background: #fff;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.visual-block-canvas {
+  width: 100%;
+  min-height: 1px;
+}
+.visual-block--mermaid .visual-block-canvas {
+  display: flex;
+  justify-content: center;
+}
+.visual-block--mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+.visual-geometry-board {
+  width: 100%;
+  max-width: 480px;
+  aspect-ratio: 1 / 1;
+  margin: 0 auto;
+  border: none;
+  border-radius: 8px;
+}
+.visual-block-pending {
+  padding: 1.5rem 0;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--green-dark);
+  opacity: 0.75;
+}
+.visual-block--error {
+  background: transparent;
+}
+.visual-block-error-msg {
+  margin-bottom: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--error, #b42318);
+}
+.visual-block--error .kojo-code-block {
+  margin: 0;
+}
