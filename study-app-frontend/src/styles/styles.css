@@ -26634,3 +26634,30 @@ a.sd-chip.is-done:hover {
 .visual-block--error .kojo-code-block {
   margin: 0;
 }
+
+/* Mermaid polish: soft rounded nodes, pill edge labels, no runaway height */
+.visual-block--mermaid .visual-block-canvas {
+  max-height: 560px;
+  overflow: auto;
+}
+.visual-block--mermaid .node rect,
+.visual-block--mermaid .node polygon,
+.visual-block--mermaid .node path {
+  filter: none;
+}
+.visual-block--mermaid .node rect:not([rx="0"]) {
+  rx: 8px;
+  ry: 8px;
+}
+.visual-block--mermaid .edgeLabel,
+.visual-block--mermaid .edgeLabel p,
+.visual-block--mermaid .labelBkg {
+  background-color: var(--white) !important;
+  border-radius: 999px;
+  padding: 1px 6px;
+  font-size: 12px;
+  color: var(--green-dark);
+}
+.visual-block--mermaid .flowchart-link {
+  stroke-width: 1.75px;
+}

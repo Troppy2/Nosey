@@ -1677,11 +1677,18 @@ _VISUALS_GUIDE = """VISUALS (optional, use when a picture genuinely helps):
 {"boundingbox": [-1, 5, 6, -1], "axis": false, "elements": [{"type": "point", "id": "A", "coords": [0, 0]}, {"type": "point", "id": "B", "coords": [4, 0]}, {"type": "point", "id": "C", "coords": [0, 3]}, {"type": "polygon", "points": ["A", "B", "C"]}, {"type": "angle", "points": ["B", "A", "C"], "name": "90°"}, {"type": "text", "coords": [2, 1.8], "text": "c = 5"}]}
 ```
 - Flowchart/process/tree: fenced block tagged mermaid, standard Mermaid syntax.
+  Shapes: ([text]) for start/end, [text] for steps, {text} for decisions (styling is automatic, do not add classDef or style lines).
+  Decisions are a SHORT question (max ~4 words, e.g. {3 < 7?}); put details on the edge labels (-- yes, go right -->).
+  Keep it to about 10 nodes: summarize the process, do not trace every iteration. Use LR for a simple chain, TD when it branches.
 ```mermaid
-flowchart LR
-  A[Start] --> B{Is n > 1?}
-  B -- yes --> C[n = n - 1]
-  B -- no --> D[Done]
+flowchart TD
+  S([Search for 7]) --> M[Check middle value]
+  M --> D{mid == 7?}
+  D -- yes --> F([Found])
+  D -- "no, mid < 7" --> R[Search right half]
+  D -- "no, mid > 7" --> L[Search left half]
+  R --> M
+  L --> M
 ```
 - Data chart: fenced block tagged chart (Plotly). Trace types: scatter, bar, pie.
 ```chart
