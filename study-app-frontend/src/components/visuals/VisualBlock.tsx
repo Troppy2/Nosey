@@ -24,6 +24,67 @@ function escapeText(s: unknown): string {
   return String(s ?? "").replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }
 
+const SUB: Record<string, string> = {
+  "0": "₀", "1": "₁", "2": "₂", "3": "₃", "4": "₄", "5": "₅", "6": "₆", "7": "₇", "8": "₈", "9": "₉",
+  "+": "₊", "-": "₋", "=": "₌", "(": "₍", ")": "₎",
+  a: "ₐ", e: "ₑ", h: "ₕ", i: "ᵢ", j: "ⱼ", k: "ₖ", l: "ₗ", m: "ₘ", n: "ₙ", o: "ₒ", p: "ₚ", r: "ᵣ", s: "ₛ", t: "ₜ", u: "ᵤ", v: "ᵥ", x: "ₓ",
+};
+const SUP: Record<string, string> = {
+  "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹",
+  "+": "⁺", "-": "⁻", "=": "⁼", "(": "⁽", ")": "⁾", n: "ⁿ", i: "ⁱ", T: "ᵀ",
+};
+
+function script(text: string, map: Record<string, string>, fallback: string): string {
+  const chars = [...text];
+  return chars.every((c) => c in map) ? chars.map((c) => map[c]).join("") : `${fallback}${text}`;
+}
+
+// Labels are drawn as plain SVG text, so HTML and LaTeX would print literally.
+// Models still write x<sub>i</sub>, x_i, x^2 or $\|x\|$; turn the common cases
+// into Unicode (xᵢ, x², ‖x‖) and drop whatever markup is left.
+export function plainLabel(raw: unknown): string {
+  return String(raw ?? "")
+    .replace(/<sub>(.*?)<\/sub>/gi, (_, t: string) => script(t, SUB, "_"))
+    .replace(/<sup>(.*?)<\/sup>/gi, (_, t: string) => script(t, SUP, "^"))
+    .replace(/<[^>]*>/g, "")
+    .replace(/\$/g, "")
+    .replace(/\\\||\|\|/g, "‖")
+    .replace(/\^\s*\{?\\circ\}?/g, "°")
+    .replace(/\\(theta|alpha|beta|pi|degree|circ)\b/g, (_, w: string) =>
+      ({ theta: "θ", alpha: "α", beta: "β", pi: "π", degree: "°", circ: "°" })[w] ?? w)
+    .replace(/_\{([^}]*)\}|_([A-Za-z0-9])/g, (_, a?: string, b?: string) => script(a ?? b ?? "", SUB, "_"))
+    .replace(/\^\{([^}]*)\}|\^([A-Za-z0-9])/g, (_, a?: string, b?: string) => script(a ?? b ?? "", SUP, "^"))
+    .replace(/\\[a-zA-Z]+/g, "")
+    .replace(/[{}]/g, "")
+    .trim();
+}
+
+// Models crop the view tightly around their points, so labels hit the axes.
+// Grow the requested box to contain every point with ~15% padding.
+export function fitBoundingBox(spec: Record<string, any>): number[] {
+  const asked =
+    Array.isArray(spec.boundingbox) && spec.boundingbox.length === 4 && spec.boundingbox.every((n: unknown) => Number.isFinite(Number(n)))
+      ? spec.boundingbox.map(Number)
+      : null;
+  const pts: number[][] = (Array.isArray(spec.elements) ? spec.elements : [])
+    .filter((e: any) => e && Array.isArray(e.coords) && e.coords.length === 2)
+    .map((e: any) => e.coords.map(Number))
+    .filter((c: number[]) => c.every(Number.isFinite));
+  if (pts.length === 0) return asked ?? [-6, 6, 6, -6];
+  const xs = pts.map((c) => c[0]);
+  const ys = pts.map((c) => c[1]);
+  const span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), 1);
+  const pad = span * 0.15;
+  let [left, top, right, bottom] = [Math.min(...xs) - pad, Math.max(...ys) + pad, Math.max(...xs) + pad, Math.min(...ys) - pad];
+  if (asked) {
+    left = Math.min(left, asked[0]);
+    top = Math.max(top, asked[1]);
+    right = Math.max(right, asked[2]);
+    bottom = Math.min(bottom, asked[3]);
+  }
+  return [left, top, right, bottom];
+}
+
 function asObject(v: unknown, what: string): Record<string, any> {
   if (!v || typeof v !== "object" || Array.isArray(v)) throw new Error(`${what} must be a JSON object`);
   return v as Record<string, any>;
@@ -95,13 +156,15 @@ async function renderGeometry(el: HTMLElement, src: string) {
   boardEl.className = "jxgbox visual-geometry-board";
   el.appendChild(boardEl);
 
-  const bb = Array.isArray(spec.boundingbox) && spec.boundingbox.length === 4 ? spec.boundingbox.map(Number) : [-6, 6, 6, -6];
+  const bb = fitBoundingBox(spec);
   const board = JXG.JSXGraph.initBoard(boardEl.id, {
     boundingbox: bb,
     axis: spec.axis !== false,
     keepaspectratio: true,
     showCopyright: false,
-    showNavigation: true,
+    // The nav buttons sat on top of the x-axis numbers; wheel zoom and
+    // two-finger pan still work without them.
+    showNavigation: false,
     pan: { enabled: true, needTwoFingers: true },
     zoom: { wheel: true, needShift: false },
   });
@@ -123,21 +186,23 @@ async function renderGeometry(el: HTMLElement, src: string) {
     const e = asObject(raw, "geometry element");
     const type = String(e.type);
     if (!GEOMETRY_TYPES.has(type)) throw new Error(`geometry: unsupported element type "${type}"`);
-    const label = e.name != null ? escapeText(e.name) : "";
+    const label = e.name != null ? escapeText(plainLabel(e.name)) : "";
     const common = { strokeColor: accent, name: label, withLabel: !!label, label: { display: "internal", strokeColor: ink } };
     let obj: any;
     switch (type) {
       case "point": {
         if (!Array.isArray(e.coords) || e.coords.length !== 2) throw new Error("geometry: point needs coords [x, y]");
         obj = board.create("point", e.coords.map(Number), {
-          ...common, name: label || escapeText(e.id ?? ""), withLabel: true, fillColor: accent, size: 3, fixed: e.fixed === true,
+          ...common, name: label || escapeText(plainLabel(e.id ?? "")), withLabel: true, fillColor: accent, size: 3, fixed: e.fixed === true,
         });
         break;
       }
       case "segment":
       case "line":
       case "arrow":
-        obj = board.create(type, pointRefs(e.points, 2).slice(0, 2), { ...common, strokeWidth: 2 });
+        obj = board.create(type, pointRefs(e.points, 2).slice(0, 2), {
+          ...common, strokeWidth: 2, label: { ...common.label, position: "top", offset: [8, 10] },
+        });
         break;
       case "circle":
         if (Array.isArray(e.points)) obj = board.create("circle", pointRefs(e.points, 2).slice(0, 2), { ...common, strokeWidth: 2 });
@@ -155,8 +220,8 @@ async function renderGeometry(el: HTMLElement, src: string) {
         break;
       case "text":
         if (!Array.isArray(e.coords) || e.coords.length !== 2) throw new Error("geometry: text needs coords [x, y]");
-        obj = board.create("text", [Number(e.coords[0]), Number(e.coords[1]), escapeText(e.text)], {
-          display: "internal", strokeColor: ink, fixed: true,
+        obj = board.create("text", [Number(e.coords[0]), Number(e.coords[1]), escapeText(plainLabel(e.text))], {
+          display: "internal", strokeColor: ink, fixed: true, anchorX: "middle", anchorY: "bottom",
         });
         break;
     }

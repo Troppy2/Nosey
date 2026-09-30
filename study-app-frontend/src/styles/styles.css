@@ -26667,3 +26667,13 @@ a.sd-chip.is-done:hover {
 .visual-block--mermaid .flowchart-link {
   stroke-width: 1.75px;
 }
+
+/* Geometry labels: a white halo so text stays readable where it crosses lines,
+   fills or grid. Beats JSXGraph's presentation attributes. */
+.visual-geometry-board text {
+  paint-order: stroke;
+  stroke: var(--white);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  font-size: 13px;
+}
