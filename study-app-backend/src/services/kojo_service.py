@@ -1679,7 +1679,7 @@ _VISUALS_GUIDE = """VISUALS (optional, use when a picture genuinely helps):
 - Flowchart/process/tree: fenced block tagged mermaid, standard Mermaid syntax.
   Shapes: ([text]) for start/end, [text] for steps, {text} for decisions (styling is automatic, do not add classDef or style lines).
   Decisions are a SHORT question (max ~4 words, e.g. {3 < 7?}); put details on the edge labels (-- yes, go right -->).
-  Keep it to about 10 nodes: summarize the process, do not trace every iteration. Use LR for a simple chain, TD when it branches.
+  Keep it to about 10 nodes: summarize the process, do not trace every iteration. Default to TD (the chat column is narrow); use LR only for a chain of 4 nodes or fewer.
 ```mermaid
 flowchart TD
   S([Search for 7]) --> M[Check middle value]

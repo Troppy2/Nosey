@@ -197,7 +197,7 @@ async function renderMermaid(el: HTMLElement, src: string) {
     theme: "base",
     themeVariables: {
       fontFamily: cssVar("--font-sans", "system-ui, sans-serif"),
-      fontSize: "14px",
+      fontSize: "16px",
       primaryColor: cssVar("--green-lightest", "#e9f5db"),
       primaryBorderColor: green,
       primaryTextColor: cssVar("--ink", "#26301f"),
@@ -205,7 +205,7 @@ async function renderMermaid(el: HTMLElement, src: string) {
       edgeLabelBackground: "#ffffff",
       tertiaryColor: "#ffffff",
     },
-    flowchart: { curve: "basis", nodeSpacing: 28, rankSpacing: 34, padding: 12, wrappingWidth: 170, useMaxWidth: true },
+    flowchart: { curve: "basis", nodeSpacing: 36, rankSpacing: 44, padding: 16, wrappingWidth: 200, useMaxWidth: false },
   });
   const styled = styleFlowchart(src);
   await mermaid.parse(styled);

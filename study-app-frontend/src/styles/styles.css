@@ -26604,9 +26604,15 @@ a.sd-chip.is-done:hover {
   display: flex;
   justify-content: center;
 }
+/* Render at natural size (useMaxWidth off) so text never shrinks; wide charts
+   scroll sideways inside .visual-block-canvas instead. */
 .visual-block--mermaid svg {
-  max-width: 100%;
+  max-width: none;
   height: auto;
+  flex-shrink: 0;
+}
+.visual-block--mermaid .visual-block-canvas {
+  justify-content: safe center;
 }
 .visual-geometry-board {
   width: 100%;
