@@ -71,6 +71,31 @@ def test_no_interviewer_mode_leaves_prompt_persona_free() -> None:
     assert "OUTRANKS" not in prompt
 
 
+@pytest.mark.parametrize("strictness", ["strict", "medium", "none"])
+def test_study_chat_prompt_includes_visuals_guide(strictness: str) -> None:
+    prompt = _build_prompt(
+        notes="[notes.md]\nA parabola is the graph of a quadratic.",
+        user_message="Graph y = x^2",
+        history=[],
+        strictness=strictness,
+    )
+
+    assert "VISUALS" in prompt
+    for fence in ("```graph", "```geometry", "```mermaid", "```chart"):
+        assert fence in prompt
+
+
+def test_interviewer_mode_prompt_omits_visuals_guide() -> None:
+    prompt = _build_prompt(
+        notes="[Current task context]\nTwo Sum problem.",
+        user_message="I'm stuck",
+        history=[],
+        interviewer_mode="startup",
+    )
+
+    assert "```geometry" not in prompt
+
+
 @pytest.mark.asyncio
 async def test_map_reduce_open_strictness_does_not_force_notes_only() -> None:
     service = LLMService()
