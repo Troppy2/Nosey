@@ -1673,6 +1673,9 @@ _VISUALS_GUIDE = """VISUALS (optional, use when a picture genuinely helps):
 ```
   Shade area under a curve with "closed": true and "range": [a, b] on the data item.
 - Geometry: fenced block tagged geometry. Element types: point (id, coords), segment/line/arrow (points: [id, id]), circle (points: [center, through] or center + radius), polygon (points: [ids]), angle (points: [A, vertex, C]), text (coords, text). Define points before using them.
+  Labels are PLAIN TEXT: no HTML, no LaTeX, no $. Write subscripts/powers as Unicode (xᵢ, x², ‖x‖, θ).
+  To label a side, put "name" on its segment (it is placed beside the line automatically) instead of a separate text element.
+  Only use text for a short note, placed in empty space away from lines and axes.
 ```geometry
 {"boundingbox": [-1, 5, 6, -1], "axis": false, "elements": [{"type": "point", "id": "A", "coords": [0, 0]}, {"type": "point", "id": "B", "coords": [4, 0]}, {"type": "point", "id": "C", "coords": [0, 3]}, {"type": "polygon", "points": ["A", "B", "C"]}, {"type": "angle", "points": ["B", "A", "C"], "name": "90°"}, {"type": "text", "coords": [2, 1.8], "text": "c = 5"}]}
 ```

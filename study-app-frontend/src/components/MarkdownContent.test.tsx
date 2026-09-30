@@ -508,3 +508,26 @@ describe("styleFlowchart", () => {
     expect(styleFlowchart(src)).toBe(src);
   });
 });
+
+describe("geometry label cleanup", () => {
+  it("turns HTML/LaTeX-ish markup into plain Unicode", async () => {
+    const { plainLabel } = await import("./visuals/VisualBlock");
+    expect(plainLabel("Nearest Vector (x<sub>i</sub> e<sub>i</sub>)")).toBe("Nearest Vector (xᵢ eᵢ)");
+    expect(plainLabel("x^2 + y_{12}")).toBe("x² + y₁₂");
+    expect(plainLabel("Hypotenuse (||x||)")).toBe("Hypotenuse (‖x‖)");
+    expect(plainLabel(String.raw`$\theta$ = 90^\circ`)).toBe("θ = 90°");
+    expect(plainLabel("<b>bold</b>")).toBe("bold");
+  });
+
+  it("pads the bounding box so points never sit on the edge", async () => {
+    const { fitBoundingBox } = await import("./visuals/VisualBlock");
+    const [l, t, r, b] = fitBoundingBox({
+      boundingbox: [0, 4, 3, 0],
+      elements: [{ type: "point", coords: [0, 0] }, { type: "point", coords: [3, 4] }],
+    });
+    expect(l).toBeLessThan(0);
+    expect(b).toBeLessThan(0);
+    expect(r).toBeGreaterThan(3);
+    expect(t).toBeGreaterThan(4);
+  });
+});
