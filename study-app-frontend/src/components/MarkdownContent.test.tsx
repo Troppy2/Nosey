@@ -492,3 +492,19 @@ describe("visual blocks", () => {
     expect(code).toEqual(["print(1)"]);
   });
 });
+
+describe("styleFlowchart", () => {
+  it("tags stadium/circle nodes as terminals and diamonds as decisions", async () => {
+    const { styleFlowchart } = await import("./visuals/VisualBlock");
+    const out = styleFlowchart("flowchart TD\n  S([Start]) --> M[Step]\n  M --> D{ok?}\n  D -- yes --> E((End))");
+    expect(out).toContain("class S,E nosey-terminal");
+    expect(out).toContain("class D nosey-decision");
+    expect(out).toContain("classDef default");
+  });
+
+  it("leaves non-flowchart diagrams untouched", async () => {
+    const { styleFlowchart } = await import("./visuals/VisualBlock");
+    const src = "sequenceDiagram\n  A->>B: hi";
+    expect(styleFlowchart(src)).toBe(src);
+  });
+});

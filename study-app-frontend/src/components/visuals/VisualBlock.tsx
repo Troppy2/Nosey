@@ -31,12 +31,23 @@ function asObject(v: unknown, what: string): Record<string, any> {
 
 let uid = 0;
 
+// Series colors shared by graph and chart so every visual matches the app.
+function seriesPalette(): string[] {
+  return [
+    cssVar("--green-dark", "#718355"),
+    cssVar("--accent-info", "#3a6478"),
+    cssVar("--accent-caution", "#8a5a15"),
+    cssVar("--accent-danger", "#9d3b31"),
+    cssVar("--green-light-mid", "#b5c99a"),
+  ];
+}
+
 // ── graph: function-plot ──────────────────────────────────────────────────────
 async function renderGraph(el: HTMLElement, src: string) {
   const spec = asObject(JSON.parse(src), "graph spec");
   if (!Array.isArray(spec.data) || spec.data.length === 0) throw new Error("graph spec needs a non-empty data array");
   const { default: functionPlot } = await import("function-plot");
-  const palette = [cssVar("--green-dark", "#2f6b3a"), "#2563eb", "#d97706", "#9333ea", "#dc2626"];
+  const palette = seriesPalette();
   const data = spec.data.slice(0, 8).map((d: unknown, idx: number) => {
     const item = asObject(d, "graph data item");
     const out: Record<string, any> = { color: palette[idx % palette.length] };
@@ -155,11 +166,50 @@ async function renderGeometry(el: HTMLElement, src: string) {
 }
 
 // ── mermaid ──────────────────────────────────────────────────────────────────
+// Kojo rarely remembers classDef syntax, so node roles are assigned here from
+// shape: ([stadium]) and ((circle)) are start/end, {diamond} is a decision.
+// Only applies to flowchart/graph diagrams; other diagram types pass through.
+export function styleFlowchart(src: string): string {
+  const header = src.trimStart().split("\n", 1)[0].trim();
+  if (!/^(flowchart|graph)\b/i.test(header)) return src;
+  const terminal = new Set<string>();
+  const decision = new Set<string>();
+  for (const m of src.matchAll(/(?:^|[\s;>&|-])([A-Za-z0-9_]+)\s*(\(\[|\(\(|\{\{|\{)/g)) {
+    (m[2] === "{" || m[2] === "{{" ? decision : terminal).add(m[1]);
+  }
+  const lines = [
+    src.trimEnd(),
+    `  classDef default fill:${cssVar("--green-lightest", "#e9f5db")},stroke:${cssVar("--green-dark", "#718355")},stroke-width:1.5px,color:${cssVar("--ink", "#26301f")}`,
+    `  classDef nosey-terminal fill:${cssVar("--green-dark", "#718355")},stroke:${cssVar("--green-dark", "#718355")},color:#ffffff,font-weight:600`,
+    `  classDef nosey-decision fill:${cssVar("--accent-caution-tint", "#f6ebd8")},stroke:${cssVar("--accent-caution", "#8a5a15")},stroke-width:1.5px,color:${cssVar("--accent-caution-strong", "#6f4810")}`,
+  ];
+  if (terminal.size) lines.push(`  class ${[...terminal].join(",")} nosey-terminal`);
+  if (decision.size) lines.push(`  class ${[...decision].join(",")} nosey-decision`);
+  return lines.join("\n");
+}
+
 async function renderMermaid(el: HTMLElement, src: string) {
   const { default: mermaid } = await import("mermaid");
-  mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: "neutral" });
-  await mermaid.parse(src);
-  const { svg } = await mermaid.render(`nosey-mmd-${++uid}`, src);
+  const green = cssVar("--green-dark", "#718355");
+  mermaid.initialize({
+    startOnLoad: false,
+    securityLevel: "strict",
+    theme: "base",
+    themeVariables: {
+      fontFamily: cssVar("--font-sans", "system-ui, sans-serif"),
+      fontSize: "14px",
+      primaryColor: cssVar("--green-lightest", "#e9f5db"),
+      primaryBorderColor: green,
+      primaryTextColor: cssVar("--ink", "#26301f"),
+      lineColor: green,
+      edgeLabelBackground: "#ffffff",
+      tertiaryColor: "#ffffff",
+    },
+    flowchart: { curve: "basis", nodeSpacing: 28, rankSpacing: 34, padding: 12, wrappingWidth: 170, useMaxWidth: true },
+  });
+  const styled = styleFlowchart(src);
+  await mermaid.parse(styled);
+  const { svg } = await mermaid.render(`nosey-mmd-${++uid}`, styled);
   el.innerHTML = svg; // strict mode sanitizes the SVG with DOMPurify
 }
 
@@ -188,7 +238,7 @@ async function renderChart(el: HTMLElement, src: string) {
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: "rgba(0,0,0,0)",
     font: { color: ink },
-    colorway: [cssVar("--green-dark", "#2f6b3a"), "#2563eb", "#d97706", "#9333ea", "#dc2626"],
+    colorway: seriesPalette(),
   };
   if (lay.title) layout.title = { text: escapeText(typeof lay.title === "string" ? lay.title : lay.title.text) };
   for (const ax of ["xaxis", "yaxis"]) {
