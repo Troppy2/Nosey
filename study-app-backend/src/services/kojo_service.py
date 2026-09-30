@@ -1660,6 +1660,35 @@ def _clean_custom_instruction(custom_instruction: Optional[str]) -> str:
     return custom_instruction.strip()[:500]
 
 
+# Visuals: the frontend (components/visuals/VisualBlock.tsx) renders these fenced
+# specs as interactive graphs/diagrams. Keep the formats in sync with it. Specs
+# are declarative data only; nothing the model writes is executed.
+_VISUALS_GUIDE = """VISUALS (optional, use when a picture genuinely helps):
+- Draw one when the student asks for a graph/diagram/drawing, or when the topic is inherently visual (graphing a function, a geometry problem, a process/flow, comparing data). Otherwise answer in text only.
+- At most 2 visuals per reply. Always explain the visual in text too.
+- Output ONLY valid JSON (double quotes, no comments, no trailing commas) inside graph/geometry/chart fences.
+- Function graph: fenced block tagged graph. "fn" uses plain math syntax (x^2, sin(x), exp(x), sqrt(x)), NOT LaTeX.
+```graph
+{"title": "y = x^2 - 4", "xAxis": {"domain": [-5, 5]}, "yAxis": {"domain": [-5, 10]}, "data": [{"fn": "x^2 - 4"}, {"points": [[-2, 0], [2, 0]], "fnType": "points", "graphType": "scatter"}]}
+```
+  Shade area under a curve with "closed": true and "range": [a, b] on the data item.
+- Geometry: fenced block tagged geometry. Element types: point (id, coords), segment/line/arrow (points: [id, id]), circle (points: [center, through] or center + radius), polygon (points: [ids]), angle (points: [A, vertex, C]), text (coords, text). Define points before using them.
+```geometry
+{"boundingbox": [-1, 5, 6, -1], "axis": false, "elements": [{"type": "point", "id": "A", "coords": [0, 0]}, {"type": "point", "id": "B", "coords": [4, 0]}, {"type": "point", "id": "C", "coords": [0, 3]}, {"type": "polygon", "points": ["A", "B", "C"]}, {"type": "angle", "points": ["B", "A", "C"], "name": "90°"}, {"type": "text", "coords": [2, 1.8], "text": "c = 5"}]}
+```
+- Flowchart/process/tree: fenced block tagged mermaid, standard Mermaid syntax.
+```mermaid
+flowchart LR
+  A[Start] --> B{Is n > 1?}
+  B -- yes --> C[n = n - 1]
+  B -- no --> D[Done]
+```
+- Data chart: fenced block tagged chart (Plotly). Trace types: scatter, bar, pie.
+```chart
+{"data": [{"type": "bar", "x": ["A", "B", "C"], "y": [3, 7, 2]}], "layout": {"title": "Scores", "xaxis": {"title": "Group"}, "yaxis": {"title": "Count"}}}
+```"""
+
+
 def _build_prompt(
     notes: str,
     user_message: str,
@@ -1740,6 +1769,9 @@ def _build_prompt(
     normalized_mode = _normalize_interviewer_mode(interviewer_mode)
     if normalized_mode:
         constitution = f"{_build_interviewer_block(normalized_mode)}\n\n{constitution}"
+    else:
+        # Study chat only: KojoCode interviews stay text/code.
+        constitution = f"{constitution}\n\n{_VISUALS_GUIDE}"
 
     # What Kojo has learned about the student over the past week (server-generated
     # weekly memory). Context only, never overrides the notes or the guidelines.
