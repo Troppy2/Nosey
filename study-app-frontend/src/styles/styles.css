@@ -4235,6 +4235,14 @@ pre.kojo-code-block code {
   color: var(--ink);
 }
 
+.attempt-history-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px;
+}
+
 .flash-class-picker {
   display: inline-flex;
   align-items: center;

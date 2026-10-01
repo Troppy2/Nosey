@@ -1619,18 +1619,17 @@ export default function KojoMode() {
   // conversation, then send the first message into it (queued until its id is in
   // state so the message doesn't land in the previously active conversation).
   async function handleStartChatFromHome(text: string) {
-    setView("chat");
     const trimmed = text.trim();
     if (!trimmed || isLoading) return;
-    if (folderId === null) { void handleSend(trimmed); return; }
+    // Blank the chat pane BEFORE the create round-trip. Flipping the view while
+    // the folder's latest conversation was still active flashed its messages.
+    handleNewChat();
     try {
-      const fresh = await createKojoConversation(folderId);
+      const fresh = folderId === null
+        ? await createGeneralKojoConversation()
+        : await createKojoConversation(folderId);
       setConversations((prev) => [fresh, ...prev]);
-      setMessages([]);
-      setSessionFiles([]);
-      setActionCards([]);
-      setError(null);
-      setDeletingConvId(null);
+      setPendingNewChat(false);
       pendingSendRef.current = trimmed;
       setConversationId(fresh.id);
     } catch (err) {

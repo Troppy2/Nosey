@@ -423,7 +423,9 @@ class GradingService:
     async def list_attempts(
         self, test_id: int, user_id: int, session: AsyncSession
     ) -> list[AttemptSummary]:
-        test = await TestRepository(session).get_owned_with_questions(test_id, user_id)
+        # Ownership check only: the history list needs no questions or notes, and
+        # loading them (full note text included) made the history toggle slow.
+        test = await TestRepository(session).get_owned(test_id, user_id)
         if test is None:
             raise ResourceNotFoundException("Test")
         attempts = await AttemptRepository(session).list_for_test(user_id, test_id)

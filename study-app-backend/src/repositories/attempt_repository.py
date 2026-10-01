@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import Select, case, delete, func, select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import defer, selectinload
 
 from src.models.question import Question
 from src.models.test import Test
@@ -72,17 +72,21 @@ class AttemptRepository(BaseRepository[UserAttempt]):
         return list(rows.all())
 
     async def get_detail(self, attempt_id: int, user_id: int) -> Optional[UserAttempt]:
-        from src.models.question import Question
-        from src.models.mcq_option import MCQOption
-        from src.models.frq_answer import FRQAnswer
-        from src.models.test import Test
+        # work_strokes is scratch-pad stroke JSON (up to 200KB per answer) that
+        # the results view never reads. Loading it made opening a past attempt
+        # pull megabytes off the DB for a STEM test worked on the scratch pad.
         return await self.session.scalar(
             select(UserAttempt)
             .where(UserAttempt.id == attempt_id, UserAttempt.user_id == user_id)
             .options(
                 selectinload(UserAttempt.test),
-                selectinload(UserAttempt.answers).selectinload(UserAnswer.question).selectinload(Question.mcq_options),
-                selectinload(UserAttempt.answers).selectinload(UserAnswer.question).selectinload(Question.frq_answer),
+                selectinload(UserAttempt.answers).options(
+                    defer(UserAnswer.work_strokes),
+                    selectinload(UserAnswer.question).options(
+                        selectinload(Question.mcq_options),
+                        selectinload(Question.frq_answer),
+                    ),
+                ),
             )
         )
 
