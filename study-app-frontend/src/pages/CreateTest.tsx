@@ -10,6 +10,7 @@ import { InlineLoading, LoadingNotice } from "../components/Loaders";
 import { createTest, fetchFolderFiles, fetchFolders, fetchProviderStatus, scopeKey } from "../lib/api";
 import { useSettings } from "../lib/useSettings";
 import { toast } from "../lib/toast";
+import { usePageTour } from "../components/tours/usePageTour";
 import type { Folder, ProviderStatus, TestCreationParams } from "../lib/types";
 
 const MAX_UPLOAD_FILE_SIZE_MB = 100;
@@ -271,6 +272,8 @@ export default function CreateTest() {
     !isSubmitting &&
     (files.length > 0 || practiceTestFile !== null || folderFileCount > 0);
 
+  usePageTour("create-test", folders.length > 0);
+
   return (
     <div className="page page-narrow">
       <Link className="back-link" to={folderId ? `/folders/${folderId}` : "/folders"}>
@@ -286,6 +289,7 @@ export default function CreateTest() {
         </div>
         <button
           type="button"
+          data-tour="create-advanced"
           className={`choice ${advancedMode ? "active" : ""}`}
           style={{ display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}
           onClick={() => setAdvancedMode((v) => !v)}
@@ -340,14 +344,14 @@ export default function CreateTest() {
                 : "No saved files in this folder yet. You can still upload new documents here."}
             </p>
 
-            <div id="tour-create-type" className="field">
+            <div data-tour="create-type" className="field">
               <span className="field-label">Test type</span>
               <div className="choice-grid">
                 {[
                   ["MCQ_only", "Multiple choice"],
-                  ["FRQ_only", "Free response"],
+                  ["FRQ_only", "Written"],
                   ["mixed", "Mixed"],
-                  ["Extreme", "Extreme MCQ"],
+                  ["Extreme", "Extreme"],
                 ].map(([value, label]) => (
                   <button
                     key={value}
@@ -361,7 +365,7 @@ export default function CreateTest() {
               </div>
             </div>
 
-            <div className="field">
+            <div data-tour="create-mode" className="field">
               <span className="field-label">Mode</span>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <button
@@ -423,11 +427,11 @@ export default function CreateTest() {
 
           {/* Advanced Mode panel */}
           {advancedMode && (
-            <Card className="form-panel">
+            <Card data-tour="create-advanced-panel" className="form-panel">
               <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
 
                 {/* Difficulty */}
-                <div>
+                <div data-tour="create-difficulty">
                   <span className="eyebrow eyebrow-group">Difficulty</span>
                   <div className="choice-grid">
                     {(["easy", "medium", "hard", "mixed"] as const).map((d) => (
@@ -446,7 +450,7 @@ export default function CreateTest() {
 
                 {/* Topic focus */}
 
-                <div className="field">
+                <div data-tour="create-topic" className="field">
                   <label className="field-label" htmlFor="topic-focus">
                     Topic focus <span className="muted" style={{ fontWeight: 400 }}>(optional)</span>
                   </label>
@@ -465,7 +469,7 @@ export default function CreateTest() {
                 </div>
 
                 {/* Custom instructions */}
-                <div className="field">
+                <div data-tour="create-instructions" className="field">
                   <label className="field-label" htmlFor="custom-instructions">
                     Custom instructions <span className="muted" style={{ fontWeight: 400 }}>(optional)</span>
                   </label>
@@ -473,7 +477,7 @@ export default function CreateTest() {
                     id="custom-instructions"
                     className="input"
                     rows={6}
-                    placeholder="e.g. Generate 5 word problems involving integration by parts, make all MCQ options close in value, include at least 2 proof questions…"
+                    placeholder="e.g. Generate 5 word problems involving integration by parts, make all answer choices close in value, include at least 2 proof questions…"
                     value={customInstructions}
                     onChange={(e) => setCustomInstructions(e.target.value)}
                     maxLength={CUSTOM_INSTRUCTIONS_MAX}
@@ -488,11 +492,11 @@ export default function CreateTest() {
                 </div>
 
                 {/* Question counts */}
-                <div>
+                <div data-tour="create-counts">
                   <span className="eyebrow eyebrow-group">Question count</span>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                     <div className="field">
-                      <label className="field-label" htmlFor="count-mcq">MCQ questions</label>
+                      <label className="field-label" htmlFor="count-mcq">Multiple choice</label>
                       <input
                         id="count-mcq"
                         type="number"
@@ -506,7 +510,7 @@ export default function CreateTest() {
                       />
                     </div>
                     <div className="field">
-                      <label className="field-label" htmlFor="count-frq">FRQ questions</label>
+                      <label className="field-label" htmlFor="count-frq">Written</label>
                       <input
                         id="count-frq"
                         type="number"
@@ -529,7 +533,7 @@ export default function CreateTest() {
                       Extra question types <span className="pill pill--beta">Beta</span>
                     </span>
                     <p className="muted" style={{ marginTop: 0, marginBottom: 10, fontSize: "0.8rem" }}>
-                      Added on top of your MCQ and FRQ counts. Generated separately, so they never block the rest of the test. Up to 10 each.
+                      Added on top of your multiple choice and written counts. Generated separately, so they never block the rest of the test. Up to 10 each.
                     </p>
                     <div className="extra-types-grid">
                       <div className="field">
@@ -573,7 +577,7 @@ export default function CreateTest() {
                 )}
 
                 {/* Practice test upload */}
-                <div>
+                <div data-tour="create-practice">
                   <span className="eyebrow eyebrow-group eyebrow-group--described">Upload practice test</span>
                   <p className="muted" style={{ marginTop: 0, marginBottom: 10, fontSize: "0.875rem" }}>
                     Upload an existing practice test , Nosey will extract and recreate the questions. If the folder already has saved files, Nosey can also use those for test generation.
@@ -611,7 +615,7 @@ export default function CreateTest() {
                 </div>
 
                 {/* Question editor mode */}
-                <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none" }}>
+                <label data-tour="create-editor" style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none" }}>
                   <input
                     type="checkbox"
                     checked={reviewBeforeTaking}
@@ -627,7 +631,7 @@ export default function CreateTest() {
           )}
 
           <Card
-            id="tour-create-upload"
+            data-tour="create-upload"
             className={`upload-zone ${isDragging ? "dragging" : ""}`}
             onDragLeave={() => setIsDragging(false)}
             onDragOver={(event) => {
@@ -694,7 +698,7 @@ export default function CreateTest() {
             <Link to="/dashboard">
               <Button variant="secondary">Cancel</Button>
             </Link>
-            <Button disabled={!canSubmit} type="submit">
+            <Button data-tour="create-generate" disabled={!canSubmit} type="submit">
               {isSubmitting ? <InlineLoading label="Generating" /> : "Generate Test"}
             </Button>
           </div>

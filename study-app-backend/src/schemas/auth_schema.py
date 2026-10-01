@@ -3,7 +3,9 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
+
+from src.models.user import parse_tours_seen
 
 
 class GoogleAuthRequest(BaseModel):
@@ -17,6 +19,11 @@ class DateOfBirthRequest(BaseModel):
 class PreferredNameRequest(BaseModel):
     # None or blank clears the preference and falls display back to full_name.
     preferred_name: Optional[str] = Field(default=None, max_length=60)
+
+
+class TourSeenRequest(BaseModel):
+    # Lowercase slug matching a frontend TourId ("create-test", "kojo", ...).
+    tour_id: str = Field(min_length=1, max_length=40, pattern=r"^[a-z0-9-]+$")
 
 
 class UserResponse(BaseModel):
@@ -33,6 +40,15 @@ class UserResponse(BaseModel):
     date_of_birth: Optional[date] = None
     age: Optional[int] = None
     onboarding_completed_at: Optional[datetime] = None
+    # Page tours already shown. Stored as JSON text on the model.
+    tours_seen: list[str] = Field(default_factory=list)
+
+    @field_validator("tours_seen", mode="before")
+    @classmethod
+    def _decode_tours_seen(cls, value: object) -> object:
+        if value is None or isinstance(value, str):
+            return parse_tours_seen(value)
+        return value
 
     @computed_field
     @property

@@ -9,6 +9,7 @@ import { MarkdownContent } from "../components/MarkdownContent";
 import { Skeleton } from "../components/Skeletons";
 import { fetchFlashcards, fetchFolders, recordFlashcardAttempt, scopeKey } from "../lib/api";
 import type { Flashcard, Folder } from "../lib/types";
+import { usePageTour } from "../components/tours/usePageTour";
 
 type Tile = {
   key: string;
@@ -379,6 +380,8 @@ export default function Matching() {
   const activeDeck = decks.find((d) => d.id === deckId);
   const selectedTile = selectedKey ? tiles.find((t) => t.key === selectedKey) ?? null : null;
 
+  usePageTour("matching", phase === "setup");
+
   if (numericFolderId == null) return <Navigate to="/flashcards" replace />;
 
   if (phase === "loading") {
@@ -462,7 +465,7 @@ export default function Matching() {
 
           <h1 className="match-setup-title">What do you want to drill?</h1>
 
-          <div className="match-deck-grid">
+          <div className="match-deck-grid" data-tour="match-decks">
             {decks.map((deck) => {
               const Icon = deck.icon;
               const isPicker = deck.id === "custom";
@@ -536,7 +539,7 @@ export default function Matching() {
             </div>
           ) : null}
 
-          <div className="match-size">
+          <div className="match-size" data-tour="match-size">
             <span className="match-size-label">Pairs on the board</span>
             <div className="match-size-options" role="group" aria-label="Pairs on the board">
               {BOARD_SIZES.map((size) => (
@@ -557,7 +560,7 @@ export default function Matching() {
           </div>
 
           <div className="match-setup-foot">
-            <Button disabled={!canStart} onClick={() => startRun(chosen)}>
+            <Button data-tour="match-start" disabled={!canStart} onClick={() => startRun(chosen)}>
               Start matching
             </Button>
             <p className="match-setup-note">

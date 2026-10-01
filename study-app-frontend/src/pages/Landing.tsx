@@ -15,7 +15,7 @@ const features = [
   {
     icon: BookOpen,
     title: "Generate tests",
-    body: "Practice with MCQ, FRQ, or mixed question sets.",
+    body: "Practice with multiple choice, written, or mixed question sets.",
   },
   {
     icon: Brain,

@@ -23,6 +23,7 @@ import {
 import { useSettings } from "../lib/useSettings";
 import { toast } from "../lib/toast";
 import type { Flashcard, ProviderStatus } from "../lib/types";
+import { usePageTour } from "../components/tours/usePageTour";
 
 const MANAGE_PAGE_SIZE = 50;
 
@@ -227,6 +228,8 @@ export default function FlashcardsManage() {
     }
   }
 
+  usePageTour("manage-flashcards");
+
   return (
     <div className="page page-narrow">
       <header className="page-header">
@@ -255,7 +258,7 @@ export default function FlashcardsManage() {
 
       <FormError message={error} />
 
-      <Card tone="soft" className="flashcard-gen-panel">
+      <Card tone="soft" className="flashcard-gen-panel" data-tour="manage-generate">
         <div className="flashcard-gen-head">
           <h3>Generate with AI</h3>
           <p className="muted small">
@@ -274,6 +277,7 @@ export default function FlashcardsManage() {
             type="file"
           />
           <Button
+            data-tour="manage-from-file"
             icon={<Upload size={18} />}
             onClick={() => fileRef.current?.click()}
             variant="secondary"
@@ -282,6 +286,7 @@ export default function FlashcardsManage() {
             {generating ? <InlineLoading label="Generating" /> : "Generate from file"}
           </Button>
           <Button
+            data-tour="manage-more"
             icon={<Plus size={18} />}
             onClick={handleGenerateMore}
             variant="secondary"
@@ -318,7 +323,7 @@ export default function FlashcardsManage() {
         )}
       </Card>
 
-      <Card tone="soft" className="add-card-form">
+      <Card tone="soft" className="add-card-form" data-tour="manage-add">
         <h3>Add a card</h3>
         <TextInput
           label="Front (question / term)"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import date, datetime
 from typing import Optional, TYPE_CHECKING
 
@@ -33,6 +34,17 @@ if TYPE_CHECKING:
     from src.models.user_attempt import UserAttempt
 
 
+def parse_tours_seen(raw: Optional[str]) -> list[str]:
+    """Decode User.tours_seen. Anything unreadable counts as nothing seen."""
+    if not raw:
+        return []
+    try:
+        value = json.loads(raw)
+    except ValueError:
+        return []
+    return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
+
+
 class User(Base, TimestampMixin):
     __tablename__ = "users"
 
@@ -58,6 +70,12 @@ class User(Base, TimestampMixin):
     # cache, a second device, or a guest promoting to a real account all made
     # the walkthrough reappear for someone who had already done it.
     onboarding_completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    # JSON array of page-tour ids (e.g. ["folders", "create-test"]) the user
+    # has already been shown. Text rather than a JSON column to match the other
+    # JSON-in-Text fields. NULL means none seen. On the account for the same
+    # reason as onboarding_completed_at: a per-browser flag replays every tour
+    # on a new device.
+    tours_seen: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     folders: Mapped[list[Folder]] = relationship(
         "Folder", back_populates="user", cascade="all, delete-orphan"

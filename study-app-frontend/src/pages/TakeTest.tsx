@@ -1257,7 +1257,7 @@ function questionTypeLabel(question: Question): string {
     case "RANK":
       return "Ranking";
     default:
-      return "Free response";
+      return "Written";
   }
 }
 

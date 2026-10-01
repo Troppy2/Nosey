@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { usePageTour } from "../components/tours/usePageTour";
 import { Button } from "../components/Button";
 import KojoActionCard from "../components/KojoActionCard";
 import KojoMascot from "../components/KojoMascot";
@@ -383,9 +384,9 @@ function BlueprintCard({ message, folderId, provider, onGenerate, onCancel }: Bl
           <label className="kojo-blueprint-label">
             <span>Type</span>
             <select className="kojo-blueprint-select" value={testType} onChange={(e) => handleTypeChange(e.target.value)} disabled={generating}>
-              <option value="mixed">Mixed (MCQ + FRQ)</option>
-              <option value="MCQ_only">MCQ only</option>
-              <option value="FRQ_only">FRQ only</option>
+              <option value="mixed">Mixed</option>
+              <option value="MCQ_only">Multiple choice</option>
+              <option value="FRQ_only">Written</option>
             </select>
           </label>
           <label className="kojo-blueprint-label">
@@ -401,13 +402,13 @@ function BlueprintCard({ message, folderId, provider, onGenerate, onCancel }: Bl
         <div className="kojo-blueprint-row">
           {testType !== "FRQ_only" && (
             <label className="kojo-blueprint-label">
-              <span>MCQ count</span>
+              <span>Multiple choice</span>
               <input className="kojo-blueprint-input kojo-blueprint-input--num" type="number" min={1} max={20} value={countMcq} onChange={(e) => setCountMcq(Math.max(1, Math.min(20, Number(e.target.value))))} disabled={generating} />
             </label>
           )}
           {testType !== "MCQ_only" && (
             <label className="kojo-blueprint-label">
-              <span>FRQ count</span>
+              <span>Written</span>
               <input className="kojo-blueprint-input kojo-blueprint-input--num" type="number" min={1} max={10} value={countFrq} onChange={(e) => setCountFrq(Math.max(1, Math.min(10, Number(e.target.value))))} disabled={generating} />
             </label>
           )}
@@ -1691,6 +1692,8 @@ export default function KojoMode() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
+  usePageTour("kojo", !loadingFolders && canCompose && view === "chat");
+
   // Mirrors the chat shell: sidebar rail of classes beside the message column,
   // so the two-pane layout is already standing when the chat arrives.
   if (loadingFolders) {
@@ -1751,6 +1754,7 @@ export default function KojoMode() {
           </button>
           <button
             type="button"
+            data-tour="kojo-folders"
             className={`chat-mode-nav-btn${view === "folders" || view === "home" ? " chat-mode-nav-btn--active" : ""}`}
             onClick={() => { setView("folders"); setSidebarOpen(false); }}
           >
@@ -1828,6 +1832,7 @@ export default function KojoMode() {
             <button
               type="button"
               className="chat-mode-menu-btn"
+              data-tour="kojo-menu"
               onClick={() => setSidebarOpen(true)}
               aria-label="Open chats and folders"
             >
@@ -1885,6 +1890,7 @@ export default function KojoMode() {
             <div className="chat-mode-header-actions">
               <button
                 type="button"
+                data-tour="kojo-docs"
                 className={`chat-mode-docs-btn${docsOpen ? " chat-mode-docs-btn--open" : ""}`}
                 onClick={() => setDocsOpen((v) => !v)}
                 aria-label="Open documents"
@@ -2268,7 +2274,7 @@ export default function KojoMode() {
             )}
             {uploadError && <p className="chat-mode-upload-error">{uploadError}</p>}
 
-            <div id="tour-kojo-chat" className="chat-mode-input-wrap">
+            <div data-tour="kojo-composer" className="chat-mode-input-wrap">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -2283,6 +2289,7 @@ export default function KojoMode() {
                 <div className="kojo-attach-wrap" ref={attachMenuRef}>
                   <button
                     type="button"
+                    data-tour="kojo-attach"
                     className={`kojo-attach-btn${showAttachMenu ? " kojo-attach-btn--open" : ""}`}
                     onClick={() => setShowAttachMenu((v) => !v)}
                     disabled={isLoading || !canCompose}

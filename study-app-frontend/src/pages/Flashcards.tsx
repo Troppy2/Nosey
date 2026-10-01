@@ -11,6 +11,7 @@ import { MarkdownContent } from "../components/MarkdownContent";
 import { SkeletonFlashcard, SkeletonFolderGrid } from "../components/Skeletons";
 import { deleteFlashcard, fetchFlashcards, fetchFolders, isGuestSession, recordFlashcardAttempt, scopeKey } from "../lib/api";
 import type { Flashcard, Folder } from "../lib/types";
+import { usePageTour } from "../components/tours/usePageTour";
 
 export default function Flashcards() {
   const { folderId } = useParams();
@@ -174,6 +175,8 @@ export default function Flashcards() {
     }
   }
 
+  usePageTour("flashcard-review", selectedFolderId != null && !loadingCards && !!current && !complete);
+
   if (selectedFolderId == null) {
     return (
       <div className="page">
@@ -317,7 +320,7 @@ export default function Flashcards() {
           </span>
           <span className="pill">Difficulty {current.difficulty}</span>
         </div>
-        <button className={`flip-card ${flipped ? "flipped" : ""}`} onClick={() => setFlipped(!flipped)} type="button">
+        <button data-tour="review-card" className={`flip-card ${flipped ? "flipped" : ""}`} onClick={() => setFlipped(!flipped)} type="button">
           <div className="flip-inner">
             <Card className="flip-face flip-front">
               <span className="eyebrow">Question</span>
@@ -334,7 +337,7 @@ export default function Flashcards() {
           </div>
         </button>
 
-        <div className="flash-controls">
+        <div className="flash-controls" data-tour="review-nav">
           <button
             className="flash-nav-btn"
             onClick={() => goTo(index - 1)}
@@ -358,7 +361,7 @@ export default function Flashcards() {
 
         <div className="flash-confidence-zone">
           {flipped ? (
-            <div className="confidence-row">
+            <div className="confidence-row" data-tour="review-confidence">
               <button className="confidence confidence--hard" onClick={() => mark(false)} type="button">
                 <span className="confidence-icon"><XCircle size={20} /></span>
                 <span className="confidence-label">Hard</span>

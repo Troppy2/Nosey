@@ -13,6 +13,7 @@ import { Skeleton, SkeletonTestRows } from "../components/Skeletons";
 import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, prefetchAttemptDetail, regenerateTest, reindexFolderFiles, scopeKey, updateFolder, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
 import { toast } from "../lib/toast";
+import { usePageTour } from "../components/tours/usePageTour";
 import type { AttemptSummary, Flashcard, Folder, TestCreationParams, TestSummary } from "../lib/types";
 
 const PERSONA_DESCRIPTIONS: Record<string, string> = {
@@ -277,6 +278,8 @@ export default function FolderDetail() {
 
   // Mirrors the loaded page: eyebrow + title header up top, then the
   // Practice Tests section with its row list.
+  usePageTour("folder-detail", !isLoading && !testsLoading);
+
   if (isLoading) {
     return (
       <div className="page">
@@ -306,6 +309,7 @@ export default function FolderDetail() {
         </div>
         <div className="toolbar">
           <Button
+            data-tour="folder-notes"
             variant="secondary"
             icon={<Files size={24} />}
             onClick={() => setFilesOpen(true)}
@@ -313,18 +317,19 @@ export default function FolderDetail() {
             Manage Notes
           </Button>
           <Button
+            data-tour="folder-settings"
             variant="secondary"
             icon={kojoSettingsOpen ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
             onClick={() => setKojoSettingsOpen((o) => !o)}
           >
             Folder Settings
           </Button>
-          <Link to={`/folders/${id}/flashcards/manage`}>
+          <Link to={`/folders/${id}/flashcards/manage`} data-tour="folder-flashcards">
             <Button variant="secondary" icon={<Settings size={24} />}>
               Manage Flashcards
             </Button>
           </Link>
-          <Link to={`/create-test?folderId=${id}`}>
+          <Link to={`/create-test?folderId=${id}`} data-tour="folder-new-test">
             <Button icon={<Plus size={24} />}>New Test</Button>
           </Link>
         </div>
@@ -558,7 +563,7 @@ export default function FolderDetail() {
                 }
               />
             ) : activeTests.length > 0 ? (
-              <section>
+              <section data-tour="folder-tests">
                 <div className="section-title">
                   <h2>Practice Tests</h2>
                   <span className="muted small">
@@ -831,9 +836,9 @@ function TestRow({
 
 const TEST_TYPE_LABELS: Record<string, string> = {
   MCQ_only: "Multiple choice",
-  FRQ_only: "Free response",
+  FRQ_only: "Written",
   mixed: "Mixed",
-  Extreme: "Extreme MCQ",
+  Extreme: "Extreme",
 };
 
 function PromptModal({
@@ -890,9 +895,9 @@ function PromptModal({
                 <div className="prompt-modal-field">
                   <span className="prompt-modal-label">Questions</span>
                   <span className="prompt-modal-value">
-                    {params.testType !== "FRQ_only" ? `${params.countMcq} MCQ` : ""}
+                    {params.testType !== "FRQ_only" ? `${params.countMcq} multiple choice` : ""}
                     {params.testType === "mixed" ? " · " : ""}
-                    {params.testType !== "MCQ_only" && params.testType !== "Extreme" ? `${params.countFrq} FRQ` : ""}
+                    {params.testType !== "MCQ_only" && params.testType !== "Extreme" ? `${params.countFrq} written` : ""}
                   </span>
                 </div>
               </>

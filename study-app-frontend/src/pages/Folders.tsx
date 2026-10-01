@@ -12,6 +12,7 @@ import { PullToRefreshIndicator } from "../components/PullToRefreshIndicator";
 import { createFolder, deleteFolder, fetchFolders, scopeKey, updateFolder } from "../lib/api";
 import { toast } from "../lib/toast";
 import { usePullToRefresh } from "../lib/usePullToRefresh";
+import { usePageTour } from "../components/tours/usePageTour";
 import type { Folder } from "../lib/types";
 
 export default function Folders() {
@@ -40,6 +41,7 @@ export default function Folders() {
   }, []);
 
   const { pullPx, isRefreshing } = usePullToRefresh(refreshFolders);
+  usePageTour("folders", !isLoading);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -107,7 +109,7 @@ export default function Folders() {
     <div className="page">
       <PullToRefreshIndicator pullPx={pullPx} isRefreshing={isRefreshing} />
       <header className="page-header">
-        <div>
+        <div data-tour="folders-header">
           <h1>Folders</h1>
           <p className="muted">Organize tests and flashcards by subject or exam.</p>
         </div>
@@ -120,7 +122,7 @@ export default function Folders() {
               <List size={18} />
             </button>
           </div>
-          <Button id="tour-folders-new" icon={<Plus size={18} />} onClick={() => setIsModalOpen(true)}>
+          <Button data-tour="folders-new" icon={<Plus size={18} />} onClick={() => setIsModalOpen(true)}>
             New Folder
           </Button>
         </div>
@@ -138,13 +140,13 @@ export default function Folders() {
           title="No folders yet"
           body="Create your first folder to organize tests and flashcards."
           action={
-            <Button icon={<Plus size={18} />} onClick={() => setIsModalOpen(true)}>
+            <Button data-tour="folders-new" icon={<Plus size={18} />} onClick={() => setIsModalOpen(true)}>
               New Folder
             </Button>
           }
         />
       ) : (
-        <section className={view === "grid" ? "folder-grid" : "folder-list"}>
+        <section data-tour="folders-list" className={view === "grid" ? "folder-grid" : "folder-list"}>
           {folders.map((folder) =>
             view === "grid" ? (
               <FolderGridCard key={folder.id} folder={folder} onRename={handleRename} onDelete={handleDelete} />

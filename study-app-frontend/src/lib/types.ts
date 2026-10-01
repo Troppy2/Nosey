@@ -381,6 +381,8 @@ export type AuthUser = {
   kojo_enabled?: boolean;
   onboarding_completed?: boolean;
   onboarding_completed_at?: string | null;
+  /** Page tours already shown (users.tours_seen). Absent on copies stored before it existed. */
+  tours_seen?: string[];
 };
 
 export type AdminUserRow = {

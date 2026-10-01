@@ -358,6 +358,77 @@ export async function resetOnboarding(): Promise<void> {
   }
 }
 
+// First-visit page tours. One per page, each runs once per account.
+export type TourId =
+  | "folders"
+  | "folder-detail"
+  | "create-test"
+  | "learning-modes"
+  | "flashcard-review"
+  | "matching"
+  | "manage-flashcards"
+  | "kojo";
+
+// Same-tab mirror of users.tours_seen, so a tour cannot replay in the moment
+// before the POST lands. The account is the source of truth.
+const TOURS_SEEN_KEY = "nosey_tours_seen";
+// Unscoped list written while in a guest session. A guest who then signs in
+// gets a new user id (and so a new scopeKey), and without this would be shown
+// every tour they already sat through as a guest.
+const GUEST_TOURS_SEEN_KEY = "nosey_guest_tours_seen";
+
+function readTourList(key: string): string[] {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) ?? "[]");
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function addToTourList(key: string, id: string) {
+  const list = readTourList(key);
+  if (!list.includes(id)) localStorage.setItem(key, JSON.stringify([...list, id]));
+}
+
+// Whether the stored user copy knows about tours at all. A copy cached before
+// tours_seen existed says nothing either way, so callers refresh via getMe()
+// before deciding to show a tour to someone who may already be onboarded.
+export function hasTourState(): boolean {
+  return Array.isArray(getStoredUser()?.tours_seen);
+}
+
+export function hasSeenTour(id: TourId): boolean {
+  if (getStoredUser()?.tours_seen?.includes(id)) return true;
+  if (readTourList(scopeKey(TOURS_SEEN_KEY)).includes(id)) return true;
+  return !isGuestSession() && readTourList(GUEST_TOURS_SEEN_KEY).includes(id);
+}
+
+// Records a tour as shown. Never throws, same reasoning as completeOnboarding:
+// a failed POST must not replay a tour the user has already sat through.
+export async function markTourSeen(id: TourId): Promise<void> {
+  addToTourList(scopeKey(TOURS_SEEN_KEY), id);
+  if (isGuestSession()) addToTourList(GUEST_TOURS_SEEN_KEY, id);
+  try {
+    const user = await request<AuthUser>("/auth/tours-seen", {
+      method: "POST",
+      body: JSON.stringify({ tour_id: id }),
+    });
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  } catch {
+    /* Local mirror already set. */
+  }
+}
+
+// Settings > Replay page tips. Clears every copy, and waits for the server so
+// the next /auth/me cannot hand the old list straight back.
+export async function resetTours(): Promise<void> {
+  localStorage.removeItem(scopeKey(TOURS_SEEN_KEY));
+  localStorage.removeItem(GUEST_TOURS_SEEN_KEY);
+  const user = await request<AuthUser>("/auth/tours-seen", { method: "DELETE" });
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
 // Sets what the user wants to be called. Sending an empty string clears the
 // preference and falls display back to the name on their Google account.
 export async function updatePreferredName(name: string): Promise<AuthUser> {
