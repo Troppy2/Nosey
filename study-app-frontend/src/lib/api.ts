@@ -1239,7 +1239,25 @@ export async function fetchClearedKojoConversations(): Promise<KojoClearedConver
   }
 }
 
+// Warm-up for opening a past attempt: the attempt row starts this request on
+// touch/hover so Results gets a head start on the round-trip. A warmed request
+// is handed over once and only while fresh, so a later visit never shows a
+// stale grade.
+const ATTEMPT_PREFETCH_TTL_MS = 30_000;
+const attemptDetailPrefetch = new Map<number, { promise: Promise<AttemptDetail>; at: number }>();
+
+export function prefetchAttemptDetail(attemptId: number): void {
+  const warm = attemptDetailPrefetch.get(attemptId);
+  if (warm && Date.now() - warm.at < ATTEMPT_PREFETCH_TTL_MS) return;
+  const promise = request<AttemptDetail>(`/attempts/${attemptId}`);
+  promise.catch(() => attemptDetailPrefetch.delete(attemptId));
+  attemptDetailPrefetch.set(attemptId, { promise, at: Date.now() });
+}
+
 export async function fetchAttemptDetail(attemptId: number): Promise<AttemptDetail> {
+  const warm = attemptDetailPrefetch.get(attemptId);
+  attemptDetailPrefetch.delete(attemptId);
+  if (warm && Date.now() - warm.at < ATTEMPT_PREFETCH_TTL_MS) return warm.promise;
   return request<AttemptDetail>(`/attempts/${attemptId}`);
 }
 

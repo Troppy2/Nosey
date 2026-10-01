@@ -10,7 +10,7 @@ import { EmptyState } from "../components/EmptyState";
 import { FileManager } from "../components/FileManager";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { Skeleton, SkeletonTestRows } from "../components/Skeletons";
-import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, regenerateTest, reindexFolderFiles, scopeKey, updateFolder, updateTest } from "../lib/api";
+import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, prefetchAttemptDetail, regenerateTest, reindexFolderFiles, scopeKey, updateFolder, updateTest } from "../lib/api";
 import { formatDate, formatPercent } from "../lib/format";
 import { toast } from "../lib/toast";
 import type { AttemptSummary, Flashcard, Folder, TestCreationParams, TestSummary } from "../lib/types";
@@ -699,21 +699,31 @@ function TestRow({
   onViewPrompt?: (test: TestSummary) => void;
 }) {
   const [showAttempts, setShowAttempts] = useState(false);
-  const [attempts, setAttempts] = useState<AttemptSummary[]>([]);
+  // null = not loaded yet. Kept after the first load so re-opening is instant.
+  const [attempts, setAttempts] = useState<AttemptSummary[] | null>(null);
+  const [attemptsFailed, setAttemptsFailed] = useState(false);
   const hasPrompt = !!localStorage.getItem(scopeKey(`nosey_test_params_${test.id}`));
 
-  async function loadAttempts() {
+  // Open the panel immediately and fill it when the list arrives. Waiting for
+  // the fetch before opening made the button look dead on a slow connection.
+  async function toggleAttempts() {
     if (showAttempts) { setShowAttempts(false); return; }
-    const data = await fetchAttempts(test.id);
-    setAttempts(data);
     setShowAttempts(true);
+    if (attempts !== null) return;
+    setAttemptsFailed(false);
+    const data = await fetchAttempts(test.id);
+    // The toggle only renders when attempt_count > 0, so an empty list here
+    // means the request failed (fetchAttempts swallows errors). Leave the cache
+    // empty so the next open retries.
+    if (data.length > 0) setAttempts(data);
+    else setAttemptsFailed(true);
   }
 
   const isGenerating = test.generation_status === "generating";
   const isFailed = test.generation_status === "failed";
 
   return (
-    <Card className={`test-row${showAttempts ? " test-row--attempts-open" : ""}`}>
+    <Card className={`test-row test-row--stacked${showAttempts ? " test-row--attempts-open" : ""}`}>
       {isGenerating && test.question_count > 0 ? (
         // First questions are ready while the rest stream in: let the student
         // open and start taking now. TakeTest streams the remainder.
@@ -763,7 +773,7 @@ function TestRow({
           <button
             aria-label="View attempt history"
             className={`attempt-toggle-btn${showAttempts ? " attempt-toggle-btn--active" : ""}`}
-            onClick={loadAttempts}
+            onClick={toggleAttempts}
             title="Attempt history"
             type="button"
           >
@@ -789,14 +799,30 @@ function TestRow({
           <Trash2 size={17} />
         </button>
       </div>
-      {showAttempts && attempts.length > 0 ? (
-        <div className="attempt-history">
-          {attempts.map((a) => (
-            <Link className="attempt-row" key={a.id} to={`/results/${a.id}`}>
-              <span>Attempt {a.attempt_number}</span>
-              <span>{formatPercent(a.score)} · {formatDate(a.created_at)}</span>
-            </Link>
-          ))}
+      {showAttempts ? (
+        <div className="attempt-history" aria-busy={attempts === null && !attemptsFailed}>
+          {attempts !== null ? (
+            attempts.map((a) => (
+              <Link
+                className="attempt-row"
+                key={a.id}
+                to={`/results/${a.id}`}
+                onPointerDown={() => prefetchAttemptDetail(a.id)}
+                onPointerEnter={() => prefetchAttemptDetail(a.id)}
+                onFocus={() => prefetchAttemptDetail(a.id)}
+              >
+                <span>Attempt {a.attempt_number}</span>
+                <span>{formatPercent(a.score)} · {formatDate(a.created_at)}</span>
+              </Link>
+            ))
+          ) : attemptsFailed ? (
+            <p className="muted small attempt-history-status">Couldn't load attempts. Close and reopen to retry.</p>
+          ) : (
+            <p className="muted small attempt-history-status">
+              <Loader2 size={14} className="spin" aria-hidden="true" />
+              Loading attempts
+            </p>
+          )}
         </div>
       ) : null}
     </Card>

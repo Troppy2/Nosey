@@ -324,6 +324,46 @@
     overflow-wrap: anywhere;
   }
 
+  /* Folder test rows carry up to four 44px icon buttons, ~190px of a 360px
+     row. On one line that crushed the title to a word per line and pushed the
+     card past the screen edge, and the attempt history panel (width 100%) got
+     squeezed in beside it. Stack instead: title + score, then the actions,
+     then the history panel, each on its own full-width line. */
+  .shell--mobile .test-row--stacked {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+
+  .shell--mobile .test-row--stacked .test-row-main {
+    flex: 1 1 100%;
+  }
+
+  .shell--mobile .test-row--stacked .test-row-main > :first-child {
+    flex: 1 1 auto;
+  }
+
+  .shell--mobile .test-row--stacked .row-actions {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+    gap: 0;
+    margin-right: -8px;
+  }
+
+  .shell--mobile .test-row--stacked .row-actions button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .shell--mobile .test-row--stacked .attempt-history {
+    flex: 1 1 100%;
+    padding: 10px 0 2px;
+  }
+
+  .shell--mobile .test-row--stacked .attempt-row {
+    padding: 10px 12px;
+    font-size: 0.84rem;
+  }
+
   /* Nothing in the mobile shell may scroll the page sideways. */
   .shell--mobile {
     overflow-x: hidden;

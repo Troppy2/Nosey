@@ -103,104 +103,102 @@ export function Sidebar() {
     };
   }, [isMobileShell]);
 
-  if (isMobileShell) {
-    return (
-      <div className="shell shell--mobile">
-        <main className="shell-main">
-          <AgeGateModal />
-          <OnboardingTour />
-          <Outlet />
-        </main>
-        {isImmersiveRoute(location.pathname) ? null : <MobileDock items={dockItems} />}
-      </div>
-    );
-  }
-
+  // One tree for both shells. Returning a different root per breakpoint
+  // remounted <Outlet />, so resizing across 760px (or rotating a tablet)
+  // re-ran every page's data load and flashed its loading state.
   return (
-    <div className="shell" data-sidebar-collapsed={isSidebarCollapsed}>
-      {/* Mobile top bar , shown only on phones (<760px) */}
-      <div className="mobile-topbar">
-        <Link className="brand-lockup brand-link" to="/dashboard" aria-label="Go to dashboard">
-          <span className="brand-mark brand-mark--art" role="img" aria-label="Nosey" />
-          <strong>Nosey</strong>
-        </Link>
-        <button
-          className="hamburger-btn"
-          onClick={() => setIsDrawerOpen(true)}
-          aria-label="Open navigation"
-          aria-expanded={isDrawerOpen}
-        >
-          <Menu size={22} />
-        </button>
-      </div>
-
-      {/* Backdrop overlay , closes drawer on tap */}
-      <div
-        className="sidebar-backdrop"
-        data-visible={isDrawerOpen}
-        onClick={() => setIsDrawerOpen(false)}
-        aria-hidden="true"
-      />
-
-      <aside
-        className="sidebar"
-        aria-label="Primary navigation"
-        data-hidden={isNavHidden}
-        data-open={isDrawerOpen}
-        data-collapsed={isSidebarCollapsed}
-      >
-        {/* sidebar-header wraps brand controls; close is hidden on desktop */}
-        <div className="sidebar-header">
-          <Link className="brand-lockup brand-link" to="/dashboard" aria-label="Go to dashboard" title="Go to dashboard">
-            <span className="brand-mark brand-mark--art" role="img" aria-label="Nosey" />
-            <div className="brand-copy">
+    <div
+      className={isMobileShell ? "shell shell--mobile" : "shell"}
+      data-sidebar-collapsed={isMobileShell ? undefined : isSidebarCollapsed}
+    >
+      {isMobileShell ? null : (
+        <>
+          {/* Mobile top bar , shown only on phones (<760px) */}
+          <div className="mobile-topbar">
+            <Link className="brand-lockup brand-link" to="/dashboard" aria-label="Go to dashboard">
+              <span className="brand-mark brand-mark--art" role="img" aria-label="Nosey" />
               <strong>Nosey</strong>
-              <span>Study workspace</span>
-            </div>
-          </Link>
-          <button
-            className="sidebar-collapse-btn"
-            onClick={() => setIsSidebarCollapsed((current) => !current)}
-            aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            aria-pressed={isSidebarCollapsed}
-            title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {isSidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-          </button>
-          <button
-            className="drawer-close-btn"
-            onClick={() => setIsDrawerOpen(false)}
-            aria-label="Close navigation"
-          >
-            <X size={20} />
-          </button>
-        </div>
+            </Link>
+            <button
+              className="hamburger-btn"
+              onClick={() => setIsDrawerOpen(true)}
+              aria-label="Open navigation"
+              aria-expanded={isDrawerOpen}
+            >
+              <Menu size={22} />
+            </button>
+          </div>
 
-        <nav className="sidebar-nav">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.to}
-                id={item.tourId}
-                className="nav-link"
-                to={item.to}
-                aria-label={item.label}
-                title={isSidebarCollapsed ? item.label : undefined}
+          {/* Backdrop overlay , closes drawer on tap */}
+          <div
+            className="sidebar-backdrop"
+            data-visible={isDrawerOpen}
+            onClick={() => setIsDrawerOpen(false)}
+            aria-hidden="true"
+          />
+
+          <aside
+            className="sidebar"
+            aria-label="Primary navigation"
+            data-hidden={isNavHidden}
+            data-open={isDrawerOpen}
+            data-collapsed={isSidebarCollapsed}
+          >
+            {/* sidebar-header wraps brand controls; close is hidden on desktop */}
+            <div className="sidebar-header">
+              <Link className="brand-lockup brand-link" to="/dashboard" aria-label="Go to dashboard" title="Go to dashboard">
+                <span className="brand-mark brand-mark--art" role="img" aria-label="Nosey" />
+                <div className="brand-copy">
+                  <strong>Nosey</strong>
+                  <span>Study workspace</span>
+                </div>
+              </Link>
+              <button
+                className="sidebar-collapse-btn"
+                onClick={() => setIsSidebarCollapsed((current) => !current)}
+                aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                aria-pressed={isSidebarCollapsed}
+                title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
               >
-                <Icon size={19} />
-                <span className="nav-label">{item.label}</span>
-              </NavLink>
-            );
-          })}
-        </nav>
-      </aside>
+                {isSidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+              </button>
+              <button
+                className="drawer-close-btn"
+                onClick={() => setIsDrawerOpen(false)}
+                aria-label="Close navigation"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <nav className="sidebar-nav">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink
+                    key={item.to}
+                    id={item.tourId}
+                    className="nav-link"
+                    to={item.to}
+                    aria-label={item.label}
+                    title={isSidebarCollapsed ? item.label : undefined}
+                  >
+                    <Icon size={19} />
+                    <span className="nav-label">{item.label}</span>
+                  </NavLink>
+                );
+              })}
+            </nav>
+          </aside>
+        </>
+      )}
 
       <main className="shell-main">
         <AgeGateModal />
         <OnboardingTour />
         <Outlet />
       </main>
+      {isMobileShell && !isImmersiveRoute(location.pathname) ? <MobileDock items={dockItems} /> : null}
     </div>
   );
 }
