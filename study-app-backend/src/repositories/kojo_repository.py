@@ -140,8 +140,11 @@ class KojoRepository(BaseRepository[KojoConversation]):
         )
         return await self.session.scalar(stmt)
 
-    async def add_message(self, conversation_id: int, role: str, content: str) -> KojoMessage:
-        message = KojoMessage(conversation_id=conversation_id, role=role, content=content)
+    async def add_message(
+        self, conversation_id: int, role: str, content: str, **tutor_state: Optional[str]
+    ) -> KojoMessage:
+        """``tutor_state`` takes the tutor_* columns (see kojo_tutor.TutorOutcome.columns)."""
+        message = KojoMessage(conversation_id=conversation_id, role=role, content=content, **tutor_state)
         self.session.add(message)
         await self.session.flush()
         return message

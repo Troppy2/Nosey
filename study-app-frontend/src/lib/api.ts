@@ -22,6 +22,7 @@ import type {
   KojoActionType,
   KojoBootstrap,
   KojoChatResponse,
+  KojoTestRef,
   KojoConversation,
   KojoConversationSummary,
   KojoMemory,
@@ -1074,6 +1075,7 @@ export async function kojoChatGeneralStream(
   signal?: AbortSignal,
   context?: string,
   interviewerMode?: string,
+  testRef?: KojoTestRef | null,
 ): Promise<KojoChatResponse> {
   const body: Record<string, unknown> = { message };
   if (provider) body.provider = provider;
@@ -1081,6 +1083,10 @@ export async function kojoChatGeneralStream(
   if (customInstruction) body.custom_instruction = customInstruction;
   if (context) body.context = context;
   if (interviewerMode) body.interviewer_mode = interviewerMode;
+  if (testRef) {
+    body.test_id = testRef.testId;
+    body.question_id = testRef.questionId;
+  }
   if (typeof handlers === "object" && handlers.reasoning) body.reasoning = true;
   return consumeKojoStream(`/kojo/conversations/${conversationId}/chat/stream`, body, handlers, signal);
 }
@@ -1181,6 +1187,7 @@ export async function kojoChatGeneral(
   customInstruction?: string,
   context?: string,
   interviewerMode?: string,
+  testRef?: KojoTestRef | null,
 ): Promise<KojoChatResponse> {
   const body: Record<string, unknown> = { message };
   if (provider) body.provider = provider;
@@ -1188,6 +1195,10 @@ export async function kojoChatGeneral(
   if (customInstruction) body.custom_instruction = customInstruction;
   if (context) body.context = context;
   if (interviewerMode) body.interviewer_mode = interviewerMode;
+  if (testRef) {
+    body.test_id = testRef.testId;
+    body.question_id = testRef.questionId;
+  }
   return request<KojoChatResponse>(`/kojo/conversations/${conversationId}/chat`, {
     method: "POST",
     body: JSON.stringify(body),

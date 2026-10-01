@@ -4605,7 +4605,10 @@ Return only the JSON object."""
         provider: Optional[str] = None,
         strictness: str = "medium",
         owner_id: Optional[int] = None,
+        tutor_rules: Optional[str] = None,
     ) -> str:
+        """``tutor_rules``: Kojo's tutor guardrails (GH #108), appended to the
+        reduce prompt so a long answer cannot bypass them."""
         strictness = (strictness or "medium").strip().lower()
         if strictness not in {"strict", "medium", "none"}:
             strictness = "medium"
@@ -4734,6 +4737,8 @@ Return only the JSON object."""
             f"{map_outputs_text}\n\n"
             "Return the final answer with citations."
         )
+        if tutor_rules:
+            reduce_prompt = f"{reduce_prompt}\n\n{tutor_rules}"
 
         return await self.call_kojo(reduce_prompt, provider=provider)
 

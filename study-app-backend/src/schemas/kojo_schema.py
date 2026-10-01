@@ -106,6 +106,8 @@ class GeneralChatRequest(BaseModel):
     custom_instruction: Optional[str] = Field(default=None, max_length=500, description="User's standing instruction for how Kojo should behave in chat")
     context: Optional[str] = Field(default=None, max_length=8000, description="Ephemeral per-turn grounding (e.g. the current problem statement and code, or test question) mixed into the prompt but never persisted as a visible message")
     interviewer_mode: Optional[str] = Field(default=None, description="KojoCode interviewer persona controlling how much Kojo helps: 'startup' | 'local' | 'bigtech'. Absent for the general study chat.")
+    test_id: Optional[int] = Field(default=None, description="In-test Kojo: the Nosey test being taken. Sent with question_id.")
+    question_id: Optional[int] = Field(default=None, description="In-test Kojo: the current question. The backend loads it (ownership checked) and applies the in-test tutor rules: no answer, no confirm/deny, no option elimination.")
 
 
 class RegenerateRequest(BaseModel):

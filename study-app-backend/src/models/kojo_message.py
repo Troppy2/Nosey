@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -26,6 +26,12 @@ class KojoMessage(Base, TimestampMixin):
     )
     role: Mapped[str] = mapped_column(String(10), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    # Tutor ladder state (GH #108, see services/kojo_tutor.py). Set on assistant
+    # rows of study-chat turns; NULL elsewhere.
+    tutor_intent: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    tutor_subtype: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    tutor_step: Mapped[Optional[str]] = mapped_column(String(24), nullable=True)
+    tutor_problem: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
 
     conversation: Mapped[KojoConversation] = relationship("KojoConversation", back_populates="messages")
 

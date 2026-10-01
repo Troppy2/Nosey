@@ -545,6 +545,13 @@ export type KojoChatResponse = {
   conversation_name?: string | null;
 };
 
+// In-test Kojo (GH #108): identifies the question being worked on so the
+// backend loads it itself and applies the in-test tutor rules.
+export type KojoTestRef = {
+  testId: ID;
+  questionId: ID;
+};
+
 export type KojoClearResponse = {
   conversation_id: ID;
   folder_id: ID;
