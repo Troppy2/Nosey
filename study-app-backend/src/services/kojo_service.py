@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.repositories.attempt_repository import AttemptRepository
 from src.repositories.folder_repository import FolderRepository
 from src.repositories.kojo_repository import KojoRepository
+from src.repositories.test_repository import TestRepository
 from src.schemas.kojo_schema import (
     ACTION_TYPES,
     ConversationFileDTO,
@@ -25,7 +26,7 @@ from src.schemas.kojo_schema import (
     TestBlueprintResponse,
     GeneralChatRequest,
 )
-from src.services import kojo_context_cache
+from src.services import kojo_context_cache, kojo_tutor
 from src.services.file_service import FileService
 from src.services.llm_service import LLMService
 from src.services.rag_service import HybridRAGService
@@ -137,20 +138,40 @@ def _reasoning_worthwhile(user_message: str) -> bool:
     return False
 
 
-def _wrap_reasoning_prompt(prompt: str) -> str:
+def _wrap_reasoning_prompt(prompt: str, tutor_labels: bool = False, private: bool = False) -> str:
     """Append the reasoning output-format directive to a Kojo prompt.
 
     The model emits a short thinking pass, then the final answer, split by
     sentinel markers the streaming splitter uses to route each part to its own
     channel. The markers are ASCII sentinels the model is very unlikely to
-    produce in normal prose.
+    produce in normal prose. With ``tutor_labels`` the thinking pass starts with
+    the hidden INTENT/SUBTYPE/ATTEMPT lines the tutor ladder reads (GH #108).
+
+    ``private`` means the thinking is never sent to the client, so the model may
+    solve the student's problem there; it needs that answer to pick a parallel
+    example whose answer is different. Visible thinking must never contain it.
     """
+    labels = f"\n   {kojo_tutor.LABEL_INSTRUCTIONS}\n   " if tutor_labels else " "
+    if tutor_labels and private:
+        secrecy = (
+            " This thinking is never shown to the student. If you will give a parallel example, "
+            "first write the line \"Their answer: ...\" with the answer to THEIR problem, then "
+            "\"Parallel answer: ...\" for the parallel you plan. If the two match, change the "
+            "parallel's numbers until they differ."
+        )
+    elif tutor_labels:
+        secrecy = (
+            " This thinking is shown to the student: never write the answer to their own "
+            "problem in it."
+        )
+    else:
+        secrecy = ""
     return (
         f"{prompt}\n\n"
         "OUTPUT FORMAT (follow exactly):\n"
-        f"1. Write the line {_REASONING_START} on its own, then 2 to 4 short sentences "
+        f"1. Write the line {_REASONING_START} on its own.{labels}Then write 2 to 4 short sentences "
         "of your genuine thinking: what the student is really asking, what their notes say, "
-        "and your plan. Keep it brief and plain.\n"
+        f"and your plan. Keep it brief and plain.{secrecy}\n"
         f"2. Write the line {_REASONING_ANSWER} on its own, then give ONLY the final answer "
         "for the student, following all the response guidelines above.\n"
         f"Use {_REASONING_START} and {_REASONING_ANSWER} exactly once each, nowhere else."
@@ -165,28 +186,48 @@ class _ReasoningSplitter:
     tail. If the stream ends without an ANSWER marker (model ignored the
     format), the whole output is promoted to the answer so a response is never
     lost.
+
+    With ``expect_labels`` the leading INTENT/SUBTYPE/ATTEMPT lines of the
+    reasoning are parsed into ``labels`` and never emitted on either channel
+    (also stripped if the model puts them at the start of the answer instead).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, expect_labels: bool = False) -> None:
         self.raw = ""
         self.in_answer = False
         self._reasoning_emitted = 0
         self._answer_emitted = 0
         self.promoted = False
+        self.expect_labels = expect_labels
+        self._reasoning_gate = kojo_tutor.LabelGate()
+        self._answer_gate = kojo_tutor.LabelGate()
 
-    def _reasoning_visible(self) -> Optional[str]:
-        """Reasoning text with the START marker stripped, or None if we should
-        wait because the START marker may still be arriving."""
+    @property
+    def labels(self) -> dict[str, str]:
+        merged = dict(self._answer_gate.labels)
+        merged.update(self._reasoning_gate.labels)
+        return merged
+
+    def _strip_labels(self, gate, body: str, final: bool) -> Optional[str]:
+        if not self.expect_labels:
+            return body
+        offset = gate.consume(body, final)
+        return None if offset is None else body[offset:]
+
+    def _reasoning_visible(self, final: bool = False) -> Optional[str]:
+        """Reasoning text with the START marker (and labels) stripped, or None
+        if we should wait because the START marker or a label line may still be
+        arriving."""
         idx = self.raw.find(_REASONING_START)
         if idx != -1:
-            return self.raw[idx + len(_REASONING_START):]
+            return self._strip_labels(self._reasoning_gate, self.raw[idx + len(_REASONING_START):], final)
         # START not found yet. If what we have so far is a prefix of the START
         # marker, hold everything back: the marker is still streaming in.
         stripped = self.raw.lstrip()
-        if len(stripped) < len(_REASONING_START) and _REASONING_START.startswith(stripped):
+        if not final and len(stripped) < len(_REASONING_START) and _REASONING_START.startswith(stripped):
             return None
         # The marker will never appear at the front: treat all as reasoning.
-        return self.raw
+        return self._strip_labels(self._reasoning_gate, self.raw, final)
 
     def feed(self, chunk: str) -> list[tuple[str, str]]:
         out: list[tuple[str, str]] = []
@@ -197,7 +238,7 @@ class _ReasoningSplitter:
             if mark_idx == -1:
                 visible = self._reasoning_visible()
                 if visible is None:
-                    return out  # still waiting for the START marker
+                    return out  # still waiting for the START marker or labels
                 # Hold back a tail that could be the start of the ANSWER marker.
                 hold = len(_REASONING_ANSWER) - 1
                 safe_end = max(0, len(visible) - hold)
@@ -210,66 +251,217 @@ class _ReasoningSplitter:
             region = self.raw[:mark_idx]
             start_idx = region.find(_REASONING_START)
             visible = region[start_idx + len(_REASONING_START):] if start_idx != -1 else region
+            visible = self._strip_labels(self._reasoning_gate, visible, True) or ""
             new = visible[self._reasoning_emitted:]
             if new:
                 out.append(("reasoning", new))
                 self._reasoning_emitted += len(new)
             self.in_answer = True
 
+        out.extend(self._emit_answer(final=False))
+        return out
+
+    def _emit_answer(self, final: bool) -> list[tuple[str, str]]:
         mark_idx = self.raw.find(_REASONING_ANSWER)
         answer_region = self.raw[mark_idx + len(_REASONING_ANSWER):]
+        answer_region = self._strip_labels(self._answer_gate, answer_region, final)
+        if answer_region is None:
+            return []
         new = answer_region[self._answer_emitted:]
-        if new:
-            out.append(("answer", new))
-            self._answer_emitted += len(new)
-        return out
+        if not new:
+            return []
+        self._answer_emitted += len(new)
+        return [("answer", new)]
 
     def flush(self) -> list[tuple[str, str]]:
         out: list[tuple[str, str]] = []
-        if not self.in_answer:
-            # No answer marker ever arrived: emit remaining reasoning, then
-            # promote the whole thing to the answer so a response is never lost.
-            idx = self.raw.find(_REASONING_START)
-            visible = self.raw[idx + len(_REASONING_START):] if idx != -1 else self.raw
-            new = visible[self._reasoning_emitted:]
-            if new:
-                out.append(("reasoning", new))
-                self._reasoning_emitted += len(new)
-            self.promoted = True
-            out.append(("answer", visible))
-            self._answer_emitted = len(visible)
+        if self.in_answer:
+            # Release anything held back while checking for leaked label lines.
+            return self._emit_answer(final=True)
+        # No answer marker ever arrived: emit remaining reasoning, then
+        # promote the whole thing to the answer so a response is never lost.
+        visible = self._reasoning_visible(final=True) or ""
+        new = visible[self._reasoning_emitted:]
+        if new:
+            out.append(("reasoning", new))
+            self._reasoning_emitted += len(new)
+        self.promoted = True
+        out.append(("answer", visible))
+        self._answer_emitted = len(visible)
         return out
 
 
-async def _stream_answer(llm, prompt: str, provider, reasoning: bool, answer_chunks: list):
+def _split_full_response(text: str, expect_labels: bool) -> tuple[str, dict[str, str]]:
+    """Non-streamed counterpart of the splitter: (answer, labels) of a full reply."""
+    splitter = _ReasoningSplitter(expect_labels=expect_labels)
+    events = splitter.feed(text) + splitter.flush()
+    answer = "".join(t for channel, t in events if channel == "answer")
+    return answer, splitter.labels
+
+
+async def _stream_answer(
+    llm,
+    prompt: str,
+    provider,
+    reasoning: bool,
+    answer_chunks: list,
+    *,
+    show_reasoning: bool = True,
+    tutor_labels: bool = False,
+    labels: Optional[dict] = None,
+):
     """Stream a Kojo response, optionally splitting a reasoning pass first.
 
     Appends answer text to answer_chunks (so the caller can persist the final
     message) and yields {"type": "reasoning"|"delta", "text": str} events.
+    ``show_reasoning=False`` runs the reasoning pass but never sends it: the
+    tutor forces the pass on for its labels even when the student turned
+    reasoning off. Parsed tutor labels are written into ``labels``.
     """
     if reasoning:
-        wrapped = _wrap_reasoning_prompt(prompt)
-        splitter = _ReasoningSplitter()
-        async for chunk in llm.stream_kojo(wrapped, provider=provider):
-            for channel, text in splitter.feed(chunk):
+        wrapped = _wrap_reasoning_prompt(prompt, tutor_labels=tutor_labels, private=not show_reasoning)
+        splitter = _ReasoningSplitter(expect_labels=tutor_labels)
+
+        def _route(events):
+            for channel, text in events:
                 if channel == "reasoning":
-                    yield {"type": "reasoning", "text": text}
+                    if show_reasoning:
+                        yield {"type": "reasoning", "text": text}
                 else:
                     answer_chunks.append(text)
                     yield {"type": "delta", "text": text}
-        for channel, text in splitter.flush():
-            if channel == "reasoning":
-                yield {"type": "reasoning", "text": text}
-            else:
-                answer_chunks.append(text)
-                yield {"type": "delta", "text": text}
+
+        async for chunk in llm.stream_kojo(wrapped, provider=provider):
+            for event in _route(splitter.feed(chunk)):
+                yield event
+        for event in _route(splitter.flush()):
+            yield event
+        if labels is not None:
+            labels.update(splitter.labels)
     else:
         async for chunk in llm.stream_kojo(prompt, provider=provider):
             answer_chunks.append(chunk)
             yield {"type": "delta", "text": chunk}
 
 
+# ---------------------------------------------------------------------------
+# Tutor guardrails glue (GH #108). The pure logic lives in kojo_tutor; these
+# helpers wire it into every study-chat path so no path can skip it.
+# ---------------------------------------------------------------------------
+
+def _test_question_text(question) -> str:
+    """Question text plus option texts (never which option is correct)."""
+    lines = [question.question_text.strip()]
+    options = [o.option_text for o in (getattr(question, "mcq_options", None) or [])]
+    if options:
+        lines.append("Options:")
+        lines.extend(f"{chr(ord('A') + i)}. {text}" for i, text in enumerate(options))
+    return "\n".join(lines)
+
+
+def _test_question_context(question) -> str:
+    return (
+        "The student is taking a Nosey practice test and has NOT submitted it yet. "
+        f"Question they are working on:\n{_test_question_text(question)}"
+    )
+
+
+def _plan_tutor_turn(
+    user_message: str,
+    history: list,
+    user_message_id: int,
+    question=None,
+    interviewer_mode: Optional[str] = None,
+) -> Optional[kojo_tutor.TutorTurn]:
+    """Tutor state for a study-chat turn; None for KojoCode interviewer turns,
+    which keep their own persona rules."""
+    if _normalize_interviewer_mode(interviewer_mode):
+        return None
+    if question is None:
+        return kojo_tutor.plan_turn(user_message, history, user_message_id)
+    return kojo_tutor.plan_turn(
+        user_message,
+        history,
+        user_message_id,
+        question_id=question.id,
+        question_text=_test_question_text(question),
+        question_subtype=kojo_tutor.question_subtype(question.question_type, question.question_text),
+    )
+
+
+def _use_wrapper(turn: Optional[kojo_tutor.TutorTurn], reasoning: bool, user_message: str) -> bool:
+    """Run the reasoning pass when the student asked for it, or when the tutor
+    needs its INTENT labels (then the pass runs hidden if reasoning is off)."""
+    if turn is not None and turn.force_wrapper:
+        return True
+    return reasoning and _reasoning_worthwhile(user_message)
+
+
+def _show_reasoning(turn: Optional[kojo_tutor.TutorTurn], reasoning: bool) -> bool:
+    """Reasoning is never sent for a turn on a tutor ladder: the private pass
+    may work out the answer the ladder is still holding back."""
+    return reasoning and (turn is None or turn.problem_key is None)
+
+
+async def _call_kojo_tutored(llm, prompt: str, provider, turn: Optional[kojo_tutor.TutorTurn]):
+    """Non-streamed Kojo call. Returns (answer, tutor labels)."""
+    if turn is not None and turn.force_wrapper:
+        wrapped = _wrap_reasoning_prompt(prompt, tutor_labels=True, private=True)
+        raw = await (llm.call_kojo(wrapped, provider=provider) if provider else llm.call_kojo(wrapped))
+        answer, labels = _split_full_response(raw, expect_labels=True)
+        return answer.strip(), labels
+    text = await (llm.call_kojo(prompt, provider=provider) if provider else llm.call_kojo(prompt))
+    return text, {}
+
+
+def _finish_tutor_turn(
+    turn: Optional[kojo_tutor.TutorTurn],
+    labels: dict,
+    user_message_id: int,
+    conversation_id: int,
+    user_id: int,
+) -> dict:
+    """Resolve the stored tutor step for this turn, log it, and return the
+    tutor_* columns for the assistant row ({} when there is nothing to store)."""
+    if turn is None:
+        return {}
+    outcome = kojo_tutor.resolve_turn(turn, labels, user_message_id)
+    if outcome is None:
+        return {}
+    logger.info(
+        "Kojo tutor turn",
+        extra={
+            "user_id": user_id,
+            "conversation_id": conversation_id,
+            "intent": outcome.intent,
+            "subtype": outcome.subtype,
+            "in_test": turn.in_test,
+            "tutor_step": outcome.step,
+            "tutor_problem": outcome.problem_key,
+            "answer_unlocked": outcome.unlocked,
+            "labels_parsed": bool(labels),
+        },
+    )
+    return outcome.columns()
+
+
 class KojoService:
+    async def _load_test_question(
+        self,
+        session: AsyncSession,
+        user_id: int,
+        test_id: Optional[int],
+        question_id: Optional[int],
+    ):
+        """In-test Kojo: load the current question server-side with an
+        ownership check instead of trusting a client-supplied string."""
+        if question_id is None:
+            return None
+        question = await TestRepository(session).get_question_owned(question_id, user_id)
+        if question is None or (test_id is not None and question.test_id != test_id):
+            raise ResourceNotFoundException("Question")
+        return question
+
     async def create_general_conversation(
         self,
         user_id: int,
@@ -306,6 +498,8 @@ class KojoService:
         custom_instruction: Optional[str] = None,
         context: Optional[str] = None,
         interviewer_mode: Optional[str] = None,
+        test_id: Optional[int] = None,
+        question_id: Optional[int] = None,
     ) -> KojoChatResponse:
         repo = KojoRepository(session)
         conversation = await repo.get_conversation_by_id(conversation_id, user_id)
@@ -319,30 +513,35 @@ class KojoService:
         # `context` is caller-supplied per-turn grounding (e.g. a LeetCode problem
         # statement + the student's current code, or the active test question). It
         # is mixed into the prompt like notes but never persisted as a message.
-        task_context = f"[Current task context]\n{context.strip()}" if context and context.strip() else ""
+        question = await self._load_test_question(session, user_id, test_id, question_id)
+        if question is not None:
+            # In-test Kojo (GH #108): the question comes from the DB, not the client.
+            task_context = f"[Current task context]\n{_test_question_context(question)}"
+        else:
+            task_context = f"[Current task context]\n{context.strip()}" if context and context.strip() else ""
         context_parts = [part for part in (task_context, session_files_content) if part]
         notes_context = "\n\n---\n\n".join(context_parts) if context_parts else _NO_NOTES
 
         user_memory = await _load_user_memory(user_id, session)
-        await repo.add_message(conversation.id, "user", user_message)
+        user_msg = await repo.add_message(conversation.id, "user", user_message)
         history = await repo.get_history(conversation.id, limit=10, after=conversation.cleared_at)
+        turn = _plan_tutor_turn(user_message, history, user_msg.id, question, interviewer_mode)
         prompt = _build_prompt(
             notes_context, user_message, history, strictness=strictness or "medium",
             custom_instruction=custom_instruction, user_memory=user_memory,
             interviewer_mode=interviewer_mode, owner_id=user_id,
+            tutor_block=turn.block if turn else None,
         )
 
         try:
             llm = LLMService()
-            if provider:
-                kojo_response = await llm.call_kojo(prompt, provider=provider)
-            else:
-                kojo_response = await llm.call_kojo(prompt)
+            kojo_response, labels = await _call_kojo_tutored(llm, prompt, provider, turn)
         except Exception as exc:
             logger.warning("Kojo general chat LLM call failed: %s", exc)
             raise LLMException("Kojo failed to generate a response. Try again.") from exc
 
-        kojo_msg = await repo.add_message(conversation.id, "assistant", kojo_response)
+        tutor_cols = _finish_tutor_turn(turn, labels, user_msg.id, conversation.id, user_id)
+        kojo_msg = await repo.add_message(conversation.id, "assistant", kojo_response, **tutor_cols)
 
         auto_name: Optional[str] = None
         if conversation.name is None:
@@ -372,6 +571,8 @@ class KojoService:
         custom_instruction: Optional[str] = None,
         context: Optional[str] = None,
         interviewer_mode: Optional[str] = None,
+        test_id: Optional[int] = None,
+        question_id: Optional[int] = None,
     ):
         """Streaming variant of general_chat.
 
@@ -390,31 +591,42 @@ class KojoService:
         session_files_content = "\n\n---\n\n".join(
             f"[Session upload: {f.file_name}]\n{f.content}" for f in session_files if f.content
         )
-        task_context = f"[Current task context]\n{context.strip()}" if context and context.strip() else ""
+        question = await self._load_test_question(session, user_id, test_id, question_id)
+        if question is not None:
+            # In-test Kojo (GH #108): the question comes from the DB, not the client.
+            task_context = f"[Current task context]\n{_test_question_context(question)}"
+        else:
+            task_context = f"[Current task context]\n{context.strip()}" if context and context.strip() else ""
         context_parts = [part for part in (task_context, session_files_content) if part]
         notes_context = "\n\n---\n\n".join(context_parts) if context_parts else _NO_NOTES
 
         user_memory = await _load_user_memory(user_id, session)
-        await repo.add_message(conversation.id, "user", user_message)
+        user_msg = await repo.add_message(conversation.id, "user", user_message)
         history = await repo.get_history(conversation.id, limit=10, after=conversation.cleared_at)
+        turn = _plan_tutor_turn(user_message, history, user_msg.id, question, interviewer_mode)
         prompt = _build_prompt(
             notes_context, user_message, history, strictness=strictness or "medium",
             custom_instruction=custom_instruction, user_memory=user_memory,
             interviewer_mode=interviewer_mode, owner_id=user_id,
+            tutor_block=turn.block if turn else None,
         )
 
         llm = LLMService()
         answer_chunks: list[str] = []
-        use_reasoning = reasoning and _reasoning_worthwhile(user_message)
+        labels: dict[str, str] = {}
         try:
-            async for event in _stream_answer(llm, prompt, provider, use_reasoning, answer_chunks):
+            async for event in _stream_answer(
+                llm, prompt, provider, _use_wrapper(turn, reasoning, user_message), answer_chunks,
+                show_reasoning=_show_reasoning(turn, reasoning), tutor_labels=turn is not None, labels=labels,
+            ):
                 yield event
         except Exception as exc:
             logger.warning("Kojo general stream LLM call failed: %s", exc)
             raise LLMException("Kojo failed to generate a response. Try again.") from exc
 
         kojo_response = normalize_latex("".join(answer_chunks)).strip()
-        kojo_msg = await repo.add_message(conversation.id, "assistant", kojo_response)
+        tutor_cols = _finish_tutor_turn(turn, labels, user_msg.id, conversation.id, user_id)
+        kojo_msg = await repo.add_message(conversation.id, "assistant", kojo_response, **tutor_cols)
 
         auto_name: Optional[str] = None
         if conversation.name is None:
@@ -614,8 +826,15 @@ class KojoService:
         context_parts = [part for part in (folder_context, session_files_content) if part]
         notes_context = "\n\n---\n\n".join(context_parts) if context_parts else _NO_NOTES
 
-        # Check if user is asking to review wrong answers
-        if _is_review_wrong_answers_request(user_message):
+        # Post-submit review of wrong answers. A message about the student's
+        # own problem ("I got x = 5, what's wrong?") is a tutor turn instead.
+        review_request = (
+            _is_review_wrong_answers_request(user_message)
+            and not kojo_tutor.prepass(user_message).hit
+        )
+        turn: Optional[kojo_tutor.TutorTurn] = None
+        user_msg = None
+        if review_request:
             wrong_answers_result = await AttemptRepository(session).get_recent_wrong_answers(user_id)
             if wrong_answers_result:
                 attempt, wrong_answers_data = wrong_answers_result
@@ -640,12 +859,13 @@ class KojoService:
         else:
             # Regular Kojo chat
             user_memory = await _load_user_memory(user_id, session)
-            await repo.add_message(conversation.id, "user", user_message)
+            user_msg = await repo.add_message(conversation.id, "user", user_message)
             history = await repo.get_history(conversation.id, limit=10, after=conversation.cleared_at)
+            turn = _plan_tutor_turn(user_message, history, user_msg.id)
             prompt = _build_prompt(
                 notes_context, user_message, history, strictness=strictness or "medium",
                 custom_instruction=custom_instruction, user_memory=user_memory,
-                owner_id=user_id,
+                owner_id=user_id, tutor_block=turn.block if turn else None,
             )
 
         active_provider = provider
@@ -657,8 +877,12 @@ class KojoService:
                 notes_context != _NO_NOTES
                 and len(notes_context) >= _MAP_REDUCE_NOTES_MIN_CHARS
                 and _is_long_answer_request(user_message)
-                and not _is_review_wrong_answers_request(user_message)
+                and not review_request
+                # Tutor turns need the ladder directive, which only the
+                # standard prompt carries.
+                and not (turn is not None and turn.force_wrapper)
             )
+            labels: dict[str, str] = {}
             if use_map_reduce:
                 history_block = _build_history_block(history)
                 kojo_response = await llm.map_reduce_long_answer(
@@ -668,11 +892,10 @@ class KojoService:
                     provider=active_provider,
                     strictness=kojo_strictness,
                     owner_id=user_id,
+                    tutor_rules=kojo_tutor.build_tutor_block(),
                 )
-            elif active_provider:
-                kojo_response = await llm.call_kojo(prompt if isinstance(prompt, str) else str(prompt), provider=active_provider)
             else:
-                kojo_response = await llm.call_kojo(prompt if isinstance(prompt, str) else str(prompt))
+                kojo_response, labels = await _call_kojo_tutored(llm, str(prompt), active_provider, turn)
         except Exception as exc:
             logger.warning("Kojo LLM call failed: %s", exc)
             raise LLMException("Kojo failed to generate a response. Try again.") from exc
@@ -683,7 +906,10 @@ class KojoService:
             or "not covered in your" in kojo_response.lower()
         )
 
-        kojo_msg = await repo.add_message(conversation.id, "assistant", kojo_response)
+        tutor_cols = (
+            _finish_tutor_turn(turn, labels, user_msg.id, conversation.id, user_id) if user_msg else {}
+        )
+        kojo_msg = await repo.add_message(conversation.id, "assistant", kojo_response, **tutor_cols)
 
         # Auto-name the conversation from the first user message
         auto_name: Optional[str] = None
@@ -755,7 +981,15 @@ class KojoService:
         prebuilt: Optional[str] = None
         prompt: Optional[str] = None
 
-        if _is_review_wrong_answers_request(user_message):
+        # Post-submit review of wrong answers. A message about the student's
+        # own problem ("I got x = 5, what's wrong?") is a tutor turn instead.
+        review_request = (
+            _is_review_wrong_answers_request(user_message)
+            and not kojo_tutor.prepass(user_message).hit
+        )
+        turn: Optional[kojo_tutor.TutorTurn] = None
+        user_msg = None
+        if review_request:
             wrong_answers_result = await AttemptRepository(session).get_recent_wrong_answers(user_id)
             if wrong_answers_result:
                 _attempt, wrong_answers_data = wrong_answers_result
@@ -770,12 +1004,13 @@ class KojoService:
                 prebuilt = "You don't have any wrong answers from your most recent test to review. Keep practicing!"
         else:
             user_memory = await _load_user_memory(user_id, session)
-            await repo.add_message(conversation.id, "user", user_message)
+            user_msg = await repo.add_message(conversation.id, "user", user_message)
             history = await repo.get_history(conversation.id, limit=10, after=conversation.cleared_at)
+            turn = _plan_tutor_turn(user_message, history, user_msg.id)
             prompt = _build_prompt(
                 notes_context, user_message, history, strictness=strictness or "medium",
                 custom_instruction=custom_instruction, user_memory=user_memory,
-                owner_id=user_id,
+                owner_id=user_id, tutor_block=turn.block if turn else None,
             )
 
         llm = LLMService()
@@ -785,8 +1020,12 @@ class KojoService:
             and notes_context != _NO_NOTES
             and len(notes_context) >= _MAP_REDUCE_NOTES_MIN_CHARS
             and _is_long_answer_request(user_message)
-            and not _is_review_wrong_answers_request(user_message)
+            and not review_request
+            # Tutor turns need the ladder directive, which only the standard
+            # prompt carries.
+            and not (turn is not None and turn.force_wrapper)
         )
+        labels: dict[str, str] = {}
 
         answer_chunks: list[str] = []
         try:
@@ -804,12 +1043,15 @@ class KojoService:
                     provider=provider,
                     strictness=kojo_strictness,
                     owner_id=user_id,
+                    tutor_rules=kojo_tutor.build_tutor_block(),
                 )
                 kojo_response = full
                 yield {"type": "delta", "text": full}
             else:
-                use_reasoning = reasoning and _reasoning_worthwhile(user_message)
-                async for event in _stream_answer(llm, str(prompt), provider, use_reasoning, answer_chunks):
+                async for event in _stream_answer(
+                    llm, str(prompt), provider, _use_wrapper(turn, reasoning, user_message), answer_chunks,
+                    show_reasoning=_show_reasoning(turn, reasoning), tutor_labels=turn is not None, labels=labels,
+                ):
                     yield event
                 kojo_response = normalize_latex("".join(answer_chunks)).strip()
         except Exception as exc:
@@ -822,7 +1064,10 @@ class KojoService:
             or "not covered in your" in kojo_response.lower()
         )
 
-        kojo_msg = await repo.add_message(conversation.id, "assistant", kojo_response)
+        tutor_cols = (
+            _finish_tutor_turn(turn, labels, user_msg.id, conversation.id, user_id) if user_msg else {}
+        )
+        kojo_msg = await repo.add_message(conversation.id, "assistant", kojo_response, **tutor_cols)
 
         auto_name: Optional[str] = None
         if conversation.name is None:
@@ -881,8 +1126,21 @@ class KojoService:
         if last_user_idx is None:
             raise ResourceNotFoundException("No message to regenerate")
 
-        user_message = history_all[last_user_idx].content
-        for stale_msg in history_all[last_user_idx + 1:]:
+        user_msg = history_all[last_user_idx]
+        user_message = user_msg.content
+        # An answer given during a test stays in-test when regenerated: its
+        # stored ladder key names the question (re-checked for ownership).
+        stale = history_all[last_user_idx + 1:]
+        test_key = next(
+            (m.tutor_problem for m in stale if (m.tutor_problem or "").startswith("q:")), None
+        )
+        question = None
+        if test_key and test_key[2:].isdigit():
+            try:
+                question = await self._load_test_question(session, user_id, None, int(test_key[2:]))
+            except ResourceNotFoundException:
+                question = None  # question deleted since: regenerate as open chat
+        for stale_msg in stale:
             await repo.delete_message_by_id(stale_msg.id)
         history = history_all[: last_user_idx + 1]
 
@@ -897,21 +1155,28 @@ class KojoService:
         session_files_content = "\n\n---\n\n".join(
             f"[Session upload: {f.file_name}]\n{f.content}" for f in session_files if f.content
         )
-        context_parts = [part for part in (folder_context, session_files_content) if part]
+        task_context = (
+            f"[Current task context]\n{_test_question_context(question)}" if question is not None else ""
+        )
+        context_parts = [part for part in (task_context, folder_context, session_files_content) if part]
         notes_context = "\n\n---\n\n".join(context_parts) if context_parts else _NO_NOTES
 
         user_memory = await _load_user_memory(user_id, session)
+        turn = _plan_tutor_turn(user_message, history, user_msg.id, question)
         prompt = _build_prompt(
             notes_context, user_message, history, strictness=strictness or "medium",
             custom_instruction=custom_instruction, user_memory=user_memory,
-            owner_id=user_id,
+            owner_id=user_id, tutor_block=turn.block if turn else None,
         )
 
         llm = LLMService()
         answer_chunks: list[str] = []
-        use_reasoning = reasoning and _reasoning_worthwhile(user_message)
+        labels: dict[str, str] = {}
         try:
-            async for event in _stream_answer(llm, prompt, provider, use_reasoning, answer_chunks):
+            async for event in _stream_answer(
+                llm, prompt, provider, _use_wrapper(turn, reasoning, user_message), answer_chunks,
+                show_reasoning=_show_reasoning(turn, reasoning), tutor_labels=turn is not None, labels=labels,
+            ):
                 yield event
         except Exception as exc:  # noqa: BLE001
             logger.warning("Kojo regenerate LLM call failed: %s", exc)
@@ -923,7 +1188,8 @@ class KojoService:
             or "cannot help" in kojo_response.lower()
             or "not covered in your" in kojo_response.lower()
         )
-        kojo_msg = await repo.add_message(conversation.id, "assistant", kojo_response)
+        tutor_cols = _finish_tutor_turn(turn, labels, user_msg.id, conversation.id, user_id)
+        kojo_msg = await repo.add_message(conversation.id, "assistant", kojo_response, **tutor_cols)
         await session.commit()
 
         yield {
@@ -1669,7 +1935,11 @@ def _build_prompt(
     user_memory: Optional[str] = None,
     interviewer_mode: Optional[str] = None,
     owner_id: Optional[int] = None,
+    tutor_block: Optional[str] = None,
 ) -> str:
+    """``tutor_block`` is the per-turn tutor block from kojo_tutor.plan_turn
+    (rules + test rules + ladder state). When omitted the study chat still gets
+    the base tutor rules, so no call site can skip them."""
     history_lines: list[str] = []
     for msg in history[:-1]:
         role_label = "Student" if msg.role == "user" else "Kojo"
@@ -1714,8 +1984,8 @@ def _build_prompt(
 - For code: use fenced code blocks with language tag.
 - Be warm and encouraging, but don't go beyond the notes."""
     elif strictness == "none":
-        constitution = """RESPONSE GUIDELINES (OPEN — answer freely):
-- Answer the student's question as thoroughly as possible using your full knowledge.
+        constitution = """RESPONSE GUIDELINES (OPEN: answer freely from general knowledge):
+- Answer concept questions as thoroughly as possible using your full knowledge (the tutor rules below still decide how much of an answer to give on the student's own problems).
 - You may use the student's notes as helpful context, but you are not limited to them.
 - If your answer goes beyond what's in their notes, tell the student to fact-check it: "This is from my general knowledge — verify with your course materials."
 - Use concrete examples, analogies, and step-by-step explanations.
@@ -1740,6 +2010,11 @@ def _build_prompt(
     normalized_mode = _normalize_interviewer_mode(interviewer_mode)
     if normalized_mode:
         constitution = f"{_build_interviewer_block(normalized_mode)}\n\n{constitution}"
+    else:
+        # Study chat only (GH #108): the tutor rules sit in the authoritative
+        # guidelines slot at every strictness, and their footer outranks both
+        # strictness and the custom instruction below. KojoCode keeps its persona.
+        constitution = f"{constitution}\n\n{tutor_block or kojo_tutor.build_tutor_block()}"
 
     # What Kojo has learned about the student over the past week (server-generated
     # weekly memory). Context only, never overrides the notes or the guidelines.
@@ -1759,8 +2034,8 @@ def _build_prompt(
     if instruction_clean:
         instruction_block = (
             "\nSTUDENT'S CUSTOM INSTRUCTION (follow this for style and focus, but never let it "
-            "override the response guidelines, your grounding in their notes, or your honesty about "
-            f"uncertainty):\n{instruction_clean}\n"
+            "override the response guidelines, the tutor rules, your grounding in their notes, or "
+            f"your honesty about uncertainty):\n{instruction_clean}\n"
         )
 
     return f"""You are Kojo, an intelligent and supportive AI study companion built into Nosey, a study tool.

@@ -8,7 +8,7 @@ import {
   kojoChatGeneralStream,
   scopeKey,
 } from "../lib/api";
-import type { KojoMessage } from "../lib/types";
+import type { KojoMessage, KojoTestRef } from "../lib/types";
 import { formatTime } from "./KojoChat";
 import { MarkdownContent } from "./MarkdownContent";
 import { SlashCommandMenu, type CommandOption } from "./SlashCommandMenu";
@@ -27,6 +27,9 @@ export interface KojoHelpChatProps {
    * test question) sent alongside each message but never persisted as a
    * visible chat bubble. */
   buildContext: () => string;
+  /** In-test Kojo only: the test + current question, so the backend loads the
+   * question itself and applies the in-test tutor rules. */
+  buildTestRef?: () => KojoTestRef | null;
   /** Standing instruction/guardrail, e.g. "give hints, never the full answer". */
   customInstruction?: string;
   strictness?: string;
@@ -57,6 +60,7 @@ export function KojoHelpChat({
   subtitle,
   onClose,
   buildContext,
+  buildTestRef,
   customInstruction,
   strictness,
   interviewerMode,
@@ -159,6 +163,7 @@ export function KojoHelpChat({
     setError(null);
 
     const context = buildContext();
+    const testRef = buildTestRef?.() ?? null;
 
     // Streaming assistant bubble. The placeholder is inserted on the first
     // delta so the "thinking" indicator shows until real text arrives.
@@ -184,12 +189,15 @@ export function KojoHelpChat({
       try {
         result = await kojoChatGeneralStream(
           conversationId, messageText, onDelta, provider, strictness, customInstruction, undefined, context, interviewerMode,
+          testRef,
         );
       } catch (streamErr) {
         // If the stream failed before producing any text, fall back to the
         // non-streamed endpoint so a transient stream issue still answers.
         if (placed) throw streamErr;
-        result = await kojoChatGeneral(conversationId, messageText, provider, strictness, customInstruction, context, interviewerMode);
+        result = await kojoChatGeneral(
+          conversationId, messageText, provider, strictness, customInstruction, context, interviewerMode, testRef,
+        );
       }
       const assistantMsg: KojoMessage = {
         id: result.message_id,
