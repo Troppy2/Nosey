@@ -7,11 +7,12 @@ import os
 import re
 import time
 import unicodedata
+import uuid
 import weakref
 from collections import defaultdict
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Awaitable, Callable, Optional, TypeVar
+from typing import Awaitable, Callable, Optional, Sequence, TypeVar
 
 import pdfplumber
 from fastapi import UploadFile
@@ -122,6 +123,9 @@ class PdfText:
     text: str
     pages_read: int
     page_count: int
+    # Raw text of each page read, in order. Lets the practice-test vision pass
+    # swap in a transcription for the pages that lost their math.
+    page_texts: tuple[str, ...] = ()
 
 
 @dataclass
@@ -130,6 +134,7 @@ class ExtractionResult:
     file_type: str
     pages_read: Optional[int] = None
     page_count: Optional[int] = None
+    page_texts: tuple[str, ...] = ()
 
 
 # How often parse progress is written while a parse runs (one small UPDATE each).
@@ -167,6 +172,27 @@ _MATH_KEEP_CHARS = frozenset(
 )
 
 
+# Exam content that looks like noise to a character count: a part or option
+# label ("(a) ...", "b) ...", "C. ...", "12. ...") or short math with an
+# operator between terms ("b = (0, a)", "2a + c"). Kept by both filters below.
+_LABELED_LINE_RE = re.compile(r"^\s*(?:\(?[A-Za-z]\)|\(?\d{1,3}[.)]|[A-Za-z][.)])\s+\S")
+_MATH_LINE_RE = re.compile(r"[\w)\]]\s*[=<>≤≥≠+\-−×*/^]\s*[\w(\[]")
+# Answer options that repeat throughout any test and are never page furniture.
+_OPTION_LINE_RE = re.compile(
+    r"^\(?[a-f]?\)?\s*(true|false|t|f|yes|no|all of the above|none of the above|both|neither)\.?$",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_exam_content(line: str, *, math: bool = True) -> bool:
+    """math=False for the repeated-line filter: a header such as
+    "CHEM 1010 - General Chemistry" matches the math pattern too."""
+    stripped = line.strip()
+    if _OPTION_LINE_RE.match(stripped) or _LABELED_LINE_RE.match(stripped):
+        return True
+    return math and bool(_MATH_LINE_RE.search(stripped)) and any(ch.isalnum() for ch in stripped)
+
+
 def _is_ocr_noise_line(line: str) -> bool:
     stripped = line.strip()
     if not stripped:
@@ -179,13 +205,30 @@ def _is_ocr_noise_line(line: str) -> bool:
         return True
     if re.fullmatch(r"[\W_]+", stripped):
         return True
-    letters = sum(1 for ch in stripped if ch.isalpha())
-    digits = sum(1 for ch in stripped if ch.isdigit())
+    if _looks_like_exam_content(stripped):
+        return False
     printable = sum(1 for ch in stripped if ch.isprintable())
     if printable == 0:
         return True
-    symbol_ratio = 1.0 - ((letters + digits) / max(1, len(stripped)))
+    # Spaces and markdown emphasis markers are layout, not symbols: counting them
+    # dropped every short math line such as "(a) _b_ = (0 _, a_ )."
+    content = re.sub(r"[\s_*]", "", stripped)
+    letters = sum(1 for ch in content if ch.isalpha())
+    digits = sum(1 for ch in content if ch.isdigit())
+    symbol_ratio = 1.0 - ((letters + digits) / max(1, len(content)))
     return symbol_ratio > 0.7 and len(stripped) < 24
+
+
+def _strip_pdf_emphasis(text: str) -> str:
+    """Drop pymupdf4llm's emphasis markers.
+
+    A LaTeX PDF sets every math variable in italics, so the markdown comes out as
+    "( _a,_ 1) + ( _c_ 1 _, b_ )" and "**1.2** **Vector** **notation**". The
+    markers carry no meaning for the LLM, clutter every question, and make two
+    copies of one question look different to deduplication.
+    """
+    text = re.sub(r"\*\*([^*\n]+?)\*\*", r"\1", text)
+    return re.sub(r"(?<![\w_])_([^_\n]+?)_(?![\w_])", r"\1", text)
 
 
 def _clean_extracted_text(text: str, preserve_code: bool = False) -> str:
@@ -212,8 +255,10 @@ def _clean_extracted_text(text: str, preserve_code: bool = False) -> str:
             if not key:
                 filtered.append("")
                 continue
-            # Drop frequent short repeated lines (headers/footers/page artifacts).
-            if len(key) < 90 and freq[key] >= 4:
+            # Drop frequent short repeated lines (headers/footers/page artifacts),
+            # but never answer options or labeled parts: in a test, "True",
+            # "False" and "(a)" repeat on every page and are the content.
+            if len(key) < 90 and freq[key] >= 4 and not _looks_like_exam_content(line, math=False):
                 continue
             if _is_ocr_noise_line(line):
                 continue
@@ -225,6 +270,26 @@ def _clean_extracted_text(text: str, preserve_code: bool = False) -> str:
 
     cleaned = "\n".join(lines)
     return _collapse_whitespace_lines(cleaned)
+
+
+def assemble_pdf_pages(page_texts: Sequence[str], replacements: dict[int, str]) -> str:
+    """Clean a PDF's pages as one document, with some pages replaced verbatim.
+
+    The replacements are vision transcriptions (practice_vision.py): LaTeX whose
+    short lines ("\\end{bmatrix}") repeat by nature, so the line filters must
+    not touch them. Each one rides through cleaning as a unique placeholder line
+    and is swapped back in afterwards; every other page is cleaned as usual,
+    including header/footer detection across the whole document.
+    """
+    placeholders = {i: f"NOSEY-VISION-PAGE-{i}-{uuid.uuid4().hex}" for i in replacements}
+    joined = "\n".join(
+        placeholders[i] if i in placeholders else _strip_pdf_emphasis(text or "")
+        for i, text in enumerate(page_texts)
+    )
+    cleaned = _clean_extracted_text(joined)
+    for i, placeholder in placeholders.items():
+        cleaned = cleaned.replace(placeholder, replacements[i].strip())
+    return cleaned
 
 
 def _flush_mupdf_store() -> None:
@@ -310,7 +375,7 @@ def _extract_with_pymupdf(
         progress.pages_done = index + 1
         if (index + 1 - pages.start) % _MUPDF_STORE_FLUSH_EVERY == 0:
             _flush_mupdf_store()
-    return PdfText(_join_extracted_chunks(parts), max(stop, pages.start), page_count)
+    return PdfText(_join_extracted_chunks(parts), max(stop, pages.start), page_count, tuple(parts))
 
 
 def _extract_with_pdfplumber(
@@ -336,7 +401,7 @@ def _extract_with_pdfplumber(
             page.flush_cache()
             page.get_textmap.cache_clear()
             progress.pages_done = index + 1
-    return PdfText(_join_extracted_chunks(parts), max(stop, pages.start), page_count)
+    return PdfText(_join_extracted_chunks(parts), max(stop, pages.start), page_count, tuple(parts))
 
 
 def _extract_pdf_pages(
@@ -517,7 +582,13 @@ class FileService:
             pdf = _extract_pdf_pages(
                 path, progress, deadline, start=pages.start, batch=pages.batch, max_pages=pages.max_pages
             )
-            return ExtractionResult(_clean_extracted_text(pdf.text), file_type, pdf.pages_read, pdf.page_count)
+            return ExtractionResult(
+                _clean_extracted_text(_strip_pdf_emphasis(pdf.text)),
+                file_type,
+                pdf.pages_read,
+                pdf.page_count,
+                pdf.page_texts,
+            )
         with open(path, "rb") as handle:
             data = handle.read()
         return ExtractionResult(self._parse_bytes(data, file_type, deadline), file_type)
@@ -538,7 +609,7 @@ class FileService:
             return _clean_extracted_text(self._extract_docx(data))
         if file_type == "ipynb":
             return _clean_extracted_text(self._extract_notebook(data), preserve_code=True)
-        return _clean_extracted_text(self._extract_pdf(data, deadline))
+        return _clean_extracted_text(_strip_pdf_emphasis(self._extract_pdf(data, deadline)))
 
     async def extract_from_files(self, notes_files: list[UploadFile]) -> tuple[str, list[str]]:
         total_size_bytes = 0
@@ -581,13 +652,23 @@ class FileService:
             sections.append(f"--- Document {index}: {name or 'notes'} ---\n{result.text}")
         return "\n\n".join(sections), file_types
 
-    async def get_folder_files_content(self, folder_id: int, user_id: int, session: AsyncSession) -> str:
-        rows = await session.scalars(
+    async def get_folder_files_content(
+        self,
+        folder_id: int,
+        user_id: int,
+        session: AsyncSession,
+        file_ids: Optional[Sequence[int]] = None,
+    ) -> str:
+        """Every file in the folder, or only file_ids when given."""
+        stmt = (
             select(FolderFile)
             .join(Folder, Folder.id == FolderFile.folder_id)
             .where(FolderFile.folder_id == folder_id, Folder.user_id == user_id)
             .order_by(FolderFile.uploaded_at.desc())
         )
+        if file_ids is not None:
+            stmt = stmt.where(FolderFile.id.in_(list(file_ids)))
+        rows = await session.scalars(stmt)
         files = list(rows.all())
         if not files:
             return ""

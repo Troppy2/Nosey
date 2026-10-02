@@ -5,7 +5,7 @@ import hashlib
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,9 +16,14 @@ from src.models.folder import Folder
 from src.models.folder_file import FolderFile
 from src.models.user import User
 from src.repositories.usage_event_repository import UsageEventRepository
-from src.services.file_service import FileService, ParseProgress
+from src.services.file_service import FileService, ParseProgress, assemble_pdf_pages
+from src.services.practice_vision import transcribe_math_pages
+from src.services.quota_service import QuotaService
+from src.utils.usage_context import bind_usage
 from src.services.kojo_context_cache import invalidate_folder
+from src.services.practice_sections import detect_sections
 from src.services.upload_recovery import stopped_reading_note
+from src.utils.detached_tasks import spawn_detached
 from src.utils.logger import get_logger
 from src.utils.process_memory import process_rss_mb
 from src.utils.temp_uploads import UploadTooLargeError, remove_temp, save_upload_to_temp
@@ -53,6 +58,9 @@ class FolderFileResponse(BaseModel):
 class SkippedFile(BaseModel):
     file_name: str
     reason: str
+    # Set when the upload was skipped as an exact copy of a file already in the
+    # folder, so a caller can use that file instead.
+    existing_file_id: Optional[int] = None
 
 
 class UploadResult(BaseModel):
@@ -186,6 +194,8 @@ async def _extract_and_update(
     file_name: str,
     folder_id: int,
     user_id: int,
+    vision_charge: Optional[int] = None,
+    use_vision: bool = False,
 ) -> None:
     """Background task: parse the uploaded temp file and update the folder_file record.
 
@@ -203,6 +213,16 @@ async def _extract_and_update(
             max_pages=PDF_BOOK_MAX_PAGES,
         )
         content = result.text
+        if use_vision:
+            # Practice test (GH #133): pages that lost their math are re-read by a
+            # vision model before the row turns ready, so a test built from this
+            # file never sees the broken text.
+            bind_usage(user_id, "practice_vision")
+            transcribed = await transcribe_math_pages(path, list(result.page_texts))
+            if transcribed:
+                content = assemble_pdf_pages(result.page_texts, transcribed)
+            else:
+                await _refund_vision(vision_charge)
         content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
 
         async with async_session_maker() as session:
@@ -268,6 +288,8 @@ async def _extract_and_update(
                 logger.warning("Reading later PDF batches failed for file_id=%s: %s", file_id, exc)
     except Exception as exc:
         logger.warning("Background extraction failed for file_id=%s: %s", file_id, exc)
+        if use_vision:
+            await _refund_vision(vision_charge)
         duration_ms = int((_time.monotonic() - _t0) * 1000)
         async with async_session_maker() as err_session:
             record = await err_session.get(FolderFile, file_id)
@@ -284,6 +306,16 @@ async def _extract_and_update(
             await err_session.commit()
     finally:
         remove_temp(path)
+
+
+async def _refund_vision(charge_id: Optional[int]) -> None:
+    if charge_id is None:
+        return
+    try:
+        async with async_session_maker() as session:
+            await QuotaService().refund(session, charge_id)
+    except Exception as exc:
+        logger.warning("Practice vision refund failed for charge %s: %s", charge_id, exc)
 
 
 @router.get("/{folder_id}/files", response_model=list[FolderFileResponse])
@@ -355,7 +387,7 @@ async def get_folder_file_content(
 async def upload_folder_files(
     folder_id: int,
     files: list[UploadFile] = File(...),
-    background_tasks: BackgroundTasks = BackgroundTasks(),
+    purpose: Optional[str] = Form(None),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> UploadResult:
@@ -370,8 +402,9 @@ async def upload_folder_files(
     created: list[FolderFileResponse] = []
     skipped: list[SkippedFile] = []
     pending_total_bytes = 0
-    # Temp files handed to background tasks; removed here if the request fails first.
-    queued_paths: list[str] = []
+    # Parses to start once the rows are committed, as (file_id, temp path, name).
+    # Their temp files are removed here if the request fails first.
+    queued: list[tuple[int, str, str]] = []
 
     try:
         for upload in files:
@@ -421,6 +454,7 @@ async def upload_folder_files(
                 skipped.append(SkippedFile(
                     file_name=name,
                     reason=f"Identical file already exists as '{duplicate.file_name}'",
+                    existing_file_id=duplicate.id,
                 ))
                 continue
 
@@ -440,9 +474,7 @@ async def upload_folder_files(
             session.add(record)
             await session.flush()
 
-            # Schedule text extraction in the background; user can navigate away.
-            queued_paths.append(saved.path)
-            background_tasks.add_task(_extract_and_update, record.id, saved.path, name, folder_id, user.id)
+            queued.append((record.id, saved.path, name))
 
             created.append(FolderFileResponse.model_validate(record))
             logger.info(
@@ -452,12 +484,59 @@ async def upload_folder_files(
 
         await session.commit()
     except BaseException:
-        for path in queued_paths:
+        for _, path, _ in queued:
             remove_temp(path)
         raise
+    # Text extraction runs detached (not BackgroundTasks, rule 8a): the caller
+    # usually fires its next request right away, e.g. Create Test starting the
+    # test that reads these files. A PDF uploaded as a practice test may also
+    # get the vision pass for pages that lost their math (GH #133).
+    for file_id, path, name in queued:
+        if purpose == "practice_test" and name.lower().endswith(".pdf"):
+            allowed, charge_id = await QuotaService().charge_practice_vision(session, user)
+            if allowed:
+                spawn_detached(_extract_and_update(
+                    file_id, path, name, folder_id, user.id, vision_charge=charge_id, use_vision=True,
+                ))
+                continue
+        spawn_detached(_extract_and_update(file_id, path, name, folder_id, user.id))
     if created:
         invalidate_folder(folder_id)
     return UploadResult(uploaded=created, skipped=skipped)
+
+
+class PracticeSectionResponse(BaseModel):
+    index: int
+    title: str
+    question_count: int
+
+
+@router.get("/{folder_id}/files/{file_id}/sections", response_model=list[PracticeSectionResponse])
+async def get_practice_sections(
+    folder_id: int,
+    file_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[PracticeSectionResponse]:
+    """Sections of a practice test the student can choose from (GH #133).
+
+    Empty when the document has fewer than two sections with questions; the
+    whole document is used then. 409 while the file is still being read.
+    """
+    await _get_owned_folder(folder_id, user, session)
+    record = await session.scalar(
+        select(FolderFile).where(FolderFile.id == file_id, FolderFile.folder_id == folder_id)
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="File not found")
+    if record.upload_status == "processing":
+        raise HTTPException(status_code=409, detail="This file is still being read.")
+    if record.upload_status == "error":
+        raise HTTPException(status_code=400, detail=record.upload_error or "This file could not be read.")
+    return [
+        PracticeSectionResponse(index=s.index, title=s.title, question_count=s.question_count)
+        for s in detect_sections(record.content or "")
+    ]
 
 
 class TextNoteRequest(BaseModel):

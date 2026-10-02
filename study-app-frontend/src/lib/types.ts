@@ -143,6 +143,9 @@ export type AnswerResult = {
   // submitted. Response-only: never persisted, so it is absent when this
   // attempt is viewed again later.
   work_transcript?: string | null;
+  // The correct answer was worked out by Nosey: the uploaded practice test
+  // had no answer key for this question.
+  answer_inferred?: boolean;
 };
 
 export type AttemptResult = {

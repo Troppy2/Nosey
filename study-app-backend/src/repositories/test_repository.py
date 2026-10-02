@@ -152,13 +152,19 @@ class TestRepository(BaseRepository[Test]):
         return note
 
     async def add_mcq_question(
-        self, test_id: int, text: str, display_order: int, options: list[tuple[str, bool]]
+        self,
+        test_id: int,
+        text: str,
+        display_order: int,
+        options: list[tuple[str, bool]],
+        answer_inferred: bool = False,
     ) -> Question:
         question = Question(
             test_id=test_id,
             question_text=text,
             question_type="MCQ",
             display_order=display_order,
+            answer_inferred=answer_inferred,
         )
         self.session.add(question)
         await self.session.flush()
@@ -230,13 +236,19 @@ class TestRepository(BaseRepository[Test]):
         return question
 
     async def add_frq_question(
-        self, test_id: int, text: str, display_order: int, expected_answer: str
+        self,
+        test_id: int,
+        text: str,
+        display_order: int,
+        expected_answer: str,
+        answer_inferred: bool = False,
     ) -> Question:
         question = Question(
             test_id=test_id,
             question_text=text,
             question_type="FRQ",
             display_order=display_order,
+            answer_inferred=answer_inferred,
         )
         self.session.add(question)
         await self.session.flush()

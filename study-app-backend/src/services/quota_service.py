@@ -41,6 +41,9 @@ from src.utils.usage_context import current_device_id
 FEATURE_TESTS = "test"
 FEATURE_FLASHCARDS = "flashcard"
 FEATURE_KOJO = "kojo"
+# Practice-test files read with a vision model (GH #133). Charged per file,
+# refunded when no page turned out to need it.
+FEATURE_PRACTICE_VISION = "practice_vision"
 
 # Every Kojo usage-scope feature name starts with this prefix
 # (kojo_chat, kojo_general, kojo_regenerate, kojo_action).
@@ -277,6 +280,30 @@ class QuotaService:
         session.add(charge)
         await session.commit()
         return allowed, charge.id
+
+    async def charge_practice_vision(self, session: AsyncSession, user: User) -> tuple[bool, Optional[int]]:
+        """May this practice-test upload use the vision pass? Returns (allowed, charge_id).
+
+        Guests never; admins and beta users always, uncharged; everyone else up
+        to practice_vision_limit_per_window files per window. Never raises: a
+        "no" only means the file is read with text extraction alone. Commits.
+        """
+        if is_guest(user):
+            return False, None
+        if not self.limits_active(user):
+            return True, None
+        device_id = current_device_id()
+        if device_id is None:
+            return False, None
+        await self._lock(session, user.id, device_id)
+        used, _ = await self._charge_usage_both(session, FEATURE_PRACTICE_VISION, user.id, device_id)
+        if used >= settings.practice_vision_limit_per_window:
+            await session.commit()  # releases the advisory locks; nothing pending
+            return False, None
+        charge = QuotaCharge(user_id=user.id, device_id=device_id, feature=FEATURE_PRACTICE_VISION, units=1)
+        session.add(charge)
+        await session.commit()
+        return True, charge.id
 
     async def settle_charge(self, session: AsyncSession, charge_id: Optional[int], units: int) -> None:
         """Adjust a charge DOWN to what was actually produced. 0 refunds it.

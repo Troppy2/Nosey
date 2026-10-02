@@ -89,6 +89,9 @@ class AnswerResult(BaseModel):
     # AttemptDetail. Shown to the student so an OCR misread is diagnosable
     # rather than reading as an inexplicable grade.
     work_transcript: Optional[str] = None
+    # The correct answer was worked out by Nosey, not taken from the uploaded
+    # practice test's answer key (GH #133).
+    answer_inferred: bool = False
 
 
 class AttemptResult(BaseModel):

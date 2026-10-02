@@ -87,6 +87,10 @@ class Settings(BaseSettings):
     usage_window_hours: int = Field(default=5, alias="USAGE_WINDOW_HOURS")
     test_limit_per_window: int = Field(default=5, alias="TEST_LIMIT_PER_WINDOW")
     flashcard_limit_per_window: int = Field(default=50, alias="FLASHCARD_LIMIT_PER_WINDOW")
+    # Practice-test files whose math-heavy pages may be read by a vision model,
+    # per window (GH #133), and the page cap per file.
+    practice_vision_limit_per_window: int = Field(default=3, alias="PRACTICE_VISION_LIMIT_PER_WINDOW")
+    practice_vision_max_pages: int = Field(default=20, alias="PRACTICE_VISION_MAX_PAGES")
     kojo_token_limit_per_window: int = Field(default=150_000, alias="KOJO_TOKEN_LIMIT_PER_WINDOW")
     # Optional JSON override of the admin cost-estimate price table (USD per 1M
     # tokens, [input, output]); see services/token_analytics_service.py.

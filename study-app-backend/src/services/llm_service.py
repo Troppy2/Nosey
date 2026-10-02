@@ -8,7 +8,7 @@ from collections import OrderedDict
 from math import log, sqrt
 import re
 from fractions import Fraction
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import httpx
 
@@ -127,12 +127,16 @@ class GeneratedMCQ:
     question_text: str
     options: list[str]
     correct_index: int
+    # Recreated practice tests only: the document had no answer for this
+    # question, so the model worked it out (stored as questions.answer_inferred).
+    answer_inferred: bool = False
 
 
 @dataclass(frozen=True)
 class GeneratedFRQ:
     question_text: str
     expected_answer: str
+    answer_inferred: bool = False
 
 
 # ── Extra (beta) question types ──────────────────────────────────────────────
@@ -365,6 +369,118 @@ class _MapEvidence:
 
 
 _EXTRACT_CHAR_LIMIT = 10_000
+
+# Recreating an uploaded practice test reads the whole document in chunks, one
+# JSON call per chunk, so a dense test never overflows _JSON_MAX_TOKENS. Chunks
+# overlap so a question cut at a boundary is whole in one of them; the overlap's
+# duplicates are dropped by text. The reply echoes every question plus its
+# answer, so LaTeX-heavy pages came back too long to parse at 12K chars per
+# chunk. 15 chunks is about 40 pages of questions.
+_PRACTICE_CHUNK_CHARS = 8_000
+_PRACTICE_CHUNK_OVERLAP_CHARS = 1_200
+_PRACTICE_MAX_CHUNKS = 15
+# Chunks are parsed this many at a time; one that takes longer than the timeout
+# is retried once off Ollama (a hung Ollama call once held a chunk for 8 minutes).
+_PRACTICE_CHUNK_CONCURRENCY = 3
+_PRACTICE_CHUNK_TIMEOUT_S = 180
+# Questions with no answer in the document are solved in batches of this size
+# by the strongest available provider.
+_PRACTICE_SOLVE_BATCH = 12
+# Course notes shown to the solver, for notation and conventions only.
+_PRACTICE_SOLVE_NOTES_CHARS = 8_000
+_STRONGEST_PROVIDER_ORDER = ("claude", "groq", "minimax", "gemini", "ollama")
+# "Match its style" writes one new question per original, this many originals
+# per call, and reads at most this much of the notes for grounding.
+_PARALLEL_BATCH = 8
+_PARALLEL_NOTES_CHARS = 12_000
+_PRACTICE_ANSWER_KEY_CHARS = 6_000
+_PRACTICE_MIN_OPTIONS = 2
+_PRACTICE_MAX_OPTIONS = 6
+# A heading line that starts an answer key section ("Answer Key", "Answers:").
+_PRACTICE_ANSWER_KEY_RE = re.compile(
+    r"(?im)^[ \t]*(?:#+[ \t]*)?(?:answer[ \t]*key|answers|solutions)[ \t]*:?[ \t]*$"
+)
+# "A. ", "b) ", "(C) ", "[d] " at the start of an option.
+_OPTION_LABEL_RE = re.compile(r"^\s*(?:\(?[A-Fa-f]\)|[A-Fa-f][.:]|\[[A-Fa-f]\])\s+")
+# Table-of-contents entries: "1.2 Vector notation . . . . . . 8".
+_TOC_LINE_RE = re.compile(r"(?m)^.*?(?:\s*\.){5,}\s*\d+\s*$\n?")
+# Answers a model writes when the "question" was only a heading it could not see.
+_NON_ANSWER_RE = re.compile(
+    r"depends on the (specific )?(problem|question)|not (provided|given|shown|visible)|"
+    r"cannot be determined from the (given|provided)|no (question|problem) (text|statement)",
+    re.IGNORECASE,
+)
+_NO_PRACTICE_QUESTIONS_MESSAGE = (
+    "No questions were found in that practice test. If it is a scanned PDF, its text can't be read yet."
+)
+
+
+def _clean_practice_test_text(content: str) -> str:
+    """Light cleanup for a practice test before parsing.
+
+    Deliberately NOT _strip_metadata: that drops every short line repeated 4+
+    times, which in a test are the options themselves ("True", "False", "All of
+    the above"), and deletes everything between two --- lines.
+    """
+    text = (content or "").replace("\r\n", "\n").replace("\r", "\n").replace("\ufffd", " ")
+    text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", text)
+    # Section markers added by FileService.extract_from_paths.
+    text = re.sub(r"(?m)^--- Document \d+: .* ---[ \t]*$", "", text)
+    # A table of contents lists every exercise title; parsed, each became a
+    # "question" with no content (198 of them in one real homework PDF).
+    text = _TOC_LINE_RE.sub("", text)
+    text = re.sub(r"(?im)^[ \t#]*(table of )?contents[ \t]*$", "", text)
+    text = re.sub(r"[ \t]+\n", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
+def _practice_test_chunks(text: str) -> list[str]:
+    """Split a practice test into overlapping chunks cut at line breaks."""
+    if len(text) <= _PRACTICE_CHUNK_CHARS:
+        return [text]
+    chunks: list[str] = []
+    start = 0
+    while start < len(text) and len(chunks) < _PRACTICE_MAX_CHUNKS:
+        end = min(len(text), start + _PRACTICE_CHUNK_CHARS)
+        if end < len(text):
+            # Prefer a blank line, then any line break, in the back half.
+            floor = start + _PRACTICE_CHUNK_CHARS // 2
+            cut = text.rfind("\n\n", floor, end)
+            if cut == -1:
+                cut = text.rfind("\n", floor, end)
+            if cut != -1:
+                end = cut
+        chunks.append(text[start:end])
+        if end >= len(text):
+            break
+        overlap_start = end - _PRACTICE_CHUNK_OVERLAP_CHARS
+        line_break = text.find("\n", overlap_start, end)
+        start = line_break + 1 if line_break != -1 else overlap_start
+    if chunks and start < len(text) and len(chunks) == _PRACTICE_MAX_CHUNKS:
+        logger.warning(
+            "Practice test truncated: read %d of %d chars in %d chunks",
+            start, len(text), _PRACTICE_MAX_CHUNKS,
+        )
+    return chunks
+
+
+def _practice_answer_key(text: str) -> str:
+    """The answer key section at the end of a test, if it has one."""
+    matches = list(_PRACTICE_ANSWER_KEY_RE.finditer(text))
+    if not matches or matches[-1].start() < len(text) * 0.4:
+        return ""
+    return text[matches[-1].start():][:_PRACTICE_ANSWER_KEY_CHARS].strip()
+
+
+def _practice_dedup_key(question: str, options: Optional[list[str]] = None) -> str:
+    def norm(value: str) -> str:
+        # Underscores count as punctuation: extraction leftovers like "_a_" made
+        # two copies of one question look different.
+        return re.sub(r"[\W_]+", " ", value).strip().lower()
+
+    # Options are part of the key: tests repeat stems like "Which is true?".
+    return norm(question) + "|" + "|".join(norm(o) for o in options or [])
 _GENERATE_CHAR_LIMIT = 8_000
 # Per-type cap for the beta extra question types (TF / Multiple Select / Ranking).
 # Kept low so the extra-types JSON stays well within the token budget; the existing
@@ -1176,57 +1292,427 @@ class LLMService:
     async def parse_practice_test(
         self,
         content: str,
-        count_mcq: int = 0,
-        count_frq: int = 0,
+        include_mcq: bool = True,
+        include_frq: bool = True,
         provider: Optional[str] = None,
+        solve_keyless: bool = True,
+        solve_context: str = "",
     ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
-        """Extract questions from an uploaded practice test document."""
-        cleaned = self._strip_metadata(content)
-        prompt = (
-            "Read the following practice test document and extract every question you find.\n"
-            "For multiple-choice questions: extract the question text, all answer options (exactly 4), "
-            "and which option is correct (0-indexed as correct_index).\n"
-            "For free-response/short-answer questions: extract the question text and any provided "
-            "sample answer or answer key (as expected_answer). If no sample answer is given, "
-            "write a concise expected answer based on the question context.\n\n"
-            "Return JSON only with keys mcq and frq.\n"
-            "mcq items: {question_text, options: [4 strings], correct_index: 0-3}\n"
-            "frq items: {question_text, expected_answer}\n\n"
-            f"PRACTICE TEST:\n{cleaned[:_EXTRACT_CHAR_LIMIT]}"
+        """Recreate an uploaded practice test: extract its own questions.
+
+        solve_context: the folder's notes. Never a source of questions; the
+        solver reads them for the course's notation and conventions (in Boyd's
+        textbook "(1, 2, 1)" is a column vector, and a solver without the book
+        marks that equation false).
+
+        Reads the whole document in overlapping chunks, one JSON call per chunk,
+        a few at a time (a bounded loop over the document, not over providers:
+        _complete_json does its own provider fallback inside each call). Keeps
+        every question the test type allows, in the document's own option count.
+        A chunk that fails is skipped; only a document that yields nothing
+        raises, so the test is marked failed with a reason instead of finishing
+        empty. Questions the document gives no answer for are re-solved by the
+        strongest available provider when solve_keyless is set, and flagged
+        answer_inferred either way.
+        """
+        from src.utils.exceptions import LLMException, ValidationException
+
+        text = _clean_practice_test_text(content)
+        if not text:
+            raise ValidationException(_NO_PRACTICE_QUESTIONS_MESSAGE)
+        chunks = _practice_test_chunks(text)
+        # A key at the end of the document is out of reach of the earlier chunks.
+        answer_key = _practice_answer_key(text) if len(chunks) > 1 else ""
+
+        gate = asyncio.Semaphore(_PRACTICE_CHUNK_CONCURRENCY)
+        # "auto" already falls back across providers inside _complete_json; a
+        # pinned provider (an admin/beta pick) has no fallback, so it gets one
+        # retry on the rest of the chain, as a hung call does.
+        pinned = self._normalize_generation_provider(provider) != "auto"
+
+        async def parse_chunk(part: int, chunk: str) -> Optional[dict[str, object]]:
+            prompt = self._practice_test_prompt(chunk, part, len(chunks), answer_key)
+            async with gate:
+                try:
+                    return await asyncio.wait_for(
+                        self._complete_json(prompt, provider=provider), _PRACTICE_CHUNK_TIMEOUT_S
+                    )
+                except asyncio.TimeoutError:
+                    logger.warning("parse_practice_test part %d/%d timed out; retrying off Ollama", part, len(chunks))
+                except Exception as exc:
+                    logger.warning("parse_practice_test part %d/%d failed: %s", part, len(chunks), exc)
+                    if not pinned:
+                        return None
+                try:
+                    return await asyncio.wait_for(
+                        self._complete_json_skip_ollama(prompt), _PRACTICE_CHUNK_TIMEOUT_S
+                    )
+                except Exception as exc:
+                    logger.warning("parse_practice_test part %d/%d retry failed: %s", part, len(chunks), exc)
+                    return None
+
+        results = await asyncio.gather(*(parse_chunk(i, c) for i, c in enumerate(chunks, start=1)))
+
+        mcq: list[GeneratedMCQ] = []
+        frq: list[GeneratedFRQ] = []
+        seen: set[str] = set()
+        for data in results:
+            if data is None:
+                continue
+            mcq_raw = data.get("mcq")
+            for item in mcq_raw if isinstance(mcq_raw, list) else []:
+                question = self._parsed_practice_mcq(item)
+                if question is None:
+                    continue
+                key = _practice_dedup_key(question.question_text, question.options)
+                if key not in seen:
+                    seen.add(key)
+                    mcq.append(question)
+            frq_raw = data.get("frq")
+            for item in frq_raw if isinstance(frq_raw, list) else []:
+                question = self._parsed_practice_frq(item)
+                if question is None:
+                    continue
+                key = _practice_dedup_key(question.question_text)
+                if key not in seen:
+                    seen.add(key)
+                    frq.append(question)
+
+        failed_chunks = sum(1 for data in results if data is None)
+        if failed_chunks == len(chunks):
+            raise LLMException(
+                "Nosey couldn't read the questions in that practice test right now. Try again in a moment."
+            )
+        kept_mcq = mcq if include_mcq else []
+        kept_frq = frq if include_frq else []
+        if not kept_mcq and not kept_frq:
+            if mcq or frq:
+                raise ValidationException(
+                    "That practice test has no questions of the type you picked. Try Mixed instead."
+                )
+            raise ValidationException(_NO_PRACTICE_QUESTIONS_MESSAGE)
+        if solve_keyless:
+            kept_mcq, kept_frq = await self._solve_keyless_questions(kept_mcq, kept_frq, solve_context)
+        logger.info(
+            "Parsed practice test: %d MCQ, %d FRQ (%d with no answer in the document) from %d part(s), %d failed",
+            len(kept_mcq), len(kept_frq),
+            sum(1 for q in [*kept_mcq, *kept_frq] if q.answer_inferred),
+            len(chunks), failed_chunks,
         )
-        try:
-            data = await self._complete_json(prompt, provider=provider)
-            mcq_raw = data.get("mcq", [])
-            frq_raw = data.get("frq", [])
-            mcq: list[GeneratedMCQ] = []
-            frq: list[GeneratedFRQ] = []
-            if isinstance(mcq_raw, list):
-                for item in mcq_raw:
-                    if self._is_valid_mcq(item):
-                        options = [str(o) for o in item["options"]][:4]  # type: ignore[index]
-                        index = self._coerce_correct_index(item, len(options))  # type: ignore[arg-type]
-                        if index is None:
-                            continue
-                        mcq.append(GeneratedMCQ(
-                            question_text=str(item.get("question_text", "")),  # type: ignore[union-attr]
-                            options=options,
-                            correct_index=index,
-                        ))
-            if isinstance(frq_raw, list):
-                for item in frq_raw:
-                    if self._is_valid_frq(item):
-                        frq.append(GeneratedFRQ(
-                            question_text=str(item.get("question_text", "")),  # type: ignore[union-attr]
-                            expected_answer=str(item.get("expected_answer", "")),  # type: ignore[union-attr]
-                        ))
-            if not (count_mcq == 0 and count_frq == 0):
-                mcq = mcq[: max(0, int(count_mcq))]
-                frq = frq[: max(0, int(count_frq))]
-            logger.info("Parsed practice test: %d MCQ, %d FRQ", len(mcq), len(frq))
+        return kept_mcq, kept_frq
+
+    async def _complete_json_strongest(self, prompt: str) -> dict[str, object]:
+        """Strongest available provider first (Claude), then the rest.
+
+        For the few calls where answer quality matters more than cost: solving
+        practice-test questions the document gives no answer for (GH #133).
+        Never re-raises LLMException mid-loop, like every provider loop here.
+        """
+        from src.utils.exceptions import LLMException
+
+        available = await self._candidate_providers("auto")
+        rank = {name: i for i, name in enumerate(_STRONGEST_PROVIDER_ORDER)}
+        candidates = sorted(available, key=lambda name: rank.get(name, len(rank)))
+        if not candidates:
+            raise LLMException(_AI_SERVICES_UNAVAILABLE_MESSAGE)
+        last_error: Optional[Exception] = None
+        for candidate in candidates:
+            try:
+                return await self._complete_json_for_provider(prompt, candidate)
+            except Exception as exc:
+                last_error = exc
+                logger.warning("%s JSON generation failed; trying next provider: %s", candidate, exc)
+        raise LLMException(_AI_SERVICES_UNAVAILABLE_MESSAGE) from last_error
+
+    async def _solve_keyless_questions(
+        self, mcq: list[GeneratedMCQ], frq: list[GeneratedFRQ], context: str = ""
+    ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
+        """Re-solve questions with no answer in the document on the strongest provider.
+
+        The parse model's own guess stays when a batch fails, so this can only
+        improve answers, never lose questions. Every question touched keeps
+        answer_inferred, since no answer key backs it either way.
+        """
+        targets: list[tuple[str, int]] = [("mcq", i) for i, q in enumerate(mcq) if q.answer_inferred]
+        targets += [("frq", i) for i, q in enumerate(frq) if q.answer_inferred]
+        if not targets:
             return mcq, frq
-        except Exception as exc:
-            logger.warning("parse_practice_test failed: %s", exc)
-            return [], []
+        mcq, frq = list(mcq), list(frq)
+        batches = [targets[i:i + _PRACTICE_SOLVE_BATCH] for i in range(0, len(targets), _PRACTICE_SOLVE_BATCH)]
+        notes_block = ""
+        if context.strip():
+            query = " ".join(
+                (mcq[i] if kind == "mcq" else frq[i]).question_text[:200] for kind, i in targets
+            )[:4000]
+            try:
+                loop = asyncio.get_event_loop()
+                snippet, _ = await loop.run_in_executor(
+                    None, lambda: self._retrieve_relevant_context(context, query)
+                )
+                if snippet.strip():
+                    notes_block = (
+                        "COURSE NOTES (follow their notation, definitions and conventions; where they "
+                        "define something, they decide what is correct):\n"
+                        f"{snippet[:_PRACTICE_SOLVE_NOTES_CHARS]}\n\n"
+                    )
+            except Exception as exc:
+                logger.warning("Solve context retrieval failed; solving without notes: %s", exc)
+        gate = asyncio.Semaphore(_PRACTICE_CHUNK_CONCURRENCY)
+
+        async def solve(batch: list[tuple[str, int]]) -> None:
+            lines: list[str] = []
+            for n, (kind, i) in enumerate(batch, start=1):
+                if kind == "mcq":
+                    opts = "\n".join(f"   {j}. {o}" for j, o in enumerate(mcq[i].options))
+                    lines.append(f"Q{n} (multiple choice, answer with the option number):\n{mcq[i].question_text}\n{opts}")
+                else:
+                    lines.append(f"Q{n} (written, answer in 1-4 sentences or a short result):\n{frq[i].question_text}")
+            prompt = (
+                "Solve each question below carefully. Work it out step by step in the \"work\" field, "
+                "then give the final answer. These come from a student's practice test, so the answer "
+                "must be correct, not plausible.\n\n"
+                + notes_block
+                + "\n\n".join(lines)
+                + '\n\nReturn JSON only: {"answers": [{"q": 1, "work": "...", "option": 0, "answer": "..."}]}\n'
+                "For multiple choice set \"option\" to the correct option number. For written set \"answer\"."
+            )
+            async with gate:
+                try:
+                    data = await self._complete_json_strongest(prompt)
+                except Exception as exc:
+                    logger.warning("Solving %d practice-test questions failed; keeping parse answers: %s", len(batch), exc)
+                    return
+            answers = data.get("answers")
+            for entry in answers if isinstance(answers, list) else []:
+                if not isinstance(entry, dict):
+                    continue
+                try:
+                    kind, i = batch[int(entry.get("q", 0)) - 1]
+                except (ValueError, TypeError, IndexError):
+                    continue
+                if kind == "mcq":
+                    index = self._coerce_correct_index({"correct_index": entry.get("option")}, len(mcq[i].options))
+                    if index is not None:
+                        mcq[i] = replace(mcq[i], correct_index=index)
+                else:
+                    answer = str(entry.get("answer") or "").strip()
+                    if answer:
+                        frq[i] = replace(frq[i], expected_answer=answer)
+
+        await asyncio.gather(*(solve(batch) for batch in batches))
+        return mcq, frq
+
+    async def generate_parallel_practice_test(
+        self,
+        practice_test_content: str,
+        notes: str = "",
+        include_mcq: bool = True,
+        include_frq: bool = True,
+        difficulty: str = "mixed",
+        custom_instructions: Optional[str] = None,
+        provider: Optional[str] = None,
+        owner_id: Optional[int] = None,
+    ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
+        """"Match its style": a parallel version of an uploaded practice test.
+
+        The exam's own questions are parsed first, then each gets exactly one
+        new counterpart: same skill, format, option count and difficulty, with
+        new specifics. Notes ground the content when they cover a topic; the
+        exam's own topics are used otherwise, so notes are optional (GH #133).
+        The previous template path only ever saw three abstract style phrases,
+        which is why its questions had nothing to do with the exam.
+        """
+        from src.utils.exceptions import LLMException
+
+        mcq_src, frq_src = await self.parse_practice_test(
+            practice_test_content,
+            include_mcq=include_mcq,
+            include_frq=include_frq,
+            provider=provider,
+            solve_keyless=False,
+        )
+        originals: list[tuple[str, object]] = [("mcq", q) for q in mcq_src] + [("frq", q) for q in frq_src]
+
+        notes_context = ""
+        if notes.strip():
+            query = " ".join(q.question_text[:200] for _, q in originals)[:4000]
+            loop = asyncio.get_event_loop()
+            notes_context, _ = await loop.run_in_executor(
+                None, lambda: self._retrieve_relevant_context(notes, query, owner_id=owner_id)
+            )
+            notes_context = notes_context[:_PARALLEL_NOTES_CHARS]
+
+        batches = [originals[i:i + _PARALLEL_BATCH] for i in range(0, len(originals), _PARALLEL_BATCH)]
+        gate = asyncio.Semaphore(_PRACTICE_CHUNK_CONCURRENCY)
+
+        async def write_batch(batch: list[tuple[str, object]]) -> list[object]:
+            prompt = self._parallel_prompt(batch, notes_context, difficulty, custom_instructions)
+            async with gate:
+                try:
+                    data = await asyncio.wait_for(
+                        self._complete_json(prompt, provider=provider), _PRACTICE_CHUNK_TIMEOUT_S
+                    )
+                except Exception as exc:
+                    logger.warning("Parallel version batch of %d failed: %s", len(batch), exc)
+                    return []
+            written: dict[int, object] = {}
+            raw = data.get("questions")
+            for item in raw if isinstance(raw, list) else []:
+                if not isinstance(item, dict):
+                    continue
+                try:
+                    slot = int(item.get("original", 0)) - 1
+                except (TypeError, ValueError):
+                    continue
+                if not 0 <= slot < len(batch) or slot in written:
+                    continue
+                # The counterpart keeps its original's type even if the model drifts.
+                kind = batch[slot][0]
+                question = self._parsed_practice_mcq(item) if kind == "mcq" else self._parsed_practice_frq(item)
+                if question is not None:
+                    # No answer key backs a new question: it is solved and
+                    # flagged like a recreated question the document left blank.
+                    written[slot] = replace(question, answer_inferred=True)
+            return [written[slot] for slot in sorted(written)]
+
+        results = await asyncio.gather(*(write_batch(batch) for batch in batches))
+        mcq = [q for batch in results for q in batch if isinstance(q, GeneratedMCQ)]
+        frq = [q for batch in results for q in batch if isinstance(q, GeneratedFRQ)]
+        if not mcq and not frq:
+            raise LLMException("Nosey couldn't write a new version of that practice test right now. Try again in a moment.")
+        # The writer's own answers miss course conventions (a twin of Boyd 1.1(c)
+        # came back "false"), so the strongest provider re-solves them with the notes.
+        mcq, frq = await self._solve_keyless_questions(mcq, frq, notes)
+        logger.info("Parallel practice test: %d MCQ, %d FRQ from %d originals", len(mcq), len(frq), len(originals))
+        return mcq, frq
+
+    def _parallel_prompt(
+        self,
+        batch: list[tuple[str, object]],
+        notes_context: str,
+        difficulty: str,
+        custom_instructions: Optional[str],
+    ) -> str:
+        lines: list[str] = []
+        for n, (kind, q) in enumerate(batch, start=1):
+            if kind == "mcq":
+                opts = "\n".join(f"   - {o}" for o in q.options)  # type: ignore[attr-defined]
+                lines.append(
+                    f"[{n}] multiple choice, {len(q.options)} options:\n{q.question_text}\n{opts}"  # type: ignore[attr-defined]
+                )
+            else:
+                lines.append(f"[{n}] written:\n{q.question_text}")  # type: ignore[attr-defined]
+        difficulty_line = (
+            "Match each original's difficulty."
+            if difficulty in ("", "mixed")
+            else f"Make every new question {difficulty} difficulty."
+        )
+        notes_block = (
+            f"STUDY NOTES (use them for facts when they cover a topic):\n{notes_context}\n\n"
+            if notes_context.strip()
+            else ""
+        )
+        return (
+            "You are writing a NEW version of a student's practice test, like a second version of the same exam.\n"
+            "For each ORIGINAL question below, write exactly one NEW question that:\n"
+            "- tests the same skill or concept in the same format: multiple choice stays multiple choice with "
+            "the same number of options, written stays written, a calculation stays the same kind of calculation, "
+            "a proof stays a proof\n"
+            "- keeps the original's style and structure, so a student who can do one can do the other\n"
+            "- changes the specifics (numbers, scenario, example, objects, wording) so it is not a copy and its "
+            "answer is different\n"
+            "- is complete on its own: include any data, vectors, matrices or code it needs\n"
+            "Stay within the original question's topic. Use the study notes for facts when they cover it; never "
+            "contradict them. Work out the correct answer to every new question.\n"
+            f"{difficulty_line}\n\n"
+            f"ORIGINAL QUESTIONS:\n" + "\n\n".join(lines) + "\n\n"
+            f"{notes_block}"
+            f"{self._student_instructions_block(custom_instructions)}"
+            "Return JSON only, one entry per original, in order:\n"
+            '{"questions": [{"original": 1, "question_text": "...", "options": ["...", "..."], "correct_index": 0}, '
+            '{"original": 2, "question_text": "...", "expected_answer": "..."}]}\n'
+            "Multiple choice entries have options and correct_index; written entries have expected_answer.\n"
+        )
+
+    @staticmethod
+    def _practice_test_prompt(chunk: str, part: int, parts: int, answer_key: str) -> str:
+        part_line = (
+            f"This is part {part} of {parts} of the document, and the parts overlap a little. "
+            "Skip a question that is cut off at the very start or end of this part: "
+            "it appears whole in the neighboring part.\n"
+            if parts > 1
+            else ""
+        )
+        key_block = (
+            f"ANSWER KEY FROM THE END OF THE DOCUMENT (use it for the answers):\n{answer_key}\n\n"
+            if answer_key
+            else ""
+        )
+        return (
+            "You are copying the questions out of a student's practice test so they can retake it.\n"
+            "Extract EVERY question in the text below, in order. Do not write new questions and do not skip any.\n"
+            f"{part_line}\n"
+            f"PRACTICE TEST:\n{chunk}\n\n"
+            f"{key_block}"
+            "Rules:\n"
+            "- Copy each question's wording exactly, including any passage, code, table, or data it needs.\n"
+            "- Multiple choice: keep ALL of its answer options in their original order (2 to 6 of them), "
+            "without letter labels such as 'A.' or '(b)'.\n"
+            '- True/false: a multiple choice question with options ["True", "False"].\n'
+            "- Short answer, fill in the blank, essay, or calculation: a written (frq) question.\n"
+            "- A question with lettered parts (a), (b): one written question per part, "
+            "each repeating the context it needs.\n"
+            "- A multiple choice question where more than one option can be correct (\"select all\", "
+            "\"which must be true\" with several true options): a written question that lists the options; "
+            "its expected_answer names every correct one.\n"
+            "- Answers: use the document's answer key or marked answers when it has them, and set "
+            "answer_from_document to true. When it has none, work out the correct answer yourself and "
+            "set answer_from_document to false.\n"
+            "- expected_answer: the key's answer, or a concise correct model answer.\n"
+            "- Instructions, headings, titles, table-of-contents lines, point values, and answer key lines "
+            "are not questions. Never output a question whose full text you cannot see; skip it.\n\n"
+            "Return JSON only with keys mcq and frq.\n"
+            'mcq items: {"question_text": "...", "options": ["...", "..."], "correct_index": 0, "answer_from_document": true}\n'
+            'frq items: {"question_text": "...", "expected_answer": "...", "answer_from_document": true}\n'
+        )
+
+    def _parsed_practice_mcq(self, item: object) -> Optional[GeneratedMCQ]:
+        """One extracted MCQ, kept with its own 2-6 options, or None."""
+        if not isinstance(item, dict):
+            return None
+        question = str(item.get("question_text") or "").strip()
+        raw_options = item.get("options")
+        if not question or not isinstance(raw_options, list):
+            return None
+        options = [str(o).strip() for o in raw_options]
+        if all(_OPTION_LABEL_RE.match(o) for o in options):
+            options = [_OPTION_LABEL_RE.sub("", o, count=1).strip() for o in options]
+        if not (_PRACTICE_MIN_OPTIONS <= len(options) <= _PRACTICE_MAX_OPTIONS) or not all(options):
+            return None
+        index = self._coerce_correct_index(item, len(options))
+        if index is None:
+            return None
+        return GeneratedMCQ(
+            question_text=question,
+            options=options,
+            correct_index=index,
+            answer_inferred=item.get("answer_from_document") is False,
+        )
+
+    @staticmethod
+    def _parsed_practice_frq(item: object) -> Optional[GeneratedFRQ]:
+        """One extracted written question, or None for an empty or non-answer."""
+        if not isinstance(item, dict):
+            return None
+        question = str(item.get("question_text") or "").strip()
+        answer = str(item.get("expected_answer") or "").strip()
+        if not question or not answer or _NON_ANSWER_RE.search(answer):
+            return None
+        return GeneratedFRQ(
+            question_text=question,
+            expected_answer=answer,
+            answer_inferred=item.get("answer_from_document") is False,
+        )
 
     async def _analyze_practice_test_style(
         self,
@@ -5814,7 +6300,7 @@ Return only the JSON object."""
         if isinstance(raw, str):
             stripped = raw.strip()
             # Some models answer with the option letter instead of the index.
-            if len(stripped) == 1 and stripped.upper() in "ABCD":
+            if len(stripped) == 1 and stripped.upper() in "ABCDEF":
                 index = ord(stripped.upper()) - ord("A")
                 return index if 0 <= index < option_count else None
             if not stripped.lstrip("-").isdigit():

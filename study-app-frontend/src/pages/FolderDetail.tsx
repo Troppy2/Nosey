@@ -1,4 +1,4 @@
-import { Archive, BookOpen, Brain, ChevronDown, ChevronUp, Edit3, Files, FolderOpen, History, Info, Loader2, Plus, RotateCcw, ScrollText, Settings, Trash2, X } from "lucide-react";
+import { Archive, BookOpen, Brain, ChevronDown, ChevronUp, Edit3, FilePenLine, Files, FolderOpen, History, Info, Loader2, Plus, RotateCcw, ScrollText, Settings, Trash2, X } from "lucide-react";
 import KojoMascot from "../components/KojoMascot";
 import { FormError } from "../components/FormError";
 import { useEffect, useRef, useState } from "react";
@@ -707,6 +707,7 @@ function TestRow({
   // null = not loaded yet. Kept after the first load so re-opening is instant.
   const [attempts, setAttempts] = useState<AttemptSummary[] | null>(null);
   const [attemptsFailed, setAttemptsFailed] = useState(false);
+  const navigate = useNavigate();
   const hasPrompt = !!localStorage.getItem(scopeKey(`nosey_test_params_${test.id}`));
 
   // Open the panel immediately and fill it when the list arrives. Waiting for
@@ -758,7 +759,9 @@ function TestRow({
           <div>
             <h3>{test.title}</h3>
             <p className="muted small" style={{ color: "var(--red, #e53e3e)" }}>
-              Generation failed , delete and try again
+              {test.generation_error
+                ? `Generation failed: ${test.generation_error}`
+                : "Generation failed. Delete it and try again."}
             </p>
           </div>
         </div>
@@ -793,6 +796,16 @@ function TestRow({
             type="button"
           >
             <ScrollText size={17} />
+          </button>
+        ) : null}
+        {!isGenerating && !isFailed ? (
+          <button
+            aria-label={`Edit questions in ${test.title}`}
+            onClick={() => navigate(`/test/${test.id}/edit`)}
+            title="Edit questions"
+            type="button"
+          >
+            <FilePenLine size={17} />
           </button>
         ) : null}
         {!isGenerating && (

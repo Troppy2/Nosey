@@ -7,14 +7,29 @@ import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { SelectInput, TextInput } from "../components/Field";
 import { InlineLoading, LoadingNotice } from "../components/Loaders";
-import { createTest, fetchFolderFiles, fetchFolders, fetchProviderStatus, scopeKey } from "../lib/api";
+import {
+  createTest,
+  fetchFolderFiles,
+  fetchFolders,
+  fetchPracticeSections,
+  fetchProviderStatus,
+  scopeKey,
+  type PracticeSection,
+  type SkippedFile,
+} from "../lib/api";
+import { describeUploadStatus } from "../lib/uploadStatus";
+import {
+  ACCEPTED_UPLOAD_ATTR,
+  MAX_FOLDER_UPLOAD_MB,
+  MAX_UPLOAD_FILE_SIZE_MB,
+  isAcceptedUpload,
+  uploadToFolder,
+} from "../lib/folderUploads";
 import { useSettings } from "../lib/useSettings";
 import { toast } from "../lib/toast";
 import { usePageTour } from "../components/tours/usePageTour";
 import type { Folder, ProviderStatus, TestCreationParams } from "../lib/types";
 
-const MAX_UPLOAD_FILE_SIZE_MB = 100;
-const MAX_UPLOAD_TOTAL_SIZE_MB = 300;
 // Matches _CUSTOM_INSTRUCTIONS_MAX in study-app-backend/src/routes/tests.py.
 const CUSTOM_INSTRUCTIONS_MAX = 10_000;
 
@@ -29,6 +44,8 @@ export default function CreateTest() {
   const [files, setFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // What the submit is waiting on right now, shown in the loading notice.
+  const [submitPhase, setSubmitPhase] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Advanced mode state
@@ -41,7 +58,19 @@ export default function CreateTest() {
   const [countRank, setCountRank] = useState(0);
   const [reviewBeforeTaking, setReviewBeforeTaking] = useState(false);
   const [practiceTestFile, setPracticeTestFile] = useState<File | null>(null);
+  const [practiceTestMode, setPracticeTestMode] = useState<"recreate" | "style">("recreate");
   const practiceTestInputRef = useRef<HTMLInputElement>(null);
+  // The practice test is uploaded and read as soon as it is picked, so its
+  // sections can be listed before Generate (GH #133).
+  const [practiceTestFileId, setPracticeTestFileId] = useState<number | null>(null);
+  const [practicePhase, setPracticePhase] = useState<"idle" | "reading" | "ready" | "error">("idle");
+  const [practiceStatus, setPracticeStatus] = useState<string | null>(null);
+  const [practiceSections, setPracticeSections] = useState<PracticeSection[]>([]);
+  const [chosenSections, setChosenSections] = useState<Set<number>>(new Set());
+  // Bumped on every pick/remove so a slow earlier read cannot overwrite a newer one.
+  const practiceRun = useRef(0);
+  // The folder the practice test was uploaded into.
+  const practiceFolderRef = useRef<number | null>(null);
   const [isMathMode, setIsMathMode] = useState(false);
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard" | "mixed">("mixed");
   const [topicFocus, setTopicFocus] = useState("");
@@ -98,6 +127,20 @@ export default function CreateTest() {
     });
   }, [searchParams]);
 
+  // A practice test read into one folder is not in the next one: pick it again.
+  useEffect(() => {
+    if (practiceFolderRef.current !== null && practiceFolderRef.current !== folderId) {
+      practiceRun.current += 1;
+      practiceFolderRef.current = null;
+      setPracticeTestFile(null);
+      setPracticeTestFileId(null);
+      setPracticePhase("idle");
+      setPracticeStatus(null);
+      setPracticeSections([]);
+      setChosenSections(new Set());
+    }
+  }, [folderId]);
+
   useEffect(() => {
     if (!folderId) return;
     let active = true;
@@ -141,23 +184,60 @@ export default function CreateTest() {
       (generationProvider === "ollama" && !providerStatus.ollama));
   const effectiveProvider = providerUnavailable ? "auto" : generationProvider;
 
+  // The practice test only counts in Advanced mode, where its control lives.
+  const activePracticeTest = advancedMode ? practiceTestFile : null;
+  // Both modes work without notes: a parallel version falls back to the exam's
+  // own topics when the notes don't cover them.
+  const recreatingPracticeTest = activePracticeTest !== null && practiceTestMode === "recreate";
+
+  function describeSkipped(skipped: SkippedFile[]): string {
+    return skipped.map((s) => `${s.file_name}: ${s.reason}`).join(" · ");
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!folderId) return;
     const resolvedTitle = title.trim() || "Untitled Test";
     setIsSubmitting(true);
+    setError(null);
     try {
+      // Files go through the folder upload pipeline first (per-file status,
+      // page batching, duplicate check), then the test is created from their
+      // ids. The server waits for their text, so this returns once bytes land.
+      let fileIds: number[] | undefined;
+      let skippedNotes: SkippedFile[] = [];
+      if (files.length > 0 && !recreatingPracticeTest) {
+        const upload = await uploadToFolder(folderId, files, (done, total) =>
+          setSubmitPhase(
+            total > 1 ? `Uploading your notes (${Math.min(done + 1, total)} of ${total})` : "Uploading your notes",
+          ),
+        );
+        if (upload.fileIds.length === 0) throw new Error(describeSkipped(upload.skipped));
+        fileIds = upload.fileIds;
+        skippedNotes = upload.skipped;
+      }
+      if (activePracticeTest && (practicePhase !== "ready" || practiceTestFileId === null)) {
+        throw new Error("Your practice test is still being read. Generate once it's ready.");
+      }
+      const allSectionsChosen = chosenSections.size === practiceSections.length;
+      if (activePracticeTest && practiceSections.length > 0 && chosenSections.size === 0) {
+        throw new Error("Pick at least one section of the practice test.");
+      }
+      setSubmitPhase("Setting up your test");
       const result = await createTest({
         folderId,
         title: resolvedTitle,
         testType,
-        files,
+        fileIds,
+        practiceTestFileId: activePracticeTest ? practiceTestFileId : undefined,
+        practiceTestMode: activePracticeTest ? (recreatingPracticeTest ? "recreate" : "style") : undefined,
+        practiceTestSections:
+          activePracticeTest && !allSectionsChosen ? Array.from(chosenSections).sort((a, b) => a - b) : undefined,
         countMcq: advancedMode ? countMcq : undefined,
         countFrq: advancedMode ? (testType === "Extreme" ? 0 : countFrq) : undefined,
         countTf: advancedMode && betaMode ? countTf : undefined,
         countMs: advancedMode && betaMode ? countMs : undefined,
         countRank: advancedMode && betaMode ? countRank : undefined,
-        practiceTestFile: advancedMode ? practiceTestFile : null,
         isMathMode: isMathMode && !isCodingMode,
         isCodingMode,
         codingLanguage: isCodingMode ? codingLanguage : undefined,
@@ -191,17 +271,19 @@ export default function CreateTest() {
         localStorage.setItem(scopeKey(`nosey_test_params_${result.test_id}`), JSON.stringify(params));
         localStorage.removeItem(scopeKey(`nosey_create_test_form_${folderId}`));
       }
+      if (skippedNotes.length > 0) {
+        toast.error("Some files were not added", describeSkipped(skippedNotes));
+      }
       // Generation runs in the background. Land back in the folder (the original
       // flow) instead of a dead-end loading screen: the folder polls and opens the
-      // test for taking as soon as the first questions are ready. Only a test that
-      // is already fully ready (rare fast path) opens straight away.
-      if (result.generation_status === "ready") {
+      // test for taking as soon as the first questions are ready. Question editor
+      // mode goes straight to the editor, which waits for generation itself. Only
+      // a test that is already fully ready (rare fast path) opens straight away.
+      if (advancedMode && reviewBeforeTaking) {
+        navigate(`/test/${result.test_id}/edit`);
+      } else if (result.generation_status === "ready") {
         toast.success("Practice test ready");
-        if (advancedMode && reviewBeforeTaking) {
-          navigate(`/test/${result.test_id}/edit`);
-        } else {
-          navigate(`/test/${result.test_id}`);
-        }
+        navigate(`/test/${result.test_id}`);
       } else {
         // Still generating: FolderDetail's poll raises the completion toast once
         // it flips to ready or failed.
@@ -211,32 +293,32 @@ export default function CreateTest() {
       setError(submitError instanceof Error ? submitError.message : "Unable to create that practice test.");
     } finally {
       setIsSubmitting(false);
+      setSubmitPhase(null);
     }
+  }
+
+  function isUploadable(file: File) {
+    return isAcceptedUpload(file) && file.size <= MAX_UPLOAD_FILE_SIZE_MB * 1024 * 1024;
   }
 
   function acceptFiles(nextFiles?: FileList | File[]) {
     if (!nextFiles || nextFiles.length === 0) return;
-    const selected = Array.from(nextFiles).filter((file) => {
-      const allowedType =
-        [
-          "application/pdf",
-          "text/plain",
-          "text/markdown",
-          "text/x-markdown",
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        ].includes(file.type) || /\.(pdf|docx|txt|md)$/i.test(file.name);
-      return allowedType && file.size <= MAX_UPLOAD_FILE_SIZE_MB * 1024 * 1024;
-    });
+    const all = Array.from(nextFiles);
+    const selected = all.filter(isUploadable);
     if (selected.length === 0) {
-      setError(`Upload PDF, DOCX, TXT, or Markdown documents under ${MAX_UPLOAD_FILE_SIZE_MB} MB each.`);
+      setError(`Upload PDF, DOCX, PPTX, TXT, Markdown, or code files up to ${MAX_UPLOAD_FILE_SIZE_MB} MB each.`);
       return;
     }
-    setError(null);
+    setError(
+      selected.length < all.length
+        ? `Skipped ${all.length - selected.length} file${all.length - selected.length === 1 ? "" : "s"}: unsupported type or over ${MAX_UPLOAD_FILE_SIZE_MB} MB.`
+        : null,
+    );
     setFiles((current) => {
       const merged = [...current, ...selected];
       const totalBytes = merged.reduce((sum, file) => sum + file.size, 0);
-      if (totalBytes > MAX_UPLOAD_TOTAL_SIZE_MB * 1024 * 1024) {
-        setError(`Combined uploads exceed ${MAX_UPLOAD_TOTAL_SIZE_MB} MB. Remove a file and try again.`);
+      if (totalBytes > MAX_FOLDER_UPLOAD_MB * 1024 * 1024) {
+        setError(`A folder holds up to ${MAX_FOLDER_UPLOAD_MB} MB of files. Remove a file and try again.`);
         return current;
       }
       if (!title && merged[0]) setTitle(merged[0].name.replace(/\.[^/.]+$/, ""));
@@ -250,27 +332,82 @@ export default function CreateTest() {
 
   function acceptPracticeTestFile(file?: File) {
     if (!file) return;
-    const allowed =
-      [
-        "application/pdf",
-        "text/plain",
-        "text/markdown",
-        "text/x-markdown",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      ].includes(file.type) || /\.(pdf|docx|txt|md)$/i.test(file.name);
-    if (!allowed || file.size > MAX_UPLOAD_FILE_SIZE_MB * 1024 * 1024) {
-      setError(`Practice test must be a PDF, DOCX, TXT, or Markdown file under ${MAX_UPLOAD_FILE_SIZE_MB} MB.`);
+    if (!isUploadable(file)) {
+      setError(`Practice test must be a PDF, DOCX, PPTX, TXT, Markdown, or code file up to ${MAX_UPLOAD_FILE_SIZE_MB} MB.`);
       return;
     }
     setError(null);
     setPracticeTestFile(file);
     if (!title) setTitle(file.name.replace(/\.[^/.]+$/, ""));
+    if (folderId !== null) void readPracticeTest(file, folderId);
+  }
+
+  function clearPracticeTest() {
+    practiceRun.current += 1;
+    practiceFolderRef.current = null;
+    setPracticeTestFile(null);
+    setPracticeTestFileId(null);
+    setPracticePhase("idle");
+    setPracticeStatus(null);
+    setPracticeSections([]);
+    setChosenSections(new Set());
+    if (practiceTestInputRef.current) practiceTestInputRef.current.value = "";
+  }
+
+  // Upload through the folder pipeline, wait for the server to read it (the
+  // vision pass for math-heavy pages runs then too), then list its sections.
+  async function readPracticeTest(file: File, targetFolderId: number) {
+    const run = ++practiceRun.current;
+    const current = () => run === practiceRun.current;
+    practiceFolderRef.current = targetFolderId;
+    setPracticePhase("reading");
+    setPracticeStatus("Uploading your practice test");
+    setPracticeTestFileId(null);
+    setPracticeSections([]);
+    setChosenSections(new Set());
+    try {
+      const upload = await uploadToFolder(targetFolderId, [file], undefined, "practice_test");
+      if (!current()) return;
+      if (upload.fileIds.length === 0) throw new Error(describeSkipped(upload.skipped));
+      const fileId = upload.fileIds[0];
+      setPracticeTestFileId(fileId);
+      const deadline = Date.now() + 15 * 60_000;
+      for (;;) {
+        const row = (await fetchFolderFiles(targetFolderId)).find((f) => f.id === fileId);
+        if (!current()) return;
+        if (row?.upload_status === "error") throw new Error(row.upload_error ?? "Nosey couldn't read that file.");
+        if (row && row.upload_status !== "processing") break;
+        setPracticeStatus(row ? describeUploadStatus(row) ?? "Reading your practice test" : "Reading your practice test");
+        if (Date.now() > deadline) throw new Error("Reading your practice test is taking too long. Try again in a moment.");
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+      const sections = await fetchPracticeSections(targetFolderId, fileId);
+      if (!current()) return;
+      setPracticeSections(sections);
+      setChosenSections(new Set(sections.map((s) => s.index)));
+      setPracticePhase("ready");
+      setPracticeStatus(null);
+    } catch (err) {
+      if (!current()) return;
+      setPracticePhase("error");
+      setPracticeStatus(err instanceof Error ? err.message : "Nosey couldn't read that practice test.");
+    }
+  }
+
+  function toggleSection(index: number) {
+    setChosenSections((current) => {
+      const next = new Set(current);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
   }
 
   const canSubmit =
     folderId !== null &&
     !isSubmitting &&
-    (files.length > 0 || practiceTestFile !== null || folderFileCount > 0);
+    (activePracticeTest === null || practicePhase === "ready") &&
+    (files.length > 0 || activePracticeTest !== null || folderFileCount > 0);
 
   usePageTour("create-test", folders.length > 0);
 
@@ -284,7 +421,7 @@ export default function CreateTest() {
         <div>
           <h1>Create a practice test</h1>
           <p className="muted">
-            Upload PDF, DOCX, TXT, or Markdown documents ({MAX_UPLOAD_FILE_SIZE_MB} MB each, {MAX_UPLOAD_TOTAL_SIZE_MB} MB total), or use files already saved in the folder, and choose the question style Nosey should generate.
+            Upload notes ({MAX_UPLOAD_FILE_SIZE_MB} MB each), or use files already saved in the folder, and choose the question style Nosey should generate.
           </p>
         </div>
         <button
@@ -494,6 +631,11 @@ export default function CreateTest() {
                 {/* Question counts */}
                 <div data-tour="create-counts">
                   <span className="eyebrow eyebrow-group">Question count</span>
+                  {activePracticeTest ? (
+                    <p className="muted small practice-mode-note practice-mode-note--above">
+                      Not used with a practice test: you get one question for each question in it.
+                    </p>
+                  ) : null}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                     <div className="field">
                       <label className="field-label" htmlFor="count-mcq">Multiple choice</label>
@@ -580,18 +722,69 @@ export default function CreateTest() {
                 <div data-tour="create-practice">
                   <span className="eyebrow eyebrow-group eyebrow-group--described">Upload practice test</span>
                   <p className="muted" style={{ marginTop: 0, marginBottom: 10, fontSize: "0.875rem" }}>
-                    Upload an existing practice test , Nosey will extract and recreate the questions. If the folder already has saved files, Nosey can also use those for test generation.
+                    Upload an old exam or worksheet and Nosey rebuilds its questions so you can retake it. It is saved to this folder too.
                   </p>
                   {practiceTestFile ? (
-                    <div className="selected-file" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <span>
-                        <FileText size={14} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
-                        {practiceTestFile.name} · {(practiceTestFile.size / (1024 * 1024)).toFixed(1)} MB
-                      </span>
-                      <button type="button" onClick={() => { setPracticeTestFile(null); if (practiceTestInputRef.current) practiceTestInputRef.current.value = ""; }}>
-                        Remove
-                      </button>
-                    </div>
+                    <>
+                      <div className="selected-file" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <span>
+                          <FileText size={14} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
+                          {practiceTestFile.name} · {(practiceTestFile.size / (1024 * 1024)).toFixed(1)} MB
+                        </span>
+                        <button type="button" onClick={clearPracticeTest}>
+                          Remove
+                        </button>
+                      </div>
+                      {practicePhase === "reading" ? (
+                        <p className="practice-status">
+                          <InlineLoading label={practiceStatus ?? "Reading your practice test"} />
+                        </p>
+                      ) : null}
+                      {practicePhase === "error" ? (
+                        <p className="practice-status practice-status--error">{practiceStatus}</p>
+                      ) : null}
+                      {practicePhase === "ready" && practiceSections.length > 0 ? (
+                        <fieldset className="practice-sections">
+                          <legend className="field-label">Sections to include</legend>
+                          {practiceSections.map((section) => (
+                            <label key={section.index} className="practice-section-option">
+                              <input
+                                type="checkbox"
+                                checked={chosenSections.has(section.index)}
+                                onChange={() => toggleSection(section.index)}
+                              />
+                              <span className="practice-section-title">{section.title}</span>
+                              <span className="muted small">
+                                {section.question_count} question{section.question_count === 1 ? "" : "s"}
+                              </span>
+                            </label>
+                          ))}
+                        </fieldset>
+                      ) : null}
+                      <div className="choice-grid practice-mode-grid" role="group" aria-label="What to do with the practice test">
+                          <button
+                            type="button"
+                            className={`choice ${practiceTestMode === "recreate" ? "active" : ""}`}
+                            aria-pressed={practiceTestMode === "recreate"}
+                            onClick={() => setPracticeTestMode("recreate")}
+                          >
+                            Recreate its questions
+                          </button>
+                          <button
+                            type="button"
+                            className={`choice ${practiceTestMode === "style" ? "active" : ""}`}
+                            aria-pressed={practiceTestMode === "style"}
+                            onClick={() => setPracticeTestMode("style")}
+                          >
+                            Match its style
+                          </button>
+                      </div>
+                      <p className="muted small practice-mode-note">
+                        {recreatingPracticeTest
+                          ? "Every question in the test is kept, with its answers. Where it has no answer key, Nosey works the answers out."
+                          : "A new version of this test: each question gets a twin that tests the same skill in the same format, with new numbers or examples. Uses your notes when they cover the topic."}
+                      </p>
+                    </>
                   ) : (
                     <label
                       style={{
@@ -606,9 +799,12 @@ export default function CreateTest() {
                       <input
                         ref={practiceTestInputRef}
                         type="file"
-                        accept=".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.ml,.mli,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml,.ipynb"
+                        accept={ACCEPTED_UPLOAD_ATTR}
                         style={{ display: "none" }}
-                        onChange={(e) => acceptPracticeTestFile(e.target.files?.[0])}
+                        onChange={(e) => {
+                          acceptPracticeTestFile(e.target.files?.[0]);
+                          e.target.value = "";
+                        }}
                       />
                     </label>
                   )}
@@ -623,7 +819,7 @@ export default function CreateTest() {
                     style={{ width: 16, height: 16, accentColor: "var(--green-dark)", cursor: "pointer" }}
                   />
                   <span style={{ fontSize: "0.9rem" }}>
-                    <strong>Question editor mode</strong> , review and edit questions before taking the test
+                    <strong>Question editor mode</strong>: review and edit questions before taking the test
                   </span>
                 </label>
               </div>
@@ -646,9 +842,13 @@ export default function CreateTest() {
           >
             <input
               aria-label="Upload notes files"
-              accept=".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.ml,.mli,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml,.ipynb"
+              accept={ACCEPTED_UPLOAD_ATTR}
               multiple
-              onChange={(event) => acceptFiles(event.target.files ?? undefined)}
+              onChange={(event) => {
+                acceptFiles(event.target.files ?? undefined);
+                // Lets the same file be picked again after Remove.
+                event.target.value = "";
+              }}
               type="file"
             />
             {files.length > 0 ? (
@@ -658,7 +858,9 @@ export default function CreateTest() {
                   {files.length} document{files.length === 1 ? "" : "s"} selected
                 </h2>
                 <p>
-                  Each document must be {MAX_UPLOAD_FILE_SIZE_MB} MB or smaller. Combined uploads must stay under {MAX_UPLOAD_TOTAL_SIZE_MB} MB.
+                  {recreatingPracticeTest
+                    ? "Not used while recreating a practice test."
+                    : `Up to ${MAX_UPLOAD_FILE_SIZE_MB} MB each. They are saved to this folder when you generate.`}
                 </p>
                 <div className="selected-files">
                   {files.map((file, index) => (
@@ -677,7 +879,7 @@ export default function CreateTest() {
               <>
                 <Upload size={44} />
                 <h2>Drop notes here</h2>
-                <p>PDF, DOCX, TXT, and Markdown files are supported.</p>
+                <p>PDF, DOCX, PPTX, TXT, Markdown, and code files. They are saved to this folder.</p>
               </>
             )}
           </Card>
@@ -687,8 +889,8 @@ export default function CreateTest() {
           {isSubmitting ? (
             <LoadingNotice
               compact
-              title={files.length > 0 ? "Uploading your notes" : "Setting up your test"}
-              estimate="Generation starts as soon as this finishes, and you can leave once it does."
+              title={submitPhase ?? "Setting up your test"}
+              estimate="Nosey reads your files and generates in the background, so you can leave once this finishes."
               slowNote="Still uploading. Large PDFs take a while. Keep this page open until it finishes."
               slowAfterMs={15000}
             />
