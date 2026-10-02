@@ -240,15 +240,14 @@ export default function CreateTest() {
       }
       // Generation runs in the background. Land back in the folder (the original
       // flow) instead of a dead-end loading screen: the folder polls and opens the
-      // test for taking as soon as the first questions are ready. Only a test that
-      // is already fully ready (rare fast path) opens straight away.
-      if (result.generation_status === "ready") {
+      // test for taking as soon as the first questions are ready. Question editor
+      // mode goes straight to the editor, which waits for generation itself. Only
+      // a test that is already fully ready (rare fast path) opens straight away.
+      if (advancedMode && reviewBeforeTaking) {
+        navigate(`/test/${result.test_id}/edit`);
+      } else if (result.generation_status === "ready") {
         toast.success("Practice test ready");
-        if (advancedMode && reviewBeforeTaking) {
-          navigate(`/test/${result.test_id}/edit`);
-        } else {
-          navigate(`/test/${result.test_id}`);
-        }
+        navigate(`/test/${result.test_id}`);
       } else {
         // Still generating: FolderDetail's poll raises the completion toast once
         // it flips to ready or failed.
@@ -697,7 +696,7 @@ export default function CreateTest() {
                     style={{ width: 16, height: 16, accentColor: "var(--green-dark)", cursor: "pointer" }}
                   />
                   <span style={{ fontSize: "0.9rem" }}>
-                    <strong>Question editor mode</strong> , review and edit questions before taking the test
+                    <strong>Question editor mode</strong>: review and edit questions before taking the test
                   </span>
                 </label>
               </div>

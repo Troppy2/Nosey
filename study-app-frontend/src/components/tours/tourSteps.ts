@@ -85,7 +85,7 @@ export const TOURS: Record<TourId, TourDef> = {
       {
         element: t("folder-tests"),
         title: "Your tests",
-        body: "Every test you make shows up here. Open one to take it again or look back at past attempts.",
+        body: "Every test you make shows up here. Open one to take it again, look back at past attempts, or use the edit button to change its questions.",
         side: "top",
         align: "start",
       },
@@ -136,26 +136,26 @@ export const TOURS: Record<TourId, TourDef> = {
       {
         element: t("create-counts"),
         title: "Question counts",
-        body: "Choose exactly how many multiple choice and written questions you get, up to 50 each.",
+        body: "Choose exactly how many multiple choice and written questions you get, up to 50 each. A recreated practice test keeps all of its own questions instead.",
         side: "top",
       },
       {
         element: t("create-practice"),
         title: "Have an old exam?",
-        body: "Upload a practice test and Nosey recreates its questions.",
+        body: "Upload an old exam or worksheet and Nosey copies out every question so you can retake it, working out any answers it leaves blank. If the folder has notes, you can pick Match its style instead to get new questions written the same way.",
         side: "top",
       },
       {
         element: t("create-editor"),
         title: "Question editor mode",
-        body: "Turn this on to review and edit the questions before you take the test.",
+        body: "Turn this on and the questions open as soon as you click Generate. You can edit them once they finish. Any test can also be edited later from its folder.",
         side: "top",
         align: "start",
       },
       {
         element: t("create-upload"),
         title: "Add your notes",
-        body: "Drop files here. If the folder already has saved notes, Nosey uses those too, so this can stay empty.",
+        body: "Drop files here and Nosey saves them to the folder. Leave it empty to use the notes the folder already has.",
         side: "top",
       },
       {

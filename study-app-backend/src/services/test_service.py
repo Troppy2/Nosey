@@ -32,6 +32,22 @@ from typing import Optional
 
 logger = get_logger(__name__)
 
+# A recreated practice test keeps each question's own option count (true/false
+# up to A-F), so edits accept the same range. Generated MCQs always have 4.
+MCQ_MIN_OPTIONS = 2
+MCQ_MAX_OPTIONS = 6
+
+
+def _validate_mcq_options(options) -> None:
+    if not MCQ_MIN_OPTIONS <= len(options) <= MCQ_MAX_OPTIONS:
+        raise ValidationException(
+            f"Multiple choice questions need {MCQ_MIN_OPTIONS} to {MCQ_MAX_OPTIONS} options"
+        )
+    if any(not o.text.strip() for o in options):
+        raise ValidationException("Options cannot be empty")
+    if sum(1 for o in options if o.is_correct) != 1:
+        raise ValidationException("Exactly one option must be marked correct")
+
 
 class TestService:
     def __init__(
@@ -368,11 +384,7 @@ class TestService:
             question.question_text = data.question_text
         qtype = question.question_type
         if qtype == "MCQ" and data.options is not None:
-            if len(data.options) != 4:
-                raise ValidationException("MCQ questions must have exactly 4 options")
-            correct_count = sum(1 for o in data.options if o.is_correct)
-            if correct_count != 1:
-                raise ValidationException("Exactly one option must be marked correct")
+            _validate_mcq_options(data.options)
             await repo.update_mcq_options(question, [(o.text, o.is_correct) for o in data.options])
         elif qtype == "FRQ" and data.expected_answer is not None and question.frq_answer is not None:
             question.frq_answer.expected_answer = data.expected_answer
@@ -400,11 +412,7 @@ class TestService:
             raise ResourceNotFoundException("Test")
         display_order = await repo.get_max_display_order(test_id) + 1
         if data.type == "MCQ":
-            if len(data.options) != 4:
-                raise ValidationException("MCQ questions must have exactly 4 options")
-            correct_count = sum(1 for o in data.options if o.is_correct)
-            if correct_count != 1:
-                raise ValidationException("Exactly one option must be marked correct")
+            _validate_mcq_options(data.options)
             question = await repo.add_mcq_question(
                 test_id, data.question_text, display_order,
                 [(o.text, o.is_correct) for o in data.options],

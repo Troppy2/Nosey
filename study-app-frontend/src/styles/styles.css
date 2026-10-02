@@ -26593,3 +26593,30 @@ a.sd-chip.is-done:hover {
 .practice-mode-note--above {
   margin: 0 0 10px;
 }
+
+/* Question editor: read-only previews while the test is still generating */
+.editor-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.editor-preview-text {
+  margin: 0;
+  white-space: pre-wrap;
+  color: var(--ink);
+}
+
+.editor-preview-options {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 20px;
+  color: #596949;
+  font-size: 0.9rem;
+}
+
+.editor-preview-options .is-correct {
+  color: var(--green-dark);
+  font-weight: 700;
+}

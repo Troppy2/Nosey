@@ -5,14 +5,27 @@ import { Button } from "../components/Button";
 import { FormError } from "../components/FormError";
 import { Card } from "../components/Card";
 import { ConfirmModal } from "../components/ConfirmModal";
+import { LoadingNotice } from "../components/Loaders";
 import { SkeletonList } from "../components/Skeletons";
 import {
   addQuestion,
   deleteQuestion,
   fetchQuestionsForEditing,
+  fetchTest,
   updateQuestion,
 } from "../lib/api";
-import type { MCQOptionInput, QuestionCreate, QuestionEditable } from "../lib/types";
+import type { MCQOptionInput, QuestionCreate, QuestionEditable, TestTake } from "../lib/types";
+
+// Matches TakeTest's poll while a test generates in the background.
+const GENERATION_POLL_MS = 1800;
+
+const TYPE_LABELS: Record<string, string> = {
+  MCQ: "Multiple choice",
+  FRQ: "Written",
+  TF: "True / False",
+  MS: "Multiple select",
+  RANK: "Ranking",
+};
 
 type DraftOption = { text: string; is_correct: boolean };
 
@@ -127,7 +140,7 @@ function MCQCard({
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <span className="field-label">Options , select the correct answer</span>
+        <span className="field-label">Options: select the correct answer</span>
         {options.map((opt, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <input
@@ -158,6 +171,8 @@ function MCQCard({
   );
 }
 
+// Written questions, and the text of the beta types (True / False, Multiple
+// select, Ranking), whose answers this editor cannot change yet.
 function FRQCard({
   question,
   testId,
@@ -169,6 +184,7 @@ function FRQCard({
   onSaved: (q: QuestionEditable) => void;
   onDeleted: (id: number) => void;
 }) {
+  const isWritten = question.type === "FRQ";
   const [text, setText] = useState(question.question_text);
   const [answer, setAnswer] = useState(question.expected_answer ?? "");
   const [saving, setSaving] = useState(false);
@@ -182,7 +198,7 @@ function FRQCard({
     try {
       const saved = await updateQuestion(testId, question.id, {
         question_text: text.trim(),
-        expected_answer: answer.trim(),
+        ...(isWritten ? { expected_answer: answer.trim() } : {}),
       });
       onSaved(saved);
     } catch (e) {
@@ -216,7 +232,7 @@ function FRQCard({
         />
       ) : null}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span className="eyebrow">Written</span>
+        <span className="eyebrow">{TYPE_LABELS[question.type] ?? "Written"}</span>
         <button
           type="button"
           onClick={() => setConfirmDelete(true)}
@@ -249,14 +265,20 @@ function FRQCard({
         />
       </div>
 
-      <div className="field">
-        <label className="field-label">Expected answer (used for grading)</label>
-        <textarea
-          className="input textarea"
-          value={answer}
-          onChange={(e) => setAnswer(e.target.value)}
-        />
-      </div>
+      {isWritten ? (
+        <div className="field">
+          <label className="field-label">Expected answer (used for grading)</label>
+          <textarea
+            className="input textarea"
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value)}
+          />
+        </div>
+      ) : (
+        <p className="muted small" style={{ margin: 0 }}>
+          Only the question text can be edited for this question type.
+        </p>
+      )}
 
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <Button onClick={handleSave} disabled={saving || !text.trim()}>
@@ -344,7 +366,7 @@ function AddQuestionPanel({
 
       {type === "MCQ" ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <span className="field-label">Options , select the correct answer</span>
+          <span className="field-label">Options: select the correct answer</span>
           {options.map((opt, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <input
@@ -386,21 +408,81 @@ function AddQuestionPanel({
   );
 }
 
+// Shown while the test is still generating: questions can still be rewritten
+// or dropped by MCQ verification until it finishes, so they are not editable yet.
+function QuestionPreview({ question, number }: { question: QuestionEditable; number: number }) {
+  return (
+    <Card className="form-panel editor-preview">
+      <span className="eyebrow">
+        {number}. {TYPE_LABELS[question.type] ?? "Question"}
+      </span>
+      <p className="editor-preview-text">{question.question_text}</p>
+      {question.options.length > 0 ? (
+        <ol className="editor-preview-options" type="A">
+          {question.options.map((option) => (
+            <li key={option.id} className={option.is_correct ? "is-correct" : undefined}>
+              {option.text}
+            </li>
+          ))}
+        </ol>
+      ) : question.expected_answer ? (
+        <p className="muted small" style={{ margin: 0 }}>Answer: {question.expected_answer}</p>
+      ) : null}
+    </Card>
+  );
+}
+
 export default function QuestionEditor() {
   const { testId } = useParams<{ testId: string }>();
   const navigate = useNavigate();
   const id = Number(testId);
 
+  const [test, setTest] = useState<TestTake | null>(null);
   const [questions, setQuestions] = useState<QuestionEditable[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const generating = test?.generation_status === "generating";
+
   useEffect(() => {
-    fetchQuestionsForEditing(id)
-      .then(setQuestions)
-      .catch((e) => setError(e instanceof Error ? e.message : "Could not load questions"))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    Promise.all([fetchTest(id), fetchQuestionsForEditing(id)])
+      .then(([meta, editable]) => {
+        if (cancelled) return;
+        setTest(meta);
+        setQuestions(editable);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Could not load questions");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
+
+  // Question editor mode lands here right after Create Test, while the test is
+  // still generating: poll until it finishes, then the cards become editable.
+  useEffect(() => {
+    if (!generating) return;
+    let cancelled = false;
+    const timer = window.setInterval(async () => {
+      try {
+        const [meta, editable] = await Promise.all([fetchTest(id), fetchQuestionsForEditing(id)]);
+        if (cancelled) return;
+        setTest(meta);
+        setQuestions(editable);
+      } catch {
+        // Transient failure; keep polling.
+      }
+    }, GENERATION_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [generating, id]);
 
   function handleSaved(updated: QuestionEditable) {
     setQuestions((prev) => prev.map((q) => (q.id === updated.id ? updated : q)));
@@ -414,11 +496,14 @@ export default function QuestionEditor() {
     setQuestions((prev) => [...prev, q]);
   }
 
+  const expected = test?.expected_question_count;
+  const backTo = test?.folder_id ? `/folders/${test.folder_id}` : "/dashboard";
+
   return (
     <div className="page page-narrow">
-      <Link className="back-link" to="/dashboard">
+      <Link className="back-link" to={backTo}>
         <ArrowLeft size={16} />
-        Dashboard
+        {test?.folder_name ?? "Folder"}
       </Link>
 
       <header className="page-header">
@@ -426,19 +511,33 @@ export default function QuestionEditor() {
           <span className="eyebrow">Advanced mode</span>
           <h1>Question editor</h1>
           <p className="muted">
-            Edit, remove, or add questions. Changes save immediately. When you&apos;re done, take the test.
+            Edit, remove, or add questions. Each card saves on its own. When you&apos;re done, take the test.
           </p>
         </div>
         <Button onClick={() => navigate(`/test/${id}`)}>Take Test</Button>
       </header>
 
       <FormError message={error} />
+      {test?.generation_status === "failed" ? (
+        <FormError message={`Generation failed: ${test.generation_error ?? "no questions were made."}`} />
+      ) : null}
 
       {loading ? (
         <SkeletonList rows={4} label="Loading questions" />
+      ) : generating ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <LoadingNotice
+            compact
+            title="Generating questions"
+            estimate={`${questions.length}${expected ? ` of ${expected}` : ""} ready. You can edit them once generation finishes.`}
+          />
+          {questions.map((q, i) => (
+            <QuestionPreview key={q.id} question={q} number={i + 1} />
+          ))}
+        </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          {questions.length === 0 && !loading && (
+          {questions.length === 0 && (
             <Card className="form-panel">
               <p className="muted" style={{ textAlign: "center" }}>
                 No questions yet. Add some below.
