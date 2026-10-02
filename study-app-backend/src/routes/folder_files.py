@@ -5,7 +5,7 @@ import hashlib
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +16,10 @@ from src.models.folder import Folder
 from src.models.folder_file import FolderFile
 from src.models.user import User
 from src.repositories.usage_event_repository import UsageEventRepository
-from src.services.file_service import FileService, ParseProgress
+from src.services.file_service import FileService, ParseProgress, assemble_pdf_pages
+from src.services.practice_vision import transcribe_math_pages
+from src.services.quota_service import QuotaService
+from src.utils.usage_context import bind_usage
 from src.services.kojo_context_cache import invalidate_folder
 from src.services.practice_sections import detect_sections
 from src.services.upload_recovery import stopped_reading_note
@@ -191,6 +194,8 @@ async def _extract_and_update(
     file_name: str,
     folder_id: int,
     user_id: int,
+    vision_charge: Optional[int] = None,
+    use_vision: bool = False,
 ) -> None:
     """Background task: parse the uploaded temp file and update the folder_file record.
 
@@ -208,6 +213,16 @@ async def _extract_and_update(
             max_pages=PDF_BOOK_MAX_PAGES,
         )
         content = result.text
+        if use_vision:
+            # Practice test (GH #133): pages that lost their math are re-read by a
+            # vision model before the row turns ready, so a test built from this
+            # file never sees the broken text.
+            bind_usage(user_id, "practice_vision")
+            transcribed = await transcribe_math_pages(path, list(result.page_texts))
+            if transcribed:
+                content = assemble_pdf_pages(result.page_texts, transcribed)
+            else:
+                await _refund_vision(vision_charge)
         content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
 
         async with async_session_maker() as session:
@@ -273,6 +288,8 @@ async def _extract_and_update(
                 logger.warning("Reading later PDF batches failed for file_id=%s: %s", file_id, exc)
     except Exception as exc:
         logger.warning("Background extraction failed for file_id=%s: %s", file_id, exc)
+        if use_vision:
+            await _refund_vision(vision_charge)
         duration_ms = int((_time.monotonic() - _t0) * 1000)
         async with async_session_maker() as err_session:
             record = await err_session.get(FolderFile, file_id)
@@ -289,6 +306,16 @@ async def _extract_and_update(
             await err_session.commit()
     finally:
         remove_temp(path)
+
+
+async def _refund_vision(charge_id: Optional[int]) -> None:
+    if charge_id is None:
+        return
+    try:
+        async with async_session_maker() as session:
+            await QuotaService().refund(session, charge_id)
+    except Exception as exc:
+        logger.warning("Practice vision refund failed for charge %s: %s", charge_id, exc)
 
 
 @router.get("/{folder_id}/files", response_model=list[FolderFileResponse])
@@ -360,6 +387,7 @@ async def get_folder_file_content(
 async def upload_folder_files(
     folder_id: int,
     files: list[UploadFile] = File(...),
+    purpose: Optional[str] = Form(None),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> UploadResult:
@@ -461,8 +489,16 @@ async def upload_folder_files(
         raise
     # Text extraction runs detached (not BackgroundTasks, rule 8a): the caller
     # usually fires its next request right away, e.g. Create Test starting the
-    # test that reads these files.
+    # test that reads these files. A PDF uploaded as a practice test may also
+    # get the vision pass for pages that lost their math (GH #133).
     for file_id, path, name in queued:
+        if purpose == "practice_test" and name.lower().endswith(".pdf"):
+            allowed, charge_id = await QuotaService().charge_practice_vision(session, user)
+            if allowed:
+                spawn_detached(_extract_and_update(
+                    file_id, path, name, folder_id, user.id, vision_charge=charge_id, use_vision=True,
+                ))
+                continue
         spawn_detached(_extract_and_update(file_id, path, name, folder_id, user.id))
     if created:
         invalidate_folder(folder_id)

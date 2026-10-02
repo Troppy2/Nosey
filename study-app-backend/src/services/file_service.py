@@ -7,6 +7,7 @@ import os
 import re
 import time
 import unicodedata
+import uuid
 import weakref
 from collections import defaultdict
 from dataclasses import dataclass
@@ -122,6 +123,9 @@ class PdfText:
     text: str
     pages_read: int
     page_count: int
+    # Raw text of each page read, in order. Lets the practice-test vision pass
+    # swap in a transcription for the pages that lost their math.
+    page_texts: tuple[str, ...] = ()
 
 
 @dataclass
@@ -130,6 +134,7 @@ class ExtractionResult:
     file_type: str
     pages_read: Optional[int] = None
     page_count: Optional[int] = None
+    page_texts: tuple[str, ...] = ()
 
 
 # How often parse progress is written while a parse runs (one small UPDATE each).
@@ -267,6 +272,26 @@ def _clean_extracted_text(text: str, preserve_code: bool = False) -> str:
     return _collapse_whitespace_lines(cleaned)
 
 
+def assemble_pdf_pages(page_texts: Sequence[str], replacements: dict[int, str]) -> str:
+    """Clean a PDF's pages as one document, with some pages replaced verbatim.
+
+    The replacements are vision transcriptions (practice_vision.py): LaTeX whose
+    short lines ("\\end{bmatrix}") repeat by nature, so the line filters must
+    not touch them. Each one rides through cleaning as a unique placeholder line
+    and is swapped back in afterwards; every other page is cleaned as usual,
+    including header/footer detection across the whole document.
+    """
+    placeholders = {i: f"NOSEY-VISION-PAGE-{i}-{uuid.uuid4().hex}" for i in replacements}
+    joined = "\n".join(
+        placeholders[i] if i in placeholders else _strip_pdf_emphasis(text or "")
+        for i, text in enumerate(page_texts)
+    )
+    cleaned = _clean_extracted_text(joined)
+    for i, placeholder in placeholders.items():
+        cleaned = cleaned.replace(placeholder, replacements[i].strip())
+    return cleaned
+
+
 def _flush_mupdf_store() -> None:
     tools = getattr(fitz, "TOOLS", None)
     if tools is not None:
@@ -350,7 +375,7 @@ def _extract_with_pymupdf(
         progress.pages_done = index + 1
         if (index + 1 - pages.start) % _MUPDF_STORE_FLUSH_EVERY == 0:
             _flush_mupdf_store()
-    return PdfText(_join_extracted_chunks(parts), max(stop, pages.start), page_count)
+    return PdfText(_join_extracted_chunks(parts), max(stop, pages.start), page_count, tuple(parts))
 
 
 def _extract_with_pdfplumber(
@@ -376,7 +401,7 @@ def _extract_with_pdfplumber(
             page.flush_cache()
             page.get_textmap.cache_clear()
             progress.pages_done = index + 1
-    return PdfText(_join_extracted_chunks(parts), max(stop, pages.start), page_count)
+    return PdfText(_join_extracted_chunks(parts), max(stop, pages.start), page_count, tuple(parts))
 
 
 def _extract_pdf_pages(
@@ -558,7 +583,11 @@ class FileService:
                 path, progress, deadline, start=pages.start, batch=pages.batch, max_pages=pages.max_pages
             )
             return ExtractionResult(
-                _clean_extracted_text(_strip_pdf_emphasis(pdf.text)), file_type, pdf.pages_read, pdf.page_count
+                _clean_extracted_text(_strip_pdf_emphasis(pdf.text)),
+                file_type,
+                pdf.pages_read,
+                pdf.page_count,
+                pdf.page_texts,
             )
         with open(path, "rb") as handle:
             data = handle.read()
