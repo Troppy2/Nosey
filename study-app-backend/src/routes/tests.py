@@ -347,8 +347,13 @@ async def _generate_questions_background(
     count_rank: int = 0,
     prior_questions: Optional[list[str]] = None,
     quota_charge_id: Optional[int] = None,
+    practice_test_mode: Optional[str] = None,
 ) -> None:
     """Run LLM generation and save questions; called as a FastAPI background task.
+
+    practice_test_mode: "recreate" (the document's own questions) or "style" (a
+    parallel version of them). None infers it the way regenerate_test must:
+    stored notes alongside the practice test mean style, otherwise recreate.
 
     Connection discipline: NO DB session is held open across the LLM calls. Each
     batch is generated first (LLM only, no DB), then written in a short-lived
@@ -365,6 +370,8 @@ async def _generate_questions_background(
     # must stay attributed even if it is ever launched from another context.
     bind_usage(user_id, "test_generation")
     llm = LLMService()
+    if practice_test_content and practice_test_mode not in ("recreate", "style"):
+        practice_test_mode = "style" if notes_content else "recreate"
 
     # Dispatch a single generation call for the requested MCQ/FRQ counts. The three
     # source paths (template / parse / notes) each have their own LLM entry point
@@ -375,23 +382,16 @@ async def _generate_questions_background(
     async def run_generation(
         c_mcq: int, c_frq: int, prior: Optional[list[str]], on_question=None
     ):
-        if practice_test_content and notes_content:
-            return await llm.generate_from_practice_test_template(
-                notes=notes_content,
+        if practice_test_content and practice_test_mode == "style":
+            # One new question per original; the counts do not apply.
+            return await llm.generate_parallel_practice_test(
                 practice_test_content=practice_test_content,
-                test_type=test_type,
-                count_mcq=c_mcq if test_type != "FRQ_only" else 0,
-                count_frq=c_frq if test_type != "MCQ_only" else 0,
-                is_math_mode=is_math_mode,
+                notes=notes_content,
+                include_mcq=test_type != "FRQ_only",
+                include_frq=test_type not in ("MCQ_only", "Extreme"),
                 difficulty=difficulty,
-                topic_focus=topic_focus,
-                is_coding_mode=is_coding_mode,
-                coding_language=coding_language,
                 custom_instructions=custom_instructions,
                 provider=provider,
-                enable_fallback=enable_fallback,
-                prior_questions=prior,
-                on_question=on_question,
                 owner_id=user_id,
             )
         if practice_test_content:
@@ -447,9 +447,12 @@ async def _generate_questions_background(
 
         # Stream in two phases (small first batch, then the rest) only when the test
         # is big enough to benefit and the source path supports cross-batch dedup.
-        # parse_practice_test is single-phase to avoid duplicating extracted questions.
-        is_parse_only = bool(practice_test_content) and not notes_content
-        streaming = (not is_parse_only) and total_main > _FIRST_BATCH_SIZE
+        # Both practice-test paths are single-phase: their size comes from the
+        # document, not the counts. Only a recreated test skips MCQ verification
+        # (its answer key is the student's own document).
+        is_parse_only = bool(practice_test_content) and practice_test_mode == "recreate"
+        streaming = not practice_test_content and total_main > _FIRST_BATCH_SIZE
+        generated_mcq = 0
 
         display_order = 1
         if streaming:
@@ -515,6 +518,7 @@ async def _generate_questions_background(
                     display_order = await persist_batch(leftover_mcq, leftover_frq, display_order)
         else:
             mcq_questions, frq_questions = await run_generation(eff_mcq, count_frq, prior_questions)
+            generated_mcq = len(mcq_questions)
             display_order = await persist_batch(mcq_questions, frq_questions, display_order)
 
         # Extra (beta) question types. Isolated and best-effort: a failure here
@@ -574,7 +578,8 @@ async def _generate_questions_background(
                     source_content=notes_content or practice_test_content,
                     variant=("math" if is_math_mode else "coding" if is_coding_mode else "prose"),
                     provider=provider,
-                    requested_mcq=eff_mcq_requested,
+                    # A parallel version has one MCQ per original MCQ, not a requested count.
+                    requested_mcq=generated_mcq if practice_test_content else eff_mcq_requested,
                     coding_language=coding_language,
                     test_type=test_type,
                     difficulty=difficulty,
@@ -798,6 +803,7 @@ async def _extract_and_generate_background(
         count_rank=count_rank,
         prior_questions=prior_questions,
         quota_charge_id=quota_charge_id,
+        practice_test_mode="recreate" if practice_test_only else "style",
     )
 
 
@@ -923,7 +929,8 @@ async def create_test(
             raise StudyAppException(
                 "Provide at least one notes document, a saved folder file, or a practice test file"
             )
-        practice_test_only = has_practice_test and (practice_test_mode == "recreate" or not has_notes)
+        # Style mode works without notes: it falls back to the exam's own topics.
+        practice_test_only = has_practice_test and practice_test_mode == "recreate"
         valid_files = [f for f in notes_files if isinstance(f, UploadFile)]
         if len(valid_files) != len(notes_files):
             raise StudyAppException("All uploaded documents must be valid files")
@@ -976,9 +983,9 @@ async def create_test(
         test.generation_status = "generating"
         # Record how many questions this test will end up with so the take-test screen
         # can show streaming progress while the background task fills them in. A
-        # recreated practice test has as many as the document does: unknown here.
+        # practice test (either mode) has as many as the document does: unknown here.
         test.expected_question_count = (
-            None if practice_test_only else eff_mcq + eff_frq + count_tf + count_ms + count_rank
+            None if has_practice_test else eff_mcq + eff_frq + count_tf + count_ms + count_rank
         )
         await session.commit()
 

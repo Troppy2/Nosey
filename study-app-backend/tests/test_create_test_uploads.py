@@ -310,8 +310,9 @@ async def test_style_mode_with_notes_uses_the_notes(client, seeded, db_session_m
     assert calls[0]["use_folder_files"] is True
 
 
-async def test_style_mode_without_other_notes_recreates(client, seeded, db_session_maker, spawned) -> None:
-    """The practice test itself is the folder's only file, so there are no notes."""
+async def test_style_mode_without_other_notes_stays_style(client, seeded, db_session_maker, spawned) -> None:
+    """The practice test is the folder's only file, so there are no notes. A
+    parallel version falls back to the exam's own topics (GH #133)."""
     _, folder_id, _ = seeded
     calls, coros = spawned
     exam = await _folder_file(db_session_maker, folder_id, "exam.pdf", "e")
@@ -323,7 +324,7 @@ async def test_style_mode_without_other_notes_recreates(client, seeded, db_sessi
 
     assert response.status_code == 201, response.text
     await coros[0]
-    assert calls[0]["practice_test_only"] is True
+    assert calls[0]["practice_test_only"] is False
 
 
 async def test_file_id_from_another_folder_is_rejected(client, seeded, db_session_maker, spawned) -> None:

@@ -329,6 +329,69 @@ class TestParsePracticeTestAccuracy:
         svc._complete_json_skip_ollama.assert_awaited_once()
 
 
+class TestParallelPracticeTest:
+    """"Match its style" writes one new question per original (GH #133)."""
+
+    def _service(self, originals_mcq, originals_frq, reply):
+        svc = LLMService()
+        svc.parse_practice_test = AsyncMock(return_value=(originals_mcq, originals_frq))  # type: ignore[method-assign]
+        prompts: list[str] = []
+
+        async def complete(prompt: str, provider=None) -> dict:
+            prompts.append(prompt)
+            return reply(prompt) if callable(reply) else reply
+
+        svc._complete_json = complete  # type: ignore[method-assign]
+        return svc, prompts
+
+    async def test_each_original_gets_one_counterpart_of_the_same_type(self):
+        originals = [GeneratedMCQ("Which gas is fastest at 25 C?", ["He", "N2", "CO2"], 0)]
+        written = [GeneratedFRQ("Explain hydrogen bonding in water.", "...")]
+        reply = {"questions": [
+            {"original": 1, "question_text": "Which gas is slowest at 25 C?", "options": ["He", "N2", "SF6"], "correct_index": 2},
+            {"original": 2, "question_text": "Explain why ice floats.", "expected_answer": "Hydrogen bonds hold an open lattice."},
+        ]}
+        svc, prompts = self._service(originals, written, reply)
+
+        mcq, frq = await svc.generate_parallel_practice_test("exam text")
+
+        assert [q.question_text for q in mcq] == ["Which gas is slowest at 25 C?"]
+        assert mcq[0].options == ["He", "N2", "SF6"] and mcq[0].correct_index == 2
+        assert [q.question_text for q in frq] == ["Explain why ice floats."]
+        assert "Which gas is fastest at 25 C?" in prompts[0]
+        assert "multiple choice, 3 options" in prompts[0]
+        svc.parse_practice_test.assert_awaited_once()
+        assert svc.parse_practice_test.call_args.kwargs["solve_keyless"] is False
+
+    async def test_notes_are_optional_and_only_sent_when_present(self):
+        originals = [GeneratedFRQ("Explain osmosis.", "...")]
+        reply = {"questions": [{"original": 1, "question_text": "Explain diffusion.", "expected_answer": "Net movement..."}]}
+        svc, prompts = self._service([], originals, reply)
+        await svc.generate_parallel_practice_test("exam text", notes="")
+        assert "STUDY NOTES" not in prompts[0]
+
+    async def test_a_failed_batch_keeps_the_others(self, monkeypatch):
+        import src.services.llm_service as llm_module
+
+        monkeypatch.setattr(llm_module, "_PARALLEL_BATCH", 1)
+        originals = [GeneratedFRQ(f"Original {i}?", "...") for i in range(3)]
+
+        def reply(prompt: str) -> dict:
+            if "Original 1?" in prompt:
+                raise RuntimeError("provider down")
+            n = 0 if "Original 0?" in prompt else 2
+            return {"questions": [{"original": 1, "question_text": f"New {n}?", "expected_answer": "x"}]}
+
+        svc, _ = self._service([], originals, reply)
+        _, frq = await svc.generate_parallel_practice_test("exam text")
+        assert [q.question_text for q in frq] == ["New 0?", "New 2?"]
+
+    async def test_nothing_written_raises(self):
+        svc, _ = self._service([], [GeneratedFRQ("Original?", "...")], {"questions": []})
+        with pytest.raises(LLMException):
+            await svc.generate_parallel_practice_test("exam text")
+
+
 # ── TestService.create_test — service-layer unit tests ─────────────────────────
 
 class TestCreateTestService:

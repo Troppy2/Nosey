@@ -203,6 +203,37 @@ class TestGenerateQuestionsBackgroundVerificationWiring:
         fake_verify.assert_not_called()
         llm.parse_practice_test.assert_awaited_once()
 
+    async def test_style_mode_writes_a_parallel_version_and_verifies_all_of_it(
+        self, db_session_maker, monkeypatch,
+    ):
+        """GH #133: style mode no longer goes through the count-driven template
+        path; verification is asked to keep every generated MCQ, not a count."""
+        from src.routes.tests import _generate_questions_background
+
+        monkeypatch.setattr("src.routes.tests.settings.mcq_verification_enabled", True)
+        test_id = await _seed_bare_test(db_session_maker)
+        llm = _make_llm_mock(_fake_generate_test_questions())
+        llm.generate_parallel_practice_test = AsyncMock(return_value=(_make_mcqs(7), []))
+
+        with (
+            patch("src.routes.tests.async_session_maker", db_session_maker),
+            patch("src.routes.tests.LLMService", return_value=llm),
+            patch("src.routes.tests._verify_persisted_mcqs", new=AsyncMock()) as fake_verify,
+        ):
+            await _generate_questions_background(
+                test_id=test_id, user_id=1, notes_content="",
+                practice_test_content="some extracted practice test text", test_type="MCQ_only",
+                count_mcq=3, count_frq=0, is_math_mode=False, difficulty="mixed",
+                topic_focus=None, is_coding_mode=False, coding_language=None,
+                custom_instructions=None, provider=None, enable_fallback=True,
+                practice_test_mode="style",
+            )
+
+        llm.generate_parallel_practice_test.assert_awaited_once()
+        llm.parse_practice_test.assert_not_awaited()
+        fake_verify.assert_awaited_once()
+        assert fake_verify.call_args.kwargs["requested_mcq"] == 7
+
     async def test_verification_failure_does_not_block_ready_status(self, db_session_maker, monkeypatch):
         from src.routes.tests import _generate_questions_background
 

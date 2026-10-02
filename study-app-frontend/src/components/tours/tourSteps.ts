@@ -142,7 +142,7 @@ export const TOURS: Record<TourId, TourDef> = {
       {
         element: t("create-practice"),
         title: "Have an old exam?",
-        body: "Upload an old exam or worksheet and Nosey copies out every question so you can retake it, working out any answers it leaves blank. If the folder has notes, you can pick Match its style instead to get new questions written the same way.",
+        body: "Upload an old exam or worksheet and Nosey copies out every question so you can retake it, working out any answers it leaves blank. Pick Match its style instead for a new version with different questions in the same format.",
         side: "top",
       },
       {

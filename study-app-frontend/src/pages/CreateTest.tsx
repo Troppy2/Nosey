@@ -151,10 +151,9 @@ export default function CreateTest() {
 
   // The practice test only counts in Advanced mode, where its control lives.
   const activePracticeTest = advancedMode ? practiceTestFile : null;
-  const notesAvailable = files.length > 0 || folderFileCount > 0;
-  // Recreate needs no notes; matching the style needs some to write from.
-  const recreatingPracticeTest =
-    activePracticeTest !== null && (practiceTestMode === "recreate" || !notesAvailable);
+  // Both modes work without notes: a parallel version falls back to the exam's
+  // own topics when the notes don't cover them.
+  const recreatingPracticeTest = activePracticeTest !== null && practiceTestMode === "recreate";
 
   function describeSkipped(skipped: SkippedFile[]): string {
     return skipped.map((s) => `${s.file_name}: ${s.reason}`).join(" · ");
@@ -532,9 +531,9 @@ export default function CreateTest() {
                 {/* Question counts */}
                 <div data-tour="create-counts">
                   <span className="eyebrow eyebrow-group">Question count</span>
-                  {recreatingPracticeTest ? (
+                  {activePracticeTest ? (
                     <p className="muted small practice-mode-note practice-mode-note--above">
-                      Not used while recreating a practice test: every question in it is kept.
+                      Not used with a practice test: you get one question for each question in it.
                     </p>
                   ) : null}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -636,8 +635,7 @@ export default function CreateTest() {
                           Remove
                         </button>
                       </div>
-                      {notesAvailable ? (
-                        <div className="choice-grid practice-mode-grid" role="group" aria-label="What to do with the practice test">
+                      <div className="choice-grid practice-mode-grid" role="group" aria-label="What to do with the practice test">
                           <button
                             type="button"
                             className={`choice ${practiceTestMode === "recreate" ? "active" : ""}`}
@@ -654,12 +652,11 @@ export default function CreateTest() {
                           >
                             Match its style
                           </button>
-                        </div>
-                      ) : null}
+                      </div>
                       <p className="muted small practice-mode-note">
                         {recreatingPracticeTest
                           ? "Every question in the test is kept, with its answers. Where it has no answer key, Nosey works the answers out."
-                          : "New questions from your notes, written like the ones in this test."}
+                          : "A new version of this test: each question gets a twin that tests the same skill in the same format, with new numbers or examples. Uses your notes when they cover the topic."}
                       </p>
                     </>
                   ) : (

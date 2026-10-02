@@ -385,6 +385,10 @@ _PRACTICE_CHUNK_TIMEOUT_S = 180
 # by the strongest available provider.
 _PRACTICE_SOLVE_BATCH = 12
 _STRONGEST_PROVIDER_ORDER = ("claude", "groq", "minimax", "gemini", "ollama")
+# "Match its style" writes one new question per original, this many originals
+# per call, and reads at most this much of the notes for grounding.
+_PARALLEL_BATCH = 8
+_PARALLEL_NOTES_CHARS = 12_000
 _PRACTICE_ANSWER_KEY_CHARS = 6_000
 _PRACTICE_MIN_OPTIONS = 2
 _PRACTICE_MAX_OPTIONS = 6
@@ -1463,6 +1467,133 @@ class LLMService:
 
         await asyncio.gather(*(solve(batch) for batch in batches))
         return mcq, frq
+
+    async def generate_parallel_practice_test(
+        self,
+        practice_test_content: str,
+        notes: str = "",
+        include_mcq: bool = True,
+        include_frq: bool = True,
+        difficulty: str = "mixed",
+        custom_instructions: Optional[str] = None,
+        provider: Optional[str] = None,
+        owner_id: Optional[int] = None,
+    ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
+        """"Match its style": a parallel version of an uploaded practice test.
+
+        The exam's own questions are parsed first, then each gets exactly one
+        new counterpart: same skill, format, option count and difficulty, with
+        new specifics. Notes ground the content when they cover a topic; the
+        exam's own topics are used otherwise, so notes are optional (GH #133).
+        The previous template path only ever saw three abstract style phrases,
+        which is why its questions had nothing to do with the exam.
+        """
+        from src.utils.exceptions import LLMException
+
+        mcq_src, frq_src = await self.parse_practice_test(
+            practice_test_content,
+            include_mcq=include_mcq,
+            include_frq=include_frq,
+            provider=provider,
+            solve_keyless=False,
+        )
+        originals: list[tuple[str, object]] = [("mcq", q) for q in mcq_src] + [("frq", q) for q in frq_src]
+
+        notes_context = ""
+        if notes.strip():
+            query = " ".join(q.question_text[:200] for _, q in originals)[:4000]
+            loop = asyncio.get_event_loop()
+            notes_context, _ = await loop.run_in_executor(
+                None, lambda: self._retrieve_relevant_context(notes, query, owner_id=owner_id)
+            )
+            notes_context = notes_context[:_PARALLEL_NOTES_CHARS]
+
+        batches = [originals[i:i + _PARALLEL_BATCH] for i in range(0, len(originals), _PARALLEL_BATCH)]
+        gate = asyncio.Semaphore(_PRACTICE_CHUNK_CONCURRENCY)
+
+        async def write_batch(batch: list[tuple[str, object]]) -> list[object]:
+            prompt = self._parallel_prompt(batch, notes_context, difficulty, custom_instructions)
+            async with gate:
+                try:
+                    data = await asyncio.wait_for(
+                        self._complete_json(prompt, provider=provider), _PRACTICE_CHUNK_TIMEOUT_S
+                    )
+                except Exception as exc:
+                    logger.warning("Parallel version batch of %d failed: %s", len(batch), exc)
+                    return []
+            written: dict[int, object] = {}
+            raw = data.get("questions")
+            for item in raw if isinstance(raw, list) else []:
+                if not isinstance(item, dict):
+                    continue
+                try:
+                    slot = int(item.get("original", 0)) - 1
+                except (TypeError, ValueError):
+                    continue
+                if not 0 <= slot < len(batch) or slot in written:
+                    continue
+                # The counterpart keeps its original's type even if the model drifts.
+                kind = batch[slot][0]
+                question = self._parsed_practice_mcq(item) if kind == "mcq" else self._parsed_practice_frq(item)
+                if question is not None:
+                    written[slot] = replace(question, answer_inferred=False)
+            return [written[slot] for slot in sorted(written)]
+
+        results = await asyncio.gather(*(write_batch(batch) for batch in batches))
+        mcq = [q for batch in results for q in batch if isinstance(q, GeneratedMCQ)]
+        frq = [q for batch in results for q in batch if isinstance(q, GeneratedFRQ)]
+        if not mcq and not frq:
+            raise LLMException("Nosey couldn't write a new version of that practice test right now. Try again in a moment.")
+        logger.info("Parallel practice test: %d MCQ, %d FRQ from %d originals", len(mcq), len(frq), len(originals))
+        return mcq, frq
+
+    def _parallel_prompt(
+        self,
+        batch: list[tuple[str, object]],
+        notes_context: str,
+        difficulty: str,
+        custom_instructions: Optional[str],
+    ) -> str:
+        lines: list[str] = []
+        for n, (kind, q) in enumerate(batch, start=1):
+            if kind == "mcq":
+                opts = "\n".join(f"   - {o}" for o in q.options)  # type: ignore[attr-defined]
+                lines.append(
+                    f"[{n}] multiple choice, {len(q.options)} options:\n{q.question_text}\n{opts}"  # type: ignore[attr-defined]
+                )
+            else:
+                lines.append(f"[{n}] written:\n{q.question_text}")  # type: ignore[attr-defined]
+        difficulty_line = (
+            "Match each original's difficulty."
+            if difficulty in ("", "mixed")
+            else f"Make every new question {difficulty} difficulty."
+        )
+        notes_block = (
+            f"STUDY NOTES (use them for facts when they cover a topic):\n{notes_context}\n\n"
+            if notes_context.strip()
+            else ""
+        )
+        return (
+            "You are writing a NEW version of a student's practice test, like a second version of the same exam.\n"
+            "For each ORIGINAL question below, write exactly one NEW question that:\n"
+            "- tests the same skill or concept in the same format: multiple choice stays multiple choice with "
+            "the same number of options, written stays written, a calculation stays the same kind of calculation, "
+            "a proof stays a proof\n"
+            "- keeps the original's style and structure, so a student who can do one can do the other\n"
+            "- changes the specifics (numbers, scenario, example, objects, wording) so it is not a copy and its "
+            "answer is different\n"
+            "- is complete on its own: include any data, vectors, matrices or code it needs\n"
+            "Stay within the original question's topic. Use the study notes for facts when they cover it; never "
+            "contradict them. Work out the correct answer to every new question.\n"
+            f"{difficulty_line}\n\n"
+            f"ORIGINAL QUESTIONS:\n" + "\n\n".join(lines) + "\n\n"
+            f"{notes_block}"
+            f"{self._student_instructions_block(custom_instructions)}"
+            "Return JSON only, one entry per original, in order:\n"
+            '{"questions": [{"original": 1, "question_text": "...", "options": ["...", "..."], "correct_index": 0}, '
+            '{"original": 2, "question_text": "...", "expected_answer": "..."}]}\n'
+            "Multiple choice entries have options and correct_index; written entries have expected_answer.\n"
+        )
 
     @staticmethod
     def _practice_test_prompt(chunk: str, part: int, parts: int, answer_key: str) -> str:
