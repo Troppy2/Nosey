@@ -18,6 +18,7 @@ from src.models.user import User
 from src.repositories.usage_event_repository import UsageEventRepository
 from src.services.file_service import FileService, ParseProgress
 from src.services.kojo_context_cache import invalidate_folder
+from src.services.practice_sections import detect_sections
 from src.services.upload_recovery import stopped_reading_note
 from src.utils.detached_tasks import spawn_detached
 from src.utils.logger import get_logger
@@ -466,6 +467,40 @@ async def upload_folder_files(
     if created:
         invalidate_folder(folder_id)
     return UploadResult(uploaded=created, skipped=skipped)
+
+
+class PracticeSectionResponse(BaseModel):
+    index: int
+    title: str
+    question_count: int
+
+
+@router.get("/{folder_id}/files/{file_id}/sections", response_model=list[PracticeSectionResponse])
+async def get_practice_sections(
+    folder_id: int,
+    file_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[PracticeSectionResponse]:
+    """Sections of a practice test the student can choose from (GH #133).
+
+    Empty when the document has fewer than two sections with questions; the
+    whole document is used then. 409 while the file is still being read.
+    """
+    await _get_owned_folder(folder_id, user, session)
+    record = await session.scalar(
+        select(FolderFile).where(FolderFile.id == file_id, FolderFile.folder_id == folder_id)
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="File not found")
+    if record.upload_status == "processing":
+        raise HTTPException(status_code=409, detail="This file is still being read.")
+    if record.upload_status == "error":
+        raise HTTPException(status_code=400, detail=record.upload_error or "This file could not be read.")
+    return [
+        PracticeSectionResponse(index=s.index, title=s.title, question_count=s.question_count)
+        for s in detect_sections(record.content or "")
+    ]
 
 
 class TextNoteRequest(BaseModel):

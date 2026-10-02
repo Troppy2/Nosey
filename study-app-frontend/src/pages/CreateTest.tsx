@@ -7,7 +7,17 @@ import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { SelectInput, TextInput } from "../components/Field";
 import { InlineLoading, LoadingNotice } from "../components/Loaders";
-import { createTest, fetchFolderFiles, fetchFolders, fetchProviderStatus, scopeKey, type SkippedFile } from "../lib/api";
+import {
+  createTest,
+  fetchFolderFiles,
+  fetchFolders,
+  fetchPracticeSections,
+  fetchProviderStatus,
+  scopeKey,
+  type PracticeSection,
+  type SkippedFile,
+} from "../lib/api";
+import { describeUploadStatus } from "../lib/uploadStatus";
 import {
   ACCEPTED_UPLOAD_ATTR,
   MAX_FOLDER_UPLOAD_MB,
@@ -50,6 +60,17 @@ export default function CreateTest() {
   const [practiceTestFile, setPracticeTestFile] = useState<File | null>(null);
   const [practiceTestMode, setPracticeTestMode] = useState<"recreate" | "style">("recreate");
   const practiceTestInputRef = useRef<HTMLInputElement>(null);
+  // The practice test is uploaded and read as soon as it is picked, so its
+  // sections can be listed before Generate (GH #133).
+  const [practiceTestFileId, setPracticeTestFileId] = useState<number | null>(null);
+  const [practicePhase, setPracticePhase] = useState<"idle" | "reading" | "ready" | "error">("idle");
+  const [practiceStatus, setPracticeStatus] = useState<string | null>(null);
+  const [practiceSections, setPracticeSections] = useState<PracticeSection[]>([]);
+  const [chosenSections, setChosenSections] = useState<Set<number>>(new Set());
+  // Bumped on every pick/remove so a slow earlier read cannot overwrite a newer one.
+  const practiceRun = useRef(0);
+  // The folder the practice test was uploaded into.
+  const practiceFolderRef = useRef<number | null>(null);
   const [isMathMode, setIsMathMode] = useState(false);
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard" | "mixed">("mixed");
   const [topicFocus, setTopicFocus] = useState("");
@@ -105,6 +126,20 @@ export default function CreateTest() {
       }
     });
   }, [searchParams]);
+
+  // A practice test read into one folder is not in the next one: pick it again.
+  useEffect(() => {
+    if (practiceFolderRef.current !== null && practiceFolderRef.current !== folderId) {
+      practiceRun.current += 1;
+      practiceFolderRef.current = null;
+      setPracticeTestFile(null);
+      setPracticeTestFileId(null);
+      setPracticePhase("idle");
+      setPracticeStatus(null);
+      setPracticeSections([]);
+      setChosenSections(new Set());
+    }
+  }, [folderId]);
 
   useEffect(() => {
     if (!folderId) return;
@@ -181,12 +216,12 @@ export default function CreateTest() {
         fileIds = upload.fileIds;
         skippedNotes = upload.skipped;
       }
-      let practiceTestFileId: number | undefined;
-      if (activePracticeTest) {
-        setSubmitPhase("Uploading your practice test");
-        const upload = await uploadToFolder(folderId, [activePracticeTest]);
-        if (upload.fileIds.length === 0) throw new Error(describeSkipped(upload.skipped));
-        practiceTestFileId = upload.fileIds[0];
+      if (activePracticeTest && (practicePhase !== "ready" || practiceTestFileId === null)) {
+        throw new Error("Your practice test is still being read. Generate once it's ready.");
+      }
+      const allSectionsChosen = chosenSections.size === practiceSections.length;
+      if (activePracticeTest && practiceSections.length > 0 && chosenSections.size === 0) {
+        throw new Error("Pick at least one section of the practice test.");
       }
       setSubmitPhase("Setting up your test");
       const result = await createTest({
@@ -194,8 +229,10 @@ export default function CreateTest() {
         title: resolvedTitle,
         testType,
         fileIds,
-        practiceTestFileId,
+        practiceTestFileId: activePracticeTest ? practiceTestFileId : undefined,
         practiceTestMode: activePracticeTest ? (recreatingPracticeTest ? "recreate" : "style") : undefined,
+        practiceTestSections:
+          activePracticeTest && !allSectionsChosen ? Array.from(chosenSections).sort((a, b) => a - b) : undefined,
         countMcq: advancedMode ? countMcq : undefined,
         countFrq: advancedMode ? (testType === "Extreme" ? 0 : countFrq) : undefined,
         countTf: advancedMode && betaMode ? countTf : undefined,
@@ -302,11 +339,74 @@ export default function CreateTest() {
     setError(null);
     setPracticeTestFile(file);
     if (!title) setTitle(file.name.replace(/\.[^/.]+$/, ""));
+    if (folderId !== null) void readPracticeTest(file, folderId);
+  }
+
+  function clearPracticeTest() {
+    practiceRun.current += 1;
+    practiceFolderRef.current = null;
+    setPracticeTestFile(null);
+    setPracticeTestFileId(null);
+    setPracticePhase("idle");
+    setPracticeStatus(null);
+    setPracticeSections([]);
+    setChosenSections(new Set());
+    if (practiceTestInputRef.current) practiceTestInputRef.current.value = "";
+  }
+
+  // Upload through the folder pipeline, wait for the server to read it (the
+  // vision pass for math-heavy pages runs then too), then list its sections.
+  async function readPracticeTest(file: File, targetFolderId: number) {
+    const run = ++practiceRun.current;
+    const current = () => run === practiceRun.current;
+    practiceFolderRef.current = targetFolderId;
+    setPracticePhase("reading");
+    setPracticeStatus("Uploading your practice test");
+    setPracticeTestFileId(null);
+    setPracticeSections([]);
+    setChosenSections(new Set());
+    try {
+      const upload = await uploadToFolder(targetFolderId, [file], undefined, "practice_test");
+      if (!current()) return;
+      if (upload.fileIds.length === 0) throw new Error(describeSkipped(upload.skipped));
+      const fileId = upload.fileIds[0];
+      setPracticeTestFileId(fileId);
+      const deadline = Date.now() + 15 * 60_000;
+      for (;;) {
+        const row = (await fetchFolderFiles(targetFolderId)).find((f) => f.id === fileId);
+        if (!current()) return;
+        if (row?.upload_status === "error") throw new Error(row.upload_error ?? "Nosey couldn't read that file.");
+        if (row && row.upload_status !== "processing") break;
+        setPracticeStatus(row ? describeUploadStatus(row) ?? "Reading your practice test" : "Reading your practice test");
+        if (Date.now() > deadline) throw new Error("Reading your practice test is taking too long. Try again in a moment.");
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+      const sections = await fetchPracticeSections(targetFolderId, fileId);
+      if (!current()) return;
+      setPracticeSections(sections);
+      setChosenSections(new Set(sections.map((s) => s.index)));
+      setPracticePhase("ready");
+      setPracticeStatus(null);
+    } catch (err) {
+      if (!current()) return;
+      setPracticePhase("error");
+      setPracticeStatus(err instanceof Error ? err.message : "Nosey couldn't read that practice test.");
+    }
+  }
+
+  function toggleSection(index: number) {
+    setChosenSections((current) => {
+      const next = new Set(current);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
   }
 
   const canSubmit =
     folderId !== null &&
     !isSubmitting &&
+    (activePracticeTest === null || practicePhase === "ready") &&
     (files.length > 0 || activePracticeTest !== null || folderFileCount > 0);
 
   usePageTour("create-test", folders.length > 0);
@@ -631,10 +731,36 @@ export default function CreateTest() {
                           <FileText size={14} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
                           {practiceTestFile.name} · {(practiceTestFile.size / (1024 * 1024)).toFixed(1)} MB
                         </span>
-                        <button type="button" onClick={() => { setPracticeTestFile(null); if (practiceTestInputRef.current) practiceTestInputRef.current.value = ""; }}>
+                        <button type="button" onClick={clearPracticeTest}>
                           Remove
                         </button>
                       </div>
+                      {practicePhase === "reading" ? (
+                        <p className="practice-status">
+                          <InlineLoading label={practiceStatus ?? "Reading your practice test"} />
+                        </p>
+                      ) : null}
+                      {practicePhase === "error" ? (
+                        <p className="practice-status practice-status--error">{practiceStatus}</p>
+                      ) : null}
+                      {practicePhase === "ready" && practiceSections.length > 0 ? (
+                        <fieldset className="practice-sections">
+                          <legend className="field-label">Sections to include</legend>
+                          {practiceSections.map((section) => (
+                            <label key={section.index} className="practice-section-option">
+                              <input
+                                type="checkbox"
+                                checked={chosenSections.has(section.index)}
+                                onChange={() => toggleSection(section.index)}
+                              />
+                              <span className="practice-section-title">{section.title}</span>
+                              <span className="muted small">
+                                {section.question_count} question{section.question_count === 1 ? "" : "s"}
+                              </span>
+                            </label>
+                          ))}
+                        </fieldset>
+                      ) : null}
                       <div className="choice-grid practice-mode-grid" role="group" aria-label="What to do with the practice test">
                           <button
                             type="button"

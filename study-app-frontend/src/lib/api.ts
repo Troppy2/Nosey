@@ -586,6 +586,8 @@ export async function createTest(input: {
   // recreate: rebuild the practice test's own questions. style: new questions
   // from the notes in the practice test's style.
   practiceTestMode?: "recreate" | "style";
+  // Section indices from fetchPracticeSections; omitted means the whole document.
+  practiceTestSections?: number[];
   countMcq?: number;
   countFrq?: number;
   countTf?: number;
@@ -634,6 +636,9 @@ export async function createTest(input: {
   input.fileIds?.forEach((id) => formData.append("file_ids", String(id)));
   if (input.practiceTestFileId != null) formData.append("practice_test_file_id", String(input.practiceTestFileId));
   if (input.practiceTestMode) formData.append("practice_test_mode", input.practiceTestMode);
+  if (input.practiceTestSections?.length) {
+    formData.append("practice_test_sections", input.practiceTestSections.join(","));
+  }
 
   try {
     return await request(`/folders/${input.folderId}/tests`, {
@@ -1475,13 +1480,33 @@ export interface UploadResult {
   skipped: SkippedFile[];
 }
 
-export async function uploadFolderFiles(folderId: number, files: File[]): Promise<UploadResult> {
+// "practice_test" lets the server read math-heavy PDF pages with a vision model.
+export type UploadPurpose = "notes" | "practice_test";
+
+export async function uploadFolderFiles(
+  folderId: number,
+  files: File[],
+  purpose?: UploadPurpose,
+): Promise<UploadResult> {
   const formData = new FormData();
   files.forEach((f) => formData.append("files", f));
+  if (purpose) formData.append("purpose", purpose);
   return request<UploadResult>(`/folders/${folderId}/files`, {
     method: "POST",
     body: formData,
   });
+}
+
+export interface PracticeSection {
+  index: number;
+  title: string;
+  question_count: number;
+}
+
+// The sections of an uploaded practice test the student can pick from. Empty
+// when the document has fewer than two; the whole document is used then.
+export async function fetchPracticeSections(folderId: number, fileId: number): Promise<PracticeSection[]> {
+  return request<PracticeSection[]>(`/folders/${folderId}/files/${fileId}/sections`);
 }
 
 export async function addFolderTextNote(

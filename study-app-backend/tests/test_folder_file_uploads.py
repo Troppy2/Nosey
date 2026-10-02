@@ -503,3 +503,31 @@ async def test_a_queued_upload_is_read_between_batches(
 
     assert order == [("book", 0), ("notes", 0), ("book", 2), ("book", 4)]
     assert (await _row(background_db, book_id)).content == "book text 0\n\nbook text 2\n\nbook text 4"
+
+
+# --- practice test sections (GH #133) -------------------------------------------------
+
+_SECTIONED = (
+    "PART I. MULTIPLE CHOICE\n1. First question here?\nA. yes\nB. no\n\n"
+    "PART II. WRITTEN\n2. Second question here?\n3. Third question here?\n"
+)
+
+
+async def test_sections_endpoint_lists_parts(client, seeded, db_session_maker) -> None:
+    file_id = await _add_row(db_session_maker, seeded.folder_id, upload_status="ready", content=_SECTIONED)
+
+    response = await client.get(f"/folders/{seeded.folder_id}/files/{file_id}/sections")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {"index": 0, "title": "PART I. MULTIPLE CHOICE", "question_count": 1},
+        {"index": 1, "title": "PART II. WRITTEN", "question_count": 2},
+    ]
+
+
+async def test_sections_endpoint_waits_for_the_parse(client, seeded, db_session_maker) -> None:
+    file_id = await _add_row(db_session_maker, seeded.folder_id, upload_status="processing")
+
+    response = await client.get(f"/folders/{seeded.folder_id}/files/{file_id}/sections")
+
+    assert response.status_code == 409

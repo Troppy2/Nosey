@@ -1,4 +1,4 @@
-import { type SkippedFile, uploadFolderFiles } from "./api";
+import { type SkippedFile, type UploadPurpose, uploadFolderFiles } from "./api";
 
 // Mirrors ALLOWED_FILE_TYPES in study-app-backend/src/utils/validators.py.
 export const ACCEPTED_UPLOAD_EXTENSIONS = [
@@ -34,12 +34,13 @@ export async function uploadToFolder(
   folderId: number,
   files: File[],
   onProgress?: (done: number, total: number) => void,
+  purpose?: UploadPurpose,
 ): Promise<FolderUploadResult> {
   const fileIds: number[] = [];
   const skipped: SkippedFile[] = [];
   for (const [index, file] of files.entries()) {
     onProgress?.(index, files.length);
-    const result = await uploadFolderFiles(folderId, [file]);
+    const result = await uploadFolderFiles(folderId, [file], purpose);
     for (const uploaded of result.uploaded) fileIds.push(uploaded.id);
     for (const skip of result.skipped) {
       if (skip.existing_file_id != null) fileIds.push(skip.existing_file_id);

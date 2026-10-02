@@ -36,6 +36,7 @@ from src.services.file_service import PARSE_DEADLINE_S, FileService
 from src.services.grading_service import GradingService
 from src.services.kojo_context_cache import invalidate_folder
 from src.services.llm_service import LLMService
+from src.services.practice_sections import slice_sections
 from src.services.mcq_verification_service import MCQVerificationService, VerifiableMCQ, inflated_mcq_count
 from src.services.quota_service import QuotaService
 from src.services.test_service import TestService
@@ -656,6 +657,7 @@ async def _extract_and_generate_background(
     folder_file_ids: Optional[list[int]] = None,
     practice_test_file_id: Optional[int] = None,
     practice_test_only: bool = False,
+    practice_test_sections: Optional[list[int]] = None,
 ) -> None:
     """Extract uploaded files, persist notes, then run generation.
 
@@ -714,6 +716,10 @@ async def _extract_and_generate_background(
                 pt_name = rows[practice_test_file_id].file_name
                 if not practice_test_content:
                     raise StudyAppException(f"{pt_name} has no readable text")
+            if practice_test_content and practice_test_sections:
+                # Only the sections the student picked (GH #133). Stored as the
+                # test's note too, so regenerate uses the same slice.
+                practice_test_content = slice_sections(practice_test_content, practice_test_sections)
 
             if practice_test_only:
                 notes_content = ""
@@ -852,6 +858,12 @@ async def create_test(
         practice_test_mode = str(form.get("practice_test_mode", "recreate")).strip().lower()
         if practice_test_mode not in ("recreate", "style"):
             practice_test_mode = "recreate"
+        try:
+            practice_test_sections = [
+                int(part) for part in str(form.get("practice_test_sections") or "").split(",") if part.strip()
+            ]
+        except ValueError as exc:
+            raise StudyAppException("practice_test_sections must be numbers") from exc
 
         try:
             count_mcq = max(0, min(50, int(str(form.get("count_mcq", "10")))))
@@ -1019,6 +1031,7 @@ async def create_test(
                 folder_file_ids=file_ids or None,
                 practice_test_file_id=practice_test_file_id,
                 practice_test_only=practice_test_only,
+                practice_test_sections=practice_test_sections or None,
             )
         )
         handed_off = True

@@ -432,3 +432,22 @@ async def test_background_unreadable_upload_fails_the_test_with_its_reason(
     assert test.generation_status == "failed"
     assert test.generation_error == "Could not read your files: scan.pdf: No text could be extracted from the PDF"
     background.assert_not_awaited()
+
+
+async def test_background_uses_only_the_chosen_sections(background, seeded, db_session_maker) -> None:
+    _, folder_id, _ = seeded
+    exam = await _folder_file(
+        db_session_maker, folder_id, "exam.pdf",
+        "PART I\n1. First question here?\n\nPART II\n2. Second question here?\n",
+    )
+
+    await tests_route._extract_and_generate_background(**{
+        **_background_kwargs(seeded, []),
+        "practice_test_file_id": exam,
+        "practice_test_only": True,
+        "practice_test_sections": [1],
+    })
+
+    content = background.await_args.kwargs["practice_test_content"]
+    assert "Second question" in content
+    assert "First question" not in content
