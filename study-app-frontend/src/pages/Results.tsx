@@ -1,4 +1,4 @@
-import { AlertTriangle, Brain, Calculator, CheckCircle2, ChevronDown, Loader2, RotateCcw, Sparkles, Target, X, XCircle } from "lucide-react";
+import { AlertTriangle, Brain, Calculator, CheckCircle2, ChevronDown, Info, Loader2, RotateCcw, Sparkles, Target, X, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -460,6 +460,15 @@ function ReviewItem({ answer, number }: { answer: AnswerResult; number: number }
                 This grade may be off. The auto-generated answer key for this question looks
                 questionable, so Nosey flagged it for review. If you think your answer was right,
                 read the explanation below and trust your own judgement.
+              </span>
+            </div>
+          ) : null}
+          {answer.answer_inferred ? (
+            <div className="review-inferred-note">
+              <Info size={15} />
+              <span>
+                Answer worked out by Nosey. Your practice test had no answer key for this question,
+                so check it against your notes if it looks off.
               </span>
             </div>
           ) : null}

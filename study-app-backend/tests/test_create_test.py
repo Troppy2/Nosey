@@ -9,6 +9,7 @@ Covers:
 """
 from __future__ import annotations
 
+import asyncio
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -242,6 +243,90 @@ class TestParsePracticeTest:
         svc._complete_json = flaky  # type: ignore[method-assign]
         mcq, _ = await svc.parse_practice_test(body)
         assert len(mcq) == calls - 1
+
+
+class TestParsePracticeTestAccuracy:
+    """GH #133: found with a real 236-page homework PDF."""
+
+    async def test_table_of_contents_never_reaches_the_llm(self):
+        doc = (
+            "Contents\n"
+            "1.1 Vector equations . . . . . . . . . . . . . 7\n"
+            "1.2 Vector notation . . . . . . . . . . . . . . 8\n\n"
+            "1.1 Vector equations\nDetermine whether (1, 2) = (1, 2) is true.\n"
+        )
+        svc = LLMService()
+        prompts: list[str] = []
+
+        async def capture(prompt: str, provider=None) -> dict:
+            prompts.append(prompt)
+            return {"mcq": [], "frq": [VALID_FRQ]}
+
+        svc._complete_json = capture  # type: ignore[method-assign]
+        await svc.parse_practice_test(doc)
+        assert ". . . . ." not in prompts[0]
+        assert "Determine whether (1, 2) = (1, 2) is true." in prompts[0]
+
+    async def test_heading_only_questions_with_non_answers_are_dropped(self):
+        junk = {"question_text": "1.1 Vector equations", "expected_answer": "Depends on the specific problem statement in the textbook."}
+        svc = LLMService()
+        svc._complete_json = AsyncMock(return_value={"mcq": [], "frq": [junk, VALID_FRQ]})
+        _, frq = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST)
+        assert [q.question_text for q in frq] == [VALID_FRQ["question_text"]]
+
+    async def test_dedup_ignores_leftover_emphasis_markers(self):
+        plain = _mcq(1, question_text="Assuming the matrix K makes sense, which is true?")
+        marked = _mcq(1, question_text="Assuming the matrix _K_ makes sense, which is true?")
+        svc = LLMService()
+        svc._complete_json = AsyncMock(return_value={"mcq": [plain, marked], "frq": []})
+        mcq, _ = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST)
+        assert len(mcq) == 1
+
+    async def test_keyless_questions_are_solved_by_the_strongest_provider_and_flagged(self):
+        keyed = _mcq(1, answer_from_document=True)
+        keyless_mcq = _mcq(2, correct_index=3, answer_from_document=False)
+        keyless_frq = _frq(1, expected_answer="a weak guess", answer_from_document=False)
+        svc = LLMService()
+        svc._complete_json = AsyncMock(return_value={"mcq": [keyed, keyless_mcq], "frq": [keyless_frq]})
+        solve_prompts: list[str] = []
+
+        async def strongest(prompt: str) -> dict:
+            solve_prompts.append(prompt)
+            return {"answers": [{"q": 1, "option": 0}, {"q": 2, "answer": "the solved answer"}]}
+
+        svc._complete_json_strongest = strongest  # type: ignore[method-assign]
+        mcq, frq = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST)
+
+        assert len(solve_prompts) == 1
+        assert [q.answer_inferred for q in mcq] == [False, True]
+        assert mcq[1].correct_index == 0
+        assert frq[0].answer_inferred is True
+        assert frq[0].expected_answer == "the solved answer"
+
+    async def test_a_failed_solve_keeps_the_parse_answer(self):
+        keyless = _frq(1, expected_answer="parse guess", answer_from_document=False)
+        svc = LLMService()
+        svc._complete_json = AsyncMock(return_value={"mcq": [], "frq": [keyless]})
+        svc._complete_json_strongest = AsyncMock(side_effect=RuntimeError("all providers down"))  # type: ignore[method-assign]
+        _, frq = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST)
+        assert frq[0].expected_answer == "parse guess"
+        assert frq[0].answer_inferred is True
+
+    async def test_a_hung_chunk_is_retried_off_ollama(self, monkeypatch):
+        import src.services.llm_service as llm_module
+
+        monkeypatch.setattr(llm_module, "_PRACTICE_CHUNK_TIMEOUT_S", 0.05)
+        svc = LLMService()
+
+        async def hang(prompt: str, provider=None) -> dict:
+            await asyncio.sleep(5)
+            return {}
+
+        svc._complete_json = hang  # type: ignore[method-assign]
+        svc._complete_json_skip_ollama = AsyncMock(return_value={"mcq": [VALID_MCQ], "frq": []})  # type: ignore[method-assign]
+        mcq, _ = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST)
+        assert len(mcq) == 1
+        svc._complete_json_skip_ollama.assert_awaited_once()
 
 
 # ── TestService.create_test — service-layer unit tests ─────────────────────────

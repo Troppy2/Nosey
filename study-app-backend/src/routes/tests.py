@@ -143,10 +143,15 @@ async def _persist_generated(
             (option_text, index == item.correct_index)
             for index, option_text in enumerate(item.options)
         ]
-        await repo.add_mcq_question(test_id, item.question_text, display_order, options)
+        await repo.add_mcq_question(
+            test_id, item.question_text, display_order, options, answer_inferred=item.answer_inferred
+        )
         display_order += 1
     for item in frq_questions:
-        await repo.add_frq_question(test_id, item.question_text, display_order, item.expected_answer)
+        await repo.add_frq_question(
+            test_id, item.question_text, display_order, item.expected_answer,
+            answer_inferred=item.answer_inferred,
+        )
         display_order += 1
     return display_order
 

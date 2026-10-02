@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import BIGINT_ID, Base
@@ -24,6 +24,12 @@ class Question(Base):
     question_text: Mapped[str] = mapped_column(Text, nullable=False)
     question_type: Mapped[str] = mapped_column(String(10), nullable=False)
     display_order: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Recreated practice tests: the document had no answer for this question,
+    # so the model worked it out. Results labels it; written grading treats the
+    # reference answer as a guide (GH #133).
+    answer_inferred: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
 
     test: Mapped[Test] = relationship("Test", back_populates="questions")
     mcq_options: Mapped[list[MCQOption]] = relationship(

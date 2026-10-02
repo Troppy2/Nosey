@@ -165,6 +165,7 @@ class GradingService:
                     is_math=is_math_mode and question.question_type == "FRQ",
                     # Response-only, never persisted (see OcrResult / AnswerResult).
                     work_transcript=work_transcript,
+                    answer_inferred=bool(question.answer_inferred),
                 )
             )
 
@@ -218,24 +219,33 @@ class GradingService:
                 flagged_uncertain=True,
                 confidence=0.0,
             )
+        expected_answer = question.frq_answer.expected_answer
+        if question.answer_inferred:
+            # No answer key backs this one (GH #133): a correct answer that
+            # differs from Nosey's own reference must not be marked wrong.
+            expected_answer = (
+                f"{expected_answer}\n\n(This reference answer was worked out by Nosey, not taken from "
+                "an answer key. Treat it as a guide: if the student's answer is correct on its own "
+                "merits, mark it correct even where it differs.)"
+            )
         if is_coding_mode:
             return await self.llm_service.grade_code_answer(
                 question=question.question_text,
-                expected_answer=question.frq_answer.expected_answer,
+                expected_answer=expected_answer,
                 user_code=user_answer,
                 language=coding_language,
             )
         if is_math_mode:
             return await self.llm_service.grade_math_answer(
                 question=question.question_text,
-                expected_answer=question.frq_answer.expected_answer,
+                expected_answer=expected_answer,
                 user_answer=user_answer,
                 work=work,
             )
         return await self.llm_service.grade_frq_answer(
             notes=notes,
             question=question.question_text,
-            expected_answer=question.frq_answer.expected_answer,
+            expected_answer=expected_answer,
             user_answer=user_answer,
         )
 
@@ -470,6 +480,7 @@ class GradingService:
                     if answer.confidence_score is not None
                     else None,
                     flagged_uncertain=answer.flagged_uncertain,
+                    answer_inferred=bool(answer.question.answer_inferred) if answer.question else False,
                 )
                 for answer in attempt.answers
             ],
