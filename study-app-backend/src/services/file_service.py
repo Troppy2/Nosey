@@ -11,7 +11,7 @@ import weakref
 from collections import defaultdict
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Awaitable, Callable, Optional, TypeVar
+from typing import Awaitable, Callable, Optional, Sequence, TypeVar
 
 import pdfplumber
 from fastapi import UploadFile
@@ -581,13 +581,23 @@ class FileService:
             sections.append(f"--- Document {index}: {name or 'notes'} ---\n{result.text}")
         return "\n\n".join(sections), file_types
 
-    async def get_folder_files_content(self, folder_id: int, user_id: int, session: AsyncSession) -> str:
-        rows = await session.scalars(
+    async def get_folder_files_content(
+        self,
+        folder_id: int,
+        user_id: int,
+        session: AsyncSession,
+        file_ids: Optional[Sequence[int]] = None,
+    ) -> str:
+        """Every file in the folder, or only file_ids when given."""
+        stmt = (
             select(FolderFile)
             .join(Folder, Folder.id == FolderFile.folder_id)
             .where(FolderFile.folder_id == folder_id, Folder.user_id == user_id)
             .order_by(FolderFile.uploaded_at.desc())
         )
+        if file_ids is not None:
+            stmt = stmt.where(FolderFile.id.in_(list(file_ids)))
+        rows = await session.scalars(stmt)
         files = list(rows.all())
         if not files:
             return ""

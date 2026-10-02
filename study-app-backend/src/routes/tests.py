@@ -32,7 +32,7 @@ from src.schemas.test_schema import (
     TestUpdate,
     WeaknessResponse,
 )
-from src.services.file_service import FileService
+from src.services.file_service import PARSE_DEADLINE_S, FileService
 from src.services.grading_service import GradingService
 from src.services.kojo_context_cache import invalidate_folder
 from src.services.llm_service import LLMService
@@ -40,6 +40,7 @@ from src.services.mcq_verification_service import MCQVerificationService, Verifi
 from src.services.quota_service import QuotaService
 from src.services.test_service import TestService
 from src.utils.exceptions import LLMException, ResourceNotFoundException, StudyAppException
+from src.utils.detached_tasks import spawn_detached
 from src.utils.logger import get_logger
 from src.utils.provider_policy import resolve_request_provider
 from src.utils.temp_uploads import UploadTooLargeError, remove_temp, save_upload_to_temp
@@ -54,22 +55,59 @@ logger = get_logger(__name__)
 _CUSTOM_INSTRUCTIONS_MAX = 10_000
 
 
-# Strong references to detached generation tasks. We deliberately do NOT use
-# FastAPI BackgroundTasks for generation: those run *inside* the ASGI response
-# cycle, so with a single uvicorn worker and HTTP/1.1 keep-alive the POST's TCP
-# connection stays busy for the whole ~30-60s generation. The browser then reuses
-# that same keep-alive connection for one of the post-create GETs (e.g.
-# GET /folders/{id}/tests), which hangs until generation finishes. Spawning the
-# work with asyncio.create_task frees the connection as soon as the 201 returns.
-# A reference is kept here so the task is not garbage-collected mid-run.
-_generation_tasks: set[asyncio.Task] = set()
-
-
 def _spawn_generation(coro) -> None:
-    """Detach a generation coroutine from the request/response cycle."""
-    task = asyncio.create_task(coro)
-    _generation_tasks.add(task)
-    task.add_done_callback(_generation_tasks.discard)
+    """Detach a generation coroutine from the request/response cycle.
+
+    Never FastAPI BackgroundTasks: those hold the POST's keep-alive connection
+    for the whole generation, and the browser's next GET on it hangs (see
+    utils/detached_tasks.py).
+    """
+    spawn_detached(coro)
+
+
+# How long test creation waits for files uploaded through the folder pipeline
+# (POST /folders/{id}/files) to finish their own parse. Parses run one at a time,
+# so a file can queue behind other uploads: two full parse budgets.
+_FOLDER_FILE_WAIT_S = 2 * PARSE_DEADLINE_S
+_FOLDER_FILE_POLL_S = 3.0
+
+
+async def _wait_for_folder_files(folder_id: int, file_ids: list[int]) -> dict:
+    """Poll the rows until none is still processing (or the wait runs out).
+
+    Returns {id: row} with file_name, upload_status and upload_error only; the
+    content is read once afterwards, not on every poll. A row the user deleted
+    meanwhile is simply missing.
+    """
+    deadline = time.monotonic() + _FOLDER_FILE_WAIT_S
+    while True:
+        async with async_session_maker() as session:
+            result = await session.execute(
+                select(
+                    FolderFile.id,
+                    FolderFile.file_name,
+                    FolderFile.upload_status,
+                    FolderFile.upload_error,
+                ).where(FolderFile.folder_id == folder_id, FolderFile.id.in_(file_ids))
+            )
+            rows = {row.id: row for row in result.all()}
+        still_reading = any(row.upload_status == "processing" for row in rows.values())
+        if not still_reading or time.monotonic() >= deadline:
+            return rows
+        await asyncio.sleep(_FOLDER_FILE_POLL_S)
+
+
+def _unreadable_reason(rows: dict, file_ids: list[int]) -> str:
+    """Why none of file_ids can be used, naming the first file at fault."""
+    for file_id in file_ids:
+        row = rows.get(file_id)
+        if row is None:
+            return "a selected file was removed from the folder"
+        if row.upload_status == "processing":
+            return f"{row.file_name} is still being read. Try again once it is ready in the folder's Files."
+        if row.upload_status == "error":
+            return f"{row.file_name}: {row.upload_error or 'it could not be read'}"
+    return "your files have no readable text"
 
 
 async def _settle_test_quota(quota_charge_id: Optional[int], test_id: int, generated: int) -> None:
@@ -605,6 +643,9 @@ async def _extract_and_generate_background(
     count_ms: int = 0,
     count_rank: int = 0,
     quota_charge_id: Optional[int] = None,
+    folder_file_ids: Optional[list[int]] = None,
+    practice_test_file_id: Optional[int] = None,
+    practice_test_only: bool = False,
 ) -> None:
     """Extract uploaded files, persist notes, then run generation.
 
@@ -613,6 +654,11 @@ async def _extract_and_generate_background(
     endpoint return immediately and the UI land in the folder right away.
     The uploads arrive as (temp file path, name) pairs; the temp files are
     removed as soon as extraction ends, whether it succeeded or not.
+
+    folder_file_ids / practice_test_file_id name files the client already
+    uploaded through the folder pipeline: their parse runs on its own, so this
+    waits for it, then uses only those files. practice_test_only (recreate
+    mode) leaves every notes source out so the practice test is parsed as is.
     """
     try:
         svc = FileService()
@@ -632,13 +678,54 @@ async def _extract_and_generate_background(
             if practice_test_path is not None:
                 remove_temp(practice_test_path[0])
 
+        waited_ids = list(folder_file_ids or [])
+        if practice_test_file_id is not None:
+            waited_ids.append(practice_test_file_id)
+        rows = await _wait_for_folder_files(folder_id, waited_ids) if waited_ids else {}
+
+        def _ready(file_id: int) -> bool:
+            row = rows.get(file_id)
+            return row is not None and row.upload_status == "ready"
+
+        if practice_test_file_id is not None and not _ready(practice_test_file_id):
+            raise StudyAppException(_unreadable_reason(rows, [practice_test_file_id]))
+        note_ids: Optional[list[int]] = None
+        if folder_file_ids and not practice_test_only:
+            note_ids = [file_id for file_id in folder_file_ids if _ready(file_id)]
+            if not note_ids:
+                raise StudyAppException(_unreadable_reason(rows, folder_file_ids))
+
         # Short-lived session: folder-file read + note writes only, then released.
         async with async_session_maker() as session:
-            folder_files_content = (
-                await svc.get_folder_files_content(folder_id, user_id, session)
-                if use_folder_files
-                else ""
-            )
+            pt_name: Optional[str] = None
+            if practice_test_file_id is not None:
+                pt_row = await session.get(FolderFile, practice_test_file_id)
+                practice_test_content = (pt_row.content or "").strip() if pt_row else ""
+                pt_name = rows[practice_test_file_id].file_name
+                if not practice_test_content:
+                    raise StudyAppException(f"{pt_name} has no readable text")
+
+            if practice_test_only:
+                notes_content = ""
+                folder_files_content = ""
+            elif note_ids is not None:
+                folder_files_content = await svc.get_folder_files_content(
+                    folder_id, user_id, session, file_ids=note_ids
+                )
+            elif use_folder_files and practice_test_file_id is not None:
+                # The practice test is itself a folder file now; it is not notes.
+                other_ids = list(await session.scalars(
+                    select(FolderFile.id).where(
+                        FolderFile.folder_id == folder_id, FolderFile.id != practice_test_file_id
+                    )
+                ))
+                folder_files_content = await svc.get_folder_files_content(
+                    folder_id, user_id, session, file_ids=other_ids
+                )
+            elif use_folder_files:
+                folder_files_content = await svc.get_folder_files_content(folder_id, user_id, session)
+            else:
+                folder_files_content = ""
             combined_notes = "\n\n---\n\n".join(
                 p for p in [notes_content, folder_files_content] if p
             )
@@ -656,10 +743,12 @@ async def _extract_and_generate_background(
                 return
             test.notes_hash = notes_hash
             if combined_notes:
-                note_label = ", ".join(n for _, n in notes_paths) or "folder files"
+                note_names = [n for _, n in notes_paths] + [rows[i].file_name for i in note_ids or []]
+                note_label = ", ".join(note_names) or "folder files"
                 await repo.add_note(test_id, note_label[:255], "combined", combined_notes)
             if practice_test_content:
-                pt_label = practice_test_path[1] if practice_test_path else "practice_test"
+                # Stored as "pdf": regenerate_test reads that type back as the practice test.
+                pt_label = practice_test_path[1] if practice_test_path else (pt_name or "practice_test")
                 await repo.add_note(test_id, pt_label[:255], "pdf", practice_test_content)
 
             prior_questions: list[str] = []
@@ -734,6 +823,24 @@ async def create_test(
         notes_files = form.getlist("notes_files") if hasattr(form, "getlist") else []
         practice_test_raw = form.get("practice_test_file")
         practice_test_file = practice_test_raw if isinstance(practice_test_raw, UploadFile) else None
+        # Files already uploaded through POST /folders/{id}/files (the current
+        # client). notes_files / practice_test_file above are the older inline path.
+        try:
+            file_ids = list(dict.fromkeys(
+                int(part)
+                for raw in (form.getlist("file_ids") if hasattr(form, "getlist") else [])
+                for part in str(raw).split(",")
+                if part.strip()
+            ))
+            pt_id_raw = str(form.get("practice_test_file_id") or "").strip()
+            practice_test_file_id = int(pt_id_raw) if pt_id_raw else None
+        except ValueError as exc:
+            raise StudyAppException("file_ids and practice_test_file_id must be numbers") from exc
+        # recreate: rebuild the practice test's own questions. style: write new
+        # questions from the notes in the practice test's style.
+        practice_test_mode = str(form.get("practice_test_mode", "recreate")).strip().lower()
+        if practice_test_mode not in ("recreate", "style"):
+            practice_test_mode = "recreate"
 
         try:
             count_mcq = max(0, min(50, int(str(form.get("count_mcq", "10")))))
@@ -791,10 +898,27 @@ async def create_test(
         folder_file_count = await session.scalar(
             select(func.count()).select_from(FolderFile).where(FolderFile.folder_id == folder_id)
         )
-        if not notes_files and practice_test_file is None and int(folder_file_count or 0) == 0:
+        referenced_ids = set(file_ids)
+        if practice_test_file_id is not None:
+            referenced_ids.add(practice_test_file_id)
+        if referenced_ids:
+            found_ids = set(await session.scalars(
+                select(FolderFile.id).where(
+                    FolderFile.folder_id == folder_id, FolderFile.id.in_(referenced_ids)
+                )
+            ))
+            if found_ids != referenced_ids:
+                raise ResourceNotFoundException("File")
+        has_practice_test = practice_test_file is not None or practice_test_file_id is not None
+        # Saved folder files are the notes when nothing else is given; a practice
+        # test uploaded to the folder is not one of them.
+        other_folder_files = int(folder_file_count or 0) - (1 if practice_test_file_id is not None else 0)
+        has_notes = bool(notes_files) or bool(file_ids) or other_folder_files > 0
+        if not has_notes and not has_practice_test:
             raise StudyAppException(
                 "Provide at least one notes document, a saved folder file, or a practice test file"
             )
+        practice_test_only = has_practice_test and (practice_test_mode == "recreate" or not has_notes)
         valid_files = [f for f in notes_files if isinstance(f, UploadFile)]
         if len(valid_files) != len(notes_files):
             raise StudyAppException("All uploaded documents must be valid files")
@@ -846,8 +970,11 @@ async def create_test(
         )
         test.generation_status = "generating"
         # Record how many questions this test will end up with so the take-test screen
-        # can show streaming progress while the background task fills them in.
-        test.expected_question_count = eff_mcq + eff_frq + count_tf + count_ms + count_rank
+        # can show streaming progress while the background task fills them in. A
+        # recreated practice test has as many as the document does: unknown here.
+        test.expected_question_count = (
+            None if practice_test_only else eff_mcq + eff_frq + count_tf + count_ms + count_rank
+        )
         await session.commit()
 
         # ── Schedule extraction + LLM generation off the request cycle ────────
@@ -860,7 +987,7 @@ async def create_test(
                 folder_id=folder_id,
                 notes_paths=notes_paths,
                 practice_test_path=practice_test_path,
-                use_folder_files=(not notes_paths),
+                use_folder_files=(not notes_paths and not file_ids),
                 avoid_repeat=bool(getattr(folder, "avoid_repeat_questions", False)),
                 test_type=test_type,
                 count_mcq=count_mcq,
@@ -877,6 +1004,9 @@ async def create_test(
                 count_ms=count_ms,
                 count_rank=count_rank,
                 quota_charge_id=quota_charge_id,
+                folder_file_ids=file_ids or None,
+                practice_test_file_id=practice_test_file_id,
+                practice_test_only=practice_test_only,
             )
         )
         handed_off = True

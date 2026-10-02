@@ -5,7 +5,7 @@ import hashlib
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +19,7 @@ from src.repositories.usage_event_repository import UsageEventRepository
 from src.services.file_service import FileService, ParseProgress
 from src.services.kojo_context_cache import invalidate_folder
 from src.services.upload_recovery import stopped_reading_note
+from src.utils.detached_tasks import spawn_detached
 from src.utils.logger import get_logger
 from src.utils.process_memory import process_rss_mb
 from src.utils.temp_uploads import UploadTooLargeError, remove_temp, save_upload_to_temp
@@ -53,6 +54,9 @@ class FolderFileResponse(BaseModel):
 class SkippedFile(BaseModel):
     file_name: str
     reason: str
+    # Set when the upload was skipped as an exact copy of a file already in the
+    # folder, so a caller can use that file instead.
+    existing_file_id: Optional[int] = None
 
 
 class UploadResult(BaseModel):
@@ -355,7 +359,6 @@ async def get_folder_file_content(
 async def upload_folder_files(
     folder_id: int,
     files: list[UploadFile] = File(...),
-    background_tasks: BackgroundTasks = BackgroundTasks(),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> UploadResult:
@@ -370,8 +373,9 @@ async def upload_folder_files(
     created: list[FolderFileResponse] = []
     skipped: list[SkippedFile] = []
     pending_total_bytes = 0
-    # Temp files handed to background tasks; removed here if the request fails first.
-    queued_paths: list[str] = []
+    # Parses to start once the rows are committed, as (file_id, temp path, name).
+    # Their temp files are removed here if the request fails first.
+    queued: list[tuple[int, str, str]] = []
 
     try:
         for upload in files:
@@ -421,6 +425,7 @@ async def upload_folder_files(
                 skipped.append(SkippedFile(
                     file_name=name,
                     reason=f"Identical file already exists as '{duplicate.file_name}'",
+                    existing_file_id=duplicate.id,
                 ))
                 continue
 
@@ -440,9 +445,7 @@ async def upload_folder_files(
             session.add(record)
             await session.flush()
 
-            # Schedule text extraction in the background; user can navigate away.
-            queued_paths.append(saved.path)
-            background_tasks.add_task(_extract_and_update, record.id, saved.path, name, folder_id, user.id)
+            queued.append((record.id, saved.path, name))
 
             created.append(FolderFileResponse.model_validate(record))
             logger.info(
@@ -452,9 +455,14 @@ async def upload_folder_files(
 
         await session.commit()
     except BaseException:
-        for path in queued_paths:
+        for _, path, _ in queued:
             remove_temp(path)
         raise
+    # Text extraction runs detached (not BackgroundTasks, rule 8a): the caller
+    # usually fires its next request right away, e.g. Create Test starting the
+    # test that reads these files.
+    for file_id, path, name in queued:
+        spawn_detached(_extract_and_update(file_id, path, name, folder_id, user.id))
     if created:
         invalidate_folder(folder_id)
     return UploadResult(uploaded=created, skipped=skipped)

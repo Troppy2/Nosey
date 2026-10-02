@@ -1,6 +1,7 @@
 """Test creation hands uploaded files to its background task as temp files."""
 from __future__ import annotations
 
+import asyncio
 import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
@@ -11,8 +12,10 @@ from httpx import AsyncClient
 
 from src.database import get_session
 from src.dependencies import get_current_user
+from src.limiter import limiter
 from src.main import app
 from src.models.folder import Folder
+from src.models.folder_file import FolderFile
 from src.models.test import Test as TestRow
 from src.models.user import User
 from src.routes import tests as tests_route
@@ -77,6 +80,9 @@ async def client(db_session_maker, seeded):
 
     app.dependency_overrides[get_session] = _session
     app.dependency_overrides[get_current_user] = _user
+    # POST /folders/{id}/tests is limited to 5/minute per address, and every
+    # test here posts from the same one.
+    limiter.reset()
     try:
         async with AsyncClient(app=app, base_url="http://test") as http:
             yield http
@@ -216,4 +222,212 @@ async def test_background_extraction_failure_fails_the_test_and_removes_temp_fil
     assert test.generation_status == "failed"
     assert test.generation_error == "Could not read your files: No text could be extracted from the PDF"
     assert not Path(notes).exists()
+    background.assert_not_awaited()
+
+
+# --- files uploaded through the folder pipeline (file_ids) --------------------------
+
+
+async def _folder_file(
+    db_session_maker, folder_id: int, name: str, content: str = "", status: str = "ready", error=None
+) -> int:
+    async with db_session_maker() as session:
+        row = FolderFile(
+            folder_id=folder_id,
+            file_name=name,
+            file_type="pdf",
+            size_bytes=max(len(content), 1),
+            content=content,
+            content_hash="",
+            upload_status=status,
+            upload_error=error,
+        )
+        session.add(row)
+        await session.commit()
+        return row.id
+
+
+async def _expected_count(db_session_maker, test_id: int):
+    async with db_session_maker() as session:
+        return (await session.get(TestRow, test_id)).expected_question_count
+
+
+async def test_create_with_file_ids_scopes_generation_to_those_files(
+    client, seeded, db_session_maker, spawned
+) -> None:
+    _, folder_id, _ = seeded
+    calls, coros = spawned
+    picked = await _folder_file(db_session_maker, folder_id, "week1.pdf", "w1")
+    await _folder_file(db_session_maker, folder_id, "old.pdf", "old")
+
+    response = await client.post(
+        f"/folders/{folder_id}/tests",
+        data={"title": "Quiz", "test_type": "MCQ_only", "file_ids": str(picked)},
+    )
+
+    assert response.status_code == 201, response.text
+    await coros[0]
+    (call,) = calls
+    assert call["folder_file_ids"] == [picked]
+    assert call["use_folder_files"] is False
+    assert call["practice_test_only"] is False
+    assert await _expected_count(db_session_maker, response.json()["test_id"]) == 10
+
+
+async def test_practice_test_file_defaults_to_recreate(client, seeded, db_session_maker, spawned) -> None:
+    _, folder_id, _ = seeded
+    calls, coros = spawned
+    notes = await _folder_file(db_session_maker, folder_id, "notes.pdf", "n")
+    exam = await _folder_file(db_session_maker, folder_id, "exam.pdf", "e")
+
+    response = await client.post(
+        f"/folders/{folder_id}/tests",
+        data={"title": "Quiz", "test_type": "mixed", "file_ids": str(notes), "practice_test_file_id": str(exam)},
+    )
+
+    assert response.status_code == 201, response.text
+    await coros[0]
+    assert calls[0]["practice_test_file_id"] == exam
+    assert calls[0]["practice_test_only"] is True
+    # As many questions as the document has: unknown up front.
+    assert await _expected_count(db_session_maker, response.json()["test_id"]) is None
+
+
+async def test_style_mode_with_notes_uses_the_notes(client, seeded, db_session_maker, spawned) -> None:
+    _, folder_id, _ = seeded
+    calls, coros = spawned
+    await _folder_file(db_session_maker, folder_id, "notes.pdf", "n")
+    exam = await _folder_file(db_session_maker, folder_id, "exam.pdf", "e")
+
+    response = await client.post(
+        f"/folders/{folder_id}/tests",
+        data={"title": "Quiz", "test_type": "mixed", "practice_test_file_id": str(exam), "practice_test_mode": "style"},
+    )
+
+    assert response.status_code == 201, response.text
+    await coros[0]
+    assert calls[0]["practice_test_only"] is False
+    assert calls[0]["use_folder_files"] is True
+
+
+async def test_style_mode_without_other_notes_recreates(client, seeded, db_session_maker, spawned) -> None:
+    """The practice test itself is the folder's only file, so there are no notes."""
+    _, folder_id, _ = seeded
+    calls, coros = spawned
+    exam = await _folder_file(db_session_maker, folder_id, "exam.pdf", "e")
+
+    response = await client.post(
+        f"/folders/{folder_id}/tests",
+        data={"title": "Quiz", "test_type": "mixed", "practice_test_file_id": str(exam), "practice_test_mode": "style"},
+    )
+
+    assert response.status_code == 201, response.text
+    await coros[0]
+    assert calls[0]["practice_test_only"] is True
+
+
+async def test_file_id_from_another_folder_is_rejected(client, seeded, db_session_maker, spawned) -> None:
+    user, folder_id, _ = seeded
+    _, coros = spawned
+    async with db_session_maker() as session:
+        other = Folder(user_id=user.id, name="Physics")
+        session.add(other)
+        await session.commit()
+        other_id = other.id
+    foreign = await _folder_file(db_session_maker, other_id, "theirs.pdf", "x")
+
+    response = await client.post(
+        f"/folders/{folder_id}/tests",
+        data={"title": "Quiz", "test_type": "mixed", "file_ids": str(foreign)},
+    )
+
+    assert response.status_code == 404
+    assert coros == []
+
+
+async def test_background_waits_for_a_file_still_being_read(
+    background, seeded, db_session_maker, monkeypatch
+) -> None:
+    _, folder_id, _ = seeded
+    reading = await _folder_file(db_session_maker, folder_id, "week2.pdf", status="processing")
+    await _folder_file(db_session_maker, folder_id, "unpicked.pdf", "not part of this test")
+    real_sleep = asyncio.sleep
+    polls: list[float] = []
+
+    # The parse finishes while the task sleeps between polls. Done inside the
+    # sleep, not as a concurrent task: the in-memory test DB shares one
+    # connection, and two sessions interleaving on it deadlock.
+    async def parse_finishes_during_the_wait(delay, *args, **kwargs):
+        polls.append(delay)
+        async with db_session_maker() as session:
+            row = await session.get(FolderFile, reading)
+            row.content = "week two notes"
+            row.upload_status = "ready"
+            await session.commit()
+        await real_sleep(0)
+
+    monkeypatch.setattr(asyncio, "sleep", parse_finishes_during_the_wait)
+    await tests_route._extract_and_generate_background(
+        **{**_background_kwargs(seeded, []), "folder_file_ids": [reading]}
+    )
+    monkeypatch.undo()
+
+    assert polls == [tests_route._FOLDER_FILE_POLL_S]
+    notes = background.await_args.kwargs["notes_content"]
+    assert "week two notes" in notes
+    assert "not part of this test" not in notes
+
+
+async def test_background_recreate_mode_ignores_the_notes(background, seeded, db_session_maker) -> None:
+    _, folder_id, _ = seeded
+    notes = await _folder_file(db_session_maker, folder_id, "notes.pdf", "lecture notes")
+    exam = await _folder_file(db_session_maker, folder_id, "exam.pdf", "1. What is 2+2?")
+
+    await tests_route._extract_and_generate_background(**{
+        **_background_kwargs(seeded, []),
+        "folder_file_ids": [notes],
+        "practice_test_file_id": exam,
+        "practice_test_only": True,
+    })
+
+    kwargs = background.await_args.kwargs
+    assert kwargs["notes_content"] == ""
+    assert kwargs["practice_test_content"] == "1. What is 2+2?"
+
+
+async def test_background_style_mode_does_not_treat_the_practice_test_as_notes(
+    background, seeded, db_session_maker
+) -> None:
+    _, folder_id, _ = seeded
+    await _folder_file(db_session_maker, folder_id, "notes.pdf", "lecture notes")
+    exam = await _folder_file(db_session_maker, folder_id, "exam.pdf", "exam text")
+
+    await tests_route._extract_and_generate_background(**{
+        **_background_kwargs(seeded, []),
+        "use_folder_files": True,
+        "practice_test_file_id": exam,
+    })
+
+    kwargs = background.await_args.kwargs
+    assert "lecture notes" in kwargs["notes_content"]
+    assert "exam text" not in kwargs["notes_content"]
+    assert kwargs["practice_test_content"] == "exam text"
+
+
+async def test_background_unreadable_upload_fails_the_test_with_its_reason(
+    background, seeded, db_session_maker
+) -> None:
+    _, folder_id, test_id = seeded
+    broken = await _folder_file(
+        db_session_maker, folder_id, "scan.pdf", status="error", error="No text could be extracted from the PDF"
+    )
+
+    await tests_route._extract_and_generate_background(
+        **{**_background_kwargs(seeded, []), "folder_file_ids": [broken]}
+    )
+
+    async with db_session_maker() as session:
+        test = await session.get(TestRow, test_id)
+    assert test.generation_status == "failed"
+    assert test.generation_error == "Could not read your files: scan.pdf: No text could be extracted from the PDF"
     background.assert_not_awaited()

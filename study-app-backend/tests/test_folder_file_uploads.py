@@ -96,12 +96,17 @@ def temp_dir(monkeypatch, tmp_path):
 
 @pytest.fixture
 def captured_tasks(monkeypatch):
-    """Replace the background parse with a recorder that snapshots its temp file."""
+    """Replace the background parse with a recorder that snapshots its temp file.
+
+    The recording happens when the route builds the coroutine, so it does not
+    depend on when the detached task gets scheduled.
+    """
     calls: list[dict] = []
 
-    async def fake_extract_and_update(file_id, path, file_name, folder_id, user_id):
+    def fake_extract_and_update(file_id, path, file_name, folder_id, user_id):
         with open(path, "rb") as handle:
             calls.append({"file_id": file_id, "path": path, "bytes": handle.read(), "file_name": file_name})
+        return asyncio.sleep(0)
 
     monkeypatch.setattr(folder_files, "_extract_and_update", fake_extract_and_update)
     return calls
@@ -139,6 +144,29 @@ async def test_background_parse_receives_a_temp_file_path_not_bytes(client, seed
     assert call["file_name"] == "notes.pdf"
 
 
+async def test_parse_is_detached_not_a_background_task(client, seeded, temp_dir, monkeypatch) -> None:
+    """Rule 8a: BackgroundTasks would hold this connection for the whole parse,
+    and Create Test's next request (POST /tests) would queue behind it."""
+    spawned: list = []
+
+    def record(coro):
+        spawned.append(coro)
+        coro.close()
+
+    monkeypatch.setattr(folder_files, "spawn_detached", record)
+
+    response = await client.post(
+        f"/folders/{seeded.folder_id}/files",
+        files=[
+            ("files", ("a.pdf", b"%PDF-1.4 one", "application/pdf")),
+            ("files", ("b.txt", b"two", "text/plain")),
+        ],
+    )
+
+    assert response.status_code == 201
+    assert len(spawned) == 2
+
+
 async def test_oversized_file_is_skipped_and_its_temp_file_removed(
     client, seeded, temp_dir, captured_tasks, monkeypatch
 ) -> None:
@@ -160,7 +188,7 @@ async def test_exact_reupload_is_rejected_before_parsing(
     client, seeded, db_session_maker, temp_dir, captured_tasks
 ) -> None:
     data = b"%PDF-1.4 the same file twice"
-    await _add_row(
+    existing_id = await _add_row(
         db_session_maker, seeded.folder_id, upload_status="ready", raw_hash=hashlib.sha256(data).hexdigest()
     )
 
@@ -171,7 +199,11 @@ async def test_exact_reupload_is_rejected_before_parsing(
 
     body = response.json()
     assert body["uploaded"] == []
-    assert body["skipped"] == [{"file_name": "copy.pdf", "reason": "Identical file already exists as 'orig.pdf'"}]
+    assert body["skipped"] == [{
+        "file_name": "copy.pdf",
+        "reason": "Identical file already exists as 'orig.pdf'",
+        "existing_file_id": existing_id,
+    }]
     assert captured_tasks == []
     assert list(temp_dir.iterdir()) == []
 

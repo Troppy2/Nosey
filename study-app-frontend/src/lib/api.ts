@@ -578,7 +578,14 @@ export async function createTest(input: {
   folderId: number;
   title: string;
   testType: string;
-  files: File[];
+  // Inline uploads (older path). Create Test now uploads through the folder
+  // pipeline first and passes fileIds / practiceTestFileId instead.
+  files?: File[];
+  fileIds?: number[];
+  practiceTestFileId?: number | null;
+  // recreate: rebuild the practice test's own questions. style: new questions
+  // from the notes in the practice test's style.
+  practiceTestMode?: "recreate" | "style";
   countMcq?: number;
   countFrq?: number;
   countTf?: number;
@@ -601,7 +608,8 @@ export async function createTest(input: {
       throw new Error("Guest accounts can only create one practice test. Sign in to make more.");
     }
   }
-  const totalUploadBytes = input.files.reduce((sum, file) => sum + file.size, 0);
+  const files = input.files ?? [];
+  const totalUploadBytes = files.reduce((sum, file) => sum + file.size, 0);
   if (totalUploadBytes > MAX_NOTES_UPLOAD_TOTAL_BYTES) {
     throw new Error("Combined uploaded files exceed 100 MB.");
   }
@@ -621,8 +629,11 @@ export async function createTest(input: {
   if (input.customInstructions) formData.append("custom_instructions", input.customInstructions);
   if (input.generationProvider) formData.append("provider", input.generationProvider);
   formData.append("enable_fallback", input.enableFallback === false ? "false" : "true");
-  input.files.forEach((file) => formData.append("notes_files", file));
+  files.forEach((file) => formData.append("notes_files", file));
   if (input.practiceTestFile) formData.append("practice_test_file", input.practiceTestFile);
+  input.fileIds?.forEach((id) => formData.append("file_ids", String(id)));
+  if (input.practiceTestFileId != null) formData.append("practice_test_file_id", String(input.practiceTestFileId));
+  if (input.practiceTestMode) formData.append("practice_test_mode", input.practiceTestMode);
 
   try {
     return await request(`/folders/${input.folderId}/tests`, {
@@ -1455,6 +1466,8 @@ export async function fetchFolderFileContent(folderId: number, fileId: number): 
 export interface SkippedFile {
   file_name: string;
   reason: string;
+  // Set when the file is an exact copy of one already in the folder.
+  existing_file_id?: number | null;
 }
 
 export interface UploadResult {

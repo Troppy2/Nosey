@@ -1422,6 +1422,13 @@
   opacity: 0;
 }
 
+/* The invisible input above covers the whole zone; lift the selected-file rows
+   over it or their Remove buttons open the file picker instead. */
+.upload-zone .selected-files {
+  position: relative;
+  z-index: 1;
+}
+
 .upload-zone svg {
   color: var(--green-dark);
 }
@@ -26571,4 +26578,18 @@ a.sd-chip.is-done:hover {
   stroke-width: 4px;
   stroke-linejoin: round;
   font-size: 13px;
+}
+
+/* Create Test: practice test mode (recreate vs match style) */
+.practice-mode-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 10px;
+}
+
+.practice-mode-note {
+  margin: 8px 0 0;
+}
+
+.practice-mode-note--above {
+  margin: 0 0 10px;
 }
