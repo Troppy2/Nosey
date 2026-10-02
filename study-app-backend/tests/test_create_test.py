@@ -303,6 +303,22 @@ class TestParsePracticeTestAccuracy:
         assert frq[0].answer_inferred is True
         assert frq[0].expected_answer == "the solved answer"
 
+    async def test_the_solver_sees_the_course_notes_for_conventions(self):
+        keyless = _frq(1, answer_from_document=False)
+        svc = LLMService()
+        svc._complete_json = AsyncMock(return_value={"mcq": [], "frq": [keyless]})
+        svc._retrieve_relevant_context = lambda notes, query, **kw: ("We write (1, 2, 1) for a column vector.", {})  # type: ignore[method-assign]
+        prompts: list[str] = []
+
+        async def strongest(prompt: str) -> dict:
+            prompts.append(prompt)
+            return {"answers": []}
+
+        svc._complete_json_strongest = strongest  # type: ignore[method-assign]
+        await svc.parse_practice_test(SAMPLE_PRACTICE_TEST, solve_context="textbook chapter 1")
+        assert "COURSE NOTES" in prompts[0]
+        assert "(1, 2, 1) for a column vector" in prompts[0]
+
     async def test_a_failed_solve_keeps_the_parse_answer(self):
         keyless = _frq(1, expected_answer="parse guess", answer_from_document=False)
         svc = LLMService()
@@ -335,6 +351,7 @@ class TestParallelPracticeTest:
     def _service(self, originals_mcq, originals_frq, reply):
         svc = LLMService()
         svc.parse_practice_test = AsyncMock(return_value=(originals_mcq, originals_frq))  # type: ignore[method-assign]
+        svc._complete_json_strongest = AsyncMock(return_value={"answers": []})  # type: ignore[method-assign]
         prompts: list[str] = []
 
         async def complete(prompt: str, provider=None) -> dict:
@@ -358,6 +375,9 @@ class TestParallelPracticeTest:
         assert [q.question_text for q in mcq] == ["Which gas is slowest at 25 C?"]
         assert mcq[0].options == ["He", "N2", "SF6"] and mcq[0].correct_index == 2
         assert [q.question_text for q in frq] == ["Explain why ice floats."]
+        # Twins have no answer key: solved by the strongest provider and flagged.
+        assert all(q.answer_inferred for q in [*mcq, *frq])
+        svc._complete_json_strongest.assert_awaited_once()
         assert "Which gas is fastest at 25 C?" in prompts[0]
         assert "multiple choice, 3 options" in prompts[0]
         svc.parse_practice_test.assert_awaited_once()

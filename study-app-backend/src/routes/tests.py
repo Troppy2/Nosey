@@ -349,6 +349,7 @@ async def _generate_questions_background(
     prior_questions: Optional[list[str]] = None,
     quota_charge_id: Optional[int] = None,
     practice_test_mode: Optional[str] = None,
+    practice_solve_context: str = "",
 ) -> None:
     """Run LLM generation and save questions; called as a FastAPI background task.
 
@@ -404,6 +405,7 @@ async def _generate_questions_background(
                 include_mcq=test_type != "FRQ_only",
                 include_frq=test_type not in ("MCQ_only", "Extreme"),
                 provider=provider,
+                solve_context=practice_solve_context,
             )
         return await llm.generate_test_questions(
             notes=notes_content,
@@ -721,9 +723,23 @@ async def _extract_and_generate_background(
                 # test's note too, so regenerate uses the same slice.
                 practice_test_content = slice_sections(practice_test_content, practice_test_sections)
 
+            solve_context = ""
             if practice_test_only:
                 notes_content = ""
                 folder_files_content = ""
+                # Not a source of questions, only of notation for answering the
+                # ones the practice test leaves unanswered.
+                other_ids = list(await session.scalars(
+                    select(FolderFile.id).where(
+                        FolderFile.folder_id == folder_id,
+                        FolderFile.id != (practice_test_file_id or -1),
+                        FolderFile.upload_status == "ready",
+                    )
+                ))
+                if other_ids:
+                    solve_context = await svc.get_folder_files_content(
+                        folder_id, user_id, session, file_ids=other_ids
+                    )
             elif note_ids is not None:
                 folder_files_content = await svc.get_folder_files_content(
                     folder_id, user_id, session, file_ids=note_ids
@@ -810,6 +826,7 @@ async def _extract_and_generate_background(
         prior_questions=prior_questions,
         quota_charge_id=quota_charge_id,
         practice_test_mode="recreate" if practice_test_only else "style",
+        practice_solve_context=solve_context,
     )
 
 

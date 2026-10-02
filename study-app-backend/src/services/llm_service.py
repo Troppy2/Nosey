@@ -373,10 +373,12 @@ _EXTRACT_CHAR_LIMIT = 10_000
 # Recreating an uploaded practice test reads the whole document in chunks, one
 # JSON call per chunk, so a dense test never overflows _JSON_MAX_TOKENS. Chunks
 # overlap so a question cut at a boundary is whole in one of them; the overlap's
-# duplicates are dropped by text. 10 chunks is about 40 pages of questions.
-_PRACTICE_CHUNK_CHARS = 12_000
-_PRACTICE_CHUNK_OVERLAP_CHARS = 1_500
-_PRACTICE_MAX_CHUNKS = 10
+# duplicates are dropped by text. The reply echoes every question plus its
+# answer, so LaTeX-heavy pages came back too long to parse at 12K chars per
+# chunk. 15 chunks is about 40 pages of questions.
+_PRACTICE_CHUNK_CHARS = 8_000
+_PRACTICE_CHUNK_OVERLAP_CHARS = 1_200
+_PRACTICE_MAX_CHUNKS = 15
 # Chunks are parsed this many at a time; one that takes longer than the timeout
 # is retried once off Ollama (a hung Ollama call once held a chunk for 8 minutes).
 _PRACTICE_CHUNK_CONCURRENCY = 3
@@ -384,6 +386,8 @@ _PRACTICE_CHUNK_TIMEOUT_S = 180
 # Questions with no answer in the document are solved in batches of this size
 # by the strongest available provider.
 _PRACTICE_SOLVE_BATCH = 12
+# Course notes shown to the solver, for notation and conventions only.
+_PRACTICE_SOLVE_NOTES_CHARS = 8_000
 _STRONGEST_PROVIDER_ORDER = ("claude", "groq", "minimax", "gemini", "ollama")
 # "Match its style" writes one new question per original, this many originals
 # per call, and reads at most this much of the notes for grounding.
@@ -1292,8 +1296,14 @@ class LLMService:
         include_frq: bool = True,
         provider: Optional[str] = None,
         solve_keyless: bool = True,
+        solve_context: str = "",
     ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
         """Recreate an uploaded practice test: extract its own questions.
+
+        solve_context: the folder's notes. Never a source of questions; the
+        solver reads them for the course's notation and conventions (in Boyd's
+        textbook "(1, 2, 1)" is a column vector, and a solver without the book
+        marks that equation false).
 
         Reads the whole document in overlapping chunks, one JSON call per chunk,
         a few at a time (a bounded loop over the document, not over providers:
@@ -1315,6 +1325,10 @@ class LLMService:
         answer_key = _practice_answer_key(text) if len(chunks) > 1 else ""
 
         gate = asyncio.Semaphore(_PRACTICE_CHUNK_CONCURRENCY)
+        # "auto" already falls back across providers inside _complete_json; a
+        # pinned provider (an admin/beta pick) has no fallback, so it gets one
+        # retry on the rest of the chain, as a hung call does.
+        pinned = self._normalize_generation_provider(provider) != "auto"
 
         async def parse_chunk(part: int, chunk: str) -> Optional[dict[str, object]]:
             prompt = self._practice_test_prompt(chunk, part, len(chunks), answer_key)
@@ -1327,7 +1341,8 @@ class LLMService:
                     logger.warning("parse_practice_test part %d/%d timed out; retrying off Ollama", part, len(chunks))
                 except Exception as exc:
                     logger.warning("parse_practice_test part %d/%d failed: %s", part, len(chunks), exc)
-                    return None
+                    if not pinned:
+                        return None
                 try:
                     return await asyncio.wait_for(
                         self._complete_json_skip_ollama(prompt), _PRACTICE_CHUNK_TIMEOUT_S
@@ -1377,7 +1392,7 @@ class LLMService:
                 )
             raise ValidationException(_NO_PRACTICE_QUESTIONS_MESSAGE)
         if solve_keyless:
-            kept_mcq, kept_frq = await self._solve_keyless_questions(kept_mcq, kept_frq)
+            kept_mcq, kept_frq = await self._solve_keyless_questions(kept_mcq, kept_frq, solve_context)
         logger.info(
             "Parsed practice test: %d MCQ, %d FRQ (%d with no answer in the document) from %d part(s), %d failed",
             len(kept_mcq), len(kept_frq),
@@ -1410,7 +1425,7 @@ class LLMService:
         raise LLMException(_AI_SERVICES_UNAVAILABLE_MESSAGE) from last_error
 
     async def _solve_keyless_questions(
-        self, mcq: list[GeneratedMCQ], frq: list[GeneratedFRQ]
+        self, mcq: list[GeneratedMCQ], frq: list[GeneratedFRQ], context: str = ""
     ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
         """Re-solve questions with no answer in the document on the strongest provider.
 
@@ -1424,6 +1439,24 @@ class LLMService:
             return mcq, frq
         mcq, frq = list(mcq), list(frq)
         batches = [targets[i:i + _PRACTICE_SOLVE_BATCH] for i in range(0, len(targets), _PRACTICE_SOLVE_BATCH)]
+        notes_block = ""
+        if context.strip():
+            query = " ".join(
+                (mcq[i] if kind == "mcq" else frq[i]).question_text[:200] for kind, i in targets
+            )[:4000]
+            try:
+                loop = asyncio.get_event_loop()
+                snippet, _ = await loop.run_in_executor(
+                    None, lambda: self._retrieve_relevant_context(context, query)
+                )
+                if snippet.strip():
+                    notes_block = (
+                        "COURSE NOTES (follow their notation, definitions and conventions; where they "
+                        "define something, they decide what is correct):\n"
+                        f"{snippet[:_PRACTICE_SOLVE_NOTES_CHARS]}\n\n"
+                    )
+            except Exception as exc:
+                logger.warning("Solve context retrieval failed; solving without notes: %s", exc)
         gate = asyncio.Semaphore(_PRACTICE_CHUNK_CONCURRENCY)
 
         async def solve(batch: list[tuple[str, int]]) -> None:
@@ -1438,6 +1471,7 @@ class LLMService:
                 "Solve each question below carefully. Work it out step by step in the \"work\" field, "
                 "then give the final answer. These come from a student's practice test, so the answer "
                 "must be correct, not plausible.\n\n"
+                + notes_block
                 + "\n\n".join(lines)
                 + '\n\nReturn JSON only: {"answers": [{"q": 1, "work": "...", "option": 0, "answer": "..."}]}\n'
                 "For multiple choice set \"option\" to the correct option number. For written set \"answer\"."
@@ -1536,7 +1570,9 @@ class LLMService:
                 kind = batch[slot][0]
                 question = self._parsed_practice_mcq(item) if kind == "mcq" else self._parsed_practice_frq(item)
                 if question is not None:
-                    written[slot] = replace(question, answer_inferred=False)
+                    # No answer key backs a new question: it is solved and
+                    # flagged like a recreated question the document left blank.
+                    written[slot] = replace(question, answer_inferred=True)
             return [written[slot] for slot in sorted(written)]
 
         results = await asyncio.gather(*(write_batch(batch) for batch in batches))
@@ -1544,6 +1580,9 @@ class LLMService:
         frq = [q for batch in results for q in batch if isinstance(q, GeneratedFRQ)]
         if not mcq and not frq:
             raise LLMException("Nosey couldn't write a new version of that practice test right now. Try again in a moment.")
+        # The writer's own answers miss course conventions (a twin of Boyd 1.1(c)
+        # came back "false"), so the strongest provider re-solves them with the notes.
+        mcq, frq = await self._solve_keyless_questions(mcq, frq, notes)
         logger.info("Parallel practice test: %d MCQ, %d FRQ from %d originals", len(mcq), len(frq), len(originals))
         return mcq, frq
 

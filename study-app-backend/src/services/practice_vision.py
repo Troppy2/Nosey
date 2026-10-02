@@ -32,9 +32,14 @@ _CONCURRENCY = 3
 # 2x the PDF's 72 dpi: a letter page renders at about 1224x1584, which Claude
 # reads comfortably (it downscales past 1568 px on the long edge).
 _RENDER_ZOOM = 2.0
-# TeX math extension and AMS symbol fonts: their glyphs are the brackets,
-# radicals and big operators that text extraction cannot place.
-_MATH_FONT_RE = re.compile(r"cmex|msam|msbm|stix.*(ext|size)|mathex|euex", re.IGNORECASE)
+# TeX math fonts (Computer Modern / Latin Modern / AMS / STIX). Extension fonts
+# draw the brackets, radicals and big operators text extraction cannot place;
+# math italic and symbol fonts carry the variables whose subscripts and
+# superscripts extraction flattens ("c_{3:12}" comes out as "c 3:12").
+_MATH_FONT_RE = re.compile(
+    r"cmex|cmmi|cmsy|msam|msbm|euex|mathex|mathitalic|mathsymbols|stix.*(math|ext|size)",
+    re.IGNORECASE,
+)
 _PRIVATE_USE_RE = re.compile("[-]")
 # A part label left alone on its line: whatever followed it was drawn, not written.
 _BARE_LABEL_RE = re.compile(r"(?m)^\s*\(?[a-h]\)\s*$")
