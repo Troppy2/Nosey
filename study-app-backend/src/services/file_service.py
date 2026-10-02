@@ -167,6 +167,27 @@ _MATH_KEEP_CHARS = frozenset(
 )
 
 
+# Exam content that looks like noise to a character count: a part or option
+# label ("(a) ...", "b) ...", "C. ...", "12. ...") or short math with an
+# operator between terms ("b = (0, a)", "2a + c"). Kept by both filters below.
+_LABELED_LINE_RE = re.compile(r"^\s*(?:\(?[A-Za-z]\)|\(?\d{1,3}[.)]|[A-Za-z][.)])\s+\S")
+_MATH_LINE_RE = re.compile(r"[\w)\]]\s*[=<>≤≥≠+\-−×*/^]\s*[\w(\[]")
+# Answer options that repeat throughout any test and are never page furniture.
+_OPTION_LINE_RE = re.compile(
+    r"^\(?[a-f]?\)?\s*(true|false|t|f|yes|no|all of the above|none of the above|both|neither)\.?$",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_exam_content(line: str, *, math: bool = True) -> bool:
+    """math=False for the repeated-line filter: a header such as
+    "CHEM 1010 - General Chemistry" matches the math pattern too."""
+    stripped = line.strip()
+    if _OPTION_LINE_RE.match(stripped) or _LABELED_LINE_RE.match(stripped):
+        return True
+    return math and bool(_MATH_LINE_RE.search(stripped)) and any(ch.isalnum() for ch in stripped)
+
+
 def _is_ocr_noise_line(line: str) -> bool:
     stripped = line.strip()
     if not stripped:
@@ -179,13 +200,30 @@ def _is_ocr_noise_line(line: str) -> bool:
         return True
     if re.fullmatch(r"[\W_]+", stripped):
         return True
-    letters = sum(1 for ch in stripped if ch.isalpha())
-    digits = sum(1 for ch in stripped if ch.isdigit())
+    if _looks_like_exam_content(stripped):
+        return False
     printable = sum(1 for ch in stripped if ch.isprintable())
     if printable == 0:
         return True
-    symbol_ratio = 1.0 - ((letters + digits) / max(1, len(stripped)))
+    # Spaces and markdown emphasis markers are layout, not symbols: counting them
+    # dropped every short math line such as "(a) _b_ = (0 _, a_ )."
+    content = re.sub(r"[\s_*]", "", stripped)
+    letters = sum(1 for ch in content if ch.isalpha())
+    digits = sum(1 for ch in content if ch.isdigit())
+    symbol_ratio = 1.0 - ((letters + digits) / max(1, len(content)))
     return symbol_ratio > 0.7 and len(stripped) < 24
+
+
+def _strip_pdf_emphasis(text: str) -> str:
+    """Drop pymupdf4llm's emphasis markers.
+
+    A LaTeX PDF sets every math variable in italics, so the markdown comes out as
+    "( _a,_ 1) + ( _c_ 1 _, b_ )" and "**1.2** **Vector** **notation**". The
+    markers carry no meaning for the LLM, clutter every question, and make two
+    copies of one question look different to deduplication.
+    """
+    text = re.sub(r"\*\*([^*\n]+?)\*\*", r"\1", text)
+    return re.sub(r"(?<![\w_])_([^_\n]+?)_(?![\w_])", r"\1", text)
 
 
 def _clean_extracted_text(text: str, preserve_code: bool = False) -> str:
@@ -212,8 +250,10 @@ def _clean_extracted_text(text: str, preserve_code: bool = False) -> str:
             if not key:
                 filtered.append("")
                 continue
-            # Drop frequent short repeated lines (headers/footers/page artifacts).
-            if len(key) < 90 and freq[key] >= 4:
+            # Drop frequent short repeated lines (headers/footers/page artifacts),
+            # but never answer options or labeled parts: in a test, "True",
+            # "False" and "(a)" repeat on every page and are the content.
+            if len(key) < 90 and freq[key] >= 4 and not _looks_like_exam_content(line, math=False):
                 continue
             if _is_ocr_noise_line(line):
                 continue
@@ -517,7 +557,9 @@ class FileService:
             pdf = _extract_pdf_pages(
                 path, progress, deadline, start=pages.start, batch=pages.batch, max_pages=pages.max_pages
             )
-            return ExtractionResult(_clean_extracted_text(pdf.text), file_type, pdf.pages_read, pdf.page_count)
+            return ExtractionResult(
+                _clean_extracted_text(_strip_pdf_emphasis(pdf.text)), file_type, pdf.pages_read, pdf.page_count
+            )
         with open(path, "rb") as handle:
             data = handle.read()
         return ExtractionResult(self._parse_bytes(data, file_type, deadline), file_type)
@@ -538,7 +580,7 @@ class FileService:
             return _clean_extracted_text(self._extract_docx(data))
         if file_type == "ipynb":
             return _clean_extracted_text(self._extract_notebook(data), preserve_code=True)
-        return _clean_extracted_text(self._extract_pdf(data, deadline))
+        return _clean_extracted_text(_strip_pdf_emphasis(self._extract_pdf(data, deadline)))
 
     async def extract_from_files(self, notes_files: list[UploadFile]) -> tuple[str, list[str]]:
         total_size_bytes = 0
