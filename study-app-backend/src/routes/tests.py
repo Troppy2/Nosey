@@ -352,12 +352,13 @@ async def _generate_questions_background(
                 owner_id=user_id,
             )
         if practice_test_content:
-            # Parsing extracts questions from a fixed document and has no
-            # cross-batch dedup, so this path is never split (see below).
+            # Recreate mode: the document's own questions, all of them. The
+            # counts do not apply; the test type still filters MCQ vs written.
+            # Never split into batches (see below).
             return await llm.parse_practice_test(
                 content=practice_test_content,
-                count_mcq=c_mcq if test_type != "FRQ_only" else 0,
-                count_frq=c_frq if test_type != "MCQ_only" else 0,
+                include_mcq=test_type != "FRQ_only",
+                include_frq=test_type not in ("MCQ_only", "Extreme"),
                 provider=provider,
             )
         return await llm.generate_test_questions(

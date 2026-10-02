@@ -243,8 +243,8 @@ class TestService:
             
             mcq_questions, frq_questions = await self.llm_service.parse_practice_test(
                 content=pt_content,
-                count_mcq=count_mcq if test_type != "FRQ_only" else 0,
-                count_frq=count_frq if test_type != "MCQ_only" else 0,
+                include_mcq=test_type != "FRQ_only",
+                include_frq=test_type not in ("MCQ_only", "Extreme"),
                 provider=active_provider,
             )
             beta_source_notes = pt_content

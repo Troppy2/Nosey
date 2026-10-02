@@ -2,8 +2,8 @@
 Unit tests for the test creation pipeline.
 
 Covers:
-- LLMService.parse_practice_test(): count limiting, count=0 filtering,
-  type filtering, malformed LLM responses, empty results
+- LLMService.parse_practice_test(): recreate mode keeps every question,
+  type filtering, 2-6 options, chunking, dedup, and failing loudly
 - TestService.create_test(): regular notes path, practice-test-file path,
   validation errors, question storage
 """
@@ -16,10 +16,12 @@ import pytest
 
 from src.services.mcq_verification_service import inflated_mcq_count
 from src.services.llm_service import (
+    _PRACTICE_CHUNK_CHARS,
     GeneratedFRQ,
     GeneratedMCQ,
     LLMService,
 )
+from src.utils.exceptions import LLMException, ValidationException
 
 # ── shared fixtures ────────────────────────────────────────────────────────────
 
@@ -57,6 +59,14 @@ SAMPLE_PRACTICE_TEST = (
 
 # ── parse_practice_test ────────────────────────────────────────────────────────
 
+def _mcq(n: int, **overrides) -> dict:
+    return {**VALID_MCQ, "question_text": f"Question {n}: what does Atomicity guarantee?", **overrides}
+
+
+def _frq(n: int, **overrides) -> dict:
+    return {**VALID_FRQ, "question_text": f"Question {n}: explain Durability.", **overrides}
+
+
 class TestParsePracticeTest:
 
     async def test_returns_mcq_and_frq_from_llm(self):
@@ -68,62 +78,58 @@ class TestParsePracticeTest:
         assert isinstance(mcq[0], GeneratedMCQ)
         assert isinstance(frq[0], GeneratedFRQ)
 
-    async def test_limits_mcq_when_count_mcq_specified(self):
-        """count_mcq=2 with 5 questions returned → only 2 kept."""
+    async def test_keeps_every_question_with_no_count_cap(self):
+        """Recreate mode: a 30-question test comes back with 30 questions."""
         svc = LLMService()
-        svc._complete_json = AsyncMock(return_value={"mcq": [VALID_MCQ] * 5, "frq": []})
-        mcq, frq = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST, count_mcq=2)
-        assert len(mcq) == 2
-        assert len(frq) == 0
-
-    async def test_limits_frq_when_count_frq_specified(self):
-        """count_frq=1 with 4 FRQ returned → only 1 kept."""
-        svc = LLMService()
-        svc._complete_json = AsyncMock(return_value={"mcq": [], "frq": [VALID_FRQ] * 4})
-        mcq, frq = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST, count_frq=1)
-        assert len(mcq) == 0
-        assert len(frq) == 1
-
-    async def test_count_mcq_zero_filters_out_all_mcq(self):
-        """
-        REGRESSION: count_mcq=0 must produce zero MCQ even if the LLM found some.
-        This happens in MCQ_only mode where count_frq is forced to 0 — symmetrically,
-        FRQ_only mode forces count_mcq to 0.
-        Previously the guard `if count_mcq > 0:` skipped the slice, returning all items.
-        """
-        svc = LLMService()
-        svc._complete_json = AsyncMock(return_value={"mcq": [VALID_MCQ] * 3, "frq": [VALID_FRQ]})
-        mcq, frq = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST, count_mcq=0, count_frq=1)
-        assert len(mcq) == 0, "count_mcq=0 must return zero MCQ (FRQ_only path)"
-        assert len(frq) == 1
-
-    async def test_count_frq_zero_filters_out_all_frq(self):
-        """
-        REGRESSION: count_frq=0 must produce zero FRQ even if the LLM found some.
-        This happens in MCQ_only mode.
-        """
-        svc = LLMService()
-        svc._complete_json = AsyncMock(return_value={"mcq": [VALID_MCQ], "frq": [VALID_FRQ] * 3})
-        mcq, frq = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST, count_mcq=1, count_frq=0)
-        assert len(frq) == 0, "count_frq=0 must return zero FRQ (MCQ_only path)"
-        assert len(mcq) == 1
-
-    async def test_both_counts_zero_returns_all_found(self):
-        """Default call (count_mcq=0, count_frq=0) should return everything found."""
-        svc = LLMService()
-        svc._complete_json = AsyncMock(return_value={"mcq": [VALID_MCQ] * 3, "frq": [VALID_FRQ] * 2})
+        svc._complete_json = AsyncMock(return_value={
+            "mcq": [_mcq(i) for i in range(25)], "frq": [_frq(i) for i in range(5)],
+        })
         mcq, frq = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST)
-        assert len(mcq) == 3
-        assert len(frq) == 2
+        assert (len(mcq), len(frq)) == (25, 5)
 
-    async def test_filters_invalid_mcq_items(self):
-        """MCQ items failing _is_valid_mcq are dropped."""
-        invalid = {"question_text": "Which statement is supported by the notes? (1)", "options": ["A", "B", "C", "D"], "correct_index": 0}
+    async def test_include_mcq_false_drops_mcq(self):
+        """FRQ_only keeps only the written questions."""
         svc = LLMService()
-        svc._complete_json = AsyncMock(return_value={"mcq": [invalid, VALID_MCQ], "frq": []})
-        mcq, _ = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST)
+        svc._complete_json = AsyncMock(return_value={"mcq": [_mcq(1), _mcq(2)], "frq": [VALID_FRQ]})
+        mcq, frq = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST, include_mcq=False)
+        assert mcq == []
+        assert len(frq) == 1
+
+    async def test_include_frq_false_drops_frq(self):
+        """MCQ_only keeps only the multiple choice questions."""
+        svc = LLMService()
+        svc._complete_json = AsyncMock(return_value={"mcq": [VALID_MCQ], "frq": [_frq(1), _frq(2)]})
+        mcq, frq = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST, include_frq=False)
         assert len(mcq) == 1
-        assert VALID_MCQ["question_text"] in mcq[0].question_text
+        assert frq == []
+
+    async def test_true_false_and_five_option_questions_are_kept(self):
+        svc = LLMService()
+        true_false = {"question_text": "Atomicity is part of ACID.", "options": ["True", "False"], "correct_index": 0}
+        five = {
+            "question_text": "Which is not an ACID property?",
+            "options": ["Atomicity", "Consistency", "Isolation", "Durability", "Scalability"],
+            "correct_index": "E",
+        }
+        svc._complete_json = AsyncMock(return_value={"mcq": [true_false, five], "frq": []})
+        mcq, _ = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST)
+        assert [q.options for q in mcq] == [true_false["options"], five["options"]]
+        assert [q.correct_index for q in mcq] == [0, 4]
+
+    async def test_letter_labels_are_stripped_from_options(self):
+        svc = LLMService()
+        labeled = _mcq(1, options=["A. one", "B. two", "(C) three", "d) four"])
+        svc._complete_json = AsyncMock(return_value={"mcq": [labeled], "frq": []})
+        mcq, _ = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST)
+        assert mcq[0].options == ["one", "two", "three", "four"]
+
+    async def test_seven_options_or_an_empty_option_is_rejected(self):
+        svc = LLMService()
+        too_many = _mcq(1, options=[str(i) for i in range(7)])
+        blank = _mcq(2, options=["a", "", "c", "d"])
+        svc._complete_json = AsyncMock(return_value={"mcq": [too_many, blank, VALID_MCQ], "frq": []})
+        mcq, _ = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST)
+        assert [q.question_text for q in mcq] == [VALID_MCQ["question_text"]]
 
     async def test_filters_invalid_frq_items(self):
         """FRQ items with empty answer are dropped."""
@@ -133,38 +139,61 @@ class TestParsePracticeTest:
         _, frq = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST)
         assert len(frq) == 1
 
-    async def test_returns_empty_on_llm_exception(self):
-        """If LLM call fails, returns ([], []) rather than raising."""
-        svc = LLMService()
-        svc._complete_json = AsyncMock(side_effect=Exception("Groq timeout"))
-        mcq, frq = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST, count_mcq=5, count_frq=3)
-        assert mcq == []
-        assert frq == []
-
-    async def test_returns_empty_on_malformed_llm_json(self):
-        """If LLM returns unexpected structure, returns ([], []) gracefully."""
-        svc = LLMService()
-        svc._complete_json = AsyncMock(return_value={"wrong_key": "oops"})
-        mcq, frq = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST)
-        assert mcq == []
-        assert frq == []
-
     async def test_correct_index_out_of_range_is_rejected_not_clamped(self):
         """correct_index out of bounds (e.g. 99) is rejected, not silently
         clamped into a confidently wrong answer key (MCQ verification hardening).
         """
-        bad_index = {**VALID_MCQ, "correct_index": 99}
         svc = LLMService()
-        svc._complete_json = AsyncMock(return_value={"mcq": [bad_index], "frq": []})
+        svc._complete_json = AsyncMock(return_value={"mcq": [_mcq(1, correct_index=99), VALID_MCQ], "frq": []})
         mcq, _ = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST)
-        assert len(mcq) == 0
+        assert len(mcq) == 1
 
-    async def test_metadata_stripped_before_sending_to_llm(self):
-        """Document markers are stripped before sending to LLM."""
-        content_with_meta = (
-            "[practice_test.md]\n--- Document 1: practice_test.md ---\n"
-            "---\ntitle: Test\n---\n" + SAMPLE_PRACTICE_TEST
-        )
+    async def test_llm_failure_raises_instead_of_an_empty_test(self):
+        """REGRESSION: a failed parse used to return ([], []), so the test went
+        "ready" with zero questions and no error."""
+        svc = LLMService()
+        svc._complete_json = AsyncMock(side_effect=Exception("Groq timeout"))
+        with pytest.raises(LLMException):
+            await svc.parse_practice_test(SAMPLE_PRACTICE_TEST)
+
+    async def test_no_questions_found_raises_with_a_reason(self):
+        svc = LLMService()
+        svc._complete_json = AsyncMock(return_value={"wrong_key": "oops"})
+        with pytest.raises(ValidationException, match="No questions were found"):
+            await svc.parse_practice_test(SAMPLE_PRACTICE_TEST)
+
+    async def test_only_filtered_out_questions_names_the_test_type(self):
+        svc = LLMService()
+        svc._complete_json = AsyncMock(return_value={"mcq": [VALID_MCQ], "frq": []})
+        with pytest.raises(ValidationException, match="type you picked"):
+            await svc.parse_practice_test(SAMPLE_PRACTICE_TEST, include_mcq=False)
+
+    async def test_empty_document_raises_without_an_llm_call(self):
+        svc = LLMService()
+        svc._complete_json = AsyncMock()
+        with pytest.raises(ValidationException):
+            await svc.parse_practice_test("  \n\n ")
+        svc._complete_json.assert_not_awaited()
+
+    async def test_repeated_option_lines_reach_the_llm(self):
+        """REGRESSION: _strip_metadata dropped any short line repeated 4+ times,
+        which deleted the True/False options of every question, and everything
+        between two --- lines."""
+        doc = "\n".join(f"{i}. Statement {i} is correct.\nTrue\nFalse\n---" for i in range(1, 7))
+        svc = LLMService()
+        captured: list[str] = []
+
+        async def capture(prompt: str, provider=None) -> dict:
+            captured.append(prompt)
+            return {"mcq": [VALID_MCQ], "frq": []}
+
+        svc._complete_json = capture  # type: ignore[method-assign]
+        await svc.parse_practice_test(doc)
+        assert captured[0].count("\nTrue\nFalse") == 6
+        assert "Statement 3 is correct." in captured[0]
+
+    async def test_document_markers_are_removed(self):
+        content = "--- Document 1: practice_test.md ---\n" + SAMPLE_PRACTICE_TEST
         svc = LLMService()
         captured: list[str] = []
 
@@ -173,11 +202,46 @@ class TestParsePracticeTest:
             return {"mcq": [VALID_MCQ], "frq": [VALID_FRQ]}
 
         svc._complete_json = capture  # type: ignore[method-assign]
-        await svc.parse_practice_test(content_with_meta)
-
-        assert len(captured) == 1
+        await svc.parse_practice_test(content)
         assert "Document 1:" not in captured[0]
-        assert "title: Test" not in captured[0]
+        assert "1. What does Atomicity guarantee?" in captured[0]
+
+    async def test_long_test_is_read_in_chunks_with_the_answer_key(self):
+        """A document past one chunk is read whole: every part gets its own
+        call, and each call sees the answer key from the end."""
+        body = "\n\n".join(f"{i}. Question {i}?\nA. w\nB. x\nC. y\nD. z" for i in range(1, 900))
+        doc = body + "\n\nAnswer Key\n1. B\n2. C\n"
+        assert len(doc) > 2 * _PRACTICE_CHUNK_CHARS
+        svc = LLMService()
+        prompts: list[str] = []
+
+        async def capture(prompt: str, provider=None) -> dict:
+            prompts.append(prompt)
+            # Every part re-reports the overlap question; it must be kept once.
+            return {"mcq": [_mcq(len(prompts)), VALID_MCQ], "frq": []}
+
+        svc._complete_json = capture  # type: ignore[method-assign]
+        mcq, _ = await svc.parse_practice_test(doc)
+        assert len(prompts) >= 3
+        assert all("ANSWER KEY FROM THE END" in p and "1. B" in p for p in prompts)
+        assert "899. Question 899?" in prompts[-1]
+        assert len(mcq) == len(prompts) + 1
+
+    async def test_one_failed_chunk_keeps_the_rest(self):
+        body = "\n\n".join(f"{i}. Question {i}?\nA. w\nB. x\nC. y\nD. z" for i in range(1, 900))
+        svc = LLMService()
+        calls = 0
+
+        async def flaky(prompt: str, provider=None) -> dict:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise RuntimeError("rate limited")
+            return {"mcq": [_mcq(calls)], "frq": []}
+
+        svc._complete_json = flaky  # type: ignore[method-assign]
+        mcq, _ = await svc.parse_practice_test(body)
+        assert len(mcq) == calls - 1
 
 
 # ── TestService.create_test — service-layer unit tests ─────────────────────────
@@ -351,10 +415,10 @@ class TestCreateTestService:
         assert call_kwargs["count_frq"] == 8
         assert result.questions_generated == 28
 
-    async def test_practice_test_mcq_only_passes_zero_frq_count(self):
+    async def test_practice_test_mcq_only_drops_frq(self):
         """
         With test_type='MCQ_only' and a practice test file, parse_practice_test
-        must be called with count_frq=0 so no FRQ questions are stored.
+        must be told to drop FRQ so no FRQ questions are stored.
         """
         svc = self._make_service(parse_mcq=[GeneratedMCQ("PQ1", ["A", "B", "C", "D"], 0)], parse_frq=[])
         session, folder_repo, test_repo = self._make_session_and_repo()
@@ -373,12 +437,13 @@ class TestCreateTestService:
             )
 
         call_kwargs = svc.llm_service.parse_practice_test.call_args.kwargs
-        assert call_kwargs["count_frq"] == 0, "MCQ_only must set count_frq=0 for parse_practice_test"
+        assert call_kwargs["include_frq"] is False, "MCQ_only must drop FRQ in parse_practice_test"
+        assert call_kwargs["include_mcq"] is True
 
-    async def test_practice_test_frq_only_passes_zero_mcq_count(self):
+    async def test_practice_test_frq_only_drops_mcq(self):
         """
         With test_type='FRQ_only' and a practice test file, parse_practice_test
-        must be called with count_mcq=0 so no MCQ questions are stored.
+        must be told to drop MCQ so no MCQ questions are stored.
         """
         svc = self._make_service(parse_mcq=[], parse_frq=[GeneratedFRQ("PFQ1", "ans")])
         session, folder_repo, test_repo = self._make_session_and_repo()
@@ -397,7 +462,8 @@ class TestCreateTestService:
             )
 
         call_kwargs = svc.llm_service.parse_practice_test.call_args.kwargs
-        assert call_kwargs["count_mcq"] == 0, "FRQ_only must set count_mcq=0 for parse_practice_test"
+        assert call_kwargs["include_mcq"] is False, "FRQ_only must drop MCQ in parse_practice_test"
+        assert call_kwargs["include_frq"] is True
 
     async def test_notes_file_stored_as_note_record(self):
         """A notes file must be persisted as a Note record via add_note."""
