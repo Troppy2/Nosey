@@ -381,6 +381,8 @@ export type AuthUser = {
   kojo_enabled?: boolean;
   onboarding_completed?: boolean;
   onboarding_completed_at?: string | null;
+  /** Page tours already shown (users.tours_seen). Absent on copies stored before it existed. */
+  tours_seen?: string[];
 };
 
 export type AdminUserRow = {
@@ -541,6 +543,13 @@ export type KojoChatResponse = {
   message_id: ID;
   flagged_uncertain: boolean;
   conversation_name?: string | null;
+};
+
+// In-test Kojo (GH #108): identifies the question being worked on so the
+// backend loads it itself and applies the in-test tutor rules.
+export type KojoTestRef = {
+  testId: ID;
+  questionId: ID;
 };
 
 export type KojoClearResponse = {

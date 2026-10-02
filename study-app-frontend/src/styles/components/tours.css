@@ -1,0 +1,136 @@
+/* First-visit page tours (components/tours). Restyles driver.js's popover in
+   Nosey's tokens. Every rule is scoped to .driver-popover.nosey-tour so it
+   outranks driver.css without touching anything else. */
+
+.driver-popover.nosey-tour {
+  min-width: 260px;
+  max-width: 340px;
+  padding: 18px 20px 16px;
+  color: var(--ink);
+  background: var(--white);
+  border: 1px solid var(--green-light);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+}
+
+.driver-popover.nosey-tour * {
+  font-family: var(--font-sans);
+}
+
+.driver-popover.nosey-tour .driver-popover-title {
+  padding-right: 22px;
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.driver-popover.nosey-tour .driver-popover-description {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--green-dark);
+}
+
+.driver-popover.nosey-tour .driver-popover-close-btn {
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-pill);
+  color: var(--green-mid);
+}
+
+.driver-popover.nosey-tour .driver-popover-close-btn:hover,
+.driver-popover.nosey-tour .driver-popover-close-btn:focus-visible {
+  color: var(--ink);
+  background: var(--green-lightest);
+}
+
+/* driver.js focuses the close button on steps without Next; the global 3px
+   offset ring would spill past the popover corner. */
+.driver-popover.nosey-tour .driver-popover-close-btn:focus-visible {
+  outline: 2px solid var(--green-mid);
+  outline-offset: 0;
+}
+
+.driver-popover.nosey-tour .driver-popover-footer {
+  margin-top: 16px;
+}
+
+.driver-popover.nosey-tour .driver-popover-footer button {
+  min-height: 36px;
+  padding: 7px 16px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.2;
+  text-shadow: none;
+  color: var(--green-dark);
+  background: var(--white);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.driver-popover.nosey-tour .driver-popover-footer button:hover {
+  background: var(--green-lightest);
+}
+
+.driver-popover.nosey-tour .driver-popover-footer .driver-popover-next-btn {
+  color: var(--white);
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+}
+
+.driver-popover.nosey-tour .driver-popover-footer .driver-popover-next-btn:hover {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.driver-popover.nosey-tour .driver-popover-footer button:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.driver-popover.nosey-tour .driver-popover-navigation-btns button + button {
+  margin-left: 8px;
+}
+
+/* driver.js draws the arrow as a zero-size box whose one coloured border is
+   the triangle; the other three must stay transparent or it renders as a
+   square. Enlarged from driver's 5px so it reads as a pointer, which means
+   re-centring it (driver hard-codes a -5px margin for 5px). */
+.driver-popover.nosey-tour .driver-popover-arrow {
+  border: 9px solid transparent;
+}
+
+.driver-popover.nosey-tour .driver-popover-arrow-side-top { border-top-color: var(--white); }
+.driver-popover.nosey-tour .driver-popover-arrow-side-bottom { border-bottom-color: var(--white); }
+.driver-popover.nosey-tour .driver-popover-arrow-side-left { border-left-color: var(--white); }
+.driver-popover.nosey-tour .driver-popover-arrow-side-right { border-right-color: var(--white); }
+
+.driver-popover.nosey-tour .driver-popover-arrow-side-top.driver-popover-arrow-align-center,
+.driver-popover.nosey-tour .driver-popover-arrow-side-bottom.driver-popover-arrow-align-center {
+  margin-left: -9px;
+}
+
+.driver-popover.nosey-tour .driver-popover-arrow-side-left.driver-popover-arrow-align-center,
+.driver-popover.nosey-tour .driver-popover-arrow-side-right.driver-popover-arrow-align-center {
+  margin-top: -9px;
+}
+
+.driver-popover.nosey-tour .driver-popover-arrow-side-top.driver-popover-arrow-align-start,
+.driver-popover.nosey-tour .driver-popover-arrow-side-bottom.driver-popover-arrow-align-start {
+  left: 20px;
+}
+
+.driver-popover.nosey-tour .driver-popover-arrow-side-top.driver-popover-arrow-align-end,
+.driver-popover.nosey-tour .driver-popover-arrow-side-bottom.driver-popover-arrow-align-end {
+  right: 20px;
+}
+
+@media (max-width: 760px) {
+  .driver-popover.nosey-tour {
+    max-width: calc(100vw - 32px);
+  }
+}

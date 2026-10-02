@@ -27,7 +27,7 @@ import { SkeletonQuestionCard } from "../components/Skeletons";
 import { API_BASE_URL, fetchTest, getDraftAttempt, saveDraftAttempt, scopeKey, submitAttempt } from "../lib/api";
 import { applyTextHighlights, clearTextHighlights, getSelectionSignature, HIGHLIGHT_SUPPORTED } from "../lib/highlightRanges";
 import { useSettings } from "../lib/useSettings";
-import type { DraftAttemptAnswer, Question, SubmittedAnswer, TestTake } from "../lib/types";
+import type { DraftAttemptAnswer, KojoTestRef, Question, SubmittedAnswer, TestTake } from "../lib/types";
 
 // Monaco ids that differ from the lowercased display name. Monaco has no OCaml
 // grammar, so it borrows F# (same ML family) for highlighting.
@@ -161,6 +161,13 @@ export default function TakeTest() {
   function buildTestKojoContext(): string {
     const currentQuestion = test?.questions[index];
     return currentQuestion ? `Question the student is working on:\n${currentQuestion.question_text}` : "";
+  }
+
+  // The backend loads the current question itself from these ids (ownership
+  // checked) and applies the in-test tutor rules, so they cannot be talked away.
+  function buildTestKojoRef(): KojoTestRef | null {
+    const currentQuestion = test?.questions[index];
+    return currentQuestion ? { testId: numericTestId, questionId: currentQuestion.id } : null;
   }
 
   useEffect(() => {
@@ -1027,10 +1034,11 @@ export default function TakeTest() {
           subtitle={test.title}
           onClose={() => setKojoOpen(false)}
           buildContext={buildTestKojoContext}
+          buildTestRef={buildTestKojoRef}
           customInstruction="You're helping a student during a practice test in Learning Mode. Help them understand the underlying concept and reason toward the answer. Guide their thinking, do not just hand over the final answer to the test question."
           provider={generationProvider}
           strictness={kojoStrictness}
-          contractNote="Kojo answers from your uploaded notes to help you understand the material. It guides your thinking instead of handing over the answer."
+          contractNote="Kojo won't solve this question, it'll guide you."
           emptyTitle="Stuck on this question?"
           emptySub="Ask Kojo about the concept behind it. I'll guide your thinking instead of handing over the answer."
           suggestions={["Explain the concept this question is testing", "Give me a hint without the answer", "What should I review first?"]}
@@ -1257,7 +1265,7 @@ function questionTypeLabel(question: Question): string {
     case "RANK":
       return "Ranking";
     default:
-      return "Free response";
+      return "Written";
   }
 }
 

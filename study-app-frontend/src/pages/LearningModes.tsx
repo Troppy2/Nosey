@@ -8,6 +8,7 @@ import { Skeleton, SkeletonFolderGrid } from "../components/Skeletons";
 import { FlashcardsIcon } from "../components/FlashcardsIcon";
 import { fetchFolders } from "../lib/api";
 import { useSettings } from "../lib/useSettings";
+import { usePageTour } from "../components/tours/usePageTour";
 import type { Folder } from "../lib/types";
 
 // The Learning Modes hub. Replaces the old "pick a folder, jump straight into
@@ -27,6 +28,8 @@ export default function LearningModes() {
       .catch(() => setFolders([]))
       .finally(() => setLoading(false));
   }, []);
+
+  usePageTour("learning-modes", !loading && selectedFolderId != null);
 
   // Step 1: folder picker.
   if (selectedFolderId == null) {
@@ -116,6 +119,7 @@ export default function LearningModes() {
           icon={<FlashcardsIcon size={32} />}
           accent="var(--green-dark)"
           title="Flashcards"
+          tourId="mode-flashcards"
           blurb="Flip through your cards one at a time and rate how well you knew each one."
         />
         <ModeCard
@@ -124,6 +128,7 @@ export default function LearningModes() {
           icon={<Puzzle size={26} />}
           accent="var(--warning)"
           title="Matching"
+          tourId="mode-matching"
           blurb="Race the clock to pair every term with its definition across timed rounds."
         />
         {betaMode ? (
@@ -140,7 +145,7 @@ export default function LearningModes() {
       </section>
 
       {!loading && !hasCards ? (
-        <p className="muted small mode-empty-note">
+        <p className="muted small mode-empty-note" data-tour="modes-empty">
           This class has no flashcards yet. Add or generate some to start studying.
         </p>
       ) : null}
@@ -156,6 +161,7 @@ function ModeCard({
   title,
   blurb,
   beta = false,
+  tourId,
 }: {
   to: string;
   disabled: boolean;
@@ -164,6 +170,7 @@ function ModeCard({
   title: string;
   blurb: string;
   beta?: boolean;
+  tourId?: string;
 }) {
   const inner = (
     <>
@@ -180,14 +187,14 @@ function ModeCard({
 
   if (disabled) {
     return (
-      <div className={`mode-card mode-card--disabled${beta ? " mode-card--beta" : ""}`} aria-disabled="true">
+      <div className={`mode-card mode-card--disabled${beta ? " mode-card--beta" : ""}`} aria-disabled="true" data-tour={tourId}>
         {inner}
       </div>
     );
   }
 
   return (
-    <Link className={`mode-card${beta ? " mode-card--beta" : ""}`} to={to} style={{ ["--mode-accent" as string]: accent }}>
+    <Link className={`mode-card${beta ? " mode-card--beta" : ""}`} to={to} data-tour={tourId} style={{ ["--mode-accent" as string]: accent }}>
       {inner}
     </Link>
   );

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import date, datetime
 from typing import Optional
 
 from sqlalchemy import extract, func, select
 
-from src.models.user import User
+from src.models.user import User, parse_tours_seen
 from src.repositories.base_repository import BaseRepository
 
 
@@ -98,6 +99,21 @@ class UserRepository(BaseRepository[User]):
         if user.onboarding_completed_at is None:
             user.onboarding_completed_at = datetime.utcnow()
             await self.session.flush()
+        return user
+
+    async def mark_tour_seen(self, user: User, tour_id: str) -> User:
+        # Idempotent: a tour already in the list is left alone.
+        seen = parse_tours_seen(user.tours_seen)
+        if tour_id not in seen:
+            seen.append(tour_id)
+            user.tours_seen = json.dumps(seen)
+            await self.session.flush()
+        return user
+
+    async def reset_tours_seen(self, user: User) -> User:
+        """Clear every page tour so each one runs again on its next page visit."""
+        user.tours_seen = None
+        await self.session.flush()
         return user
 
     async def refresh_age_if_birthday(self, user: User) -> bool:

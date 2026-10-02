@@ -308,9 +308,9 @@ export default function Results() {
                       value={targetedTestType}
                       onChange={(e) => setTargetedTestType(e.target.value)}
                     >
-                      <option value="mixed">Mixed (MCQ + FRQ)</option>
-                      <option value="MCQ_only">Multiple Choice Only</option>
-                      <option value="FRQ_only">Free Response Only</option>
+                      <option value="mixed">Mixed</option>
+                      <option value="MCQ_only">Multiple choice</option>
+                      <option value="FRQ_only">Written</option>
                     </SelectInput>
                     <SelectInput
                       label="Difficulty"
@@ -326,7 +326,7 @@ export default function Results() {
                   <div className="targeted-row">
                     {targetedTestType !== "FRQ_only" && (
                       <TextInput
-                        label="MCQ questions"
+                        label="Multiple choice questions"
                         type="number"
                         min={1}
                         max={20}
@@ -338,7 +338,7 @@ export default function Results() {
                     )}
                     {targetedTestType !== "MCQ_only" && (
                       <TextInput
-                        label="FRQ questions"
+                        label="Written questions"
                         type="number"
                         min={1}
                         max={10}

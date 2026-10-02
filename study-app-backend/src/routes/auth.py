@@ -15,6 +15,7 @@ from src.schemas.auth_schema import (
     DateOfBirthRequest,
     GoogleAuthRequest,
     PreferredNameRequest,
+    TourSeenRequest,
     UserResponse,
 )
 from src.services.auth_service import AuthService
@@ -127,6 +128,37 @@ async def complete_onboarding(
     except Exception as exc:
         logger.exception("Unexpected error completing onboarding")
         raise HTTPException(status_code=500, detail="Failed to save onboarding progress") from exc
+
+
+@router.post("/tours-seen", response_model=UserResponse)
+async def mark_tour_seen(
+    request: TourSeenRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserResponse:
+    """Record that a page tour was shown, so it never runs again for this account."""
+    try:
+        user = await UserRepository(session).mark_tour_seen(current_user, request.tour_id)
+        await session.commit()
+        return UserResponse.model_validate(user)
+    except Exception as exc:
+        logger.exception("Unexpected error saving page tour progress")
+        raise HTTPException(status_code=500, detail="Failed to save tour progress") from exc
+
+
+@router.delete("/tours-seen", response_model=UserResponse)
+async def reset_tours_seen(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserResponse:
+    """Clear every page tour (Settings > Replay page tips)."""
+    try:
+        user = await UserRepository(session).reset_tours_seen(current_user)
+        await session.commit()
+        return UserResponse.model_validate(user)
+    except Exception as exc:
+        logger.exception("Unexpected error resetting page tours")
+        raise HTTPException(status_code=500, detail="Failed to reset page tips") from exc
 
 
 @router.delete("/account", status_code=204)

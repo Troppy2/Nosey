@@ -516,7 +516,7 @@ function coachTitle(stage: Stage, qIndex: number, mcqDone: boolean, frqDone: boo
       return "This is the part that does the work";
     case "test":
       if (qIndex === 0) return mcqDone ? "Every answer comes with the reasoning" : "Now sit the test";
-      return frqDone ? "Written answers get graded too" : "Free response works the same way";
+      return frqDone ? "Written answers get graded too" : "Written answers work the same way";
     case "results":
       return "Results are kept, not thrown away";
     case "done":
@@ -541,7 +541,7 @@ function coachBody(
       return "Pick a file. Nosey reads PDFs, Word documents, slides, and plain text, and writes questions from what is inside them, not from the internet.";
     case "generate":
       if (generating) return "Questions land one at a time as they are written. On your own notes this takes about a minute.";
-      return "Press Generate. Nosey pulls the ideas out of the file and writes a mix of multiple choice and free response.";
+      return "Press Generate. Nosey pulls the ideas out of the file and writes a mix of multiple choice and written questions.";
     case "test":
       if (qIndex === 0) {
         return mcqDone

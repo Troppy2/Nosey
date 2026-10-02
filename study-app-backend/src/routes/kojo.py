@@ -453,6 +453,8 @@ async def general_chat(
                 custom_instruction=body.custom_instruction,
                 context=body.context,
                 interviewer_mode=body.interviewer_mode,
+                test_id=body.test_id,
+                question_id=body.question_id,
                 session=session,
             )
             try:
@@ -501,6 +503,8 @@ async def general_chat_stream(
                 custom_instruction=body.custom_instruction,
                 context=body.context,
                 interviewer_mode=body.interviewer_mode,
+                test_id=body.test_id,
+                question_id=body.question_id,
                 session=session,
             ):
                 yield _sse(event)

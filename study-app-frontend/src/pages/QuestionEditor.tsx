@@ -93,7 +93,7 @@ function MCQCard({
         />
       ) : null}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span className="eyebrow">MCQ</span>
+        <span className="eyebrow">Multiple choice</span>
         <button
           type="button"
           onClick={() => setConfirmDelete(true)}
@@ -216,7 +216,7 @@ function FRQCard({
         />
       ) : null}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span className="eyebrow">FRQ</span>
+        <span className="eyebrow">Written</span>
         <button
           type="button"
           onClick={() => setConfirmDelete(true)}
@@ -326,7 +326,7 @@ function AddQuestionPanel({
             className={`choice ${type === t ? "active" : ""}`}
             onClick={() => setType(t)}
           >
-            {t === "MCQ" ? "Multiple choice" : "Free response"}
+            {t === "MCQ" ? "Multiple choice" : "Written"}
           </button>
         ))}
       </div>

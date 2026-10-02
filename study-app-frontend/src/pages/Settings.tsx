@@ -19,6 +19,7 @@ import {
   isGuestSession,
   refreshKojoMemory,
   resetOnboarding,
+  resetTours,
   updatePreferredName,
   restoreKojoConversation,
   scopeKey,
@@ -66,6 +67,7 @@ export default function Settings() {
   const [unarchivedFolderId, setUnarchivedFolderId] = useState<number | null>(null);
   const [unarchiveError, setUnarchiveError] = useState<string | null>(null);
   const [resettingStats, setResettingStats] = useState(false);
+  const [resettingTours, setResettingTours] = useState(false);
   const [statsResetNotice, setStatsResetNotice] = useState<string | null>(null);
   const [slashCommands, setSlashCommands] = useState<SlashCommand[]>([]);
   const [loadingSlashCommands, setLoadingSlashCommands] = useState(true);
@@ -560,6 +562,34 @@ export default function Settings() {
               }}
             >
               Start the practice run
+            </Button>
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection title="Page tips">
+          <p className="muted small">
+            Folders, Create Test, flashcards, and Kojo each show a short tour the first time you
+            open them. Replay brings every tour back for your next visit to that page.
+          </p>
+          <div className="settings-reset-row">
+            <Button
+              type="button"
+              variant="secondary"
+              icon={<RotateCcw size={16} />}
+              disabled={resettingTours}
+              onClick={async () => {
+                setResettingTours(true);
+                try {
+                  await resetTours();
+                  toast.success("Page tips will show again");
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Could not reset page tips");
+                } finally {
+                  setResettingTours(false);
+                }
+              }}
+            >
+              Replay page tips
             </Button>
           </div>
         </CollapsibleSection>
