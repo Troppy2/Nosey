@@ -26687,3 +26687,12 @@ a.sd-chip.is-done:hover {
   font-size: 0.9rem;
   color: var(--ink);
 }
+
+/* Kojo: AI disclaimer under the message box */
+.kojo-disclaimer {
+  margin: 4px 0 0;
+  font-size: 0.72rem;
+  text-align: center;
+  color: var(--muted, #7a8a6a);
+  flex-basis: 100%;
+}
