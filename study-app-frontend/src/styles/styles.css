@@ -26688,11 +26688,17 @@ a.sd-chip.is-done:hover {
   color: var(--ink);
 }
 
-/* Kojo: AI disclaimer under the message box */
-.kojo-disclaimer {
-  margin: 4px 0 0;
-  font-size: 0.72rem;
-  text-align: center;
-  color: var(--muted, #7a8a6a);
-  flex-basis: 100%;
+/* Kojo: the hint line under the message box alternates with the AI disclaimer */
+.kojo-hint-carousel-item {
+  display: inline-block;
+  animation: kojo-hint-fade 0.4s ease;
+}
+
+@keyframes kojo-hint-fade {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kojo-hint-carousel-item { animation: none; }
 }
