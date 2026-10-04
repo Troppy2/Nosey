@@ -408,6 +408,7 @@ export function KojoHelpChat({
           </div>
           <div className="kojo-input-footer">
             <p className="kojo-input-hint">Enter · Shift+Enter for new line</p>
+            <p className="kojo-disclaimer">Kojo is AI and can make mistakes.</p>
           </div>
         </div>
       </div>

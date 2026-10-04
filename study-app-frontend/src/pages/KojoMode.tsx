@@ -2380,6 +2380,7 @@ export default function KojoMode() {
               </div>
             </div>
             <p className="chat-mode-input-hint">↵ send · ⇧↵ new line{!isGeneralMode || betaMode ? " · / for commands" : ""}</p>
+            <p className="kojo-disclaimer">Kojo is AI and can make mistakes. Check important answers against your notes.</p>
           </div>
         </div>
         </>
