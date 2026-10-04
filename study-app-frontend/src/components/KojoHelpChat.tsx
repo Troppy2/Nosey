@@ -1,5 +1,6 @@
 import { AlertCircle, ArrowDown, Lock, Maximize2, Minimize2, Send, Sparkles, X } from "lucide-react";
 import KojoMascot from "./KojoMascot";
+import { KojoHintCarousel } from "./KojoHintCarousel";
 import { useEffect, useRef, useState } from "react";
 import {
   createGeneralKojoConversation,
@@ -407,8 +408,7 @@ export function KojoHelpChat({
             </div>
           </div>
           <div className="kojo-input-footer">
-            <p className="kojo-input-hint">Enter · Shift+Enter for new line</p>
-            <p className="kojo-disclaimer">Kojo is AI and can make mistakes.</p>
+            <KojoHintCarousel className="kojo-input-hint" hint="Enter · Shift+Enter for new line" />
           </div>
         </div>
       </div>

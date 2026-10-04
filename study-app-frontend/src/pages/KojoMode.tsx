@@ -41,6 +41,7 @@ import { usePageTour } from "../components/tours/usePageTour";
 import { Button } from "../components/Button";
 import KojoActionCard from "../components/KojoActionCard";
 import KojoMascot from "../components/KojoMascot";
+import { KojoHintCarousel } from "../components/KojoHintCarousel";
 import { KojoReasoning, KojoStagedThinking } from "../components/KojoThinking";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
@@ -2379,8 +2380,10 @@ export default function KojoMode() {
                 )}
               </div>
             </div>
-            <p className="chat-mode-input-hint">↵ send · ⇧↵ new line{!isGeneralMode || betaMode ? " · / for commands" : ""}</p>
-            <p className="kojo-disclaimer">Kojo is AI and can make mistakes. Check important answers against your notes.</p>
+            <KojoHintCarousel
+              className="chat-mode-input-hint"
+              hint={`↵ send · ⇧↵ new line${!isGeneralMode || betaMode ? " · / for commands" : ""}`}
+            />
           </div>
         </div>
         </>
