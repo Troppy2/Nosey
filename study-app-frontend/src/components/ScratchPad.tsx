@@ -270,10 +270,9 @@ type Tool = "pen" | "erase" | "select";
 type SelectMode = "lasso" | "box";
 
 function ctxOf(canvas: HTMLCanvasElement | null): CanvasRenderingContext2D | null {
-  // desynchronized lets the browser paint the ink layer without waiting for
-  // the compositor, which is the largest single cut in pen-to-ink latency.
-  // The flag only takes effect on the first getContext call for a canvas.
-  return canvas ? canvas.getContext("2d", { desynchronized: true }) : null;
+  // No `desynchronized` hint: it cuts pen latency a little, but on some
+  // Windows GPU/driver combinations the whole canvas paints opaque black.
+  return canvas ? canvas.getContext("2d") : null;
 }
 
 function inkStyle(ctx: CanvasRenderingContext2D) {
