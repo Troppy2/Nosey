@@ -1,6 +1,22 @@
-import { ChevronDown, Eraser, Hand, Maximize2, Minimize2, PenLine, Plus, Trash2, Undo2, X } from "lucide-react";
+import {
+  BoxSelect,
+  ChevronDown,
+  Copy,
+  Delete,
+  Eraser,
+  Hand,
+  LassoSelect,
+  Maximize2,
+  Minimize2,
+  PenLine,
+  Plus,
+  Trash2,
+  Undo2,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { scopeKey } from "../lib/api";
+import { traceInk } from "../lib/inkTrace";
 import { MarkdownContent } from "./MarkdownContent";
 
 // ── Stroke data model ───────────────────────────────────────────────────────
@@ -25,7 +41,8 @@ export type ScratchPadData = {
 
 export type PaperStyle = "blank" | "lined" | "graph";
 
-const MAX_STROKES_PER_QUESTION = 400;
+// Raised from 400: a traced photo of handwriting is a few hundred strokes.
+const MAX_STROKES_PER_QUESTION = 1500;
 // Generous on purpose: fast cursive with coalesced stylus samples can run to
 // well over a thousand points in a single long stroke, and silently dropping
 // the tail of a stroke is what makes writing transcribe as garbled.
@@ -205,7 +222,7 @@ export function exportScratchPadPng(data: ScratchPadData): string | null {
   return comma === -1 ? null : dataUrl.slice(comma + 1);
 }
 
-// ── The canvas itself: pointer capture, dpr, replay-on-resize ──────────────
+// ── The canvas itself: pointer capture, dpr, incremental painting ───────────
 
 type CanvasSurfaceProps = {
   strokes: Stroke[];
@@ -220,9 +237,66 @@ type CanvasSurfaceProps = {
 const MIN_LOGICAL_HEIGHT = 700;
 const LOGICAL_HEIGHT_STEP = 500;
 const MAX_LOGICAL_HEIGHT = 4200;
+// A window wider than the base page shows MORE page instead of a bigger one:
+// ink is drawn at no more than this many CSS pixels per logical unit, and the
+// page's logical width grows to fill the rest. The pad at full screen is a
+// roomier sheet, not a zoomed one.
+const INK_SCALE = 0.75;
+const MAX_LOGICAL_WIDTH = 5000;
+// The draft column holds the strokes as JSON (work_strokes max_length 200_000).
+const MAX_STROKES_JSON_CHARS = 180_000;
+// Coordinates are kept to a tenth of a logical unit: indistinguishable on
+// screen, and about a third the JSON of raw floats.
+const COORD_PRECISION = 10;
+// A stroke is simplified only to the extent the eye cannot see. The old 1.2
+// removed enough points that the saved stroke visibly reshaped the moment the
+// pen lifted, most noticeably on a wide pad where one unit is more pixels.
+const SIMPLIFY_EPSILON = 0.4;
+// The parent (the whole test page) hears about edits this long after the last
+// stroke, not after every one: re-rendering it per stroke is what stalled
+// writing. The pad flushes on close and when the page is hidden.
+const NOTIFY_DELAY_MS = 400;
+const SELECT_COLOR = "#2b6fd6";
+const SELECT_PAD_PX = 6;
+const HANDLE_PX = 5;
+const HANDLE_HIT_PX = 16;
+const HISTORY_LIMIT = 60;
+const DUPLICATE_OFFSET = 24;
 
 // Radius, in logical units, within which the stroke eraser takes a stroke out.
 const ERASE_RADIUS = 16;
+
+type Tool = "pen" | "erase" | "select";
+type SelectMode = "lasso" | "box";
+
+function ctxOf(canvas: HTMLCanvasElement | null): CanvasRenderingContext2D | null {
+  // desynchronized lets the browser paint the ink layer without waiting for
+  // the compositor, which is the largest single cut in pen-to-ink latency.
+  // The flag only takes effect on the first getContext call for a canvas.
+  return canvas ? canvas.getContext("2d", { desynchronized: true }) : null;
+}
+
+function inkStyle(ctx: CanvasRenderingContext2D) {
+  ctx.strokeStyle = "#26301f";
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+}
+
+function clearCanvas(canvas: HTMLCanvasElement | null) {
+  const ctx = ctxOf(canvas);
+  if (!canvas || !ctx) return;
+  const dpr = window.devicePixelRatio || 1;
+  ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+}
+
+function round1(value: number): number {
+  return Math.round(value * COORD_PRECISION) / COORD_PRECISION;
+}
+
+function roundPoints(points: number[]): number[] {
+  return points.map(round1);
+}
 
 function distanceToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
   const dx = x2 - x1;
@@ -244,6 +318,46 @@ function strokeHit(points: number[], x: number, y: number, radius: number): bool
     if (distanceToSegment(x, y, points[i], points[i + 1], points[i + 2], points[i + 3]) <= radius) return true;
   }
   return false;
+}
+
+function pointInPolygon(x: number, y: number, poly: number[]): boolean {
+  let inside = false;
+  const n = poly.length / 2;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = poly[i * 2];
+    const yi = poly[i * 2 + 1];
+    const xj = poly[j * 2];
+    const yj = poly[j * 2 + 1];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+// A stroke is picked up when at least half of its points fall inside the
+// shape, so a lasso that clips a tail of a long stroke leaves it alone.
+function strokesInShape(strokes: Stroke[], mode: SelectMode, shape: number[]): Stroke[] {
+  const x0 = shape[0];
+  const y0 = shape[1];
+  const x1 = shape[shape.length - 2];
+  const y1 = shape[shape.length - 1];
+  const inside = (x: number, y: number) =>
+    mode === "box"
+      ? x >= Math.min(x0, x1) && x <= Math.max(x0, x1) && y >= Math.min(y0, y1) && y <= Math.max(y0, y1)
+      : pointInPolygon(x, y, shape);
+  return strokes.filter((stroke) => {
+    const n = stroke.points.length / 2;
+    let hit = 0;
+    for (let i = 0; i < n; i++) if (inside(stroke.points[i * 2], stroke.points[i * 2 + 1])) hit++;
+    return n > 0 && hit * 2 >= n;
+  });
+}
+
+function translateStroke(stroke: Stroke, dx: number, dy: number): Stroke {
+  return { points: stroke.points.map((v, i) => round1(v + (i % 2 === 0 ? dx : dy))) };
+}
+
+function scaleStroke(stroke: Stroke, ax: number, ay: number, factor: number): Stroke {
+  return { points: stroke.points.map((v, i) => round1(i % 2 === 0 ? ax + (v - ax) * factor : ay + (v - ay) * factor)) };
 }
 
 // Draws a polyline as quadratic curves through the midpoints of consecutive
@@ -274,50 +388,71 @@ function drawSmoothPath(ctx: CanvasRenderingContext2D, points: number[], scaleX:
 // drawing and a palm or finger resting on the glass are two live pointers at
 // once and must not interfere with each other.
 type Gesture =
-  | { kind: "draw"; pointerId: number; points: number[] }
+  | { kind: "draw"; pointerId: number; points: number[]; predicted: number[] }
   | { kind: "erase"; pointerId: number; snapshot: Stroke[]; remaining: Stroke[] }
-  | { kind: "scroll"; pointerId: number; startY: number; startTop: number };
+  | { kind: "scroll"; pointerId: number; startY: number; startTop: number }
+  | { kind: "select"; pointerId: number; mode: SelectMode; points: number[] }
+  | { kind: "move"; pointerId: number; startX: number; startY: number; base: Stroke[]; rest: Stroke[]; dx: number; dy: number }
+  | { kind: "scale"; pointerId: number; ax: number; ay: number; startDist: number; base: Stroke[]; rest: Stroke[]; factor: number };
 
 function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfaceProps) {
-  // Two stacked canvases. The static one holds committed strokes and repaints
-  // only when they change; the live one holds just the stroke being drawn and
-  // is appended to incrementally. Repainting every committed stroke on every
-  // frame is what made writing lag once a page had real work on it: the
-  // per-frame cost grew with everything already written.
+  // Three stacked canvases. The static one holds committed strokes and gains
+  // each new stroke incrementally; the live one holds just the stroke being
+  // drawn; the overlay holds selection chrome and the preview of a selection
+  // being moved or resized. Repainting every committed stroke after every
+  // stroke is what made writing stall once a page had real work on it.
   const staticCanvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const liveCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const gesturesRef = useRef<Map<number, Gesture>>(new Map());
   const rafPendingRef = useRef(false);
-  // How much of the in-progress stroke the live layer has already drawn, so
-  // each frame appends only the new part instead of redrawing the stroke.
-  const liveProgressRef = useRef<{ nextControl: number; lastMid: [number, number] | null }>({
-    nextControl: 1,
-    lastMid: null,
-  });
+  // The page's logical size and the CSS pixels per logical unit, set by
+  // applySize. Everything that maps pointer to page reads this, so a window
+  // resize never has to re-render React.
+  const dimsRef = useRef({ w: SCRATCH_PAD_LOGICAL_WIDTH, h: MIN_LOGICAL_HEIGHT, scale: 1 });
+  // What the static canvas currently shows, so a single added stroke is drawn
+  // alone instead of repainting the page.
+  const paintedRef = useRef<{ strokes: Stroke[]; key: string } | null>(null);
 
   const [allowFingerDraw, setAllowFingerDraw] = useState<boolean>(() => {
     const saved = localStorage.getItem(scopeKey("nosey_scratchpad_finger"));
     return saved === null ? true : saved === "1";
   });
-  const [tool, setTool] = useState<"pen" | "erase">("pen");
+  const [tool, setTool] = useState<Tool>("pen");
+  const [selectMode, setSelectMode] = useState<SelectMode>("lasso");
+  const [selected, setSelected] = useState<Stroke[]>([]);
+  const selectedRef = useRef<Stroke[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
   const [history, setHistory] = useState<Stroke[][]>([]);
 
   // The canvas owns what it renders. Routing every stroke through the parent
   // first meant a finished stroke could not appear until the whole test page
-  // re-rendered, which is why ink showed up seconds late, or only once the pen
-  // touched down again.
+  // re-rendered, which is why ink showed up seconds late.
   const [localStrokes, setLocalStrokes] = useState<Stroke[]>(strokes);
-  const lastEmittedRef = useRef<Stroke[]>(strokes);
+  const localStrokesRef = useRef<Stroke[]>(strokes);
+  // Arrays this component has handed to the parent. A prop that matches one is
+  // an echo of our own edit, not news from outside: adopting a slightly older
+  // echo would wipe the newest stroke.
+  const emittedRef = useRef<Stroke[][]>([strokes]);
+  const onChangeRef = useRef(onStrokesChange);
+  const pendingRef = useRef<Stroke[] | null>(null);
+  const notifyTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    onChangeRef.current = onStrokesChange;
+  }, [onStrokesChange]);
 
   // Adopt strokes that came from outside (a draft loading, the parent
   // resetting) while ignoring the echo of what this component just emitted.
   useEffect(() => {
-    if (strokes !== lastEmittedRef.current) {
-      lastEmittedRef.current = strokes;
-      setLocalStrokes(strokes);
-    }
+    if (emittedRef.current.includes(strokes)) return;
+    emittedRef.current = [strokes];
+    localStrokesRef.current = strokes;
+    setLocalStrokes(strokes);
+    selectedRef.current = [];
+    setSelected([]);
   }, [strokes]);
 
   // Sized on open to fit whatever was drawn before, so reopening a drawing
@@ -331,154 +466,244 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     );
   });
 
+  const flushNotify = useCallback(() => {
+    if (notifyTimerRef.current != null) {
+      window.clearTimeout(notifyTimerRef.current);
+      notifyTimerRef.current = null;
+    }
+    const pending = pendingRef.current;
+    if (pending) {
+      pendingRef.current = null;
+      onChangeRef.current(pending);
+    }
+  }, []);
+
   const commitStrokes = useCallback(
     (next: Stroke[]) => {
-      lastEmittedRef.current = next;
+      localStrokesRef.current = next;
+      emittedRef.current = [...emittedRef.current.slice(-7), next];
       setLocalStrokes(next);
-      // Tell the parent after the ink has painted. The parent update re-renders
-      // the test page and schedules a draft save, and doing that inline is what
-      // made a finished stroke appear late.
-      requestAnimationFrame(() => onStrokesChange(next));
+      // Tell the parent once the pen has been still for a moment. The parent
+      // update re-renders the test page and schedules a draft save; doing that
+      // per stroke is what froze the pad between strokes.
+      pendingRef.current = next;
+      if (notifyTimerRef.current != null) window.clearTimeout(notifyTimerRef.current);
+      notifyTimerRef.current = window.setTimeout(flushNotify, NOTIFY_DELAY_MS);
     },
-    [onStrokesChange],
+    [flushNotify],
   );
 
-  const toLogical = useCallback(
-    (clientX: number, clientY: number): [number, number] => {
-      const canvas = liveCanvasRef.current;
-      if (!canvas) return [0, 0];
-      // The canvas element's own rect, not the container's: the canvas may
-      // stand taller than the container and scroll inside it.
-      const rect = canvas.getBoundingClientRect();
-      return [
-        (clientX - rect.left) * (SCRATCH_PAD_LOGICAL_WIDTH / rect.width),
-        (clientY - rect.top) * (pageHeight / rect.height),
-      ];
-    },
-    [pageHeight],
-  );
+  useEffect(() => {
+    const flushIfHidden = () => {
+      if (document.visibilityState === "hidden") flushNotify();
+    };
+    window.addEventListener("pagehide", flushNotify);
+    document.addEventListener("visibilitychange", flushIfHidden);
+    return () => {
+      window.removeEventListener("pagehide", flushNotify);
+      document.removeEventListener("visibilitychange", flushIfHidden);
+      flushNotify();
+    };
+  }, [flushNotify]);
 
-  function inkStyle(ctx: CanvasRenderingContext2D) {
-    ctx.strokeStyle = "#26301f";
-    ctx.lineWidth = 2.4;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
+  const pushHistory = useCallback((snapshot: Stroke[]) => {
+    setHistory((h) => [...h, snapshot].slice(-HISTORY_LIMIT));
+  }, []);
+
+  const setSelection = useCallback((next: Stroke[]) => {
+    selectedRef.current = next;
+    setSelected(next);
+  }, []);
+
+  const ensureHeight = useCallback((maxY: number) => {
+    setPageHeight((h) =>
+      Math.min(MAX_LOGICAL_HEIGHT, Math.max(h, Math.ceil((maxY + 120) / LOGICAL_HEIGHT_STEP) * LOGICAL_HEIGHT_STEP)),
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = window.setTimeout(() => setNotice(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  function toLogicalIn(rect: DOMRect, clientX: number, clientY: number): [number, number] {
+    const { w, h } = dimsRef.current;
+    return [(clientX - rect.left) * (w / rect.width), (clientY - rect.top) * (h / rect.height)];
   }
 
-  function canvasScale(canvas: HTMLCanvasElement, height: number): [number, number] {
+  const toLogical = useCallback((clientX: number, clientY: number): [number, number] => {
+    const canvas = liveCanvasRef.current;
+    if (!canvas) return [0, 0];
+    // The canvas element's own rect, not the container's: the canvas may
+    // stand taller than the container and scroll inside it.
+    return toLogicalIn(canvas.getBoundingClientRect(), clientX, clientY);
+  }, []);
+
+  // Paints committed strokes. With no override and exactly one new stroke
+  // since the last paint, only that stroke is drawn. `override` lets an erase
+  // or move drag preview its result before it is committed.
+  const paintStatic = useCallback((override?: Stroke[]) => {
+    const canvas = staticCanvasRef.current;
+    const ctx = ctxOf(canvas);
+    if (!canvas || !ctx) return;
     const dpr = window.devicePixelRatio || 1;
-    return [canvas.width / dpr / SCRATCH_PAD_LOGICAL_WIDTH, canvas.height / dpr / height];
-  }
-
-  // Repaints committed strokes. `override` lets an erase drag preview its
-  // result before that result is committed.
-  const paintStatic = useCallback(
-    (override?: Stroke[]) => {
-      const canvas = staticCanvasRef.current;
-      const ctx = canvas?.getContext("2d");
-      if (!canvas || !ctx) return;
-      const dpr = window.devicePixelRatio || 1;
+    const { w, h, scale } = dimsRef.current;
+    const list = override ?? localStrokesRef.current;
+    const key = `${w}x${h}x${dpr}x${canvas.width}`;
+    const prev = paintedRef.current;
+    inkStyle(ctx);
+    if (
+      !override &&
+      prev &&
+      prev.key === key &&
+      list.length === prev.strokes.length + 1 &&
+      prev.strokes.every((stroke, i) => stroke === list[i])
+    ) {
+      drawSmoothPath(ctx, list[list.length - 1].points, scale, scale);
+    } else {
       ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
-      inkStyle(ctx);
-      const [scaleX, scaleY] = canvasScale(canvas, pageHeight);
-      for (const stroke of override ?? localStrokes) drawSmoothPath(ctx, stroke.points, scaleX, scaleY);
-    },
-    [localStrokes, pageHeight],
-  );
+      for (const stroke of list) drawSmoothPath(ctx, stroke.points, scale, scale);
+    }
+    paintedRef.current = override ? null : { strokes: list, key };
+  }, []);
 
   function clearLive() {
-    const canvas = liveCanvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
-    liveProgressRef.current = { nextControl: 1, lastMid: null };
+    clearCanvas(liveCanvasRef.current);
   }
 
-  // Appends the part of the in-progress stroke that has not been drawn yet, as
-  // quadratic curves through sample midpoints. Cost is proportional to the new
-  // samples, not to the length of the stroke or to what is already on the page.
-  function extendLive(points: number[]) {
+  // Redraws the in-progress strokes whole, once per frame. One stroke is at
+  // most a couple of thousand points, so this is cheap, and it lets the line
+  // run all the way to the pen tip (plus the browser's predicted next
+  // samples) instead of stopping at the last midpoint behind it.
+  function renderLive() {
     const canvas = liveCanvasRef.current;
-    const ctx = canvas?.getContext("2d");
+    const ctx = ctxOf(canvas);
     if (!canvas || !ctx) return;
-    const n = points.length / 2;
-    if (n < 3) return; // needs at least one complete curve segment
-    const [scaleX, scaleY] = canvasScale(canvas, pageHeight);
-    const px = (i: number) => points[i * 2] * scaleX;
-    const py = (i: number) => points[i * 2 + 1] * scaleY;
-    const progress = liveProgressRef.current;
-
+    clearCanvas(canvas);
     inkStyle(ctx);
-    ctx.beginPath();
-    if (progress.lastMid) ctx.moveTo(progress.lastMid[0], progress.lastMid[1]);
-    else ctx.moveTo(px(0), py(0));
-
-    let drew = false;
-    for (let i = progress.nextControl; i <= n - 2; i++) {
-      const mx = (px(i) + px(i + 1)) / 2;
-      const my = (py(i) + py(i + 1)) / 2;
-      ctx.quadraticCurveTo(px(i), py(i), mx, my);
-      progress.lastMid = [mx, my];
-      progress.nextControl = i + 1;
-      drew = true;
+    const { scale } = dimsRef.current;
+    for (const gesture of gesturesRef.current.values()) {
+      if (gesture.kind !== "draw") continue;
+      drawSmoothPath(ctx, gesture.predicted.length ? gesture.points.concat(gesture.predicted) : gesture.points, scale, scale);
     }
-    if (drew) ctx.stroke();
   }
 
-  // Pointer events fire faster than the display refreshes, so the live layer is
-  // extended once per frame rather than once per event.
-  function scheduleLive() {
+  function drawOverlay() {
+    const canvas = overlayCanvasRef.current;
+    const ctx = ctxOf(canvas);
+    if (!canvas || !ctx) return;
+    clearCanvas(canvas);
+    const { scale } = dimsRef.current;
+    let active: Gesture | undefined;
+    for (const gesture of gesturesRef.current.values()) {
+      if (gesture.kind === "move" || gesture.kind === "scale" || gesture.kind === "select") active = gesture;
+    }
+    let shown = selectedRef.current;
+    if (active?.kind === "move") shown = active.base.map((s) => translateStroke(s, active.dx, active.dy));
+    else if (active?.kind === "scale") shown = active.base.map((s) => scaleStroke(s, active.ax, active.ay, active.factor));
+
+    if (shown.length) {
+      ctx.strokeStyle = SELECT_COLOR;
+      ctx.lineWidth = 2.4;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.setLineDash([]);
+      for (const stroke of shown) drawSmoothPath(ctx, stroke.points, scale, scale);
+      const b = strokeBounds(shown);
+      if (b) {
+        const pad = SELECT_PAD_PX / scale;
+        const x = (b.minX - pad) * scale;
+        const y = (b.minY - pad) * scale;
+        const w = (b.maxX - b.minX + pad * 2) * scale;
+        const h = (b.maxY - b.minY + pad * 2) * scale;
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([5, 4]);
+        ctx.strokeRect(x, y, w, h);
+        ctx.setLineDash([]);
+        ctx.fillStyle = "#ffffff";
+        ctx.lineWidth = 1.5;
+        for (const [cx, cy] of [[x, y], [x + w, y], [x + w, y + h], [x, y + h]]) {
+          ctx.beginPath();
+          ctx.rect(cx - HANDLE_PX, cy - HANDLE_PX, HANDLE_PX * 2, HANDLE_PX * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+    }
+    if (active?.kind === "select" && active.points.length >= 4) {
+      ctx.strokeStyle = SELECT_COLOR;
+      ctx.fillStyle = "rgba(43, 111, 214, 0.08)";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 4]);
+      const p = active.points;
+      ctx.beginPath();
+      if (active.mode === "box") {
+        const x0 = p[0] * scale;
+        const y0 = p[1] * scale;
+        ctx.rect(x0, y0, p[p.length - 2] * scale - x0, p[p.length - 1] * scale - y0);
+      } else {
+        ctx.moveTo(p[0] * scale, p[1] * scale);
+        for (let i = 2; i < p.length; i += 2) ctx.lineTo(p[i] * scale, p[i + 1] * scale);
+        ctx.closePath();
+      }
+      ctx.fill();
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // Pointer events fire faster than the display refreshes, so the live and
+  // overlay layers are redrawn once per frame rather than once per event.
+  function scheduleFrame() {
     if (rafPendingRef.current) return;
     rafPendingRef.current = true;
     requestAnimationFrame(() => {
       rafPendingRef.current = false;
-      for (const gesture of gesturesRef.current.values()) {
-        if (gesture.kind === "draw") extendLive(gesture.points);
-      }
+      renderLive();
+      drawOverlay();
     });
   }
 
-  // Held in a ref so the mount-only ResizeObserver always calls the CURRENT
-  // painter. Calling the captured one repainted the strokes as they stood when
-  // the pad opened, which looked exactly like a resize wiping the page.
-  const paintStaticRef = useRef(paintStatic);
-  useEffect(() => {
-    paintStaticRef.current = paintStatic;
-  }, [paintStatic]);
-
   // Any assignment to canvas.width/height clears the canvas, so sizing always
-  // means: resize both backing stores, re-apply the dpr transform, full replay.
+  // means: resize the backing stores, re-apply the dpr transform, full replay.
+  // The window's width sets the page's logical width (see INK_SCALE).
   const applySize = useCallback(() => {
     const container = containerRef.current;
     const page = pageRef.current;
-    const staticCanvas = staticCanvasRef.current;
-    const liveCanvas = liveCanvasRef.current;
-    if (!container || !page || !staticCanvas || !liveCanvas) return;
+    const canvases = [staticCanvasRef.current, overlayCanvasRef.current, liveCanvasRef.current];
+    if (!container || !page || canvases.some((c) => !c)) return;
     const cssWidth = container.clientWidth;
+    const cssAvailHeight = container.clientHeight;
     if (cssWidth <= 0) return;
-    // The page keeps the logical sheet's aspect ratio, so it may stand taller
-    // than the container, which then scrolls.
-    const cssHeight = (cssWidth / SCRATCH_PAD_LOGICAL_WIDTH) * pageHeight;
+    const bounds = strokeBounds(localStrokesRef.current);
+    const needW = bounds ? Math.ceil((bounds.maxX + 40) / 50) * 50 : 0;
+    const logicalW = Math.min(
+      MAX_LOGICAL_WIDTH,
+      Math.max(SCRATCH_PAD_LOGICAL_WIDTH, needW, Math.ceil(cssWidth / INK_SCALE / 50) * 50),
+    );
+    const scale = cssWidth / logicalW;
+    // Never shorter than the window: a tall window gets a taller sheet, so
+    // there is no dead strip under the paper.
+    const logicalH = Math.max(pageHeight, Math.floor(cssAvailHeight / scale));
+    const cssHeight = logicalH * scale;
+    dimsRef.current = { w: logicalW, h: logicalH, scale };
     const dpr = window.devicePixelRatio || 1;
     page.style.height = `${cssHeight}px`;
-    for (const canvas of [staticCanvas, liveCanvas]) {
+    for (const canvas of canvases as HTMLCanvasElement[]) {
       canvas.width = Math.max(1, Math.round(cssWidth * dpr));
       canvas.height = Math.max(1, Math.round(cssHeight * dpr));
       canvas.style.width = `${cssWidth}px`;
       canvas.style.height = `${cssHeight}px`;
-      const ctx = canvas.getContext("2d");
+      const ctx = ctxOf(canvas);
       if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
-    paintStaticRef.current();
-    // Resizing wiped the live layer too, so an in-progress stroke is redrawn
-    // from its start.
-    liveProgressRef.current = { nextControl: 1, lastMid: null };
-    for (const gesture of gesturesRef.current.values()) {
-      if (gesture.kind === "draw") extendLive(gesture.points);
-    }
+    paintedRef.current = null;
+    paintStatic();
+    renderLive();
+    drawOverlay();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageHeight]);
+  }, [pageHeight, paintStatic]);
 
   const applySizeRef = useRef(applySize);
   useEffect(() => {
@@ -487,7 +712,7 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
+    if (!container) return undefined;
     let timer: number | null = null;
     const observer = new ResizeObserver(() => {
       if (timer != null) window.clearTimeout(timer);
@@ -506,12 +731,24 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     applySizeRef.current();
   }, [pageHeight]);
 
+  // Ink that reaches past the page's right edge (a drawing from a wider
+  // window) widens the logical page so it is not cropped on a narrow one.
+  const rightEdge = useMemo(() => strokeBounds(localStrokes)?.maxX ?? 0, [localStrokes]);
+  useEffect(() => {
+    if (rightEdge + 40 > dimsRef.current.w) applySizeRef.current();
+  }, [rightEdge]);
+
   // useLayoutEffect, not useEffect: a finished stroke is cleared from the live
   // layer synchronously, so the static layer has to pick it up before the
   // browser paints. On useEffect the stroke would blink out for one frame.
   useLayoutEffect(() => {
     paintStatic();
-  }, [paintStatic]);
+  }, [localStrokes, paintStatic]);
+
+  useLayoutEffect(() => {
+    drawOverlay();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, localStrokes]);
 
   function eraseAt(pointerId: number, clientX: number, clientY: number) {
     const gesture = gesturesRef.current.get(pointerId);
@@ -524,6 +761,33 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     }
   }
 
+  // ── Selection actions ───────────────────────────────────────────────────
+
+  function deleteSelection() {
+    const sel = selectedRef.current;
+    if (sel.length === 0) return;
+    const prev = localStrokesRef.current;
+    pushHistory(prev);
+    commitStrokes(prev.filter((s) => !sel.includes(s)));
+    setSelection([]);
+  }
+
+  function duplicateSelection() {
+    const sel = selectedRef.current;
+    if (sel.length === 0) return;
+    const prev = localStrokesRef.current;
+    if (prev.length + sel.length > MAX_STROKES_PER_QUESTION) {
+      setNotice("The page is full. Erase something before duplicating.");
+      return;
+    }
+    const copies = sel.map((s) => translateStroke(s, DUPLICATE_OFFSET, DUPLICATE_OFFSET));
+    const b = strokeBounds(copies);
+    if (b) ensureHeight(b.maxY);
+    pushHistory(prev);
+    commitStrokes([...prev, ...copies]);
+    setSelection(copies);
+  }
+
   // Closes out one pointer's gesture, committing whatever it produced. Used
   // both on a normal pointerup and to recover a gesture whose pointerup the
   // device never delivered (an occasional real failure for stylus input).
@@ -531,14 +795,69 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     const gesture = gesturesRef.current.get(pointerId);
     if (!gesture) return;
     gesturesRef.current.delete(pointerId);
+    const prev = localStrokesRef.current;
+    const { w, scale } = dimsRef.current;
 
     if (gesture.kind === "scroll") return;
 
     if (gesture.kind === "erase") {
       if (gesture.remaining.length !== gesture.snapshot.length) {
-        setHistory((h) => [...h, gesture.snapshot]);
+        pushHistory(gesture.snapshot);
         commitStrokes(gesture.remaining);
+        setSelection([]);
       }
+      return;
+    }
+
+    if (gesture.kind === "move" || gesture.kind === "scale") {
+      const moved =
+        gesture.kind === "move"
+          ? Math.abs(gesture.dx) + Math.abs(gesture.dy) >= 1
+          : Math.abs(gesture.factor - 1) > 0.005;
+      if (!moved) {
+        paintStatic();
+        drawOverlay();
+        return;
+      }
+      const clampX = (v: number) => Math.max(0, Math.min(w, v));
+      const transformed = gesture.base.map((s) => {
+        const t =
+          gesture.kind === "move"
+            ? translateStroke(s, gesture.dx, gesture.dy)
+            : scaleStroke(s, gesture.ax, gesture.ay, gesture.factor);
+        return { points: t.points.map((v, i) => (i % 2 === 0 ? clampX(v) : Math.max(0, v))) };
+      });
+      const b = strokeBounds(transformed);
+      if (b) ensureHeight(b.maxY);
+      pushHistory(prev);
+      commitStrokes(prev.map((s) => {
+        const i = gesture.base.indexOf(s);
+        return i >= 0 ? transformed[i] : s;
+      }));
+      setSelection(transformed);
+      return;
+    }
+
+    if (gesture.kind === "select") {
+      const p = gesture.points;
+      // The extent of what was drawn, not first-to-last distance: a closed
+      // lasso ends where it began and would otherwise read as a tap.
+      let extent = 0;
+      for (let i = 2; i < p.length; i += 2) extent = Math.max(extent, Math.hypot(p[i] - p[0], p[i + 1] - p[1]));
+      let picked: Stroke[] = [];
+      if (extent * scale < 6) {
+        // A tap: pick the stroke under the finger, if any.
+        for (let i = prev.length - 1; i >= 0; i--) {
+          if (strokeHit(prev[i].points, p[0], p[1], 10 / scale)) {
+            picked = [prev[i]];
+            break;
+          }
+        }
+      } else {
+        picked = strokesInShape(prev, gesture.mode, p);
+      }
+      setSelection(picked);
+      drawOverlay();
       return;
     }
 
@@ -546,9 +865,9 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
       clearLive();
       return; // a tap, not a stroke
     }
-    const simplified = simplifyStroke(gesture.points);
-    const next = [...localStrokes, { points: simplified }].slice(-MAX_STROKES_PER_QUESTION);
-    setHistory((h) => [...h, localStrokes]);
+    const simplified = roundPoints(simplifyStroke(gesture.points, SIMPLIFY_EPSILON));
+    const next = [...prev, { points: simplified }].slice(-MAX_STROKES_PER_QUESTION);
+    pushHistory(prev);
     // The static layer picks this stroke up on the very next paint, which
     // React commits synchronously from local state, so clearing the live layer
     // here does not leave a visible gap.
@@ -596,21 +915,61 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     const canvas = liveCanvasRef.current;
     if (!canvas) return;
     canvas.setPointerCapture(e.pointerId);
+    const list = localStrokesRef.current;
 
     if (erasing) {
       gesturesRef.current.set(e.pointerId, {
         kind: "erase",
         pointerId: e.pointerId,
-        snapshot: localStrokes,
-        remaining: localStrokes,
+        snapshot: list,
+        remaining: list,
       });
       eraseAt(e.pointerId, e.clientX, e.clientY);
       return;
     }
 
+    if (tool === "select") {
+      const [x, y] = toLogical(e.clientX, e.clientY);
+      const { scale } = dimsRef.current;
+      const sel = selectedRef.current;
+      const b = sel.length ? strokeBounds(sel) : null;
+      if (b) {
+        const pad = SELECT_PAD_PX / scale;
+        const corners: [number, number][] = [
+          [b.minX - pad, b.minY - pad],
+          [b.maxX + pad, b.minY - pad],
+          [b.maxX + pad, b.maxY + pad],
+          [b.minX - pad, b.maxY + pad],
+        ];
+        const hit = corners.findIndex(([cx, cy]) => Math.hypot(cx - x, cy - y) <= HANDLE_HIT_PX / scale);
+        const rest = list.filter((s) => !sel.includes(s));
+        if (hit >= 0) {
+          const [ax, ay] = corners[(hit + 2) % 4];
+          const startDist = Math.hypot(corners[hit][0] - ax, corners[hit][1] - ay) || 1;
+          gesturesRef.current.set(e.pointerId, {
+            kind: "scale", pointerId: e.pointerId, ax, ay, startDist, base: sel, rest, factor: 1,
+          });
+          paintStatic(rest);
+          drawOverlay();
+          return;
+        }
+        if (x >= b.minX - pad && x <= b.maxX + pad && y >= b.minY - pad && y <= b.maxY + pad) {
+          gesturesRef.current.set(e.pointerId, {
+            kind: "move", pointerId: e.pointerId, startX: x, startY: y, base: sel, rest, dx: 0, dy: 0,
+          });
+          paintStatic(rest);
+          drawOverlay();
+          return;
+        }
+      }
+      setSelection([]);
+      gesturesRef.current.set(e.pointerId, { kind: "select", pointerId: e.pointerId, mode: selectMode, points: [x, y] });
+      return;
+    }
+
     clearLive();
     const [x, y] = toLogical(e.clientX, e.clientY);
-    gesturesRef.current.set(e.pointerId, { kind: "draw", pointerId: e.pointerId, points: [x, y] });
+    gesturesRef.current.set(e.pointerId, { kind: "draw", pointerId: e.pointerId, points: [x, y], predicted: [] });
   }
 
   function handlePointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -628,17 +987,68 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
       return;
     }
 
+    const canvas = liveCanvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+
+    if (gesture.kind === "move") {
+      const [x, y] = toLogicalIn(rect, e.clientX, e.clientY);
+      const b = strokeBounds(gesture.base);
+      const { w } = dimsRef.current;
+      let dx = x - gesture.startX;
+      let dy = y - gesture.startY;
+      if (b) {
+        dx = Math.max(-b.minX, Math.min(w - b.maxX, dx));
+        dy = Math.max(-b.minY, dy);
+      }
+      gesture.dx = dx;
+      gesture.dy = dy;
+      scheduleFrame();
+      return;
+    }
+
+    if (gesture.kind === "scale") {
+      const [x, y] = toLogicalIn(rect, e.clientX, e.clientY);
+      gesture.factor = Math.max(0.1, Math.min(10, Math.hypot(x - gesture.ax, y - gesture.ay) / gesture.startDist));
+      scheduleFrame();
+      return;
+    }
+
     // getCoalescedEvents returns every sample the browser batched since the
     // last frame. Keeping them is what stops fast writing from coming out
     // sparse and angular, which then transcribes badly.
     const native = e.nativeEvent;
     const events = typeof native.getCoalescedEvents === "function" ? native.getCoalescedEvents() : [];
+
+    if (gesture.kind === "select") {
+      const [x, y] = toLogicalIn(rect, e.clientX, e.clientY);
+      if (gesture.mode === "box") {
+        gesture.points = [gesture.points[0], gesture.points[1], x, y];
+      } else {
+        for (const evt of events.length ? events : [native]) {
+          const [lx, ly] = toLogicalIn(rect, evt.clientX, evt.clientY);
+          gesture.points.push(lx, ly);
+        }
+      }
+      scheduleFrame();
+      return;
+    }
+
     for (const evt of events.length ? events : [native]) {
       if (gesture.points.length >= MAX_POINTS_PER_STROKE * 2) break;
-      const [x, y] = toLogical(evt.clientX, evt.clientY);
+      const [x, y] = toLogicalIn(rect, evt.clientX, evt.clientY);
       gesture.points.push(x, y);
     }
-    scheduleLive();
+    // Where the pen is about to be, as predicted by the browser. Drawn for this
+    // frame only and never stored, so a wrong guess costs nothing.
+    gesture.predicted = [];
+    if (typeof native.getPredictedEvents === "function") {
+      for (const evt of native.getPredictedEvents().slice(0, 2)) {
+        const [x, y] = toLogicalIn(rect, evt.clientX, evt.clientY);
+        gesture.predicted.push(x, y);
+      }
+    }
+    scheduleFrame();
   }
 
   function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -649,23 +1059,32 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     const gesture = gesturesRef.current.get(e.pointerId);
     if (!gesture) return;
     gesturesRef.current.delete(e.pointerId);
-    // An abandoned erase drag has been previewing its result on the static
-    // layer without committing it, so the real strokes have to be put back.
-    if (gesture.kind === "erase") paintStatic();
+    // An abandoned erase, move or resize has been previewing its result on the
+    // static layer without committing it, so the real strokes are put back.
+    if (gesture.kind === "erase" || gesture.kind === "move" || gesture.kind === "scale") paintStatic();
     else if (gesture.kind === "draw") clearLive();
+    drawOverlay();
   }
 
   function undo() {
-    if (history.length === 0) return;
     const prev = history[history.length - 1];
+    if (!prev) return;
     setHistory((h) => h.slice(0, -1));
     commitStrokes(prev);
+    setSelection([]);
   }
 
   function clearAll() {
-    if (localStrokes.length === 0) return;
-    setHistory((h) => [...h, localStrokes]);
+    if (localStrokesRef.current.length === 0) return;
+    pushHistory(localStrokesRef.current);
     commitStrokes([]);
+    setSelection([]);
+  }
+
+  function chooseTool(next: Tool, mode?: SelectMode) {
+    if (mode) setSelectMode(mode);
+    setTool(next);
+    if (next !== "select") setSelection([]);
   }
 
   function toggleFingerDraw() {
@@ -688,26 +1107,162 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     );
   }
 
+  // Pasting a picture of handwriting traces it into pen strokes, below
+  // whatever is already on the page (see lib/inkTrace.ts).
+  async function importImage(file: Blob) {
+    setNotice("Tracing your image...");
+    try {
+      const bitmap = await createImageBitmap(file);
+      const down = Math.min(1, 1100 / Math.max(bitmap.width, bitmap.height));
+      const w = Math.max(1, Math.round(bitmap.width * down));
+      const h = Math.max(1, Math.round(bitmap.height * down));
+      const surface = document.createElement("canvas");
+      surface.width = w;
+      surface.height = h;
+      const ctx = surface.getContext("2d", { willReadFrequently: true });
+      if (!ctx) throw new Error("no canvas");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(bitmap, 0, 0, w, h);
+      bitmap.close();
+      const image = ctx.getImageData(0, 0, w, h);
+      // Let the notice paint before the tracer holds the thread.
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+      const traced = traceInk({ data: image.data, width: w, height: h });
+      if (traced.strokes.length === 0) {
+        setNotice("Couldn't find any writing in that image.");
+        return;
+      }
+      const prev = localStrokesRef.current;
+      const { w: pageW } = dimsRef.current;
+      const startY = (strokeBounds(prev)?.maxY ?? 0) + 40;
+      const fit = Math.min(2, ((pageW - 80) * 0.6) / traced.width, (MAX_LOGICAL_HEIGHT - 120 - startY) / traced.height);
+      if (fit < 0.25) {
+        setNotice("There isn't enough room left on the page for that image.");
+        return;
+      }
+      const imported = traced.strokes.map((points) => ({
+        points: points.map((v, i) => round1(i % 2 === 0 ? 40 + v * fit : startY + v * fit)),
+      }));
+      const next = [...prev, ...imported];
+      if (next.length > MAX_STROKES_PER_QUESTION || JSON.stringify({ version: 1, strokes: next }).length > MAX_STROKES_JSON_CHARS) {
+        setNotice("That image is too detailed to add. Crop it to the part you need.");
+        return;
+      }
+      ensureHeight(startY + traced.height * fit);
+      pushHistory(prev);
+      commitStrokes(next);
+      // Straight into select mode, so the new ink can be dragged into place or
+      // resized right away.
+      setTool("select");
+      setSelection(imported);
+      setNotice("Added your image as ink. Drag it into place or resize it with the corners.");
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          const container = containerRef.current;
+          if (container) container.scrollTo({ top: Math.max(0, (startY - 40) * dimsRef.current.scale), behavior: "smooth" });
+        }),
+      );
+    } catch {
+      setNotice("Couldn't read that image.");
+    }
+  }
+
+  // Window-level handlers need the latest closures but are attached once.
+  const actionsRef = useRef({ deleteSelection, undo, importImage, setSelection });
+  actionsRef.current = { deleteSelection, undo, importImage, setSelection };
+
+  useEffect(() => {
+    const typingTarget = (t: EventTarget | null) => {
+      const el = t as HTMLElement | null;
+      return !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+    };
+    function onKey(e: KeyboardEvent) {
+      if (typingTarget(e.target)) return;
+      const hasSelection = selectedRef.current.length > 0;
+      if ((e.key === "Delete" || e.key === "Backspace") && hasSelection) {
+        e.preventDefault();
+        actionsRef.current.deleteSelection();
+      } else if (e.key === "Escape" && hasSelection) {
+        // Clears the selection without also closing the whole pad.
+        e.stopImmediatePropagation();
+        actionsRef.current.setSelection([]);
+      } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        actionsRef.current.undo();
+      }
+    }
+    function onPaste(e: ClipboardEvent) {
+      if (typingTarget(e.target)) return;
+      for (const item of Array.from(e.clipboardData?.items ?? [])) {
+        if (!item.type.startsWith("image/")) continue;
+        const file = item.getAsFile();
+        if (!file) continue;
+        e.preventDefault();
+        void actionsRef.current.importImage(file);
+        return;
+      }
+    }
+    // Capture phase, so Escape can be claimed before the modal's own handler.
+    window.addEventListener("keydown", onKey, true);
+    window.addEventListener("paste", onPaste);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("paste", onPaste);
+    };
+  }, []);
+
   const paperClass =
     paperStyle === "lined" ? "scratchpad-paper-lined" : paperStyle === "graph" ? "scratchpad-paper-graph" : "scratchpad-paper-blank";
   const atMaxHeight = pageHeight >= MAX_LOGICAL_HEIGHT;
+  const hasSelection = selected.length > 0;
 
   return (
     <div className="scratchpad-canvas-wrap">
       <div className="scratchpad-canvas-toolbar">
-        <button type="button" className="scratchpad-tool-btn" onClick={undo} disabled={history.length === 0} aria-label="Undo last stroke" title="Undo">
+        <button type="button" className="scratchpad-tool-btn" onClick={undo} disabled={history.length === 0} aria-label="Undo" title="Undo (Ctrl+Z)">
           <Undo2 size={16} />
         </button>
         <button
           type="button"
           className={`scratchpad-tool-btn${tool === "erase" ? " is-active" : ""}`}
-          onClick={() => setTool((t) => (t === "erase" ? "pen" : "erase"))}
+          onClick={() => chooseTool(tool === "erase" ? "pen" : "erase")}
           aria-pressed={tool === "erase"}
           aria-label="Erase individual strokes"
           title="Erase individual strokes"
         >
           <Eraser size={16} />
         </button>
+        <button
+          type="button"
+          className={`scratchpad-tool-btn${tool === "select" && selectMode === "lasso" ? " is-active" : ""}`}
+          onClick={() => chooseTool(tool === "select" && selectMode === "lasso" ? "pen" : "select", "lasso")}
+          aria-pressed={tool === "select" && selectMode === "lasso"}
+          aria-label="Select freehand"
+          title="Select freehand: draw around the writing"
+        >
+          <LassoSelect size={16} />
+        </button>
+        <button
+          type="button"
+          className={`scratchpad-tool-btn${tool === "select" && selectMode === "box" ? " is-active" : ""}`}
+          onClick={() => chooseTool(tool === "select" && selectMode === "box" ? "pen" : "select", "box")}
+          aria-pressed={tool === "select" && selectMode === "box"}
+          aria-label="Select a box"
+          title="Select a box: drag a rectangle"
+        >
+          <BoxSelect size={16} />
+        </button>
+        {hasSelection ? (
+          <>
+            <button type="button" className="scratchpad-tool-btn" onClick={duplicateSelection} aria-label="Duplicate selection" title="Duplicate">
+              <Copy size={16} />
+            </button>
+            <button type="button" className="scratchpad-tool-btn" onClick={deleteSelection} aria-label="Delete selection" title="Delete selection (Del)">
+              <Delete size={16} />
+            </button>
+          </>
+        ) : null}
         <button
           type="button"
           className="scratchpad-tool-btn"
@@ -729,14 +1284,20 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
           {allowFingerDraw ? "Draw with finger" : "Finger scrolls"}
         </button>
       </div>
+      {notice ? (
+        <p className="scratchpad-notice" role="status">
+          {notice}
+        </p>
+      ) : null}
       <div ref={containerRef} className={`scratchpad-canvas-container ${paperClass}`}>
         <div ref={pageRef} className="scratchpad-page">
           <canvas ref={staticCanvasRef} className="scratchpad-canvas scratchpad-canvas--static" aria-hidden="true" />
+          <canvas ref={overlayCanvasRef} className="scratchpad-canvas scratchpad-canvas--overlay" aria-hidden="true" />
           <canvas
             ref={liveCanvasRef}
             className={`scratchpad-canvas scratchpad-canvas--live${tool === "erase" ? " is-erasing" : ""}${
-              allowFingerDraw ? "" : " allows-scroll"
-            }`}
+              tool === "select" ? " is-selecting" : ""
+            }${allowFingerDraw ? "" : " allows-scroll"}`}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}

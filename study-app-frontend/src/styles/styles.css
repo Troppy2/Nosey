@@ -24064,8 +24064,13 @@ button.lc-official-link:disabled:hover {
   height: min(760px, 92vh);
 }
 .scratchpad-modal--full {
-  width: 96vw;
-  height: 94vh;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  border-radius: 0;
+}
+.scratchpad-backdrop:has(.scratchpad-modal--full) {
+  padding: 0;
 }
 
 .scratchpad-header {
@@ -24288,6 +24293,23 @@ button.lc-official-link:disabled:hover {
 }
 .scratchpad-canvas--live.is-erasing {
   cursor: cell;
+}
+.scratchpad-canvas--live.is-selecting {
+  cursor: crosshair;
+}
+/* Selection chrome and the preview of a selection being moved or resized.
+   Never receives input; the live layer above it does. */
+.scratchpad-canvas--overlay {
+  pointer-events: none;
+}
+.scratchpad-notice {
+  margin: 0;
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--radius-md);
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light-mid);
+  color: var(--green-dark);
+  font-size: 0.82rem;
 }
 /* Paper styles are CSS decoration behind a transparent canvas only. The
    exported PNG is strokes composited on a fresh white background (see
