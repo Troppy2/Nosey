@@ -18,7 +18,7 @@ from src.main import app
 from src.models.folder import Folder
 from src.models.folder_file import FolderFile
 from src.models.user import User
-from src.routes import folder_files
+from src.routes import folder_files, practice_problems
 from src.services import file_service
 from src.services.file_service import ExtractionResult, FileService, ParseProgress, ParseTimeoutError
 from src.utils.exceptions import ValidationException
@@ -531,3 +531,113 @@ async def test_sections_endpoint_waits_for_the_parse(client, seeded, db_session_
     response = await client.get(f"/folders/{seeded.folder_id}/files/{file_id}/sections")
 
     assert response.status_code == 409
+
+
+# --- practice test problem picker (GH #138) -------------------------------------------
+
+_WORKSHEET = (
+    "# Chapter 1\n\n### 1.1 Vector equations PRIORITY\n\nIs (1, 2) = (2, 1)?\n\n"
+    "### 1.2 Overloading\n\nWhich expressions are correct?\n(a) b = (0, a).\n(b) a = (0, b).\n"
+)
+
+
+async def test_problems_endpoint_lists_problems(client, seeded, db_session_maker) -> None:
+    file_id = await _add_row(db_session_maker, seeded.folder_id, upload_status="ready", content=_WORKSHEET)
+
+    response = await client.get(f"/folders/{seeded.folder_id}/files/{file_id}/problems")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source"] == "headings"
+    assert [(p["label"], p["title"], p["chapter"], p["part_count"]) for p in body["problems"]] == [
+        ("1.1", "Vector equations", "Chapter 1", 0),
+        ("1.2", "Overloading", "Chapter 1", 2),
+    ]
+
+
+async def test_problems_endpoint_falls_back_to_the_ai_index(client, seeded, db_session_maker, monkeypatch) -> None:
+    text = "Tell me about photosynthesis in plants.\n\nNow explain the Krebs cycle in detail.\n"
+    file_id = await _add_row(db_session_maker, seeded.folder_id, upload_status="ready", content=text)
+
+    async def fake_index(self, content, provider=None):
+        return [(0, "Q1", "Photosynthesis"), (content.index("Now explain"), "Q2", "Krebs cycle")]
+
+    monkeypatch.setattr(practice_problems.LLMService, "index_practice_problems", fake_index)
+    response = await client.get(f"/folders/{seeded.folder_id}/files/{file_id}/problems")
+
+    body = response.json()
+    assert body["source"] == "ai"
+    assert [p["label"] for p in body["problems"]] == ["Q1", "Q2"]
+
+
+async def test_parse_problems_reads_only_the_picked_ranges(client, seeded, db_session_maker, monkeypatch) -> None:
+    from src.services.llm_service import GeneratedFRQ
+
+    file_id = await _add_row(db_session_maker, seeded.folder_id, upload_status="ready", content=_WORKSHEET)
+    problems = (await client.get(f"/folders/{seeded.folder_id}/files/{file_id}/problems")).json()["problems"]
+    seen: list = []
+
+    async def fake_parse(self, items, answer_key="", provider=None):
+        seen.extend(items)
+        return {items[0][0]: ([], [GeneratedFRQ("Is (1, 2) = (2, 1)?", "False", True)])}
+
+    async def fake_solve(self, mcq, frq, context=""):
+        # The review shows the solved answer, so Generate never solves again.
+        from dataclasses import replace
+
+        return mcq, [replace(q, expected_answer="False: order matters") for q in frq]
+
+    monkeypatch.setattr(practice_problems.LLMService, "parse_practice_problems", fake_parse)
+    monkeypatch.setattr(practice_problems.LLMService, "_solve_keyless_questions", fake_solve)
+    picked = problems[0]
+    response = await client.post(
+        f"/folders/{seeded.folder_id}/files/{file_id}/problems/parse",
+        json={"problems": [{"index": 0, "label": "1.1", "start": picked["start"], "end": picked["end"]}]},
+    )
+
+    assert response.status_code == 200
+    assert len(seen) == 1 and "Overloading" not in seen[0][2] and "PRIORITY" not in seen[0][2]
+    parsed = response.json()["problems"][0]
+    assert parsed["questions"][0]["kind"] == "frq"
+    assert parsed["questions"][0]["answer_inferred"] is True
+    assert parsed["questions"][0]["expected_answer"] == "False: order matters"
+
+
+async def test_parse_problems_rejects_a_range_outside_the_file(client, seeded, db_session_maker) -> None:
+    file_id = await _add_row(db_session_maker, seeded.folder_id, upload_status="ready", content=_WORKSHEET)
+
+    response = await client.post(
+        f"/folders/{seeded.folder_id}/files/{file_id}/problems/parse",
+        json={"problems": [{"index": 0, "start": 0, "end": 99_999}]},
+    )
+
+    assert response.status_code == 400
+
+
+async def test_fix_problem_returns_the_redone_questions(client, seeded, db_session_maker, monkeypatch) -> None:
+    from src.services.llm_service import GeneratedMCQ
+
+    file_id = await _add_row(db_session_maker, seeded.folder_id, upload_status="ready", content=_WORKSHEET)
+    got: dict = {}
+
+    async def fake_fix(self, source, current, message, answer_key="", provider=None):
+        got.update(source=source, current=current, message=message)
+        return [GeneratedMCQ("Is (1, 2) = (2, 1)?", ["True", "False"], 1, True)], []
+
+    async def fake_solve(self, mcq, frq, context=""):
+        return mcq, frq
+
+    monkeypatch.setattr(practice_problems.LLMService, "fix_practice_problem", fake_fix)
+    monkeypatch.setattr(practice_problems.LLMService, "_solve_keyless_questions", fake_solve)
+    response = await client.post(
+        f"/folders/{seeded.folder_id}/files/{file_id}/problems/fix",
+        json={
+            "start": 0, "end": _WORKSHEET.index("### 1.2"),
+            "current": [{"kind": "frq", "question_text": "Is (1, 2)?", "expected_answer": "No"}],
+            "message": "make it true/false",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["questions"][0]["options"] == ["True", "False"]
+    assert got["message"] == "make it true/false" and "Answer: No" in got["current"]

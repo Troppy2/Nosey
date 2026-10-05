@@ -288,3 +288,44 @@ class TestGenerateQuestionsBackgroundVerificationWiring:
                     custom_instructions=None, provider=None, enable_fallback=True,
                 )
             assert fake_verify.call_args.kwargs["variant"] == expected_variant
+
+
+class TestReviewedPracticeQuestions:
+
+    async def test_reviewed_questions_are_saved_without_any_llm_call(self, db_session_maker, monkeypatch):
+        """GH #138: answers were solved in the review step, so Generate only saves."""
+        from sqlalchemy import func, select
+
+        from src.models.question import Question
+        from src.routes.tests import _generate_questions_background
+
+        monkeypatch.setattr("src.routes.tests.settings.mcq_verification_enabled", True)
+        test_id = await _seed_bare_test(db_session_maker, test_type="mixed")
+        llm = _make_llm_mock(_fake_generate_test_questions())
+        llm._solve_keyless_questions = AsyncMock()
+        reviewed = ([GeneratedMCQ("Is 2 prime?", ["Yes", "No"], 0, True)], [GeneratedFRQ("Define a norm.", "A length.", True)])
+
+        with (
+            patch("src.routes.tests.async_session_maker", db_session_maker),
+            patch("src.routes.tests.LLMService", return_value=llm),
+            patch("src.routes.tests._verify_persisted_mcqs", new=AsyncMock()) as fake_verify,
+        ):
+            await _generate_questions_background(
+                test_id=test_id, user_id=1, notes_content="",
+                practice_test_content="1.1 Is 2 prime?", test_type="mixed",
+                count_mcq=10, count_frq=5, is_math_mode=False, difficulty="mixed",
+                topic_focus=None, is_coding_mode=False, coding_language=None,
+                custom_instructions=None, provider=None, enable_fallback=True,
+                practice_test_mode="recreate", reviewed_questions=reviewed,
+            )
+
+        llm._solve_keyless_questions.assert_not_awaited()
+        llm.parse_practice_test.assert_not_awaited()
+        fake_verify.assert_not_awaited()
+        async with db_session_maker() as session:
+            test = await session.get(TestRow, test_id)
+            assert test.generation_status == "ready"
+            count = await session.scalar(
+                select(func.count()).select_from(Question).where(Question.test_id == test_id)
+            )
+            assert count == 2

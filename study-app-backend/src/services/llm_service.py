@@ -410,6 +410,24 @@ _NON_ANSWER_RE = re.compile(
     r"cannot be determined from the (given|provided)|no (question|problem) (text|statement)",
     re.IGNORECASE,
 )
+# Rules every practice-test extraction prompt shares (GH #138).
+_PRACTICE_SHARED_RULES = (
+    "- Leave out worksheet labels and annotations that are not part of the question: priority or "
+    "status tags (PRIORITY, SEEN IN HW, OPTIONAL), source notes (\"Course HW / Discussion\"), page "
+    "headers and footers, page numbers.\n"
+    "- A question is multiple choice ONLY when the document itself lists its answer options. Never "
+    "invent options, and never output the same question as both multiple choice and written.\n"
+    "- Math: write it in LaTeX between $...$ (inline) or $$...$$ (display). The text came from a PDF and "
+    "math may be garbled (\"x [T]\" is $x^T$, \"R [3]\" is $\\mathbb{R}^3$, \"y ˆ\" is $\\hat{y}$); "
+    "restore what was meant.\n"
+)
+# The per-problem parse groups whole problems into calls up to this size.
+_PRACTICE_PROBLEM_BATCH_CHARS = 8_000
+_PRACTICE_PROBLEM_MAX = 150
+# The AI index pass (documents with no recognizable problem headings) reads
+# this much text per call and returns where each problem starts.
+_PRACTICE_INDEX_CHUNK_CHARS = 16_000
+_PRACTICE_INDEX_MAX_CHUNKS = 8
 _NO_PRACTICE_QUESTIONS_MESSAGE = (
     "No questions were found in that practice test. If it is a scanned PDF, its text can't be read yet."
 )
@@ -481,6 +499,38 @@ def _practice_dedup_key(question: str, options: Optional[list[str]] = None) -> s
 
     # Options are part of the key: tests repeat stems like "Which is true?".
     return norm(question) + "|" + "|".join(norm(o) for o in options or [])
+
+
+def _practice_norm(value: str) -> str:
+    return re.sub(r"[\W_]+", " ", value or "").strip().lower()
+
+
+# Two chunks that both saw a question in their overlap word it a little
+# differently, so exact keys miss the copy (GH #138: 4.2 and 4.3 twice).
+_PRACTICE_NEAR_DUPLICATE_RATIO = 0.9
+
+
+def _is_near_duplicate(text: str, kept: list[str]) -> bool:
+    """Same question reworded. Numbers must match exactly: "Compute 3 + 4" and
+    "Compute 3 + 5" are two questions however similar the rest is."""
+    norm = _practice_norm(text)
+    numbers = re.findall(r"\d+", norm)
+    for other in kept:
+        if norm == other:
+            return True
+        if re.findall(r"\d+", other) != numbers:
+            continue
+        if abs(len(norm) - len(other)) > max(len(norm), len(other)) * 0.15:
+            continue
+        if difflib.SequenceMatcher(None, norm, other, autojunk=False).ratio() >= _PRACTICE_NEAR_DUPLICATE_RATIO:
+            return True
+    return False
+
+
+def _drop_mcq_twins(mcq: list[GeneratedMCQ], frq: list[GeneratedFRQ]) -> list[GeneratedMCQ]:
+    """MCQs whose stem is also a written question: one problem parsed as both."""
+    stems = [_practice_norm(q.question_text) for q in frq]
+    return [q for q in mcq if not _is_near_duplicate(q.question_text, stems)]
 _GENERATE_CHAR_LIMIT = 8_000
 # Per-type cap for the beta extra question types (TF / Multiple Select / Ranking).
 # Kept low so the extra-types JSON stays well within the token budget; the existing
@@ -1355,28 +1405,22 @@ class LLMService:
 
         mcq: list[GeneratedMCQ] = []
         frq: list[GeneratedFRQ] = []
-        seen: set[str] = set()
+        seen_mcq: list[str] = []
+        seen_frq: list[str] = []
         for data in results:
             if data is None:
                 continue
-            mcq_raw = data.get("mcq")
-            for item in mcq_raw if isinstance(mcq_raw, list) else []:
-                question = self._parsed_practice_mcq(item)
-                if question is None:
-                    continue
+            chunk_mcq, chunk_frq = self._practice_items(data)
+            for question in chunk_mcq:
                 key = _practice_dedup_key(question.question_text, question.options)
-                if key not in seen:
-                    seen.add(key)
+                if not _is_near_duplicate(key, seen_mcq):
+                    seen_mcq.append(_practice_norm(key))
                     mcq.append(question)
-            frq_raw = data.get("frq")
-            for item in frq_raw if isinstance(frq_raw, list) else []:
-                question = self._parsed_practice_frq(item)
-                if question is None:
-                    continue
-                key = _practice_dedup_key(question.question_text)
-                if key not in seen:
-                    seen.add(key)
+            for question in chunk_frq:
+                if not _is_near_duplicate(question.question_text, seen_frq):
+                    seen_frq.append(_practice_norm(question.question_text))
                     frq.append(question)
+        mcq = _drop_mcq_twins(mcq, frq)
 
         failed_chunks = sum(1 for data in results if data is None)
         if failed_chunks == len(chunks):
@@ -1400,6 +1444,212 @@ class LLMService:
             len(chunks), failed_chunks,
         )
         return kept_mcq, kept_frq
+
+    def _practice_items(
+        self, data: dict[str, object]
+    ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
+        """The usable MCQ/FRQ in one extraction reply, minus MCQ copies of written ones."""
+        mcq_raw = data.get("mcq")
+        frq_raw = data.get("frq")
+        mcq = [
+            q for item in (mcq_raw if isinstance(mcq_raw, list) else [])
+            if (q := self._parsed_practice_mcq(item)) is not None
+        ]
+        frq = [
+            q for item in (frq_raw if isinstance(frq_raw, list) else [])
+            if (q := self._parsed_practice_frq(item)) is not None
+        ]
+        return _drop_mcq_twins(mcq, frq), frq
+
+    @staticmethod
+    def _practice_problem_rules(answer_key: str) -> str:
+        key_block = (
+            f"ANSWER KEY FROM THE DOCUMENT (use it for the answers):\n{answer_key[:_PRACTICE_ANSWER_KEY_CHARS]}\n\n"
+            if answer_key
+            else ""
+        )
+        return (
+            f"{key_block}"
+            "Rules:\n"
+            "- Copy each question's wording exactly, including any passage, code, table, or data it needs.\n"
+            "- Multiple choice: keep ALL of its answer options in their original order (2 to 6), without "
+            "letter labels.\n"
+            '- True/false: a multiple choice question with options ["True", "False"].\n'
+            "- A problem with lettered parts (a), (b): one written question per part, each starting with "
+            "the setup it needs so it reads on its own. A problem with no parts is one question.\n"
+            "- Answers: use the answer key or marked answers when there are any and set "
+            "answer_from_document to true. Otherwise work out the correct answer and set it to false.\n"
+            f"{_PRACTICE_SHARED_RULES}"
+        )
+
+    async def parse_practice_problems(
+        self,
+        problems: list[tuple[int, str, str]],
+        answer_key: str = "",
+        provider: Optional[str] = None,
+    ) -> dict[int, Optional[tuple[list[GeneratedMCQ], list[GeneratedFRQ]]]]:
+        """Recreate only the problems a student picked, keyed by problem index.
+
+        problems: (index, label, text) from practice_problems.split_problems.
+        Whole problems are grouped into calls of about _PRACTICE_PROBLEM_BATCH_CHARS,
+        never cut, so there is no chunk overlap and no cross-chunk duplicate. A
+        bounded loop over the document, not over providers: _complete_json does
+        its own fallback. A problem whose call failed maps to None so the
+        student can retry it from the review step.
+        """
+        problems = problems[:_PRACTICE_PROBLEM_MAX]
+        batches: list[list[tuple[int, str, str]]] = []
+        size = 0
+        for problem in problems:
+            if batches and size + len(problem[2]) <= _PRACTICE_PROBLEM_BATCH_CHARS:
+                batches[-1].append(problem)
+                size += len(problem[2])
+            else:
+                batches.append([problem])
+                size = len(problem[2])
+        gate = asyncio.Semaphore(_PRACTICE_CHUNK_CONCURRENCY)
+        rules = self._practice_problem_rules(answer_key)
+
+        async def parse_batch(batch: list[tuple[int, str, str]]) -> dict[int, object]:
+            blocks = "\n\n".join(f"=== PROBLEM {index} ({label}) ===\n{text}" for index, label, text in batch)
+            prompt = (
+                "You are copying problems out of a student's practice test so they can retake them.\n"
+                "Each problem below starts with a === PROBLEM n === line. Extract every question in each "
+                "problem. Do not write new questions and do not skip any.\n\n"
+                f"{blocks}\n\n{rules}\n"
+                "Return JSON only, one entry per problem:\n"
+                '{"problems": [{"problem": 0, "mcq": [{"question_text": "...", "options": ["...", "..."], '
+                '"correct_index": 0, "answer_from_document": true}], "frq": [{"question_text": "...", '
+                '"expected_answer": "...", "answer_from_document": false}]}]}\n'
+            )
+            async with gate:
+                try:
+                    data = await asyncio.wait_for(
+                        self._complete_json(prompt, provider=provider), _PRACTICE_CHUNK_TIMEOUT_S
+                    )
+                except Exception as exc:
+                    logger.warning("parse_practice_problems batch of %d failed: %s", len(batch), exc)
+                    return {}
+            entries = data.get("problems")
+            return {
+                entry.get("problem"): entry
+                for entry in (entries if isinstance(entries, list) else [])
+                if isinstance(entry, dict)
+            }
+
+        replies = await asyncio.gather(*(parse_batch(b) for b in batches))
+        out: dict[int, Optional[tuple[list[GeneratedMCQ], list[GeneratedFRQ]]]] = {}
+        for batch, reply in zip(batches, replies):
+            for index, _label, text in batch:
+                entry = reply.get(index)
+                if entry is None:
+                    entry = reply.get(str(index))
+                if not isinstance(entry, dict):
+                    out[index] = None
+                    continue
+                mcq, frq = self._practice_items(entry)
+                out[index] = (mcq, frq) if (mcq or frq) else None
+        return out
+
+    async def fix_practice_problem(
+        self,
+        source_text: str,
+        current: str,
+        message: str,
+        answer_key: str = "",
+        provider: Optional[str] = None,
+    ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
+        """Redo one problem from the student's correction.
+
+        message is either an instruction ("part (a) is the column vector
+        (1,2,1)") or the problem pasted in full; the model decides which. One
+        JSON call; _complete_json does the provider fallback.
+        """
+        from src.utils.exceptions import LLMException
+
+        prompt = (
+            "A student is checking how Nosey read one problem from their practice test, and says it is "
+            "wrong.\n\n"
+            f"TEXT EXTRACTED FROM THE PDF (may be garbled):\n{source_text[:12_000]}\n\n"
+            f"NOSEY'S CURRENT VERSION:\n{current[:8_000]}\n\n"
+            f"THE STUDENT'S MESSAGE:\n{message[:8_000]}\n\n"
+            "The message is either a correction to apply, or the problem pasted in full. If it is the "
+            "pasted problem, use it as the true text of the problem and ignore the extracted text where "
+            "they differ. If it is a correction, apply it to the current version and keep everything else, "
+            "including the question type (multiple choice or written) of every part it does not mention. "
+            "The student knows what the problem says: follow the message. If the message gives an "
+            "answer, use it and set answer_from_document to true.\n\n"
+            f"{self._practice_problem_rules(answer_key)}\n"
+            "Return JSON only with keys mcq and frq.\n"
+            'mcq items: {"question_text": "...", "options": ["...", "..."], "correct_index": 0, "answer_from_document": false}\n'
+            'frq items: {"question_text": "...", "expected_answer": "...", "answer_from_document": false}\n'
+        )
+        data = await self._complete_json(prompt, provider=provider)
+        mcq, frq = self._practice_items(data)
+        if not mcq and not frq:
+            raise LLMException("Nosey couldn't redo that problem. Try rewording your fix.")
+        return mcq, frq
+
+    async def index_practice_problems(
+        self, text: str, provider: Optional[str] = None
+    ) -> list[tuple[int, str, str]]:
+        """Where each problem starts, for documents with no problem headings.
+
+        Only an index (label, title, the problem's first words), no cleanup and
+        no answers, so it is a small reply. The first words are found in the
+        text to get offsets; one the model misquoted is dropped.
+        """
+        chunks = [
+            (start, text[start:start + _PRACTICE_INDEX_CHUNK_CHARS])
+            for start in range(0, len(text), _PRACTICE_INDEX_CHUNK_CHARS)
+        ][:_PRACTICE_INDEX_MAX_CHUNKS]
+        gate = asyncio.Semaphore(_PRACTICE_CHUNK_CONCURRENCY)
+
+        async def index_chunk(chunk: str) -> list[object]:
+            prompt = (
+                "List every separate problem or question in this part of a student's practice test, in "
+                "order. Lettered parts (a), (b) belong to their problem and are not listed. Skip the table "
+                "of contents, instructions and answer key.\n\n"
+                f"TEXT:\n{chunk}\n\n"
+                "For each problem give a short label (its number, or Q1, Q2 when unnumbered), a title of at "
+                "most 8 words, and \"starts_with\": the first 6 to 10 words of the problem copied EXACTLY "
+                "from the text.\n"
+                'Return JSON only: {"problems": [{"label": "1", "title": "...", "starts_with": "..."}]}\n'
+            )
+            async with gate:
+                try:
+                    data = await asyncio.wait_for(
+                        self._complete_json(prompt, provider=provider), _PRACTICE_CHUNK_TIMEOUT_S
+                    )
+                except Exception as exc:
+                    logger.warning("index_practice_problems chunk failed: %s", exc)
+                    return []
+            entries = data.get("problems")
+            return entries if isinstance(entries, list) else []
+
+        replies = await asyncio.gather(*(index_chunk(chunk) for _, chunk in chunks))
+        starts: list[tuple[int, str, str]] = []
+        for (offset, chunk), entries in zip(chunks, replies):
+            cursor = 0
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                quote = " ".join(str(entry.get("starts_with") or "").split())
+                if len(quote) < 8:
+                    continue
+                # Whitespace in the PDF text rarely matches the model's quote exactly.
+                pattern = r"\s+".join(re.escape(word) for word in quote.split())
+                found = re.compile(pattern).search(chunk, cursor)
+                if found is None:
+                    continue
+                cursor = found.end()
+                line_start = chunk.rfind("\n", 0, found.start()) + 1
+                starts.append((
+                    offset + line_start,
+                    str(entry.get("label") or len(starts) + 1)[:12],
+                    str(entry.get("title") or "")[:120],
+                ))
+        return starts
 
     async def _complete_json_strongest(self, prompt: str) -> dict[str, object]:
         """Strongest available provider first (Claude), then the rest.
@@ -1670,7 +1920,8 @@ class LLMService:
             "set answer_from_document to false.\n"
             "- expected_answer: the key's answer, or a concise correct model answer.\n"
             "- Instructions, headings, titles, table-of-contents lines, point values, and answer key lines "
-            "are not questions. Never output a question whose full text you cannot see; skip it.\n\n"
+            "are not questions. Never output a question whose full text you cannot see; skip it.\n"
+            f"{_PRACTICE_SHARED_RULES}\n"
             "Return JSON only with keys mcq and frq.\n"
             'mcq items: {"question_text": "...", "options": ["...", "..."], "correct_index": 0, "answer_from_document": true}\n'
             'frq items: {"question_text": "...", "expected_answer": "...", "answer_from_document": true}\n'
