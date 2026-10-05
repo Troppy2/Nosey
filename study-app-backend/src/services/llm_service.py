@@ -699,6 +699,99 @@ _AI_SERVICES_UNAVAILABLE_MESSAGE = (
     "An error has occurred. Test generation can't happen right now because AI services are unavailable."
 )
 
+# ── Math grading depth (GH #158) ─────────────────────────────────────────────
+# Shown-work math grading tries these first, strongest model first.
+_STRONGEST_FIRST = ("claude", "minimax", "gemini", "groq")
+# A wrong-answer grade below either bar is "thin" and earns one retry on the
+# next provider: fewer worked steps than this, or a what-to-fix this short.
+_MIN_WALKTHROUGH_STEPS = 3
+_MIN_WHAT_TO_FIX_CHARS = 120
+_THIN_GRADE_RETRY_NOTE = (
+    "\n\nIMPORTANT: a previous grader returned a one-line correction and no worked solution. "
+    "Quote the student's wrong step in what_went_wrong, and give at least 3 complete steps."
+)
+
+
+def _math_steps(raw: object) -> list[dict[str, str]]:
+    """The usable steps of a math grade: dicts with a description."""
+    if not isinstance(raw, list):
+        return []
+    steps: list[dict[str, str]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        desc = str(item.get("description", "")).strip()
+        if not desc:
+            continue
+        steps.append({
+            "part": str(item.get("part", "") or "").strip().strip("()").lower(),
+            "description": desc,
+            "expression": str(item.get("expression", "") or "").strip(),
+        })
+    return steps
+
+
+def _math_final_answers(data: dict) -> list[tuple[str, str]]:
+    """(part, answer) pairs; also reads the older single "final_answer" key."""
+    finals: list[tuple[str, str]] = []
+    raw = data.get("final_answers")
+    if isinstance(raw, list):
+        for item in raw:
+            if isinstance(item, dict):
+                answer = str(item.get("answer", "")).strip()
+                if answer:
+                    finals.append((str(item.get("part", "") or "").strip().strip("()").lower(), answer))
+            elif isinstance(item, str) and item.strip():
+                finals.append(("", item.strip()))
+    if not finals:
+        single = str(data.get("final_answer", "") or "").strip()
+        if single:
+            finals.append(("", single))
+    return finals
+
+
+def _is_thin_math_grade(data: dict) -> bool:
+    """A wrong-answer grade with too little substance to teach from."""
+    if bool(data.get("is_correct", False)):
+        return False
+    what_wrong = str(data.get("what_went_wrong", "")).strip()
+    return len(_math_steps(data.get("steps"))) < _MIN_WALKTHROUGH_STEPS or len(what_wrong) < _MIN_WHAT_TO_FIX_CHARS
+
+
+def _math_grade_depth(data: dict) -> int:
+    """Rough size of a grade's explanation, for picking the better of two."""
+    steps = _math_steps(data.get("steps"))
+    return len(steps) * 100 + len(str(data.get("what_went_wrong", "")).strip())
+
+
+def _render_math_steps(steps: list[dict[str, str]]) -> str:
+    """Numbered steps, with a part heading whenever the part changes."""
+    lines: list[str] = []
+    current_part: Optional[str] = None
+    number = 0
+    for step in steps:
+        part = step["part"]
+        if part and part != current_part:
+            lines.append(f"*Part ({part})*")
+            number = 0
+        current_part = part
+        number += 1
+        line = f"**Step {number}:** {normalize_latex(step['description'])}"
+        if step["expression"]:
+            line += f"  $${step['expression']}$$"
+        lines.append(line)
+    return "\n\n".join(lines)
+
+
+def _render_final_answers(finals: list[tuple[str, str]]) -> str:
+    if len(finals) == 1 and not finals[0][0]:
+        return f"**Final answer:** {_format_final_answer(finals[0][1])}"
+    rows = [
+        f"**({part})** {_format_final_answer(answer)}" if part else _format_final_answer(answer)
+        for part, answer in finals
+    ]
+    return "**Final answers:**\n\n" + "\n\n".join(rows)
+
 _RETRIEVAL_STOPWORDS = {
     "the", "and", "for", "are", "but", "not", "you", "all", "can", "had", "was", "one", "our",
     "out", "has", "how", "its", "may", "new", "now", "old", "two", "way", "did", "each", "from",
@@ -2753,75 +2846,92 @@ Determine if the student's final answer is mathematically correct (even if writt
 Then return JSON only with these exact keys:
 {{
   "is_correct": true or false,
-  "what_went_right": "brief description of what the student did correctly (empty string if nothing)",
-  "what_went_wrong": "brief description of the error (empty string if correct)",
+  "what_went_right": "what the student did correctly, specific to their own work (empty string if nothing)",
+  "what_went_wrong": "empty string if correct; otherwise see the rules below",
   "steps": [
-    {{"step": 1, "description": "step description", "expression": "LaTeX math expression for this step"}},
-    {{"step": 2, ...}}
+    {{"part": "a", "step": 1, "description": "what is done in this step and why", "expression": "LaTeX for the result of this step"}},
+    {{"part": "a", "step": 2, ...}}
   ],
-  "final_answer": "the correct final answer (format rules below)",
+  "final_answers": [
+    {{"part": "a", "answer": "the correct final answer for this part (format rules below)"}}
+  ],
   "confidence": 0.0 to 1.0,
   "flagged_uncertain": true or false
 }}
 
 Rules:
 - Accept equivalent forms (e.g. x=4 and 4 are equivalent for "solve for x: ... = 4")
-- steps must walk through the complete solution from start to finish. This is the detailed
-  working, shown to the student only if they expand a "Reasoning" dropdown.
+- "what_went_wrong": quote the exact step, value or expression the student wrote that is wrong,
+  say why it is wrong, and give the correct version. 2 to 4 sentences. If several parts are
+  wrong, cover each one. Never just say "computed X incorrectly" without showing where and why.
+- "steps": a complete worked solution from start to finish covering EVERY part the question
+  asks for, at least 3 steps. A wrong answer's steps are shown to the student as "How to solve
+  it", so write them as a worked solution a student can follow line by line: one action per
+  step, what was done and why, and the expression it produces. Never skip the integral,
+  substitution or algebra that the answer depends on.
+- "part": the part label ("a", "b", ...) when the question asks for several things, in the
+  order asked; "" when it asks for one thing.
+- "final_answers": one entry per part, in order. Never join several answers into one entry.
 - "what_went_right" and "what_went_wrong" are the clean, default-visible summary: state them
   plainly with NO trial-and-error, second-guessing, or phrases like "wait", "let me reconsider",
-  "actually", or "oh". Do any messy thinking inside "steps" only.
+  "actually", or "oh". Do any messy thinking before you write, not in the output.
 - Write ALL math expressions in LaTeX notation: \\frac{{dy}}{{dx}} = 3t^{{2}} + 1
-- In what_went_right and what_went_wrong (prose), wrap every piece of math in single dollar
-  signs: "setting $\\epsilon_4 = 0$ removes the fourth term". Never leave LaTeX undelimited.
+- In what_went_right, what_went_wrong and step descriptions (prose), wrap every piece of math
+  in single dollar signs: "setting $\\epsilon_4 = 0$ removes the fourth term". Never leave LaTeX
+  undelimited.
 - "expression" in steps: bare LaTeX with no dollar signs.
-- "final_answer": if it is a number or an expression, bare LaTeX with no dollar signs
+- "answer" in final_answers: if it is a number or an expression, bare LaTeX with no dollar signs
   (e.g. x = 4). If it is a word (True, False, Yes) or a sentence, plain text with any math inside
   it wrapped in single dollar signs. Never put a sentence inside \\text{{}}.
-- Be specific in what_went_right and what_went_wrong
+- Never use TikZ, pgfplots or any LaTeX picture environment.
 """
         try:
-            # Skips Ollama on the shown-work path only: this prompt is now the
-            # most nuanced grading prompt in the app, and Ollama has a
-            # documented history of math failures. Plain math grading (no
-            # work attached) is unchanged, still bare auto.
-            data = await (self._complete_json_skip_ollama(prompt) if work_section else self._complete_json(prompt))
+            # Shown-work grading is the most nuanced grading prompt in the app,
+            # so it goes to the strongest provider first and never to Ollama
+            # (documented math failures). Plain typed math grading keeps the
+            # normal cost-ascending auto chain.
+            candidates = await self._math_grading_candidates(shown_work=bool(work_section))
+            data, used = await self._complete_json_ranked(prompt, candidates)
+            has_answer = has_typed_answer or bool(work_section)
+            if has_answer and _is_thin_math_grade(data):
+                # One retry, on the next provider only (GH #158): a wrong
+                # answer with a one-line "what to fix" and no real walkthrough
+                # is the lazy response this guards against. Not a loop.
+                later = candidates[candidates.index(used) + 1:] if used in candidates else []
+                if later:
+                    try:
+                        retry = await self._complete_json_for_provider(prompt + _THIN_GRADE_RETRY_NOTE, later[0])
+                        if _math_grade_depth(retry) > _math_grade_depth(data):
+                            data = retry
+                    except Exception as exc:
+                        logger.info("Thin math grade retry on %s failed; keeping first grade: %s", later[0], exc)
             is_correct = bool(data.get("is_correct", False))
             what_right = str(data.get("what_went_right", "")).strip()
             what_wrong = str(data.get("what_went_wrong", "")).strip()
-            steps_raw = data.get("steps", [])
-            final_answer = str(data.get("final_answer", "")).strip()
+            steps = _math_steps(data.get("steps"))
+            finals = _math_final_answers(data)
             confidence = max(0.0, min(1.0, float(data.get("confidence", 0.5))))
             flagged = bool(data.get("flagged_uncertain", False))
 
-            # Default-visible feedback: the clean verdict and the correct final answer.
-            # The step-by-step working goes into reasoning, hidden behind a dropdown.
-            # normalize_latex wraps any LaTeX the model left undelimited in the
-            # prose, which otherwise rendered as raw "\epsilon_4" text.
+            # Default-visible feedback: the verdict, and for a wrong answer the
+            # full worked solution ("How to solve it", GH #158), then the
+            # correct final answer per part. normalize_latex wraps any LaTeX
+            # the model left undelimited in the prose, which otherwise
+            # rendered as raw "\epsilon_4" text.
             sections: list[str] = []
             if what_right:
                 sections.append(f"**What you got right:** {normalize_latex(what_right)}")
             if what_wrong:
                 sections.append(f"**What to fix:** {normalize_latex(what_wrong)}")
-            if final_answer:
-                sections.append(f"\n**Final answer:** {_format_final_answer(final_answer)}")
+            if not is_correct and steps:
+                sections.append("**How to solve it**\n\n" + _render_math_steps(steps))
+            if finals:
+                sections.append(_render_final_answers(finals))
             feedback = "\n\n".join(sections)
 
-            # Build the step-by-step working as the collapsible reasoning.
-            reasoning_lines: list[str] = []
-            if isinstance(steps_raw, list) and steps_raw:
-                for item in steps_raw:
-                    if not isinstance(item, dict):
-                        continue
-                    num = item.get("step", "")
-                    desc = str(item.get("description", "")).strip()
-                    expr = str(item.get("expression", "")).strip()
-                    if desc:
-                        line = f"**Step {num}:** {desc}"
-                        if expr:
-                            line += f"  $${expr}$$"
-                        reasoning_lines.append(line)
-            reasoning = "\n\n".join(reasoning_lines) or None
+            # A correct answer keeps the working behind the Reasoning
+            # dropdown; a wrong one already shows it above.
+            reasoning = _render_math_steps(steps) if is_correct and steps else None
 
             # Prepend the OCR transcript into reasoning, under its own heading,
             # so a student who expands the Reasoning dropdown can see what was
@@ -2833,8 +2943,8 @@ Rules:
 
             return FRQGrade(
                 is_correct=is_correct,
-                feedback=feedback[:4000],
-                reasoning=(reasoning[:4000] if reasoning else None),
+                feedback=feedback[:8000],
+                reasoning=(reasoning[:6000] if reasoning else None),
                 flagged_uncertain=flagged,
                 confidence=confidence,
                 work_transcript=(work.transcript if work is not None else None),
@@ -6341,13 +6451,41 @@ Return only the JSON object."""
                 logger.warning("%s JSON generation failed; trying next provider: %s", candidate, exc)
         raise LLMException(_AI_SERVICES_UNAVAILABLE_MESSAGE) from last_error
 
+    async def _math_grading_candidates(self, shown_work: bool) -> list[str]:
+        """Provider order for grade_math_answer.
+
+        Shown work: strongest first, never Ollama (GH #158). Otherwise the
+        normal cost-ascending auto chain.
+        """
+        candidates = await self._candidate_providers("auto")
+        if not shown_work:
+            return candidates
+        rank = {name: i for i, name in enumerate(_STRONGEST_FIRST)}
+        return sorted((p for p in candidates if p != "ollama"), key=lambda p: rank.get(p, len(rank)))
+
+    async def _complete_json_ranked(self, prompt: str, candidates: list[str]) -> tuple[dict[str, object], str]:
+        """Fallback chain over `candidates` in order; returns the JSON and the
+        provider that produced it, so a caller can retry on the next one.
+        Never re-raises mid-loop, matching every other provider loop here."""
+        from src.utils.exceptions import LLMException
+
+        if not candidates:
+            raise LLMException(_AI_SERVICES_UNAVAILABLE_MESSAGE)
+        last_error: Optional[Exception] = None
+        for candidate in candidates:
+            try:
+                return await self._complete_json_for_provider(prompt, candidate), candidate
+            except Exception as exc:
+                last_error = exc
+                logger.warning("%s JSON generation failed; trying next provider: %s", candidate, exc)
+        raise LLMException(_AI_SERVICES_UNAVAILABLE_MESSAGE) from last_error
+
     async def _complete_json_skip_ollama(self, prompt: str) -> dict[str, object]:
         """Like _complete_json("auto"), but never routes to Ollama.
 
-        Used only by grade_math_answer's scratch-pad path (STEM Scratch Pad
-        feature): that prompt is the most nuanced grading prompt in the app,
-        now carrying an extra untrusted OCR transcript section, and Ollama has
-        a documented history of math failures
+        Used by practice-test parsing (grade_math_answer's shown-work path
+        moved to _math_grading_candidates in GH #158). Ollama has a
+        documented history of math failures
         (.claude/misc/OLLAMA_MATH_FAILURE_ANALYSIS.md). Passing a specific
         provider straight to _complete_json would bypass its fallback chain
         entirely (single point of failure), so this builds its own loop from
