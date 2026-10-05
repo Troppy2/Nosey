@@ -18,8 +18,6 @@ export type TraceResult = {
 const MAX_INK_THRESHOLD = 185;
 // Ink blobs smaller than this many pixels are speckle, not writing.
 const MIN_BLOB_PIXELS = 6;
-// A skeleton branch this short that ends at a junction is thinning noise.
-const MAX_SPUR_LENGTH = 7;
 const SIMPLIFY_EPSILON = 0.9;
 
 const N8: ReadonlyArray<readonly [number, number]> = [
@@ -338,6 +336,23 @@ export function walkSkeleton(sk: Uint8Array, width: number, height: number): Ske
       paths.push({ pixels: line, startKind: 2, endKind: 2, startNode: -1, endNode: -1 });
     }
   }
+  // A short arm (the crossbar of a "t", the tail of an "r") can be all
+  // junction/end pixels, so no walk ever enters it. Each line end with no walk
+  // of its own gets a stroke from its cluster's centre out to it.
+  const started = new Set<number>();
+  for (const path of paths) {
+    started.add(path.pixels[0]);
+    started.add(path.pixels[path.pixels.length - 1]);
+  }
+  for (let i = 0; i < sk.length; i++) {
+    if (!sk[i] || kind[i] !== 1 || started.has(i)) continue;
+    const centre = centroidOf(i);
+    if (!centre) continue;
+    const ix = i % width;
+    const iy = (i - ix) / width;
+    if (Math.hypot(ix - centre[0], iy - centre[1]) < 2) continue;
+    paths.push({ pixels: [i, i], startKind: 2, endKind: 2, startNode: -1, endNode: i });
+  }
   return { paths, centroidOf };
 }
 
@@ -417,6 +432,10 @@ export function traceInk(img: RawImage): TraceResult {
   if (Math.max(origWidth, origHeight) <= UPSCALE_BELOW) {
     lum = upscale2x(lum, origWidth, origHeight);
     factor = 2;
+    if (Math.max(origWidth, origHeight) <= 700) {
+      lum = upscale2x(lum, origWidth * 2, origHeight * 2);
+      factor = 4;
+    }
   }
   const width = origWidth * factor;
   const height = origHeight * factor;
@@ -449,13 +468,23 @@ export function traceInk(img: RawImage): TraceResult {
     }
   }
   despeckle(mask, w, h);
+  let inkPixels = 0;
+  for (let i = 0; i < mask.length; i++) inkPixels += mask[i];
   thin(mask, w, h);
+  let skeletonPixels = 0;
+  for (let i = 0; i < mask.length; i++) skeletonPixels += mask[i];
+  // Average pen thickness in pixels. Thinning a thick line leaves little
+  // whiskers about half as long as the line is wide; a real short branch (the
+  // crossbar of a small typed "t") is only a few pixels too. Pruning by a
+  // fixed length removed the crossbars, so the cutoff follows the thickness.
+  const thickness = skeletonPixels > 0 ? inkPixels / skeletonPixels : 1;
+  const maxSpur = Math.max(2, Math.round(thickness * 0.8));
 
   const strokes: number[][] = [];
   const skeleton = walkSkeleton(mask, w, h);
   for (const path of skeleton.paths) {
     const isSpur = (path.startKind === 1 && path.endKind >= 3) || (path.endKind === 1 && path.startKind >= 3);
-    if (isSpur && path.pixels.length <= MAX_SPUR_LENGTH) continue;
+    if (isSpur && path.pixels.length <= maxSpur) continue;
     const points: number[] = [];
     for (const p of path.pixels) {
       const x = p % w;

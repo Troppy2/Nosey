@@ -62,3 +62,5 @@ LEARNING_MODES_AND_GAMES.md
 leetcode-redesign-concept-ui/
 *.jpeg
 /docs
+# Local launcher scripts (start/stop Nosey without VS Code)
+scripts/

@@ -66,6 +66,17 @@ describe("traceInk", () => {
     for (const [x, y] of [[60, 28], [60, 92], [28, 60], [92, 60]]) expect(near(x, y)).toBe(true);
   });
 
+  it("keeps the crossbar of a small typed t", () => {
+    // Screenshot-sized text: a 1px stem and a 1px crossbar 2px each side.
+    // A fixed-length whisker cutoff used to delete the crossbar ("that" -> "ihai").
+    const img = blank(30, 30);
+    for (let y = 10; y <= 21; y++) disc(img, 10.5, y, 0.6, BLACK);
+    for (let x = 8; x <= 13; x++) disc(img, x, 13, 0.6, BLACK);
+    const xs = traceInk(img).strokes.flatMap((st) => st.filter((_, i) => i % 2 === 0));
+    expect(Math.min(...xs)).toBeLessThan(9.5);
+    expect(Math.max(...xs)).toBeGreaterThan(12);
+  });
+
   it("ignores a yellow highlighter but keeps the pen", () => {
     const img = blank(200, 80);
     line(img, 10, 40, 190, 40, 9, [255, 247, 80]);
