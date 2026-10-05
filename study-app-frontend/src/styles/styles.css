@@ -24073,6 +24073,19 @@ button.lc-official-link:disabled:hover {
   padding: 0;
 }
 
+/* Focus: the question and paper rows are hidden so the canvas fills the screen. */
+.scratchpad-modal--focus {
+  gap: 0.35rem;
+  padding: 0.5rem 0.75rem 0.5rem;
+}
+.scratchpad-modal--focus .scratchpad-question-text,
+.scratchpad-modal--focus .scratchpad-paper-picker {
+  display: none;
+}
+.scratchpad-modal--focus .scratchpad-header {
+  align-items: center;
+}
+
 .scratchpad-header {
   display: flex;
   align-items: flex-start;

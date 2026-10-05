@@ -1,13 +1,18 @@
 import {
   BoxSelect,
   ChevronDown,
+  Clipboard,
+  ClipboardPaste,
   Copy,
   Delete,
   Eraser,
   Hand,
+  ImageDown,
   LassoSelect,
   Maximize2,
   Minimize2,
+  PanelTopClose,
+  PanelTopOpen,
   PenLine,
   Plus,
   Trash2,
@@ -771,6 +776,90 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     setSelection([]);
   }
 
+  // Ink copied inside the pad. The system clipboard cannot hold strokes, so
+  // this is kept here; pasting prefers a picture on the system clipboard (see
+  // the paste handler) and falls back to this.
+  const clipboardInkRef = useRef<Stroke[]>([]);
+  const pasteCountRef = useRef(0);
+
+  function copySelection(): boolean {
+    const sel = selectedRef.current;
+    if (sel.length === 0) return false;
+    clipboardInkRef.current = sel;
+    pasteCountRef.current = 0;
+    // Replace any picture on the system clipboard, or the next Ctrl+V would
+    // bring that back instead of this ink.
+    void navigator.clipboard?.writeText("nosey-ink").catch(() => undefined);
+    setNotice("Copied. Ctrl+V pastes it.");
+    return true;
+  }
+
+  function cutSelection() {
+    if (copySelection()) deleteSelection();
+  }
+
+  function pasteInk(): boolean {
+    const source = clipboardInkRef.current;
+    if (source.length === 0) return false;
+    const prev = localStrokesRef.current;
+    if (prev.length + source.length > MAX_STROKES_PER_QUESTION) {
+      setNotice("The page is full. Erase something before pasting.");
+      return true;
+    }
+    // Each paste lands a little further along, so repeated pastes do not stack.
+    pasteCountRef.current += 1;
+    const shift = DUPLICATE_OFFSET * pasteCountRef.current;
+    const copies = source.map((st) => translateStroke(st, shift, shift));
+    const b = strokeBounds(copies);
+    if (b) ensureHeight(b.maxY);
+    pushHistory(prev);
+    commitStrokes([...prev, ...copies]);
+    setTool("select");
+    setSelection(copies);
+    return true;
+  }
+
+  // The selection as a picture on the system clipboard, to paste into Kojo,
+  // a document or a chat. Needs a secure context and clipboard permission.
+  async function copySelectionAsPicture() {
+    const sel = selectedRef.current;
+    const png = sel.length ? exportScratchPadPng({ version: 1, strokes: sel }) : null;
+    if (!png) {
+      setNotice("Select some writing first.");
+      return;
+    }
+    try {
+      const bytes = Uint8Array.from(atob(png), (c) => c.charCodeAt(0));
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": new Blob([bytes], { type: "image/png" }) })]);
+      setNotice("Copied as a picture. Paste it anywhere.");
+    } catch {
+      setNotice("Couldn't copy a picture here. Your browser blocked the clipboard.");
+    }
+  }
+
+  // The toolbar Paste: a picture on the clipboard becomes ink, otherwise ink
+  // copied in the pad is pasted. Ctrl+V does the same without the prompt.
+  async function pasteFromButton() {
+    try {
+      // A permission prompt that is ignored never settles, so the read is
+      // raced against a timer and the pad's own copy is used instead.
+      const items = await Promise.race([
+        navigator.clipboard.read(),
+        new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("clipboard timeout")), 1500)),
+      ]);
+      for (const item of items) {
+        const type = item.types.find((t) => t.startsWith("image/"));
+        if (type) {
+          await importImage(await item.getType(type));
+          return;
+        }
+      }
+    } catch {
+      /* clipboard read blocked or unsupported: fall through to the pad's own copy */
+    }
+    if (!pasteInk()) setNotice("Nothing to paste. Copy a picture, or select some ink and copy it.");
+  }
+
   function duplicateSelection() {
     const sel = selectedRef.current;
     if (sel.length === 0) return;
@@ -1168,8 +1257,8 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
   }
 
   // Window-level handlers need the latest closures but are attached once.
-  const actionsRef = useRef({ deleteSelection, undo, importImage, setSelection });
-  actionsRef.current = { deleteSelection, undo, importImage, setSelection };
+  const actionsRef = useRef({ deleteSelection, undo, importImage, setSelection, copySelection, cutSelection, pasteInk });
+  actionsRef.current = { deleteSelection, undo, importImage, setSelection, copySelection, cutSelection, pasteInk };
 
   useEffect(() => {
     const typingTarget = (t: EventTarget | null) => {
@@ -1189,6 +1278,12 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
       } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") {
         e.preventDefault();
         actionsRef.current.undo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c" && hasSelection) {
+        e.preventDefault();
+        actionsRef.current.copySelection();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "x" && hasSelection) {
+        e.preventDefault();
+        actionsRef.current.cutSelection();
       }
     }
     function onPaste(e: ClipboardEvent) {
@@ -1201,6 +1296,8 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
         void actionsRef.current.importImage(file);
         return;
       }
+      // No picture on the clipboard: paste ink copied inside the pad, if any.
+      if (actionsRef.current.pasteInk()) e.preventDefault();
     }
     // Capture phase, so Escape can be claimed before the modal's own handler.
     window.addEventListener("keydown", onKey, true);
@@ -1252,8 +1349,29 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
         >
           <BoxSelect size={16} />
         </button>
+        <button
+          type="button"
+          className="scratchpad-tool-btn"
+          onClick={() => void pasteFromButton()}
+          aria-label="Paste"
+          title="Paste a picture or copied ink (Ctrl+V)"
+        >
+          <ClipboardPaste size={16} />
+        </button>
         {hasSelection ? (
           <>
+            <button type="button" className="scratchpad-tool-btn" onClick={copySelection} aria-label="Copy selection" title="Copy (Ctrl+C)">
+              <Clipboard size={16} />
+            </button>
+            <button
+              type="button"
+              className="scratchpad-tool-btn"
+              onClick={() => void copySelectionAsPicture()}
+              aria-label="Copy selection as a picture"
+              title="Copy as a picture, to paste anywhere"
+            >
+              <ImageDown size={16} />
+            </button>
             <button type="button" className="scratchpad-tool-btn" onClick={duplicateSelection} aria-label="Duplicate selection" title="Duplicate">
               <Copy size={16} />
             </button>
@@ -1337,6 +1455,9 @@ export function ScratchPadModal({
   const [size, setSize] = useState<SizeState>(
     () => (localStorage.getItem(scopeKey("nosey_scratchpad_size")) as SizeState | null) ?? "comfortable",
   );
+  // Focus hides the question and paper rows so the canvas takes nearly the
+  // whole screen. The question is one click away on the same button.
+  const [focus, setFocus] = useState<boolean>(() => localStorage.getItem(scopeKey("nosey_scratchpad_focus")) === "1");
   const cardRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
   const [customSize, setCustomSize] = useState<{ w: number; h: number } | null>(null);
@@ -1357,6 +1478,14 @@ export function ScratchPadModal({
       document.body.style.overflow = prevOverflow;
     };
   }, [onClose]);
+
+  function toggleFocus() {
+    const next = !focus;
+    setFocus(next);
+    localStorage.setItem(scopeKey("nosey_scratchpad_focus"), next ? "1" : "0");
+    // Focus only means something at full size.
+    if (next) changeSize("full");
+  }
 
   function changeSize(next: SizeState) {
     setSize(next);
@@ -1392,7 +1521,7 @@ export function ScratchPadModal({
     <div className="modal-backdrop scratchpad-backdrop" onMouseDown={onClose}>
       <div
         ref={cardRef}
-        className={`modal-card scratchpad-modal ${sizeClass}`}
+        className={`modal-card scratchpad-modal ${sizeClass}${focus ? " scratchpad-modal--focus" : ""}`}
         style={sizeStyle}
         role="dialog"
         aria-modal="true"
@@ -1436,6 +1565,16 @@ export function ScratchPadModal({
                 title="Full screen"
               >
                 <ChevronDown size={14} style={{ transform: "rotate(45deg)" }} />
+              </button>
+              <button
+                type="button"
+                className={focus ? "is-active" : ""}
+                onClick={toggleFocus}
+                aria-pressed={focus}
+                aria-label={focus ? "Show the question" : "Use the whole screen for writing"}
+                title={focus ? "Show the question" : "Whole screen: hide the question and paper rows"}
+              >
+                {focus ? <PanelTopOpen size={14} /> : <PanelTopClose size={14} />}
               </button>
             </div>
             <button type="button" className="scratchpad-minimize" onClick={onClose} aria-label="Minimize scratch pad">
