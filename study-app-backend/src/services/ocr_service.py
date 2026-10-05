@@ -35,7 +35,7 @@ _TRANSCRIBE_PROMPT = (
     "Do not solve the problem. Do not correct errors. Do not add steps. Transcribe only what is on the page. "
     "Highlighter color, boxes and underlines are not part of the math: leave them out of the transcript "
     "(mention them in LAYOUT) and never write markup such as \\colorbox.\n\n"
-    "Return your response as plain text in three sections, separated by lines containing only '---':\n\n"
+    "Return your response as plain text in four sections, separated by lines containing only '---':\n\n"
     "1. TRANSCRIPT: the work in reading order, one step per line. Write words as plain text and wrap every "
     "piece of math in single dollar signs, inline, for example: Since $\\epsilon_4 = 0$, $\\hat{y} = w^T x$. "
     "Never use $$ or \\[ \\]. Never use spacing or positioning commands (\\quad, \\qquad, \\hspace, \\,, ~) "
@@ -48,7 +48,11 @@ _TRANSCRIBE_PROMPT = (
     "division, matrices, a sketch or number line, which line is boxed or circled as the final answer, "
     "arrows between steps. If nothing spatial matters, write NONE.\n\n"
     "3. LEGIBILITY: one word. high if you read every mark with confidence, medium if you had to guess a "
-    "few marks, low if much of the page was guessed or illegible.\n"
+    "few marks, low if much of the page was guessed or illegible.\n\n"
+    "4. NOT WORK: the numbers of the TRANSCRIPT lines (the first line is 1) that are not the student's own "
+    "working or answer: lines that only restate the problem or the given information, question or part "
+    "headings on their own (Q3], a], (b)), and remarks that are not part of the solution (I ran out of "
+    "room, I give up). Comma-separated, for example 1, 2, 5. If every line is working, write NONE.\n"
 )
 
 # LEGIBILITY self-rating -> OcrResult.confidence (GH #149). low sits under
@@ -136,11 +140,13 @@ def _strip_label(section: str, label: str) -> str:
 def _parse_transcription(raw: str, engine: str) -> OcrResult:
     # Split on a line that is only '---', not any '---' (a transcript can hold
     # a drawn horizontal rule or a long minus run).
-    parts = [part.strip() for part in re.split(r"^\s*-{3,}\s*$", raw, maxsplit=2, flags=re.MULTILINE)]
+    parts = [part.strip() for part in re.split(r"^\s*-{3,}\s*$", raw, maxsplit=3, flags=re.MULTILINE)]
     transcript = _strip_label(parts[0], "TRANSCRIPT")
     layout_raw = _strip_label(parts[1], "LAYOUT") if len(parts) > 1 else ""
     legibility_raw = _strip_label(parts[2], "LEGIBILITY") if len(parts) > 2 else ""
+    not_work_raw = _strip_label(parts[3], "NOT WORK") if len(parts) > 3 else ""
     layout_notes = None if not layout_raw or layout_raw.upper() == "NONE" else layout_raw
+    answer_work = None
     if not transcript or transcript.upper() == "NONE":
         transcript = ""
     elif is_degenerate_transcript(transcript):
@@ -149,13 +155,54 @@ def _parse_transcription(raw: str, engine: str) -> OcrResult:
         logger.info("OCR engine %s returned a degenerate transcript (%d chars)", engine, len(transcript))
         transcript = ""
     else:
+        answer_work = answer_work_lines(transcript, not_work_raw)
         transcript = normalize_transcript(transcript)
     # Neither vision model reports a real confidence score, so the model's own
     # LEGIBILITY word stands in for one (GH #149). A missing or unrecognized
     # word keeps the old fixed value, above the low-confidence floor.
     legibility = legibility_raw.split()[0].strip(".:").lower() if legibility_raw else ""
     confidence = _LEGIBILITY_CONFIDENCE.get(legibility, _DEFAULT_CONFIDENCE) if transcript else 0.0
-    return OcrResult(transcript=transcript, layout_notes=layout_notes, confidence=confidence, engine=engine)
+    return OcrResult(
+        transcript=transcript,
+        layout_notes=layout_notes,
+        confidence=confidence,
+        engine=engine,
+        answer_work=answer_work,
+    )
+
+
+def answer_work_lines(raw_transcript: str, not_work: str) -> Optional[str]:
+    """The student's working only, for showing as their answer (GH #157).
+
+    The reader names the raw lines to drop (restated problem, headings, side
+    remarks) by number instead of copying the rest, which would double the
+    output against the vision token budget. Only lines that survive into the
+    normalized transcript are kept, so the result is always a subset of it.
+    None when nothing is dropped or nothing would be left.
+    """
+    drop = {int(n) for n in re.findall(r"\d+", not_work or "")}
+    if not drop:
+        return None
+    raw_lines = [line for line in raw_transcript.splitlines() if line.strip()]
+    kept_raw = [line for i, line in enumerate(raw_lines, start=1) if i not in drop]
+    if not kept_raw or len(kept_raw) == len(raw_lines):
+        return None
+    full = normalize_transcript(raw_transcript).split("\n\n")
+    known = set(full)
+    kept = [line for line in normalize_transcript("\n".join(kept_raw)).split("\n\n") if line in known]
+    if not kept or len(kept) == len(full):
+        return None
+    return "\n\n".join(kept)
+
+
+def is_read_from_drawing(answer: str, transcript: Optional[str]) -> bool:
+    """Whether a stored answer is (part of) the drawing's transcript rather
+    than something the student typed: every paragraph is a transcript line."""
+    answer = (answer or "").strip()
+    if not answer or not transcript:
+        return False
+    known = set(transcript.strip().split("\n\n"))
+    return all(line in known for line in answer.split("\n\n"))
 
 
 async def _transcribe_claude(image_b64: str, media_type: str) -> OcrResult:

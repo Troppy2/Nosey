@@ -27243,6 +27243,58 @@ a.sd-chip.is-done:hover {
   gap: 6px;
 }
 
+/* GH #157: a whole scratch pad read back no longer pushes the feedback off
+   screen. Tall boxes are capped with a fade and a "Show more" toggle. */
+.review-detail .review-clamp {
+  max-height: 320px;
+  overflow: hidden;
+  position: relative;
+}
+.review-detail .review-clamp.expanded {
+  max-height: none;
+}
+.review-detail .review-clamp.clipped {
+  -webkit-mask-image: linear-gradient(to bottom, #000 75%, transparent);
+  mask-image: linear-gradient(to bottom, #000 75%, transparent);
+}
+.review-clamp-toggle,
+.review-full-read-toggle {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  background: none;
+  cursor: pointer;
+}
+.review-clamp-toggle:hover,
+.review-full-read-toggle:hover {
+  text-decoration: underline;
+}
+.review-full-read-toggle .rotated {
+  transform: rotate(180deg);
+}
+.review-detail .review-full-read {
+  opacity: 0.85;
+}
+
+/* Any wide equation scrolls inside its own box instead of widening the card.
+   Paragraphs are grid items too: "**Final answer:** $$...$$" put a display
+   equation inside a <p>, whose min-width: auto stretched the card. */
+.review-detail p,
+.review-detail li {
+  min-width: 0;
+  max-width: 100%;
+}
+.review-detail .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
 .review-work-transcript .math-block {
   margin: 0;
   padding: 0;

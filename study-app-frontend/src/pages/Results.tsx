@@ -1,5 +1,5 @@
 import { AlertTriangle, Brain, Calculator, CheckCircle2, ChevronDown, Info, Loader2, PenLine, RotateCcw, Sparkles, Target, X, XCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -29,6 +29,7 @@ import {
   skipUnreadableAnswers,
 } from "../lib/api";
 import { formatCodingProblem } from "../lib/codingProblemFormat";
+import { isReadFromDrawing } from "../lib/drawnAnswer";
 import { scoreTone } from "../lib/format";
 import type { AnswerResult, AttemptDetail, RedoAnswerResponse } from "../lib/types";
 
@@ -558,15 +559,49 @@ function reviewBlocks(answers: AnswerResult[]): { groupId: AnswerResult["group_i
   return blocks;
 }
 
+// A long answer (a whole scratch pad read back) is capped so the feedback
+// below it stays on screen; "Show more" opens it. GH #157.
+function ClampedBox({ className, children }: { className: string; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [overflows, setOverflows] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => setOverflows(el.scrollHeight > el.clientHeight + 4);
+    measure();
+    // KaTeX and fonts can change the height after the first paint.
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(el);
+    return () => observer?.disconnect();
+  }, [children]);
+
+  return (
+    <>
+      <div className={`${className} review-clamp${expanded ? " expanded" : ""}${overflows && !expanded ? " clipped" : ""}`} ref={ref}>
+        {children}
+      </div>
+      {overflows || expanded ? (
+        <button className="review-clamp-toggle" onClick={() => setExpanded(!expanded)} type="button">
+          {expanded ? "Show less" : "Show more"}
+        </button>
+      ) : null}
+    </>
+  );
+}
+
 function ReviewItem({ answer, label }: { answer: AnswerResult; label: string }) {
   const [open, setOpen] = useState(false);
   const [reasoningOpen, setReasoningOpen] = useState(false);
   const Icon = answer.is_correct ? CheckCircle2 : XCircle;
   const reasoning = answer.reasoning?.trim();
+  const [fullReadOpen, setFullReadOpen] = useState(false);
   const transcript = answer.work_transcript?.trim();
-  // Draw-only answers are stored as their transcript; show them as read
-  // handwriting, not as a typed answer.
-  const drawnOnly = Boolean(transcript) && answer.user_answer.trim() === transcript;
+  // Draw-only answers are stored as their transcript, or just the working
+  // lines of it (GH #157); show them as read handwriting, not typed text.
+  const drawnOnly = isReadFromDrawing(answer.user_answer, transcript);
+  const trimmed = drawnOnly && answer.user_answer.trim() !== transcript;
 
   return (
     <Card className={`review-item ${answer.is_correct ? "correct" : "incorrect"}`}>
@@ -604,16 +639,27 @@ function ReviewItem({ answer, label }: { answer: AnswerResult; label: string }) 
           ) : null}
           <div>
             <span>{drawnOnly ? "Your answer (read from your drawing)" : "Your answer"}</span>
-            <div className={`review-answer-markdown ${drawnOnly ? "review-work-transcript" : "review-answer-text"}`}>
+            <ClampedBox className={`review-answer-markdown ${drawnOnly ? "review-work-transcript" : "review-answer-text"}`}>
               <MarkdownContent content={formatAnswerForDisplay(answer.user_answer)} />
-            </div>
+            </ClampedBox>
+            {trimmed ? (
+              <button className="review-full-read-toggle" onClick={() => setFullReadOpen(!fullReadOpen)} type="button">
+                {fullReadOpen ? "Hide everything Kojo read" : "Show everything Kojo read"}
+                <ChevronDown className={fullReadOpen ? "rotated" : ""} size={14} />
+              </button>
+            ) : null}
+            {trimmed && fullReadOpen && transcript ? (
+              <ClampedBox className="review-answer-markdown review-work-transcript review-full-read">
+                <MarkdownContent content={transcript} />
+              </ClampedBox>
+            ) : null}
           </div>
           {transcript && !drawnOnly ? (
             <div>
               <span>What Kojo read from your work</span>
-              <div className="review-answer-markdown review-work-transcript">
+              <ClampedBox className="review-answer-markdown review-work-transcript">
                 <MarkdownContent content={transcript} />
-              </div>
+              </ClampedBox>
             </div>
           ) : null}
           <div className="math-explanation">
