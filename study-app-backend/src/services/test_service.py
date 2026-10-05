@@ -6,13 +6,15 @@ from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.repositories.folder_repository import FolderRepository
-from src.repositories.test_repository import TestRepository
+from src.repositories.test_repository import TestRepository, add_generated_questions
 from src.schemas.test_schema import (
     CreateTestResponse,
     MCQOptionEditable,
     MCQOptionPublic,
     QuestionCreate,
     QuestionEditable,
+    QuestionGroupPublic,
+    QuestionGroupUpdate,
     QuestionPublic,
     QuestionUpdate,
     TestResponse,
@@ -81,16 +83,29 @@ class TestService:
 
         return "uploaded"[:10]
 
+    @staticmethod
+    def _group_fields(q) -> dict:
+        """group + part_label for a part of a multi-part problem (GH #151)."""
+        group = q.__dict__.get("group")
+        if group is None:
+            return {}
+        return {
+            "group": QuestionGroupPublic(id=group.id, label=group.label or "", stem=group.stem or ""),
+            "part_label": q.part_label,
+        }
+
     def _serialize_question_editable(self, q) -> QuestionEditable:
         qtype = q.question_type
         if qtype == "MCQ":
             return QuestionEditable(
                 id=q.id, type="MCQ", question_text=q.question_text,
                 options=[MCQOptionEditable(id=opt.id, text=opt.option_text, is_correct=opt.is_correct) for opt in q.mcq_options],
+                **self._group_fields(q),
             )
         return QuestionEditable(
             id=q.id, type=qtype or "FRQ", question_text=q.question_text,
             expected_answer=q.frq_answer.expected_answer if q.frq_answer else None,
+            **self._group_fields(q),
         )
 
     def _serialize_question_public(self, q) -> QuestionPublic:
@@ -100,6 +115,7 @@ class TestService:
             return QuestionPublic(
                 id=q.id, type=qtype, question_text=q.question_text,
                 options=[MCQOptionPublic(id=opt.id, text=opt.option_text) for opt in q.mcq_options],
+                **self._group_fields(q),
             )
         # Ranking: shuffle so the stored correct order (display_order) is never revealed.
         if qtype == "RANK":
@@ -108,8 +124,9 @@ class TestService:
             return QuestionPublic(
                 id=q.id, type="RANK", question_text=q.question_text,
                 options=[MCQOptionPublic(id=opt.id, text=opt.option_text) for opt in shuffled],
+                **self._group_fields(q),
             )
-        return QuestionPublic(id=q.id, type=qtype or "FRQ", question_text=q.question_text)
+        return QuestionPublic(id=q.id, type=qtype or "FRQ", question_text=q.question_text, **self._group_fields(q))
 
     async def create_test(
         self,
@@ -335,17 +352,7 @@ class TestService:
                 logger.info("MCQ verification for test_id=%s: %s", test.id, verify_stats)
                 generation_meta["mcq_verification"] = verify_stats
 
-        display_order = 1
-        for item in mcq_questions:
-            options = [
-                (option_text, index == item.correct_index)
-                for index, option_text in enumerate(item.options)
-            ]
-            await repo.add_mcq_question(test.id, item.question_text, display_order, options)
-            display_order += 1
-        for item in frq_questions:
-            await repo.add_frq_question(test.id, item.question_text, display_order, item.expected_answer)
-            display_order += 1
+        display_order = await add_generated_questions(repo, test.id, mcq_questions, frq_questions, 1)
 
         await session.commit()
         fallback_used = bool(generation_meta.get("fallback_used", False))
@@ -392,6 +399,19 @@ class TestService:
         refreshed = await repo.get_question_owned(question.id, user_id)
         assert refreshed is not None
         return self._serialize_question_editable(refreshed)
+
+    async def update_question_group(
+        self, test_id: int, group_id: int, user_id: int, data: QuestionGroupUpdate, session: AsyncSession
+    ) -> QuestionGroupPublic:
+        """A multi-part problem's setup, edited once for every part (GH #151)."""
+        group = await TestRepository(session).get_group_owned(group_id, test_id, user_id)
+        if group is None:
+            raise ResourceNotFoundException("Problem")
+        group.stem = data.stem.strip()
+        if data.label is not None:
+            group.label = data.label.strip()
+        await session.commit()
+        return QuestionGroupPublic(id=group.id, label=group.label or "", stem=group.stem or "")
 
     async def add_question(
         self, test_id: int, user_id: int, data: QuestionCreate, session: AsyncSession

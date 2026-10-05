@@ -27344,3 +27344,91 @@ a.sd-chip.is-done:hover {
   background: rgba(245, 158, 11, 0.14);
   color: var(--accent-caution-strong);
 }
+
+/* ─── Multi-part problems (GH #151) ─────────────────────────────────────── */
+
+/* Test page: the setup once, then each part with its own answer box. */
+.question-card--problem {
+  gap: 22px;
+}
+
+.question-problem-setup {
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--green-light-mid);
+}
+
+.question-part {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px 20px;
+  border-radius: var(--radius-md);
+  background: var(--green-lightest);
+  border-left: 3px solid var(--green-mid);
+}
+
+.question-part-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.question-part-head strong {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  color: var(--green-dark);
+}
+
+.question-part-text {
+  min-width: 0;
+}
+
+.test-nav-chip-parts {
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent-caution-strong);
+}
+
+/* Results: one block per problem, its parts inside. */
+.review-problem {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--green-light-mid);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.review-problem-head {
+  display: grid;
+  gap: 6px;
+  padding: 4px 6px 6px;
+  min-width: 0;
+}
+
+/* Create Test review step: the setup above a problem's parts. */
+.pp-setup {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: var(--green-lightest);
+}
+
+/* Question editor: a problem's setup card. */
+.editor-group-setup {
+  display: grid;
+  gap: 10px;
+  border-left: 3px solid var(--green-mid);
+}
+
+@media (max-width: 640px) {
+  .question-part {
+    padding: 14px;
+  }
+
+  .review-problem {
+    padding: 10px;
+  }
+}

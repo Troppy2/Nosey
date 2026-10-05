@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.question import Question
+from src.models.question import Question, full_question_text
 from src.models.user_attempt import UserAttempt
 from src.repositories.attempt_repository import AttemptRepository
 from src.repositories.test_repository import TestRepository
@@ -124,7 +124,7 @@ class GradingService:
             and not self._readable(work_by_question_id.get(qid))
         }
 
-        # Grade all questions in parallel — LLM calls for FRQ are concurrent, MCQ is instant.
+        # Grade all questions in parallel: LLM calls for FRQ are concurrent, MCQ is instant.
         # A needs_input answer is not graded at all yet: no LLM spend on it.
         pairs = [(question_by_id[qid], ans) for qid, ans in submitted_by_id.items()]
 
@@ -300,6 +300,7 @@ class GradingService:
         the client before the redo, or the student could copy the key into it.
         """
         held = ocr_status == OCR_STATUS_NEEDS_INPUT
+        group = question.__dict__.get("group") if question is not None else None
         return AnswerResult(
             question_id=question.id if question is not None else int(question_id or 0),
             question_text=question.question_text if question is not None else None,
@@ -315,6 +316,10 @@ class GradingService:
             answer_inferred=bool(question.answer_inferred) if question is not None else False,
             ocr_status=ocr_status,
             work_strokes=work_strokes if held else None,
+            group_id=group.id if group is not None else None,
+            group_label=group.label if group is not None else None,
+            group_stem=group.stem if group is not None else None,
+            part_label=question.part_label if group is not None else None,
         )
 
     async def _load_held_answer(self, attempt_id: int, user_id: int, session: AsyncSession):
@@ -543,21 +548,21 @@ class GradingService:
             )
         if is_coding_mode:
             return await self.llm_service.grade_code_answer(
-                question=question.question_text,
+                question=full_question_text(question),
                 expected_answer=expected_answer,
                 user_code=user_answer,
                 language=coding_language,
             )
         if is_math_mode:
             return await self.llm_service.grade_math_answer(
-                question=question.question_text,
+                question=full_question_text(question),
                 expected_answer=expected_answer,
                 user_answer=user_answer,
                 work=work,
             )
         return await self.llm_service.grade_frq_answer(
             notes=notes,
-            question=question.question_text,
+            question=full_question_text(question),
             expected_answer=expected_answer,
             user_answer=user_answer,
         )
@@ -588,7 +593,7 @@ class GradingService:
 
         options = [o.option_text for o in question.mcq_options] or None
         result = await self.llm_service.explain_objective_answer(
-            question=question.question_text,
+            question=full_question_text(question),
             correct_answer=correct_answer,
             user_answer=user_answer,
             is_correct=grade.is_correct,

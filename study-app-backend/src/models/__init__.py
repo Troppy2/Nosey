@@ -28,6 +28,7 @@ from src.models.mcq_option import MCQOption
 from src.models.mock_interview import MockInterviewSession
 from src.models.note import Note
 from src.models.question import Question
+from src.models.question_group import QuestionGroup
 from src.models.quota_charge import QuotaCharge
 from src.models.slash_command import SlashCommand
 from src.models.survey_response import SurveyResponse
@@ -71,6 +72,7 @@ __all__ = [
     "SDSubmission",
     "Note",
     "Question",
+    "QuestionGroup",
     "QuotaCharge",
     "SlashCommand",
     "SurveyResponse",

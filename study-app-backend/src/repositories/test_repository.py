@@ -8,6 +8,7 @@ from src.models.folder import Folder
 from src.models.mcq_option import MCQOption
 from src.models.note import Note
 from src.models.question import Question
+from src.models.question_group import QuestionGroup
 from src.models.test import Test
 from src.models.user_attempt import UserAttempt
 from src.repositories.base_repository import BaseRepository
@@ -16,6 +17,8 @@ from typing import Optional
 _QUESTION_WITH_ANSWERS = (
     selectinload(Question.mcq_options),
     selectinload(Question.frq_answer),
+    # Multi-part problems (GH #151): the setup every LLM call needs with a part.
+    selectinload(Question.group),
 )
 
 
@@ -158,6 +161,8 @@ class TestRepository(BaseRepository[Test]):
         display_order: int,
         options: list[tuple[str, bool]],
         answer_inferred: bool = False,
+        group_id: Optional[int] = None,
+        part_label: Optional[str] = None,
     ) -> Question:
         question = Question(
             test_id=test_id,
@@ -165,6 +170,8 @@ class TestRepository(BaseRepository[Test]):
             question_type="MCQ",
             display_order=display_order,
             answer_inferred=answer_inferred,
+            group_id=group_id,
+            part_label=part_label,
         )
         self.session.add(question)
         await self.session.flush()
@@ -242,6 +249,8 @@ class TestRepository(BaseRepository[Test]):
         display_order: int,
         expected_answer: str,
         answer_inferred: bool = False,
+        group_id: Optional[int] = None,
+        part_label: Optional[str] = None,
     ) -> Question:
         question = Question(
             test_id=test_id,
@@ -249,11 +258,23 @@ class TestRepository(BaseRepository[Test]):
             question_type="FRQ",
             display_order=display_order,
             answer_inferred=answer_inferred,
+            group_id=group_id,
+            part_label=part_label,
         )
         self.session.add(question)
         await self.session.flush()
         self.session.add(FRQAnswer(question_id=question.id, expected_answer=expected_answer))
         return question
+
+    async def add_question_group(self, test_id: int, label: str, stem: str) -> QuestionGroup:
+        """One multi-part problem's shared setup (GH #151), after the test's last group."""
+        last = await self.session.scalar(
+            select(func.coalesce(func.max(QuestionGroup.display_order), 0)).where(QuestionGroup.test_id == test_id)
+        )
+        group = QuestionGroup(test_id=test_id, label=label[:50], stem=stem, display_order=int(last or 0) + 1)
+        self.session.add(group)
+        await self.session.flush()
+        return group
 
     async def delete(self, test: Test) -> None:
         await self.session.delete(test)
@@ -280,6 +301,15 @@ class TestRepository(BaseRepository[Test]):
         )
         return await self.session.scalar(stmt)
 
+    async def get_group_owned(self, group_id: int, test_id: int, user_id: int) -> Optional[QuestionGroup]:
+        stmt = (
+            select(QuestionGroup)
+            .join(Test, Test.id == QuestionGroup.test_id)
+            .join(Folder, Folder.id == Test.folder_id)
+            .where(QuestionGroup.id == group_id, QuestionGroup.test_id == test_id, Folder.user_id == user_id)
+        )
+        return await self.session.scalar(stmt)
+
     async def get_max_display_order(self, test_id: int) -> int:
         result = await self.session.scalar(
             select(func.max(Question.display_order)).where(Question.test_id == test_id)
@@ -301,3 +331,44 @@ class TestRepository(BaseRepository[Test]):
     async def delete_question(self, question: Question) -> None:
         await self.session.delete(question)
 
+
+
+async def add_generated_questions(repo: TestRepository, test_id: int, mcq: list, frq: list, start_order: int) -> int:
+    """Write generated MCQ/FRQ items; return the next display_order.
+
+    Items with a document order (seq, recreated practice tests) are written in
+    that order across both types, so a problem's parts stay together, and each
+    multi-part problem gets one QuestionGroup holding its setup (GH #151).
+    Items without seq keep the old order: every MCQ, then every FRQ. Groups are
+    matched within this one call only; every practice path persists its
+    questions in a single call.
+    """
+    items: list[tuple[str, object]] = [("mcq", q) for q in mcq] + [("frq", q) for q in frq]
+    if any(getattr(q, "seq", None) is not None for _, q in items):
+        unordered = max((q.seq for _, q in items if getattr(q, "seq", None) is not None), default=0) + 1
+        items = sorted(items, key=lambda pair: pair[1].seq if pair[1].seq is not None else unordered)
+    group_ids: dict[str, int] = {}
+    display_order = start_order
+    for kind, item in items:
+        group_key = getattr(item, "group_key", None)
+        part_label = getattr(item, "part_label", None)
+        group_id: Optional[int] = None
+        if group_key and part_label:
+            if group_key not in group_ids:
+                group = await repo.add_question_group(test_id, item.group_label or "", item.group_stem or "")
+                group_ids[group_key] = group.id
+            group_id = group_ids[group_key]
+        grouping = {"group_id": group_id, "part_label": part_label} if group_id is not None else {}
+        if kind == "mcq":
+            options = [(text, index == item.correct_index) for index, text in enumerate(item.options)]
+            await repo.add_mcq_question(
+                test_id, item.question_text, display_order, options,
+                answer_inferred=item.answer_inferred, **grouping,
+            )
+        else:
+            await repo.add_frq_question(
+                test_id, item.question_text, display_order, item.expected_answer,
+                answer_inferred=item.answer_inferred, **grouping,
+            )
+        display_order += 1
+    return display_order

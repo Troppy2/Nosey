@@ -10,6 +10,7 @@ from src.models.base import BIGINT_ID, Base
 if TYPE_CHECKING:
     from src.models.frq_answer import FRQAnswer
     from src.models.mcq_option import MCQOption
+    from src.models.question_group import QuestionGroup
     from src.models.test import Test
     from src.models.user_answer import UserAnswer
 
@@ -30,6 +31,12 @@ class Question(Base):
     answer_inferred: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )
+    # Multi-part practice problems (GH #151): the shared setup lives on the
+    # group, this row holds one part. Both None for an ordinary question.
+    group_id: Mapped[Optional[int]] = mapped_column(
+        BIGINT_ID, ForeignKey("question_groups.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    part_label: Mapped[Optional[str]] = mapped_column(String(8))
 
     test: Mapped[Test] = relationship("Test", back_populates="questions")
     mcq_options: Mapped[list[MCQOption]] = relationship(
@@ -44,6 +51,21 @@ class Question(Base):
     user_answers: Mapped[list[UserAnswer]] = relationship(
         "UserAnswer", back_populates="question", cascade="all, delete-orphan"
     )
+    group: Mapped[Optional[QuestionGroup]] = relationship("QuestionGroup", back_populates="questions")
 
     def __repr__(self) -> str:
         return f"Question(id={self.id!r}, type={self.question_type!r})"
+
+
+def full_question_text(question: Question) -> str:
+    """The text an LLM needs to understand this question on its own.
+
+    A part of a multi-part problem (GH #151) is stored without the setup it
+    depends on ("(b) Find its inverse"), so every grader, explainer and
+    summary gets the setup first. The group must already be loaded.
+    """
+    group = question.__dict__.get("group")
+    if group is None or not (group.stem or "").strip():
+        return question.question_text
+    part = f"({question.part_label}) " if question.part_label else ""
+    return f"{group.stem.strip()}\n\n{part}{question.question_text}"

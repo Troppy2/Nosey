@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.models.question import full_question_text
 from src.repositories.attempt_repository import AttemptRepository
 from src.repositories.folder_repository import FolderRepository
 from src.repositories.kojo_repository import KojoRepository
@@ -84,7 +85,7 @@ def _format_wrong_answers_context(wrong_answers_data: list[tuple]) -> str:
     for i, (question, user_answer) in enumerate(wrong_answers_data, 1):
         lines.append(f"\n--- Question {i} ---")
         lines.append(f"Type: {question.question_type.upper()}")
-        lines.append(f"Question: {question.question_text}")
+        lines.append(f"Question: {full_question_text(question)}")
         lines.append(f"Student's Answer: {user_answer.user_answer}")
 
         if question.question_type == "MCQ":
@@ -351,7 +352,8 @@ async def _stream_answer(
 
 def _test_question_text(question) -> str:
     """Question text plus option texts (never which option is correct)."""
-    lines = [question.question_text.strip()]
+    # A part of a multi-part problem carries its setup (GH #151).
+    lines = [full_question_text(question).strip()]
     options = [o.option_text for o in (getattr(question, "mcq_options", None) or [])]
     if options:
         lines.append("Options:")

@@ -317,10 +317,17 @@ export function PracticeProblemPicker({ folderId, fileId, problems, mode, initia
                       </span>
                     </div>
                     {r.error ? <p className="practice-status practice-status--error">{r.error}</p> : null}
+                    {/* A multi-part problem's setup, shown once above its parts (GH #151). */}
+                    {r.questions.find((q) => q.part_label && q.group_stem)?.group_stem ? (
+                      <div className="pp-setup">
+                        <span className="muted small">Setup</span>
+                        <MarkdownContent content={r.questions.find((q) => q.part_label && q.group_stem)?.group_stem ?? ""} />
+                      </div>
+                    ) : null}
                     {r.questions.map((q, i) => (
                       <div key={i} className="pp-question">
                         <span className="muted small">
-                          {r.questions.length > 1 ? `Question ${i + 1} · ` : ""}
+                          {q.part_label ? `Part (${q.part_label}) · ` : r.questions.length > 1 ? `Question ${i + 1} · ` : ""}
                           {q.kind === "mcq" ? "Multiple choice" : "Written"}
                           {q.answer_inferred ? " · Answer worked out by Nosey" : ""}
                         </span>

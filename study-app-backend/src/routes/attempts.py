@@ -218,7 +218,12 @@ async def generate_review_summary(
 
     missed_dicts = [
         {
-            "question_text": a.question_text,
+            # A part of a multi-part problem reads with its setup (GH #151).
+            "question_text": (
+                f"{a.group_stem.strip()}\n\n({a.part_label}) {a.question_text}"
+                if a.group_stem and a.group_stem.strip()
+                else a.question_text
+            ),
             "user_answer": a.user_answer,
             "correct_answer": a.correct_answer,
             "feedback": a.feedback,

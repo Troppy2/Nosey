@@ -470,19 +470,42 @@ export default function Results() {
           <h2>Answer Review</h2>
         </div>
         <div className="review-list">
-          {attempt.answers.map((answer, i) =>
-            answer.ocr_status === "needs_input" ? (
-              <NeedsInputItem
-                answer={answer}
-                attemptId={Number(attempt.id)}
-                key={answer.question_id}
-                number={i + 1}
-                onRegraded={applyRegrade}
-              />
-            ) : (
-              <ReviewItem answer={answer} key={answer.question_id} number={i + 1} />
-            ),
-          )}
+          {reviewBlocks(attempt.answers).map((block, blockIndex) => {
+            const items = block.answers.map((answer) => {
+              const label = block.groupId != null ? `Part (${answer.part_label ?? "?"})` : `Question ${blockIndex + 1}`;
+              return answer.ocr_status === "needs_input" ? (
+                <NeedsInputItem
+                  answer={answer}
+                  attemptId={Number(attempt.id)}
+                  key={answer.question_id}
+                  label={label}
+                  onRegraded={applyRegrade}
+                />
+              ) : (
+                <ReviewItem answer={answer} key={answer.question_id} label={label} />
+              );
+            });
+            if (block.groupId == null) return items;
+            // A multi-part problem (GH #151): its setup once, then its parts.
+            const first = block.answers[0];
+            const right = block.answers.filter((a) => a.is_correct).length;
+            return (
+              <div className="review-problem" key={`group-${block.groupId}`}>
+                <div className="review-problem-head">
+                  <span className="small muted">
+                    Question {blockIndex + 1}
+                    {first.group_label ? `, problem ${first.group_label}` : ""} · {right} of {block.answers.length} parts right
+                  </span>
+                  {first.group_stem ? (
+                    <div className="review-question-markdown">
+                      <MarkdownContent content={first.group_stem} />
+                    </div>
+                  ) : null}
+                </div>
+                {items}
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -519,7 +542,22 @@ function formatAnswerForDisplay(raw: string): string {
   return raw;
 }
 
-function ReviewItem({ answer, number }: { answer: AnswerResult; number: number }) {
+// Consecutive answers of one multi-part problem form a block (GH #151); any
+// other answer is a block of its own.
+function reviewBlocks(answers: AnswerResult[]): { groupId: AnswerResult["group_id"]; answers: AnswerResult[] }[] {
+  const blocks: { groupId: AnswerResult["group_id"]; answers: AnswerResult[] }[] = [];
+  for (const answer of answers) {
+    const last = blocks[blocks.length - 1];
+    if (answer.group_id != null && last && last.groupId === answer.group_id) {
+      last.answers.push(answer);
+    } else {
+      blocks.push({ groupId: answer.group_id ?? null, answers: [answer] });
+    }
+  }
+  return blocks;
+}
+
+function ReviewItem({ answer, label }: { answer: AnswerResult; label: string }) {
   const [open, setOpen] = useState(false);
   const [reasoningOpen, setReasoningOpen] = useState(false);
   const Icon = answer.is_correct ? CheckCircle2 : XCircle;
@@ -534,7 +572,7 @@ function ReviewItem({ answer, number }: { answer: AnswerResult; number: number }
       <button className="review-trigger" onClick={() => setOpen(!open)} type="button">
         <Icon size={22} />
         <div>
-          <span className="small muted">Question {number}</span>
+          <span className="small muted">{label}</span>
           <div className="review-question-markdown">
             <MarkdownContent content={answer.question_text ?? `Question ${answer.question_id}`} />
           </div>
@@ -612,12 +650,12 @@ function ReviewItem({ answer, number }: { answer: AnswerResult; number: number }
 function NeedsInputItem({
   answer,
   attemptId,
-  number,
+  label,
   onRegraded,
 }: {
   answer: AnswerResult;
   attemptId: number;
-  number: number;
+  label: string;
   onRegraded: (response: RedoAnswerResponse) => void;
 }) {
   const initialStrokes = useMemo(() => parseScratchPadJson(answer.work_strokes), [answer.work_strokes]);
@@ -678,7 +716,7 @@ function NeedsInputItem({
       <div className="review-trigger needs-input-head">
         <PenLine size={22} />
         <div>
-          <span className="small muted">Question {number}, needs your input</span>
+          <span className="small muted">{label}, needs your input</span>
           <div className="review-question-markdown">
             <MarkdownContent content={answer.question_text ?? `Question ${answer.question_id}`} />
           </div>
@@ -704,7 +742,11 @@ function NeedsInputItem({
         ) : null}
         <div className="needs-input-fields">
           <ScratchPadTrigger
-            questionText={answer.question_text ?? ""}
+            questionText={
+              answer.group_stem
+                ? `${answer.group_stem}\n\n(${answer.part_label ?? "?"}) ${answer.question_text ?? ""}`
+                : answer.question_text ?? ""
+            }
             data={strokes}
             onChange={setStrokes}
             paperStyle={paperStyle}

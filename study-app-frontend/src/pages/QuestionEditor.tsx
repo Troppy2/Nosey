@@ -13,8 +13,9 @@ import {
   fetchQuestionsForEditing,
   fetchTest,
   updateQuestion,
+  updateQuestionGroup,
 } from "../lib/api";
-import type { MCQOptionInput, QuestionCreate, QuestionEditable, TestTake } from "../lib/types";
+import type { MCQOptionInput, QuestionCreate, QuestionEditable, QuestionGroup, TestTake } from "../lib/types";
 
 // Matches TakeTest's poll while a test generates in the background.
 const GENERATION_POLL_MS = 1800;
@@ -106,7 +107,9 @@ function MCQCard({
         />
       ) : null}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span className="eyebrow">Multiple choice</span>
+        <span className="eyebrow">
+          {question.part_label ? `Part (${question.part_label}) · ` : ""}Multiple choice
+        </span>
         <button
           type="button"
           onClick={() => setConfirmDelete(true)}
@@ -232,7 +235,10 @@ function FRQCard({
         />
       ) : null}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span className="eyebrow">{TYPE_LABELS[question.type] ?? "Written"}</span>
+        <span className="eyebrow">
+          {question.part_label ? `Part (${question.part_label}) · ` : ""}
+          {TYPE_LABELS[question.type] ?? "Written"}
+        </span>
         <button
           type="button"
           onClick={() => setConfirmDelete(true)}
@@ -410,6 +416,58 @@ function AddQuestionPanel({
 
 // Shown while the test is still generating: questions can still be rewritten
 // or dropped by MCQ verification until it finishes, so they are not editable yet.
+// A multi-part problem's setup (GH #151), shown above its parts and saved
+// once for all of them.
+function GroupSetupCard({
+  group,
+  testId,
+  onSaved,
+}: {
+  group: QuestionGroup;
+  testId: number;
+  onSaved: (group: QuestionGroup) => void;
+}) {
+  const [stem, setStem] = useState(group.stem);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    try {
+      onSaved(await updateQuestionGroup(testId, Number(group.id), { stem }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save the setup");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card className="form-panel editor-group-setup">
+      <span className="eyebrow">{group.label ? `Problem ${group.label}` : "Problem"} · Setup shared by its parts</span>
+      <textarea
+        className="field-input"
+        rows={4}
+        value={stem}
+        onChange={(e) => setStem(e.target.value)}
+        aria-label={`Setup for problem ${group.label}`}
+      />
+      <FormError message={error} />
+      <div className="button-row">
+        <Button
+          variant="secondary"
+          icon={<Save size={16} />}
+          onClick={() => void handleSave()}
+          disabled={saving || stem.trim() === group.stem.trim()}
+        >
+          {saving ? "Saving..." : "Save setup"}
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
 function QuestionPreview({ question, number }: { question: QuestionEditable; number: number }) {
   return (
     <Card className="form-panel editor-preview">
@@ -496,6 +554,10 @@ export default function QuestionEditor() {
     setQuestions((prev) => [...prev, q]);
   }
 
+  function handleGroupSaved(group: QuestionGroup) {
+    setQuestions((prev) => prev.map((q) => (q.group?.id === group.id ? { ...q, group } : q)));
+  }
+
   const expected = test?.expected_question_count;
   const backTo = test?.folder_id ? `/folders/${test.folder_id}` : "/dashboard";
 
@@ -545,8 +607,8 @@ export default function QuestionEditor() {
             </Card>
           )}
 
-          {questions.map((q) =>
-            q.type === "MCQ" ? (
+          {questions.map((q, i) => {
+            const card = q.type === "MCQ" ? (
               <MCQCard
                 key={q.id}
                 question={q}
@@ -562,8 +624,15 @@ export default function QuestionEditor() {
                 onSaved={handleSaved}
                 onDeleted={handleDeleted}
               />
-            )
-          )}
+            );
+            // First part of a multi-part problem: its setup goes above it.
+            const opensGroup = q.group && questions[i - 1]?.group?.id !== q.group.id;
+            if (!opensGroup || !q.group) return card;
+            return [
+              <GroupSetupCard key={`group-${q.group.id}`} group={q.group} testId={id} onSaved={handleGroupSaved} />,
+              card,
+            ];
+          })}
 
           <AddQuestionPanel testId={id} onAdded={handleAdded} />
 
