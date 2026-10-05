@@ -6016,6 +6016,54 @@ Return only the JSON object."""
             return str(content[0]["text"]).strip()
         return await self._with_retry(_do, "Claude vision")
 
+    async def _complete_vision_gemini(self, image_b64: str, media_type: str, prompt: str) -> str:
+        """Send one image plus a text prompt to Gemini and return its plain-text reply.
+
+        The free OCR engine for scratch-pad work (see ocr_service.py). Same
+        privacy rule as _complete_vision_anthropic: the image is assembled into
+        the request body here and never reaches a logger, an exception message
+        or safe_serialize_payload; only its byte length is logged.
+        """
+        model = settings.ocr_gemini_model or settings.google_ai_model
+
+        async def _do() -> str:
+            logger.debug(
+                "Sending vision payload provider=gemini image_bytes=%d media_type=%s",
+                len(image_b64),
+                media_type,
+            )
+            async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
+                response = await client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                    headers=_gemini_headers(),
+                    json={
+                        # Image before text, matching the Claude call.
+                        "contents": [{
+                            "parts": [
+                                {"inline_data": {"mime_type": media_type, "data": image_b64}},
+                                {"text": prompt},
+                            ],
+                        }],
+                        "generationConfig": {
+                            **_gemini_thinking_config(model),
+                            "maxOutputTokens": settings.llm_max_tokens,
+                            "temperature": 0.1,
+                        },
+                    },
+                )
+                response.raise_for_status()
+            payload = response.json()
+            record_parsed_usage("gemini", model, usage_from_gemini(payload))
+            try:
+                parts = payload["candidates"][0]["content"]["parts"]
+                text = "".join(str(part.get("text", "")) for part in parts).strip()
+            except (KeyError, IndexError, TypeError) as exc:
+                raise ValueError("Gemini vision response missing text content") from exc
+            if not text:
+                raise ValueError("Gemini vision response was empty")
+            return text
+        return await self._with_retry(_do, "Gemini vision")
+
     async def _complete_anthropic(self, prompt: str, max_tokens: Optional[int] = None) -> dict[str, object]:
         async def _do() -> dict[str, object]:
             # Haiku 4.5 has a 200K-token context window (~800K chars), so normal

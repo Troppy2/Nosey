@@ -24,11 +24,16 @@ logger = get_logger(__name__)
 # which also needs it and must not import this module).
 LOW_CONFIDENCE_THRESHOLD = OCR_LOW_CONFIDENCE_THRESHOLD
 
-_ENGINE_ALIASES = {"anthropic": "claude"}
+_ENGINE_ALIASES = {"anthropic": "claude", "google": "gemini"}
+
+# "auto" is not an engine: it means try the configured order (settings.ocr_engine_order).
+AUTO_ENGINE = "auto"
 
 _TRANSCRIBE_PROMPT = (
     "You are transcribing a student's handwritten math scratch work, exactly as written. "
-    "Do not solve the problem. Do not correct errors. Do not add steps. Transcribe only what is on the page.\n\n"
+    "Do not solve the problem. Do not correct errors. Do not add steps. Transcribe only what is on the page. "
+    "Highlighter color, boxes and underlines are not part of the math: leave them out of the transcript "
+    "(mention them in LAYOUT) and never write markup such as \\colorbox.\n\n"
     "Return your response as plain text in two sections, separated by a line containing only '---':\n\n"
     "1. TRANSCRIPT: every line of work, in order, as LaTeX where math notation appears. "
     "If a line is crossed out, wrap it in \\cancel{...} and still include it; a crossed-out attempt is "
@@ -41,7 +46,7 @@ _TRANSCRIBE_PROMPT = (
 
 
 def _normalize_engine(name: Optional[str]) -> str:
-    value = (name or "claude").strip().lower()
+    value = (name or AUTO_ENGINE).strip().lower()
     return _ENGINE_ALIASES.get(value, value)
 
 
@@ -58,11 +63,10 @@ def _parse_transcription(raw: str, engine: str) -> OcrResult:
     layout_notes = None if not layout_raw or layout_raw.upper() == "NONE" else layout_raw
     if not transcript or transcript.upper() == "NONE":
         transcript = ""
-    # Claude has no native confidence score for this task; a fixed value that
-    # sits above the low-confidence floor reflects that vision transcription
-    # of legible handwriting is generally reliable, while leaving room for a
-    # future engine (or a future prompt asking Claude to self-report) to
-    # report a real per-transcript number.
+    # Neither vision model reports a confidence score for this task; a fixed
+    # value that sits above the low-confidence floor reflects that vision
+    # transcription of legible handwriting is generally reliable, while
+    # leaving room for a future engine to report a real per-transcript number.
     confidence = 0.75 if transcript else 0.0
     return OcrResult(transcript=transcript, layout_notes=layout_notes, confidence=confidence, engine=engine)
 
@@ -72,13 +76,48 @@ async def _transcribe_claude(image_b64: str, media_type: str) -> OcrResult:
     return _parse_transcription(raw, engine="claude")
 
 
+async def _transcribe_gemini(image_b64: str, media_type: str) -> OcrResult:
+    raw = await LLMService()._complete_vision_gemini(image_b64, media_type, _TRANSCRIBE_PROMPT)
+    return _parse_transcription(raw, engine="gemini")
+
+
 # Module-level constant, not a class attribute: CLAUDE.md bans shared mutable
-# state on services. There is exactly one engine in v1; see
-# ocr-routing.md for why a candidate-fallback loop is deliberately not built
-# until a second engine exists to inform its ordering.
+# state on services.
 _OCR_ENGINES: dict[str, Callable[[str, str], Awaitable[OcrResult]]] = {
     "claude": _transcribe_claude,
+    "gemini": _transcribe_gemini,
 }
+
+
+def _engine_has_key(name: str) -> bool:
+    from src.config import settings
+
+    return bool({"claude": settings.anthropic_api_key, "gemini": settings.google_ai_api_key}.get(name))
+
+
+def _candidate_ocr_engines(requested: Optional[str]) -> list[str]:
+    """Engines to try, in order.
+
+    A pinned engine goes first and the rest of the configured order follow it,
+    so one provider's outage or rate limit never fails a submission. "auto"
+    (the default) is just the configured order, free engine first. Engines
+    with no API key are skipped. Never empty: with no keys at all Claude is
+    returned so the failure is logged against a real engine.
+    """
+    from src.config import settings
+
+    order = [
+        e for e in (_normalize_engine(part) for part in settings.ocr_engine_order.split(","))
+        if e in _OCR_ENGINES
+    ]
+    for engine in _OCR_ENGINES:
+        if engine not in order:
+            order.append(engine)
+    pinned = _normalize_engine(requested)
+    if pinned in _OCR_ENGINES:
+        order = [pinned] + [e for e in order if e != pinned]
+    keyed = [e for e in order if _engine_has_key(e)]
+    return keyed or ["claude"]
 
 
 class OcrService:
@@ -93,17 +132,19 @@ class OcrService:
         ocr-routing.md); a transcription failure must degrade to grading as if
         no drawing had been submitted, never fail the whole submission.
         """
-        normalized = _normalize_engine(engine)
-        adapter = _OCR_ENGINES.get(normalized)
-        if adapter is None:
-            logger.warning("Unknown OCR engine %r requested; falling back to claude", engine)
-            adapter = _OCR_ENGINES["claude"]
-            normalized = "claude"
-        try:
-            return await adapter(image_b64, media_type)
-        except Exception as exc:
-            logger.warning("OCR transcription failed (engine=%s): %s", normalized, exc)
-            return None
+        # A bounded loop over the configured engines, one call each: a failure
+        # or an empty read moves on to the next engine (never re-raised, per the
+        # provider-loop rule), and only when every engine fails is None returned.
+        for name in _candidate_ocr_engines(engine):
+            try:
+                result = await _OCR_ENGINES[name](image_b64, media_type)
+            except Exception as exc:
+                logger.warning("OCR transcription failed (engine=%s): %s", name, exc)
+                continue
+            if result.transcript:
+                return result
+            logger.info("OCR engine %s read nothing; trying the next one", name)
+        return None
 
 
 def check_ocr_engines_status() -> dict[str, bool]:
@@ -114,7 +155,7 @@ def check_ocr_engines_status() -> dict[str, bool]:
     """
     from src.config import settings
 
-    return {"claude": bool(settings.anthropic_api_key)}
+    return {"claude": bool(settings.anthropic_api_key), "gemini": bool(settings.google_ai_api_key)}
 
 
 def valid_ocr_engines() -> set[str]:

@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     google_ai_model: str = Field(default="gemini-3.1-flash-lite", alias="GOOGLE_AI_MODEL")
     anthropic_api_key: Optional[str] = Field(default=None, alias="ANTHROPIC_API_KEY")
     anthropic_model: str = Field(default="claude-haiku-4-5-20251001", alias="ANTHROPIC_MODEL")
+    # Scratch-pad OCR engines to try, in order, when no engine is pinned. The
+    # free one first; Claude catches a Gemini failure or empty read.
+    ocr_engine_order: str = Field(default="gemini,claude", alias="OCR_ENGINE_ORDER")
+    # Vision model for Gemini OCR; empty means the same model as text generation.
+    ocr_gemini_model: str = Field(default="", alias="OCR_GEMINI_MODEL")
     # MiniMax via OpenRouter (provider name "minimax"). Replaced Gemini in the
     # auto chain on 2026-09-25. Model id is env config like the Groq ones.
     openrouter_api_key: Optional[str] = Field(default=None, alias="OPENROUTER_API_KEY")
