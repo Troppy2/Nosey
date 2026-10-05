@@ -297,7 +297,10 @@ const MAX_ZOOM = 3;
 const ZOOM_STEP = 1.25;
 // A canvas backing store above this many pixels is rendered at a lower density
 // instead of risking the browser's memory limit when zoomed in.
-const MAX_CANVAS_PIXELS = 36_000_000;
+const MAX_CANVAS_PIXELS = 16_000_000;
+// A continuous zoom (pinch, Ctrl+wheel) is shown as a GPU scale of the page and
+// the canvases are rebuilt once, this long after the last zoom event.
+const ZOOM_SETTLE_MS = 140;
 const ERASER_MIN_PX = 6;
 const ERASER_MAX_PX = 64;
 const ERASER_DEFAULT_PX = 16;
@@ -849,17 +852,21 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     // mode switch or a scrollbar appearing fires several resize callbacks in a
     // row, and each rebuild clears and repaints every layer: that is the
     // flicker.
-    const sizeKey = [cssWidth, cssAvailHeight, logicalW, pageHeight, zoomRef.current, window.devicePixelRatio].join("x");
+    const z = zoomRef.current;
+    const sizeKey = [cssWidth, cssAvailHeight, logicalW, pageHeight, z, window.devicePixelRatio].join("x");
     if (sizeKey === lastSizeKeyRef.current) return;
     lastSizeKeyRef.current = sizeKey;
-    const baseScale = cssWidth / logicalW;
-    const scale = baseScale * zoomRef.current;
-    const pageCssWidth = cssWidth * zoomRef.current;
+    // Zoomed in, the page is wider than the window and scrolls. Zoomed out,
+    // the page still fills the window but holds more of the sheet, so zooming
+    // out shows more work instead of a small page in a big empty box.
+    const zoomedW = z < 1 ? Math.min(MAX_LOGICAL_WIDTH, Math.ceil(logicalW / z / 50) * 50) : logicalW;
+    const pageCssWidth = z < 1 ? cssWidth : cssWidth * z;
+    const scale = pageCssWidth / zoomedW;
     // Never shorter than the window: a tall window gets a taller sheet, so
     // there is no dead strip under the paper.
-    const logicalH = Math.max(pageHeight, Math.floor(cssAvailHeight / baseScale));
+    const logicalH = Math.max(pageHeight, Math.floor(cssAvailHeight / scale));
     const cssHeight = logicalH * scale;
-    dimsRef.current = { w: logicalW, h: logicalH, scale };
+    dimsRef.current = { w: zoomedW, h: logicalH, scale };
     const wantDpr = window.devicePixelRatio || 1;
     const dpr = Math.min(wantDpr, Math.sqrt(MAX_CANVAS_PIXELS / Math.max(1, pageCssWidth * cssHeight)));
     page.style.width = `${pageCssWidth}px`;
@@ -1308,7 +1315,7 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
       const pinch = pinchRef.current;
       if (pinch && touchesRef.current.size === 2) {
         const [a, b] = Array.from(touchesRef.current.values());
-        setZoomTo(pinch.startZoom * (Math.hypot(a.x - b.x, a.y - b.y) / pinch.startDist), {
+        previewZoom(pinch.startZoom * (Math.hypot(a.x - b.x, a.y - b.y) / pinch.startDist), {
           clientX: (a.x + b.x) / 2,
           clientY: (a.y + b.y) / 2,
         });
@@ -1406,7 +1413,10 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
   function endTouch(pointerId: number) {
     penDownRef.current.delete(pointerId);
     touchesRef.current.delete(pointerId);
-    if (touchesRef.current.size < 2) pinchRef.current = null;
+    if (touchesRef.current.size < 2 && pinchRef.current) {
+      pinchRef.current = null;
+      commitZoomPreview();
+    }
   }
 
   function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -1454,9 +1464,61 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
 
   // Sets the zoom and keeps whatever is under `anchor` (the viewport centre by
   // default) where it is, so zooming does not throw the page off screen.
+  // A pinch or Ctrl+wheel in progress: the target zoom and the page point
+  // (in logical units) that must stay under the fingers or the pointer.
+  const previewRef = useRef<{ target: number; lx: number; ly: number; ax: number; ay: number } | null>(null);
+  const settleTimerRef = useRef<number | null>(null);
+
+  // Shows a zoom instantly as a GPU scale of the already painted page; the
+  // canvases are rebuilt once when the gesture settles. Rebuilding three
+  // full-page canvases on every wheel tick or pinch frame is what made zoom
+  // slow and stiff.
+  function previewZoom(requested: number, anchor: { clientX: number; clientY: number }) {
+    const container = containerRef.current;
+    const page = pageRef.current;
+    if (!container || !page) return;
+    const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, requested));
+    const rect = container.getBoundingClientRect();
+    const ax = Math.min(rect.width, Math.max(0, anchor.clientX - rect.left));
+    const ay = Math.min(rect.height, Math.max(0, anchor.clientY - rect.top));
+    if (!previewRef.current) {
+      const s0 = dimsRef.current.scale;
+      previewRef.current = { target: next, lx: (container.scrollLeft + ax) / s0, ly: (container.scrollTop + ay) / s0, ax, ay };
+    }
+    const preview = previewRef.current;
+    preview.target = next;
+    const s0 = dimsRef.current.scale;
+    const ratio = next / zoomRef.current;
+    page.style.transformOrigin = `${preview.lx * s0}px ${preview.ly * s0}px`;
+    page.style.transform = `scale(${ratio})`;
+    setZoom(next);
+    if (settleTimerRef.current != null) window.clearTimeout(settleTimerRef.current);
+    settleTimerRef.current = window.setTimeout(commitZoomPreview, ZOOM_SETTLE_MS);
+  }
+
+  function commitZoomPreview() {
+    if (settleTimerRef.current != null) {
+      window.clearTimeout(settleTimerRef.current);
+      settleTimerRef.current = null;
+    }
+    const preview = previewRef.current;
+    const container = containerRef.current;
+    const page = pageRef.current;
+    previewRef.current = null;
+    if (!preview || !container || !page) return;
+    page.style.transform = "";
+    page.style.transformOrigin = "";
+    zoomRef.current = preview.target;
+    setZoom(preview.target);
+    applySizeRef.current();
+    container.scrollLeft = preview.lx * dimsRef.current.scale - preview.ax;
+    container.scrollTop = preview.ly * dimsRef.current.scale - preview.ay;
+  }
+
   function setZoomTo(requested: number, anchor?: { clientX: number; clientY: number }) {
     const container = containerRef.current;
     if (!container) return;
+    if (previewRef.current) commitZoomPreview();
     const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, requested));
     if (Math.abs(next - zoomRef.current) < 0.001) return;
     const rect = container.getBoundingClientRect();
@@ -1633,22 +1695,32 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
   function zoomBy(factor: number) {
     setZoomTo(factor === 0 ? 1 : zoomRef.current * factor);
   }
-  const actionsRef = useRef({ deleteSelection, undo, importImage, importFromClipboard, setSelection, copySelection, cutSelection, pasteInk, setNotice, zoomBy, setZoomTo });
-  actionsRef.current = { deleteSelection, undo, importImage, importFromClipboard, setSelection, copySelection, cutSelection, pasteInk, setNotice, zoomBy, setZoomTo };
+  const actionsRef = useRef({ deleteSelection, undo, importImage, importFromClipboard, setSelection, copySelection, cutSelection, pasteInk, setNotice, zoomBy, setZoomTo, previewZoom });
+  actionsRef.current = { deleteSelection, undo, importImage, importFromClipboard, setSelection, copySelection, cutSelection, pasteInk, setNotice, zoomBy, setZoomTo, previewZoom };
 
   // Ctrl+wheel (and a trackpad pinch, which arrives the same way) zooms toward
   // the pointer. Attached natively because React's wheel listener is passive
   // and could not stop the browser zooming the whole page instead.
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return undefined;
+    // On the window, not the canvas: the pad covers the screen, and a Ctrl+wheel
+    // or trackpad pinch anywhere over it must zoom the pad, never the browser.
+    // The handler returns at once for plain scrolling, so it does not slow it.
     function onWheel(e: WheelEvent) {
       if (!e.ctrlKey) return;
       e.preventDefault();
-      actionsRef.current.setZoomTo(zoomRef.current * Math.exp(-e.deltaY * 0.01), { clientX: e.clientX, clientY: e.clientY });
+      const base = previewRef.current?.target ?? zoomRef.current;
+      actionsRef.current.previewZoom(base * Math.exp(-e.deltaY * 0.01), { clientX: e.clientX, clientY: e.clientY });
     }
-    container.addEventListener("wheel", onWheel, { passive: false });
-    return () => container.removeEventListener("wheel", onWheel);
+    // Safari's own pinch-zoom gesture.
+    const stopGesture = (e: Event) => e.preventDefault();
+    window.addEventListener("wheel", onWheel, { passive: false });
+    window.addEventListener("gesturestart", stopGesture);
+    window.addEventListener("gesturechange", stopGesture);
+    return () => {
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("gesturestart", stopGesture);
+      window.removeEventListener("gesturechange", stopGesture);
+    };
   }, []);
 
   useEffect(() => {
@@ -1941,8 +2013,8 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
           {notice}
         </p>
       ) : null}
-      <div ref={containerRef} className={`scratchpad-canvas-container ${paperClass}`}>
-        <div ref={pageRef} className="scratchpad-page">
+      <div ref={containerRef} className="scratchpad-canvas-container">
+        <div ref={pageRef} className={`scratchpad-page ${paperClass}`}>
           <canvas ref={staticCanvasRef} className="scratchpad-canvas scratchpad-canvas--static" aria-hidden="true" />
           <canvas ref={overlayCanvasRef} className="scratchpad-canvas scratchpad-canvas--overlay" aria-hidden="true" />
           <canvas
