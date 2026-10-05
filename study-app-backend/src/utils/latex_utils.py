@@ -146,8 +146,10 @@ def format_final_answer(answer: str) -> str:
     sentence (or anything already holding inline $...$) is prose with its
     maths delimited; only a bare expression becomes a display block.
     """
-    text = answer.strip()
+    text = replace_tikz(answer.strip())
     if not text:
+        return text
+    if text == TIKZ_FALLBACK:
         return text
     if "$" in text:
         inner = _OUTER_DELIMS_RE.match(text)
@@ -166,6 +168,27 @@ def format_final_answer(answer: str) -> str:
     return f"$${text}$$"
 
 
+_TIKZ_RE = re.compile(
+    r"\$*\\begin\{(tikzpicture|pgfpicture)\}[\s\S]*?\\end\{\1\}\$*"
+    r"|\$*\\begin\{tikzpicture\}[\s\S]*$",
+)
+TIKZ_FALLBACK = "*(A graph goes here, but it was written in a drawing format Nosey can't display.)*"
+
+
+def replace_tikz(text: str) -> str:
+    """Swap TikZ/pgf drawing code for a short note (GH #156).
+
+    KaTeX cannot draw TikZ, so it printed as a wall of source code. Prompts
+    ban it; this catches what still gets through, including a picture cut
+    off before its \\end.
+    """
+    if not text or "\\begin{" not in text:
+        return text
+    # Code fences are left alone: TikZ shown as code is meant to be read.
+    parts = re.split(r"(```[\s\S]*?(?:```|$))", text)
+    return "".join(part if part.startswith("```") else _TIKZ_RE.sub(TIKZ_FALLBACK, part) for part in parts)
+
+
 def normalize_latex(text: str) -> str:
     """Normalize common LaTeX usage in free text.
 
@@ -177,7 +200,7 @@ def normalize_latex(text: str) -> str:
     """
     if not text:
         return text
-    text = balance_display_delimiters(text)
+    text = balance_display_delimiters(replace_tikz(text))
 
     out: List[str] = []
     last = 0

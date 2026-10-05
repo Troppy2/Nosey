@@ -23,7 +23,7 @@ from src.services.lc_taxonomy import (
 )
 from src.services.rag_service import HybridRAGService
 from src.utils.logger import get_logger
-from src.utils.latex_utils import format_final_answer as _format_final_answer, normalize_latex
+from src.utils.latex_utils import format_final_answer as _format_final_answer, normalize_latex, replace_tikz
 from src.utils.serialization import safe_serialize_payload
 from src.utils.usage_context import (
     StreamUsage,
@@ -542,6 +542,8 @@ _PRACTICE_SHARED_RULES = (
     "- Math: write it in LaTeX between $...$ (inline) or $$...$$ (display). The text came from a PDF and "
     "math may be garbled (\"x [T]\" is $x^T$, \"R [3]\" is $\\mathbb{R}^3$, \"y ˆ\" is $\\hat{y}$); "
     "restore what was meant.\n"
+    "- Never write TikZ, pgfplots or any LaTeX picture environment (it cannot be displayed). An answer "
+    "that is a graph or chart is written as its plotted values in a Markdown table, or as its equation.\n"
 )
 # The per-problem parse groups whole problems into calls up to this size.
 _PRACTICE_PROBLEM_BATCH_CHARS = 8_000
@@ -804,6 +806,87 @@ def _render_math_steps(steps: list[dict[str, str]]) -> str:
             line += f"  $${step['expression']}$$"
         lines.append(line)
     return "\n\n".join(lines)
+
+
+_GRAPH_MAX_POINTS = 60
+_GRAPH_FN_RE = re.compile(r"^[0-9a-z+\-*/^().,\s]{1,120}$")
+
+
+def _graph_series(raw: object) -> Optional[tuple[list, list[float]]]:
+    """x and y of one plotted series, or None when it is not usable data."""
+    if not isinstance(raw, dict):
+        return None
+    xs, ys = raw.get("x"), raw.get("y")
+    if not isinstance(xs, list) or not isinstance(ys, list) or not xs or len(xs) != len(ys):
+        return None
+    if len(xs) > _GRAPH_MAX_POINTS:
+        return None
+    try:
+        y_values = [float(y) for y in ys]
+    except (TypeError, ValueError):
+        return None
+    x_values = [x if isinstance(x, (int, float)) else str(x)[:40] for x in xs]
+    return x_values, y_values
+
+
+def _graph_fn(raw: object) -> Optional[dict]:
+    if not isinstance(raw, dict):
+        return None
+    fn = str(raw.get("fn", "")).strip().lower()
+    if not _GRAPH_FN_RE.match(fn):
+        return None
+    domain = raw.get("domain")
+    if isinstance(domain, list) and len(domain) == 2 and all(isinstance(d, (int, float)) for d in domain):
+        return {"fn": fn, "domain": [float(domain[0]), float(domain[1])]}
+    return {"fn": fn}
+
+
+def render_answer_graph(raw: object) -> Optional[str]:
+    """The grader's graph object as a chart/graph fence the frontend draws
+    (components/visuals/VisualBlock.tsx), correct vs the student's (GH #156).
+
+    The model sends plain data, never drawing code; it is validated and
+    re-serialized here, so a malformed graph is simply left out.
+    """
+    if not isinstance(raw, dict):
+        return None
+    kind = str(raw.get("type", "")).lower()
+    title = str(raw.get("title", "") or "")[:80]
+    x_label = str(raw.get("x_label", "") or "")[:40]
+    y_label = str(raw.get("y_label", "") or "")[:40]
+    if kind == "function":
+        correct, student = _graph_fn(raw.get("correct")), _graph_fn(raw.get("student"))
+        if correct is None:
+            return None
+        domain = correct.get("domain") or (student or {}).get("domain")
+        spec: dict = {
+            "title": title or None,
+            "xAxis": {**({"domain": domain} if domain else {}), **({"label": x_label} if x_label else {})},
+            "yAxis": {"label": y_label} if y_label else {},
+            "data": [{"fn": correct["fn"]}] + ([{"fn": student["fn"]}] if student else []),
+        }
+        caption = "**Graph:** green is the correct curve" + (", blue is yours." if student else ".")
+        return f"{caption}\n\n```graph\n{json.dumps(spec)}\n```"
+    if kind not in ("bar", "line", "scatter"):
+        return None
+    correct, student = _graph_series(raw.get("correct")), _graph_series(raw.get("student"))
+    if correct is None:
+        return None
+    trace_base = {"type": "bar"} if kind == "bar" else {
+        "type": "scatter", "mode": "lines+markers" if kind == "line" else "markers",
+    }
+    traces = [{**trace_base, "name": "Correct", "x": correct[0], "y": correct[1]}]
+    if student is not None:
+        traces.append({**trace_base, "name": "Yours", "x": student[0], "y": student[1]})
+    layout: dict = {"barmode": "group", "showlegend": student is not None}
+    if title:
+        layout["title"] = title
+    if x_label:
+        layout["xaxis"] = {"title": x_label}
+    if y_label:
+        layout["yaxis"] = {"title": y_label}
+    heading = "**Graph: correct vs yours**" if student is not None else "**Graph**"
+    return f"{heading}\n\n```chart\n{json.dumps({'data': traces, 'layout': layout})}\n```"
 
 
 def _render_final_answers(finals: list[tuple[str, str]]) -> str:
@@ -2250,8 +2333,8 @@ class LLMService:
         """One extracted written question, or None for an empty or non-answer."""
         if not isinstance(item, dict):
             return None
-        question = str(item.get("question_text") or "").strip()
-        answer = str(item.get("expected_answer") or "").strip()
+        question = replace_tikz(str(item.get("question_text") or "").strip())
+        answer = replace_tikz(str(item.get("expected_answer") or "").strip())
         if not question or not answer or _NON_ANSWER_RE.search(answer):
             return None
         return GeneratedFRQ(
@@ -2880,6 +2963,7 @@ Then return JSON only with these exact keys:
   "final_answers": [
     {{"part": "a", "answer": "the correct final answer for this part (format rules below)"}}
   ],
+  "graph": null or a graph object (graph rules below),
   "confidence": 0.0 to 1.0,
   "flagged_uncertain": true or false
 }}
@@ -2908,7 +2992,16 @@ Rules:
 - "answer" in final_answers: if it is a number or an expression, bare LaTeX with no dollar signs
   (e.g. x = 4). If it is a word (True, False, Yes) or a sentence, plain text with any math inside
   it wrapped in single dollar signs. Never put a sentence inside \\text{{}}.
-- Never use TikZ, pgfplots or any LaTeX picture environment.
+- Never use TikZ, pgfplots or any LaTeX picture environment. Graphs go in "graph" only.
+- "graph": null unless the question asks the student to draw, sketch, plot or chart something, or
+  the answer is a distribution, histogram or function graph. Then:
+  {{"type": "bar" | "line" | "scatter" | "function", "title": "...", "x_label": "...", "y_label": "...",
+    "correct": {{"x": [0, 1, 2], "y": [0.41, 0.37, 0.16]}},
+    "student": the same shape for what the student drew or wrote, or null if they gave no graph}}
+  For "function", correct and student are {{"fn": "x^2 - 4", "domain": [-5, 5]}} with fn in plain math
+  syntax (x^2, sin(x), exp(x), sqrt(x)), NOT LaTeX. Read the student's graph from their answer, their
+  shown work and the spatial layout notes. When both exist, name each difference in what_went_wrong
+  ("your bar at $x = 1$ is $0.30$, it should be $0.37$").
 """
         try:
             # Shown-work grading is the most nuanced grading prompt in the app,
@@ -2950,6 +3043,9 @@ Rules:
                 sections.append(f"**What to fix:** {normalize_latex(what_wrong)}")
             if not is_correct and steps:
                 sections.append("**How to solve it**\n\n" + _render_math_steps(steps))
+            graph = render_answer_graph(data.get("graph"))
+            if graph:
+                sections.append(graph)
             if finals:
                 sections.append(_render_final_answers(finals))
             feedback = "\n\n".join(sections)
