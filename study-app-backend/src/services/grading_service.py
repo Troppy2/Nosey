@@ -34,7 +34,7 @@ from src.schemas.attempt_schema import (
 )
 from src.schemas.test_schema import WeaknessResponse
 from src.services.llm_service import LLMService
-from src.services.ocr_service import OcrService
+from src.services.ocr_service import OcrService, is_read_from_drawing
 from src.utils.exceptions import ResourceNotFoundException, ValidationException
 from src.utils.logger import get_logger
 from typing import Optional
@@ -127,9 +127,19 @@ def related_context(
     return "\n\n".join(entries)
 
 
+def _drawn_answer(work: Optional[OcrResult]) -> str:
+    """What a draw-only answer is stored and shown as: the working alone when
+    the reader trimmed it, else the whole transcript (GH #157)."""
+    if work is None:
+        return ""
+    return work.answer_work or work.transcript or ""
+
+
 def _context_answer(typed: str, transcript: Optional[str]) -> str:
     typed = (typed or "").strip()
     transcript = (transcript or "").strip()
+    if is_read_from_drawing(typed, transcript):
+        typed = ""
     if transcript and transcript != typed:
         return f"{typed}\nShown work: {transcript}" if typed else transcript
     return typed
@@ -302,7 +312,7 @@ class GradingService:
             # A draw-only answer (empty typed text) is persisted as its
             # transcript, so it is not stored as an empty string and Results
             # has something to show for "your answer".
-            user_answer = submitted.answer or (work_transcript or "")
+            user_answer = submitted.answer or _drawn_answer(question_work)
             ocr_status = OCR_STATUS_OK if submitted.work_image else None
             await repo.add_answer(
                 attempt.id,
@@ -519,7 +529,7 @@ class GradingService:
             )
 
         work_transcript = work.transcript if work is not None else row.work_transcript
-        row.user_answer = body.answer or (work.transcript if work is not None else "")
+        row.user_answer = body.answer or _drawn_answer(work)
         row.is_correct = grade.is_correct
         row.ai_feedback = grade.feedback
         row.ai_reasoning = grade.reasoning
@@ -591,7 +601,7 @@ class GradingService:
                 if row is None or row.ocr_status == OCR_STATUS_NEEDS_INPUT:
                     continue
                 transcript = (row.work_transcript or "").strip()
-                typed = "" if transcript and row.user_answer.strip() == transcript else row.user_answer
+                typed = "" if is_read_from_drawing(row.user_answer, transcript) else row.user_answer
                 work = OcrResult(transcript=transcript, confidence=1.0, engine="stored") if transcript else None
                 grade = await self._grade_question(
                     question,

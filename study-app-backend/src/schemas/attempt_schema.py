@@ -176,6 +176,10 @@ class OcrResult(BaseModel):
     # to false: an OCR misread must never read as "the student was wrong."
     confidence: float
     engine: str
+    # The student's working without restated problem text, headings or side
+    # remarks; shown as their answer when they drew it (GH #157). Grading
+    # still reads the full transcript. None when nothing was dropped.
+    answer_work: Optional[str] = None
 
 
 class DraftAttemptAnswer(BaseModel):
