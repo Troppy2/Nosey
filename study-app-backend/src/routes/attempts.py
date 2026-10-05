@@ -27,7 +27,7 @@ router = APIRouter(tags=["attempts"])
 
 
 @router.post("/tests/{test_id}/attempts", response_model=AttemptResult)
-# A submission can trigger up to 6 vision calls (STEM Scratch Pad feature),
+# A submission can trigger one vision call per drawing (STEM Scratch Pad feature),
 # so this route gets a rate limit for the first time; attempts.py previously
 # had none.
 @limiter.limit("10/minute;60/hour")
