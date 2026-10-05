@@ -24280,6 +24280,9 @@ button.lc-official-link:disabled:hover {
 .scratchpad-page {
   position: relative;
   width: 100%;
+  /* Its own layer: scrolling moves it instead of repainting, and a zoom in
+     progress is a scale of it. */
+  will-change: transform;
 }
 .scratchpad-canvas {
   position: absolute;
@@ -24333,7 +24336,6 @@ button.lc-official-link:disabled:hover {
    background-attachment: local keeps the ruling pinned to the page as it
    scrolls, rather than to the viewport, so lines stay under the ink. */
 .scratchpad-paper-lined {
-  background-attachment: local;
   background-image: repeating-linear-gradient(
     to bottom,
     transparent,
@@ -24342,7 +24344,6 @@ button.lc-official-link:disabled:hover {
   );
 }
 .scratchpad-paper-graph {
-  background-attachment: local;
   background-image:
     repeating-linear-gradient(to right, var(--green-lightest) 0 1px, transparent 1px 24px),
     repeating-linear-gradient(to bottom, var(--green-lightest) 0 1px, transparent 1px 24px);
@@ -27183,4 +27184,10 @@ a.sd-chip.is-done:hover {
 }
 .scratchpad-zoom + .scratchpad-finger-toggle {
   margin-left: 0;
+}
+
+/* Pinch anywhere over the scratch pad must never zoom the browser page; the
+   pad handles two-finger zoom itself. Single-finger panning still scrolls. */
+.scratchpad-backdrop {
+  touch-action: pan-x pan-y;
 }
