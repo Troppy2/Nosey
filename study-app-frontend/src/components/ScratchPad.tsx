@@ -853,6 +853,13 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
           await importImage(await item.getType(type));
           return;
         }
+        if (item.types.includes("text/html")) {
+          const html = await (await item.getType("text/html")).text();
+          if (/<img\b/i.test(html)) {
+            await importFromClipboard([], html, item.types.slice());
+            return;
+          }
+        }
       }
     } catch {
       /* clipboard read blocked or unsupported: fall through to the pad's own copy */
@@ -1197,7 +1204,10 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
 
   // Pasting a picture of handwriting traces it into pen strokes, below
   // whatever is already on the page (see lib/inkTrace.ts).
-  async function importImage(file: Blob) {
+  // Returns false only when the bytes are not a readable image, so a caller
+  // with other candidates (Samsung Notes and Word paste HTML or untyped files)
+  // can try the next one. quiet: leave the "couldn't read" notice to the caller.
+  async function importImage(file: Blob, quiet = false): Promise<boolean> {
     setNotice("Tracing your image...");
     try {
       const bitmap = await createImageBitmap(file);
@@ -1219,7 +1229,7 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
       const traced = traceInk({ data: image.data, width: w, height: h });
       if (traced.strokes.length === 0) {
         setNotice("Couldn't find any writing in that image.");
-        return;
+        return true;
       }
       const prev = localStrokesRef.current;
       const { w: pageW } = dimsRef.current;
@@ -1227,7 +1237,7 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
       const fit = Math.min(2, ((pageW - 80) * 0.6) / traced.width, (MAX_LOGICAL_HEIGHT - 120 - startY) / traced.height);
       if (fit < 0.25) {
         setNotice("There isn't enough room left on the page for that image.");
-        return;
+        return true;
       }
       const imported = traced.strokes.map((points) => ({
         points: points.map((v, i) => round1(i % 2 === 0 ? 40 + v * fit : startY + v * fit)),
@@ -1235,7 +1245,7 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
       const next = [...prev, ...imported];
       if (next.length > MAX_STROKES_PER_QUESTION || JSON.stringify({ version: 1, strokes: next }).length > MAX_STROKES_JSON_CHARS) {
         setNotice("That image is too detailed to add. Crop it to the part you need.");
-        return;
+        return true;
       }
       ensureHeight(startY + traced.height * fit);
       pushHistory(prev);
@@ -1251,14 +1261,34 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
           if (container) container.scrollTo({ top: Math.max(0, (startY - 40) * dimsRef.current.scale), behavior: "smooth" });
         }),
       );
+      return true;
     } catch {
-      setNotice("Couldn't read that image.");
+      if (!quiet) setNotice("Couldn't read that image.");
+      return false;
     }
   }
 
+  // Pasted content that is not a plain image item: files with no type, or an
+  // HTML snippet carrying an <img> (what Samsung Notes and Office put on the
+  // clipboard). Each candidate is tried until one reads as a picture.
+  async function importFromClipboard(files: Blob[], html: string, types: string[]) {
+    for (const file of files) if (await importImage(file, true)) return;
+    const src = html ? new DOMParser().parseFromString(html, "text/html").querySelector("img")?.getAttribute("src") : null;
+    if (src) {
+      try {
+        const blob = await (await fetch(src)).blob();
+        if (await importImage(blob, true)) return;
+      } catch {
+        /* a link the page cannot fetch (another site, a local file): fall through */
+      }
+    }
+    const seen = types.length ? ` (it had: ${types.join(", ")})` : "";
+    setNotice(`Couldn't find a picture in what you pasted${seen}. Try pasting a screenshot of your writing.`);
+  }
+
   // Window-level handlers need the latest closures but are attached once.
-  const actionsRef = useRef({ deleteSelection, undo, importImage, setSelection, copySelection, cutSelection, pasteInk });
-  actionsRef.current = { deleteSelection, undo, importImage, setSelection, copySelection, cutSelection, pasteInk };
+  const actionsRef = useRef({ deleteSelection, undo, importImage, importFromClipboard, setSelection, copySelection, cutSelection, pasteInk, setNotice });
+  actionsRef.current = { deleteSelection, undo, importImage, importFromClipboard, setSelection, copySelection, cutSelection, pasteInk, setNotice };
 
   useEffect(() => {
     const typingTarget = (t: EventTarget | null) => {
@@ -1288,16 +1318,29 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     }
     function onPaste(e: ClipboardEvent) {
       if (typingTarget(e.target)) return;
-      for (const item of Array.from(e.clipboardData?.items ?? [])) {
-        if (!item.type.startsWith("image/")) continue;
+      const data = e.clipboardData;
+      if (!data) return;
+      // Everything is read now: clipboard data is gone once the handler returns.
+      const files: Blob[] = Array.from(data.files ?? []);
+      for (const item of Array.from(data.items ?? [])) {
+        if (item.kind !== "file") continue;
         const file = item.getAsFile();
-        if (!file) continue;
+        if (file && !files.includes(file)) files.push(file);
+      }
+      const html = data.getData("text/html");
+      const types = Array.from(data.types ?? []);
+      if (files.length > 0 || /<img\b/i.test(html)) {
         e.preventDefault();
-        void actionsRef.current.importImage(file);
+        void actionsRef.current.importFromClipboard(files, html, types);
         return;
       }
       // No picture on the clipboard: paste ink copied inside the pad, if any.
-      if (actionsRef.current.pasteInk()) e.preventDefault();
+      if (actionsRef.current.pasteInk()) {
+        e.preventDefault();
+      } else if (types.length > 0) {
+        e.preventDefault();
+        actionsRef.current.setNotice(`That isn't a picture (it had: ${types.join(", ")}). Paste a screenshot of your writing.`);
+      }
     }
     // Capture phase, so Escape can be claimed before the modal's own handler.
     window.addEventListener("keydown", onKey, true);
