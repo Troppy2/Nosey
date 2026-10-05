@@ -7,6 +7,7 @@ import {
   Delete,
   Eraser,
   Hand,
+  Highlighter,
   ImageDown,
   LassoSelect,
   Maximize2,
@@ -18,8 +19,10 @@ import {
   Trash2,
   Undo2,
   X,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { scopeKey } from "../lib/api";
 import { traceInk } from "../lib/inkTrace";
 import { MarkdownContent } from "./MarkdownContent";
@@ -37,6 +40,11 @@ export const SCRATCH_PAD_LOGICAL_WIDTH = 1000;
 
 export type Stroke = {
   points: number[]; // flat [x0,y0,x1,y1,...] in logical paper units
+  // Optional look. Absent means the default pen, so drawings saved before pen
+  // colors existed load unchanged. Short names: the strokes ride in the draft.
+  c?: string; // CSS color
+  w?: number; // line width in CSS pixels
+  h?: 1; // a highlighter stroke: wide, translucent, drawn under the ink
 };
 
 export type ScratchPadData = {
@@ -160,8 +168,10 @@ function strokeBounds(strokes: Stroke[]): { minX: number; minY: number; maxX: nu
 // design doc, "no ink, no cost"): the vision model must never be called for
 // an unused pad, and this is the cheapest guard in the whole feature.
 export function isScratchPadEmpty(data: ScratchPadData): boolean {
-  if (data.strokes.length === 0) return true;
-  const bounds = strokeBounds(data.strokes);
+  // Highlighter strokes are not writing: a page that is only highlights is empty.
+  const ink = data.strokes.filter((stroke) => !stroke.h);
+  if (ink.length === 0) return true;
+  const bounds = strokeBounds(ink);
   if (!bounds) return true;
   const area = (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY);
   return area < MIN_INK_BBOX_AREA;
@@ -174,9 +184,13 @@ export function isScratchPadEmpty(data: ScratchPadData): boolean {
 // alpha is composited unpredictably by vision models. Returns null when the
 // pad is empty (see isScratchPadEmpty), so a caller never accidentally spends
 // an OCR call on nothing.
-export function exportScratchPadPng(data: ScratchPadData): string | null {
+export function exportScratchPadPng(data: ScratchPadData, options: { faithful?: boolean } = {}): string | null {
   if (isScratchPadEmpty(data)) return null;
-  const bounds = strokeBounds(data.strokes);
+  // The OCR image carries the writing only, in forced near-black: highlight
+  // color and pen color must not change how handwriting is read. A faithful
+  // render (copy as picture) keeps every stroke in its own color.
+  const drawn = options.faithful ? data.strokes : data.strokes.filter((stroke) => !stroke.h);
+  const bounds = strokeBounds(drawn);
   if (!bounds) return null;
 
   const padding = 24;
@@ -217,8 +231,11 @@ export function exportScratchPadPng(data: ScratchPadData): string | null {
   // the engine reads the same curves the student saw rather than a faceted
   // polyline version of them.
   ctx.translate(-cropX * scale, -cropY * scale);
-  for (const stroke of data.strokes) {
-    drawSmoothPath(ctx, stroke.points, scale, scale);
+  if (options.faithful) {
+    for (const stroke of drawn.filter((st) => st.h)) drawStroke(ctx, stroke, scale, scale, scale);
+    for (const stroke of drawn.filter((st) => !st.h)) drawStroke(ctx, stroke, scale, scale, scale);
+  } else {
+    for (const stroke of drawn) drawSmoothPath(ctx, stroke.points, scale, scale);
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
@@ -268,10 +285,51 @@ const HANDLE_HIT_PX = 16;
 const HISTORY_LIMIT = 60;
 const DUPLICATE_OFFSET = 24;
 
-// Radius, in logical units, within which the stroke eraser takes a stroke out.
-const ERASE_RADIUS = 16;
+const DEFAULT_INK = "#26301f";
+const DEFAULT_WIDTH = 2.4;
+const PEN_COLORS = [DEFAULT_INK, "#1d4ed8", "#c62828", "#2e7d32", "#7b1fa2"];
+const PEN_WIDTHS = [1.6, DEFAULT_WIDTH, 4];
+const HIGHLIGHT_COLORS = ["#ffe14d", "#7fe38a", "#ff9ecb", "#7cc7ff"];
+const HIGHLIGHT_WIDTH = 16;
+const HIGHLIGHT_ALPHA = 0.38;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 3;
+const ZOOM_STEP = 1.25;
+// A canvas backing store above this many pixels is rendered at a lower density
+// instead of risking the browser's memory limit when zoomed in.
+const MAX_CANVAS_PIXELS = 36_000_000;
+const ERASER_MIN_PX = 6;
+const ERASER_MAX_PX = 64;
+const ERASER_DEFAULT_PX = 16;
 
-type Tool = "pen" | "erase" | "select";
+// stroke: a whole stroke goes when touched. precise: only the part under the
+// eraser goes and the stroke is split around the gap. highlight: like stroke,
+// but touches nothing except highlighter strokes.
+type EraseMode = "stroke" | "precise" | "highlight";
+
+type PenPrefs = { color: string; width: number; hlColor: string; eraseMode: EraseMode; eraserPx: number };
+
+function loadPenPrefs(): PenPrefs {
+  const fallback: PenPrefs = {
+    color: DEFAULT_INK, width: DEFAULT_WIDTH, hlColor: HIGHLIGHT_COLORS[0], eraseMode: "stroke", eraserPx: ERASER_DEFAULT_PX,
+  };
+  try {
+    const raw = localStorage.getItem(scopeKey("nosey_scratchpad_pen"));
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw) as Partial<PenPrefs>;
+    return {
+      color: PEN_COLORS.includes(parsed.color ?? "") ? (parsed.color as string) : fallback.color,
+      width: PEN_WIDTHS.includes(parsed.width ?? 0) ? (parsed.width as number) : fallback.width,
+      hlColor: HIGHLIGHT_COLORS.includes(parsed.hlColor ?? "") ? (parsed.hlColor as string) : fallback.hlColor,
+      eraseMode: parsed.eraseMode === "precise" || parsed.eraseMode === "highlight" ? parsed.eraseMode : "stroke",
+      eraserPx: Math.min(ERASER_MAX_PX, Math.max(ERASER_MIN_PX, Number(parsed.eraserPx) || ERASER_DEFAULT_PX)),
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+type Tool = "pen" | "highlight" | "erase" | "select";
 type SelectMode = "lasso" | "box";
 
 function ctxOf(canvas: HTMLCanvasElement | null): CanvasRenderingContext2D | null {
@@ -280,18 +338,79 @@ function ctxOf(canvas: HTMLCanvasElement | null): CanvasRenderingContext2D | nul
   return canvas ? canvas.getContext("2d") : null;
 }
 
-function inkStyle(ctx: CanvasRenderingContext2D) {
-  ctx.strokeStyle = "#26301f";
-  ctx.lineWidth = 2.4;
+type StrokeLook = Pick<Stroke, "c" | "w" | "h">;
+
+function styleStroke(ctx: CanvasRenderingContext2D, look: StrokeLook) {
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
+  if (look.h) {
+    ctx.strokeStyle = look.c ?? HIGHLIGHT_COLORS[0];
+    ctx.lineWidth = look.w ?? HIGHLIGHT_WIDTH;
+    ctx.globalAlpha = HIGHLIGHT_ALPHA;
+  } else {
+    ctx.strokeStyle = look.c ?? DEFAULT_INK;
+    ctx.lineWidth = look.w ?? DEFAULT_WIDTH;
+    ctx.globalAlpha = 1;
+  }
+}
+
+// One stroke in its own look. `widthScale` multiplies the line width, for
+// renders that are not at 1 CSS pixel per unit.
+function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke, scaleX: number, scaleY: number, widthScale = 1) {
+  styleStroke(ctx, stroke);
+  if (widthScale !== 1) ctx.lineWidth *= widthScale;
+  drawSmoothPath(ctx, stroke.points, scaleX, scaleY);
+  ctx.globalAlpha = 1;
+}
+
+// Highlighter strokes go first so ink always stays on top of them.
+function drawAllStrokes(ctx: CanvasRenderingContext2D, list: Stroke[], scale: number) {
+  for (const stroke of list) if (stroke.h) drawStroke(ctx, stroke, scale, scale);
+  for (const stroke of list) if (!stroke.h) drawStroke(ctx, stroke, scale, scale);
+}
+
+// How many backing pixels per CSS pixel a canvas was sized at.
+function canvasDensity(canvas: HTMLCanvasElement): number {
+  const css = parseFloat(canvas.style.width);
+  return css > 0 ? canvas.width / css : window.devicePixelRatio || 1;
 }
 
 function clearCanvas(canvas: HTMLCanvasElement | null) {
   const ctx = ctxOf(canvas);
   if (!canvas || !ctx) return;
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = canvasDensity(canvas);
   ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+}
+
+// What is left of a stroke after an eraser of this radius passes over (x, y).
+// null means the stroke was not touched. Segments are split into short pieces
+// first: simplified strokes have long straight runs with no point near the
+// eraser, which would otherwise slip through it.
+function eraseFromStroke(stroke: Stroke, x: number, y: number, r: number): Stroke[] | null {
+  if (!strokeHit(stroke.points, x, y, r)) return null;
+  const pts = stroke.points;
+  const n = pts.length / 2;
+  const dense: number[] = [pts[0], pts[1]];
+  for (let i = 1; i < n; i++) {
+    const x0 = pts[(i - 1) * 2];
+    const y0 = pts[(i - 1) * 2 + 1];
+    const x1 = pts[i * 2];
+    const y1 = pts[i * 2 + 1];
+    const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / (r / 2)));
+    for (let k = 1; k <= steps; k++) dense.push(x0 + ((x1 - x0) * k) / steps, y0 + ((y1 - y0) * k) / steps);
+  }
+  const out: Stroke[] = [];
+  let run: number[] = [];
+  const flush = () => {
+    if (run.length >= 4) out.push({ ...stroke, points: roundPoints(simplifyStroke(run, SIMPLIFY_EPSILON)) });
+    run = [];
+  };
+  for (let i = 0; i < dense.length; i += 2) {
+    if (Math.hypot(dense[i] - x, dense[i + 1] - y) <= r) flush();
+    else run.push(dense[i], dense[i + 1]);
+  }
+  flush();
+  return out;
 }
 
 function round1(value: number): number {
@@ -392,9 +511,9 @@ function drawSmoothPath(ctx: CanvasRenderingContext2D, points: number[], scaleX:
 // drawing and a palm or finger resting on the glass are two live pointers at
 // once and must not interfere with each other.
 type Gesture =
-  | { kind: "draw"; pointerId: number; points: number[]; predicted: number[] }
+  | { kind: "draw"; pointerId: number; points: number[]; predicted: number[]; look: StrokeLook }
   | { kind: "erase"; pointerId: number; snapshot: Stroke[]; remaining: Stroke[] }
-  | { kind: "scroll"; pointerId: number; startY: number; startTop: number }
+  | { kind: "scroll"; pointerId: number; startX: number; startY: number; startLeft: number; startTop: number }
   | { kind: "select"; pointerId: number; mode: SelectMode; points: number[] }
   | { kind: "move"; pointerId: number; startX: number; startY: number; base: Stroke[]; rest: Stroke[]; dx: number; dy: number }
   | { kind: "scale"; pointerId: number; ax: number; ay: number; startDist: number; base: Stroke[]; rest: Stroke[]; factor: number };
@@ -425,6 +544,26 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     return saved === null ? true : saved === "1";
   });
   const [tool, setTool] = useState<Tool>("pen");
+  const [prefs, setPrefs] = useState<PenPrefs>(loadPenPrefs);
+  const prefsRef = useRef(prefs);
+  prefsRef.current = prefs;
+  useEffect(() => {
+    try {
+      localStorage.setItem(scopeKey("nosey_scratchpad_pen"), JSON.stringify(prefs));
+    } catch {
+      /* storage blocked: the choice just does not persist */
+    }
+  }, [prefs]);
+  // Where the eraser is, in logical units, for its on-canvas size circle.
+  const hoverRef = useRef<[number, number] | null>(null);
+  const toolRef = useRef<Tool>("pen");
+  toolRef.current = tool;
+  const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(1);
+  const touchesRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinchRef = useRef<{ startDist: number; startZoom: number } | null>(null);
+  const penDownRef = useRef<Set<number>>(new Set());
+  const lastSizeKeyRef = useRef("");
   const [selectMode, setSelectMode] = useState<SelectMode>("lasso");
   const [selected, setSelected] = useState<Stroke[]>([]);
   const selectedRef = useRef<Stroke[]>([]);
@@ -551,23 +690,24 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     const canvas = staticCanvasRef.current;
     const ctx = ctxOf(canvas);
     if (!canvas || !ctx) return;
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = canvasDensity(canvas);
     const { w, h, scale } = dimsRef.current;
     const list = override ?? localStrokesRef.current;
-    const key = `${w}x${h}x${dpr}x${canvas.width}`;
+    const key = `${w}x${h}x${scale}x${canvas.width}`;
     const prev = paintedRef.current;
-    inkStyle(ctx);
     if (
       !override &&
       prev &&
       prev.key === key &&
       list.length === prev.strokes.length + 1 &&
+      !list[list.length - 1].h &&
       prev.strokes.every((stroke, i) => stroke === list[i])
     ) {
-      drawSmoothPath(ctx, list[list.length - 1].points, scale, scale);
+      drawStroke(ctx, list[list.length - 1], scale, scale);
     } else {
+      // A new highlight repaints everything: it has to go under the ink.
       ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
-      for (const stroke of list) drawSmoothPath(ctx, stroke.points, scale, scale);
+      drawAllStrokes(ctx, list, scale);
     }
     paintedRef.current = override ? null : { strokes: list, key };
   }, []);
@@ -585,11 +725,12 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     const ctx = ctxOf(canvas);
     if (!canvas || !ctx) return;
     clearCanvas(canvas);
-    inkStyle(ctx);
     const { scale } = dimsRef.current;
     for (const gesture of gesturesRef.current.values()) {
       if (gesture.kind !== "draw") continue;
+      styleStroke(ctx, gesture.look);
       drawSmoothPath(ctx, gesture.predicted.length ? gesture.points.concat(gesture.predicted) : gesture.points, scale, scale);
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -609,11 +750,13 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
 
     if (shown.length) {
       ctx.strokeStyle = SELECT_COLOR;
-      ctx.lineWidth = 2.4;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.setLineDash([]);
-      for (const stroke of shown) drawSmoothPath(ctx, stroke.points, scale, scale);
+      for (const stroke of shown) {
+        ctx.lineWidth = stroke.h ? 2 : stroke.w ?? DEFAULT_WIDTH;
+        drawSmoothPath(ctx, stroke.points, scale, scale);
+      }
       const b = strokeBounds(shown);
       if (b) {
         const pad = SELECT_PAD_PX / scale;
@@ -634,6 +777,19 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
           ctx.stroke();
         }
       }
+    }
+    // The eraser's size, drawn where it will act.
+    const hover = hoverRef.current;
+    if (hover && toolRef.current === "erase") {
+      const radius = prefsRef.current.eraserPx / 2;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(hover[0] * scale, hover[1] * scale, radius, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
+      ctx.fill();
+      ctx.strokeStyle = "#6b7a5c";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
     }
     if (active?.kind === "select" && active.points.length >= 4) {
       ctx.strokeStyle = SELECT_COLOR;
@@ -686,21 +842,35 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
       MAX_LOGICAL_WIDTH,
       Math.max(SCRATCH_PAD_LOGICAL_WIDTH, needW, Math.ceil(cssWidth / INK_SCALE / 50) * 50),
     );
-    const scale = cssWidth / logicalW;
+    // Zoom scales the page, not the stored coordinates: the logical page and
+    // the stroke data are the same at every zoom. Ink line widths stay in CSS
+    // pixels, so zooming in gives finer control without fattening the pen.
+    // Skip the rebuild when nothing that sizes the canvases has changed. A
+    // mode switch or a scrollbar appearing fires several resize callbacks in a
+    // row, and each rebuild clears and repaints every layer: that is the
+    // flicker.
+    const sizeKey = [cssWidth, cssAvailHeight, logicalW, pageHeight, zoomRef.current, window.devicePixelRatio].join("x");
+    if (sizeKey === lastSizeKeyRef.current) return;
+    lastSizeKeyRef.current = sizeKey;
+    const baseScale = cssWidth / logicalW;
+    const scale = baseScale * zoomRef.current;
+    const pageCssWidth = cssWidth * zoomRef.current;
     // Never shorter than the window: a tall window gets a taller sheet, so
     // there is no dead strip under the paper.
-    const logicalH = Math.max(pageHeight, Math.floor(cssAvailHeight / scale));
+    const logicalH = Math.max(pageHeight, Math.floor(cssAvailHeight / baseScale));
     const cssHeight = logicalH * scale;
     dimsRef.current = { w: logicalW, h: logicalH, scale };
-    const dpr = window.devicePixelRatio || 1;
+    const wantDpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(wantDpr, Math.sqrt(MAX_CANVAS_PIXELS / Math.max(1, pageCssWidth * cssHeight)));
+    page.style.width = `${pageCssWidth}px`;
     page.style.height = `${cssHeight}px`;
     for (const canvas of canvases as HTMLCanvasElement[]) {
-      canvas.width = Math.max(1, Math.round(cssWidth * dpr));
+      canvas.width = Math.max(1, Math.round(pageCssWidth * dpr));
       canvas.height = Math.max(1, Math.round(cssHeight * dpr));
-      canvas.style.width = `${cssWidth}px`;
+      canvas.style.width = `${pageCssWidth}px`;
       canvas.style.height = `${cssHeight}px`;
       const ctx = ctxOf(canvas);
-      if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (ctx) ctx.setTransform(canvas.width / pageCssWidth, 0, 0, canvas.width / pageCssWidth, 0, 0);
     }
     paintedRef.current = null;
     paintStatic();
@@ -718,9 +888,19 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     const container = containerRef.current;
     if (!container) return undefined;
     let timer: number | null = null;
-    const observer = new ResizeObserver(() => {
+    // Rebuild only once the size has stopped changing, and ignore sub-pixel
+    // jitter, so a window that is still resizing is not repainted every tick.
+    let lastW = 0;
+    let lastH = 0;
+    const observer = new ResizeObserver((entries) => {
+      const box = entries[entries.length - 1]?.contentRect;
+      if (box && Math.abs(box.width - lastW) < 2 && Math.abs(box.height - lastH) < 2) return;
+      if (box) {
+        lastW = box.width;
+        lastH = box.height;
+      }
       if (timer != null) window.clearTimeout(timer);
-      timer = window.setTimeout(() => applySizeRef.current(), 100);
+      timer = window.setTimeout(() => applySizeRef.current(), 180);
     });
     observer.observe(container);
     applySizeRef.current();
@@ -758,11 +938,36 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     const gesture = gesturesRef.current.get(pointerId);
     if (!gesture || gesture.kind !== "erase") return;
     const [x, y] = toLogical(clientX, clientY);
-    const kept = gesture.remaining.filter((stroke) => !strokeHit(stroke.points, x, y, ERASE_RADIUS));
-    if (kept.length !== gesture.remaining.length) {
-      gesture.remaining = kept;
-      paintStatic(kept);
+    hoverRef.current = [x, y];
+    const { scale } = dimsRef.current;
+    // The size control is a diameter in CSS pixels, so it feels the same at
+    // any zoom; the radius here is in logical units.
+    const r = prefsRef.current.eraserPx / 2 / scale;
+    const mode = prefsRef.current.eraseMode;
+    let changed = false;
+    let next: Stroke[];
+    if (mode === "precise") {
+      next = [];
+      for (const stroke of gesture.remaining) {
+        const pieces = eraseFromStroke(stroke, x, y, r);
+        if (pieces === null) next.push(stroke);
+        else {
+          changed = true;
+          next.push(...pieces);
+        }
+      }
+    } else {
+      next = gesture.remaining.filter((stroke) => {
+        const hit = (mode !== "highlight" || stroke.h) && strokeHit(stroke.points, x, y, r);
+        if (hit) changed = true;
+        return !hit;
+      });
     }
+    if (changed) {
+      gesture.remaining = next;
+      paintStatic(next);
+    }
+    scheduleFrame();
   }
 
   // ── Selection actions ───────────────────────────────────────────────────
@@ -823,7 +1028,7 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
   // a document or a chat. Needs a secure context and clipboard permission.
   async function copySelectionAsPicture() {
     const sel = selectedRef.current;
-    const png = sel.length ? exportScratchPadPng({ version: 1, strokes: sel }) : null;
+    const png = sel.length ? exportScratchPadPng({ version: 1, strokes: sel }, { faithful: true }) : null;
     if (!png) {
       setNotice("Select some writing first.");
       return;
@@ -961,7 +1166,7 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
       return; // a tap, not a stroke
     }
     const simplified = roundPoints(simplifyStroke(gesture.points, SIMPLIFY_EPSILON));
-    const next = [...prev, { points: simplified }].slice(-MAX_STROKES_PER_QUESTION);
+    const next = [...prev, { points: simplified, ...gesture.look }].slice(-MAX_STROKES_PER_QUESTION);
     pushHistory(prev);
     // The static layer picks this stroke up on the very next paint, which
     // React commits synchronously from local state, so clearing the live layer
@@ -977,6 +1182,24 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     // what cut strokes short.
     if (gesturesRef.current.has(e.pointerId)) finalizeGesture(e.pointerId);
 
+    if (e.pointerType === "pen") penDownRef.current.add(e.pointerId);
+    if (e.pointerType === "touch") {
+      touchesRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      // Two fingers anywhere zoom the page, whether a finger draws or scrolls.
+      // Not while a stylus is down: a resting palm is several touch points at
+      // once and must never turn writing into a zoom.
+      if (touchesRef.current.size >= 2 && penDownRef.current.size === 0) {
+        const [a, b] = Array.from(touchesRef.current.values());
+        // The first finger may have started a stroke, scroll or selection drag:
+        // drop it, the student meant a pinch.
+        for (const id of Array.from(touchesRef.current.keys())) abortGesture(id);
+        pinchRef.current = { startDist: Math.hypot(a.x - b.x, a.y - b.y) || 1, startZoom: zoomRef.current };
+        liveCanvasRef.current?.setPointerCapture(e.pointerId);
+        return;
+      }
+      if (pinchRef.current) return; // a third finger during a pinch does nothing
+    }
+
     if (e.pointerType === "touch" && !allowFingerDraw) {
       // Finger still drives the page, it just does not mark it: drag to
       // scroll, handled here rather than by the browser. touch-action stays
@@ -990,7 +1213,9 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
       gesturesRef.current.set(e.pointerId, {
         kind: "scroll",
         pointerId: e.pointerId,
+        startX: e.clientX,
         startY: e.clientY,
+        startLeft: container.scrollLeft,
         startTop: container.scrollTop,
       });
       return;
@@ -1064,16 +1289,48 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
 
     clearLive();
     const [x, y] = toLogical(e.clientX, e.clientY);
-    gesturesRef.current.set(e.pointerId, { kind: "draw", pointerId: e.pointerId, points: [x, y], predicted: [] });
+    // The look of this stroke is fixed when it starts, so changing the pen
+    // mid-stroke or later never recolors ink already on the page.
+    const pen = prefsRef.current;
+    const look: StrokeLook =
+      tool === "highlight"
+        ? { h: 1, c: pen.hlColor }
+        : {
+            ...(pen.color !== DEFAULT_INK ? { c: pen.color } : {}),
+            ...(pen.width !== DEFAULT_WIDTH ? { w: pen.width } : {}),
+          };
+    gesturesRef.current.set(e.pointerId, { kind: "draw", pointerId: e.pointerId, points: [x, y], predicted: [], look });
   }
 
   function handlePointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (touchesRef.current.has(e.pointerId)) {
+      touchesRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const pinch = pinchRef.current;
+      if (pinch && touchesRef.current.size === 2) {
+        const [a, b] = Array.from(touchesRef.current.values());
+        setZoomTo(pinch.startZoom * (Math.hypot(a.x - b.x, a.y - b.y) / pinch.startDist), {
+          clientX: (a.x + b.x) / 2,
+          clientY: (a.y + b.y) / 2,
+        });
+        return;
+      }
+    }
     const gesture = gesturesRef.current.get(e.pointerId);
-    if (!gesture) return;
+    if (!gesture) {
+      // Hovering with the eraser: show where it will act and how big it is.
+      if (toolRef.current === "erase" && e.pointerType !== "touch") {
+        hoverRef.current = toLogical(e.clientX, e.clientY);
+        scheduleFrame();
+      }
+      return;
+    }
 
     if (gesture.kind === "scroll") {
       const container = containerRef.current;
-      if (container) container.scrollTop = gesture.startTop + (gesture.startY - e.clientY);
+      if (container) {
+        container.scrollTop = gesture.startTop + (gesture.startY - e.clientY);
+        container.scrollLeft = gesture.startLeft + (gesture.startX - e.clientX);
+      }
       return;
     }
 
@@ -1146,19 +1403,38 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     scheduleFrame();
   }
 
+  function endTouch(pointerId: number) {
+    penDownRef.current.delete(pointerId);
+    touchesRef.current.delete(pointerId);
+    if (touchesRef.current.size < 2) pinchRef.current = null;
+  }
+
   function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
+    endTouch(e.pointerId);
     finalizeGesture(e.pointerId);
   }
 
-  function handlePointerCancel(e: React.PointerEvent<HTMLCanvasElement>) {
-    const gesture = gesturesRef.current.get(e.pointerId);
+  function handlePointerLeave(e: React.PointerEvent<HTMLCanvasElement>) {
+    hoverRef.current = null;
+    scheduleFrame();
+    handlePointerUp(e);
+  }
+
+  // Throws a pointer's in-progress gesture away without committing it.
+  function abortGesture(pointerId: number) {
+    const gesture = gesturesRef.current.get(pointerId);
     if (!gesture) return;
-    gesturesRef.current.delete(e.pointerId);
+    gesturesRef.current.delete(pointerId);
     // An abandoned erase, move or resize has been previewing its result on the
     // static layer without committing it, so the real strokes are put back.
     if (gesture.kind === "erase" || gesture.kind === "move" || gesture.kind === "scale") paintStatic();
     else if (gesture.kind === "draw") clearLive();
     drawOverlay();
+  }
+
+  function handlePointerCancel(e: React.PointerEvent<HTMLCanvasElement>) {
+    endTouch(e.pointerId);
+    abortGesture(e.pointerId);
   }
 
   function undo() {
@@ -1176,10 +1452,76 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
     setSelection([]);
   }
 
+  // Sets the zoom and keeps whatever is under `anchor` (the viewport centre by
+  // default) where it is, so zooming does not throw the page off screen.
+  function setZoomTo(requested: number, anchor?: { clientX: number; clientY: number }) {
+    const container = containerRef.current;
+    if (!container) return;
+    const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, requested));
+    if (Math.abs(next - zoomRef.current) < 0.001) return;
+    const rect = container.getBoundingClientRect();
+    const ax = anchor ? anchor.clientX - rect.left : rect.width / 2;
+    const ay = anchor ? anchor.clientY - rect.top : rect.height / 2;
+    const before = dimsRef.current.scale;
+    const lx = (container.scrollLeft + ax) / before;
+    const ly = (container.scrollTop + ay) / before;
+    zoomRef.current = next;
+    setZoom(next);
+    applySizeRef.current();
+    container.scrollLeft = lx * dimsRef.current.scale - ax;
+    container.scrollTop = ly * dimsRef.current.scale - ay;
+  }
+
+  // Applies a look to the selected ink: color and width go to pen strokes,
+  // the highlighter color to highlighter strokes.
+  function restyleSelection(look: { c?: string; w?: number; hlC?: string }) {
+    const sel = selectedRef.current;
+    if (sel.length === 0) return;
+    const prev = localStrokesRef.current;
+    const changed = sel.map((stroke) => {
+      if (stroke.h) return look.hlC ? { ...stroke, c: look.hlC } : stroke;
+      const next: Stroke = { ...stroke };
+      if (look.c !== undefined) {
+        if (look.c === DEFAULT_INK) delete next.c;
+        else next.c = look.c;
+      }
+      if (look.w !== undefined) {
+        if (look.w === DEFAULT_WIDTH) delete next.w;
+        else next.w = look.w;
+      }
+      return next;
+    });
+    pushHistory(prev);
+    commitStrokes(prev.map((stroke) => {
+      const i = sel.indexOf(stroke);
+      return i >= 0 ? changed[i] : stroke;
+    }));
+    setSelection(changed);
+  }
+
+  function pickInkColor(color: string) {
+    setPrefs((p) => ({ ...p, color }));
+    if (toolRef.current === "select") restyleSelection({ c: color });
+  }
+
+  function pickInkWidth(width: number) {
+    setPrefs((p) => ({ ...p, width }));
+    if (toolRef.current === "select") restyleSelection({ w: width });
+  }
+
+  function pickHighlightColor(color: string) {
+    setPrefs((p) => ({ ...p, hlColor: color }));
+    if (toolRef.current === "select") restyleSelection({ hlC: color });
+  }
+
   function chooseTool(next: Tool, mode?: SelectMode) {
     if (mode) setSelectMode(mode);
     setTool(next);
     if (next !== "select") setSelection([]);
+    if (next !== "erase") {
+      hoverRef.current = null;
+      scheduleFrame();
+    }
   }
 
   function toggleFingerDraw() {
@@ -1287,8 +1629,27 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
   }
 
   // Window-level handlers need the latest closures but are attached once.
-  const actionsRef = useRef({ deleteSelection, undo, importImage, importFromClipboard, setSelection, copySelection, cutSelection, pasteInk, setNotice });
-  actionsRef.current = { deleteSelection, undo, importImage, importFromClipboard, setSelection, copySelection, cutSelection, pasteInk, setNotice };
+  // zoomBy(0) resets to 100%.
+  function zoomBy(factor: number) {
+    setZoomTo(factor === 0 ? 1 : zoomRef.current * factor);
+  }
+  const actionsRef = useRef({ deleteSelection, undo, importImage, importFromClipboard, setSelection, copySelection, cutSelection, pasteInk, setNotice, zoomBy, setZoomTo });
+  actionsRef.current = { deleteSelection, undo, importImage, importFromClipboard, setSelection, copySelection, cutSelection, pasteInk, setNotice, zoomBy, setZoomTo };
+
+  // Ctrl+wheel (and a trackpad pinch, which arrives the same way) zooms toward
+  // the pointer. Attached natively because React's wheel listener is passive
+  // and could not stop the browser zooming the whole page instead.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return undefined;
+    function onWheel(e: WheelEvent) {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      actionsRef.current.setZoomTo(zoomRef.current * Math.exp(-e.deltaY * 0.01), { clientX: e.clientX, clientY: e.clientY });
+    }
+    container.addEventListener("wheel", onWheel, { passive: false });
+    return () => container.removeEventListener("wheel", onWheel);
+  }, []);
 
   useEffect(() => {
     const typingTarget = (t: EventTarget | null) => {
@@ -1314,6 +1675,15 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "x" && hasSelection) {
         e.preventDefault();
         actionsRef.current.cutSelection();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === "=" || e.key === "+")) {
+        e.preventDefault();
+        actionsRef.current.zoomBy(ZOOM_STEP);
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === "-" || e.key === "_")) {
+        e.preventDefault();
+        actionsRef.current.zoomBy(1 / ZOOM_STEP);
+      } else if ((e.ctrlKey || e.metaKey) && e.key === "0") {
+        e.preventDefault();
+        actionsRef.current.zoomBy(0);
       }
     }
     function onPaste(e: ClipboardEvent) {
@@ -1361,6 +1731,26 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
       <div className="scratchpad-canvas-toolbar">
         <button type="button" className="scratchpad-tool-btn" onClick={undo} disabled={history.length === 0} aria-label="Undo" title="Undo (Ctrl+Z)">
           <Undo2 size={16} />
+        </button>
+        <button
+          type="button"
+          className={`scratchpad-tool-btn${tool === "pen" ? " is-active" : ""}`}
+          onClick={() => chooseTool("pen")}
+          aria-pressed={tool === "pen"}
+          aria-label="Pen"
+          title="Pen"
+        >
+          <PenLine size={16} />
+        </button>
+        <button
+          type="button"
+          className={`scratchpad-tool-btn${tool === "highlight" ? " is-active" : ""}`}
+          onClick={() => chooseTool(tool === "highlight" ? "pen" : "highlight")}
+          aria-pressed={tool === "highlight"}
+          aria-label="Highlighter"
+          title="Highlighter"
+        >
+          <Highlighter size={16} />
         </button>
         <button
           type="button"
@@ -1433,6 +1823,17 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
         >
           <Trash2 size={16} />
         </button>
+        <div className="scratchpad-zoom" role="group" aria-label="Zoom">
+          <button type="button" className="scratchpad-tool-btn" onClick={() => zoomBy(1 / ZOOM_STEP)} disabled={zoom <= MIN_ZOOM} aria-label="Zoom out" title="Zoom out (Ctrl+-)">
+            <ZoomOut size={16} />
+          </button>
+          <button type="button" className="scratchpad-zoom-label" onClick={() => zoomBy(0)} aria-label="Reset zoom to 100%" title="Reset zoom (Ctrl+0)">
+            {Math.round(zoom * 100)}%
+          </button>
+          <button type="button" className="scratchpad-tool-btn" onClick={() => zoomBy(ZOOM_STEP)} disabled={zoom >= MAX_ZOOM} aria-label="Zoom in" title="Zoom in (Ctrl++)">
+            <ZoomIn size={16} />
+          </button>
+        </div>
         <button
           type="button"
           className={`scratchpad-finger-toggle${allowFingerDraw ? " is-active" : ""}`}
@@ -1444,6 +1845,97 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
           {allowFingerDraw ? "Draw with finger" : "Finger scrolls"}
         </button>
       </div>
+      {tool === "pen" || tool === "highlight" || tool === "erase" || (tool === "select" && hasSelection) ? (
+        <div className="scratchpad-style-bar" role="group" aria-label={tool === "erase" ? "Eraser options" : "Pen options"}>
+          {tool === "erase" ? (
+            <>
+              <div className="scratchpad-segmented" role="group" aria-label="Eraser type">
+                {(
+                  [
+                    ["stroke", "Stroke", "Removes a whole stroke you touch"],
+                    ["precise", "Precise", "Removes only the part under the eraser"],
+                    ["highlight", "Highlights", "Only removes highlighter, never writing"],
+                  ] as [EraseMode, string, string][]
+                ).map(([mode, label, hint]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={prefs.eraseMode === mode ? "is-active" : ""}
+                    aria-pressed={prefs.eraseMode === mode}
+                    title={hint}
+                    onClick={() => setPrefs((p) => ({ ...p, eraseMode: mode }))}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <label className="scratchpad-eraser-size">
+                <span className="muted small">Size</span>
+                {/* The same custom slider Learning Modules uses for seeking. */}
+                <input
+                  className="lm-dock-seek scratchpad-eraser-range"
+                  type="range"
+                  min={ERASER_MIN_PX}
+                  max={ERASER_MAX_PX}
+                  value={prefs.eraserPx}
+                  style={{ "--seek-pct": `${((prefs.eraserPx - ERASER_MIN_PX) / (ERASER_MAX_PX - ERASER_MIN_PX)) * 100}%` } as CSSProperties}
+                  onChange={(e) => setPrefs((p) => ({ ...p, eraserPx: Number(e.target.value) }))}
+                  aria-label="Eraser size"
+                  aria-valuetext={`${prefs.eraserPx} pixels`}
+                />
+                <span className="scratchpad-eraser-preview" aria-hidden="true">
+                  <span style={{ width: prefs.eraserPx, height: prefs.eraserPx }} />
+                </span>
+                <span className="muted small">{prefs.eraserPx}px</span>
+              </label>
+            </>
+          ) : tool === "highlight" ? (
+            <div className="scratchpad-swatches" role="group" aria-label="Highlighter color">
+              {HIGHLIGHT_COLORS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  className={`scratchpad-swatch scratchpad-swatch--highlight${prefs.hlColor === color ? " is-active" : ""}`}
+                  style={{ background: color }}
+                  aria-label={`Highlighter ${color}`}
+                  aria-pressed={prefs.hlColor === color}
+                  onClick={() => pickHighlightColor(color)}
+                />
+              ))}
+            </div>
+          ) : (
+            <>
+              <div className="scratchpad-swatches" role="group" aria-label="Pen color">
+                {PEN_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    className={`scratchpad-swatch${prefs.color === color ? " is-active" : ""}`}
+                    style={{ background: color }}
+                    aria-label={`Pen ${color}`}
+                    aria-pressed={prefs.color === color}
+                    onClick={() => pickInkColor(color)}
+                  />
+                ))}
+              </div>
+              <div className="scratchpad-widths" role="group" aria-label="Pen width">
+                {PEN_WIDTHS.map((width) => (
+                  <button
+                    key={width}
+                    type="button"
+                    className={prefs.width === width ? "is-active" : ""}
+                    aria-label={`Pen width ${width}`}
+                    aria-pressed={prefs.width === width}
+                    onClick={() => pickInkWidth(width)}
+                  >
+                    <span style={{ height: width + 1 }} />
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      ) : null}
       {notice ? (
         <p className="scratchpad-notice" role="status">
           {notice}
@@ -1462,7 +1954,7 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerCancel}
-            onPointerLeave={handlePointerUp}
+            onPointerLeave={handlePointerLeave}
           />
         </div>
       </div>
