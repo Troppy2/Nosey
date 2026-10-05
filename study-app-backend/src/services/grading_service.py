@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from datetime import datetime
 
 from sqlalchemy import select
@@ -51,6 +52,104 @@ _OCR_TIMEOUT_SECONDS = 45
 # bound to a dead event loop is a classic prod-only bug, and CLAUDE.md bans
 # shared mutable state on services.
 _OCR_CONCURRENCY = 3
+
+# ── Related questions (GH #155) ─────────────────────────────────────────────
+# "question 2", "Q2", "problem 2", "#2", numbered as the student sees them.
+_QUESTION_REF_RE = re.compile(r"\b(?:question|problem|q|#)\s*(\d{1,3})\b", re.IGNORECASE)
+# "part (a)" or "part a" (tests made before multi-part groups existed).
+_PART_REF_RE = re.compile(r"\bparts?\s*(?:\(([a-h])\)|([a-h])\b)", re.IGNORECASE)
+_PREVIOUS_RE = re.compile(r"\b(?:previous|preceding|prior|last|above)\s+(?:question|problem|part)\b", re.IGNORECASE)
+_LEADING_PART_RE = re.compile(r"^\s*\(?([a-h])[).:]\s", re.IGNORECASE)
+_MAX_RELATED = 4
+_RELATED_ANSWER_CHARS = 1500
+_UNREADABLE_CONTEXT = "(their handwriting for this one could not be read yet)"
+
+
+def related_questions(question: Question, ordered: list[Question]) -> list[Question]:
+    """Earlier questions this one builds on (GH #155).
+
+    A part of a multi-part problem builds on every earlier part of its
+    group. Any question also builds on what its text points back to:
+    "question 2" / "Q2", "part (a)" (the nearest earlier question starting
+    with that label, for tests made before groups existed), or "the previous
+    question". Only EARLIER questions count, so grading order has no cycles.
+    """
+    index = next((i for i, q in enumerate(ordered) if q.id == question.id), None)
+    if not index:
+        return []
+    earlier = ordered[:index]
+    found: dict[int, Question] = {}
+    if question.group_id is not None:
+        for q in earlier:
+            if q.group_id == question.group_id:
+                found[q.id] = q
+    text = question.question_text
+    for match in _QUESTION_REF_RE.finditer(text):
+        number = int(match.group(1))
+        if 1 <= number <= index:
+            found[ordered[number - 1].id] = ordered[number - 1]
+    for match in _PART_REF_RE.finditer(text):
+        label = (match.group(1) or match.group(2)).lower()
+        for q in reversed(earlier):
+            lead = _LEADING_PART_RE.match(q.question_text)
+            same_group = question.group_id is None or q.group_id == question.group_id
+            if same_group and ((q.part_label or "").lower() == label or (lead and lead.group(1).lower() == label)):
+                found[q.id] = q
+                break
+    if _PREVIOUS_RE.search(text):
+        found[earlier[-1].id] = earlier[-1]
+    position = {q.id: i for i, q in enumerate(ordered)}
+    return sorted(found.values(), key=lambda q: position[q.id])[-_MAX_RELATED:]
+
+
+def related_context(
+    question: Question,
+    ordered: list[Question],
+    answers: dict[int, str],
+    verdicts: dict[int, bool],
+) -> str:
+    """The earlier questions, the student's answers and (for earlier parts of
+    the same problem, which are graded first) their verdicts."""
+    position = {q.id: i for i, q in enumerate(ordered)}
+    entries: list[str] = []
+    for q in related_questions(question, ordered):
+        same_group = question.group_id is not None and q.group_id == question.group_id
+        label = f"Question {position[q.id] + 1}"
+        if q.group_id is not None and q.part_label:
+            label += f", part ({q.part_label})"
+        answer = (answers.get(q.id) or "").strip() or "(no answer)"
+        if len(answer) > _RELATED_ANSWER_CHARS:
+            answer = answer[:_RELATED_ANSWER_CHARS] + " ..."
+        entry = f"{label}: {q.question_text if same_group else full_question_text(q)}\nStudent's answer: {answer}"
+        if same_group and q.id in verdicts:
+            entry += f"\nGraded: {'correct' if verdicts[q.id] else 'wrong'}"
+        entries.append(entry)
+    return "\n\n".join(entries)
+
+
+def _context_answer(typed: str, transcript: Optional[str]) -> str:
+    typed = (typed or "").strip()
+    transcript = (transcript or "").strip()
+    if transcript and transcript != typed:
+        return f"{typed}\nShown work: {transcript}" if typed else transcript
+    return typed
+
+
+def _grading_lanes(pairs: list) -> list[list]:
+    """Each multi-part problem is one lane graded in order; every other
+    question is a lane of its own. Lanes grade in parallel."""
+    lanes: list[list] = []
+    by_group: dict[int, list] = {}
+    for pair in sorted(pairs, key=lambda p: p[0].display_order):
+        group_id = pair[0].group_id
+        if group_id is None:
+            lanes.append([pair])
+        elif group_id in by_group:
+            by_group[group_id].append(pair)
+        else:
+            by_group[group_id] = [pair]
+            lanes.append(by_group[group_id])
+    return lanes
 
 
 class GradingService:
@@ -124,15 +223,27 @@ class GradingService:
             and not self._readable(work_by_question_id.get(qid))
         }
 
-        # Grade all questions in parallel: LLM calls for FRQ are concurrent, MCQ is instant.
         # A needs_input answer is not graded at all yet: no LLM spend on it.
         pairs = [(question_by_id[qid], ans) for qid, ans in submitted_by_id.items()]
+
+        # Each question sees the earlier questions it builds on (GH #155).
+        # Parts of one problem grade in order so a later part also sees the
+        # earlier parts' verdicts; everything else still grades in parallel.
+        ordered = list(test.questions)
+        context_answers: dict[int, str] = {}
+        for qid, ans in submitted_by_id.items():
+            work = work_by_question_id.get(qid)
+            context_answers[qid] = (
+                _UNREADABLE_CONTEXT if qid in needs_input
+                else _context_answer(ans.answer, work.transcript if work else None)
+            )
+        verdicts: dict[int, bool] = {}
 
         async def _grade_or_hold(question: Question, submitted: SubmittedAnswer) -> Optional[FRQGrade]:
             if question.id in needs_input:
                 return None
             work = work_by_question_id.get(question.id)
-            return await self._grade_question(
+            grade = await self._grade_question(
                 question,
                 self._answer_for_grading(question, submitted.answer, work, is_math_mode, is_coding_mode),
                 notes,
@@ -140,9 +251,20 @@ class GradingService:
                 is_coding_mode=is_coding_mode,
                 coding_language=coding_language,
                 work=work,
+                related=related_context(question, ordered, context_answers, verdicts),
             )
+            verdicts[question.id] = grade.is_correct
+            return grade
 
-        grades = await asyncio.gather(*(_grade_or_hold(q, ans) for q, ans in pairs))
+        async def _grade_lane(lane: list) -> list[Optional[FRQGrade]]:
+            return [await _grade_or_hold(q, ans) for q, ans in lane]
+
+        lanes = _grading_lanes(pairs)
+        lane_grades = await asyncio.gather(*(_grade_lane(lane) for lane in lanes))
+        grade_by_id = {
+            q.id: grade for lane, graded in zip(lanes, lane_grades) for (q, _), grade in zip(lane, graded)
+        }
+        grades = [grade_by_id[q.id] for q, _ in pairs]
 
         results: list[AnswerResult] = []
         correct_count = 0
@@ -384,6 +506,7 @@ class GradingService:
             )
         else:
             notes = "\n\n".join(note.content for note in test.notes)
+            answers, verdicts = await self._stored_context(attempt.id, session)
             grade = await self._grade_question(
                 question,
                 self._answer_for_grading(question, body.answer, work, is_math_mode, is_coding_mode),
@@ -392,6 +515,7 @@ class GradingService:
                 is_coding_mode=is_coding_mode,
                 coding_language=getattr(test, "coding_language", None) or "Python",
                 work=work,
+                related=related_context(question, list(test.questions), answers, verdicts),
             )
 
         work_transcript = work.transcript if work is not None else row.work_transcript
@@ -405,6 +529,7 @@ class GradingService:
         row.work_strokes = None
         row.ocr_status = OCR_STATUS_RESOLVED
         await session.flush()
+        later = await self._regrade_later_parts(test, attempt.id, {question_id}, session)
         score, correct, total, provisional = await self._rescore(attempt, session)
         await session.commit()
 
@@ -425,8 +550,77 @@ class GradingService:
                 is_math=is_math_mode and question.question_type == "FRQ",
                 work_transcript=work_transcript,
                 ocr_status=OCR_STATUS_RESOLVED,
-            )],
+            )] + later,
         )
+
+    async def _stored_context(self, attempt_id: int, session: AsyncSession) -> tuple[dict[int, str], dict[int, bool]]:
+        """Answers and verdicts as stored, for regrading with related context."""
+        answers: dict[int, str] = {}
+        verdicts: dict[int, bool] = {}
+        for row in await AttemptRepository(session).list_answers(attempt_id):
+            if row.ocr_status == OCR_STATUS_NEEDS_INPUT:
+                answers[row.question_id] = _UNREADABLE_CONTEXT
+                continue
+            answers[row.question_id] = _context_answer(row.user_answer, row.work_transcript)
+            verdicts[row.question_id] = bool(row.is_correct)
+        return answers, verdicts
+
+    async def _regrade_later_parts(
+        self, test, attempt_id: int, changed_ids: set[int], session: AsyncSession
+    ) -> list[AnswerResult]:
+        """After a held part is redone or skipped, the later written parts of
+        its problem were graded without knowing it: regrade them in order
+        (GH #155). Objective parts are graded on their own and stay as they are.
+        """
+        ordered = list(test.questions)
+        changed = [q for q in ordered if q.id in changed_ids and q.group_id is not None]
+        if not changed or getattr(test, "is_coding_mode", False):
+            return []
+        is_math_mode = getattr(test, "is_math_mode", False)
+        notes = "\n\n".join(note.content for note in test.notes)
+        repo = AttemptRepository(session)
+        answers, verdicts = await self._stored_context(attempt_id, session)
+        results: list[AnswerResult] = []
+        for group_id in dict.fromkeys(q.group_id for q in changed):
+            parts = [q for q in ordered if q.group_id == group_id]
+            first = min(i for i, q in enumerate(parts) if q.id in changed_ids)
+            for question in parts[first + 1:]:
+                if question.id in changed_ids or question.question_type != "FRQ":
+                    continue
+                row = await repo.get_answer(attempt_id, question.id)
+                if row is None or row.ocr_status == OCR_STATUS_NEEDS_INPUT:
+                    continue
+                transcript = (row.work_transcript or "").strip()
+                typed = "" if transcript and row.user_answer.strip() == transcript else row.user_answer
+                work = OcrResult(transcript=transcript, confidence=1.0, engine="stored") if transcript else None
+                grade = await self._grade_question(
+                    question,
+                    self._answer_for_grading(question, typed, work, is_math_mode, False),
+                    notes,
+                    is_math_mode=is_math_mode,
+                    work=work,
+                    related=related_context(question, ordered, answers, verdicts),
+                )
+                verdicts[question.id] = grade.is_correct
+                row.is_correct = grade.is_correct
+                row.ai_feedback = grade.feedback
+                row.ai_reasoning = grade.reasoning
+                row.confidence_score = grade.confidence
+                row.flagged_uncertain = grade.flagged_uncertain
+                results.append(self._to_answer_result(
+                    question,
+                    user_answer=row.user_answer,
+                    is_correct=grade.is_correct,
+                    feedback=grade.feedback,
+                    reasoning=grade.reasoning,
+                    confidence=grade.confidence,
+                    flagged_uncertain=grade.flagged_uncertain,
+                    is_math=is_math_mode and question.question_type == "FRQ",
+                    work_transcript=row.work_transcript,
+                    ocr_status=row.ocr_status,
+                ))
+        await session.flush()
+        return results
 
     async def skip_unreadable(
         self,
@@ -493,6 +687,7 @@ class GradingService:
                 ocr_status=OCR_STATUS_SKIPPED,
             ))
         await session.flush()
+        results += await self._regrade_later_parts(test, attempt.id, {row.question_id for row in rows}, session)
         score, correct, total, provisional = await self._rescore(attempt, session)
         await session.commit()
         return RedoAnswerResponse(
@@ -513,6 +708,7 @@ class GradingService:
         is_coding_mode: bool = False,
         coding_language: str = "Python",
         work: Optional[OcrResult] = None,
+        related: str = "",
     ) -> FRQGrade:
         qtype = question.question_type
 
@@ -559,12 +755,14 @@ class GradingService:
                 expected_answer=expected_answer,
                 user_answer=user_answer,
                 work=work,
+                related_context=related,
             )
         return await self.llm_service.grade_frq_answer(
             notes=notes,
             question=full_question_text(question),
             expected_answer=expected_answer,
             user_answer=user_answer,
+            related_context=related,
         )
 
     async def _enrich_objective_feedback(
