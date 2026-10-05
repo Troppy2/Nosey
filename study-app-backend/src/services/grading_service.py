@@ -4,9 +4,11 @@ import asyncio
 import json
 from datetime import datetime
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.question import Question
+from src.models.user_attempt import UserAttempt
 from src.repositories.attempt_repository import AttemptRepository
 from src.repositories.test_repository import TestRepository
 from src.schemas.attempt_schema import (
@@ -17,7 +19,14 @@ from src.schemas.attempt_schema import (
     DraftAttemptAnswer,
     DraftAttemptResponse,
     FRQGrade,
+    OCR_LOW_CONFIDENCE_THRESHOLD,
+    OCR_STATUS_NEEDS_INPUT,
+    OCR_STATUS_OK,
+    OCR_STATUS_RESOLVED,
+    OCR_STATUS_SKIPPED,
     OcrResult,
+    RedoAnswerRequest,
+    RedoAnswerResponse,
     ResumableTestInfo,
     SaveDraftAttemptRequest,
     SubmittedAnswer,
@@ -70,9 +79,13 @@ class GradingService:
                 raise ValidationException(f"Question {question_id} does not belong to this test")
 
         repo = AttemptRepository(session)
-        # Delete any in-progress draft so it doesn't inflate the attempt number
+        # Delete any in-progress draft so it doesn't inflate the attempt number.
+        # Its strokes are read first: a drawing OCR cannot read is kept on the
+        # graded answer so the student can fix it on Results (GH #149).
         draft = await repo.get_draft(user_id, test_id)
+        draft_strokes: dict[int, str] = {}
         if draft is not None:
+            draft_strokes = {a.question_id: a.work_strokes for a in draft.answers if a.work_strokes}
             await session.delete(draft)
             await session.flush()
         attempt_number = await repo.next_attempt_number(user_id, test_id)
@@ -92,17 +105,7 @@ class GradingService:
 
         async def _transcribe_one(question_id: int, image_b64: str) -> None:
             async with ocr_semaphore:
-                try:
-                    result = await asyncio.wait_for(
-                        self.ocr_service.transcribe(image_b64, engine=ocr_engine),
-                        timeout=_OCR_TIMEOUT_SECONDS,
-                    )
-                except Exception as exc:
-                    # OCR failure must never lose a submission. Grade exactly
-                    # as if no drawing had been submitted.
-                    logger.warning("Scratch-pad OCR failed for question %s: %s", question_id, exc)
-                    result = None
-                work_by_question_id[question_id] = result
+                work_by_question_id[question_id] = await self._transcribe(question_id, image_b64, ocr_engine)
 
         drawings = [
             (qid, ans.work_image) for qid, ans in submitted_by_id.items() if ans.work_image
@@ -110,24 +113,40 @@ class GradingService:
         if drawings:
             await asyncio.gather(*(_transcribe_one(qid, image) for qid, image in drawings))
 
-        # Grade all questions in parallel — LLM calls for FRQ are concurrent, MCQ is instant
+        # A drawing OCR could not read, or read with low legibility, is held
+        # for the student to fix on Results instead of being graded as if it
+        # were never sent (GH #149). Only where the drawing decides the grade.
+        needs_input: set[int] = {
+            qid
+            for qid, ans in submitted_by_id.items()
+            if ans.work_image
+            and self._drawing_matters(question_by_id[qid], ans.answer, is_math_mode, is_coding_mode)
+            and not self._readable(work_by_question_id.get(qid))
+        }
+
+        # Grade all questions in parallel — LLM calls for FRQ are concurrent, MCQ is instant.
+        # A needs_input answer is not graded at all yet: no LLM spend on it.
         pairs = [(question_by_id[qid], ans) for qid, ans in submitted_by_id.items()]
-        grades = await asyncio.gather(*(
-            self._grade_question(
-                q, ans.answer, notes,
+
+        async def _grade_or_hold(question: Question, submitted: SubmittedAnswer) -> Optional[FRQGrade]:
+            if question.id in needs_input:
+                return None
+            work = work_by_question_id.get(question.id)
+            return await self._grade_question(
+                question,
+                self._answer_for_grading(question, submitted.answer, work, is_math_mode, is_coding_mode),
+                notes,
                 is_math_mode=is_math_mode,
                 is_coding_mode=is_coding_mode,
                 coding_language=coding_language,
-                work=work_by_question_id.get(ans.question_id),
+                work=work,
             )
-            for q, ans in pairs
-        ))
+
+        grades = await asyncio.gather(*(_grade_or_hold(q, ans) for q, ans in pairs))
 
         results: list[AnswerResult] = []
         correct_count = 0
         for (question, submitted), grade in zip(pairs, grades):
-            if grade.is_correct:
-                correct_count += 1
             # Read from work_by_question_id directly, not grade.work_transcript:
             # grade_math_answer echoes it back, but MCQ/TF/MS/RANK/coding
             # grading never touches `work`, so relying on the grade result
@@ -135,11 +154,34 @@ class GradingService:
             # produced it) for every non-math-FRQ question type, even though
             # the scratch pad is available on all of them.
             question_work = work_by_question_id.get(question.id)
-            work_transcript = question_work.transcript if question_work else None
+            work_transcript = (question_work.transcript or None) if question_work else None
+            if grade is None:
+                # Held (needs_input): the typed text alone is stored, so a
+                # later skip can grade it without the drawing.
+                strokes = draft_strokes.get(question.id)
+                await repo.add_answer(
+                    attempt.id, question.id, submitted.answer, False, None, None, False,
+                    work_strokes=strokes,
+                    work_transcript=work_transcript,
+                    ocr_status=OCR_STATUS_NEEDS_INPUT,
+                )
+                results.append(self._to_answer_result(
+                    question,
+                    user_answer=submitted.answer,
+                    is_correct=False,
+                    is_math=is_math_mode and question.question_type == "FRQ",
+                    work_transcript=work_transcript,
+                    ocr_status=OCR_STATUS_NEEDS_INPUT,
+                    work_strokes=strokes,
+                ))
+                continue
+            if grade.is_correct:
+                correct_count += 1
             # A draw-only answer (empty typed text) is persisted as its
             # transcript, so it is not stored as an empty string and Results
             # has something to show for "your answer".
             user_answer = submitted.answer or (work_transcript or "")
+            ocr_status = OCR_STATUS_OK if submitted.work_image else None
             await repo.add_answer(
                 attempt.id,
                 question.id,
@@ -149,25 +191,21 @@ class GradingService:
                 grade.confidence,
                 grade.flagged_uncertain,
                 reasoning=grade.reasoning,
+                work_transcript=work_transcript,
+                ocr_status=ocr_status,
             )
-            correct_answer = self._correct_answer_text(question)
-            results.append(
-                AnswerResult(
-                    question_id=question.id,
-                    question_text=question.question_text,
-                    user_answer=user_answer,
-                    correct_answer=correct_answer,
-                    is_correct=grade.is_correct,
-                    feedback=grade.feedback,
-                    reasoning=grade.reasoning,
-                    confidence=grade.confidence,
-                    flagged_uncertain=grade.flagged_uncertain,
-                    is_math=is_math_mode and question.question_type == "FRQ",
-                    # Response-only, never persisted (see OcrResult / AnswerResult).
-                    work_transcript=work_transcript,
-                    answer_inferred=bool(question.answer_inferred),
-                )
-            )
+            results.append(self._to_answer_result(
+                question,
+                user_answer=user_answer,
+                is_correct=grade.is_correct,
+                feedback=grade.feedback,
+                reasoning=grade.reasoning,
+                confidence=grade.confidence,
+                flagged_uncertain=grade.flagged_uncertain,
+                is_math=is_math_mode and question.question_type == "FRQ",
+                work_transcript=work_transcript,
+                ocr_status=ocr_status,
+            ))
 
         total = len(results)
         score = round((correct_count / total) * 100, 2) if total else 0.0
@@ -183,6 +221,281 @@ class GradingService:
             score=score,
             correct_count=correct_count,
             total=total,
+            answers=results,
+            is_provisional=bool(needs_input),
+        )
+
+    # ── OCR redo on Results (GH #149) ─────────────────────────────────────
+
+    async def _transcribe(
+        self, question_id: int, image_b64: str, ocr_engine: Optional[str]
+    ) -> Optional[OcrResult]:
+        try:
+            return await asyncio.wait_for(
+                self.ocr_service.transcribe(image_b64, engine=ocr_engine),
+                timeout=_OCR_TIMEOUT_SECONDS,
+            )
+        except Exception as exc:
+            # OCR failure must never lose a submission: the answer is held for
+            # the student (or graded without the drawing), never an error.
+            logger.warning("Scratch-pad OCR failed for question %s: %s", question_id, exc)
+            return None
+
+    @staticmethod
+    def _readable(work: Optional[OcrResult]) -> bool:
+        return bool(work and work.transcript and work.confidence >= OCR_LOW_CONFIDENCE_THRESHOLD)
+
+    @staticmethod
+    def _drawing_matters(question: Question, typed: str, is_math_mode: bool, is_coding_mode: bool) -> bool:
+        """Whether a bad read of this drawing would change the grade.
+
+        A draw-only answer is graded from the drawing. A math FRQ grades the
+        shown work alongside the typed answer. Anything else answered by
+        typing or picking an option is graded on that alone, so a bad read is
+        simply ignored.
+        """
+        if not typed.strip():
+            return True
+        return is_math_mode and not is_coding_mode and question.question_type == "FRQ"
+
+    @staticmethod
+    def _answer_for_grading(
+        question: Question,
+        typed: str,
+        work: Optional[OcrResult],
+        is_math_mode: bool,
+        is_coding_mode: bool,
+    ) -> str:
+        """The text a question is graded on.
+
+        Math FRQ grading reads the shown work itself (grade_math_answer is told
+        when nothing was typed). Every other grader only sees this string, so a
+        draw-only answer there is graded on its transcript, not on "".
+        """
+        if typed.strip() or work is None:
+            return typed
+        if is_math_mode and not is_coding_mode and question.question_type == "FRQ":
+            return typed
+        return work.transcript
+
+    def _to_answer_result(
+        self,
+        question: Optional[Question],
+        *,
+        question_id: Optional[int] = None,
+        user_answer: str,
+        is_correct: bool,
+        feedback: Optional[str] = None,
+        reasoning: Optional[str] = None,
+        confidence: Optional[float] = None,
+        flagged_uncertain: bool = False,
+        is_math: bool = False,
+        work_transcript: Optional[str] = None,
+        ocr_status: Optional[str] = None,
+        work_strokes: Optional[str] = None,
+    ) -> AnswerResult:
+        """One AnswerResult, with the answer key redacted while needs_input.
+
+        A held answer's correct answer, feedback and reasoning must never reach
+        the client before the redo, or the student could copy the key into it.
+        """
+        held = ocr_status == OCR_STATUS_NEEDS_INPUT
+        return AnswerResult(
+            question_id=question.id if question is not None else int(question_id or 0),
+            question_text=question.question_text if question is not None else None,
+            user_answer=user_answer,
+            correct_answer=None if held or question is None else self._correct_answer_text(question),
+            is_correct=is_correct,
+            feedback=None if held else feedback,
+            reasoning=None if held else reasoning,
+            confidence=None if held else confidence,
+            flagged_uncertain=False if held else flagged_uncertain,
+            is_math=is_math,
+            work_transcript=work_transcript,
+            answer_inferred=bool(question.answer_inferred) if question is not None else False,
+            ocr_status=ocr_status,
+            work_strokes=work_strokes if held else None,
+        )
+
+    async def _load_held_answer(self, attempt_id: int, user_id: int, session: AsyncSession):
+        attempt = await session.scalar(
+            select(UserAttempt).where(UserAttempt.id == attempt_id, UserAttempt.user_id == user_id)
+        )
+        if attempt is None or attempt.status != "submitted":
+            raise ResourceNotFoundException("Attempt")
+        test = await TestRepository(session).get_owned_with_questions(attempt.test_id, user_id)
+        if test is None:
+            raise ResourceNotFoundException("Test")
+        return attempt, test
+
+    async def _rescore(self, attempt, session: AsyncSession) -> tuple[float, int, int, bool]:
+        """Recompute the attempt's score in place from its answer rows."""
+        answers = await AttemptRepository(session).list_answers(attempt.id)
+        total = attempt.total_questions or len(answers)
+        correct = sum(1 for a in answers if a.is_correct)
+        score = round((correct / total) * 100, 2) if total else 0.0
+        attempt.correct_count = correct
+        attempt.total_score = score
+        provisional = any(a.ocr_status == OCR_STATUS_NEEDS_INPUT for a in answers)
+        return score, correct, total, provisional
+
+    async def redo_answer(
+        self,
+        attempt_id: int,
+        question_id: int,
+        user_id: int,
+        body: RedoAnswerRequest,
+        session: AsyncSession,
+        ocr_engine: Optional[str] = None,
+    ) -> RedoAnswerResponse:
+        """The student's one redo of a held answer: transcribe, grade, rescore.
+
+        One redo only: the answer leaves needs_input whatever happens, so a
+        second call is refused. A drawing still unreadable is graded without
+        it (typed answer if any, else blank); a low-legibility read is graded
+        with grade_math_answer's own low-confidence caveat rather than held
+        again.
+        """
+        attempt, test = await self._load_held_answer(attempt_id, user_id, session)
+        question = next((q for q in test.questions if q.id == question_id), None)
+        repo = AttemptRepository(session)
+        row = await repo.get_answer(attempt.id, question_id)
+        if question is None or row is None:
+            raise ResourceNotFoundException("Answer")
+        if row.ocr_status != OCR_STATUS_NEEDS_INPUT:
+            raise ValidationException("This answer is not waiting for a redo")
+
+        is_math_mode = getattr(test, "is_math_mode", False)
+        is_coding_mode = getattr(test, "is_coding_mode", False)
+        work = await self._transcribe(question_id, body.work_image, ocr_engine) if body.work_image else None
+        if work is not None and not work.transcript:
+            work = None
+
+        if not body.answer and work is None:
+            grade = FRQGrade(
+                is_correct=False,
+                feedback="We still couldn't read your drawing, so this answer was graded as blank.",
+                confidence=0.0,
+            )
+        else:
+            notes = "\n\n".join(note.content for note in test.notes)
+            grade = await self._grade_question(
+                question,
+                self._answer_for_grading(question, body.answer, work, is_math_mode, is_coding_mode),
+                notes,
+                is_math_mode=is_math_mode,
+                is_coding_mode=is_coding_mode,
+                coding_language=getattr(test, "coding_language", None) or "Python",
+                work=work,
+            )
+
+        work_transcript = work.transcript if work is not None else row.work_transcript
+        row.user_answer = body.answer or (work.transcript if work is not None else "")
+        row.is_correct = grade.is_correct
+        row.ai_feedback = grade.feedback
+        row.ai_reasoning = grade.reasoning
+        row.confidence_score = grade.confidence
+        row.flagged_uncertain = grade.flagged_uncertain
+        row.work_transcript = work_transcript
+        row.work_strokes = None
+        row.ocr_status = OCR_STATUS_RESOLVED
+        await session.flush()
+        score, correct, total, provisional = await self._rescore(attempt, session)
+        await session.commit()
+
+        return RedoAnswerResponse(
+            attempt_id=attempt.id,
+            score=score,
+            correct_count=correct,
+            total=total,
+            is_provisional=provisional,
+            answers=[self._to_answer_result(
+                question,
+                user_answer=row.user_answer,
+                is_correct=grade.is_correct,
+                feedback=grade.feedback,
+                reasoning=grade.reasoning,
+                confidence=grade.confidence,
+                flagged_uncertain=grade.flagged_uncertain,
+                is_math=is_math_mode and question.question_type == "FRQ",
+                work_transcript=work_transcript,
+                ocr_status=OCR_STATUS_RESOLVED,
+            )],
+        )
+
+    async def skip_unreadable(
+        self,
+        attempt_id: int,
+        user_id: int,
+        question_ids: list[int],
+        session: AsyncSession,
+    ) -> RedoAnswerResponse:
+        """Grade held answers without their drawing. Empty question_ids = all.
+
+        A held answer with typed text is graded on that text alone; one with
+        nothing typed is graded as blank (no LLM call).
+        """
+        attempt, test = await self._load_held_answer(attempt_id, user_id, session)
+        question_by_id = {q.id: q for q in test.questions}
+        repo = AttemptRepository(session)
+        wanted = set(question_ids)
+        rows = [
+            a for a in await repo.list_answers(attempt.id)
+            if a.ocr_status == OCR_STATUS_NEEDS_INPUT and (not wanted or a.question_id in wanted)
+        ]
+        is_math_mode = getattr(test, "is_math_mode", False)
+        is_coding_mode = getattr(test, "is_coding_mode", False)
+        notes = "\n\n".join(note.content for note in test.notes)
+
+        async def _grade(row) -> FRQGrade:
+            question = question_by_id.get(row.question_id)
+            if question is None or not row.user_answer.strip():
+                return FRQGrade(
+                    is_correct=False,
+                    feedback="Skipped. Your drawing couldn't be read, so this answer was graded as blank.",
+                    confidence=0.0,
+                )
+            return await self._grade_question(
+                question, row.user_answer, notes,
+                is_math_mode=is_math_mode,
+                is_coding_mode=is_coding_mode,
+                coding_language=getattr(test, "coding_language", None) or "Python",
+                work=None,
+            )
+
+        grades = await asyncio.gather(*(_grade(row) for row in rows))
+        results: list[AnswerResult] = []
+        for row, grade in zip(rows, grades):
+            row.is_correct = grade.is_correct
+            row.ai_feedback = grade.feedback
+            row.ai_reasoning = grade.reasoning
+            row.confidence_score = grade.confidence
+            row.flagged_uncertain = grade.flagged_uncertain
+            row.work_strokes = None
+            row.ocr_status = OCR_STATUS_SKIPPED
+            question = question_by_id.get(row.question_id)
+            results.append(self._to_answer_result(
+                question,
+                question_id=row.question_id,
+                user_answer=row.user_answer,
+                is_correct=grade.is_correct,
+                feedback=grade.feedback,
+                reasoning=grade.reasoning,
+                confidence=grade.confidence,
+                flagged_uncertain=grade.flagged_uncertain,
+                is_math=bool(question and is_math_mode and question.question_type == "FRQ"),
+                work_transcript=row.work_transcript,
+                ocr_status=OCR_STATUS_SKIPPED,
+            ))
+        await session.flush()
+        score, correct, total, provisional = await self._rescore(attempt, session)
+        await session.commit()
+        return RedoAnswerResponse(
+            attempt_id=attempt.id,
+            score=score,
+            correct_count=correct,
+            total=total,
+            is_provisional=provisional,
             answers=results,
         )
 
@@ -438,7 +751,9 @@ class GradingService:
         test = await TestRepository(session).get_owned(test_id, user_id)
         if test is None:
             raise ResourceNotFoundException("Test")
-        attempts = await AttemptRepository(session).list_for_test(user_id, test_id)
+        repo = AttemptRepository(session)
+        attempts = await repo.list_for_test(user_id, test_id)
+        provisional = await repo.provisional_attempt_ids([attempt.id for attempt in attempts])
         return [
             AttemptSummary(
                 id=attempt.id,
@@ -447,6 +762,7 @@ class GradingService:
                 correct_count=attempt.correct_count or 0,
                 total=attempt.total_questions or 0,
                 created_at=attempt.created_at,
+                is_provisional=attempt.id in provisional,
             )
             for attempt in attempts
         ]
@@ -454,9 +770,13 @@ class GradingService:
     async def get_attempt_detail(
         self, attempt_id: int, user_id: int, session: AsyncSession
     ) -> AttemptDetail:
-        attempt = await AttemptRepository(session).get_detail(attempt_id, user_id)
+        repo = AttemptRepository(session)
+        attempt = await repo.get_detail(attempt_id, user_id)
         if attempt is None:
             raise ResourceNotFoundException("Attempt")
+        held = any(answer.ocr_status == OCR_STATUS_NEEDS_INPUT for answer in attempt.answers)
+        pending_strokes = await repo.get_pending_strokes(attempt.id) if held else {}
+        is_math_mode = bool(attempt.test and getattr(attempt.test, "is_math_mode", False))
         return AttemptDetail(
             id=attempt.id,
             attempt_number=attempt.attempt_number,
@@ -468,11 +788,10 @@ class GradingService:
             folder_id=attempt.test.folder_id if attempt.test else None,
             test_title=attempt.test.title if attempt.test else "",
             answers=[
-                AnswerResult(
+                self._to_answer_result(
+                    answer.question,
                     question_id=answer.question_id,
-                    question_text=answer.question.question_text if answer.question else None,
                     user_answer=answer.user_answer,
-                    correct_answer=self._correct_answer_text(answer.question) if answer.question else None,
                     is_correct=bool(answer.is_correct),
                     feedback=answer.ai_feedback,
                     reasoning=answer.ai_reasoning,
@@ -480,10 +799,14 @@ class GradingService:
                     if answer.confidence_score is not None
                     else None,
                     flagged_uncertain=answer.flagged_uncertain,
-                    answer_inferred=bool(answer.question.answer_inferred) if answer.question else False,
+                    is_math=bool(is_math_mode and answer.question and answer.question.question_type == "FRQ"),
+                    work_transcript=answer.work_transcript,
+                    ocr_status=answer.ocr_status,
+                    work_strokes=pending_strokes.get(answer.question_id),
                 )
                 for answer in attempt.answers
             ],
+            is_provisional=held,
         )
 
     async def get_weakness_detection(

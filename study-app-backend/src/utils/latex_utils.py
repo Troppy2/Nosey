@@ -56,13 +56,14 @@ _BARE_SYMBOLS = (
 
 # First alternative: \cmd{...} with one or more braced groups (and optional
 # ^/_ suffixes). Second: a bare known Greek letter or symbol not followed by a
-# letter or a brace. \begin and \end are excluded because an environment is
-# handled as a whole by _ENVIRONMENT_RE; wrapping its two halves separately
-# would produce $\begin{bmatrix}$ ... $\end{bmatrix}$, which renders as an
-# error at both ends.
+# letter or a brace, with the same optional ^/_ suffixes so "\epsilon_4" is
+# wrapped whole rather than as "$\epsilon$_4". \begin and \end are excluded
+# because an environment is handled as a whole by _ENVIRONMENT_RE; wrapping
+# its two halves separately would produce $\begin{bmatrix}$ ...
+# $\end{bmatrix}$, which renders as an error at both ends.
 _COMMAND_RE = re.compile(
     r"(\\(?!begin\b|end\b)[a-zA-Z@]+(?:\s*\{[^}]*\})+(?:[_\^](?:\{[^}]*\}|[^\s\\]))*"
-    r"|\\(?:" + _BARE_SYMBOLS + r")(?![a-zA-Z{]))"
+    r"|\\(?:" + _BARE_SYMBOLS + r")(?![a-zA-Z{])(?:[_\^](?:\{[^}]*\}|[A-Za-z0-9]))*)"
 )
 
 
@@ -129,6 +130,40 @@ def _wrap_prose(segment: str) -> str:
         last = match.end()
     out.append(_COMMAND_RE.sub(lambda m: f"${m.group(0)}$", segment[last:]))
     return "".join(out)
+
+
+_TEXT_CMD_RE = re.compile(r"\\text(?:bf|it|rm)?\{([^{}]*)\}")
+_OUTER_DELIMS_RE = re.compile(r"^\s*\$\$?([\s\S]*?)\$?\$\s*$")
+_MATH_HINT_RE = re.compile(r"[\\^_=+\-*/<>()\[\]{}|0-9]")
+
+
+def format_final_answer(answer: str) -> str:
+    """Markdown for a grader's final answer: display maths only when it is maths.
+
+    Wrapping every final answer in $$...$$ rendered a word like TRUE as
+    italic maths letters, and a sentence as one display line that never
+    wraps and widened the whole Results card. A word stays plain text; a
+    sentence (or anything already holding inline $...$) is prose with its
+    maths delimited; only a bare expression becomes a display block.
+    """
+    text = answer.strip()
+    if not text:
+        return text
+    if "$" in text:
+        inner = _OUTER_DELIMS_RE.match(text)
+        # "$$x = 4$$" or "$x = 4$" whole: the model delimited a plain
+        # expression itself. Anything else with a $ in it is prose.
+        if inner and "$" not in inner.group(1):
+            text = inner.group(1).strip()
+        else:
+            return normalize_latex(text)
+    unwrapped = _TEXT_CMD_RE.sub(lambda m: m.group(1), text)
+    if _looks_like_prose(unwrapped):
+        return normalize_latex(unwrapped)
+    if not _MATH_HINT_RE.search(text) and " " not in text and len(text) > 1:
+        # A single word: True, False, Yes, Undefined.
+        return text
+    return f"$${text}$$"
 
 
 def normalize_latex(text: str) -> str:

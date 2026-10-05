@@ -5,6 +5,7 @@ import type {
   AdminUserRow,
   AttemptDetail,
   AttemptResult,
+  RedoAnswerResponse,
   AttemptSummary,
   ConversationFile,
   CreateTestResult,
@@ -721,6 +722,27 @@ export async function submitAttempt(
   return request<AttemptResult>(`/tests/${testId}/attempts`, {
     method: "POST",
     body: JSON.stringify({ answers, ...(ocrEngine ? { ocr_engine: ocrEngine } : {}) }),
+  });
+}
+
+// One redo of an answer whose drawing could not be read (GH #149): a fixed
+// drawing, a typed answer, or both. The server allows one per answer.
+export async function redoAnswer(
+  attemptId: number,
+  questionId: number,
+  body: { answer: string; work_image?: string | null },
+): Promise<RedoAnswerResponse> {
+  return request<RedoAnswerResponse>(`/attempts/${attemptId}/answers/${questionId}/redo`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+// Grade held answers without their drawing. No ids means all of them.
+export async function skipUnreadableAnswers(attemptId: number, questionIds: number[] = []): Promise<RedoAnswerResponse> {
+  return request<RedoAnswerResponse>(`/attempts/${attemptId}/answers/skip-unreadable`, {
+    method: "POST",
+    body: JSON.stringify({ question_ids: questionIds }),
   });
 }
 

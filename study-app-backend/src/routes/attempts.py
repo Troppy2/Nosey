@@ -13,9 +13,13 @@ from src.schemas.attempt_schema import (
     AttemptResult,
     AttemptSummary,
     DraftAttemptResponse,
+    OCR_STATUS_NEEDS_INPUT,
+    RedoAnswerRequest,
+    RedoAnswerResponse,
     ResumableTestInfo,
     ReviewSummaryResponse,
     SaveDraftAttemptRequest,
+    SkipUnreadableRequest,
     SubmitAttemptRequest,
 )
 from src.services.grading_service import GradingService
@@ -63,6 +67,58 @@ async def submit_attempt(
         return result
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except StudyAppException as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/attempts/{attempt_id}/answers/{question_id}/redo", response_model=RedoAnswerResponse)
+# One OCR call + one grading call per redo; same budget shape as a submit.
+@limiter.limit("20/minute;120/hour")
+async def redo_answer(
+    attempt_id: int,
+    question_id: int,
+    request: Request,
+    response: Response,
+    body: RedoAnswerRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> RedoAnswerResponse:
+    """Fix or type an answer whose drawing OCR could not read, then regrade it (GH #149)."""
+    try:
+        # Same beta gate as a submission: only scratch-pad users send a drawing.
+        if body.work_image and not can_submit_scratch_pad_work(user):
+            raise StudyAppException(
+                "Scratch-pad drawings are a beta feature. Type your answer instead."
+            )
+        ocr_engine = resolve_ocr_engine(user, body.ocr_engine)
+        return await GradingService().redo_answer(
+            attempt_id, question_id, user.id, body, session, ocr_engine=ocr_engine
+        )
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except LLMException as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except StudyAppException as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/attempts/{attempt_id}/answers/skip-unreadable", response_model=RedoAnswerResponse)
+@limiter.limit("20/minute;120/hour")
+async def skip_unreadable(
+    attempt_id: int,
+    request: Request,
+    response: Response,
+    body: SkipUnreadableRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> RedoAnswerResponse:
+    """Grade held answers without their drawing; empty question_ids = all (GH #149)."""
+    try:
+        return await GradingService().skip_unreadable(attempt_id, user.id, body.question_ids, session)
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except LLMException as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except StudyAppException as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -154,7 +210,9 @@ async def generate_review_summary(
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    missed = [a for a in detail.answers if not a.is_correct]
+    # A needs_input answer is ungraded and its key is hidden (GH #149): the
+    # summary must not reveal it.
+    missed = [a for a in detail.answers if not a.is_correct and a.ocr_status != OCR_STATUS_NEEDS_INPUT]
     if not missed:
         return ReviewSummaryResponse(summary="All answers were correct — nothing to review!")
 

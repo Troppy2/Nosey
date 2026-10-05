@@ -829,7 +829,11 @@ function TestRow({
                 onPointerEnter={() => prefetchAttemptDetail(a.id)}
                 onFocus={() => prefetchAttemptDetail(a.id)}
               >
-                <span>Attempt {a.attempt_number}</span>
+                <span>
+                  Attempt {a.attempt_number}
+                  {/* Some answers are waiting on a handwriting redo (GH #149). */}
+                  {a.is_provisional ? <span className="pill attempt-provisional-pill">Provisional</span> : null}
+                </span>
                 <span>{formatPercent(a.score)} · {formatDate(a.created_at)}</span>
               </Link>
             ))
