@@ -24201,6 +24201,7 @@ button.lc-official-link:disabled:hover {
 }
 .scratchpad-canvas-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
 }
@@ -24268,9 +24269,11 @@ button.lc-official-link:disabled:hover {
   border: 1px solid var(--green-light-mid);
   border-radius: var(--radius-lg);
   background: var(--white);
-  /* The page can stand taller than the modal, so it scrolls vertically. */
-  overflow-x: hidden;
+  /* The page can stand taller than the modal, and wider when zoomed in. */
+  overflow-x: auto;
   overflow-y: auto;
+  /* Reserve the scrollbar's space so it appearing never resizes the canvas. */
+  scrollbar-gutter: stable;
 }
 /* The page holds the two stacked canvases. Its height is set in JS to the
    logical page length, so it can stand taller than the container and scroll. */
@@ -27071,4 +27074,113 @@ a.sd-chip.is-done:hover {
   .pp-footer .button-row {
     justify-content: flex-end;
   }
+}
+
+/* Scratch pad: pen options, eraser options, zoom. */
+.scratchpad-style-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.6);
+}
+.scratchpad-swatches,
+.scratchpad-widths,
+.scratchpad-segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.scratchpad-swatch {
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 2px solid var(--white);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--green-light-mid);
+  cursor: pointer;
+}
+.scratchpad-swatch--highlight {
+  border-radius: var(--radius-sm);
+}
+.scratchpad-swatch.is-active {
+  box-shadow: 0 0 0 2px var(--green-dark);
+}
+.scratchpad-widths button {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 1.7rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  cursor: pointer;
+}
+.scratchpad-widths button span {
+  display: block;
+  width: 1.1rem;
+  border-radius: 999px;
+  background: var(--ink);
+}
+.scratchpad-widths button.is-active,
+.scratchpad-segmented button.is-active {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+}
+.scratchpad-segmented button {
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.scratchpad-eraser-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+/* The eraser slider is Learning Modules' .lm-dock-seek; this only sizes it. */
+.scratchpad-eraser-range {
+  flex: none;
+  width: 9rem;
+}
+.scratchpad-eraser-preview {
+  display: grid;
+  place-items: center;
+  width: 4.2rem;
+  height: 4.2rem;
+}
+.scratchpad-eraser-preview span {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  border: 1.5px solid #6b7a5c;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+}
+.scratchpad-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+.scratchpad-zoom-label {
+  min-width: 3.2rem;
+  height: 2rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.scratchpad-zoom + .scratchpad-finger-toggle {
+  margin-left: 0;
 }
