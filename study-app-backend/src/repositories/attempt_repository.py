@@ -8,7 +8,7 @@ from src.models.test import Test
 from src.models.user_answer import UserAnswer
 from src.models.user_attempt import UserAttempt
 from src.repositories.base_repository import BaseRepository
-from src.schemas.attempt_schema import ResumableTestInfo
+from src.schemas.attempt_schema import OCR_STATUS_NEEDS_INPUT, ResumableTestInfo
 from typing import Optional
 
 
@@ -39,6 +39,8 @@ class AttemptRepository(BaseRepository[UserAttempt]):
         flagged_uncertain: bool,
         reasoning: Optional[str] = None,
         work_strokes: Optional[str] = None,
+        work_transcript: Optional[str] = None,
+        ocr_status: Optional[str] = None,
     ) -> UserAnswer:
         answer = UserAnswer(
             attempt_id=attempt_id,
@@ -49,11 +51,13 @@ class AttemptRepository(BaseRepository[UserAttempt]):
             ai_reasoning=reasoning,
             confidence_score=confidence,
             flagged_uncertain=flagged_uncertain,
-            # Scratch-pad strokes (STEM Scratch Pad feature). Only ever passed
-            # by save_draft_attempt; a graded submission never sets this, so
-            # the grade-and-discard guarantee holds for the rendered image
-            # even though these in-progress strokes are persisted.
+            # Scratch-pad strokes (STEM Scratch Pad feature). Passed by
+            # save_draft_attempt, and by a graded submission only for a
+            # needs_input answer (GH #149). The rendered image is never
+            # persisted either way.
             work_strokes=work_strokes,
+            work_transcript=work_transcript,
+            ocr_status=ocr_status,
         )
         self.session.add(answer)
         await self.session.flush()
@@ -89,6 +93,46 @@ class AttemptRepository(BaseRepository[UserAttempt]):
                 ),
             )
         )
+
+    async def get_answer(self, attempt_id: int, question_id: int) -> Optional[UserAnswer]:
+        return await self.session.scalar(
+            select(UserAnswer).where(
+                UserAnswer.attempt_id == attempt_id, UserAnswer.question_id == question_id
+            )
+        )
+
+    async def list_answers(self, attempt_id: int) -> list[UserAnswer]:
+        rows = await self.session.scalars(select(UserAnswer).where(UserAnswer.attempt_id == attempt_id))
+        return list(rows.all())
+
+    async def get_pending_strokes(self, attempt_id: int) -> dict[int, str]:
+        """Strokes of the needs_input answers only (GH #149).
+
+        get_detail defers work_strokes for every answer; this loads it just
+        for the few answers the student still has to fix.
+        """
+        rows = await self.session.execute(
+            select(UserAnswer.question_id, UserAnswer.work_strokes).where(
+                UserAnswer.attempt_id == attempt_id,
+                UserAnswer.ocr_status == OCR_STATUS_NEEDS_INPUT,
+                UserAnswer.work_strokes.is_not(None),
+            )
+        )
+        return {question_id: strokes for question_id, strokes in rows.all()}
+
+    async def provisional_attempt_ids(self, attempt_ids: list[int]) -> set[int]:
+        """The attempts that still hold a needs_input answer (GH #149)."""
+        if not attempt_ids:
+            return set()
+        rows = await self.session.scalars(
+            select(UserAnswer.attempt_id)
+            .where(
+                UserAnswer.attempt_id.in_(attempt_ids),
+                UserAnswer.ocr_status == OCR_STATUS_NEEDS_INPUT,
+            )
+            .distinct()
+        )
+        return set(rows.all())
 
     async def weakness(self, user_id: int, test_id: int) -> list[tuple[int, str, int, int, float]]:
         correct_count = func.sum(case((UserAnswer.is_correct.is_(True), 1), else_=0))
@@ -213,7 +257,9 @@ class AttemptRepository(BaseRepository[UserAttempt]):
         wrong_answers = [
             (answer.question, answer)
             for answer in recent_attempt.answers
-            if answer.is_correct is False
+            # A needs_input answer is not graded yet and its answer key is
+            # hidden from the student (GH #149): Kojo must not reveal it.
+            if answer.is_correct is False and answer.ocr_status != OCR_STATUS_NEEDS_INPUT
         ]
 
         if not wrong_answers:

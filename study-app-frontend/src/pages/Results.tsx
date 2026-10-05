@@ -1,5 +1,5 @@
-import { AlertTriangle, Brain, Calculator, CheckCircle2, ChevronDown, Info, Loader2, RotateCcw, Sparkles, Target, X, XCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { AlertTriangle, Brain, Calculator, CheckCircle2, ChevronDown, Info, Loader2, PenLine, RotateCcw, Sparkles, Target, X, XCircle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -8,11 +8,28 @@ import { FeatureSurvey } from "../components/FeatureSurvey";
 import { SelectInput, TextInput } from "../components/Field";
 import { LoadingNotice } from "../components/Loaders";
 import { MarkdownContent } from "../components/MarkdownContent";
+import {
+  exportScratchPadPng,
+  isScratchPadEmpty,
+  parseScratchPadJson,
+  ScratchPadTrigger,
+  type PaperStyle,
+  type ScratchPadData,
+} from "../components/ScratchPad";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
 import { SkeletonScoreSummary } from "../components/Skeletons";
-import { createTest, fetchAttemptDetail, fetchFolder, fetchReviewSummary, isGuestSession } from "../lib/api";
+import {
+  createTest,
+  fetchAttemptDetail,
+  fetchFolder,
+  fetchReviewSummary,
+  isGuestSession,
+  redoAnswer,
+  scopeKey,
+  skipUnreadableAnswers,
+} from "../lib/api";
 import { scoreTone } from "../lib/format";
-import type { AnswerResult, AttemptDetail } from "../lib/types";
+import type { AnswerResult, AttemptDetail, RedoAnswerResponse } from "../lib/types";
 
 export default function Results() {
   const { attemptId } = useParams();
@@ -42,6 +59,8 @@ export default function Results() {
   const [reviewSummary, setReviewSummary] = useState<string | null>(null);
   const [loadingReview, setLoadingReview] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
+  const [skippingAll, setSkippingAll] = useState(false);
+  const [skipAllError, setSkipAllError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadAttempt() {
@@ -110,8 +129,42 @@ export default function Results() {
   }
 
   const tone = scoreTone(attempt.score);
-  const missed = attempt.answers.filter((answer) => !answer.is_correct);
+  // A held answer (GH #149) is not graded yet, so it is not "missed".
+  const held = attempt.answers.filter((answer) => answer.ocr_status === "needs_input");
+  const missed = attempt.answers.filter((answer) => !answer.is_correct && answer.ocr_status !== "needs_input");
   const hasMath = attempt.answers.some((a) => a.is_math);
+
+  // Merge a redo / skip response into the attempt in place: the score and the
+  // regraded answers change, everything else stays.
+  function applyRegrade(response: RedoAnswerResponse) {
+    setAttempt((prev) => {
+      if (!prev) return prev;
+      const byId = new Map(response.answers.map((answer) => [answer.question_id, answer]));
+      return {
+        ...prev,
+        score: response.score,
+        correct_count: response.correct_count,
+        total: response.total,
+        is_provisional: response.is_provisional,
+        answers: prev.answers.map((answer) => byId.get(answer.question_id) ?? answer),
+      };
+    });
+    // The study notes were written from the old set of missed answers.
+    setReviewSummary(null);
+  }
+
+  async function handleSkipAll() {
+    if (!attempt) return;
+    setSkippingAll(true);
+    setSkipAllError(null);
+    try {
+      applyRegrade(await skipUnreadableAnswers(Number(attempt.id)));
+    } catch (err) {
+      setSkipAllError(err instanceof Error ? err.message : "Could not skip those answers.");
+    } finally {
+      setSkippingAll(false);
+    }
+  }
 
   async function handleGenerateReview() {
     if (!attemptId) return;
@@ -159,12 +212,35 @@ export default function Results() {
   const content = (
     <div className="page page-narrow">
       <Card className={`score-hero score-${tone}`}>
-        <span className="eyebrow">Attempt {attempt.attempt_number}</span>
+        <span className="eyebrow">
+          Attempt {attempt.attempt_number}
+          {held.length > 0 ? <span className="pill score-provisional-pill">Provisional</span> : null}
+        </span>
         <strong>{Math.round(attempt.score)}%</strong>
         <p>
           {attempt.correct_count} of {attempt.total} correct
+          {held.length > 0 ? `, ${held.length} waiting on you` : ""}
         </p>
       </Card>
+
+      {held.length > 0 ? (
+        <Card className="needs-input-banner">
+          <PenLine size={20} />
+          <div>
+            <h2>
+              {held.length === 1 ? "1 answer needs" : `${held.length} answers need`} your input
+            </h2>
+            <p className="muted small">
+              Kojo couldn't read some of your handwriting. Fix the drawing or type the answer below, once
+              per question, and it gets graded. Your score updates when you do.
+            </p>
+            {skipAllError ? <p className="needs-input-error small">{skipAllError}</p> : null}
+          </div>
+          <Button variant="secondary" onClick={() => void handleSkipAll()} disabled={skippingAll}>
+            {skippingAll ? "Grading..." : "Skip all"}
+          </Button>
+        </Card>
+      ) : null}
 
       <div className="grid grid-3 result-stats">
         <Card>
@@ -394,9 +470,19 @@ export default function Results() {
           <h2>Answer Review</h2>
         </div>
         <div className="review-list">
-          {attempt.answers.map((answer, i) => (
-            <ReviewItem answer={answer} key={answer.question_id} number={i + 1} />
-          ))}
+          {attempt.answers.map((answer, i) =>
+            answer.ocr_status === "needs_input" ? (
+              <NeedsInputItem
+                answer={answer}
+                attemptId={Number(attempt.id)}
+                key={answer.question_id}
+                number={i + 1}
+                onRegraded={applyRegrade}
+              />
+            ) : (
+              <ReviewItem answer={answer} key={answer.question_id} number={i + 1} />
+            ),
+          )}
         </div>
       </section>
 
@@ -438,6 +524,10 @@ function ReviewItem({ answer, number }: { answer: AnswerResult; number: number }
   const [reasoningOpen, setReasoningOpen] = useState(false);
   const Icon = answer.is_correct ? CheckCircle2 : XCircle;
   const reasoning = answer.reasoning?.trim();
+  const transcript = answer.work_transcript?.trim();
+  // Draw-only answers are stored as their transcript; show them as read
+  // handwriting, not as a typed answer.
+  const drawnOnly = Boolean(transcript) && answer.user_answer.trim() === transcript;
 
   return (
     <Card className={`review-item ${answer.is_correct ? "correct" : "incorrect"}`}>
@@ -473,11 +563,19 @@ function ReviewItem({ answer, number }: { answer: AnswerResult; number: number }
             </div>
           ) : null}
           <div>
-            <span>Your answer</span>
-            <div className="math-answer-text review-answer-markdown">
+            <span>{drawnOnly ? "Your answer (read from your drawing)" : "Your answer"}</span>
+            <div className={`review-answer-markdown ${drawnOnly ? "review-work-transcript" : "review-answer-text"}`}>
               <MarkdownContent content={formatAnswerForDisplay(answer.user_answer)} />
             </div>
           </div>
+          {transcript && !drawnOnly ? (
+            <div>
+              <span>What Kojo read from your work</span>
+              <div className="review-answer-markdown review-work-transcript">
+                <MarkdownContent content={transcript} />
+              </div>
+            </div>
+          ) : null}
           <div className="math-explanation">
             <span>Feedback</span>
             <MarkdownContent content={answer.feedback ?? "No feedback returned for this answer."} />
@@ -505,6 +603,135 @@ function ReviewItem({ answer, number }: { answer: AnswerResult; number: number }
           ) : null}
         </div>
       ) : null}
+    </Card>
+  );
+}
+
+// A held answer (GH #149): OCR could not read the drawing, so the answer key is
+// withheld and the student gets one redo, a fixed drawing or a typed answer.
+function NeedsInputItem({
+  answer,
+  attemptId,
+  number,
+  onRegraded,
+}: {
+  answer: AnswerResult;
+  attemptId: number;
+  number: number;
+  onRegraded: (response: RedoAnswerResponse) => void;
+}) {
+  const initialStrokes = useMemo(() => parseScratchPadJson(answer.work_strokes), [answer.work_strokes]);
+  const [strokes, setStrokes] = useState<ScratchPadData>(initialStrokes);
+  const [typed, setTyped] = useState(answer.user_answer ?? "");
+  const [paperStyle, setPaperStyle] = useState<PaperStyle>(() => {
+    try {
+      return (localStorage.getItem(scopeKey("nosey_scratchpad_paper")) as PaperStyle | null) ?? "blank";
+    } catch {
+      return "blank";
+    }
+  });
+  const [busy, setBusy] = useState<"redo" | "skip" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const transcript = answer.work_transcript?.trim();
+  const hasDrawing = !isScratchPadEmpty(strokes);
+  const canSubmit = Boolean(typed.trim()) || hasDrawing;
+
+  function changePaperStyle(style: PaperStyle) {
+    setPaperStyle(style);
+    try {
+      localStorage.setItem(scopeKey("nosey_scratchpad_paper"), style);
+    } catch {
+      // A per-viewer convenience only.
+    }
+  }
+
+  async function submitRedo() {
+    setBusy("redo");
+    setError(null);
+    try {
+      const workImage = hasDrawing ? exportScratchPadPng(strokes) : null;
+      onRegraded(
+        await redoAnswer(attemptId, Number(answer.question_id), {
+          answer: typed.trim(),
+          ...(workImage ? { work_image: workImage } : {}),
+        }),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not grade this answer. Try again.");
+      setBusy(null);
+    }
+  }
+
+  async function skip() {
+    setBusy("skip");
+    setError(null);
+    try {
+      onRegraded(await skipUnreadableAnswers(attemptId, [Number(answer.question_id)]));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not skip this answer.");
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Card className="review-item needs-input">
+      <div className="review-trigger needs-input-head">
+        <PenLine size={22} />
+        <div>
+          <span className="small muted">Question {number}, needs your input</span>
+          <div className="review-question-markdown">
+            <MarkdownContent content={answer.question_text ?? `Question ${answer.question_id}`} />
+          </div>
+        </div>
+      </div>
+      <div className="review-detail">
+        <div className="needs-input-notice">
+          <Info size={15} />
+          <span>
+            {transcript
+              ? "Kojo wasn't confident reading your handwriting. Check what it read, then fix your drawing or type the answer."
+              : "Kojo couldn't read your handwriting. Fix your drawing or type the answer."}{" "}
+            You get one redo, and the answer stays hidden until then.
+          </span>
+        </div>
+        {transcript ? (
+          <div>
+            <span>What Kojo read</span>
+            <div className="review-answer-markdown review-work-transcript">
+              <MarkdownContent content={transcript} />
+            </div>
+          </div>
+        ) : null}
+        <div className="needs-input-fields">
+          <ScratchPadTrigger
+            questionText={answer.question_text ?? ""}
+            data={strokes}
+            onChange={setStrokes}
+            paperStyle={paperStyle}
+            onPaperStyleChange={changePaperStyle}
+          />
+          <label className="needs-input-typed">
+            <span>Or type your answer</span>
+            <textarea
+              className="field-input math-answer-textarea"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              maxLength={5000}
+              rows={3}
+              placeholder="Type your final answer"
+            />
+          </label>
+        </div>
+        {error ? <p className="needs-input-error small">{error}</p> : null}
+        <div className="button-row">
+          <Button onClick={() => void submitRedo()} disabled={!canSubmit || busy !== null}>
+            {busy === "redo" ? "Grading..." : "Grade this answer"}
+          </Button>
+          <Button variant="secondary" onClick={() => void skip()} disabled={busy !== null}>
+            {busy === "skip" ? "Grading..." : "Skip"}
+          </Button>
+        </div>
+      </div>
     </Card>
   );
 }

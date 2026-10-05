@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, Numeric, Text, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import BIGINT_ID, Base
@@ -32,10 +32,16 @@ class UserAnswer(Base):
     flagged_uncertain: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # Scratch-pad drawing strokes captured while the attempt is a draft
     # (STEM Scratch Pad feature), as opaque JSON in the frontend's stroke
-    # format. Only ever populated on an in_progress attempt; the draft is
-    # deleted at submit time, so this is always None on a graded row. The
-    # rendered image sent to OCR for grading is never persisted at all.
+    # format. Populated on an in_progress attempt, and on a graded row only
+    # while it is needs_input (GH #149), so the student can fix the drawing
+    # instead of redoing it; cleared once resolved or skipped. The rendered
+    # image sent to OCR for grading is never persisted at all.
     work_strokes: Mapped[Optional[str]] = mapped_column(Text)
+    # What OCR read from the drawing, shown on Results (GH #149).
+    work_transcript: Mapped[Optional[str]] = mapped_column(Text)
+    # None (no drawing), ok, needs_input, resolved, skipped. See OCR_STATUS_*
+    # in schemas/attempt_schema.py.
+    ocr_status: Mapped[Optional[str]] = mapped_column(String(20))
 
     attempt: Mapped[UserAttempt] = relationship("UserAttempt", back_populates="answers")
     question: Mapped[Question] = relationship("Question", back_populates="user_answers")

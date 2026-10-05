@@ -27191,3 +27191,156 @@ a.sd-chip.is-done:hover {
 .scratchpad-backdrop {
   touch-action: pan-x pan-y;
 }
+
+/* ─── Results: answer text, read handwriting, OCR redo (GH #149) ───────── */
+
+/* Grid children default to min-width: auto, so one display equation that
+   cannot wrap stretched the whole review card past the screen and clipped
+   the answer above it. With min-width 0 the equation scrolls in its own box. */
+.review-detail > *,
+.review-detail div {
+  min-width: 0;
+}
+
+.review-detail .math-block {
+  max-width: 100%;
+}
+
+/* A typed answer is prose more often than code: sans, one box, wrapping. */
+.review-answer-text,
+.review-work-transcript {
+  background: var(--green-lightest);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-family: var(--font-sans);
+  white-space: normal;
+}
+
+.review-detail .review-answer-text p,
+.review-detail .review-work-transcript p {
+  padding: 0;
+  background: none;
+  border-radius: 0;
+}
+
+/* Read handwriting: one step per line, maths inline, no callout chrome. */
+.review-work-transcript .kojo-markdown {
+  display: grid;
+  gap: 6px;
+}
+
+.review-work-transcript .math-block {
+  margin: 0;
+  padding: 0;
+  background: none;
+  border-left: none;
+  border-radius: 0;
+  text-align: left;
+}
+
+.score-provisional-pill {
+  margin-left: 8px;
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  font-size: 0.72rem;
+  vertical-align: middle;
+}
+
+.needs-input-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 20px;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.needs-input-banner > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--accent-caution-strong);
+}
+
+.needs-input-banner > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.needs-input-banner h2 {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+}
+
+.needs-input-banner p {
+  margin: 0;
+}
+
+.review-item.needs-input {
+  border: 1px solid rgba(245, 158, 11, 0.45);
+}
+
+.review-item.needs-input .needs-input-head {
+  cursor: default;
+}
+
+.review-item.needs-input .needs-input-head > svg {
+  color: var(--accent-caution-strong);
+}
+
+.review-detail .needs-input-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--accent-caution-strong);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.review-detail .needs-input-notice span {
+  color: inherit;
+  font-size: inherit;
+  font-weight: 600;
+}
+
+.review-detail .needs-input-notice svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.needs-input-fields {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.needs-input-typed {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+
+.needs-input-error {
+  margin: 0;
+  color: var(--red, #e53e3e);
+}
+
+@media (max-width: 640px) {
+  .needs-input-banner {
+    flex-wrap: wrap;
+  }
+
+  .needs-input-banner > .button {
+    width: 100%;
+  }
+}
+
+.attempt-provisional-pill {
+  margin-left: 8px;
+  padding: 1px 8px;
+  font-size: 0.7rem;
+  background: rgba(245, 158, 11, 0.14);
+  color: var(--accent-caution-strong);
+}

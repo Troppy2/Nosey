@@ -140,13 +140,20 @@ export type AnswerResult = {
   flagged_uncertain: boolean;
   is_math?: boolean;
   // What the OCR engine read from a scratch-pad drawing, if one was
-  // submitted. Response-only: never persisted, so it is absent when this
-  // attempt is viewed again later.
+  // submitted. Saved with the answer (GH #149), so it is also present when
+  // the attempt is viewed again later.
   work_transcript?: string | null;
   // The correct answer was worked out by Nosey: the uploaded practice test
   // had no answer key for this question.
   answer_inferred?: boolean;
+  // OCR redo state (GH #149). While "needs_input" the answer is ungraded and
+  // correct_answer / feedback / reasoning are withheld by the server.
+  ocr_status?: OcrStatus | null;
+  // The kept strokes (scratch-pad JSON), only while needs_input.
+  work_strokes?: string | null;
 };
+
+export type OcrStatus = "ok" | "needs_input" | "resolved" | "skipped";
 
 export type AttemptResult = {
   attempt_id: ID;
@@ -155,6 +162,8 @@ export type AttemptResult = {
   correct_count: number;
   total: number;
   answers: AnswerResult[];
+  // True while any answer is needs_input: the score can still change.
+  is_provisional?: boolean;
 };
 
 export type AttemptSummary = {
@@ -164,6 +173,18 @@ export type AttemptSummary = {
   correct_count: number;
   total: number;
   created_at: string;
+  is_provisional?: boolean;
+};
+
+// Response of a redo or skip on Results (GH #149): the regraded answers and
+// the attempt's updated score.
+export type RedoAnswerResponse = {
+  attempt_id: ID;
+  score: number;
+  correct_count: number;
+  total: number;
+  is_provisional: boolean;
+  answers: AnswerResult[];
 };
 
 export type AttemptDetail = AttemptSummary & {

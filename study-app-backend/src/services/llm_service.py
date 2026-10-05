@@ -23,7 +23,7 @@ from src.services.lc_taxonomy import (
 )
 from src.services.rag_service import HybridRAGService
 from src.utils.logger import get_logger
-from src.utils.latex_utils import normalize_latex
+from src.utils.latex_utils import format_final_answer as _format_final_answer, normalize_latex
 from src.utils.serialization import safe_serialize_payload
 from src.utils.usage_context import (
     StreamUsage,
@@ -2568,7 +2568,7 @@ Then return JSON only with these exact keys:
     {{"step": 1, "description": "step description", "expression": "LaTeX math expression for this step"}},
     {{"step": 2, ...}}
   ],
-  "final_answer": "the correct final answer in LaTeX",
+  "final_answer": "the correct final answer (format rules below)",
   "confidence": 0.0 to 1.0,
   "flagged_uncertain": true or false
 }}
@@ -2581,6 +2581,12 @@ Rules:
   plainly with NO trial-and-error, second-guessing, or phrases like "wait", "let me reconsider",
   "actually", or "oh". Do any messy thinking inside "steps" only.
 - Write ALL math expressions in LaTeX notation: \\frac{{dy}}{{dx}} = 3t^{{2}} + 1
+- In what_went_right and what_went_wrong (prose), wrap every piece of math in single dollar
+  signs: "setting $\\epsilon_4 = 0$ removes the fourth term". Never leave LaTeX undelimited.
+- "expression" in steps: bare LaTeX with no dollar signs.
+- "final_answer": if it is a number or an expression, bare LaTeX with no dollar signs
+  (e.g. x = 4). If it is a word (True, False, Yes) or a sentence, plain text with any math inside
+  it wrapped in single dollar signs. Never put a sentence inside \\text{{}}.
 - Be specific in what_went_right and what_went_wrong
 """
         try:
@@ -2599,13 +2605,15 @@ Rules:
 
             # Default-visible feedback: the clean verdict and the correct final answer.
             # The step-by-step working goes into reasoning, hidden behind a dropdown.
+            # normalize_latex wraps any LaTeX the model left undelimited in the
+            # prose, which otherwise rendered as raw "\epsilon_4" text.
             sections: list[str] = []
             if what_right:
-                sections.append(f"**What you got right:** {what_right}")
+                sections.append(f"**What you got right:** {normalize_latex(what_right)}")
             if what_wrong:
-                sections.append(f"**What to fix:** {what_wrong}")
+                sections.append(f"**What to fix:** {normalize_latex(what_wrong)}")
             if final_answer:
-                sections.append(f"\n**Final answer:** $${final_answer}$$")
+                sections.append(f"\n**Final answer:** {_format_final_answer(final_answer)}")
             feedback = "\n\n".join(sections)
 
             # Build the step-by-step working as the collapsible reasoning.
@@ -6055,9 +6063,15 @@ Return only the JSON object."""
             payload = response.json()
             record_parsed_usage("gemini", model, usage_from_gemini(payload))
             try:
-                parts = payload["candidates"][0]["content"]["parts"]
+                candidate = payload["candidates"][0]
+                # Same rule as the Claude vision call: a transcript cut off by
+                # the token budget is a failed read, not a short one. A runaway
+                # \quad loop ends exactly this way (GH #149).
+                if candidate.get("finishReason") == "MAX_TOKENS":
+                    raise ValueError("Gemini vision response was truncated (MAX_TOKENS reached)")
+                parts = candidate["content"]["parts"]
                 text = "".join(str(part.get("text", "")) for part in parts).strip()
-            except (KeyError, IndexError, TypeError) as exc:
+            except (KeyError, IndexError, TypeError, AttributeError) as exc:
                 raise ValueError("Gemini vision response missing text content") from exc
             if not text:
                 raise ValueError("Gemini vision response was empty")

@@ -88,14 +88,20 @@ class AnswerResult(BaseModel):
     flagged_uncertain: bool = False
     is_math: bool = False
     # What the OCR engine read from a scratch-pad drawing, if one was
-    # submitted (STEM Scratch Pad feature). Response-only: never persisted to
-    # UserAnswer, so it is absent when this question is viewed again later via
-    # AttemptDetail. Shown to the student so an OCR misread is diagnosable
-    # rather than reading as an inexplicable grade.
+    # submitted (STEM Scratch Pad feature). Persisted on UserAnswer since
+    # GH #149 so Results can show it on a later visit too. Shown to the
+    # student so an OCR misread is diagnosable rather than reading as an
+    # inexplicable grade.
     work_transcript: Optional[str] = None
     # The correct answer was worked out by Nosey, not taken from the uploaded
     # practice test's answer key (GH #133).
     answer_inferred: bool = False
+    # OCR redo state (GH #149): None (no drawing), ok, needs_input, resolved,
+    # skipped. While needs_input, correct_answer / feedback / reasoning are
+    # redacted so the answer key cannot be copied into the redo.
+    ocr_status: Optional[str] = None
+    # The kept strokes, only while needs_input, so the pad reopens with them.
+    work_strokes: Optional[str] = None
 
 
 class AttemptResult(BaseModel):
@@ -105,6 +111,8 @@ class AttemptResult(BaseModel):
     correct_count: int
     total: int
     answers: list[AnswerResult]
+    # True while any answer is needs_input: the score can still change.
+    is_provisional: bool = False
 
 
 class AttemptSummary(BaseModel):
@@ -114,6 +122,7 @@ class AttemptSummary(BaseModel):
     correct_count: int
     total: int
     created_at: datetime
+    is_provisional: bool = False
 
 
 class AttemptDetail(AttemptSummary):
@@ -202,3 +211,59 @@ class DraftAttemptResponse(BaseModel):
 
 class ReviewSummaryResponse(BaseModel):
     summary: str
+
+
+# OCR redo states on UserAnswer.ocr_status (GH #149). None means no drawing.
+OCR_STATUS_OK = "ok"
+OCR_STATUS_NEEDS_INPUT = "needs_input"
+OCR_STATUS_RESOLVED = "resolved"
+OCR_STATUS_SKIPPED = "skipped"
+
+
+class RedoAnswerRequest(BaseModel):
+    """The student's one redo of a needs_input answer (GH #149).
+
+    Same shape and limits as a SubmittedAnswer: a typed answer, a fixed
+    drawing, or both.
+    """
+
+    answer: str = Field(default="", max_length=5000)
+    work_image: Optional[str] = Field(default=None, max_length=_WORK_IMAGE_MAX_B64_CHARS)
+    ocr_engine: Optional[str] = None
+
+    @field_validator("answer")
+    @classmethod
+    def strip_answer(cls, value: str) -> str:
+        return value.strip()
+
+    @model_validator(mode="after")
+    def validate_redo(self) -> "RedoAnswerRequest":
+        if not self.answer and not self.work_image:
+            raise ValueError("Provide a typed answer, a drawing, or both")
+        if self.work_image:
+            try:
+                decoded = base64.b64decode(self.work_image, validate=True)
+            except Exception as exc:
+                raise ValueError("The scratch-pad drawing was not valid base64") from exc
+            if len(decoded) > _WORK_IMAGE_MAX_DECODED_BYTES:
+                raise ValueError("The scratch-pad drawing is too large")
+            if not decoded.startswith(_PNG_MAGIC):
+                raise ValueError("Scratch-pad drawings must be PNG images")
+        return self
+
+
+class SkipUnreadableRequest(BaseModel):
+    """Grade needs_input answers as blank. Empty question_ids means all of them."""
+
+    question_ids: list[int] = Field(default_factory=list, max_length=200)
+
+
+class RedoAnswerResponse(BaseModel):
+    """The regraded answers plus the attempt's updated score."""
+
+    attempt_id: int
+    score: float
+    correct_count: int
+    total: int
+    is_provisional: bool
+    answers: list[AnswerResult]
