@@ -11,12 +11,14 @@ import {
   createTest,
   fetchFolderFiles,
   fetchFolders,
-  fetchPracticeSections,
+  fetchPracticeProblems,
   fetchProviderStatus,
   scopeKey,
-  type PracticeSection,
+  type DraftQuestion,
+  type PracticeProblem,
   type SkippedFile,
 } from "../lib/api";
+import { PracticeProblemPicker, type PickerResult } from "../components/PracticeProblemPicker";
 import { describeUploadStatus } from "../lib/uploadStatus";
 import {
   ACCEPTED_UPLOAD_ATTR,
@@ -61,12 +63,16 @@ export default function CreateTest() {
   const [practiceTestMode, setPracticeTestMode] = useState<"recreate" | "style">("recreate");
   const practiceTestInputRef = useRef<HTMLInputElement>(null);
   // The practice test is uploaded and read as soon as it is picked, so its
-  // sections can be listed before Generate (GH #133).
+  // problems can be listed before Generate (GH #133, #138).
   const [practiceTestFileId, setPracticeTestFileId] = useState<number | null>(null);
   const [practicePhase, setPracticePhase] = useState<"idle" | "reading" | "ready" | "error">("idle");
   const [practiceStatus, setPracticeStatus] = useState<string | null>(null);
-  const [practiceSections, setPracticeSections] = useState<PracticeSection[]>([]);
-  const [chosenSections, setChosenSections] = useState<Set<number>>(new Set());
+  const [practiceProblems, setPracticeProblems] = useState<PracticeProblem[]>([]);
+  // The picker's last result; null means nothing picked, so the whole document is read.
+  const [practicePick, setPracticePick] = useState<PickerResult | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  // The problem list request failed (not the same as a document with no problems).
+  const [practiceListFailed, setPracticeListFailed] = useState(false);
   // Bumped on every pick/remove so a slow earlier read cannot overwrite a newer one.
   const practiceRun = useRef(0);
   // The folder the practice test was uploaded into.
@@ -136,8 +142,8 @@ export default function CreateTest() {
       setPracticeTestFileId(null);
       setPracticePhase("idle");
       setPracticeStatus(null);
-      setPracticeSections([]);
-      setChosenSections(new Set());
+      setPracticeProblems([]);
+      setPracticePick(null);
     }
   }, [folderId]);
 
@@ -190,6 +196,23 @@ export default function CreateTest() {
   // own topics when the notes don't cover them.
   const recreatingPracticeTest = activePracticeTest !== null && practiceTestMode === "recreate";
 
+  // Recreate mode with a review: only problems marked Looks right, with their
+  // checked questions. Otherwise the picked problems' ranges alone.
+  function pickedForSubmit(): { ranges: [number, number][]; questions?: DraftQuestion[] } | null {
+    if (!practicePick || practicePick.chosen.length === 0) return null;
+    const pick = practicePick;
+    const byIndex = new Map(practiceProblems.map((p) => [p.index, p]));
+    const approved = pick.chosen.filter((i) => pick.reviews[i]?.status === "approved");
+    const useReview = recreatingPracticeTest && approved.length > 0;
+    const indices = useReview ? approved : pick.chosen;
+    const ranges = indices
+      .map((i) => byIndex.get(i))
+      .filter((p): p is PracticeProblem => p !== undefined)
+      .map((p) => [p.start, p.end] as [number, number]);
+    const questions = useReview ? approved.flatMap((i) => pick.reviews[i].questions) : undefined;
+    return { ranges, questions };
+  }
+
   function describeSkipped(skipped: SkippedFile[]): string {
     return skipped.map((s) => `${s.file_name}: ${s.reason}`).join(" · ");
   }
@@ -219,10 +242,7 @@ export default function CreateTest() {
       if (activePracticeTest && (practicePhase !== "ready" || practiceTestFileId === null)) {
         throw new Error("Your practice test is still being read. Generate once it's ready.");
       }
-      const allSectionsChosen = chosenSections.size === practiceSections.length;
-      if (activePracticeTest && practiceSections.length > 0 && chosenSections.size === 0) {
-        throw new Error("Pick at least one section of the practice test.");
-      }
+      const picked = activePracticeTest ? pickedForSubmit() : null;
       setSubmitPhase("Setting up your test");
       const result = await createTest({
         folderId,
@@ -231,8 +251,8 @@ export default function CreateTest() {
         fileIds,
         practiceTestFileId: activePracticeTest ? practiceTestFileId : undefined,
         practiceTestMode: activePracticeTest ? (recreatingPracticeTest ? "recreate" : "style") : undefined,
-        practiceTestSections:
-          activePracticeTest && !allSectionsChosen ? Array.from(chosenSections).sort((a, b) => a - b) : undefined,
+        practiceTestRanges: picked?.ranges,
+        practiceQuestions: picked?.questions,
         countMcq: advancedMode ? countMcq : undefined,
         countFrq: advancedMode ? (testType === "Extreme" ? 0 : countFrq) : undefined,
         countTf: advancedMode && betaMode ? countTf : undefined,
@@ -349,13 +369,14 @@ export default function CreateTest() {
     setPracticeTestFileId(null);
     setPracticePhase("idle");
     setPracticeStatus(null);
-    setPracticeSections([]);
-    setChosenSections(new Set());
+    setPracticeProblems([]);
+    setPracticePick(null);
+    setPickerOpen(false);
     if (practiceTestInputRef.current) practiceTestInputRef.current.value = "";
   }
 
   // Upload through the folder pipeline, wait for the server to read it (the
-  // vision pass for math-heavy pages runs then too), then list its sections.
+  // vision pass for math-heavy pages runs then too), then list its problems.
   async function readPracticeTest(file: File, targetFolderId: number) {
     const run = ++practiceRun.current;
     const current = () => run === practiceRun.current;
@@ -363,8 +384,8 @@ export default function CreateTest() {
     setPracticePhase("reading");
     setPracticeStatus("Uploading your practice test");
     setPracticeTestFileId(null);
-    setPracticeSections([]);
-    setChosenSections(new Set());
+    setPracticeProblems([]);
+    setPracticePick(null);
     try {
       const upload = await uploadToFolder(targetFolderId, [file], undefined, "practice_test");
       if (!current()) return;
@@ -381,10 +402,13 @@ export default function CreateTest() {
         if (Date.now() > deadline) throw new Error("Reading your practice test is taking too long. Try again in a moment.");
         await new Promise((resolve) => setTimeout(resolve, 1500));
       }
-      const sections = await fetchPracticeSections(targetFolderId, fileId);
+      setPracticeStatus("Finding the problems");
+      // The picker is optional: when the problem list can't be had, the whole
+      // document is read, as before the picker existed.
+      const found = await fetchPracticeProblems(targetFolderId, fileId).catch(() => null);
       if (!current()) return;
-      setPracticeSections(sections);
-      setChosenSections(new Set(sections.map((s) => s.index)));
+      setPracticeProblems(found?.problems ?? []);
+      setPracticeListFailed(found === null);
       setPracticePhase("ready");
       setPracticeStatus(null);
     } catch (err) {
@@ -394,13 +418,17 @@ export default function CreateTest() {
     }
   }
 
-  function toggleSection(index: number) {
-    setChosenSections((current) => {
-      const next = new Set(current);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
-    });
+  const pickedCount = practicePick?.chosen.length ?? 0;
+  const approvedCount = practicePick
+    ? practicePick.chosen.filter((i) => practicePick.reviews[i]?.status === "approved").length
+    : 0;
+  function describePick(): string {
+    if (pickedCount === 0) return `${practiceProblems.length} problems found. Pick the ones you want, or all of them are read.`;
+    if (recreatingPracticeTest && approvedCount > 0) {
+      return `${approvedCount} of ${practiceProblems.length} problems checked and ready.`;
+    }
+    if (recreatingPracticeTest) return `${pickedCount} picked, not checked yet: they are read as is when you generate.`;
+    return `${pickedCount} of ${practiceProblems.length} problems picked.`;
   }
 
   const canSubmit =
@@ -743,23 +771,34 @@ export default function CreateTest() {
                       {practicePhase === "error" ? (
                         <p className="practice-status practice-status--error">{practiceStatus}</p>
                       ) : null}
-                      {practicePhase === "ready" && practiceSections.length > 0 ? (
-                        <fieldset className="practice-sections">
-                          <legend className="field-label">Sections to include</legend>
-                          {practiceSections.map((section) => (
-                            <label key={section.index} className="practice-section-option">
-                              <input
-                                type="checkbox"
-                                checked={chosenSections.has(section.index)}
-                                onChange={() => toggleSection(section.index)}
-                              />
-                              <span className="practice-section-title">{section.title}</span>
-                              <span className="muted small">
-                                {section.question_count} question{section.question_count === 1 ? "" : "s"}
-                              </span>
-                            </label>
-                          ))}
-                        </fieldset>
+                      {practicePhase === "ready" && practiceProblems.length > 0 ? (
+                        <div className="practice-pick">
+                          <p className="small">{describePick()}</p>
+                          <Button variant="secondary" onClick={() => setPickerOpen(true)}>
+                            {pickedCount > 0 ? "Change problems" : "Choose problems"}
+                          </Button>
+                        </div>
+                      ) : null}
+                      {practicePhase === "ready" && practiceProblems.length === 0 ? (
+                        <p className="muted small practice-status">
+                          {practiceListFailed
+                            ? "Nosey couldn't list the problems right now, so the whole document is used. Remove and re-add the file to try again."
+                            : "Nosey couldn't split this one into separate problems, so the whole document is used."}
+                        </p>
+                      ) : null}
+                      {pickerOpen && folderId !== null && practiceTestFileId !== null ? (
+                        <PracticeProblemPicker
+                          folderId={folderId}
+                          fileId={practiceTestFileId}
+                          problems={practiceProblems}
+                          mode={practiceTestMode}
+                          initial={practicePick ?? { chosen: [], reviews: {} }}
+                          onClose={() => setPickerOpen(false)}
+                          onDone={(result) => {
+                            setPracticePick(result);
+                            setPickerOpen(false);
+                          }}
+                        />
                       ) : null}
                       <div className="choice-grid practice-mode-grid" role="group" aria-label="What to do with the practice test">
                           <button
