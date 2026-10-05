@@ -46,11 +46,11 @@ def resolve_ocr_engine(user: User, requested: Optional[str]) -> str:
     """
     from src.services.ocr_service import valid_ocr_engines
 
-    default = "claude"
+    default = "auto"
     if not user_can_override_provider(user):
         return default
     candidate = (requested or default).strip().lower()
-    return candidate if candidate in valid_ocr_engines() else default
+    return candidate if candidate == default or candidate in valid_ocr_engines() else default
 
 
 def can_submit_scratch_pad_work(user: User) -> bool:
