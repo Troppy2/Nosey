@@ -13,8 +13,12 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 # is enforced separately on the decoded bytes in SubmitAttemptRequest below.
 _WORK_IMAGE_MAX_B64_CHARS = 2_500_000  # ~1.9MB decoded, comfortably under Claude's 10MB cap
 _WORK_IMAGE_MAX_DECODED_BYTES = 1_500_000
-_WORK_IMAGE_MAX_COUNT = 6
-_WORK_IMAGE_TOTAL_DECODED_BUDGET = 4_000_000
+# One drawing per question is legal, so the count cap must cover a full exam
+# worked on the pad. The old cap of 6 rejected any submission with more
+# drawings (422), blocking the whole submission. OCR fan-out is bounded separately
+# by _OCR_CONCURRENCY in grading_service, so this only guards payload size.
+_WORK_IMAGE_MAX_COUNT = 60
+_WORK_IMAGE_TOTAL_DECODED_BUDGET = 16_000_000
 _PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
 
