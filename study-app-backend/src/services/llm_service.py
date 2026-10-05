@@ -130,6 +130,14 @@ class GeneratedMCQ:
     # Recreated practice tests only: the document had no answer for this
     # question, so the model worked it out (stored as questions.answer_inferred).
     answer_inferred: bool = False
+    # Multi-part practice problems (GH #151). part_label is "a", "b", ...;
+    # group_key ties the parts of one problem together, group_stem is the
+    # shared setup stored once; seq is the document order across MCQ and FRQ.
+    part_label: Optional[str] = None
+    group_key: Optional[str] = None
+    group_label: str = ""
+    group_stem: str = ""
+    seq: Optional[int] = None
 
 
 @dataclass(frozen=True)
@@ -137,6 +145,92 @@ class GeneratedFRQ:
     question_text: str
     expected_answer: str
     answer_inferred: bool = False
+    # Multi-part practice problems (GH #151). part_label is "a", "b", ...;
+    # group_key ties the parts of one problem together, group_stem is the
+    # shared setup stored once; seq is the document order across MCQ and FRQ.
+    part_label: Optional[str] = None
+    group_key: Optional[str] = None
+    group_label: str = ""
+    group_stem: str = ""
+    seq: Optional[int] = None
+
+
+def _practice_item_position(item: dict) -> dict[str, object]:
+    """part / problem / n from one extracted item (GH #151); absent keys mean none."""
+    try:
+        seq: Optional[int] = int(item.get("n"))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        seq = None
+    return {
+        "part_label": practice_part_label(item.get("part")),
+        "group_label": str(item.get("problem") or "").strip()[:50],
+        "seq": seq,
+    }
+
+
+def practice_full_text(question: "GeneratedMCQ | GeneratedFRQ") -> str:
+    """A parsed part with its problem's setup in front, for any LLM that reads it."""
+    if not question.part_label or not question.group_stem.strip():
+        return question.question_text
+    return f"{question.group_stem.strip()}\n\n({question.part_label}) {question.question_text}"
+
+
+def _practice_identity(question: "GeneratedMCQ | GeneratedFRQ") -> str:
+    """Dedup key text: a part is only a copy of the same part of the same problem."""
+    if question.part_label:
+        return f"problem {question.group_label} part {question.part_label} {practice_full_text(question)}"
+    return question.question_text
+
+
+_PART_LABEL_RE = re.compile(r"^\(?([a-z]{1,2}|[ivx]{1,4})\)?\.?$", re.IGNORECASE)
+
+
+def practice_part_label(raw: object) -> Optional[str]:
+    """'a', '(b)', 'ii' -> 'a', 'b', 'ii'; anything else (no part) -> None."""
+    text = str(raw or "").strip()
+    match = _PART_LABEL_RE.match(text)
+    return match.group(1).lower() if match else None
+
+
+def _practice_setups(data: dict[str, object]) -> dict[str, str]:
+    """{problem label: setup} from a reply's "setups" list."""
+    out: dict[str, str] = {}
+    raw = data.get("setups")
+    for entry in raw if isinstance(raw, list) else []:
+        if not isinstance(entry, dict):
+            continue
+        label = str(entry.get("problem") or "").strip()
+        setup = str(entry.get("setup") or "").strip()
+        if label and setup and label not in out:
+            out[label] = setup
+    return out
+
+
+def _attach_practice_groups(
+    questions: list,
+    key_prefix: str,
+    setups: dict[str, str],
+    default_label: str = "",
+    default_stem: str = "",
+    seq_base: int = 0,
+) -> list:
+    """Give each lettered part its problem's group; ordinary questions get none."""
+    out = []
+    for position, question in enumerate(questions):
+        seq = seq_base + (question.seq if question.seq is not None else position)
+        if not question.part_label:
+            out.append(replace(question, group_key=None, group_label="", group_stem="", seq=seq))
+            continue
+        label = (question.group_label or default_label).strip()
+        stem = setups.get(label, default_stem) if label else default_stem
+        out.append(replace(
+            question,
+            group_key=f"{key_prefix}{label}",
+            group_label=label,
+            group_stem=stem,
+            seq=seq,
+        ))
+    return out
 
 
 # ── Extra (beta) question types ──────────────────────────────────────────────
@@ -529,8 +623,8 @@ def _is_near_duplicate(text: str, kept: list[str]) -> bool:
 
 def _drop_mcq_twins(mcq: list[GeneratedMCQ], frq: list[GeneratedFRQ]) -> list[GeneratedMCQ]:
     """MCQs whose stem is also a written question: one problem parsed as both."""
-    stems = [_practice_norm(q.question_text) for q in frq]
-    return [q for q in mcq if not _is_near_duplicate(q.question_text, stems)]
+    stems = [_practice_norm(_practice_identity(q)) for q in frq]
+    return [q for q in mcq if not _is_near_duplicate(_practice_identity(q), stems)]
 _GENERATE_CHAR_LIMIT = 8_000
 # Per-type cap for the beta extra question types (TF / Multiple Select / Ranking).
 # Kept low so the extra-types JSON stays well within the token budget; the existing
@@ -1407,18 +1501,28 @@ class LLMService:
         frq: list[GeneratedFRQ] = []
         seen_mcq: list[str] = []
         seen_frq: list[str] = []
+        # A problem's setup can sit at the end of one chunk while its parts run
+        # on into the next, so setups are gathered from every chunk first and
+        # the first non-empty one per problem wins (GH #151).
+        setups: dict[str, str] = {}
         for data in results:
+            for label, setup in (_practice_setups(data) if data else {}).items():
+                setups.setdefault(label, setup)
+        for part_index, data in enumerate(results):
             if data is None:
                 continue
             chunk_mcq, chunk_frq = self._practice_items(data)
+            # Chunks are in document order; "n" orders items within a chunk.
+            chunk_mcq = _attach_practice_groups(chunk_mcq, "d:", setups, seq_base=part_index * 10_000)
+            chunk_frq = _attach_practice_groups(chunk_frq, "d:", setups, seq_base=part_index * 10_000)
             for question in chunk_mcq:
-                key = _practice_dedup_key(question.question_text, question.options)
+                key = _practice_dedup_key(_practice_identity(question), question.options)
                 if not _is_near_duplicate(key, seen_mcq):
                     seen_mcq.append(_practice_norm(key))
                     mcq.append(question)
             for question in chunk_frq:
-                if not _is_near_duplicate(question.question_text, seen_frq):
-                    seen_frq.append(_practice_norm(question.question_text))
+                if not _is_near_duplicate(_practice_identity(question), seen_frq):
+                    seen_frq.append(_practice_norm(_practice_identity(question)))
                     frq.append(question)
         mcq = _drop_mcq_twins(mcq, frq)
 
@@ -1475,8 +1579,13 @@ class LLMService:
             "- Multiple choice: keep ALL of its answer options in their original order (2 to 6), without "
             "letter labels.\n"
             '- True/false: a multiple choice question with options ["True", "False"].\n'
-            "- A problem with lettered parts (a), (b): one written question per part, each starting with "
-            "the setup it needs so it reads on its own. A problem with no parts is one question.\n"
+            "- A problem with lettered parts (a), (b), ...: put the text the parts share (everything before "
+            "(a)) in that problem's \"setup\", once. Each part is its own question with \"part\": \"a\", "
+            "\"b\", ... and only that part's own wording in question_text; do not repeat the setup. A part "
+            "can be multiple choice or written. A problem with no parts is one question with \"part\": \"\" "
+            "and an empty setup.\n"
+            "- \"n\": each question's position in the problem, counting multiple choice and written "
+            "together (1, 2, 3, ...).\n"
             "- Answers: use the answer key or marked answers when there are any and set "
             "answer_from_document to true. Otherwise work out the correct answer and set it to false.\n"
             f"{_PRACTICE_SHARED_RULES}"
@@ -1518,8 +1627,9 @@ class LLMService:
                 "problem. Do not write new questions and do not skip any.\n\n"
                 f"{blocks}\n\n{rules}\n"
                 "Return JSON only, one entry per problem:\n"
-                '{"problems": [{"problem": 0, "mcq": [{"question_text": "...", "options": ["...", "..."], '
-                '"correct_index": 0, "answer_from_document": true}], "frq": [{"question_text": "...", '
+                '{"problems": [{"problem": 0, "setup": "...", "mcq": [{"n": 1, "part": "a", '
+                '"question_text": "...", "options": ["...", "..."], "correct_index": 0, '
+                '"answer_from_document": true}], "frq": [{"n": 2, "part": "b", "question_text": "...", '
                 '"expected_answer": "...", "answer_from_document": false}]}]}\n'
             )
             async with gate:
@@ -1540,16 +1650,32 @@ class LLMService:
         replies = await asyncio.gather(*(parse_batch(b) for b in batches))
         out: dict[int, Optional[tuple[list[GeneratedMCQ], list[GeneratedFRQ]]]] = {}
         for batch, reply in zip(batches, replies):
-            for index, _label, text in batch:
+            for index, label, text in batch:
                 entry = reply.get(index)
                 if entry is None:
                     entry = reply.get(str(index))
                 if not isinstance(entry, dict):
                     out[index] = None
                     continue
-                mcq, frq = self._practice_items(entry)
+                mcq, frq = self._practice_group_entry(entry, index, label)
                 out[index] = (mcq, frq) if (mcq or frq) else None
         return out
+
+    def _practice_group_entry(
+        self, entry: dict[str, object], index: int, label: str
+    ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
+        """One picked problem's reply, its parts grouped under the problem (GH #151)."""
+        mcq, frq = self._practice_items(entry)
+        setup = str(entry.get("setup") or "").strip()
+        # Every part of a picked problem belongs to that problem, whatever
+        # "problem" label the model echoed.
+        mcq = [replace(q, group_label="") for q in mcq]
+        frq = [replace(q, group_label="") for q in frq]
+        key = f"p{index}:"
+        return (
+            _attach_practice_groups(mcq, key, {}, default_label=label or str(index + 1), default_stem=setup),
+            _attach_practice_groups(frq, key, {}, default_label=label or str(index + 1), default_stem=setup),
+        )
 
     async def fix_practice_problem(
         self,
@@ -1558,6 +1684,7 @@ class LLMService:
         message: str,
         answer_key: str = "",
         provider: Optional[str] = None,
+        label: str = "",
     ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
         """Redo one problem from the student's correction.
 
@@ -1580,12 +1707,12 @@ class LLMService:
             "The student knows what the problem says: follow the message. If the message gives an "
             "answer, use it and set answer_from_document to true.\n\n"
             f"{self._practice_problem_rules(answer_key)}\n"
-            "Return JSON only with keys mcq and frq.\n"
-            'mcq items: {"question_text": "...", "options": ["...", "..."], "correct_index": 0, "answer_from_document": false}\n'
-            'frq items: {"question_text": "...", "expected_answer": "...", "answer_from_document": false}\n'
+            "Return JSON only with keys setup, mcq and frq.\n"
+            'mcq items: {"n": 1, "part": "a", "question_text": "...", "options": ["...", "..."], "correct_index": 0, "answer_from_document": false}\n'
+            'frq items: {"n": 2, "part": "b", "question_text": "...", "expected_answer": "...", "answer_from_document": false}\n'
         )
         data = await self._complete_json(prompt, provider=provider)
-        mcq, frq = self._practice_items(data)
+        mcq, frq = self._practice_group_entry(data, 0, label)
         if not mcq and not frq:
             raise LLMException("Nosey couldn't redo that problem. Try rewording your fix.")
         return mcq, frq
@@ -1692,7 +1819,7 @@ class LLMService:
         notes_block = ""
         if context.strip():
             query = " ".join(
-                (mcq[i] if kind == "mcq" else frq[i]).question_text[:200] for kind, i in targets
+                practice_full_text(mcq[i] if kind == "mcq" else frq[i])[:200] for kind, i in targets
             )[:4000]
             try:
                 loop = asyncio.get_event_loop()
@@ -1714,9 +1841,9 @@ class LLMService:
             for n, (kind, i) in enumerate(batch, start=1):
                 if kind == "mcq":
                     opts = "\n".join(f"   {j}. {o}" for j, o in enumerate(mcq[i].options))
-                    lines.append(f"Q{n} (multiple choice, answer with the option number):\n{mcq[i].question_text}\n{opts}")
+                    lines.append(f"Q{n} (multiple choice, answer with the option number):\n{practice_full_text(mcq[i])}\n{opts}")
                 else:
-                    lines.append(f"Q{n} (written, answer in 1-4 sentences or a short result):\n{frq[i].question_text}")
+                    lines.append(f"Q{n} (written, answer in 1-4 sentences or a short result):\n{practice_full_text(frq[i])}")
             prompt = (
                 "Solve each question below carefully. Work it out step by step in the \"work\" field, "
                 "then give the final answer. These come from a student's practice test, so the answer "
@@ -1781,7 +1908,17 @@ class LLMService:
             provider=provider,
             solve_keyless=False,
         )
-        originals: list[tuple[str, object]] = [("mcq", q) for q in mcq_src] + [("frq", q) for q in frq_src]
+        # Style mode stays ungrouped (GH #151 scope): each original reads on
+        # its own, setup included, so each new question does too.
+        def standalone(q):
+            return replace(
+                q, question_text=practice_full_text(q), part_label=None,
+                group_key=None, group_label="", group_stem="", seq=None,
+            )
+
+        originals: list[tuple[str, object]] = (
+            [("mcq", standalone(q)) for q in mcq_src] + [("frq", standalone(q)) for q in frq_src]
+        )
 
         notes_context = ""
         if notes.strip():
@@ -1910,8 +2047,13 @@ class LLMService:
             "without letter labels such as 'A.' or '(b)'.\n"
             '- True/false: a multiple choice question with options ["True", "False"].\n'
             "- Short answer, fill in the blank, essay, or calculation: a written (frq) question.\n"
-            "- A question with lettered parts (a), (b): one written question per part, "
-            "each repeating the context it needs.\n"
+            "- A problem with lettered parts (a), (b), ...: list the text the parts share (everything "
+            "before (a)) once in \"setups\", under the problem's own number. Each part is its own question "
+            "with \"problem\" set to that number, \"part\": \"a\", \"b\", ..., and only that part's own "
+            "wording in question_text; do not repeat the setup. A part can be multiple choice or written. "
+            "A question with no parts has \"part\": \"\".\n"
+            "- \"n\": each question's position in this text, counting multiple choice and written "
+            "together (1, 2, 3, ...).\n"
             "- A multiple choice question where more than one option can be correct (\"select all\", "
             "\"which must be true\" with several true options): a written question that lists the options; "
             "its expected_answer names every correct one.\n"
@@ -1922,9 +2064,10 @@ class LLMService:
             "- Instructions, headings, titles, table-of-contents lines, point values, and answer key lines "
             "are not questions. Never output a question whose full text you cannot see; skip it.\n"
             f"{_PRACTICE_SHARED_RULES}\n"
-            "Return JSON only with keys mcq and frq.\n"
-            'mcq items: {"question_text": "...", "options": ["...", "..."], "correct_index": 0, "answer_from_document": true}\n'
-            'frq items: {"question_text": "...", "expected_answer": "...", "answer_from_document": true}\n'
+            "Return JSON only with keys setups, mcq and frq.\n"
+            'setups items: {"problem": "3", "setup": "..."}\n'
+            'mcq items: {"n": 1, "problem": "3", "part": "a", "question_text": "...", "options": ["...", "..."], "correct_index": 0, "answer_from_document": true}\n'
+            'frq items: {"n": 2, "problem": "3", "part": "b", "question_text": "...", "expected_answer": "...", "answer_from_document": true}\n'
         )
 
     def _parsed_practice_mcq(self, item: object) -> Optional[GeneratedMCQ]:
@@ -1948,6 +2091,7 @@ class LLMService:
             options=options,
             correct_index=index,
             answer_inferred=item.get("answer_from_document") is False,
+            **_practice_item_position(item),
         )
 
     @staticmethod
@@ -1963,6 +2107,7 @@ class LLMService:
             question_text=question,
             expected_answer=answer,
             answer_inferred=item.get("answer_from_document") is False,
+            **_practice_item_position(item),
         )
 
     async def _analyze_practice_test_style(

@@ -102,6 +102,11 @@ class AnswerResult(BaseModel):
     ocr_status: Optional[str] = None
     # The kept strokes, only while needs_input, so the pad reopens with them.
     work_strokes: Optional[str] = None
+    # Multi-part problems (GH #151): Results groups parts under their setup.
+    group_id: Optional[int] = None
+    group_label: Optional[str] = None
+    group_stem: Optional[str] = None
+    part_label: Optional[str] = None
 
 
 class AttemptResult(BaseModel):

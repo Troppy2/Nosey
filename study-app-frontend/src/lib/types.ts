@@ -63,12 +63,22 @@ export type MCQOption = {
 
 export type QuestionType = "MCQ" | "FRQ" | string;
 
+// A multi-part problem's shared setup (GH #151). Its parts are ordinary
+// questions that point at it and sit next to each other in display order.
+export type QuestionGroup = {
+  id: ID;
+  label: string;
+  stem: string;
+};
+
 export type Question = {
   id: ID;
   type: QuestionType;
   question_text: string;
   options: MCQOption[];
   expected_answer?: string | null;
+  group?: QuestionGroup | null;
+  part_label?: string | null;
 };
 
 export type MCQOptionEditable = {
@@ -88,6 +98,8 @@ export type QuestionEditable = {
   question_text: string;
   options: MCQOptionEditable[];
   expected_answer?: string | null;
+  group?: QuestionGroup | null;
+  part_label?: string | null;
 };
 
 export type QuestionCreate = {
@@ -151,6 +163,11 @@ export type AnswerResult = {
   ocr_status?: OcrStatus | null;
   // The kept strokes (scratch-pad JSON), only while needs_input.
   work_strokes?: string | null;
+  // Multi-part problems (GH #151): Results groups parts under their setup.
+  group_id?: ID | null;
+  group_label?: string | null;
+  group_stem?: string | null;
+  part_label?: string | null;
 };
 
 export type OcrStatus = "ok" | "needs_input" | "resolved" | "skipped";

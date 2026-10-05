@@ -26,6 +26,7 @@ import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
 import { SkeletonQuestionCard } from "../components/Skeletons";
 import { API_BASE_URL, fetchTest, getDraftAttempt, saveDraftAttempt, scopeKey, submitAttempt } from "../lib/api";
 import { applyTextHighlights, clearTextHighlights, getSelectionSignature, HIGHLIGHT_SUPPORTED } from "../lib/highlightRanges";
+import { buildScreens, fullQuestionText, screenAnchor, type QuestionScreens } from "../lib/questionScreens";
 import { useSettings } from "../lib/useSettings";
 import type { DraftAttemptAnswer, KojoTestRef, Question, SubmittedAnswer, TestTake } from "../lib/types";
 
@@ -86,6 +87,9 @@ export default function TakeTest() {
   const [generationMeta, setGenerationMeta] = useState<GenerationMeta | null>(null);
   const [showResumeDialog, setShowResumeDialog] = useState(false);
   const [draftInfo, setDraftInfo] = useState<{ answered: number; total: number; time: string } | null>(null);
+  // One screen per question, or per multi-part problem (GH #151). `index`
+  // stays a question index: the first question of the screen being shown.
+  const built = useMemo(() => buildScreens(test?.questions ?? []), [test]);
 
   // ── Learning Mode (beta only) ──────────────────────────────────────────────
   const { betaMode, generationProvider, kojoStrictness } = useSettings();
@@ -160,7 +164,15 @@ export default function TakeTest() {
   // shown as a chat bubble): the question the student is currently working on.
   function buildTestKojoContext(): string {
     const currentQuestion = test?.questions[index];
-    return currentQuestion ? `Question the student is working on:\n${currentQuestion.question_text}` : "";
+    if (!test || !currentQuestion) return "";
+    if (currentQuestion.group) {
+      const parts = (built.screens[built.screenOf[index]] ?? [index])
+        .map((i) => test.questions[i])
+        .map((q) => `(${q.part_label ?? "?"}) ${q.question_text}`)
+        .join("\n");
+      return `Problem the student is working on:\n${currentQuestion.group.stem}\n\n${parts}`;
+    }
+    return `Question the student is working on:\n${currentQuestion.question_text}`;
   }
 
   // The backend loads the current question itself from these ids (ownership
@@ -221,25 +233,16 @@ export default function TakeTest() {
       }
       if (event.key === "ArrowRight") {
         event.preventDefault();
-        setIndex((currentIndex) => {
-          if (!test) return currentIndex;
-          const loaded = test.questions.length;
-          const generating = (test.generation_status ?? "ready") === "generating";
-          const expected = test.expected_question_count ?? loaded;
-          // While generating, allow stepping one slot past the last loaded question
-          // (a pending slot that shows a spinner), but never past the expected end.
-          const ceiling = generating ? Math.min(loaded, Math.max(expected - 1, 0)) : loaded - 1;
-          return Math.min(currentIndex + 1, ceiling);
-        });
+        setIndex((currentIndex) => stepIndex(1, currentIndex, test, built));
       } else if (event.key === "ArrowLeft") {
         event.preventDefault();
-        setIndex((currentIndex) => Math.max(currentIndex - 1, 0));
+        setIndex((currentIndex) => stepIndex(-1, currentIndex, test, built));
       }
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [test]);
+  }, [test, built]);
 
   // Load draft if it exists
   useEffect(() => {
@@ -362,6 +365,12 @@ export default function TakeTest() {
 
   const question = test?.questions[index];
   const questionId = question?.id;
+  // The screen being shown: the question alone, or every part of its problem.
+  const screenIndex = question ? built.screenOf[index] ?? 0 : built.screens.length;
+  const screenQuestions: Question[] = question && test
+    ? (built.screens[screenIndex] ?? [index]).map((i) => test.questions[i])
+    : [];
+  const isGroupScreen = Boolean(question?.group);
 
   // ── Streaming generation state ─────────────────────────────────────────────
   const genStatus = test?.generation_status ?? "ready";
@@ -386,8 +395,12 @@ export default function TakeTest() {
   // N..." spinner that never resolves (GH #35). The resume flow can also
   // restore an out-of-range saved index; this covers that too.
   useEffect(() => {
-    setIndex((current) => Math.min(current, Math.max(maxIndex, 0)));
-  }, [maxIndex]);
+    // Also lands a position inside a problem (a resumed index) on its top.
+    setIndex((current) => {
+      const clamped = Math.min(current, Math.max(maxIndex, 0));
+      return clamped < loadedCount ? screenAnchor(built, clamped) : clamped;
+    });
+  }, [maxIndex, built, loadedCount]);
 
   // Re-paint persisted highlights for the current question after each render.
   useEffect(() => {
@@ -408,14 +421,14 @@ export default function TakeTest() {
     });
   }
 
-  function toggleCrossout(optionId: string) {
-    if (questionId == null) return;
+  // Per question, not per screen: a multi-part problem can hold several MCQs.
+  function toggleCrossout(targetId: number, optionId: string) {
     setCrossouts((prev) => {
-      const current = prev[questionId] ?? [];
+      const current = prev[targetId] ?? [];
       const next = current.includes(optionId)
         ? current.filter((id) => id !== optionId)
         : [...current, optionId];
-      return { ...prev, [questionId]: next };
+      return { ...prev, [targetId]: next };
     });
   }
 
@@ -451,7 +464,9 @@ export default function TakeTest() {
   const answeredCount = test
     ? test.questions.filter((item) => isQuestionAnswered(item, answers[item.id], hasScratchWork(item.id))).length
     : 0;
-  const progress = totalSlots ? ((index + 1) / totalSlots) * 100 : 0;
+  // Screens, not questions: a 4-part problem is one step (GH #151).
+  const totalScreens = Math.max(totalSlots - (loadedCount - built.screens.length), built.screens.length);
+  const progress = totalScreens ? ((screenIndex + 1) / totalScreens) * 100 : 0;
   // Can only submit once generation has finished and every loaded question is answered.
   const canSubmit = test && !isGenerating && loadedCount > 0
     ? test.questions.every((item) => isQuestionAnswered(item, answers[item.id], hasScratchWork(item.id)))
@@ -467,7 +482,7 @@ export default function TakeTest() {
       // The scratch pad's canvas is not a text input, so without this guard
       // pressing "a" while drawing would change the MCQ answer underneath it.
       if (event.target instanceof HTMLCanvasElement) return;
-      if (!question || question.type !== "MCQ") return;
+      if (!question || question.type !== "MCQ" || isGroupScreen) return;
       const key = event.key.toLowerCase();
       const map: Record<string, number> = { a: 0, b: 1, c: 2, d: 3 };
       const idx = map[key];
@@ -481,7 +496,7 @@ export default function TakeTest() {
 
     window.addEventListener("keydown", handleLetterKey);
     return () => window.removeEventListener("keydown", handleLetterKey);
-  }, [question]);
+  }, [question, isGroupScreen]);
 
   // Built at submit time, not as a memo: exporting each drawing to a PNG is
   // real canvas work (crop, scale, re-render), so it should happen once, on
@@ -653,7 +668,77 @@ export default function TakeTest() {
 
   // Last answerable question: only true once generation is done and we are on the
   // final loaded question (so Submit never appears mid-stream).
-  const onLastReal = !isGenerating && index === lastLoadedIndex;
+  const onLastReal = !isGenerating && loadedCount > 0 && screenIndex === built.screens.length - 1;
+  const nextIndex = stepIndex(1, index, test, built);
+  const previousIndex = stepIndex(-1, index, test, built);
+
+  // The answer box for one question: the whole card on a single-question
+  // screen, or one part's box on a multi-part screen.
+  function renderAnswer(item: Question) {
+    const setAnswer = (answer: string) => setAnswers((prev) => ({ ...prev, [item.id]: answer }));
+    return (
+      <>
+        {item.type === "MCQ" ? (
+          <MCQQuestion
+            question={item}
+            answer={answers[item.id]}
+            onAnswer={setAnswer}
+            toolsEnabled={toolsEnabled}
+            crossed={crossouts[item.id] ?? []}
+            onToggleCross={(optionId) => toggleCrossout(item.id, optionId)}
+          />
+        ) : item.type === "TF" ? (
+          <TFQuestion question={item} answer={answers[item.id]} onAnswer={setAnswer} />
+        ) : item.type === "MS" ? (
+          <MSQuestion question={item} answer={answers[item.id]} onAnswer={setAnswer} />
+        ) : item.type === "RANK" ? (
+          <RankQuestion question={item} answer={answers[item.id]} onAnswer={setAnswer} />
+        ) : isCodingMode ? (
+          <div className="code-editor-wrap">
+            <label className="field-label">Your code</label>
+            <div className="code-editor-frame">
+              <Editor
+                height="320px"
+                language={MONACO_LANGUAGE_IDS[codingLanguage.toLowerCase()] ?? codingLanguage.toLowerCase()}
+                value={answers[item.id] ?? ""}
+                onChange={(val) => setAnswer(val ?? "")}
+                theme="vs-dark"
+                options={{
+                  fontSize: 14,
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  lineNumbers: "on",
+                  wordWrap: "on",
+                  automaticLayout: true,
+                }}
+              />
+            </div>
+            <p className="muted" style={{ fontSize: "0.8rem", marginTop: 6 }}>
+              Write your solution in {codingLanguage}. Your code will be reviewed by AI.
+            </p>
+          </div>
+        ) : isMathMode ? (
+          <MathInput value={answers[item.id] ?? ""} onChange={setAnswer} />
+        ) : (
+          <TextArea
+            label="Your answer"
+            value={answers[item.id] ?? ""}
+            onChange={(event) => setAnswer(event.target.value)}
+            placeholder="Use the details from your notes..."
+          />
+        )}
+        {isMathMode && betaMode ? (
+          <ScratchPadTrigger
+            questionText={fullQuestionText(item)}
+            data={workStrokes[item.id] ?? EMPTY_SCRATCH_PAD}
+            onChange={(data) => setWorkStrokes((prev) => ({ ...prev, [item.id]: data }))}
+            paperStyle={paperStyle}
+            onPaperStyleChange={changePaperStyle}
+          />
+        ) : null}
+      </>
+    );
+  }
 
   return (
     <div className="test-screen">
@@ -720,7 +805,7 @@ export default function TakeTest() {
               )}
             </strong>
             <span>
-              Question {index + 1} of {totalSlots}
+              Question {screenIndex + 1} of {totalScreens}
               {isGenerating ? ` · ${loadedCount} generated so far` : ` · ${answeredCount} answered`}
             </span>
           </div>
@@ -789,20 +874,30 @@ export default function TakeTest() {
                   </button>
                 </div>
                 <div className="test-nav-grid">
-                  {test.questions.map((item, itemIndex) => {
-                    const answered = isQuestionAnswered(item, answers[item.id], hasScratchWork(item.id));
-                    const marked = bookmarks.has(item.id);
+                  {built.screens.map((members, screenNumber) => {
+                    const anchor = test.questions[members[0]];
+                    const doneParts = members.filter((i) => {
+                      const item = test.questions[i];
+                      return isQuestionAnswered(item, answers[item.id], hasScratchWork(item.id));
+                    }).length;
+                    const answered = doneParts === members.length;
+                    const marked = bookmarks.has(anchor.id);
+                    const isProblem = Boolean(anchor.group);
                     return (
                       <button
-                        key={item.id}
+                        key={anchor.id}
                         type="button"
-                        className={`test-nav-chip${itemIndex === index ? " test-nav-chip--current" : ""}${answered ? " test-nav-chip--answered" : ""}${marked ? " test-nav-chip--marked" : ""}`}
+                        className={`test-nav-chip${screenNumber === screenIndex ? " test-nav-chip--current" : ""}${answered ? " test-nav-chip--answered" : ""}${marked ? " test-nav-chip--marked" : ""}`}
                         onClick={() => {
-                          setIndex(itemIndex);
+                          setIndex(members[0]);
                           setNavOpen(false);
                         }}
+                        title={isProblem ? `${doneParts} of ${members.length} parts answered` : undefined}
                       >
-                        <span>{itemIndex + 1}</span>
+                        <span>{screenNumber + 1}</span>
+                        {isProblem && !answered ? (
+                          <small className="test-nav-chip-parts">{doneParts}/{members.length}</small>
+                        ) : null}
                         {marked ? <Flag size={11} className="test-nav-chip-flag" /> : null}
                       </button>
                     );
@@ -870,30 +965,65 @@ export default function TakeTest() {
               <Card className="question-card question-card--pending">
                 <div className="test-pending-slot">
                   <Loader2 size={26} className="spin" />
-                  <strong>Writing question {index + 1}...</strong>
+                  <strong>Writing question {screenIndex + 1}...</strong>
                   <span className="muted">{loadedCount} of {totalSlots} questions ready</span>
                 </div>
               </Card>
             );
           }
-          const questionCard = (
+          const highlightHint = toolsEnabled && highlightMode ? (
+            <div className="test-highlight-hint">
+              <span><Highlighter size={14} /> Select text in the question to highlight it.</span>
+              {(highlights[question.id]?.length ?? 0) > 0 ? (
+                <button type="button" className="test-highlight-clear" onClick={clearCurrentHighlights}>
+                  <Eraser size={13} /> Clear
+                </button>
+              ) : null}
+            </div>
+          ) : null;
+          const stuckBadge = toolsEnabled && bookmarks.has(question.id) ? (
+            <span className="question-stuck-badge"><Flag size={12} /> Stuck</span>
+          ) : null;
+          const questionCard = isGroupScreen && question.group ? (
+            <Card className="question-card question-card--problem">
+              <div className="question-card-top">
+                <span className="pill">
+                  {question.group.label ? `Problem ${question.group.label}` : "Problem"}
+                </span>
+                <span className="muted small">{screenQuestions.length} part{screenQuestions.length === 1 ? "" : "s"}</span>
+                {stuckBadge}
+              </div>
+              {highlightHint}
+              {question.group.stem ? (
+                <div
+                  className="test-question-markdown question-problem-setup"
+                  ref={questionTextRef}
+                  onMouseUp={toolsEnabled ? captureHighlight : undefined}
+                  onTouchEnd={toolsEnabled ? captureHighlight : undefined}
+                >
+                  <MarkdownContent content={question.group.stem} />
+                </div>
+              ) : null}
+              {screenQuestions.map((part) => (
+                <section key={part.id} className="question-part" aria-label={`Part ${part.part_label ?? ""}`}>
+                  <div className="question-part-head">
+                    <strong>({part.part_label ?? "?"})</strong>
+                    <span className="pill">{questionTypeLabel(part)}</span>
+                  </div>
+                  <div className="test-question-markdown question-part-text">
+                    <MarkdownContent content={part.question_text} />
+                  </div>
+                  {renderAnswer(part)}
+                </section>
+              ))}
+            </Card>
+          ) : (
             <Card className="question-card">
               <div className="question-card-top">
                 <span className="pill">{questionTypeLabel(question)}</span>
-                {toolsEnabled && bookmarks.has(question.id) ? (
-                  <span className="question-stuck-badge"><Flag size={12} /> Stuck</span>
-                ) : null}
+                {stuckBadge}
               </div>
-              {toolsEnabled && highlightMode ? (
-                <div className="test-highlight-hint">
-                  <span><Highlighter size={14} /> Select text in the question to highlight it.</span>
-                  {(highlights[question.id]?.length ?? 0) > 0 ? (
-                    <button type="button" className="test-highlight-clear" onClick={clearCurrentHighlights}>
-                      <Eraser size={13} /> Clear
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
+              {highlightHint}
               <div
                 className="test-question-markdown"
                 ref={questionTextRef}
@@ -902,79 +1032,7 @@ export default function TakeTest() {
               >
                 <MarkdownContent content={question.question_text} />
               </div>
-              {question.type === "MCQ" ? (
-                <MCQQuestion
-                  question={question}
-                  answer={answers[question.id]}
-                  onAnswer={(answer) => setAnswers({ ...answers, [question.id]: answer })}
-                  toolsEnabled={toolsEnabled}
-                  crossed={crossouts[question.id] ?? []}
-                  onToggleCross={toggleCrossout}
-                />
-              ) : question.type === "TF" ? (
-                <TFQuestion
-                  question={question}
-                  answer={answers[question.id]}
-                  onAnswer={(answer) => setAnswers({ ...answers, [question.id]: answer })}
-                />
-              ) : question.type === "MS" ? (
-                <MSQuestion
-                  question={question}
-                  answer={answers[question.id]}
-                  onAnswer={(answer) => setAnswers({ ...answers, [question.id]: answer })}
-                />
-              ) : question.type === "RANK" ? (
-                <RankQuestion
-                  question={question}
-                  answer={answers[question.id]}
-                  onAnswer={(answer) => setAnswers({ ...answers, [question.id]: answer })}
-                />
-              ) : isCodingMode ? (
-                <div className="code-editor-wrap">
-                  <label className="field-label">Your code</label>
-                  <div className="code-editor-frame">
-                    <Editor
-                      height="320px"
-                      language={MONACO_LANGUAGE_IDS[codingLanguage.toLowerCase()] ?? codingLanguage.toLowerCase()}
-                      value={answers[question.id] ?? ""}
-                      onChange={(val) => setAnswers({ ...answers, [question.id]: val ?? "" })}
-                      theme="vs-dark"
-                      options={{
-                        fontSize: 14,
-                        minimap: { enabled: false },
-                        scrollBeyondLastLine: false,
-                        lineNumbers: "on",
-                        wordWrap: "on",
-                        automaticLayout: true,
-                      }}
-                    />
-                  </div>
-                  <p className="muted" style={{ fontSize: "0.8rem", marginTop: 6 }}>
-                    Write your solution in {codingLanguage}. Your code will be reviewed by AI.
-                  </p>
-                </div>
-              ) : isMathMode ? (
-                <MathInput
-                  value={answers[question.id] ?? ""}
-                  onChange={(val) => setAnswers({ ...answers, [question.id]: val })}
-                />
-              ) : (
-                <TextArea
-                  label="Your answer"
-                  value={answers[question.id] ?? ""}
-                  onChange={(event) => setAnswers({ ...answers, [question.id]: event.target.value })}
-                  placeholder="Use the details from your notes..."
-                />
-              )}
-              {isMathMode && betaMode ? (
-                <ScratchPadTrigger
-                  questionText={question.question_text}
-                  data={workStrokes[question.id] ?? EMPTY_SCRATCH_PAD}
-                  onChange={(data) => setWorkStrokes((prev) => ({ ...prev, [question.id]: data }))}
-                  paperStyle={paperStyle}
-                  onPaperStyleChange={changePaperStyle}
-                />
-              ) : null}
+              {renderAnswer(question)}
             </Card>
           );
           if (learningActive && test.folder_id) {
@@ -991,19 +1049,19 @@ export default function TakeTest() {
         })()}
 
         <div className="question-nav">
-          <Button variant="secondary" disabled={index === 0} icon={<ArrowLeft size={18} />} onClick={() => setIndex(index - 1)}>
+          <Button variant="secondary" disabled={previousIndex === index} icon={<ArrowLeft size={18} />} onClick={() => setIndex(previousIndex)}>
             Previous
           </Button>
           {onLastReal ? (
             <Button disabled={!canSubmit || isSubmitting} icon={<Send size={18} />} onClick={handleSubmit}>
               {isSubmitting ? <InlineLoading label="Submitting" /> : "Submit"}
             </Button>
-          ) : index >= maxIndex ? (
+          ) : nextIndex === index ? (
             <Button variant="secondary" disabled icon={<Loader2 size={18} className="spin" />}>
               Generating...
             </Button>
           ) : (
-            <Button icon={<ArrowRight size={18} />} onClick={() => setIndex(Math.min(index + 1, maxIndex))}>
+            <Button icon={<ArrowRight size={18} />} onClick={() => setIndex(nextIndex)}>
               Next
             </Button>
           )}
@@ -1252,6 +1310,27 @@ function RankQuestion({
       ))}
     </div>
   );
+}
+
+// The question index one screen forward or back. While a test is still
+// generating, one pending slot past the last loaded question is reachable (a
+// spinner), never past the expected end. A multi-part problem is one screen
+// (GH #151), so stepping skips over its other parts.
+function stepIndex(direction: 1 | -1, current: number, test: TestTake | null, built: QuestionScreens): number {
+  if (!test) return current;
+  const loaded = test.questions.length;
+  const generating = (test.generation_status ?? "ready") === "generating";
+  const expected = test.expected_question_count ?? loaded;
+  const maxIndex = generating ? Math.min(loaded, Math.max(expected - 1, 0)) : loaded - 1;
+  if (direction < 0) {
+    if (current >= loaded) return loaded > 0 ? screenAnchor(built, loaded - 1) : 0;
+    const screen = built.screenOf[current] ?? 0;
+    return screen > 0 ? built.screens[screen - 1][0] : current;
+  }
+  if (current >= loaded) return current;
+  const screen = built.screenOf[current] ?? 0;
+  if (screen < built.screens.length - 1) return built.screens[screen + 1][0];
+  return generating && maxIndex >= loaded ? loaded : current;
 }
 
 function questionTypeLabel(question: Question): string {

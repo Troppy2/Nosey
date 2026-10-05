@@ -89,6 +89,8 @@ class AttemptRepository(BaseRepository[UserAttempt]):
                     selectinload(UserAnswer.question).options(
                         selectinload(Question.mcq_options),
                         selectinload(Question.frq_answer),
+                        # A part's setup (GH #151), for Results and the review summary.
+                        selectinload(Question.group),
                     ),
                 ),
             )
@@ -246,6 +248,10 @@ class AttemptRepository(BaseRepository[UserAttempt]):
                 selectinload(UserAttempt.answers)
                 .selectinload(UserAnswer.question)
                 .selectinload(Question.frq_answer),
+                # A part's setup (GH #151), so Kojo sees the whole problem.
+                selectinload(UserAttempt.answers)
+                .selectinload(UserAnswer.question)
+                .selectinload(Question.group),
                 selectinload(UserAttempt.test),
             )
         )

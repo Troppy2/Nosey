@@ -124,22 +124,39 @@ class DraftQuestion(BaseModel):
     correct_index: Optional[int] = None
     expected_answer: Optional[str] = None
     answer_inferred: bool = False
+    # Multi-part problems (GH #151): set on each lettered part. The setup is
+    # repeated on every part of a problem here and stored once at Create Test.
+    part_label: Optional[str] = None
+    group_key: Optional[str] = None
+    group_label: str = ""
+    group_stem: str = ""
 
 
 def _drafts(mcq: list[GeneratedMCQ], frq: list[GeneratedFRQ]) -> list[DraftQuestion]:
-    return [
-        DraftQuestion(
+    """Drafts in document order, so a problem's parts read (a), (b), (c)."""
+    def grouping(q) -> dict:
+        return {
+            "part_label": q.part_label, "group_key": q.group_key,
+            "group_label": q.group_label, "group_stem": q.group_stem,
+        }
+
+    items = [
+        (q.seq, DraftQuestion(
             kind="mcq", question_text=q.question_text, options=q.options,
-            correct_index=q.correct_index, answer_inferred=q.answer_inferred,
-        )
+            correct_index=q.correct_index, answer_inferred=q.answer_inferred, **grouping(q),
+        ))
         for q in mcq
     ] + [
-        DraftQuestion(
+        (q.seq, DraftQuestion(
             kind="frq", question_text=q.question_text,
-            expected_answer=q.expected_answer, answer_inferred=q.answer_inferred,
-        )
+            expected_answer=q.expected_answer, answer_inferred=q.answer_inferred, **grouping(q),
+        ))
         for q in frq
     ]
+    if any(seq is not None for seq, _ in items):
+        last = max((seq for seq, _ in items if seq is not None), default=0) + 1
+        items.sort(key=lambda pair: pair[0] if pair[0] is not None else last)
+    return [draft for _, draft in items]
 
 
 class ProblemRange(BaseModel):
@@ -264,6 +281,9 @@ class FixProblemRequest(BaseModel):
     end: int
     current: list[DraftQuestion] = []
     message: str
+    # The picked problem's index and label, so a fixed problem keeps its group.
+    index: Optional[int] = None
+    label: str = ""
 
 
 class FixProblemResponse(BaseModel):
@@ -272,8 +292,12 @@ class FixProblemResponse(BaseModel):
 
 def _draft_text(questions: list[DraftQuestion]) -> str:
     lines: list[str] = []
+    stem = next((q.group_stem for q in questions if q.group_stem), "")
+    if stem:
+        lines.append(f"Setup: {stem}")
     for n, q in enumerate(questions, start=1):
-        lines.append(f"Q{n} ({'multiple choice' if q.kind == 'mcq' else 'written'}): {q.question_text}")
+        part = f" part ({q.part_label})" if q.part_label else ""
+        lines.append(f"Q{n}{part} ({'multiple choice' if q.kind == 'mcq' else 'written'}): {q.question_text}")
         for j, option in enumerate(q.options or []):
             mark = " (correct)" if j == q.correct_index else ""
             lines.append(f"   {chr(65 + j)}. {option}{mark}")
@@ -308,10 +332,16 @@ async def fix_practice_problem(
         mcq, frq = await llm.fix_practice_problem(
             source, _draft_text(payload.current), message[:8_000],
             answer_key=answer_key_text(content), provider=resolve_request_provider(user, None),
+            label=payload.label,
         )
     except LLMException as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     # An answer the student gave in the message counts as from the document,
     # so only the rest is solved.
     mcq, frq = await llm._solve_keyless_questions(mcq, frq, notes)
+    # Same group key the parse step gave this problem; without an index, a key
+    # no other problem can share.
+    key = f"p{payload.index}:" if payload.index is not None else f"fix{payload.start}:"
+    mcq = [replace(q, group_key=key + q.group_label) if q.group_key else q for q in mcq]
+    frq = [replace(q, group_key=key + q.group_label) if q.group_key else q for q in frq]
     return FixProblemResponse(questions=_drafts(mcq, frq))

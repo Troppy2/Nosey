@@ -50,6 +50,7 @@ import type {
   ProviderStatus,
   QuestionCreate,
   QuestionEditable,
+  QuestionGroup,
   QuestionUpdate,
   ResumableTestInfo,
   ReviewSummaryResponse,
@@ -678,6 +679,18 @@ export async function updateQuestion(
   data: QuestionUpdate,
 ): Promise<QuestionEditable> {
   return request<QuestionEditable>(`/tests/${testId}/questions/${questionId}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+// A multi-part problem's setup, edited once for all its parts (GH #151).
+export async function updateQuestionGroup(
+  testId: number,
+  groupId: number,
+  data: { stem: string; label?: string },
+): Promise<QuestionGroup> {
+  return request<QuestionGroup>(`/tests/${testId}/groups/${groupId}`, {
     method: "PUT",
     body: JSON.stringify(data),
   });
@@ -1566,6 +1579,12 @@ export interface DraftQuestion {
   correct_index?: number | null;
   expected_answer?: string | null;
   answer_inferred: boolean;
+  // Multi-part problems (GH #151): set on each lettered part. The setup is
+  // repeated on every part here and stored once when the test is created.
+  part_label?: string | null;
+  group_key?: string | null;
+  group_label?: string;
+  group_stem?: string;
 }
 
 export interface ParsedProblem {
@@ -1605,7 +1624,15 @@ export async function fixPracticeProblem(
 ): Promise<DraftQuestion[]> {
   const result = await request<{ questions: DraftQuestion[] }>(`/folders/${folderId}/files/${fileId}/problems/fix`, {
     method: "POST",
-    body: JSON.stringify({ start: problem.start, end: problem.end, current, message }),
+    // index + label keep a fixed problem's parts in the same group (GH #151).
+    body: JSON.stringify({
+      start: problem.start,
+      end: problem.end,
+      current,
+      message,
+      index: problem.index,
+      label: problem.label,
+    }),
   });
   return result.questions;
 }

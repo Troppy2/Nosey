@@ -19,13 +19,15 @@ from src.models.question import Question
 from src.models.test import Test
 from src.models.user import User
 from src.models.user_attempt import UserAttempt
-from src.repositories.test_repository import TestRepository
+from src.repositories.test_repository import TestRepository, add_generated_questions
 from src.repositories.usage_event_repository import UsageEventRepository
 from src.schemas.test_schema import (
     CreateTestResponse,
     QuestionCreate,
     RegenerateTestRequest,
     QuestionEditable,
+    QuestionGroupPublic,
+    QuestionGroupUpdate,
     QuestionUpdate,
     TestResponse,
     TestSummary,
@@ -36,7 +38,7 @@ from src.schemas.test_schema import (
 from src.services.file_service import PARSE_DEADLINE_S, FileService
 from src.services.grading_service import GradingService
 from src.services.kojo_context_cache import invalidate_folder
-from src.services.llm_service import GeneratedFRQ, GeneratedMCQ, LLMService
+from src.services.llm_service import GeneratedFRQ, GeneratedMCQ, LLMService, practice_part_label
 from src.services.practice_problems import answer_key_text, problem_text
 from src.services.practice_sections import slice_sections
 from src.services.mcq_verification_service import MCQVerificationService, VerifiableMCQ, inflated_mcq_count
@@ -124,7 +126,10 @@ def _reviewed_questions_from_form(
     """The questions the student checked in the practice-test review step.
 
     JSON list of {kind, question_text, options, correct_index, expected_answer,
-    answer_inferred}. None when absent; a malformed entry is a 400.
+    answer_inferred, group_key, group_label, group_stem, part_label}, in the
+    order to save them. None when absent; a malformed entry is a 400. The
+    group fields keep a multi-part problem's parts together under one setup
+    (GH #151).
     """
     if raw is None or not str(raw).strip():
         return None
@@ -136,11 +141,20 @@ def _reviewed_questions_from_form(
         raise StudyAppException(f"Send between 1 and {_MAX_REVIEWED_QUESTIONS} checked questions")
     mcq: list[GeneratedMCQ] = []
     frq: list[GeneratedFRQ] = []
-    for item in items:
+    for position, item in enumerate(items):
         if not isinstance(item, dict):
             raise StudyAppException("Each checked question must be an object")
         text = str(item.get("question_text") or "").strip()[:8_000]
         inferred = bool(item.get("answer_inferred"))
+        part_label = practice_part_label(item.get("part_label"))
+        group_key = str(item.get("group_key") or "").strip()[:100] or None
+        grouping = {
+            "part_label": part_label if group_key else None,
+            "group_key": group_key if part_label else None,
+            "group_label": str(item.get("group_label") or "").strip()[:50],
+            "group_stem": str(item.get("group_stem") or "").strip()[:8_000],
+            "seq": position,
+        }
         if not text:
             raise StudyAppException("A checked question has no text")
         if item.get("kind") == "mcq":
@@ -148,10 +162,10 @@ def _reviewed_questions_from_form(
             index = item.get("correct_index")
             if not 2 <= len(options) <= 6 or not all(options) or not isinstance(index, int) or not 0 <= index < len(options):
                 raise StudyAppException("A checked multiple choice question needs 2-6 options and a correct one")
-            mcq.append(GeneratedMCQ(text, options, index, inferred))
+            mcq.append(GeneratedMCQ(text, options, index, inferred, **grouping))
         else:
             answer = str(item.get("expected_answer") or "").strip()[:8_000]
-            frq.append(GeneratedFRQ(text, answer or "(no answer given)", inferred or not answer))
+            frq.append(GeneratedFRQ(text, answer or "(no answer given)", inferred or not answer, **grouping))
     return mcq, frq
 
 
@@ -182,23 +196,7 @@ async def _persist_generated(
     start_order: int,
 ) -> int:
     """Write a batch of generated MCQ/FRQ questions; return the next display_order."""
-    display_order = start_order
-    for item in mcq_questions:
-        options = [
-            (option_text, index == item.correct_index)
-            for index, option_text in enumerate(item.options)
-        ]
-        await repo.add_mcq_question(
-            test_id, item.question_text, display_order, options, answer_inferred=item.answer_inferred
-        )
-        display_order += 1
-    for item in frq_questions:
-        await repo.add_frq_question(
-            test_id, item.question_text, display_order, item.expected_answer,
-            answer_inferred=item.answer_inferred,
-        )
-        display_order += 1
-    return display_order
+    return await add_generated_questions(repo, test_id, mcq_questions, frq_questions, start_order)
 
 
 async def _verify_persisted_mcqs(
@@ -1400,6 +1398,21 @@ async def update_question(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except StudyAppException as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.put("/tests/{test_id}/groups/{group_id}", response_model=QuestionGroupPublic)
+async def update_question_group(
+    test_id: int,
+    group_id: int,
+    data: QuestionGroupUpdate,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> QuestionGroupPublic:
+    """Edit a multi-part problem's shared setup (GH #151)."""
+    try:
+        return await TestService().update_question_group(test_id, group_id, user.id, data, session)
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.delete("/tests/{test_id}/questions/{question_id}", status_code=status.HTTP_204_NO_CONTENT)

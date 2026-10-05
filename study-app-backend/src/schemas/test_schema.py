@@ -23,11 +23,30 @@ class MCQOptionInput(BaseModel):
     is_correct: bool
 
 
+class QuestionGroupPublic(BaseModel):
+    """A multi-part problem's shared setup (GH #151)."""
+
+    id: int
+    label: str = ""
+    stem: str = ""
+
+
+class QuestionGroupUpdate(BaseModel):
+    """Edit a multi-part problem's setup once for all its parts (GH #151)."""
+
+    stem: str = Field(max_length=20_000)
+    label: Optional[str] = Field(default=None, max_length=50)
+
+
 class QuestionPublic(BaseModel):
     id: int
     type: str
     question_text: str
     options: list[MCQOptionPublic] = Field(default_factory=list)
+    # Set on each part of a multi-part problem (GH #151); parts sharing a
+    # group are shown together under its setup.
+    group: Optional[QuestionGroupPublic] = None
+    part_label: Optional[str] = None
 
 
 class QuestionEditable(BaseModel):
@@ -36,6 +55,8 @@ class QuestionEditable(BaseModel):
     question_text: str
     options: list[MCQOptionEditable] = Field(default_factory=list)
     expected_answer: Optional[str] = None
+    group: Optional[QuestionGroupPublic] = None
+    part_label: Optional[str] = None
 
 
 class QuestionCreate(BaseModel):

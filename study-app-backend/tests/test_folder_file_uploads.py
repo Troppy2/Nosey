@@ -620,7 +620,7 @@ async def test_fix_problem_returns_the_redone_questions(client, seeded, db_sessi
     file_id = await _add_row(db_session_maker, seeded.folder_id, upload_status="ready", content=_WORKSHEET)
     got: dict = {}
 
-    async def fake_fix(self, source, current, message, answer_key="", provider=None):
+    async def fake_fix(self, source, current, message, answer_key="", provider=None, label=""):
         got.update(source=source, current=current, message=message)
         return [GeneratedMCQ("Is (1, 2) = (2, 1)?", ["True", "False"], 1, True)], []
 
