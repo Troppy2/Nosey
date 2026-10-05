@@ -183,3 +183,32 @@ async def test_the_setup_is_edited_once_for_every_part(db_session_maker) -> None
             (await session.scalar(select(Question.id).where(Question.part_label == "a"))), user.id
         )
         assert full_question_text(part).startswith("Let $A = I$.")
+
+
+# ── Picked problems are matched by id, never by the document's number ───
+
+
+async def test_reply_is_matched_by_problem_id_not_document_number() -> None:
+    from src.services.llm_service import _match_practice_entries
+
+    reply = [{"problem": "P2", "frq": []}, {"problem": "P1", "frq": []}]
+    assert {slot: e["problem"] for slot, e in _match_practice_entries(reply, 2).items()} == {0: "P1", 1: "P2"}
+    # A partly matched reply is never filled in by order (that shifts problems).
+    assert list(_match_practice_entries([{"problem": "P1"}, {"problem": 99}], 3)) == [0]
+    # No usable id at all, but one entry per problem: taken in order.
+    assert list(_match_practice_entries([{"problem": 35}, {"problem": 36}], 2)) == [0, 1]
+
+
+async def test_a_reply_using_document_numbers_is_not_dropped(monkeypatch) -> None:
+    """The model answered "problem": "P1" for document problem 35 (index 34)."""
+    llm = LLMService()
+
+    async def fake_json(prompt, provider=None):
+        assert "=== P1 (numbered 35 in the document) ===" in prompt
+        return {"problems": [{"problem": "P1", "setup": SETUP, "frq": [
+            {"n": 1, "part": "a", "question_text": "Find det.", "expected_answer": "-2"},
+        ]}]}
+
+    monkeypatch.setattr(llm, "_complete_json", fake_json)
+    out = await llm.parse_practice_problems([(34, "35", "35. ... (a) Find det.")])
+    assert out[34] is not None and out[34][1][0].group_key == "p34:35"

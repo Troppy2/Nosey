@@ -168,6 +168,34 @@ def _practice_item_position(item: dict) -> dict[str, object]:
     }
 
 
+def _practice_problem_id(slot: int) -> str:
+    """The id one problem goes by in a batched parse prompt: "P1", "P2", ..."""
+    return f"P{slot + 1}"
+
+
+def _match_practice_entries(entries: list, size: int) -> dict[int, dict]:
+    """Batch slot -> the reply entry for that problem.
+
+    Matched by id ("P3", or a bare 3 / "3" read as the same id). When no entry
+    carries a usable id at all and the count matches, the reply is taken in
+    order; a partly matched reply is never filled in by order, since one
+    missing problem would shift every later one onto its neighbour.
+    """
+    dicts = [entry for entry in entries if isinstance(entry, dict)]
+    matched: dict[int, dict] = {}
+    for entry in dicts:
+        raw = str(entry.get("problem") or "").strip().upper()
+        digits = raw[1:] if raw.startswith("P") else raw
+        if not digits.isdigit():
+            continue
+        slot = int(digits) - 1
+        if 0 <= slot < size and slot not in matched:
+            matched[slot] = entry
+    if not matched and len(dicts) == size:
+        return dict(enumerate(dicts))
+    return matched
+
+
 def practice_full_text(question: "GeneratedMCQ | GeneratedFRQ") -> str:
     """A parsed part with its problem's setup in front, for any LLM that reads it."""
     if not question.part_label or not question.group_stem.strip():
@@ -1620,14 +1648,22 @@ class LLMService:
         rules = self._practice_problem_rules(answer_key)
 
         async def parse_batch(batch: list[tuple[int, str, str]]) -> dict[int, object]:
-            blocks = "\n\n".join(f"=== PROBLEM {index} ({label}) ===\n{text}" for index, label, text in batch)
+            # Each problem gets an id ("P1", "P2", ...) that cannot be mistaken
+            # for a problem number. With "=== PROBLEM 34 (35) ===" the model
+            # sometimes answered with the document's own number (35), so the
+            # reply was dropped or attached to the neighbouring problem.
+            blocks = "\n\n".join(
+                f"=== {_practice_problem_id(slot)} (numbered {label or 'unnumbered'} in the document) ===\n{text}"
+                for slot, (_index, label, text) in enumerate(batch)
+            )
             prompt = (
                 "You are copying problems out of a student's practice test so they can retake them.\n"
-                "Each problem below starts with a === PROBLEM n === line. Extract every question in each "
-                "problem. Do not write new questions and do not skip any.\n\n"
+                "Each problem below starts with a === P1 ===, === P2 === ... line. Extract every question in "
+                "each problem. Do not write new questions and do not skip any.\n\n"
                 f"{blocks}\n\n{rules}\n"
-                "Return JSON only, one entry per problem:\n"
-                '{"problems": [{"problem": 0, "setup": "...", "mcq": [{"n": 1, "part": "a", '
+                "Return JSON only, one entry per problem. \"problem\" is the problem's id from its === line "
+                "(\"P1\", \"P2\", ...), never the number the document gives it:\n"
+                '{"problems": [{"problem": "P1", "setup": "...", "mcq": [{"n": 1, "part": "a", '
                 '"question_text": "...", "options": ["...", "..."], "correct_index": 0, '
                 '"answer_from_document": true}], "frq": [{"n": 2, "part": "b", "question_text": "...", '
                 '"expected_answer": "...", "answer_from_document": false}]}]}\n'
@@ -1641,19 +1677,18 @@ class LLMService:
                     logger.warning("parse_practice_problems batch of %d failed: %s", len(batch), exc)
                     return {}
             entries = data.get("problems")
-            return {
-                entry.get("problem"): entry
-                for entry in (entries if isinstance(entries, list) else [])
-                if isinstance(entry, dict)
-            }
+            matched = _match_practice_entries(entries if isinstance(entries, list) else [], len(batch))
+            if len(matched) < len(batch):
+                logger.warning(
+                    "parse_practice_problems: %d of %d problems missing from the reply", len(batch) - len(matched), len(batch)
+                )
+            return {batch[slot][0]: entry for slot, entry in matched.items()}
 
         replies = await asyncio.gather(*(parse_batch(b) for b in batches))
         out: dict[int, Optional[tuple[list[GeneratedMCQ], list[GeneratedFRQ]]]] = {}
         for batch, reply in zip(batches, replies):
             for index, label, text in batch:
                 entry = reply.get(index)
-                if entry is None:
-                    entry = reply.get(str(index))
                 if not isinstance(entry, dict):
                     out[index] = None
                     continue
@@ -2438,7 +2473,18 @@ If the notes do not support grading, set flagged_uncertain true and confidence 0
                 f"Generate exactly {count_frq} coding challenge questions.\n"
                 "Coding challenge rules:\n"
                 f"  - Each question must be a programming task solvable in {language}\n"
-                "  - question_text must include: problem description, input format, output format, and 1-2 examples\n"
+                # One run-on paragraph mixed the task, the formats and the
+                # examples together; a fixed sectioned layout keeps them apart.
+                "  - question_text is Markdown laid out in separate sections, never one run-on paragraph. "
+                "Use exactly this shape, with a blank line (\\n\\n inside the JSON string) between sections:\n"
+                "      <the task in 1-3 short sentences; wrap identifiers like `safe_div` in backticks>\n"
+                "      **Input:** <what the function or program receives>\n"
+                "      **Output:** <what it returns or prints>\n"
+                "      **Example 1**\n"
+                "      ```\n      <the call or input>\n      ```\n"
+                "      Returns `<result>`, with an optional one-line reason.\n"
+                "      **Example 2** in the same shape.\n"
+                "    Do not start with a \"Problem:\" label, and never put an example inside a sentence.\n"
                 f"  - expected_answer must include: complete working {language} solution with brief comments\n"
                 "  - Vary: functions, loops, data structures, algorithms\n"
             )

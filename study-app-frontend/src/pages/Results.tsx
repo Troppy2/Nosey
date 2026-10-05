@@ -28,6 +28,7 @@ import {
   scopeKey,
   skipUnreadableAnswers,
 } from "../lib/api";
+import { formatCodingProblem } from "../lib/codingProblemFormat";
 import { scoreTone } from "../lib/format";
 import type { AnswerResult, AttemptDetail, RedoAnswerResponse } from "../lib/types";
 
@@ -574,7 +575,8 @@ function ReviewItem({ answer, label }: { answer: AnswerResult; label: string }) 
         <div>
           <span className="small muted">{label}</span>
           <div className="review-question-markdown">
-            <MarkdownContent content={answer.question_text ?? `Question ${answer.question_id}`} />
+            {/* Lays out a run-on coding problem; anything else is unchanged. */}
+            <MarkdownContent content={formatCodingProblem(answer.question_text ?? `Question ${answer.question_id}`)} />
           </div>
         </div>
         <ChevronDown className={open ? "rotated" : ""} size={20} />

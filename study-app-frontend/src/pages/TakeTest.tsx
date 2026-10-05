@@ -27,6 +27,7 @@ import { SkeletonQuestionCard } from "../components/Skeletons";
 import { API_BASE_URL, fetchTest, getDraftAttempt, saveDraftAttempt, scopeKey, submitAttempt } from "../lib/api";
 import { applyTextHighlights, clearTextHighlights, getSelectionSignature, HIGHLIGHT_SUPPORTED } from "../lib/highlightRanges";
 import { buildScreens, fullQuestionText, screenAnchor, type QuestionScreens } from "../lib/questionScreens";
+import { formatCodingProblem } from "../lib/codingProblemFormat";
 import { useSettings } from "../lib/useSettings";
 import type { DraftAttemptAnswer, KojoTestRef, Question, SubmittedAnswer, TestTake } from "../lib/types";
 
@@ -1030,7 +1031,8 @@ export default function TakeTest() {
                 onMouseUp={toolsEnabled ? captureHighlight : undefined}
                 onTouchEnd={toolsEnabled ? captureHighlight : undefined}
               >
-                <MarkdownContent content={question.question_text} />
+                {/* Older coding problems are one run-on paragraph; lay them out in sections. */}
+                <MarkdownContent content={isCodingMode ? formatCodingProblem(question.question_text) : question.question_text} />
               </div>
               {renderAnswer(question)}
             </Card>
