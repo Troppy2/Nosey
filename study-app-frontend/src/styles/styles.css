@@ -26619,6 +26619,20 @@ a.sd-chip.is-done:hover {
   font-size: 13px;
 }
 
+/* Geometry zoom/pan buttons: top-right instead of JSXGraph's bottom-right,
+   where they covered the x-axis numbers. bottom is cleared in VisualBlock. */
+.visual-geometry-board .JXG_navigation {
+  top: 6px;
+  background: var(--white);
+  border: 1px solid rgba(113, 131, 85, 0.25);
+  border-radius: 999px;
+  padding: 2px 4px;
+  user-select: none;
+}
+.visual-geometry-board .JXG_navigation_button:hover {
+  color: var(--ink);
+}
+
 /* Create Test: practice test mode (recreate vs match style) */
 .practice-mode-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));

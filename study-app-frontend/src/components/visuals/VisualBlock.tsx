@@ -162,10 +162,13 @@ async function renderGeometry(el: HTMLElement, src: string) {
     axis: spec.axis !== false,
     keepaspectratio: true,
     showCopyright: false,
-    // The nav buttons sat on top of the x-axis numbers; wheel zoom and
-    // two-finger pan still work without them.
-    showNavigation: false,
-    pan: { enabled: true, needTwoFingers: true },
+    // Zoom/pan buttons. JSXGraph pins them bottom-right, on top of the x-axis
+    // numbers, so bottom is cleared here and styles.css moves them to the top.
+    showNavigation: true,
+    navbar: { bottom: "auto", strokeColor: cssVar("--green-dark", "#718355") },
+    // Mouse drag pans without Shift; touch still needs two fingers so one
+    // finger scrolls the page past the board.
+    pan: { enabled: true, needShift: false, needTwoFingers: true },
     zoom: { wheel: true, needShift: false },
   });
 
@@ -186,14 +189,18 @@ async function renderGeometry(el: HTMLElement, src: string) {
     const e = asObject(raw, "geometry element");
     const type = String(e.type);
     if (!GEOMETRY_TYPES.has(type)) throw new Error(`geometry: unsupported element type "${type}"`);
-    const label = e.name != null ? escapeText(plainLabel(e.name)) : "";
-    const common = { strokeColor: accent, name: label, withLabel: !!label, label: { display: "internal", strokeColor: ink } };
+    // Labels are internal SVG text set through a text node, so HTML-escaping
+    // printed "x &#62; 0" literally. parse: false keeps JSXGraph from reading
+    // the string as JessieCode (<value> tags), which is what made escaping
+    // look necessary; the label is now shown verbatim and never evaluated.
+    const label = e.name != null ? plainLabel(e.name) : "";
+    const common = { strokeColor: accent, name: label, withLabel: !!label, label: { display: "internal", parse: false, strokeColor: ink } };
     let obj: any;
     switch (type) {
       case "point": {
         if (!Array.isArray(e.coords) || e.coords.length !== 2) throw new Error("geometry: point needs coords [x, y]");
         obj = board.create("point", e.coords.map(Number), {
-          ...common, name: label || escapeText(plainLabel(e.id ?? "")), withLabel: true, fillColor: accent, size: 3, fixed: e.fixed === true,
+          ...common, name: label || plainLabel(e.id ?? ""), withLabel: true, fillColor: accent, size: 3, fixed: e.fixed === true,
         });
         break;
       }
@@ -220,8 +227,8 @@ async function renderGeometry(el: HTMLElement, src: string) {
         break;
       case "text":
         if (!Array.isArray(e.coords) || e.coords.length !== 2) throw new Error("geometry: text needs coords [x, y]");
-        obj = board.create("text", [Number(e.coords[0]), Number(e.coords[1]), escapeText(plainLabel(e.text))], {
-          display: "internal", strokeColor: ink, fixed: true, anchorX: "middle", anchorY: "bottom",
+        obj = board.create("text", [Number(e.coords[0]), Number(e.coords[1]), plainLabel(e.text)], {
+          display: "internal", parse: false, strokeColor: ink, fixed: true, anchorX: "middle", anchorY: "bottom",
         });
         break;
     }
