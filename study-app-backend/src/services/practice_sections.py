@@ -22,8 +22,9 @@ _NAMED_HEADING_RE = re.compile(
 _MARKDOWN_HEADING_RE = re.compile(r"^\s*#{1,2}\s+(.{2,90})$")
 # Table-of-contents lines: "1.2 Vector notation . . . . . . 8".
 _TOC_LINE_RE = re.compile(r"^.*?(?:\s*\.){5,}\s*\d+\s*$")
-# A numbered question or exercise: "1. What is", "1.4 Periodic energy usage", "12) Find".
-_QUESTION_LINE_RE = re.compile(r"^\s*(?:_{2,}\s*)?\d{1,3}(?:\.\d{1,3})?[.)]?\s+[A-Za-z(\[]")
+# A numbered question or exercise: "1. What is", "1.4 Periodic energy usage", "12) Find",
+# also as a markdown heading ("### 1.1 Vector equations", GH #138).
+_QUESTION_LINE_RE = re.compile(r"^\s*(?:#{1,6}\s*)?(?:_{2,}\s*)?\d{1,3}(?:\.\d{1,3})?[.)]?\s+[A-Za-z(\[]")
 # An answer key heading near the end of the document ("Answer Key", "Answers:").
 _ANSWER_KEY_RE = re.compile(
     r"(?im)^[ \t]*(?:#+[ \t]*)?(?:answer[ \t]*key|answers|solutions)\b[^\n]{0,40}$"

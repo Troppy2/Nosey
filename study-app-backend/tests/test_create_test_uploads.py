@@ -453,6 +453,30 @@ async def test_background_uses_only_the_chosen_sections(background, seeded, db_s
     assert "First question" not in content
 
 
+async def test_background_uses_only_the_picked_problems_and_reviewed_questions(
+    background, seeded, db_session_maker
+) -> None:
+    from src.services.llm_service import GeneratedFRQ
+
+    _, folder_id, _ = seeded
+    text = "### 1.1 First\n\nFirst question here?\n\n### 1.2 Second\n\nSecond question here?\n"
+    exam = await _folder_file(db_session_maker, folder_id, "exam.pdf", text)
+    reviewed = ([], [GeneratedFRQ("Second question here?", "42")])
+
+    await tests_route._extract_and_generate_background(**{
+        **_background_kwargs(seeded, []),
+        "practice_test_file_id": exam,
+        "practice_test_only": True,
+        "practice_test_ranges": [(text.index("### 1.2"), len(text))],
+        "reviewed_questions": reviewed,
+    })
+
+    kwargs = background.await_args.kwargs
+    assert "Second question" in kwargs["practice_test_content"]
+    assert "First question" not in kwargs["practice_test_content"]
+    assert kwargs["reviewed_questions"] == reviewed
+
+
 async def test_recreate_mode_passes_folder_notes_only_as_solve_context(background, seeded, db_session_maker) -> None:
     _, folder_id, _ = seeded
     await _folder_file(db_session_maker, folder_id, "textbook.pdf", "We write (1, 2, 1) for a column vector.")

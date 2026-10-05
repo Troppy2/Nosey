@@ -1,4 +1,5 @@
 import asyncio
+import json
 import hashlib
 import time
 from typing import Optional, Tuple
@@ -35,7 +36,8 @@ from src.schemas.test_schema import (
 from src.services.file_service import PARSE_DEADLINE_S, FileService
 from src.services.grading_service import GradingService
 from src.services.kojo_context_cache import invalidate_folder
-from src.services.llm_service import LLMService
+from src.services.llm_service import GeneratedFRQ, GeneratedMCQ, LLMService
+from src.services.practice_problems import answer_key_text, problem_text
 from src.services.practice_sections import slice_sections
 from src.services.mcq_verification_service import MCQVerificationService, VerifiableMCQ, inflated_mcq_count
 from src.services.quota_service import QuotaService
@@ -109,6 +111,48 @@ def _unreadable_reason(rows: dict, file_ids: list[int]) -> str:
         if row.upload_status == "error":
             return f"{row.file_name}: {row.upload_error or 'it could not be read'}"
     return "your files have no readable text"
+
+
+# Reviewed questions one Create Test may carry (the picker caps a parse at 150
+# problems; each can have several parts).
+_MAX_REVIEWED_QUESTIONS = 400
+
+
+def _reviewed_questions_from_form(
+    raw: object,
+) -> Optional[tuple[list[GeneratedMCQ], list[GeneratedFRQ]]]:
+    """The questions the student checked in the practice-test review step.
+
+    JSON list of {kind, question_text, options, correct_index, expected_answer,
+    answer_inferred}. None when absent; a malformed entry is a 400.
+    """
+    if raw is None or not str(raw).strip():
+        return None
+    try:
+        items = json.loads(str(raw))
+    except ValueError as exc:
+        raise StudyAppException("practice_questions must be JSON") from exc
+    if not isinstance(items, list) or not items or len(items) > _MAX_REVIEWED_QUESTIONS:
+        raise StudyAppException(f"Send between 1 and {_MAX_REVIEWED_QUESTIONS} checked questions")
+    mcq: list[GeneratedMCQ] = []
+    frq: list[GeneratedFRQ] = []
+    for item in items:
+        if not isinstance(item, dict):
+            raise StudyAppException("Each checked question must be an object")
+        text = str(item.get("question_text") or "").strip()[:8_000]
+        inferred = bool(item.get("answer_inferred"))
+        if not text:
+            raise StudyAppException("A checked question has no text")
+        if item.get("kind") == "mcq":
+            options = [str(o).strip()[:1_000] for o in item.get("options") or []]
+            index = item.get("correct_index")
+            if not 2 <= len(options) <= 6 or not all(options) or not isinstance(index, int) or not 0 <= index < len(options):
+                raise StudyAppException("A checked multiple choice question needs 2-6 options and a correct one")
+            mcq.append(GeneratedMCQ(text, options, index, inferred))
+        else:
+            answer = str(item.get("expected_answer") or "").strip()[:8_000]
+            frq.append(GeneratedFRQ(text, answer or "(no answer given)", inferred or not answer))
+    return mcq, frq
 
 
 async def _settle_test_quota(quota_charge_id: Optional[int], test_id: int, generated: int) -> None:
@@ -350,6 +394,7 @@ async def _generate_questions_background(
     quota_charge_id: Optional[int] = None,
     practice_test_mode: Optional[str] = None,
     practice_solve_context: str = "",
+    reviewed_questions: Optional[tuple[list[GeneratedMCQ], list[GeneratedFRQ]]] = None,
 ) -> None:
     """Run LLM generation and save questions; called as a FastAPI background task.
 
@@ -384,6 +429,18 @@ async def _generate_questions_background(
     async def run_generation(
         c_mcq: int, c_frq: int, prior: Optional[list[str]], on_question=None
     ):
+        if reviewed_questions is not None:
+            # The student already picked and checked these in the review step
+            # (GH #138), where answers the document lacks were already worked
+            # out. Saved as approved: no parse, no second solve.
+            r_mcq, r_frq = reviewed_questions
+            r_mcq = r_mcq if test_type != "FRQ_only" else []
+            r_frq = r_frq if test_type not in ("MCQ_only", "Extreme") else []
+            if not r_mcq and not r_frq:
+                raise StudyAppException(
+                    "None of the questions you checked fit this test type. Try Mixed instead."
+                )
+            return r_mcq, r_frq
         if practice_test_content and practice_test_mode == "style":
             # One new question per original; the counts do not apply.
             return await llm.generate_parallel_practice_test(
@@ -453,8 +510,10 @@ async def _generate_questions_background(
         # Both practice-test paths are single-phase: their size comes from the
         # document, not the counts. Only a recreated test skips MCQ verification
         # (its answer key is the student's own document).
-        is_parse_only = bool(practice_test_content) and practice_test_mode == "recreate"
-        streaming = not practice_test_content and total_main > _FIRST_BATCH_SIZE
+        is_parse_only = (
+            bool(practice_test_content) and practice_test_mode == "recreate"
+        ) or reviewed_questions is not None
+        streaming = not practice_test_content and reviewed_questions is None and total_main > _FIRST_BATCH_SIZE
         generated_mcq = 0
 
         display_order = 1
@@ -660,6 +719,8 @@ async def _extract_and_generate_background(
     practice_test_file_id: Optional[int] = None,
     practice_test_only: bool = False,
     practice_test_sections: Optional[list[int]] = None,
+    practice_test_ranges: Optional[list[tuple[int, int]]] = None,
+    reviewed_questions: Optional[tuple[list[GeneratedMCQ], list[GeneratedFRQ]]] = None,
 ) -> None:
     """Extract uploaded files, persist notes, then run generation.
 
@@ -712,13 +773,29 @@ async def _extract_and_generate_background(
         # Short-lived session: folder-file read + note writes only, then released.
         async with async_session_maker() as session:
             pt_name: Optional[str] = None
+            # The picker's problem ranges are offsets into the stored text, unstripped.
+            pt_raw = ""
             if practice_test_file_id is not None:
                 pt_row = await session.get(FolderFile, practice_test_file_id)
-                practice_test_content = (pt_row.content or "").strip() if pt_row else ""
+                pt_raw = (pt_row.content or "") if pt_row else ""
+                practice_test_content = pt_raw.strip()
                 pt_name = rows[practice_test_file_id].file_name
                 if not practice_test_content:
                     raise StudyAppException(f"{pt_name} has no readable text")
-            if practice_test_content and practice_test_sections:
+            if pt_raw and practice_test_ranges:
+                # Only the problems the student picked (GH #138), plus the
+                # answer key. Stored as the test's note, so regenerate reads
+                # the same problems.
+                whole = pt_raw
+                parts = [
+                    problem_text(whole, start, end)
+                    for start, end in practice_test_ranges
+                    if 0 <= start < end <= len(whole)
+                ]
+                key = answer_key_text(whole)
+                if parts:
+                    practice_test_content = "\n\n".join(parts + ([key] if key else []))
+            elif practice_test_content and practice_test_sections:
                 # Only the sections the student picked (GH #133). Stored as the
                 # test's note too, so regenerate uses the same slice.
                 practice_test_content = slice_sections(practice_test_content, practice_test_sections)
@@ -827,6 +904,7 @@ async def _extract_and_generate_background(
         quota_charge_id=quota_charge_id,
         practice_test_mode="recreate" if practice_test_only else "style",
         practice_solve_context=solve_context,
+        reviewed_questions=reviewed_questions,
     )
 
 
@@ -881,6 +959,18 @@ async def create_test(
             ]
         except ValueError as exc:
             raise StudyAppException("practice_test_sections must be numbers") from exc
+        try:
+            practice_test_ranges = [
+                (int(a), int(b))
+                for a, b in (
+                    part.split("-", 1)
+                    for part in str(form.get("practice_test_ranges") or "").split(",")
+                    if part.strip()
+                )
+            ]
+        except ValueError as exc:
+            raise StudyAppException("practice_test_ranges must look like 120-480,480-900") from exc
+        reviewed_questions = _reviewed_questions_from_form(form.get("practice_questions"))
 
         try:
             count_mcq = max(0, min(50, int(str(form.get("count_mcq", "10")))))
@@ -1049,6 +1139,8 @@ async def create_test(
                 practice_test_file_id=practice_test_file_id,
                 practice_test_only=practice_test_only,
                 practice_test_sections=practice_test_sections or None,
+                practice_test_ranges=practice_test_ranges or None,
+                reviewed_questions=reviewed_questions if practice_test_only else None,
             )
         )
         handed_off = True

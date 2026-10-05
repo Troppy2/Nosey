@@ -588,6 +588,10 @@ export async function createTest(input: {
   practiceTestMode?: "recreate" | "style";
   // Section indices from fetchPracticeSections; omitted means the whole document.
   practiceTestSections?: number[];
+  // Picked problems as [start, end] offsets from fetchPracticeProblems (GH #138).
+  practiceTestRanges?: [number, number][];
+  // Questions the student checked in the review step; skips the server parse.
+  practiceQuestions?: DraftQuestion[];
   countMcq?: number;
   countFrq?: number;
   countTf?: number;
@@ -638,6 +642,12 @@ export async function createTest(input: {
   if (input.practiceTestMode) formData.append("practice_test_mode", input.practiceTestMode);
   if (input.practiceTestSections?.length) {
     formData.append("practice_test_sections", input.practiceTestSections.join(","));
+  }
+  if (input.practiceTestRanges?.length) {
+    formData.append("practice_test_ranges", input.practiceTestRanges.map(([a, b]) => `${a}-${b}`).join(","));
+  }
+  if (input.practiceQuestions?.length) {
+    formData.append("practice_questions", JSON.stringify(input.practiceQuestions));
   }
 
   try {
@@ -1507,6 +1517,75 @@ export interface PracticeSection {
 // when the document has fewer than two; the whole document is used then.
 export async function fetchPracticeSections(folderId: number, fileId: number): Promise<PracticeSection[]> {
   return request<PracticeSection[]>(`/folders/${folderId}/files/${fileId}/sections`);
+}
+
+export interface PracticeProblem {
+  index: number;
+  label: string;
+  title: string;
+  chapter: string | null;
+  preview: string;
+  part_count: number;
+  start: number;
+  end: number;
+}
+
+export interface PracticeProblems {
+  // headings: found by text rules. ai: the AI index pass. none: nothing to pick.
+  source: "headings" | "ai" | "none";
+  problems: PracticeProblem[];
+}
+
+// A question read from a practice test, not saved until Create Test.
+export interface DraftQuestion {
+  kind: "mcq" | "frq";
+  question_text: string;
+  options?: string[] | null;
+  correct_index?: number | null;
+  expected_answer?: string | null;
+  answer_inferred: boolean;
+}
+
+export interface ParsedProblem {
+  index: number;
+  source_text: string;
+  questions: DraftQuestion[];
+  error: string | null;
+}
+
+// The problems of an uploaded practice test, for the Create Test picker (GH #138).
+export async function fetchPracticeProblems(folderId: number, fileId: number): Promise<PracticeProblems> {
+  return request<PracticeProblems>(`/folders/${folderId}/files/${fileId}/problems`);
+}
+
+// Reads only the picked problems into draft questions for the review step.
+export async function parsePracticeProblems(
+  folderId: number,
+  fileId: number,
+  problems: PracticeProblem[],
+): Promise<ParsedProblem[]> {
+  const result = await request<{ problems: ParsedProblem[] }>(`/folders/${folderId}/files/${fileId}/problems/parse`, {
+    method: "POST",
+    body: JSON.stringify({
+      problems: problems.map((p) => ({ index: p.index, label: p.label, start: p.start, end: p.end })),
+    }),
+  });
+  return result.problems;
+}
+
+// Redoes one problem from an instruction or the pasted problem text.
+export async function fixPracticeProblem(
+  folderId: number,
+  fileId: number,
+  problem: PracticeProblem,
+  current: DraftQuestion[],
+  message: string,
+): Promise<DraftQuestion[]> {
+  const result = await request<{ questions: DraftQuestion[] }>(`/folders/${folderId}/files/${fileId}/problems/fix`, {
+    method: "POST",
+    body: JSON.stringify({ start: problem.start, end: problem.end, current, message }),
+  });
+  return result.questions;
 }
 
 export async function addFolderTextNote(
