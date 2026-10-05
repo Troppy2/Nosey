@@ -5,6 +5,7 @@ import React, { useState } from "react";
 
 import { repairMathDelimiters } from "../lib/repairMathDelimiters";
 import { VisualBlock, VisualPending, isVisualLang } from "./visuals/VisualBlock";
+import { replaceTikz } from "../lib/tikz";
 
 // ── KaTeX ─────────────────────────────────────────────────────────────────────
 
@@ -408,8 +409,9 @@ function CodeBlock({ lang, src, enableCopy }: { lang: string; src: string; enabl
 // ── Block parser ──────────────────────────────────────────────────────────────
 
 export function MarkdownContent({ content, enableCodeCopy = false }: { content: string; enableCodeCopy?: boolean }) {
-  // Step 0: reflow malformed code fences onto their own lines
-  const fenced = normalizeFences(content);
+  // Step 0: reflow malformed code fences onto their own lines, and swap any
+  // TikZ picture (which KaTeX cannot draw) for a short note (GH #156)
+  const fenced = replaceTikz(normalizeFences(content));
   // Step 1: restore LaTeX environments that were deleted before storage. Every
   // surface renders through this component, so content damaged by the old
   // normalize_latex comes back correctly wherever it appears, with no per-page
