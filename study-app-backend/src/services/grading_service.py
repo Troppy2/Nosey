@@ -1052,12 +1052,15 @@ class GradingService:
         answers: list[DraftAttemptAnswer],
         session: AsyncSession,
     ) -> DraftAttemptResponse:
-        """Save or update draft attempt with current answers."""
-        test = await TestRepository(session).get_owned_with_questions(test_id, user_id)
-        if test is None:
+        """Save the draft answers that changed since the last autosave.
+
+        Kept lean, it runs every second or so while a student works (GH #137):
+        one ownership query, the draft row lock, one upsert.
+        """
+        question_ids = await TestRepository(session).owned_question_ids(test_id, user_id)
+        if question_ids is None:
             raise ResourceNotFoundException("Test")
 
-        question_ids = {question.id for question in test.questions}
         for answer in answers:
             if answer.question_id not in question_ids:
                 raise ValidationException(f"Question {answer.question_id} does not belong to this test")
@@ -1066,7 +1069,7 @@ class GradingService:
         repo = AttemptRepository(session)
         attempt = await repo.get_or_create_draft(user_id, test_id)
         # Scratch-pad strokes are only ever written here (STEM Scratch Pad).
-        await repo.sync_draft_answers(
+        await repo.upsert_draft_answers(
             attempt.id,
             {answer.question_id: (answer.user_answer, answer.work_strokes) for answer in answers},
         )

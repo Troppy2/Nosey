@@ -93,6 +93,24 @@ class TestRepository(BaseRepository[Test]):
         )
         return await self.session.scalar(stmt)
 
+    async def owned_question_ids(self, test_id: int, user_id: int) -> Optional[set[int]]:
+        """Question ids of a test the user owns, or None if it is not theirs.
+
+        One query with no relationship loading, for hot paths like draft
+        autosave that only need to validate ids (GH #137).
+        """
+        rows = await self.session.execute(
+            select(Question.id)
+            .select_from(Test)
+            .join(Folder, Folder.id == Test.folder_id)
+            .outerjoin(Question, Question.test_id == Test.id)
+            .where(Test.id == test_id, Folder.user_id == user_id)
+        )
+        found = rows.all()
+        if not found:
+            return None
+        return {question_id for (question_id,) in found if question_id is not None}
+
     async def get_owned_with_questions(self, test_id: int, user_id: int) -> Optional[Test]:
         stmt = (
             select(Test)

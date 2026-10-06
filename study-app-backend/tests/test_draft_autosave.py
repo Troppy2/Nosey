@@ -1,8 +1,8 @@
 """Draft autosave race fixes (GH #137).
 
 SQLite cannot reproduce two Postgres transactions racing on a row lock, so
-these pin the pieces the fix relies on: answers sync in place (no
-delete-then-insert), and a draft-creation conflict falls back to the
+these pin the pieces the fix relies on: answers upsert in place (no
+delete-then-insert, unsent answers untouched), and a draft-creation conflict falls back to the
 existing draft instead of a 500.
 """
 from __future__ import annotations
@@ -41,12 +41,16 @@ async def _seed(session):
 
 
 async def _answers(session, attempt_id):
-    rows = await session.scalars(select(UserAnswer).where(UserAnswer.attempt_id == attempt_id))
+    rows = await session.scalars(
+        select(UserAnswer)
+        .where(UserAnswer.attempt_id == attempt_id)
+        .execution_options(populate_existing=True)
+    )
     return {row.question_id: row for row in rows.all()}
 
 
 @pytest.mark.asyncio
-async def test_repeated_saves_update_in_place(db_session_maker):
+async def test_saves_upsert_only_sent_answers(db_session_maker):
     async with db_session_maker() as session:
         user, test, (q1, q2, q3) = await _seed(session)
         service = GradingService()
@@ -68,7 +72,9 @@ async def test_repeated_saves_update_in_place(db_session_maker):
         after = await _answers(session, second.attempt_id)
 
     assert second.attempt_id == first.attempt_id
-    assert set(after) == {q1, q3}
+    # Patch semantics: q2 was not resent, so it is untouched.
+    assert set(after) == {q1, q2, q3}
+    assert after[q2].work_strokes == "S"
     assert after[q1].user_answer == "a2"
     # Updated in place, not deleted and re-inserted.
     assert after[q1].id == before[q1].id
@@ -112,3 +118,15 @@ async def test_submitted_attempt_does_not_collide_with_draft(db_session_maker):
         # overlapping autosave committed cannot block the submission.
         await repo.create(user.id, test.id, 2, status="submitted")
         await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_save_rejects_unowned_test(db_session_maker):
+    from src.utils.exceptions import ResourceNotFoundException
+
+    async with db_session_maker() as session:
+        user, test, (q1, _, _) = await _seed(session)
+        with pytest.raises(ResourceNotFoundException):
+            await GradingService().save_draft_attempt(
+                test.id, user.id + 999, [DraftAttemptAnswer(question_id=q1, user_answer="x")], session
+            )

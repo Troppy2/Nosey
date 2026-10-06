@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from sqlalchemy import Select, case, delete, func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import defer, selectinload
 
@@ -195,39 +197,40 @@ class AttemptRepository(BaseRepository[UserAttempt]):
                 raise
             return existing
 
-    async def sync_draft_answers(
+    async def upsert_draft_answers(
         self, attempt_id: int, answers: dict[int, tuple[str, Optional[str]]]
     ) -> None:
-        """Make the draft's answers match ``answers`` (question_id -> (text, strokes)).
+        """Insert or update the given draft answers (question_id -> (text, strokes)).
 
-        Updates rows in place, inserts new ones, deletes dropped ones. Rows that
-        did not change are not rewritten, so a save after one edit no longer
-        rewrites every answer's stroke JSON. Caller must hold the draft lock.
+        One statement, no read: autosave sends only the questions that changed
+        since its last save, and stroke JSON is never pulled back to compare.
+        Answers not in ``answers`` are left alone. Caller holds the draft lock.
         """
-        rows = await self.session.scalars(select(UserAnswer).where(UserAnswer.attempt_id == attempt_id))
-        existing = {row.question_id: row for row in rows.all()}
-        for question_id, row in existing.items():
-            if question_id not in answers:
-                await self.session.delete(row)
-        for question_id, (user_answer, work_strokes) in answers.items():
-            row = existing.get(question_id)
-            if row is None:
-                self.session.add(
-                    UserAnswer(
-                        attempt_id=attempt_id,
-                        question_id=question_id,
-                        user_answer=user_answer,
-                        flagged_uncertain=False,
-                        # Scratch-pad strokes (STEM Scratch Pad feature).
-                        work_strokes=work_strokes,
-                    )
-                )
-            else:
-                if row.user_answer != user_answer:
-                    row.user_answer = user_answer
-                if row.work_strokes != work_strokes:
-                    row.work_strokes = work_strokes
-        await self.session.flush()
+        if not answers:
+            return
+        dialect = self.session.bind.dialect.name if self.session.bind is not None else ""
+        insert = sqlite_insert if dialect == "sqlite" else pg_insert
+        stmt = insert(UserAnswer).values(
+            [
+                {
+                    "attempt_id": attempt_id,
+                    "question_id": question_id,
+                    "user_answer": user_answer,
+                    "flagged_uncertain": False,
+                    # Scratch-pad strokes (STEM Scratch Pad feature).
+                    "work_strokes": work_strokes,
+                }
+                for question_id, (user_answer, work_strokes) in answers.items()
+            ]
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[UserAnswer.attempt_id, UserAnswer.question_id],
+            set_={
+                "user_answer": stmt.excluded.user_answer,
+                "work_strokes": stmt.excluded.work_strokes,
+            },
+        )
+        await self.session.execute(stmt)
 
     async def get_draft(self, user_id: int, test_id: int) -> Optional[UserAttempt]:
         """Get the draft/in-progress attempt for a test."""

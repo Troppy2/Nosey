@@ -317,7 +317,24 @@ export default function TakeTest() {
   buildDraftRef.current = buildDraftAnswers;
   const saveInFlightRef = useRef<Promise<void> | null>(null);
   const saveQueuedRef = useRef(false);
-  const lastSavedRef = useRef("");
+  // Per question, what the server last confirmed. Saves send only the
+  // questions that differ, so a keystroke saves one answer, not every
+  // answer plus every stroke set.
+  const lastSavedRef = useRef<Record<number, string>>({});
+
+  function unsavedDraftAnswers(): DraftAttemptAnswer[] {
+    const current = buildDraftRef.current();
+    const present = new Set(current.map((answer) => answer.question_id));
+    // A saved answer that vanished (draw-only, strokes erased) is sent as
+    // blank, or the server would keep the old strokes.
+    const cleared = Object.keys(lastSavedRef.current)
+      .map(Number)
+      .filter((qid) => !present.has(qid))
+      .map((qid): DraftAttemptAnswer => ({ question_id: qid, user_answer: "" }));
+    return [...current, ...cleared].filter(
+      (answer) => lastSavedRef.current[answer.question_id] !== JSON.stringify(answer),
+    );
+  }
   const submittingRef = useRef(false);
   const autosaveTimerRef = useRef<number | undefined>(undefined);
   const [draftSaveFailed, setDraftSaveFailed] = useState(false);
@@ -347,11 +364,12 @@ export default function TakeTest() {
       do {
         saveQueuedRef.current = false;
         if (submittingRef.current) return;
-        const draftAnswers = buildDraftRef.current();
-        const serialized = JSON.stringify(draftAnswers);
-        if (draftAnswers.length === 0 || serialized === lastSavedRef.current) continue;
+        const draftAnswers = unsavedDraftAnswers();
+        if (draftAnswers.length === 0) continue;
         const ok = await saveDraftWithRetry(draftAnswers);
-        if (ok) lastSavedRef.current = serialized;
+        if (ok) {
+          for (const answer of draftAnswers) lastSavedRef.current[answer.question_id] = JSON.stringify(answer);
+        }
         setDraftSaveFailed(!ok);
       } while (saveQueuedRef.current);
     };
@@ -373,8 +391,8 @@ export default function TakeTest() {
   useEffect(() => {
     function saveOnExit() {
       if (submittingRef.current) return;
-      const draftAnswers = buildDraftRef.current();
-      if (draftAnswers.length === 0 || JSON.stringify(draftAnswers) === lastSavedRef.current) return;
+      const draftAnswers = unsavedDraftAnswers();
+      if (draftAnswers.length === 0) return;
       saveDraftAttemptOnExit(numericTestId, draftAnswers);
     }
     window.addEventListener("beforeunload", saveOnExit);
