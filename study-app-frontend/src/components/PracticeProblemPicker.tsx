@@ -276,6 +276,7 @@ export function PracticeProblemPicker({ folderId, fileId, problems, mode, initia
                           <span className="pp-row-title">
                             <strong>{p.label}</strong> {p.title}
                             {p.part_count > 1 ? <span className="muted small"> · {p.part_count} parts</span> : null}
+                            {p.similar_to ? <span className="muted small"> · same pattern as {p.similar_to}</span> : null}
                           </span>
                           <span className="pp-row-preview">{p.preview}</span>
                         </span>

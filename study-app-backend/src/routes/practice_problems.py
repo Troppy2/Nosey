@@ -24,13 +24,21 @@ from src.models.user import User
 from src.routes.folder_files import _get_owned_folder
 from src.services.file_service import FileService
 from src.services.llm_service import GeneratedFRQ, GeneratedMCQ, LLMService
-from src.services.practice_problems import answer_key_text, problem_text, problems_from_starts, split_problems
+from src.services.practice_problems import (
+    answer_key_text,
+    mark_lookalikes,
+    problem_text,
+    problems_from_starts,
+    split_problems,
+)
 from src.utils.exceptions import LLMException
 from src.utils.logger import get_logger
 from src.utils.provider_policy import resolve_request_provider
 from src.utils.usage_context import bind_usage
 
 logger = get_logger(__name__)
+# Below this many problems the picker is short enough without sections.
+_MIN_PROBLEMS_FOR_TOPICS = 8
 
 router = APIRouter(prefix="/folders", tags=["practice-problems"])
 
@@ -69,6 +77,7 @@ class PracticeProblemResponse(BaseModel):
     part_count: int
     start: int
     end: int
+    similar_to: Optional[str] = None
 
 
 class PracticeProblemsResponse(BaseModel):
@@ -111,6 +120,15 @@ async def get_practice_problems(
         problems = [p for p in problems_from_starts(content, starts) if p.preview]
         problems = [replace(p, index=i) for i, p in enumerate(problems)]
         source = "ai"
+    # A long sheet with no chapters of its own gets topic sections (GH #165):
+    # one small call, and the flat list if it fails.
+    if len(problems) >= _MIN_PROBLEMS_FOR_TOPICS and not any(p.chapter for p in problems):
+        bind_usage(user.id, "practice_topics")
+        problems = await LLMService().group_practice_topics(
+            problems, content, provider=resolve_request_provider(user, None)
+        )
+    else:
+        problems = mark_lookalikes(problems, content)
     return PracticeProblemsResponse(
         source=source if problems else "none",
         problems=[PracticeProblemResponse(**asdict(p)) for p in problems],

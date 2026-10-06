@@ -552,6 +552,9 @@ _PRACTICE_PROBLEM_MAX = 150
 # this much text per call and returns where each problem starts.
 _PRACTICE_INDEX_CHUNK_CHARS = 16_000
 _PRACTICE_INDEX_MAX_CHUNKS = 8
+_PRACTICE_INDEX_OVERLAP_CHARS = 1_500
+# Topic grouping (GH #165) reads this much of each problem.
+_PRACTICE_TOPIC_PREVIEW_CHARS = 200
 _NO_PRACTICE_QUESTIONS_MESSAGE = (
     "No questions were found in that practice test. If it is a scanned PDF, its text can't be read yet."
 )
@@ -1951,6 +1954,55 @@ class LLMService:
             raise LLMException("Nosey couldn't redo that problem. Try rewording your fix.")
         return mcq, frq
 
+    async def group_practice_topics(self, problems: list, text: str, provider: Optional[str] = None) -> list:
+        """Sort a practice sheet's problems into named topic sections (GH #165).
+
+        One small call over each problem's opening words; the picker shows the
+        topics as sections. Problems the reply leaves out go under "Other".
+        Any failure returns the list unchanged (flat picker), never an error.
+        """
+        from src.services.practice_problems import mark_lookalikes
+
+        listing = "\n".join(
+            f"{p.label}: {' '.join(text[p.start:p.end].split())[:_PRACTICE_TOPIC_PREVIEW_CHARS]}" for p in problems
+        )
+        prompt = (
+            "Group these practice problems by the skill or pattern each one practises, so a student can "
+            "pick a few of each kind. Use 3 to 10 topics with short, plain names (2 to 4 words, e.g. "
+            "\"Map over a list\", \"Filter then map\", \"Fold with a base value\"). Every problem goes in "
+            "exactly one topic. Order the topics from simplest to hardest.\n\n"
+            f"PROBLEMS:\n{listing}\n\n"
+            'Return JSON only: {"topics": [{"name": "...", "problems": ["Q1", "Q4"]}]}\n'
+        )
+        try:
+            data = await asyncio.wait_for(self._complete_json(prompt, provider=provider), _PRACTICE_CHUNK_TIMEOUT_S)
+        except Exception as exc:
+            logger.warning("group_practice_topics failed; keeping the flat list: %s", exc)
+            return problems
+        by_label = {p.label: p for p in problems}
+        topic_of: dict[str, str] = {}
+        order: list[str] = []
+        for topic in data.get("topics") or []:
+            if not isinstance(topic, dict):
+                continue
+            name = " ".join(str(topic.get("name") or "").split())[:40]
+            members = [str(m) for m in topic.get("problems") or [] if str(m) in by_label and str(m) not in topic_of]
+            if not name or not members:
+                continue
+            if name not in order:
+                order.append(name)
+            for label in members:
+                topic_of[label] = name
+        if len(order) < 2:
+            return problems
+        if len(topic_of) < len(problems):
+            order.append("Other")
+        grouped = sorted(
+            (replace(p, chapter=topic_of.get(p.label, "Other")) for p in problems),
+            key=lambda p: (order.index(p.chapter), p.start),
+        )
+        return mark_lookalikes(grouped, text)
+
     async def index_practice_problems(
         self, text: str, provider: Optional[str] = None
     ) -> list[tuple[int, str, str]]:
@@ -1960,9 +2012,13 @@ class LLMService:
         no answers, so it is a small reply. The first words are found in the
         text to get offsets; one the model misquoted is dropped.
         """
+        # Chunks overlap so a problem straddling a boundary is seen whole in
+        # one of them; a start found twice is the same offset and dedupes in
+        # problems_from_starts (GH #165).
+        step = _PRACTICE_INDEX_CHUNK_CHARS - _PRACTICE_INDEX_OVERLAP_CHARS
         chunks = [
             (start, text[start:start + _PRACTICE_INDEX_CHUNK_CHARS])
-            for start in range(0, len(text), _PRACTICE_INDEX_CHUNK_CHARS)
+            for start in range(0, len(text), step)
         ][:_PRACTICE_INDEX_MAX_CHUNKS]
         gate = asyncio.Semaphore(_PRACTICE_CHUNK_CONCURRENCY)
 
