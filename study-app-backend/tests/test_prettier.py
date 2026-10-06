@@ -18,6 +18,29 @@ def test_layout_change_keeps_the_words() -> None:
     assert prettier_words_preserved("Compute the integral of x from 0 to 1", "Compute $\\int_0^1 x\\,dx$") is False
 
 
+def test_restructuring_a_real_quiz_card_is_allowed() -> None:
+    old = (
+        "Write a function named first_letters that applies a function named first_letter of type string -> char "
+        "to each element of an input list containing values of type string. The function first_letter returns the "
+        "first character in a string and the character '!' if the string is empty.. You do not need to write "
+        "first_letter; you may assume that it exists. The function first_letters should produce a list of values "
+        "of type char resulting from the application of first_letter.\n\n"
+        "The function first_letters should have the type string list -> char list."
+    )
+    new = (
+        "Write a function named `first_letters` that applies a function named `first_letter` of type "
+        "`string -> char` to each element of an input list containing values of type `string`.\n\n"
+        "`first_letter` returns the first character in a string, and the character `'!'` if the string is empty. "
+        "You do not need to write `first_letter`; you may assume that it exists.\n\n"
+        "**Input:** a list of values of type `string`\n\n"
+        "**Output:** a list of values of type `char` resulting from the application of `first_letter`\n\n"
+        "**Type:** `first_letters : string list -> char list`"
+    )
+    assert prettier_words_preserved(old, new)
+    # Swapping a type is a content change, not formatting.
+    assert not prettier_words_preserved(old, new.replace("char list", "string list").replace("`char`", "`int`"))
+
+
 def test_reworded_or_changed_numbers_are_rejected() -> None:
     assert not prettier_words_preserved(RAW, PRETTY.replace("10 2", "12 3").replace("Some 5", "Some 4"))
     assert not prettier_words_preserved("Find the mean of 2, 4, 6.", "Calculate the average value of the numbers given below, which are 2, 4 and 6, and explain.")

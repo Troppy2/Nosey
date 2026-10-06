@@ -729,17 +729,26 @@ _PRETTIER_BATCH = 8
 _PRETTIER_CONCURRENCY = 3
 # The new text must keep this share of the original's words, and add at most
 # this share of new ones (headings like Input/Output/Example): format only.
-_PRETTIER_MIN_KEPT = 0.9
+_PRETTIER_MIN_KEPT = 0.95
 _PRETTIER_MAX_ADDED = 0.35
-_PRETTIER_WORD_RE = re.compile(r"[A-Za-z0-9]+")
+_PRETTIER_WORD_RE = re.compile(r"[A-Za-z0-9_]+")
+# Filler a layout pass may legitimately drop or add ("The function X should
+# have the type ..." becoming "**Type:** ..."). Names, types, numbers and
+# every other content word must survive.
+_PRETTIER_FILLER = frozenset(
+    "a an the of to and or in on for with that this it is are be as by from at its "
+    "function should have has type types produce produces resulting value values "
+    "input output format example examples returns return named".split()
+)
 
 
 def prettier_words_preserved(old: str, new: str) -> bool:
-    """True when `new` says what `old` said: Markdown, LaTeX and backticks may
-    change, the words and numbers may not (much)."""
+    """True when `new` says what `old` said: Markdown, LaTeX, backticks and
+    filler words may change, names, numbers and content words may not."""
     def words(text: str) -> list[str]:
         # LaTeX command names (\frac, \int) are formatting, not words.
-        return [w.lower() for w in _PRETTIER_WORD_RE.findall(re.sub(r"\\[A-Za-z]+", " ", text))]
+        found = _PRETTIER_WORD_RE.findall(re.sub(r"\\[A-Za-z]+", " ", text))
+        return [w.lower() for w in found if w.lower() not in _PRETTIER_FILLER]
 
     old_words, new_words = words(old), words(new)
     if not old_words:
