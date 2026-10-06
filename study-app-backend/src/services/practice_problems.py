@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Optional, Sequence
 
 from src.services.practice_sections import _answer_key_start
@@ -60,6 +60,9 @@ class PracticeProblem:
     part_count: int
     start: int
     end: int
+    # Label of an earlier problem in the same section with nearly the same
+    # wording (GH #165), so the picker can say "same pattern as Q3".
+    similar_to: Optional[str] = None
 
 
 def _lines_with_offsets(text: str) -> list[tuple[int, str]]:
@@ -182,11 +185,72 @@ def problems_from_starts(text: str, starts: Sequence[tuple[int, str, str]]) -> l
     return problems
 
 
+# A heading-less sheet often starts every problem with the same words
+# ("Write a function named ...", "Find the ...", GH #165).
+_OPENER_WORDS = 3
+_MIN_OPENER_HITS = 4
+_WORD_RE = re.compile(r"[a-z][a-z0-9']*")
+
+
+def _opener(line: str) -> Optional[str]:
+    words = _WORD_RE.findall(line.lower())
+    return " ".join(words[:_OPENER_WORDS]) if len(words) >= _OPENER_WORDS + 2 else None
+
+
+def _opener_heads(lines: Sequence[tuple[int, str]], key_start: int) -> list[tuple[int, str, str]]:
+    """Starts for a sheet with no headings: every line beginning with the most
+    repeated 3-word opener. Lines in between belong to the problem above, and
+    anything before the first one (instructions) is not a problem."""
+    usable = [(o, line) for o, line in lines if o < key_start and line.strip()]
+    counts = Counter(op for _, line in usable if (op := _opener(line)))
+    if not counts:
+        return []
+    opener, hits = counts.most_common(1)[0]
+    if hits < _MIN_OPENER_HITS:
+        return []
+    return [
+        (o, f"Q{n}", line.strip())
+        for n, (o, line) in enumerate(((o, line) for o, line in usable if _opener(line) == opener), start=1)
+    ]
+
+
+def _pattern_words(text: str) -> set[str]:
+    """The task sentence of a problem with its own names removed (decs,
+    dec_positive), so two problems that differ only in which functions they
+    use compare equal. Later sentences describe the helpers and differ by
+    design, so only the first counts."""
+    first = re.split(r"(?<=[.?!])\s", " ".join(text.split()), maxsplit=1)[0].lower()
+    words = _WORD_RE.findall(first)
+    named = {words[i + 1] for i, w in enumerate(words[:-1]) if w in ("named", "function", "called")}
+    return {w for w in words if "_" not in w and w not in named and len(w) > 2}
+
+
+def mark_lookalikes(problems: Sequence[PracticeProblem], text: str, threshold: float = 0.8) -> list[PracticeProblem]:
+    """Point each problem at the first earlier one in its section with nearly
+    the same wording (GH #165): a student can practise one per pattern."""
+    words = [_pattern_words(text[p.start:p.end]) for p in problems]
+    out: list[PracticeProblem] = []
+    for i, p in enumerate(problems):
+        similar = None
+        for j in range(i):
+            if problems[j].chapter != p.chapter or out[j].similar_to:
+                continue
+            union = words[i] | words[j]
+            if union and len(words[i] & words[j]) / len(union) >= threshold:
+                similar = problems[j].label
+                break
+        out.append(replace(p, similar_to=similar))
+    return out
+
+
 def split_problems(text: str) -> list[PracticeProblem]:
     """The document's problems in order, or [] when it has no clear headings."""
     text = text or ""
     lines = _lines_with_offsets(text)
-    heads = _match_heads(lines, _answer_key_start(text))
+    key_start = _answer_key_start(text)
+    heads = _match_heads(lines, key_start)
+    if len(heads) < MIN_PROBLEMS:
+        heads = _opener_heads(lines, key_start)
     problems = problems_from_starts(text, heads)
     # A heading with nothing under it is a table-of-contents or cover line.
     problems = [p for p in problems if p.preview]

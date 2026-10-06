@@ -1561,6 +1561,8 @@ export interface PracticeProblem {
   chapter: string | null;
   preview: string;
   part_count: number;
+  // An earlier problem in the same section with nearly the same wording (GH #165).
+  similar_to?: string | null;
   start: number;
   end: number;
 }
