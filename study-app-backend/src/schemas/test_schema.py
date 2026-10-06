@@ -66,6 +66,14 @@ class QuestionCreate(BaseModel):
     expected_answer: Optional[str] = None
 
 
+class PrettierProposal(BaseModel):
+    """One reformatted question from the editor's Prettier pass; not saved."""
+    question_id: int
+    question_text: str
+    options: Optional[list[str]] = None
+    expected_answer: Optional[str] = None
+
+
 class QuestionUpdate(BaseModel):
     question_text: Optional[str] = Field(default=None, min_length=1)
     options: Optional[list[MCQOptionInput]] = None
