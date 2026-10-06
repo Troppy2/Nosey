@@ -23,6 +23,7 @@ import {
   fetchAttemptDetail,
   fetchFolder,
   fetchReviewSummary,
+  fetchTest,
   isGuestSession,
   redoAnswer,
   scopeKey,
@@ -56,6 +57,9 @@ export default function Results() {
   const [targetedCountMcq, setTargetedCountMcq] = useState(5);
   const [targetedCountFrq, setTargetedCountFrq] = useState(3);
   const [targetedDifficulty, setTargetedDifficulty] = useState("mixed");
+  // Math/coding mode for the targeted test; defaults to the original test's.
+  const [targetedMode, setTargetedMode] = useState<"general" | "math" | "coding">("general");
+  const [targetedLanguage, setTargetedLanguage] = useState("Python");
   const [isCreatingTargeted, setIsCreatingTargeted] = useState(false);
   const [targetedError, setTargetedError] = useState<string | null>(null);
   const [reviewSummary, setReviewSummary] = useState<string | null>(null);
@@ -194,7 +198,10 @@ export default function Results() {
         .join("; ");
       await createTest({
         folderId: attempt.folder_id,
-        title: targetedTitle || `Targeted Practice—${attempt.test_title}`,
+        title: targetedTitle || `Targeted Practice, ${attempt.test_title}`,
+        isMathMode: targetedMode === "math",
+        isCodingMode: targetedMode === "coding",
+        codingLanguage: targetedMode === "coding" ? targetedLanguage : undefined,
         testType: targetedTestType,
         files: [],
         countMcq: targetedTestType !== "FRQ_only" ? targetedCountMcq : 0,
@@ -326,6 +333,13 @@ export default function Results() {
                 onClick={() => {
                   setTargetedTitle(`Targeted Practice, ${attempt.test_title}`);
                   setShowTargetedModal(true);
+                  // Start from the original test's mode; the picker can change it.
+                  fetchTest(attempt.test_id)
+                    .then((t) => {
+                      setTargetedMode(t.is_coding_mode ? "coding" : t.is_math_mode ? "math" : "general");
+                      if (t.coding_language) setTargetedLanguage(t.coding_language);
+                    })
+                    .catch(() => undefined);
                 }}
               >
                 Generate Targeted Test
@@ -400,6 +414,26 @@ export default function Results() {
                       <option value="medium">Medium</option>
                       <option value="hard">Hard</option>
                     </SelectInput>
+                    <SelectInput
+                      label="Mode"
+                      value={targetedMode}
+                      onChange={(e) => setTargetedMode(e.target.value as "general" | "math" | "coding")}
+                    >
+                      <option value="general">General</option>
+                      <option value="math">Math</option>
+                      <option value="coding">Coding</option>
+                    </SelectInput>
+                    {targetedMode === "coding" ? (
+                      <SelectInput
+                        label="Language"
+                        value={targetedLanguage}
+                        onChange={(e) => setTargetedLanguage(e.target.value)}
+                      >
+                        {["Python", "JavaScript", "TypeScript", "Java", "C++", "C", "C#", "Go", "Rust", "Swift", "Kotlin", "OCaml", "SQL"].map((lang) => (
+                          <option key={lang} value={lang}>{lang}</option>
+                        ))}
+                      </SelectInput>
+                    ) : null}
                   </div>
                   <div className="targeted-row">
                     {targetedTestType !== "FRQ_only" && (

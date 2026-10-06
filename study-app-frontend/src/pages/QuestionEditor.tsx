@@ -544,7 +544,7 @@ function PrettierReview({
       <div className="prettier-review-head">
         <div>
           <strong>{proposals.length} question{proposals.length === 1 ? "" : "s"} tidied up</strong>
-          <p className="muted small">Formatting only, the wording is unchanged. Apply the ones you like.</p>
+          <p className="muted small">Reworded to be easier to follow. Names, types and values are unchanged. Apply the ones you like.</p>
         </div>
         <div className="button-row">
           <Button variant="secondary" onClick={() => proposals.forEach((p) => onDone(p.question_id))} disabled={busy !== null}>

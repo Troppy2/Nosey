@@ -707,16 +707,20 @@ _AI_SERVICES_UNAVAILABLE_MESSAGE = (
 # How a coding-mode question is laid out. Shared by generation and the
 # editor's Prettier pass so both write problems the same way.
 _CODING_QUESTION_LAYOUT = (
-    "  - question_text is Markdown laid out in separate sections, never one run-on paragraph. "
-    "Use exactly this shape, with a blank line (\\n\\n inside the JSON string) between sections:\n"
-    "      <the task in 1-3 short sentences; wrap identifiers like `safe_div` in backticks>\n"
-    "      **Input:** <what the function or program receives>\n"
-    "      **Output:** <what it returns or prints>\n"
-    "      **Example 1**\n"
-    "      ```\n      <the call or input>\n      ```\n"
-    "      Returns `<result>`, with an optional one-line reason.\n"
-    "      **Example 2** in the same shape.\n"
-    "    Do not start with a \"Problem:\" label, and never put an example inside a sentence.\n"
+    "  - question_text is Markdown in exactly these four sections, in this order, each heading on its own "
+    "line and a blank line (\\n\\n inside the JSON string) between sections:\n"
+    "      **Problem**\n"
+    "      <what to write and what it does, in plain words. Name any helper functions it may use, with their "
+    "types in backticks (`uppercase` of type `string -> string`), and say they already exist>\n\n"
+    "      **Inputs**\n"
+    "      - `name` : `type` - what it is (one bullet per parameter)\n\n"
+    "      **Outputs**\n"
+    "      - `type` - what is returned\n\n"
+    "      **Examples**\n\n"
+    "      1. `the call`\n"
+    "         => `the exact result`\n\n"
+    "      2. ... (2 or 3 examples, one of them an edge case such as an empty list or empty string)\n"
+    "  - Wrap every name, type, call and result in backticks. Never put an example inside a sentence.\n"
 )
 _MATH_QUESTION_LAYOUT = (
     "  - Every piece of math is LaTeX: inline $...$, display $$...$$ on its own line for a long "
@@ -763,21 +767,135 @@ def prettier_words_preserved(old: str, new: str) -> bool:
     return kept / len(old_words) >= _PRETTIER_MIN_KEPT and added / max(len(old_words), 1) <= _PRETTIER_MAX_ADDED
 
 
-def _prettier_proposal(original: dict, item: dict) -> Optional[dict]:
-    """The reformatted fields, or None when nothing changed or the words did
-    not survive (a field that drifted keeps its original)."""
-    def pick(old: Optional[str], new: object) -> Optional[str]:
+# Clarity rewrite of question text and options: the wording may change, the
+# facts may not. Facts are names (snake_case, camelCase, or the word after
+# "named"/"function"/"called"), type signatures (int list -> int list),
+# numbers and short quoted literals. Every fact must survive, and the rewrite
+# may not invent a name or number (so no made-up examples).
+_FACT_NAME_AFTER_RE = re.compile(r"\b(?:named|function|called)\s+([A-Za-z_]\w*)", re.IGNORECASE)
+_FACT_IDENT_RE = re.compile(r"\b[A-Za-z]\w*_\w+\b|\b[a-z]+[A-Z]\w*\b")
+_FACT_TYPE_RE = re.compile(
+    r"\b\w+(?:\s+(?:list|option|array|ref|seq|set))*(?:\s*->\s*\w+(?:\s+(?:list|option|array|ref|seq|set))*)+"
+)
+_FACT_NUMBER_RE = re.compile(r"(?<![\w.])\d+(?:\.\d+)?(?![\w.]?\d)")
+_FACT_QUOTED_RE = re.compile(r"'[^'\s]{1,8}'|\"[^\"]{0,10}\"")
+_LIST_MARKER_RE = re.compile(r"^\s*\d+[.)]\s", re.MULTILINE)
+_NOT_A_NAME = frozenset("that which to of a an the is applies named".split())
+_PRETTIER_MAX_GROWTH = 2.5
+# "decrements by one" -> "by two" is a changed fact too.
+_NUMBER_WORD_RE = re.compile(
+    r"\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|hundred|thousand|twice|half|double|triple)\b",
+    re.IGNORECASE,
+)
+
+
+def _fact_text(text: str) -> str:
+    """Text with Markdown emphasis/backticks dropped and arrows normalized, so
+    `int -> int` and int → int compare equal."""
+    text = text.replace("→", "->").replace("\\to", "->").replace("\\rightarrow", "->")
+    return " ".join(re.sub(r"[`*_]{1,3}(?=\S)|(?<=\S)[`*]{1,3}", "", text).split())
+
+
+def _facts(text: str) -> tuple[set[str], set[str], set[str]]:
+    names = {m.group(1) for m in _FACT_NAME_AFTER_RE.finditer(text) if m.group(1).lower() not in _NOT_A_NAME}
+    names |= set(_FACT_IDENT_RE.findall(text))
+    types = {" ".join(m.group(0).split()).replace(" ->", " ->") for m in _FACT_TYPE_RE.finditer(_fact_text(text))}
+    types = {re.sub(r"\s*->\s*", " -> ", t) for t in types}
+    numbers = set(_FACT_NUMBER_RE.findall(_LIST_MARKER_RE.sub(" ", text)))
+    numbers |= {w.lower() for w in _NUMBER_WORD_RE.findall(text)}
+    return names | set(_FACT_QUOTED_RE.findall(text)), types, numbers
+
+
+_SECTION_HEADING_RE = re.compile(r"^\s*\*\*\s*([A-Za-z][A-Za-z ]*?)\s*(?:\(\d+\))?\s*:?\s*\*\*", re.MULTILINE)
+_TYPE_WORDS = frozenset("int float char string bool list unit option array int64 double long".split())
+_PRETTIER_MAX_GROWTH_CODING = 4.0
+
+
+def _sections(text: str) -> dict[str, str]:
+    """Body text under each bold heading ("**Problem**", "**Inputs:**"),
+    keyed by lowercased heading; text before the first heading is "problem"."""
+    marks = list(_SECTION_HEADING_RE.finditer(text))
+    out = {"problem": text[: marks[0].start()] if marks else text}
+    for i, m in enumerate(marks):
+        end = marks[i + 1].start() if i + 1 < len(marks) else len(text)
+        key = m.group(1).strip().lower().rstrip("s")  # "inputs" / "input" -> "input"
+        out[key] = out.get(key, "") + text[m.end():end]
+    return out
+
+
+def prettier_keeps_facts(old: str, new: str, allow_example: bool = False) -> bool:
+    """True when a clarity rewrite kept every fact of `old` and invented none.
+
+    allow_example is coding mode's Problem / Inputs / Outputs / Examples
+    layout (GH #165 follow-up): the Examples section may bring new values
+    when the original had no examples (a problem needs a test case), the
+    Inputs section may name parameters (`lst`), and a function type may be
+    split across Inputs and Outputs. Names, helper types, numbers and quoted
+    literals of the original must still all survive.
+    """
+    growth = _PRETTIER_MAX_GROWTH_CODING if allow_example else _PRETTIER_MAX_GROWTH
+    if not new.strip() or len(new) > growth * max(len(old), 40):
+        return False
+    old_had_examples = bool(re.search(r"(?i)\bexamples?\b", old))
+    sections = _sections(new) if allow_example else {"problem": new}
+    examples = sections.get("example", "") if allow_example and not old_had_examples else ""
+    checked = new.replace(examples, "") if examples else new  # what may not bring new values
+
+    old_names, old_types, old_numbers = _facts(old)
+    flat_new = re.sub(r"\s*->\s*", " -> ", _fact_text(new))
+    new_words = set(re.findall(r"[A-Za-z_]\w*", new))
+    if any(n.strip("'\"") not in new and n not in new_words for n in old_names):
+        return False
+    for t in old_types:
+        if t in flat_new:
+            continue
+        # A function type split into Inputs and Outputs: every part must appear.
+        if not (allow_example and all(part.strip() in flat_new for part in t.split("->"))):
+            return False
+    _, _, new_numbers = _facts(checked)
+    if old_numbers - _facts(new)[2] or new_numbers - old_numbers:
+        return False
+    old_words = set(re.findall(r"[A-Za-z_]\w*", old))
+    # No invented names outside Inputs (parameter names) and added Examples.
+    outside = checked.replace(sections.get("input", ""), "") if allow_example else checked
+    invented = {w for w in _FACT_IDENT_RE.findall(outside) if w not in old_words}
+    invented |= {
+        w for w in re.findall(r"`([A-Za-z_]\w*)", outside)
+        if w not in old_words and w.lower() not in _TYPE_WORDS
+    }
+    # Added examples may only call names the problem already has.
+    # String literals are data, and capitalized words are constructors
+    # (Some, None, true/false aside), so only lowercase calls count.
+    if examples:
+        code = re.sub(r"\"[^\"\n]*\"|'[^'\n]*'", " ", examples)
+        calls = set(re.findall(r"(?<![\w.])([a-z_]\w*)\s*[\[(\d\-\w]", code))
+        invented |= {
+            w for w in calls
+            if w not in old_words and w not in _TYPE_WORDS and w not in {"true", "false", "returns", "let", "in"}
+        }
+    return not invented
+
+
+def _prettier_proposal(original: dict, item: dict, mode: str = "general") -> Optional[dict]:
+    """The rewritten fields, or None when nothing changed or the facts did not
+    survive (a field that drifted keeps its original)."""
+    def keeps(old: str, new: str) -> bool:
+        return prettier_keeps_facts(old, new, allow_example=mode == "coding")
+
+    def pick(old: Optional[str], new: object, check=keeps) -> Optional[str]:
         if old is None:
             return None
         new_text = replace_tikz(str(new).strip()) if isinstance(new, str) and new.strip() else old
-        return new_text if prettier_words_preserved(old, new_text) else old
+        return new_text if check(old, new_text) else old
 
+    # Question and options may be reworded for clarity (facts locked); the
+    # answer key is a solution, so only its layout may change.
     question_text = pick(original["question_text"], item.get("question_text"))
     options = original.get("options") or None
     new_options = item.get("options")
     if options and isinstance(new_options, list) and len(new_options) == len(options):
         options = [pick(old, new) or old for old, new in zip(options, new_options)]
-    expected = pick(original.get("expected_answer"), item.get("expected_answer"))
+    expected = pick(original.get("expected_answer"), item.get("expected_answer"), prettier_words_preserved)
     changed = (
         question_text != original["question_text"]
         or options != (original.get("options") or None)
@@ -2792,8 +2910,13 @@ If the notes do not support grading, set flagged_uncertain true and confidence 0
         """
         if mode == "coding":
             layout = (
-                f"This is a {language} coding test. Lay every coding problem out like this:\n"
+                f"This is a {language} coding test. Rewrite every coding problem in plain words, laid out "
+                "like this:\n"
                 f"{_CODING_QUESTION_LAYOUT}"
+                "  - Keep the problem's own examples. If it has NONE, write 2 or 3 yourself, worked out exactly "
+                "from the description and the helpers, calling only the problem's own function.\n"
+                "  - The required type (\"should have the type string list -> string list\") becomes the "
+                "Inputs and Outputs types.\n"
                 f"  - expected_answer: the solution in one ```{language.lower()} fenced block; prose outside it.\n"
             )
         elif mode == "math":
@@ -2808,13 +2931,17 @@ If the notes do not support grading, set flagged_uncertain true and confidence 0
                 {k: q.get(k) for k in ("id", "type", "question_text", "options", "expected_answer")} for q in batch
             ], ensure_ascii=False)
             prompt = (
-                "You are formatting a student's test questions so they are easy to read. FORMAT ONLY:\n"
-                "- Keep every word, number, name, value and meaning exactly. Do not fix, reword, add or remove "
-                "content, and do not solve anything.\n"
+                "You are rewriting a student's test questions so they are easy to understand and solve.\n"
+                "- Say the same thing in plainer, shorter words: cut repetition (\"The function X should "
+                "produce a list of values of type int resulting from the application of dec\" is just "
+                "\"returns the list of results\").\n"
+                "- Keep every fact exactly: every name, type, number, value and quoted character. Never "
+                "change what is asked, never add a requirement, never solve the problem.\n"
                 "- Keep the options of a multiple-choice question in the same order and count.\n"
-                "- Only change layout: Markdown sections, line breaks, lists, `backticks` for identifiers, ``` "
-                "fences for code, LaTeX for math.\n"
-                "- A question already formatted well is returned unchanged.\n"
+                "- Use Markdown: short sections, lists, `backticks` for names and types, ``` fences for code, "
+                "LaTeX for math.\n"
+                "- expected_answer: change layout only, never its content.\n"
+                "- A question that is already clear is returned unchanged.\n"
                 "- Never use TikZ or any LaTeX picture environment.\n\n"
                 f"{layout}\n{context}"
                 f"QUESTIONS (JSON):\n{payload}\n\n"
@@ -2836,7 +2963,7 @@ If the notes do not support grading, set flagged_uncertain true and confidence 0
                 if not isinstance(item, dict) or item.get("id") not in by_id:
                     continue
                 original = by_id[item["id"]]
-                proposal = _prettier_proposal(original, item)
+                proposal = _prettier_proposal(original, item, mode)
                 if proposal is not None:
                     out[original["id"]] = proposal
             return out

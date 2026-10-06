@@ -41,6 +41,63 @@ def test_restructuring_a_real_quiz_card_is_allowed() -> None:
     assert not prettier_words_preserved(old, new.replace("char list", "string list").replace("`char`", "`int`"))
 
 
+DECS = (
+    "Write a function named decs that applies a function named dec of type int -> int to each element of an input "
+    "list containing values of type int. The function dec decrements an integer value by one. You do not need to "
+    "write dec; you may assume that it exists. The function decs should produce a list of values of type int "
+    "resulting from the application of dec.\n\nThe function decs should have the type int list -> int list."
+)
+DECS_CLEAR = (
+    "**Problem**\n"
+    "Write `decs`, which applies `dec` (of type `int -> int`) to every element of a list. `dec` decrements an "
+    "integer by one and already exists.\n\n"
+    "**Inputs**\n- `lst` : `int list` - the numbers\n\n"
+    "**Outputs**\n- `int list` - each element after `dec`"
+)
+DECS_EXAMPLE = (
+    DECS_CLEAR + "\n\n**Examples**\n\n1. `decs [3; 0; -2]`\n   => `[2; -1; -3]`\n\n2. `decs []`\n   => `[]`"
+)
+UPPERS = (
+    "Write a function named uppers that applies a function named uppercase of type string -> string to each "
+    "element of an input list containing values of type string. The function uppercase converts all letters in a "
+    "string to upper case letters. You do not need to write uppercase; you may assume that it exists. The function "
+    "uppers should produce a list of values of type string resulting from the application of uppercase.\n\n"
+    "The function uppers should have the type string list -> string list."
+)
+UPPERS_GOAL = (
+    "**Problem**\nWrite a function named `uppers` that applies a function named `uppercase` (of type "
+    "`string -> string`) to each element of an input list of strings. The function `uppercase` converts all "
+    "letters in a string to upper case letters. You do not need to write `uppercase`; assume it exists.\n\n"
+    "**Inputs**\n- `lst` : `string list` - a list of strings\n\n"
+    "**Outputs**\n- `string list` - each element after `uppercase`\n\n"
+    "**Examples**\n\n1. `uppers [\"hello\", \"World\", \"abc\"]`\n   => `[\"HELLO\", \"WORLD\", \"ABC\"]`\n\n"
+    "2. `uppers []`\n   => `[]`\n\n3. `uppers [\"\", \"a\", \"Hello There\"]`\n   => `[\"\", \"A\", \"HELLO THERE\"]`"
+)
+
+
+def test_clarity_rewrite_keeps_the_facts() -> None:
+    from src.services.llm_service import prettier_keeps_facts
+    # The user's own target layout passes in coding mode.
+    assert prettier_keeps_facts(UPPERS, UPPERS_GOAL, allow_example=True)
+    assert prettier_keeps_facts(DECS, DECS_EXAMPLE, allow_example=True)
+    # Outside coding mode new values (examples) and new names are not allowed.
+    assert not prettier_keeps_facts(DECS, DECS_EXAMPLE)
+    # Facts changed or invented: rejected.
+    assert not prettier_keeps_facts(DECS, DECS_EXAMPLE.replace("`int list` - the", "`int` - the").replace("`int list` - each", "`int` - each"), allow_example=True)
+    assert not prettier_keeps_facts(DECS, DECS_EXAMPLE.replace("`dec` (of type", "`decrement` (of type"), allow_example=True)
+    assert not prettier_keeps_facts(DECS, DECS_EXAMPLE.replace("by one", "by two"), allow_example=True)
+    assert not prettier_keeps_facts(DECS, DECS_EXAMPLE.replace("`decs [3", "`inc_all [3"), allow_example=True)
+    assert not prettier_keeps_facts(DECS, DECS_EXAMPLE.replace("`decs [3", "`map dec [3"), allow_example=True)
+
+
+async def test_coding_rewrite_flows_through_with_its_example() -> None:
+    svc = _svc({"questions": [{"id": 1, "question_text": UPPERS_GOAL, "options": None, "expected_answer": "x"}]})
+    out = await svc.prettify_questions(
+        [{"id": 1, "type": "FRQ", "question_text": UPPERS, "options": None, "expected_answer": "x"}], "coding", "OCaml"
+    )
+    assert out[1]["question_text"] == UPPERS_GOAL
+
+
 def test_reworded_or_changed_numbers_are_rejected() -> None:
     assert not prettier_words_preserved(RAW, PRETTY.replace("10 2", "12 3").replace("Some 5", "Some 4"))
     assert not prettier_words_preserved("Find the mean of 2, 4, 6.", "Calculate the average value of the numbers given below, which are 2, 4 and 6, and explain.")
@@ -69,7 +126,7 @@ async def test_only_changed_and_faithful_questions_come_back() -> None:
     assert set(out) == {1}
     assert out[1]["question_text"] == PRETTY and out[1]["expected_answer"].startswith("```ocaml")
     prompt = svc._complete_json.await_args.args[0]
-    assert "**Input:**" in prompt and "FORMAT ONLY" in prompt
+    assert "**Problem**" in prompt and "**Inputs**" in prompt and "**Examples**" in prompt and "Keep every fact" in prompt
 
 
 async def test_a_failed_batch_returns_nothing() -> None:
