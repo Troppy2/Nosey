@@ -1,4 +1,4 @@
-import { ArrowLeft, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Save, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -12,9 +12,13 @@ import {
   deleteQuestion,
   fetchQuestionsForEditing,
   fetchTest,
+  fetchPrettierProposals,
   updateQuestion,
   updateQuestionGroup,
+  type PrettierProposal,
 } from "../lib/api";
+import { MarkdownContent } from "../components/MarkdownContent";
+import { useSettings } from "../lib/useSettings";
 import type { MCQOptionInput, QuestionCreate, QuestionEditable, QuestionGroup, TestTake } from "../lib/types";
 
 // Matches TakeTest's poll while a test generates in the background.
@@ -490,6 +494,97 @@ function QuestionPreview({ question, number }: { question: QuestionEditable; num
   );
 }
 
+// Prettier review (beta): each reformatted question, before and after. The
+// student applies or skips each; applied ones save through the normal route.
+function PrettierReview({
+  testId,
+  proposals,
+  questions,
+  onApplied,
+  onDone,
+}: {
+  testId: number;
+  proposals: PrettierProposal[];
+  questions: QuestionEditable[];
+  onApplied: (updated: QuestionEditable) => void;
+  onDone: (questionId: number) => void;
+}) {
+  const [busy, setBusy] = useState<number | "all" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const number = (qid: number) => questions.findIndex((q) => q.id === qid) + 1;
+
+  async function apply(p: PrettierProposal) {
+    const q = questions.find((x) => x.id === p.question_id);
+    if (!q) return;
+    const options = p.options && q.type === "MCQ"
+      ? p.options.map((text, i) => ({ text, is_correct: q.options[i]?.is_correct ?? false }))
+      : undefined;
+    onApplied(await updateQuestion(testId, q.id, {
+      question_text: p.question_text,
+      ...(options ? { options } : {}),
+      ...(p.expected_answer != null && q.type !== "MCQ" ? { expected_answer: p.expected_answer } : {}),
+    }));
+    onDone(p.question_id);
+  }
+
+  async function run(target: number | "all", list: PrettierProposal[]) {
+    setBusy(target);
+    setError(null);
+    try {
+      for (const p of list) await apply(p);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save that change");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Card className="form-panel prettier-review">
+      <div className="prettier-review-head">
+        <div>
+          <strong>{proposals.length} question{proposals.length === 1 ? "" : "s"} tidied up</strong>
+          <p className="muted small">Formatting only, the wording is unchanged. Apply the ones you like.</p>
+        </div>
+        <div className="button-row">
+          <Button variant="secondary" onClick={() => proposals.forEach((p) => onDone(p.question_id))} disabled={busy !== null}>
+            Skip all
+          </Button>
+          <Button onClick={() => void run("all", proposals)} disabled={busy !== null}>
+            {busy === "all" ? "Applying..." : "Apply all"}
+          </Button>
+        </div>
+      </div>
+      <FormError message={error} />
+      {proposals.map((p) => (
+        <article key={p.question_id} className="prettier-item">
+          <div className="prettier-item-head">
+            <span className="eyebrow">Question {number(p.question_id)}</span>
+            <div className="button-row">
+              <Button variant="secondary" onClick={() => onDone(p.question_id)} disabled={busy !== null}>Skip</Button>
+              <Button onClick={() => void run(p.question_id, [p])} disabled={busy !== null}>
+                {busy === p.question_id ? "Applying..." : "Apply"}
+              </Button>
+            </div>
+          </div>
+          <div className="prettier-after">
+            <MarkdownContent content={p.question_text} />
+            {p.options ? (
+              <ol type="A">{p.options.map((o, i) => <li key={i}><MarkdownContent content={o} /></li>)}</ol>
+            ) : null}
+            {p.expected_answer ? (
+              <div className="prettier-answer">
+                <span className="muted small">Answer</span>
+                <MarkdownContent content={p.expected_answer} />
+              </div>
+            ) : null}
+          </div>
+        </article>
+      ))}
+    </Card>
+  );
+}
+
 export default function QuestionEditor() {
   const { testId } = useParams<{ testId: string }>();
   const navigate = useNavigate();
@@ -499,8 +594,41 @@ export default function QuestionEditor() {
   const [questions, setQuestions] = useState<QuestionEditable[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { betaMode } = useSettings();
+  const [proposals, setProposals] = useState<PrettierProposal[] | null>(null);
+  const [prettying, setPrettying] = useState(false);
+  const [prettierNote, setPrettierNote] = useState<string | null>(null);
+  // Bumped when Prettier rewrites a question so its card reloads its fields.
+  const [revision, setRevision] = useState<Record<number, number>>({});
 
   const generating = test?.generation_status === "generating";
+
+  async function handlePrettier() {
+    setPrettying(true);
+    setPrettierNote(null);
+    setError(null);
+    try {
+      const found = await fetchPrettierProposals(id);
+      if (found.length === 0) setPrettierNote("Everything already looks good. Nothing to tidy.");
+      setProposals(found.length ? found : null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Prettier couldn't run right now");
+    } finally {
+      setPrettying(false);
+    }
+  }
+
+  function handlePrettierApplied(updated: QuestionEditable) {
+    handleSaved(updated);
+    setRevision((prev) => ({ ...prev, [updated.id]: (prev[updated.id] ?? 0) + 1 }));
+  }
+
+  function handlePrettierDone(questionId: number) {
+    setProposals((prev) => {
+      const rest = (prev ?? []).filter((p) => p.question_id !== questionId);
+      return rest.length ? rest : null;
+    });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -576,10 +704,28 @@ export default function QuestionEditor() {
             Edit, remove, or add questions. Each card saves on its own. When you&apos;re done, take the test.
           </p>
         </div>
-        <Button onClick={() => navigate(`/test/${id}`)}>Take Test</Button>
+        <div className="button-row">
+          {betaMode && !generating && questions.length > 0 ? (
+            <Button variant="secondary" onClick={() => void handlePrettier()} disabled={prettying || proposals !== null}>
+              <Sparkles size={16} />
+              {prettying ? "Tidying..." : "Prettier"}
+            </Button>
+          ) : null}
+          <Button onClick={() => navigate(`/test/${id}`)}>Take Test</Button>
+        </div>
       </header>
 
       <FormError message={error} />
+      {prettierNote ? <p className="muted small">{prettierNote}</p> : null}
+      {proposals ? (
+        <PrettierReview
+          testId={id}
+          proposals={proposals}
+          questions={questions}
+          onApplied={handlePrettierApplied}
+          onDone={handlePrettierDone}
+        />
+      ) : null}
       {test?.generation_status === "failed" ? (
         <FormError message={`Generation failed: ${test.generation_error ?? "no questions were made."}`} />
       ) : null}
@@ -610,7 +756,7 @@ export default function QuestionEditor() {
           {questions.map((q, i) => {
             const card = q.type === "MCQ" ? (
               <MCQCard
-                key={q.id}
+                key={`${q.id}-${revision[q.id] ?? 0}`}
                 question={q}
                 testId={id}
                 onSaved={handleSaved}
@@ -618,7 +764,7 @@ export default function QuestionEditor() {
               />
             ) : (
               <FRQCard
-                key={q.id}
+                key={`${q.id}-${revision[q.id] ?? 0}`}
                 question={q}
                 testId={id}
                 onSaved={handleSaved}

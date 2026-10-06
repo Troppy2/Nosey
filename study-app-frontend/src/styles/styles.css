@@ -27498,3 +27498,44 @@ a.sd-chip.is-done:hover {
     padding: 10px;
   }
 }
+
+/* Question editor: Prettier review (beta). Before/after is one rendered
+   "after" view; the card below still shows the current text. */
+.prettier-review {
+  display: grid;
+  gap: 14px;
+}
+.prettier-review-head,
+.prettier-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.prettier-review-head p {
+  margin: 2px 0 0;
+}
+.prettier-item {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(113, 131, 85, 0.18);
+  min-width: 0;
+}
+.prettier-after {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 14px;
+  background: var(--green-lightest);
+  border-radius: var(--radius-md);
+}
+.prettier-after ol {
+  margin: 0;
+  padding-left: 22px;
+}
+.prettier-answer {
+  display: grid;
+  gap: 4px;
+}

@@ -4,7 +4,7 @@ import asyncio
 import difflib
 import hashlib
 import json
-from collections import OrderedDict
+from collections import Counter, OrderedDict
 from math import log, sqrt
 import re
 from fractions import Fraction
@@ -700,6 +700,81 @@ _PRIOR_DUP_MAX_KEYS = 200
 _AI_SERVICES_UNAVAILABLE_MESSAGE = (
     "An error has occurred. Test generation can't happen right now because AI services are unavailable."
 )
+
+# How a coding-mode question is laid out. Shared by generation and the
+# editor's Prettier pass so both write problems the same way.
+_CODING_QUESTION_LAYOUT = (
+    "  - question_text is Markdown laid out in separate sections, never one run-on paragraph. "
+    "Use exactly this shape, with a blank line (\\n\\n inside the JSON string) between sections:\n"
+    "      <the task in 1-3 short sentences; wrap identifiers like `safe_div` in backticks>\n"
+    "      **Input:** <what the function or program receives>\n"
+    "      **Output:** <what it returns or prints>\n"
+    "      **Example 1**\n"
+    "      ```\n      <the call or input>\n      ```\n"
+    "      Returns `<result>`, with an optional one-line reason.\n"
+    "      **Example 2** in the same shape.\n"
+    "    Do not start with a \"Problem:\" label, and never put an example inside a sentence.\n"
+)
+_MATH_QUESTION_LAYOUT = (
+    "  - Every piece of math is LaTeX: inline $...$, display $$...$$ on its own line for a long "
+    "equation. Never leave x^2, sqrt(x), integrals or matrices as plain text.\n"
+    "  - Given values and conditions go on separate lines or a short list, not buried in a long sentence.\n"
+)
+
+# ── Editor Prettier pass (format only) ───────────────────────────────────────
+_PRETTIER_BATCH = 8
+_PRETTIER_CONCURRENCY = 3
+# The new text must keep this share of the original's words, and add at most
+# this share of new ones (headings like Input/Output/Example): format only.
+_PRETTIER_MIN_KEPT = 0.9
+_PRETTIER_MAX_ADDED = 0.35
+_PRETTIER_WORD_RE = re.compile(r"[A-Za-z0-9]+")
+
+
+def prettier_words_preserved(old: str, new: str) -> bool:
+    """True when `new` says what `old` said: Markdown, LaTeX and backticks may
+    change, the words and numbers may not (much)."""
+    def words(text: str) -> list[str]:
+        # LaTeX command names (\frac, \int) are formatting, not words.
+        return [w.lower() for w in _PRETTIER_WORD_RE.findall(re.sub(r"\\[A-Za-z]+", " ", text))]
+
+    old_words, new_words = words(old), words(new)
+    if not old_words:
+        return not new_words
+    remaining = Counter(new_words)
+    kept = 0
+    for w in old_words:
+        if remaining[w] > 0:
+            remaining[w] -= 1
+            kept += 1
+    added = sum(remaining.values())
+    return kept / len(old_words) >= _PRETTIER_MIN_KEPT and added / max(len(old_words), 1) <= _PRETTIER_MAX_ADDED
+
+
+def _prettier_proposal(original: dict, item: dict) -> Optional[dict]:
+    """The reformatted fields, or None when nothing changed or the words did
+    not survive (a field that drifted keeps its original)."""
+    def pick(old: Optional[str], new: object) -> Optional[str]:
+        if old is None:
+            return None
+        new_text = replace_tikz(str(new).strip()) if isinstance(new, str) and new.strip() else old
+        return new_text if prettier_words_preserved(old, new_text) else old
+
+    question_text = pick(original["question_text"], item.get("question_text"))
+    options = original.get("options") or None
+    new_options = item.get("options")
+    if options and isinstance(new_options, list) and len(new_options) == len(options):
+        options = [pick(old, new) or old for old, new in zip(options, new_options)]
+    expected = pick(original.get("expected_answer"), item.get("expected_answer"))
+    changed = (
+        question_text != original["question_text"]
+        or options != (original.get("options") or None)
+        or expected != original.get("expected_answer")
+    )
+    if not changed:
+        return None
+    return {"question_text": question_text, "options": options, "expected_answer": expected}
+
 
 # ── Math grading depth (GH #158) ─────────────────────────────────────────────
 # Shown-work math grading tries these first, strongest model first.
@@ -2633,6 +2708,80 @@ If the notes do not support grading, set flagged_uncertain true and confidence 0
             logger.warning("LLM FRQ grading failed; using simple fallback: %s", exc)
             return self._fallback_grade(expected_answer, user_answer)
 
+    async def prettify_questions(
+        self,
+        questions: list[dict],
+        mode: str,
+        language: str = "Python",
+        notes: str = "",
+        provider: Optional[str] = None,
+    ) -> dict[int, dict]:
+        """Reformat questions for the editor's Prettier button: layout only.
+
+        `questions` items: {"id", "type", "question_text", "options": [str],
+        "expected_answer"}. Returns {id: {"question_text", "options",
+        "expected_answer"}} for questions whose formatting actually changed
+        and whose words survived (prettier_words_preserved). Nothing is saved
+        here; the student reviews and applies. Batches of _PRETTIER_BATCH, one
+        call each; a failed batch is just left out.
+        """
+        if mode == "coding":
+            layout = (
+                f"This is a {language} coding test. Lay every coding problem out like this:\n"
+                f"{_CODING_QUESTION_LAYOUT}"
+                f"  - expected_answer: the solution in one ```{language.lower()} fenced block; prose outside it.\n"
+            )
+        elif mode == "math":
+            layout = f"This is a math test. Lay every question out like this:\n{_MATH_QUESTION_LAYOUT}"
+        else:
+            layout = "Lay every question out as clean Markdown: short paragraphs, lists for lists, code in fences, math in $...$.\n"
+        context = f"COURSE NOTES (for terminology only; do not add content from them):\n{notes[:4000]}\n\n" if notes.strip() else ""
+        gate = asyncio.Semaphore(_PRETTIER_CONCURRENCY)
+
+        async def run(batch: list[dict]) -> dict[int, dict]:
+            payload = json.dumps([
+                {k: q.get(k) for k in ("id", "type", "question_text", "options", "expected_answer")} for q in batch
+            ], ensure_ascii=False)
+            prompt = (
+                "You are formatting a student's test questions so they are easy to read. FORMAT ONLY:\n"
+                "- Keep every word, number, name, value and meaning exactly. Do not fix, reword, add or remove "
+                "content, and do not solve anything.\n"
+                "- Keep the options of a multiple-choice question in the same order and count.\n"
+                "- Only change layout: Markdown sections, line breaks, lists, `backticks` for identifiers, ``` "
+                "fences for code, LaTeX for math.\n"
+                "- A question already formatted well is returned unchanged.\n"
+                "- Never use TikZ or any LaTeX picture environment.\n\n"
+                f"{layout}\n{context}"
+                f"QUESTIONS (JSON):\n{payload}\n\n"
+                'Return JSON only: {"questions": [{"id": 1, "question_text": "...", "options": ["..."], '
+                '"expected_answer": "..."}]} with one entry per question, same ids. Use null for options or '
+                "expected_answer when the question has none.\n"
+            )
+            async with gate:
+                try:
+                    data = await asyncio.wait_for(
+                        self._complete_json(prompt, provider=provider), _PRACTICE_CHUNK_TIMEOUT_S
+                    )
+                except Exception as exc:
+                    logger.warning("prettify_questions batch failed: %s", exc)
+                    return {}
+            by_id = {q["id"]: q for q in batch}
+            out: dict[int, dict] = {}
+            for item in data.get("questions") or []:
+                if not isinstance(item, dict) or item.get("id") not in by_id:
+                    continue
+                original = by_id[item["id"]]
+                proposal = _prettier_proposal(original, item)
+                if proposal is not None:
+                    out[original["id"]] = proposal
+            return out
+
+        batches = [questions[i:i + _PRETTIER_BATCH] for i in range(0, len(questions), _PRETTIER_BATCH)]
+        results: dict[int, dict] = {}
+        for part in await asyncio.gather(*(run(batch) for batch in batches)):
+            results.update(part)
+        return results
+
     def _build_coding_generation_prompt(
         self,
         notes: str,
@@ -2675,16 +2824,7 @@ If the notes do not support grading, set flagged_uncertain true and confidence 0
                 f"  - Each question must be a programming task solvable in {language}\n"
                 # One run-on paragraph mixed the task, the formats and the
                 # examples together; a fixed sectioned layout keeps them apart.
-                "  - question_text is Markdown laid out in separate sections, never one run-on paragraph. "
-                "Use exactly this shape, with a blank line (\\n\\n inside the JSON string) between sections:\n"
-                "      <the task in 1-3 short sentences; wrap identifiers like `safe_div` in backticks>\n"
-                "      **Input:** <what the function or program receives>\n"
-                "      **Output:** <what it returns or prints>\n"
-                "      **Example 1**\n"
-                "      ```\n      <the call or input>\n      ```\n"
-                "      Returns `<result>`, with an optional one-line reason.\n"
-                "      **Example 2** in the same shape.\n"
-                "    Do not start with a \"Problem:\" label, and never put an example inside a sentence.\n"
+                f"{_CODING_QUESTION_LAYOUT}"
                 f"  - expected_answer must include: complete working {language} solution with brief comments\n"
                 "  - Vary: functions, loops, data structures, algorithms\n"
             )

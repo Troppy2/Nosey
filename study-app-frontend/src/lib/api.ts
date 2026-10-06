@@ -685,6 +685,19 @@ export async function updateQuestion(
 }
 
 // A multi-part problem's setup, edited once for all its parts (GH #151).
+// Editor "Prettier" (beta): reformatted versions of the questions whose layout
+// changed, wording kept. Nothing is saved until each is applied.
+export type PrettierProposal = {
+  question_id: number;
+  question_text: string;
+  options: string[] | null;
+  expected_answer: string | null;
+};
+
+export async function fetchPrettierProposals(testId: number): Promise<PrettierProposal[]> {
+  return request<PrettierProposal[]>(`/tests/${testId}/questions/prettier`, { method: "POST" });
+}
+
 export async function updateQuestionGroup(
   testId: number,
   groupId: number,

@@ -12,7 +12,7 @@ from starlette.datastructures import UploadFile
 from src.config import settings
 from src.database import async_session_maker, get_session
 from src.limiter import limiter
-from src.dependencies import get_current_user
+from src.dependencies import get_beta_user, get_current_user
 from src.models.folder import Folder
 from src.models.folder_file import FolderFile
 from src.models.question import Question
@@ -22,6 +22,7 @@ from src.models.user_attempt import UserAttempt
 from src.repositories.test_repository import TestRepository, add_generated_questions
 from src.repositories.usage_event_repository import UsageEventRepository
 from src.schemas.test_schema import (
+    PrettierProposal,
     CreateTestResponse,
     QuestionCreate,
     RegenerateTestRequest,
@@ -1398,6 +1399,44 @@ async def update_question(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except StudyAppException as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/tests/{test_id}/questions/prettier", response_model=list[PrettierProposal])
+async def prettier_questions(
+    test_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_beta_user),
+) -> list[PrettierProposal]:
+    """Reformatted versions of a test's questions for the editor (beta).
+
+    Format only, words kept (prettier_words_preserved). Nothing is saved: the
+    editor shows each change and applies the ones the student keeps through
+    the normal update route. Only changed questions are returned.
+    """
+    test = await TestRepository(session).get_owned_with_questions(test_id, user.id)
+    if test is None:
+        raise HTTPException(status_code=404, detail="Test not found")
+    mode = "coding" if test.is_coding_mode else "math" if test.is_math_mode else "general"
+    items = [
+        {
+            "id": q.id,
+            "type": q.question_type,
+            "question_text": q.question_text,
+            "options": [o.option_text for o in q.mcq_options] if q.question_type == "MCQ" else None,
+            "expected_answer": q.frq_answer.expected_answer if q.question_type == "FRQ" and q.frq_answer else None,
+        }
+        for q in test.questions
+    ]
+    notes = "\n\n".join(note.content for note in test.notes)
+    language = test.coding_language or "Python"
+    provider = resolve_request_provider(user, None)
+    await session.close()
+    bind_usage(user.id, "test_prettier")
+    try:
+        proposals = await LLMService().prettify_questions(items, mode, language, notes, provider=provider)
+    except LLMException as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return [PrettierProposal(question_id=qid, **fields) for qid, fields in proposals.items()]
 
 
 @router.put("/tests/{test_id}/groups/{group_id}", response_model=QuestionGroupPublic)
