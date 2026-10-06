@@ -772,17 +772,38 @@ export async function skipUnreadableAnswers(attemptId: number, questionIds: numb
   });
 }
 
+// Throws on failure: TakeTest retries and shows an unsaved notice (GH #137).
 export async function saveDraftAttempt(testId: number, answers: DraftAttemptAnswer[]): Promise<DraftAttemptResponse> {
-  try {
-    return await request<DraftAttemptResponse>(`/tests/${testId}/attempts/draft`, {
-      method: "POST",
-      body: JSON.stringify({ answers }),
-    });
-  } catch (error) {
-    console.error("Failed to save draft attempt:", error);
-    // Don't throw - draft save is non-critical
-    return { attempt_id: 0, attempt_number: 0, answers };
+  return request<DraftAttemptResponse>(`/tests/${testId}/attempts/draft`, {
+    method: "POST",
+    body: JSON.stringify({ answers }),
+  });
+}
+
+// Browsers cap a keepalive request body at 64KB in total across in-flight
+// keepalive requests; stay under it with headroom.
+const KEEPALIVE_BODY_LIMIT = 60_000;
+
+// Last-chance save when the page is closing or the test unmounts. A plain
+// fetch is cancelled with the page; keepalive lets it finish. sendBeacon was
+// used before but cannot send the Authorization header, so it always 401'd.
+// Strokes are dropped if the body is too big: typed answers matter most, and
+// the last autosave already holds the strokes up to a second ago.
+export function saveDraftAttemptOnExit(testId: number, answers: DraftAttemptAnswer[]): void {
+  const token = localStorage.getItem(TOKEN_KEY);
+  let body = JSON.stringify({ answers });
+  if (body.length > KEEPALIVE_BODY_LIMIT) {
+    body = JSON.stringify({ answers: answers.map(({ work_strokes: _strokes, ...rest }) => rest) });
+    if (body.length > KEEPALIVE_BODY_LIMIT) return;
   }
+  const headers = new Headers({ "Content-Type": "application/json" });
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  fetch(`${API_BASE_URL}/tests/${testId}/attempts/draft`, {
+    method: "POST",
+    headers,
+    body,
+    keepalive: true,
+  }).catch(() => { /* page is going away; nothing to report to */ });
 }
 
 export async function getDraftAttempt(testId: number): Promise<DraftAttemptResponse | null> {

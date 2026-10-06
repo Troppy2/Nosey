@@ -1,6 +1,7 @@
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_session
@@ -133,6 +134,11 @@ async def save_draft_attempt(
     """Save current progress on a test without submitting/grading."""
     try:
         return await GradingService().save_draft_attempt(test_id, user.id, request.answers, session)
+    except IntegrityError as exc:
+        # Safety net (GH #137): the draft lock should make this unreachable,
+        # but a conflict is a retryable 409, never an unhandled 500.
+        await session.rollback()
+        raise HTTPException(status_code=409, detail="Draft save conflicted, retry") from exc
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except StudyAppException as exc:

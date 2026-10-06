@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import Select, case, delete, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import defer, selectinload
 
 from src.models.question import Question
@@ -22,8 +23,12 @@ class AttemptRepository(BaseRepository[UserAttempt]):
         )
         return int(current or 0) + 1
 
-    async def create(self, user_id: int, test_id: int, attempt_number: int) -> UserAttempt:
-        attempt = UserAttempt(user_id=user_id, test_id=test_id, attempt_number=attempt_number)
+    async def create(
+        self, user_id: int, test_id: int, attempt_number: int, status: str = "in_progress"
+    ) -> UserAttempt:
+        attempt = UserAttempt(
+            user_id=user_id, test_id=test_id, attempt_number=attempt_number, status=status
+        )
         self.session.add(attempt)
         await self.session.flush()
         return attempt
@@ -156,21 +161,73 @@ class AttemptRepository(BaseRepository[UserAttempt]):
         rows = await self.session.execute(stmt)
         return list(rows.all())
 
-    async def get_or_create_draft(self, user_id: int, test_id: int) -> UserAttempt:
-        """Get existing draft attempt or create a new one."""
-        existing = await self.session.scalar(
-            select(UserAttempt).where(
+    async def _select_draft_for_update(self, user_id: int, test_id: int) -> Optional[UserAttempt]:
+        return await self.session.scalar(
+            select(UserAttempt)
+            .where(
                 UserAttempt.user_id == user_id,
                 UserAttempt.test_id == test_id,
                 UserAttempt.status == "in_progress",
             )
+            .with_for_update()
         )
+
+    async def get_or_create_draft(self, user_id: int, test_id: int) -> UserAttempt:
+        """Get the draft attempt, row-locked for the rest of the transaction.
+
+        The lock serializes overlapping autosaves for one draft (GH #137):
+        without it two saves interleaved their writes and the loser 500'd on
+        uq_answer_attempt_question. Creation races are settled by the
+        uq_attempt_one_draft partial index: the loser re-selects the winner's
+        draft (blocking until it commits) instead of failing.
+        """
+        existing = await self._select_draft_for_update(user_id, test_id)
         if existing:
             return existing
 
-        # Create new draft
         attempt_number = await self.next_attempt_number(user_id, test_id)
-        return await self.create(user_id, test_id, attempt_number)
+        try:
+            async with self.session.begin_nested():
+                return await self.create(user_id, test_id, attempt_number)
+        except IntegrityError:
+            existing = await self._select_draft_for_update(user_id, test_id)
+            if existing is None:
+                raise
+            return existing
+
+    async def sync_draft_answers(
+        self, attempt_id: int, answers: dict[int, tuple[str, Optional[str]]]
+    ) -> None:
+        """Make the draft's answers match ``answers`` (question_id -> (text, strokes)).
+
+        Updates rows in place, inserts new ones, deletes dropped ones. Rows that
+        did not change are not rewritten, so a save after one edit no longer
+        rewrites every answer's stroke JSON. Caller must hold the draft lock.
+        """
+        rows = await self.session.scalars(select(UserAnswer).where(UserAnswer.attempt_id == attempt_id))
+        existing = {row.question_id: row for row in rows.all()}
+        for question_id, row in existing.items():
+            if question_id not in answers:
+                await self.session.delete(row)
+        for question_id, (user_answer, work_strokes) in answers.items():
+            row = existing.get(question_id)
+            if row is None:
+                self.session.add(
+                    UserAnswer(
+                        attempt_id=attempt_id,
+                        question_id=question_id,
+                        user_answer=user_answer,
+                        flagged_uncertain=False,
+                        # Scratch-pad strokes (STEM Scratch Pad feature).
+                        work_strokes=work_strokes,
+                    )
+                )
+            else:
+                if row.user_answer != user_answer:
+                    row.user_answer = user_answer
+                if row.work_strokes != work_strokes:
+                    row.work_strokes = work_strokes
+        await self.session.flush()
 
     async def get_draft(self, user_id: int, test_id: int) -> Optional[UserAttempt]:
         """Get the draft/in-progress attempt for a test."""

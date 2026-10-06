@@ -24,7 +24,7 @@ import type { ProgressStage } from "../components/Progress";
 import { ProgressOverlay, useStagedProgress } from "../components/Progress";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
 import { SkeletonQuestionCard } from "../components/Skeletons";
-import { API_BASE_URL, fetchTest, getDraftAttempt, saveDraftAttempt, scopeKey, submitAttempt } from "../lib/api";
+import { fetchTest, getDraftAttempt, saveDraftAttempt, saveDraftAttemptOnExit, scopeKey, submitAttempt } from "../lib/api";
 import { applyTextHighlights, clearTextHighlights, getSelectionSignature, HIGHLIGHT_SUPPORTED } from "../lib/highlightRanges";
 import { buildScreens, fullQuestionText, screenAnchor, type QuestionScreens } from "../lib/questionScreens";
 import { formatCodingProblem } from "../lib/codingProblemFormat";
@@ -33,6 +33,9 @@ import type { DraftAttemptAnswer, KojoTestRef, Question, SubmittedAnswer, TestTa
 
 // Monaco ids that differ from the lowercased display name. Monaco has no OCaml
 // grammar, so it borrows F# (same ML family) for highlighting.
+// Backoff between draft autosave retries (GH #137).
+const DRAFT_SAVE_RETRY_DELAYS_MS = [1000, 2000, 4000];
+
 const MONACO_LANGUAGE_IDS: Record<string, string> = {
   "c++": "cpp",
   "c#": "csharp",
@@ -306,39 +309,80 @@ export default function TakeTest() {
     });
   }
 
+  // Draft autosave (GH #137). At most one save is in flight: overlapping
+  // saves raced on the server, and when the newer one lost, the older
+  // snapshot stuck and the latest edits were gone. Edits made during a save
+  // trigger one trailing save with the latest state, so saves land in order.
+  const buildDraftRef = useRef(buildDraftAnswers);
+  buildDraftRef.current = buildDraftAnswers;
+  const saveInFlightRef = useRef<Promise<void> | null>(null);
+  const saveQueuedRef = useRef(false);
+  const lastSavedRef = useRef("");
+  const submittingRef = useRef(false);
+  const autosaveTimerRef = useRef<number | undefined>(undefined);
+  const [draftSaveFailed, setDraftSaveFailed] = useState(false);
+
+  async function saveDraftWithRetry(draftAnswers: DraftAttemptAnswer[]): Promise<boolean> {
+    for (let attempt = 0; attempt < DRAFT_SAVE_RETRY_DELAYS_MS.length + 1; attempt++) {
+      if (attempt > 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, DRAFT_SAVE_RETRY_DELAYS_MS[attempt - 1]));
+        if (submittingRef.current) return false;
+      }
+      try {
+        await saveDraftAttempt(numericTestId, draftAnswers);
+        return true;
+      } catch (err) {
+        console.error("Draft auto-save failed:", err);
+      }
+    }
+    return false;
+  }
+
+  function flushDraft(): Promise<void> {
+    if (saveInFlightRef.current) {
+      saveQueuedRef.current = true;
+      return saveInFlightRef.current;
+    }
+    const run = async () => {
+      do {
+        saveQueuedRef.current = false;
+        if (submittingRef.current) return;
+        const draftAnswers = buildDraftRef.current();
+        const serialized = JSON.stringify(draftAnswers);
+        if (draftAnswers.length === 0 || serialized === lastSavedRef.current) continue;
+        const ok = await saveDraftWithRetry(draftAnswers);
+        if (ok) lastSavedRef.current = serialized;
+        setDraftSaveFailed(!ok);
+      } while (saveQueuedRef.current);
+    };
+    saveInFlightRef.current = run().finally(() => {
+      saveInFlightRef.current = null;
+    });
+    return saveInFlightRef.current;
+  }
+
   // Auto-save answers when they change
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const draftAnswers = buildDraftAnswers();
-      if (draftAnswers.length > 0) {
-        saveDraftAttempt(numericTestId, draftAnswers).catch((err) =>
-          console.error("Draft auto-save failed:", err),
-        );
-      }
-    }, 1000);
-    return () => clearTimeout(timer);
+    autosaveTimerRef.current = window.setTimeout(() => void flushDraft(), 1000);
+    return () => window.clearTimeout(autosaveTimerRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answers, workStrokes, numericTestId]);
 
-  // Save draft on page leave
+  // Save whatever the debounce has not sent yet when the tab closes or the
+  // user navigates away in-app (beforeunload never fires for the latter).
   useEffect(() => {
-    function handleBeforeUnload() {
-      const draftAnswers = buildDraftAnswers();
-      if (draftAnswers.length > 0) {
-        // Use synchronous API call via navigator.sendBeacon if available
-        const payload = JSON.stringify({
-          answers: draftAnswers,
-        });
-        navigator.sendBeacon(
-          `${API_BASE_URL}/tests/${numericTestId}/attempts/draft`,
-          payload,
-        );
-      }
+    function saveOnExit() {
+      if (submittingRef.current) return;
+      const draftAnswers = buildDraftRef.current();
+      if (draftAnswers.length === 0 || JSON.stringify(draftAnswers) === lastSavedRef.current) return;
+      saveDraftAttemptOnExit(numericTestId, draftAnswers);
     }
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [answers, workStrokes, numericTestId]);
+    window.addEventListener("beforeunload", saveOnExit);
+    return () => {
+      window.removeEventListener("beforeunload", saveOnExit);
+      saveOnExit();
+    };
+  }, [numericTestId]);
 
   function handleResume() {
     const draftAnswers = sessionStorage.getItem(`_draft_answers_${numericTestId}`);
@@ -566,6 +610,11 @@ export default function TakeTest() {
     if (!test || !canSubmit) return;
     setIsSubmitting(true);
     setGraded(false);
+    // Stop autosaving and let any in-flight save land first: a save arriving
+    // after submit would recreate a draft and show the test as resumable.
+    window.clearTimeout(autosaveTimerRef.current);
+    submittingRef.current = true;
+    await saveInFlightRef.current;
     try {
       const result = await submitAttempt(test.id, buildSubmittedAnswers());
       localStorage.removeItem(scopeKey(`nosey_test_index_${numericTestId}`));
@@ -581,6 +630,8 @@ export default function TakeTest() {
       window.setTimeout(() => navigate(`/results/${result.attempt_id}`), 700);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to submit this test.");
+      submittingRef.current = false;
+      void flushDraft();
       setIsSubmitting(false);
       setGraded(false);
     }
@@ -1049,6 +1100,12 @@ export default function TakeTest() {
           }
           return questionCard;
         })()}
+
+        {draftSaveFailed && (
+          <p className="form-error" role="status">
+            Your latest answers haven't saved yet. Keep this tab open, we'll keep trying.
+          </p>
+        )}
 
         <div className="question-nav">
           <Button variant="secondary" disabled={previousIndex === index} icon={<ArrowLeft size={18} />} onClick={() => setIndex(previousIndex)}>

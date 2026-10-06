@@ -1057,35 +1057,19 @@ class GradingService:
         if test is None:
             raise ResourceNotFoundException("Test")
 
-        # Get or create draft attempt (status='in_progress')
+        question_ids = {question.id for question in test.questions}
+        for answer in answers:
+            if answer.question_id not in question_ids:
+                raise ValidationException(f"Question {answer.question_id} does not belong to this test")
+
+        # Locks the draft row so overlapping autosaves apply one at a time.
         repo = AttemptRepository(session)
         attempt = await repo.get_or_create_draft(user_id, test_id)
-
-        # Clear existing answers for this draft
-        await repo.clear_answers(attempt.id)
-
-        # Save new answers
-        submitted_by_id = {answer.question_id: answer for answer in answers}
-        question_by_id = {question.id: question for question in test.questions}
-
-        for question_id in submitted_by_id:
-            if question_by_id.get(question_id) is None:
-                raise ValidationException(f"Question {question_id} does not belong to this test")
-
-        for question_id, draft_answer in submitted_by_id.items():
-            # Draft answers: is_correct is None (not graded yet)
-            await repo.add_answer(
-                attempt.id,
-                question_id,
-                draft_answer.user_answer,
-                is_correct=None,
-                feedback=None,
-                confidence=None,
-                flagged_uncertain=False,
-                # Scratch-pad strokes so far (STEM Scratch Pad feature); this
-                # is the only place work_strokes is ever written.
-                work_strokes=draft_answer.work_strokes,
-            )
+        # Scratch-pad strokes are only ever written here (STEM Scratch Pad).
+        await repo.sync_draft_answers(
+            attempt.id,
+            {answer.question_id: (answer.user_answer, answer.work_strokes) for answer in answers},
+        )
 
         # Update exit timestamp
         attempt.exited_at = datetime.utcnow()

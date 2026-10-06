@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import ForeignKey, Index, Integer, Numeric, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import BIGINT_ID, Base, TimestampMixin
@@ -19,6 +19,16 @@ class UserAttempt(Base, TimestampMixin):
     __tablename__ = "user_attempts"
     __table_args__ = (
         UniqueConstraint("user_id", "test_id", "attempt_number", name="uq_attempt_user_test_number"),
+        # At most one draft per user per test (GH #137): two overlapping first
+        # autosaves used to both create one.
+        Index(
+            "uq_attempt_one_draft",
+            "user_id",
+            "test_id",
+            unique=True,
+            postgresql_where=text("status = 'in_progress'"),
+            sqlite_where=text("status = 'in_progress'"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)
