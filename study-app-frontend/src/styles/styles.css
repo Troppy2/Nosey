@@ -13940,6 +13940,9 @@ select.lc-custom-input {
 .math-field-input {
   display: block;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
   font-size: 1.15rem;
   padding: 10px 12px;
   background: var(--white);
@@ -27435,6 +27438,9 @@ a.sd-chip.is-done:hover {
 
 .question-part {
   display: grid;
+  /* minmax(0, 1fr), not the implicit auto track: a long unbroken math
+     preview would otherwise widen the track past the card. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   min-width: 0;
   padding: 18px 20px;
@@ -27456,6 +27462,11 @@ a.sd-chip.is-done:hover {
 }
 
 .question-part-text {
+  min-width: 0;
+}
+
+/* Same rule as .question-card > *: wide children scroll inside the part. */
+.question-part > * {
   min-width: 0;
 }
 
