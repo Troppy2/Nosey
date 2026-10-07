@@ -24273,6 +24273,9 @@ button.lc-official-link:disabled:hover {
   flex: 1;
   /* Never squeezed to nothing by a long question or a small pad. */
   min-height: 180px;
+  /* Its size never comes from the page inside: the page height is set in JS
+     from this box's height, so content-sizing here grows without end. */
+  contain: size;
   border: 1px solid var(--green-light-mid);
   border-radius: var(--radius-lg);
   background: var(--white);
