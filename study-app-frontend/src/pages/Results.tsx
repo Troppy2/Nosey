@@ -32,6 +32,7 @@ import {
 import { formatCodingProblem } from "../lib/codingProblemFormat";
 import { isReadFromDrawing } from "../lib/drawnAnswer";
 import { scoreTone } from "../lib/format";
+import { useSettings } from "../lib/useSettings";
 import type { AnswerResult, AttemptDetail, RedoAnswerResponse } from "../lib/types";
 
 export default function Results() {
@@ -60,6 +61,10 @@ export default function Results() {
   // Math/coding mode for the targeted test; defaults to the original test's.
   const [targetedMode, setTargetedMode] = useState<"general" | "math" | "coding">("general");
   const [targetedLanguage, setTargetedLanguage] = useState("Python");
+  // Beta: some written questions become multi-part problems.
+  const [targetedMultiPart, setTargetedMultiPart] = useState(false);
+  const { betaMode } = useSettings();
+  const canMultiPart = betaMode && targetedMode !== "coding" && targetedTestType !== "MCQ_only";
   const [isCreatingTargeted, setIsCreatingTargeted] = useState(false);
   const [targetedError, setTargetedError] = useState<string | null>(null);
   const [reviewSummary, setReviewSummary] = useState<string | null>(null);
@@ -206,6 +211,7 @@ export default function Results() {
         files: [],
         countMcq: targetedTestType !== "FRQ_only" ? targetedCountMcq : 0,
         countFrq: targetedTestType !== "MCQ_only" ? targetedCountFrq : 0,
+        multiPart: canMultiPart && targetedMultiPart ? true : undefined,
         difficulty: targetedDifficulty,
         topicFocus: topics.slice(0, 200),
         customInstructions: `Target the user's weak areas from a previous attempt. Focus questions on: ${topics}`.slice(0, 500),
@@ -368,61 +374,125 @@ export default function Results() {
           {showTargetedModal && (
             <div className="modal-backdrop" onMouseDown={() => setShowTargetedModal(false)}>
               <div
-                className="modal-card targeted-modal-card"
+                className="modal-card targeted-modal-card tp-card"
                 role="dialog"
                 aria-modal="true"
+                aria-labelledby="tp-title"
                 onMouseDown={(e) => e.stopPropagation()}
               >
-                <div className="targeted-modal-header">
+                <header className="tp-head">
                   <div>
-                    <h2>Targeted Practice</h2>
-                    <p className="muted small">Focused on your weak areas</p>
+                    <h2 id="tp-title">Practice what you missed</h2>
+                    <p>
+                      {missed.length} missed question{missed.length === 1 ? "" : "s"}
+                    </p>
                   </div>
-                  <button
-                    className="privacy-modal-close"
-                    onClick={() => setShowTargetedModal(false)}
-                    aria-label="Close"
-                  >
+                  <button className="tp-close" onClick={() => setShowTargetedModal(false)} aria-label="Close">
                     <X size={18} />
                   </button>
+                </header>
+
+                <div className="tp-grid">
+                  <span className="tp-label" id="tp-type">Questions</span>
+                  <div className="tp-field">
+                    <div className="choice-grid tp-choices" role="radiogroup" aria-labelledby="tp-type">
+                      {([
+                        ["mixed", "Mixed"],
+                        ["MCQ_only", "Multiple choice"],
+                        ["FRQ_only", "Written"],
+                      ] as const).map(([value, label]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          role="radio"
+                          aria-checked={targetedTestType === value}
+                          className={`choice ${targetedTestType === value ? "active" : ""}`}
+                          onClick={() => setTargetedTestType(value)}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="tp-counts">
+                      {targetedTestType !== "FRQ_only" && (
+                        <label className="tp-count">
+                          <span>Multiple choice</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={20}
+                            value={targetedCountMcq}
+                            onChange={(e) => setTargetedCountMcq(Math.max(1, Math.min(20, Number(e.target.value))))}
+                          />
+                        </label>
+                      )}
+                      {targetedTestType !== "MCQ_only" && (
+                        <label className="tp-count">
+                          <span>Written</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={10}
+                            value={targetedCountFrq}
+                            onChange={(e) => setTargetedCountFrq(Math.max(1, Math.min(10, Number(e.target.value))))}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+
+                  <span className="tp-label" id="tp-difficulty">Difficulty</span>
+                  <div className="choice-grid tp-choices" role="radiogroup" aria-labelledby="tp-difficulty">
+                    {([
+                      ["mixed", "Mixed"],
+                      ["easy", "Easy"],
+                      ["medium", "Medium"],
+                      ["hard", "Hard"],
+                    ] as const).map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        role="radio"
+                        aria-checked={targetedDifficulty === value}
+                        className={`choice ${targetedDifficulty === value ? "active" : ""}`}
+                        onClick={() => setTargetedDifficulty(value)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="targeted-modal-fields">
-                  <TextInput
-                    label="Test title"
-                    value={targetedTitle}
-                    onChange={(e) => setTargetedTitle(e.target.value)}
-                    placeholder="Targeted Practice Test"
-                  />
-                  <div className="targeted-row">
-                    <SelectInput
-                      label="Test type"
-                      value={targetedTestType}
-                      onChange={(e) => setTargetedTestType(e.target.value)}
-                    >
-                      <option value="mixed">Mixed</option>
-                      <option value="MCQ_only">Multiple choice</option>
-                      <option value="FRQ_only">Written</option>
-                    </SelectInput>
-                    <SelectInput
-                      label="Difficulty"
-                      value={targetedDifficulty}
-                      onChange={(e) => setTargetedDifficulty(e.target.value)}
-                    >
-                      <option value="mixed">Mixed</option>
-                      <option value="easy">Easy</option>
-                      <option value="medium">Medium</option>
-                      <option value="hard">Hard</option>
-                    </SelectInput>
-                    <SelectInput
-                      label="Mode"
-                      value={targetedMode}
-                      onChange={(e) => setTargetedMode(e.target.value as "general" | "math" | "coding")}
-                    >
-                      <option value="general">General</option>
-                      <option value="math">Math</option>
-                      <option value="coding">Coding</option>
-                    </SelectInput>
+                <details className="tp-more">
+                  <summary>More options</summary>
+                  <div className="tp-more-body">
+                    <TextInput
+                      label="Title"
+                      value={targetedTitle}
+                      onChange={(e) => setTargetedTitle(e.target.value)}
+                      placeholder={`Targeted Practice, ${attempt.test_title}`}
+                    />
+                    <div className="tp-row">
+                      <span className="tp-label" id="tp-mode">Mode</span>
+                      <div className="choice-grid tp-choices" role="radiogroup" aria-labelledby="tp-mode">
+                        {([
+                          ["general", "General"],
+                          ["math", "Math"],
+                          ["coding", "Coding"],
+                        ] as const).map(([value, label]) => (
+                          <button
+                            key={value}
+                            type="button"
+                            role="radio"
+                            aria-checked={targetedMode === value}
+                            className={`choice ${targetedMode === value ? "active" : ""}`}
+                            onClick={() => setTargetedMode(value)}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     {targetedMode === "coding" ? (
                       <SelectInput
                         label="Language"
@@ -434,65 +504,30 @@ export default function Results() {
                         ))}
                       </SelectInput>
                     ) : null}
+                    {canMultiPart ? (
+                      <label className="multipart-toggle tp-multipart">
+                        <input
+                          type="checkbox"
+                          checked={targetedMultiPart}
+                          onChange={(e) => setTargetedMultiPart(e.target.checked)}
+                        />
+                        <span>
+                          Multi-part problems <span className="pill pill--beta">Beta</span>
+                          <small>Some written questions become one problem with parts (a), (b), (c).</small>
+                        </span>
+                      </label>
+                    ) : null}
                   </div>
-                  <div className="targeted-row">
-                    {targetedTestType !== "FRQ_only" && (
-                      <TextInput
-                        label="Multiple choice questions"
-                        type="number"
-                        min={1}
-                        max={20}
-                        value={targetedCountMcq}
-                        onChange={(e) =>
-                          setTargetedCountMcq(Math.max(1, Math.min(20, Number(e.target.value))))
-                        }
-                      />
-                    )}
-                    {targetedTestType !== "MCQ_only" && (
-                      <TextInput
-                        label="Written questions"
-                        type="number"
-                        min={1}
-                        max={10}
-                        value={targetedCountFrq}
-                        onChange={(e) =>
-                          setTargetedCountFrq(Math.max(1, Math.min(10, Number(e.target.value))))
-                        }
-                      />
-                    )}
-                  </div>
-                </div>
-
-                <div className="targeted-topics-preview">
-                  <span className="targeted-topics-label">
-                    <Target size={13} />
-                    Targeting {missed.length} weak area{missed.length !== 1 ? "s" : ""}
-                  </span>
-                  <div className="targeted-chips">
-                    {missed.slice(0, 4).map((a) => (
-                      <span key={a.question_id} className="targeted-chip">
-                        {(a.question_text ?? "").slice(0, 52)}
-                        {(a.question_text?.length ?? 0) > 52 ? "…" : ""}
-                      </span>
-                    ))}
-                    {missed.length > 4 && (
-                      <span className="targeted-chip targeted-chip-more">+{missed.length - 4} more</span>
-                    )}
-                  </div>
-                </div>
+                </details>
 
                 {targetedError && <p className="targeted-error">{targetedError}</p>}
 
-                <div className="targeted-modal-actions">
-                  <Button variant="secondary" fullWidth onClick={() => setShowTargetedModal(false)}>
+                <div className="tp-actions">
+                  <Button variant="secondary" onClick={() => setShowTargetedModal(false)}>
                     Cancel
                   </Button>
-                  <Button
-                    fullWidth
-                    onClick={handleCreateTargetedTest}
-                    disabled={isCreatingTargeted || !targetedTitle.trim()}
-                  >
-                    {isCreatingTargeted ? "Creating…" : "Create Test"}
+                  <Button onClick={handleCreateTargetedTest} disabled={isCreatingTargeted}>
+                    {isCreatingTargeted ? "Creating…" : "Create test"}
                   </Button>
                 </div>
               </div>

@@ -38,7 +38,18 @@ type MathInputProps = {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  // Start in plain text: the math editor drops spaces, so a sentence typed
+  // into it reads as one run-on word. The student can switch either way.
+  preferText?: boolean;
 };
+
+// Questions that ask for a sentence, not a formula.
+const PROSE_PROMPT_RE =
+  /\b(explain|describe|justify|why|discuss|interpret|compare|contrast|argue|opinion|in your own words|do you think|should)\b/i;
+
+export function looksLikeProsePrompt(questionText: string): boolean {
+  return PROSE_PROMPT_RE.test(questionText);
+}
 
 function renderLatexPreview(src: string): string {
   if (!src.trim()) return "";
@@ -53,12 +64,13 @@ function renderLatexPreview(src: string): string {
   }
 }
 
-export function MathInput({ value, onChange, placeholder }: MathInputProps) {
+export function MathInput({ value, onChange, placeholder, preferText = false }: MathInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mathFieldRef = useRef<MathfieldElement | null>(null);
   const [fieldReady, setFieldReady] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const [latexMode, setLatexMode] = useState(false);
+  const [textMode, setTextMode] = useState(preferText);
 
   // Keep the latest onChange reachable from the input listener without
   // re-binding the listener on every TakeTest render (it passes an inline arrow).
@@ -86,7 +98,7 @@ export function MathInput({ value, onChange, placeholder }: MathInputProps) {
     };
   }, []);
 
-  const visual = !latexMode && fieldReady;
+  const visual = !textMode && !latexMode && fieldReady;
 
   // Push external value changes (question navigation, resume, mode switch)
   // into the field. Guarded so the field's own edits do not loop back and
@@ -128,18 +140,31 @@ export function MathInput({ value, onChange, placeholder }: MathInputProps) {
     <div className="math-input-wrap">
       <div className="math-input-header">
         <label className="field-label">Your answer</label>
-        {!loadFailed && (
-          <button
-            type="button"
-            className="math-preview-toggle"
-            onClick={() => setLatexMode((m) => !m)}
-          >
-            {latexMode ? "Visual editor" : "Edit as LaTeX"}
+        <div className="math-input-modes">
+          {!loadFailed && !textMode && (
+            <button
+              type="button"
+              className="math-preview-toggle"
+              onClick={() => setLatexMode((m) => !m)}
+            >
+              {latexMode ? "Visual editor" : "Edit as LaTeX"}
+            </button>
+          )}
+          <button type="button" className="math-preview-toggle" onClick={() => setTextMode((t) => !t)}>
+            {textMode ? "Math editor" : "Plain text"}
           </button>
-        )}
+        </div>
       </div>
 
-      {showLatexEditor ? (
+      {textMode ? (
+        <textarea
+          className="field-input math-answer-textarea"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Write your answer in sentences. Switch to the math editor for formulas."
+          rows={4}
+        />
+      ) : showLatexEditor ? (
         <>
           <textarea
             ref={textareaRef}

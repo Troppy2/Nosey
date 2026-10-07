@@ -200,6 +200,53 @@ async def _persist_generated(
     return await add_generated_questions(repo, test_id, mcq_questions, frq_questions, start_order)
 
 
+def _multipart_share(written: int) -> int:
+    """Parts of the written count that become multi-part problems (beta)."""
+    if written < 2:
+        return 0
+    return written if written <= 3 else max(3, written // 2)
+
+
+async def _generate_multipart(
+    llm: LLMService,
+    run_generation,
+    persist_batch,
+    notes_content: str,
+    parts: int,
+    is_math_mode: bool,
+    difficulty: str,
+    topic_focus: Optional[str],
+    custom_instructions: Optional[str],
+    provider: Optional[str],
+    prior_questions: Optional[list[str]],
+    display_order: int,
+    test_id: int,
+) -> int:
+    """Write the multi-part problems, topping any shortfall up with ordinary
+    written questions so the test keeps its count. Returns the next order."""
+    problems = await llm.generate_multipart_problems(
+        notes=notes_content,
+        part_count=parts,
+        is_math_mode=is_math_mode,
+        difficulty=difficulty,
+        topic_focus=topic_focus,
+        custom_instructions=custom_instructions,
+        provider=provider,
+    )
+    if problems:
+        display_order = await persist_batch([], problems, display_order)
+    shortfall = parts - len(problems)
+    logger.info("Multi-part problems for test_id=%s: %d parts, shortfall %d", test_id, len(problems), shortfall)
+    if shortfall > 0:
+        # One top-up call (not a loop): the main path's own fallbacks apply.
+        try:
+            _, frq = await run_generation(0, shortfall, prior_questions)
+            display_order = await persist_batch([], frq[:shortfall], display_order)
+        except Exception as exc:
+            logger.warning("Multi-part top-up failed for test_id=%s: %s", test_id, exc)
+    return display_order
+
+
 async def _verify_persisted_mcqs(
     test_id: int,
     source_content: str,
@@ -236,7 +283,10 @@ async def _verify_persisted_mcqs(
         if test is None:
             return  # deleted mid-generation; delete-as-cancel
 
-        mcq_rows = [q for q in test.questions if q.question_type == "MCQ"]
+        # Parts of a multi-part problem are skipped: their text needs the setup,
+        # and a repair would write a standalone question into a part's slot.
+        # Their answers were already solved with the setup.
+        mcq_rows = [q for q in test.questions if q.question_type == "MCQ" and q.group_id is None]
         items: list[VerifiableMCQ] = []
         for question in mcq_rows:
             correct_positions = [i for i, opt in enumerate(question.mcq_options) if opt.is_correct]
@@ -394,6 +444,7 @@ async def _generate_questions_background(
     practice_test_mode: Optional[str] = None,
     practice_solve_context: str = "",
     reviewed_questions: Optional[tuple[list[GeneratedMCQ], list[GeneratedFRQ]]] = None,
+    multi_part: bool = False,
 ) -> None:
     """Run LLM generation and save questions; called as a FastAPI background task.
 
@@ -502,6 +553,15 @@ async def _generate_questions_background(
         # by the route handler) always uses the un-inflated request; only the
         # count actually GENERATED here is inflated.
         eff_mcq = inflated_mcq_count(eff_mcq_requested)
+        # Multi-part problems (beta): some of the written count becomes problems
+        # with a shared setup and lettered parts, written by their own isolated
+        # call after the main questions. Notes-based tests only; coding and
+        # practice-test paths keep their own shapes.
+        multipart_parts = 0
+        if multi_part and not is_coding_mode and not practice_test_content and reviewed_questions is None:
+            multipart_parts = _multipart_share(eff_frq)
+        eff_frq -= multipart_parts
+        count_frq = max(0, count_frq - multipart_parts)
         total_main = eff_mcq + eff_frq
 
         # Stream in two phases (small first batch, then the rest) only when the test
@@ -581,6 +641,13 @@ async def _generate_questions_background(
             mcq_questions, frq_questions = await run_generation(eff_mcq, count_frq, prior_questions)
             generated_mcq = len(mcq_questions)
             display_order = await persist_batch(mcq_questions, frq_questions, display_order)
+
+        if multipart_parts:
+            display_order = await _generate_multipart(
+                llm, run_generation, persist_batch, notes_content, multipart_parts,
+                is_math_mode, difficulty, topic_focus, custom_instructions, provider,
+                prior_questions, display_order, test_id,
+            )
 
         # Extra (beta) question types. Isolated and best-effort: a failure here
         # must never break the MCQ/FRQ test that was already generated above.
@@ -720,6 +787,7 @@ async def _extract_and_generate_background(
     practice_test_sections: Optional[list[int]] = None,
     practice_test_ranges: Optional[list[tuple[int, int]]] = None,
     reviewed_questions: Optional[tuple[list[GeneratedMCQ], list[GeneratedFRQ]]] = None,
+    multi_part: bool = False,
 ) -> None:
     """Extract uploaded files, persist notes, then run generation.
 
@@ -904,6 +972,7 @@ async def _extract_and_generate_background(
         practice_test_mode="recreate" if practice_test_only else "style",
         practice_solve_context=solve_context,
         reviewed_questions=reviewed_questions,
+        multi_part=multi_part,
     )
 
 
@@ -992,6 +1061,8 @@ async def create_test(
         count_tf = _extra_count("count_tf")
         count_ms = _extra_count("count_ms")
         count_rank = _extra_count("count_rank")
+        # Multi-part problems (beta). Absent means off, so non-beta requests are unaffected.
+        multi_part = str(form.get("multi_part", "false")).lower() in ("true", "1", "yes")
         is_math_mode = str(form.get("is_math_mode", "false")).lower() in ("true", "1", "yes")
         difficulty_raw = str(form.get("difficulty", "mixed")).strip().lower()
         difficulty = difficulty_raw if difficulty_raw in ("easy", "medium", "hard", "mixed") else "mixed"
@@ -1140,6 +1211,7 @@ async def create_test(
                 practice_test_sections=practice_test_sections or None,
                 practice_test_ranges=practice_test_ranges or None,
                 reviewed_questions=reviewed_questions if practice_test_only else None,
+                multi_part=multi_part,
             )
         )
         handed_off = True

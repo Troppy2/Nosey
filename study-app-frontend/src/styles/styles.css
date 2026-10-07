@@ -27659,3 +27659,195 @@ a.sd-chip.is-done:hover {
 .scratchpad-paper-picker {
   flex-shrink: 0;
 }
+
+/* Beta multi-part problems toggle (Create Test extras, targeted practice modal). */
+.multipart-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  cursor: pointer;
+  user-select: none;
+}
+.multipart-toggle input {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: var(--green-dark);
+  cursor: pointer;
+}
+
+/* Math answer mode buttons: Edit as LaTeX / Plain text. */
+.math-input-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* Targeted practice modal: a compact one-column sheet. */
+.tp-card {
+  width: min(460px, 100%);
+  gap: 16px;
+  padding: 22px;
+}
+.tp-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.tp-head h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--green-dark);
+}
+.tp-head p {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  color: var(--green-dark-mid);
+}
+.tp-close {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  color: var(--green-dark);
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.tp-close:hover {
+  background: var(--green-light);
+}
+.tp-grid {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 14px 16px;
+}
+.tp-label {
+  /* Same column width in the main grid and in More options. */
+  min-width: 68px;
+  padding-top: 9px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--green-dark);
+}
+.tp-field {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+/* The app's .choice buttons (Create Test), compact for the modal. */
+.tp-choices {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  /* Each button at least fits its label; spare width is shared. */
+  grid-auto-columns: minmax(max-content, 1fr);
+  gap: 6px;
+}
+.tp-choices .choice {
+  min-height: 38px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.tp-choices .choice:focus-visible,
+.tp-close:focus-visible,
+.tp-more summary:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.tp-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+.tp-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+.tp-count input {
+  width: 58px;
+  height: 34px;
+  padding: 0 8px;
+  font: inherit;
+  font-weight: 600;
+  text-align: center;
+  color: var(--ink);
+  background: var(--white);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-sm);
+}
+.tp-more {
+  border-top: 1px solid var(--green-light-mid);
+  padding-top: 12px;
+}
+.tp-more summary {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.tp-more-body {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+.tp-more-body .field-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--green-dark);
+}
+.tp-more-body .input {
+  min-height: 38px;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.tp-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+.tp-multipart {
+  margin-top: 0;
+}
+.tp-multipart small {
+  display: block;
+  margin-top: 2px;
+  color: var(--green-dark-mid);
+}
+.tp-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+@media (max-width: 520px) {
+  .tp-card {
+    padding: 18px;
+  }
+  .tp-grid,
+  .tp-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+  .tp-label {
+    min-width: 0;
+    padding-top: 6px;
+  }
+  .tp-actions > * {
+    flex: 1;
+  }
+}

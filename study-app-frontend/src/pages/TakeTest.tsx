@@ -10,7 +10,7 @@ import { TextArea } from "../components/Field";
 import { InlineLoading, LoadingNotice } from "../components/Loaders";
 import { KojoHelpChat } from "../components/KojoHelpChat";
 import { MarkdownContent } from "../components/MarkdownContent";
-import { MathInput } from "../components/MathInput";
+import { MathInput, looksLikeProsePrompt } from "../components/MathInput";
 import {
   EMPTY_SCRATCH_PAD,
   exportScratchPadPng,
@@ -788,7 +788,12 @@ export default function TakeTest() {
             </p>
           </div>
         ) : isMathMode ? (
-          <MathInput value={answers[item.id] ?? ""} onChange={setAnswer} />
+          <MathInput
+            key={item.id}
+            value={answers[item.id] ?? ""}
+            onChange={setAnswer}
+            preferText={looksLikeProsePrompt(item.question_text)}
+          />
         ) : (
           <TextArea
             label="Your answer"

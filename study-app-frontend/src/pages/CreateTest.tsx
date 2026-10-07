@@ -56,6 +56,7 @@ export default function CreateTest() {
   const [countFrq, setCountFrq] = useState(5);
   // Extra (beta) question types
   const [countTf, setCountTf] = useState(0);
+  const [multiPart, setMultiPart] = useState(false);
   const [countMs, setCountMs] = useState(0);
   const [countRank, setCountRank] = useState(0);
   const [reviewBeforeTaking, setReviewBeforeTaking] = useState(false);
@@ -258,6 +259,8 @@ export default function CreateTest() {
         countTf: advancedMode && betaMode ? countTf : undefined,
         countMs: advancedMode && betaMode ? countMs : undefined,
         countRank: advancedMode && betaMode ? countRank : undefined,
+        // A practice test keeps its own shape ("Match its style" keeps its multi-part problems).
+        multiPart: advancedMode && betaMode && multiPart && !isCodingMode && !activePracticeTest ? true : undefined,
         isMathMode: isMathMode && !isCodingMode,
         isCodingMode,
         codingLanguage: isCodingMode ? codingLanguage : undefined,
@@ -743,6 +746,15 @@ export default function CreateTest() {
                         />
                       </div>
                     </div>
+                    {!isCodingMode && !activePracticeTest ? (
+                      <label className="multipart-toggle">
+                        <input type="checkbox" checked={multiPart} onChange={(e) => setMultiPart(e.target.checked)} />
+                        <span>
+                          <strong>Multi-part problems</strong>: some written questions become one problem with a
+                          shared setup and parts (a), (b), (c). Each part counts as a written question.
+                        </span>
+                      </label>
+                    ) : null}
                   </div>
                 )}
 

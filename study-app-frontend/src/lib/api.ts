@@ -599,6 +599,8 @@ export async function createTest(input: {
   countTf?: number;
   countMs?: number;
   countRank?: number;
+  // Beta: some written questions become problems with a setup and parts.
+  multiPart?: boolean;
   practiceTestFile?: File | null;
   isMathMode?: boolean;
   difficulty?: string;
@@ -629,6 +631,7 @@ export async function createTest(input: {
   if (input.countTf) formData.append("count_tf", String(input.countTf));
   if (input.countMs) formData.append("count_ms", String(input.countMs));
   if (input.countRank) formData.append("count_rank", String(input.countRank));
+  if (input.multiPart) formData.append("multi_part", "true");
   if (input.isMathMode) formData.append("is_math_mode", "true");
   if (input.difficulty) formData.append("difficulty", input.difficulty);
   if (input.topicFocus) formData.append("topic_focus", input.topicFocus);
