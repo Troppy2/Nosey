@@ -24201,7 +24201,9 @@ button.lc-official-link:disabled:hover {
   flex-direction: column;
   gap: 0.5rem;
   flex: 1;
-  min-height: 0;
+  /* Never shorter than its tools + the canvas floor: the question header
+     shrinks and scrolls instead, so nothing spills out of the modal. */
+  min-height: auto;
 }
 .scratchpad-canvas-toolbar {
   display: flex;
@@ -27621,4 +27623,24 @@ a.sd-chip.is-done:hover {
 .scratchpad-modal {
   max-width: 96vw;
   max-height: 96vh;
+}
+
+/* Inside the modal's height, the question header is what gives way: it
+   shrinks and its text scrolls, the tools and canvas keep their size. */
+.scratchpad-header {
+  flex: 0 1 auto;
+  min-height: 72px;
+  overflow: hidden;
+}
+.scratchpad-header-main {
+  align-self: stretch;
+  min-height: 0;
+}
+.scratchpad-header-main .scratchpad-question-text {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+.scratchpad-annotate-bar,
+.scratchpad-paper-picker {
+  flex-shrink: 0;
 }
