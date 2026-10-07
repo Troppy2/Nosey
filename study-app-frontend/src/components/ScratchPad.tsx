@@ -2227,6 +2227,10 @@ function QuestionAnnotator({
 
 // The question keeps about two lines when the top grip squeezes it.
 const QUESTION_MIN_HEIGHT = 44;
+// Resizing never squeezes the drawing area below this, and the pad never grows
+// past this share of the screen.
+const CANVAS_MIN_HEIGHT = 180;
+const MODAL_MAX_VIEWPORT = 0.96;
 
 type ScratchPadModalProps = {
   questionText: string;
@@ -2268,20 +2272,29 @@ export function ScratchPadModal({
     setAnnotationsState(next);
     questionAnnotations.set(questionText, next);
   }
-  const edgeStartRef = useRef<{ w: number; h: number; q: number } | null>(null);
+  const edgeStartRef = useRef<{ w: number; h: number; q: number; c: number } | null>(null);
 
   function handleEdgeDrag(edge: "top" | "bottom", phase: "start" | "move" | "end", dy: number) {
     if (phase === "start") {
       const card = cardRef.current?.getBoundingClientRect();
       if (!card) return;
-      edgeStartRef.current = { w: card.width, h: card.height, q: questionRef.current?.clientHeight ?? 0 };
+      const canvasBox = cardRef.current?.querySelector(".scratchpad-canvas-container");
+      edgeStartRef.current = {
+        w: card.width,
+        h: card.height,
+        q: questionRef.current?.clientHeight ?? 0,
+        c: canvasBox?.clientHeight ?? CANVAS_MIN_HEIGHT,
+      };
       return;
     }
     const start = edgeStartRef.current;
     if (!start) return;
     if (phase === "end") edgeStartRef.current = null;
-    const maxH = window.innerHeight * 0.96;
-    const clampH = (h: number) => Math.min(maxH, Math.max(280, h));
+    // The pad never leaves the screen and the drawing area never shrinks below
+    // CANVAS_MIN_HEIGHT, however far a grip is dragged.
+    const maxH = window.innerHeight * MODAL_MAX_VIEWPORT;
+    const minH = Math.max(280, start.h - Math.max(0, start.c - CANVAS_MIN_HEIGHT));
+    const clampH = (h: number) => Math.min(maxH, Math.max(minH, h));
     if (edge === "bottom") {
       setCustomSize({ w: start.w, h: clampH(start.h + dy) });
       return;
@@ -2289,7 +2302,9 @@ export function ScratchPadModal({
     // Top grip: dragging up (dy < 0) asks for -dy more pixels of canvas.
     const want = -dy;
     if (want <= 0) {
-      setQuestionMaxH(start.q + -want);
+      // Dragging down gives the question room, but only what the canvas can
+      // spare above its minimum.
+      setQuestionMaxH(start.q + Math.min(-want, Math.max(0, start.c - CANVAS_MIN_HEIGHT)));
       return;
     }
     const fromQuestion = Math.min(want, Math.max(0, start.q - QUESTION_MIN_HEIGHT));
@@ -2341,8 +2356,8 @@ export function ScratchPadModal({
   function handleResizeMove(e: React.PointerEvent) {
     const drag = dragRef.current;
     if (!drag) return;
-    const w = Math.max(360, drag.startW + (e.clientX - drag.startX));
-    const h = Math.max(280, drag.startH + (e.clientY - drag.startY));
+    const w = Math.min(window.innerWidth * MODAL_MAX_VIEWPORT, Math.max(360, drag.startW + (e.clientX - drag.startX)));
+    const h = Math.min(window.innerHeight * MODAL_MAX_VIEWPORT, Math.max(280, drag.startH + (e.clientY - drag.startY)));
     setCustomSize({ w, h });
   }
   function handleResizeEnd() {

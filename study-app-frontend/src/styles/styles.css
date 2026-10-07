@@ -24106,6 +24106,9 @@ button.lc-official-link:disabled:hover {
 }
 .scratchpad-question-text {
   margin: 0;
+  /* A long question scrolls instead of pushing the drawing area away. */
+  max-height: 40vh;
+  overflow-y: auto;
   color: var(--ink);
   font-size: 0.92rem;
   line-height: 1.4;
@@ -24266,7 +24269,8 @@ button.lc-official-link:disabled:hover {
 .scratchpad-canvas-container {
   position: relative;
   flex: 1;
-  min-height: 0;
+  /* Never squeezed to nothing by a long question or a small pad. */
+  min-height: 180px;
   border: 1px solid var(--green-light-mid);
   border-radius: var(--radius-lg);
   background: var(--white);
@@ -27611,4 +27615,10 @@ a.sd-chip.is-done:hover {
 }
 .scratchpad-modal--focus .scratchpad-annotate-bar {
   display: none;
+}
+
+/* A dragged or custom-sized scratch pad always stays on screen. */
+.scratchpad-modal {
+  max-width: 96vw;
+  max-height: 96vh;
 }
