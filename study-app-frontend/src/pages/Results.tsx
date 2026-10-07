@@ -1,4 +1,4 @@
-import { AlertTriangle, Brain, Calculator, CheckCircle2, ChevronDown, Info, Loader2, PenLine, RotateCcw, Sparkles, Target, X, XCircle } from "lucide-react";
+import { AlertTriangle, Atom, Brain, Calculator, CheckCircle2, ChevronDown, Info, Loader2, PenLine, RotateCcw, Sparkles, Target, X, XCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -268,8 +268,8 @@ export default function Results() {
 
       {hasMath && (
         <Card className="math-mode-notice">
-          <Calculator size={18} />
-          <span>Math mode, tap any question to see the full worked solution and step-by-step breakdown.</span>
+          <Atom size={18} />
+          STEM mode, tap any question to see the full worked solution and step-by-step breakdown.
         </Card>
       )}
 
