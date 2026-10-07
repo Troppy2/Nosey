@@ -86,6 +86,9 @@
 .dock-link:active {
   background: rgba(113, 131, 85, 0.16);
 }
+.dock-link:hover {
+  background: rgba(113, 131, 85, 0.16);
+}
 
 .dock-icon {
   flex: 0 0 auto;
