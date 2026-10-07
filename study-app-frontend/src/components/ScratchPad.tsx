@@ -250,6 +250,8 @@ type CanvasSurfaceProps = {
   strokes: Stroke[];
   onStrokesChange: (strokes: Stroke[]) => void;
   paperStyle: PaperStyle;
+  // Drag on the grips above and below the drawing area (pointer delta in px).
+  onEdgeDrag?: (edge: "top" | "bottom", phase: "start" | "move" | "end", dy: number) => void;
 };
 
 // The paper starts about one screen tall and grows downward on request, so a
@@ -521,7 +523,7 @@ type Gesture =
   | { kind: "move"; pointerId: number; startX: number; startY: number; base: Stroke[]; rest: Stroke[]; dx: number; dy: number }
   | { kind: "scale"; pointerId: number; ax: number; ay: number; startDist: number; base: Stroke[]; rest: Stroke[]; factor: number };
 
-function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfaceProps) {
+function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag }: CanvasSurfaceProps) {
   // Three stacked canvases. The static one holds committed strokes and gains
   // each new stroke incrementally; the live one holds just the stroke being
   // drawn; the overlay holds selection chrome and the preview of a selection
@@ -2013,6 +2015,7 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
           {notice}
         </p>
       ) : null}
+      {onEdgeDrag ? <EdgeGrip edge="top" onDrag={onEdgeDrag} /> : null}
       <div ref={containerRef} className="scratchpad-canvas-container">
         <div ref={pageRef} className={`scratchpad-page ${paperClass}`}>
           <canvas ref={staticCanvasRef} className="scratchpad-canvas scratchpad-canvas--static" aria-hidden="true" />
@@ -2030,6 +2033,7 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
           />
         </div>
       </div>
+      {onEdgeDrag ? <EdgeGrip edge="bottom" onDrag={onEdgeDrag} /> : null}
       <button type="button" className="scratchpad-extend-btn" onClick={addSpace} disabled={atMaxHeight}>
         <Plus size={13} />
         {atMaxHeight ? "Page is at its full length" : "Add more space"}
@@ -2038,7 +2042,51 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle }: CanvasSurfacePr
   );
 }
 
+// A bar on the drawing area's top or bottom edge that drags it taller or
+// shorter. Pointer events, so a stylus or finger works (iPad is the main user).
+function EdgeGrip({
+  edge,
+  onDrag,
+}: {
+  edge: "top" | "bottom";
+  onDrag: (edge: "top" | "bottom", phase: "start" | "move" | "end", dy: number) => void;
+}) {
+  const startYRef = useRef<number | null>(null);
+  return (
+    <div
+      className={`scratchpad-edge-grip scratchpad-edge-grip--${edge}`}
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label={edge === "top" ? "Drag up for more drawing space" : "Drag down for more drawing space"}
+      title={edge === "top" ? "Drag up for more space" : "Drag down for more space"}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        (e.target as Element).setPointerCapture(e.pointerId);
+        startYRef.current = e.clientY;
+        onDrag(edge, "start", 0);
+      }}
+      onPointerMove={(e) => {
+        if (startYRef.current == null) return;
+        onDrag(edge, "move", e.clientY - startYRef.current);
+      }}
+      onPointerUp={(e) => {
+        if (startYRef.current == null) return;
+        onDrag(edge, "end", e.clientY - startYRef.current);
+        startYRef.current = null;
+      }}
+      onPointerCancel={() => {
+        startYRef.current = null;
+      }}
+    >
+      <span />
+    </div>
+  );
+}
+
 // ── Modal shell ──────────────────────────────────────────────────────────────
+
+// The question keeps about two lines when the top grip squeezes it.
+const QUESTION_MIN_HEIGHT = 44;
 
 type ScratchPadModalProps = {
   questionText: string;
@@ -2068,6 +2116,39 @@ export function ScratchPadModal({
   const cardRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
   const [customSize, setCustomSize] = useState<{ w: number; h: number } | null>(null);
+  // Edge grips: the top grip first shrinks the
+  // question text (it scrolls), then grows the modal; the bottom grip grows
+  // or shrinks the modal. The modal is centered, so growing it extends both.
+  const questionRef = useRef<HTMLDivElement>(null);
+  const [questionMaxH, setQuestionMaxH] = useState<number | null>(null);
+  const edgeStartRef = useRef<{ w: number; h: number; q: number } | null>(null);
+
+  function handleEdgeDrag(edge: "top" | "bottom", phase: "start" | "move" | "end", dy: number) {
+    if (phase === "start") {
+      const card = cardRef.current?.getBoundingClientRect();
+      if (!card) return;
+      edgeStartRef.current = { w: card.width, h: card.height, q: questionRef.current?.clientHeight ?? 0 };
+      return;
+    }
+    const start = edgeStartRef.current;
+    if (!start) return;
+    if (phase === "end") edgeStartRef.current = null;
+    const maxH = window.innerHeight * 0.96;
+    const clampH = (h: number) => Math.min(maxH, Math.max(280, h));
+    if (edge === "bottom") {
+      setCustomSize({ w: start.w, h: clampH(start.h + dy) });
+      return;
+    }
+    // Top grip: dragging up (dy < 0) asks for -dy more pixels of canvas.
+    const want = -dy;
+    if (want <= 0) {
+      setQuestionMaxH(start.q + -want);
+      return;
+    }
+    const fromQuestion = Math.min(want, Math.max(0, start.q - QUESTION_MIN_HEIGHT));
+    setQuestionMaxH(start.q - fromQuestion);
+    if (want > fromQuestion) setCustomSize({ w: start.w, h: clampH(start.h + (want - fromQuestion)) });
+  }
   // The question runs through KaTeX, which is not cheap. Without this it would
   // re-typeset on every stroke, since a stroke updates the parent's state.
   const questionNode = useMemo(() => <MarkdownContent content={questionText} />, [questionText]);
@@ -2140,7 +2221,11 @@ export function ScratchPadModal({
             <span className="eyebrow">
               <PenLine size={13} /> Scratch pad
             </span>
-            <div className="scratchpad-question-text">
+            <div
+              ref={questionRef}
+              className="scratchpad-question-text"
+              style={questionMaxH != null ? { maxHeight: `${questionMaxH}px`, overflowY: "auto" } : undefined}
+            >
               {questionNode}
             </div>
           </div>
@@ -2207,6 +2292,7 @@ export function ScratchPadModal({
           strokes={data.strokes}
           onStrokesChange={(strokes) => onChange({ version: 1, strokes })}
           paperStyle={paperStyle}
+          onEdgeDrag={handleEdgeDrag}
         />
 
         <div

@@ -27539,3 +27539,27 @@ a.sd-chip.is-done:hover {
   display: grid;
   gap: 4px;
 }
+
+/* Scratch pad edge grips: drag the drawing area taller from its top or bottom. */
+.scratchpad-edge-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 14px;
+  margin: -0.45rem 0;
+  cursor: ns-resize;
+  touch-action: none;
+  flex-shrink: 0;
+}
+.scratchpad-edge-grip span {
+  width: 44px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--green-light-mid);
+  transition: background 0.15s ease, width 0.15s ease;
+}
+.scratchpad-edge-grip:hover span,
+.scratchpad-edge-grip:active span {
+  width: 64px;
+  background: var(--green-dark);
+}
