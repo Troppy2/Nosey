@@ -27622,8 +27622,9 @@ a.sd-chip.is-done:hover {
   display: none;
 }
 
-/* A dragged or custom-sized scratch pad always stays on screen. */
-.scratchpad-modal {
+/* A dragged or custom-sized scratch pad always stays on screen. Full screen
+   is excluded: it must keep its edge-to-edge 100vw x 100vh. */
+.scratchpad-modal:not(.scratchpad-modal--full) {
   max-width: 96vw;
   max-height: 96vh;
 }
