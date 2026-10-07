@@ -6,9 +6,11 @@ import re
 from datetime import datetime
 
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.question import Question, full_question_text
+from src.models.user_answer import UserAnswer
 from src.models.user_attempt import UserAttempt
 from src.repositories.attempt_repository import AttemptRepository
 from src.repositories.test_repository import TestRepository
@@ -188,17 +190,20 @@ class GradingService:
                 raise ValidationException(f"Question {question_id} does not belong to this test")
 
         repo = AttemptRepository(session)
-        # Delete any in-progress draft so it doesn't inflate the attempt number.
-        # Its strokes are read first: a drawing OCR cannot read is kept on the
-        # graded answer so the student can fix it on Results (GH #149).
+        # Strokes of the draft are read first: a drawing OCR cannot read is
+        # kept on the graded answer so the student can fix it on Results
+        # (GH #149). The draft itself is deleted in the write phase below.
         draft = await repo.get_draft(user_id, test_id)
-        draft_strokes: dict[int, str] = {}
-        if draft is not None:
-            draft_strokes = {a.question_id: a.work_strokes for a in draft.answers if a.work_strokes}
-            await session.delete(draft)
-            await session.flush()
-        attempt_number = await repo.next_attempt_number(user_id, test_id)
-        attempt = await repo.create(user_id, test_id, attempt_number)
+        draft_strokes: dict[int, str] = (
+            {a.question_id: a.work_strokes for a in draft.answers if a.work_strokes}
+            if draft is not None else {}
+        )
+        # End the read transaction before grading. OCR + grading can take
+        # minutes; a transaction left open that long sat idle and Neon closed
+        # the connection under it, failing the submit after all the LLM work
+        # was done. Commit (not rollback) so loaded objects stay usable
+        # (expire_on_commit=False). No connection is held while grading.
+        await session.commit()
         notes = "\n\n".join(note.content for note in test.notes)
 
         is_math_mode = getattr(test, "is_math_mode", False)
@@ -277,6 +282,8 @@ class GradingService:
         grades = [grade_by_id[q.id] for q, _ in pairs]
 
         results: list[AnswerResult] = []
+        # Rows are written after grading, in one short transaction.
+        answer_rows: list[dict] = []
         correct_count = 0
         for (question, submitted), grade in zip(pairs, grades):
             # Read from work_by_question_id directly, not grade.work_transcript:
@@ -291,12 +298,15 @@ class GradingService:
                 # Held (needs_input): the typed text alone is stored, so a
                 # later skip can grade it without the drawing.
                 strokes = draft_strokes.get(question.id)
-                await repo.add_answer(
-                    attempt.id, question.id, submitted.answer, False, None, None, False,
+                answer_rows.append(dict(
+                    question_id=question.id,
+                    user_answer=submitted.answer,
+                    is_correct=False,
+                    flagged_uncertain=False,
                     work_strokes=strokes,
                     work_transcript=work_transcript,
                     ocr_status=OCR_STATUS_NEEDS_INPUT,
-                )
+                ))
                 results.append(self._to_answer_result(
                     question,
                     user_answer=submitted.answer,
@@ -314,18 +324,17 @@ class GradingService:
             # has something to show for "your answer".
             user_answer = submitted.answer or _drawn_answer(question_work)
             ocr_status = OCR_STATUS_OK if submitted.work_image else None
-            await repo.add_answer(
-                attempt.id,
-                question.id,
-                user_answer,
-                grade.is_correct,
-                grade.feedback,
-                grade.confidence,
-                grade.flagged_uncertain,
-                reasoning=grade.reasoning,
+            answer_rows.append(dict(
+                question_id=question.id,
+                user_answer=user_answer,
+                is_correct=grade.is_correct,
+                ai_feedback=grade.feedback,
+                confidence_score=grade.confidence,
+                flagged_uncertain=grade.flagged_uncertain,
+                ai_reasoning=grade.reasoning,
                 work_transcript=work_transcript,
                 ocr_status=ocr_status,
-            )
+            ))
             results.append(self._to_answer_result(
                 question,
                 user_answer=user_answer,
@@ -341,14 +350,12 @@ class GradingService:
 
         total = len(results)
         score = round((correct_count / total) * 100, 2) if total else 0.0
-        attempt.correct_count = correct_count
-        attempt.total_questions = total
-        attempt.total_score = score
-        attempt.status = "submitted"  # Mark as submitted, no longer in-progress
-        await session.commit()
+        attempt_id, attempt_number = await self._persist_submission(
+            session, user_id, test_id, answer_rows, correct_count, total, score
+        )
 
         return AttemptResult(
-            attempt_id=attempt.id,
+            attempt_id=attempt_id,
             attempt_number=attempt_number,
             score=score,
             correct_count=correct_count,
@@ -356,6 +363,46 @@ class GradingService:
             answers=results,
             is_provisional=bool(needs_input),
         )
+
+    async def _persist_submission(
+        self,
+        session: AsyncSession,
+        user_id: int,
+        test_id: int,
+        answer_rows: list[dict],
+        correct_count: int,
+        total: int,
+        score: float,
+    ) -> tuple[int, int]:
+        """Write a graded submission in one short transaction.
+
+        Retried once on a dropped connection: the grading is already paid
+        for, and one stale connection should not throw it away.
+        """
+        for attempt_try in range(2):
+            try:
+                repo = AttemptRepository(session)
+                # Delete the draft so it does not inflate the attempt number.
+                draft = await repo.get_draft(user_id, test_id)
+                if draft is not None:
+                    await session.delete(draft)
+                    await session.flush()
+                attempt_number = await repo.next_attempt_number(user_id, test_id)
+                # Created as submitted, not in_progress, so it can never collide
+                # with a draft an overlapping autosave committed (GH #137).
+                attempt = await repo.create(user_id, test_id, attempt_number, status="submitted")
+                attempt.correct_count = correct_count
+                attempt.total_questions = total
+                attempt.total_score = score
+                session.add_all([UserAnswer(attempt_id=attempt.id, **row) for row in answer_rows])
+                await session.commit()
+                return attempt.id, attempt_number
+            except OperationalError:
+                await session.rollback()
+                if attempt_try == 1:
+                    raise
+                logger.warning("Submit write hit a dropped DB connection, retrying once")
+        raise AssertionError("unreachable")
 
     # ── OCR redo on Results (GH #149) ─────────────────────────────────────
 
