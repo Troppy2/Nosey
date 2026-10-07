@@ -24097,6 +24097,7 @@ button.lc-official-link:disabled:hover {
   flex-direction: column;
   gap: 0.15rem;
   min-width: 0;
+  flex: 1;
 }
 .scratchpad-header-main .eyebrow {
   display: inline-flex;
@@ -27562,4 +27563,52 @@ a.sd-chip.is-done:hover {
 .scratchpad-edge-grip:active span {
   width: 64px;
   background: var(--green-dark);
+}
+
+/* Scratch pad question annotations (session only). The question is held at a
+   fixed width and scaled so text never re-wraps under the ink. */
+.scratchpad-annotate-outer {
+  position: relative;
+  overflow: hidden;
+}
+.scratchpad-annotate-inner {
+  position: relative;
+  transform-origin: top left;
+}
+.scratchpad-annotate-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.scratchpad-annotate-canvas.is-active {
+  pointer-events: auto;
+  touch-action: none;
+  cursor: crosshair;
+}
+.scratchpad-annotate-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.3rem;
+}
+.scratchpad-annotate-bar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  background: transparent;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.scratchpad-annotate-bar button.is-active {
+  color: var(--white);
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+}
+.scratchpad-modal--focus .scratchpad-annotate-bar {
+  display: none;
 }

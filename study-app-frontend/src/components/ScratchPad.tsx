@@ -22,7 +22,17 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
 import { scopeKey } from "../lib/api";
 import { traceInk } from "../lib/inkTrace";
 import { MarkdownContent } from "./MarkdownContent";
@@ -252,6 +262,8 @@ type CanvasSurfaceProps = {
   paperStyle: PaperStyle;
   // Drag on the grips above and below the drawing area (pointer delta in px).
   onEdgeDrag?: (edge: "top" | "bottom", phase: "start" | "move" | "end", dy: number) => void;
+  // Current pen or highlighter look, for annotating the question.
+  onLookChange?: (look: StrokeLook) => void;
 };
 
 // The paper starts about one screen tall and grows downward on request, so a
@@ -523,7 +535,7 @@ type Gesture =
   | { kind: "move"; pointerId: number; startX: number; startY: number; base: Stroke[]; rest: Stroke[]; dx: number; dy: number }
   | { kind: "scale"; pointerId: number; ax: number; ay: number; startDist: number; base: Stroke[]; rest: Stroke[]; factor: number };
 
-function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag }: CanvasSurfaceProps) {
+function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLookChange }: CanvasSurfaceProps) {
   // Three stacked canvases. The static one holds committed strokes and gains
   // each new stroke incrementally; the live one holds just the stroke being
   // drawn; the overlay holds selection chrome and the preview of a selection
@@ -550,6 +562,12 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag }: Can
   });
   const [tool, setTool] = useState<Tool>("pen");
   const [prefs, setPrefs] = useState<PenPrefs>(loadPenPrefs);
+  // Question annotations use the highlighter when it is picked, else the pen.
+  useEffect(() => {
+    onLookChange?.(
+      tool === "highlight" ? { h: 1, c: prefs.hlColor, w: HIGHLIGHT_WIDTH } : { c: prefs.color, w: prefs.width },
+    );
+  }, [tool, prefs.color, prefs.width, prefs.hlColor, onLookChange]);
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
   useEffect(() => {
@@ -2083,6 +2101,128 @@ function EdgeGrip({
   );
 }
 
+// ── Question annotations ─────────────────────────────────────────────────────
+
+// Session only: kept while the page is open (closing and reopening the pad, or
+// moving between questions, keeps them), gone on refresh. Keyed by question
+// text. Never sent to the server.
+const questionAnnotations = new Map<string, Stroke[]>();
+
+// The question renders at this fixed width once it has ink on it, scaled down
+// to fit a narrower pad, so text never re-wraps out from under the marks.
+const ANNOTATE_WIDTH = 680;
+
+function QuestionAnnotator({
+  questionKey,
+  content,
+  active,
+  look,
+  strokes,
+  onStrokesChange,
+}: {
+  questionKey: string;
+  content: ReactNode;
+  active: boolean;
+  look: StrokeLook;
+  strokes: Stroke[];
+  onStrokesChange: (strokes: Stroke[]) => void;
+}) {
+  const outerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const liveRef = useRef<Stroke | null>(null);
+  const [box, setBox] = useState({ avail: ANNOTATE_WIDTH, h: 0 });
+  const locked = active || strokes.length > 0;
+  const scale = Math.min(1, box.avail / ANNOTATE_WIDTH);
+
+  useLayoutEffect(() => {
+    const outer = outerRef.current;
+    const inner = innerRef.current;
+    if (!outer || !inner) return undefined;
+    const measure = () => setBox({ avail: outer.clientWidth || ANNOTATE_WIDTH, h: inner.offsetHeight });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(outer);
+    observer.observe(inner);
+    return () => observer.disconnect();
+  }, [locked, questionKey]);
+
+  const paint = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = ANNOTATE_WIDTH;
+    const h = Math.max(1, box.h);
+    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+    }
+    const ctx = ctxOf(canvas);
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    const list = liveRef.current ? [...strokes, liveRef.current] : strokes;
+    drawAllStrokes(ctx, list, 1);
+  }, [strokes, box.h]);
+
+  useEffect(() => {
+    paint();
+  }, [paint, locked]);
+
+  function toLocal(e: ReactPointerEvent): [number, number] {
+    const rect = innerRef.current!.getBoundingClientRect();
+    return [round1((e.clientX - rect.left) / scale), round1((e.clientY - rect.top) / scale)];
+  }
+
+  if (!locked) {
+    return (
+      <div ref={outerRef}>
+        <div ref={innerRef}>{content}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={outerRef} className="scratchpad-annotate-outer" style={{ height: box.h * scale }}>
+      <div
+        ref={innerRef}
+        className="scratchpad-annotate-inner"
+        style={{ width: ANNOTATE_WIDTH, transform: scale < 1 ? `scale(${scale})` : undefined }}
+      >
+        {content}
+        <canvas
+          ref={canvasRef}
+          className={`scratchpad-annotate-canvas${active ? " is-active" : ""}`}
+          onPointerDown={(e) => {
+            if (!active) return;
+            e.preventDefault();
+            (e.target as Element).setPointerCapture(e.pointerId);
+            liveRef.current = { ...look, points: toLocal(e) };
+            paint();
+          }}
+          onPointerMove={(e) => {
+            const live = liveRef.current;
+            if (!live || live.points.length >= MAX_POINTS_PER_STROKE) return;
+            live.points.push(...toLocal(e));
+            paint();
+          }}
+          onPointerUp={() => {
+            const live = liveRef.current;
+            liveRef.current = null;
+            if (live) onStrokesChange([...strokes, { ...live, points: simplifyStroke(live.points, 0.6) }]);
+          }}
+          onPointerCancel={() => {
+            liveRef.current = null;
+            paint();
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 // ── Modal shell ──────────────────────────────────────────────────────────────
 
 // The question keeps about two lines when the top grip squeezes it.
@@ -2121,6 +2261,13 @@ export function ScratchPadModal({
   // or shrinks the modal. The modal is centered, so growing it extends both.
   const questionRef = useRef<HTMLDivElement>(null);
   const [questionMaxH, setQuestionMaxH] = useState<number | null>(null);
+  const [annotating, setAnnotating] = useState(false);
+  const [annotations, setAnnotationsState] = useState<Stroke[]>(() => questionAnnotations.get(questionText) ?? []);
+  const [look, setLook] = useState<StrokeLook>({ c: DEFAULT_INK, w: DEFAULT_WIDTH });
+  function setAnnotations(next: Stroke[]) {
+    setAnnotationsState(next);
+    questionAnnotations.set(questionText, next);
+  }
   const edgeStartRef = useRef<{ w: number; h: number; q: number } | null>(null);
 
   function handleEdgeDrag(edge: "top" | "bottom", phase: "start" | "move" | "end", dy: number) {
@@ -2226,7 +2373,35 @@ export function ScratchPadModal({
               className="scratchpad-question-text"
               style={questionMaxH != null ? { maxHeight: `${questionMaxH}px`, overflowY: "auto" } : undefined}
             >
-              {questionNode}
+              <QuestionAnnotator
+                questionKey={questionText}
+                content={questionNode}
+                active={annotating}
+                look={look}
+                strokes={annotations}
+                onStrokesChange={setAnnotations}
+              />
+            </div>
+            <div className="scratchpad-annotate-bar">
+              <button
+                type="button"
+                className={annotating ? "is-active" : ""}
+                onClick={() => setAnnotating((on) => !on)}
+                aria-pressed={annotating}
+                title="Mark up the question with the pen or highlighter picked below"
+              >
+                <Highlighter size={13} /> {annotating ? "Done annotating" : "Annotate question"}
+              </button>
+              {annotations.length > 0 ? (
+                <>
+                  <button type="button" onClick={() => setAnnotations(annotations.slice(0, -1))} title="Undo last mark">
+                    <Undo2 size={13} /> Undo
+                  </button>
+                  <button type="button" onClick={() => setAnnotations([])} title="Clear all marks on the question">
+                    <Trash2 size={13} /> Clear
+                  </button>
+                </>
+              ) : null}
             </div>
           </div>
           <div className="scratchpad-header-actions">
@@ -2293,6 +2468,7 @@ export function ScratchPadModal({
           onStrokesChange={(strokes) => onChange({ version: 1, strokes })}
           paperStyle={paperStyle}
           onEdgeDrag={handleEdgeDrag}
+          onLookChange={setLook}
         />
 
         <div
