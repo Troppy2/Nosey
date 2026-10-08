@@ -1,0 +1,271 @@
+/* Test timer pill (TakeTest toolbar).
+   The memorable part: a countdown drains the pill's background like a fuse,
+   left to right, from --tt-fill (100% -> 0%). Amber in the last fifth, and
+   past zero the whole pill turns danger and counts overtime. */
+
+.tt-wrap {
+  position: relative;
+  margin-left: auto;
+}
+
+.tt {
+  --tt-surface: rgba(255, 255, 255, 0.7);
+  --tt-fuse: var(--green-light);
+  --tt-ink: var(--green-dark);
+  --tt-edge: var(--green-mid);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 4px 0 12px;
+  color: var(--tt-ink);
+  background: var(--tt-surface);
+  border: 1.5px solid var(--tt-edge);
+  border-radius: var(--radius-pill);
+  transition: background var(--transition-normal), border-color var(--transition-normal), color var(--transition-normal);
+}
+
+/* The fuse: only a countdown has one. */
+.tt--countdown {
+  background:
+    linear-gradient(90deg, var(--tt-fuse) var(--tt-fill), transparent var(--tt-fill)),
+    var(--tt-surface);
+}
+
+.tt--low {
+  /* Stronger than the tint alone so the last fifth reads at a glance. */
+  --tt-fuse: color-mix(in srgb, var(--accent-caution) 28%, var(--accent-caution-tint));
+  --tt-ink: var(--accent-caution-strong);
+  --tt-edge: var(--accent-caution);
+}
+
+.tt--over {
+  --tt-surface: var(--accent-danger-tint);
+  --tt-ink: var(--accent-danger-strong);
+  --tt-edge: var(--accent-danger);
+}
+
+.tt--paused .tt-clock {
+  opacity: 0.55;
+}
+
+.tt-dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.3;
+}
+
+.tt--running .tt-dot {
+  opacity: 1;
+  animation: tt-pulse 2s ease-in-out infinite;
+}
+
+@keyframes tt-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, currentColor 0%, transparent);
+  }
+}
+
+.tt-clock {
+  display: inline-flex;
+  align-items: baseline;
+  min-width: 4.2ch;
+  font-family: var(--font-sans);
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  transition: opacity var(--transition-fast);
+}
+
+.tt-sign {
+  margin-right: 1px;
+}
+
+.tt-colon {
+  margin: 0 1px;
+  opacity: 0.6;
+}
+
+.tt-sec {
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.tt-controls {
+  display: inline-flex;
+  margin-left: auto;
+  align-items: center;
+  gap: 2px;
+}
+
+.tt-btn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: inherit;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+
+.tt-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.tt-btn:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.tt-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.tt-btn:focus-visible,
+.tt-preset:focus-visible,
+.tt-custom input:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+/* Start/pause is the one filled button. */
+.tt-btn--main {
+  color: var(--white);
+  background: var(--tt-ink);
+}
+
+.tt-btn--main:hover:not(:disabled) {
+  background: var(--tt-ink);
+  filter: brightness(1.12);
+}
+
+.tt-btn--menu svg {
+  transition: transform var(--transition-fast);
+}
+
+.tt-btn--menu.is-open svg {
+  transform: rotate(180deg);
+}
+
+.tt-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  gap: 10px;
+  width: min(280px, calc(100vw - 32px));
+  padding: 12px;
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  animation: tt-menu-in var(--transition-fast);
+}
+
+@keyframes tt-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.tt-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.tt-modes .choice {
+  min-height: 38px;
+  padding: 6px 8px;
+  font-size: 0.85rem;
+}
+
+.tt-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tt-preset {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--green-dark);
+  background: var(--white);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.tt-preset:hover:not(:disabled),
+.tt-preset.is-active {
+  color: var(--green-lightest);
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+}
+
+.tt-preset:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.tt-custom {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.tt-custom input {
+  width: 74px;
+  height: 34px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--white);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-pill);
+}
+
+@media (max-width: 640px) {
+  /* On a phone the pill takes its own row so the clock stays readable. */
+  .tt-wrap {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .tt {
+    width: 100%;
+    height: 40px;
+  }
+
+  .tt-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .tt-menu {
+    left: 0;
+    right: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tt--running .tt-dot,
+  .tt-menu {
+    animation: none;
+  }
+}

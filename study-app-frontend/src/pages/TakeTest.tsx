@@ -24,6 +24,7 @@ import type { ProgressStage } from "../components/Progress";
 import { ProgressOverlay, useStagedProgress } from "../components/Progress";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
 import { SkeletonQuestionCard } from "../components/Skeletons";
+import { TestTimer } from "../components/TestTimer";
 import { fetchTest, getDraftAttempt, saveDraftAttempt, saveDraftAttemptOnExit, scopeKey, submitAttempt } from "../lib/api";
 import { applyTextHighlights, clearTextHighlights, getSelectionSignature, HIGHLIGHT_SUPPORTED } from "../lib/highlightRanges";
 import { buildScreens, fullQuestionText, screenAnchor, type QuestionScreens } from "../lib/questionScreens";
@@ -57,6 +58,7 @@ const toolKeys = {
   crossouts: (testId: number) => `nosey_test_crossouts_${testId}`,
   notes: (testId: number) => `nosey_test_notes_${testId}`,
   highlights: (testId: number) => `nosey_test_highlights_${testId}`,
+  timer: (testId: number) => `nosey_test_timer_${testId}`,
 };
 
 type GenerationMeta = {
@@ -145,7 +147,7 @@ export default function TakeTest() {
   }, [notes, numericTestId]);
 
   function clearToolStorage() {
-    [toolKeys.bookmarks, toolKeys.crossouts, toolKeys.highlights, toolKeys.notes].forEach((fn) =>
+    [toolKeys.bookmarks, toolKeys.crossouts, toolKeys.highlights, toolKeys.notes, toolKeys.timer].forEach((fn) =>
       localStorage.removeItem(scopeKey(fn(numericTestId))),
     );
   }
@@ -939,6 +941,7 @@ export default function TakeTest() {
                 <NotebookPen size={15} />
                 Notes
               </button>
+              <TestTimer storageKey={scopeKey(toolKeys.timer(numericTestId))} />
             </div>
             {navOpen && (
               <div className="test-nav-pop" role="menu">
