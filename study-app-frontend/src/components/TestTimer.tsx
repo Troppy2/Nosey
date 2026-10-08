@@ -5,6 +5,7 @@ import { formatClock, useTestTimer, type TimerMode } from "../lib/useTestTimer";
 import "../styles/components/test-timer.css";
 
 const PRESET_MINUTES = [15, 30, 60];
+const MAX_CUSTOM_MINUTES = 600;
 
 // The timer pill in the test toolbar. A countdown drains the pill like a fuse,
 // turns amber in its last fifth, and past zero counts overtime in red.
@@ -12,6 +13,7 @@ export function TestTimer({ storageKey }: { storageKey: string }) {
   const timer = useTestTimer(storageKey);
   const [menuOpen, setMenuOpen] = useState(false);
   const [customMinutes, setCustomMinutes] = useState("");
+  const [customError, setCustomError] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const { state, running, idle, overtime, fraction } = timer;
   const isCountdown = state.mode === "countdown";
@@ -139,31 +141,44 @@ export function TestTimer({ storageKey }: { storageKey: string }) {
                   {m} min
                 </button>
               ))}
+              {/* noValidate: our own error state, not the browser's tooltip. */}
               <form
                 className="tt-custom"
+                noValidate
                 onSubmit={(e) => {
                   e.preventDefault();
-                  const m = Math.round(Number(customMinutes));
-                  if (m >= 1 && m <= 600) {
-                    choose("countdown", m);
-                    setCustomMinutes("");
+                  const m = Number(customMinutes);
+                  if (!Number.isInteger(m) || m < 1 || m > MAX_CUSTOM_MINUTES) {
+                    setCustomError(`Enter a whole number from 1 to ${MAX_CUSTOM_MINUTES}.`);
+                    return;
                   }
+                  choose("countdown", m);
+                  setCustomMinutes("");
+                  setCustomError(null);
                 }}
               >
                 <input
                   type="number"
-                  min={1}
-                  max={600}
                   inputMode="numeric"
                   placeholder={PRESET_MINUTES.includes(durationMinutes) ? "Custom" : String(durationMinutes)}
                   value={customMinutes}
-                  onChange={(e) => setCustomMinutes(e.target.value)}
+                  onChange={(e) => {
+                    setCustomMinutes(e.target.value);
+                    setCustomError(null);
+                  }}
                   aria-label="Custom minutes"
+                  aria-invalid={customError ? true : undefined}
+                  aria-describedby={customError ? "tt-custom-error" : undefined}
                 />
                 <button type="submit" className="tt-preset" disabled={!customMinutes}>
                   Set
                 </button>
               </form>
+              {customError ? (
+                <p id="tt-custom-error" className="tt-error" role="alert">
+                  {customError}
+                </p>
+              ) : null}
             </div>
           ) : null}
         </div>

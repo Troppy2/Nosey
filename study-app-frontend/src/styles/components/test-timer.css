@@ -240,6 +240,23 @@
   border-radius: var(--radius-pill);
 }
 
+.tt-custom input[aria-invalid="true"] {
+  border-color: var(--accent-danger);
+  background: var(--accent-danger-tint);
+}
+
+.tt-custom input[aria-invalid="true"]:focus-visible {
+  outline-color: var(--accent-danger);
+}
+
+.tt-error {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent-danger-strong);
+}
+
 @media (max-width: 640px) {
   /* On a phone the pill takes its own row so the clock stays readable. */
   .tt-wrap {
