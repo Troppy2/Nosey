@@ -27851,3 +27851,18 @@ a.sd-chip.is-done:hover {
     flex: 1;
   }
 }
+
+/* While annotating, the whole question shows: the ink layer takes touch for
+   drawing, so a clipped question could not be scrolled on a tablet. The pad
+   scrolls instead if the question is long. */
+.scratchpad-question-text.is-annotating {
+  max-height: none;
+  overflow: visible;
+}
+.scratchpad-header:has(.is-annotating) {
+  flex-shrink: 0;
+  overflow: visible;
+}
+.scratchpad-modal:has(.scratchpad-question-text.is-annotating) {
+  overflow-y: auto;
+}

@@ -2120,11 +2120,11 @@ function EdgeGrip({
 // Session only: kept while the page is open (closing and reopening the pad, or
 // moving between questions, keeps them), gone on refresh. Keyed by question
 // text. Never sent to the server.
-const questionAnnotations = new Map<string, Stroke[]>();
-
-// The question renders at this fixed width once it has ink on it, scaled down
-// to fit a narrower pad, so text never re-wraps out from under the marks.
-const ANNOTATE_WIDTH = 680;
+// width is the question box's width when annotating began: the text is held
+// at it (full size) so it never re-wraps out from under the marks, and only
+// scales down if the pad is later made narrower.
+type QuestionMarks = { width: number | null; strokes: Stroke[] };
+const questionAnnotations = new Map<string, QuestionMarks>();
 
 function QuestionAnnotator({
   questionKey,
@@ -2132,6 +2132,8 @@ function QuestionAnnotator({
   active,
   look,
   strokes,
+  width,
+  onLock,
   onStrokesChange,
 }: {
   questionKey: string;
@@ -2139,21 +2141,31 @@ function QuestionAnnotator({
   active: boolean;
   look: StrokeLook;
   strokes: Stroke[];
+  width: number | null;
+  onLock: (width: number) => void;
   onStrokesChange: (strokes: Stroke[]) => void;
 }) {
   const outerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const liveRef = useRef<Stroke | null>(null);
-  const [box, setBox] = useState({ avail: ANNOTATE_WIDTH, h: 0 });
-  const locked = active || strokes.length > 0;
-  const scale = Math.min(1, box.avail / ANNOTATE_WIDTH);
+  const [box, setBox] = useState({ avail: 0, h: 0 });
+  const locked = (active || strokes.length > 0) && width !== null;
+  const lockWidth = width ?? box.avail;
+  const scale = lockWidth > 0 && box.avail > 0 ? Math.min(1, box.avail / lockWidth) : 1;
+
+  // Annotating starts at the box's current width, so the text keeps its size.
+  useLayoutEffect(() => {
+    if ((active || strokes.length > 0) && width === null && outerRef.current) {
+      onLock(Math.max(1, Math.round(outerRef.current.clientWidth)));
+    }
+  });
 
   useLayoutEffect(() => {
     const outer = outerRef.current;
     const inner = innerRef.current;
     if (!outer || !inner) return undefined;
-    const measure = () => setBox({ avail: outer.clientWidth || ANNOTATE_WIDTH, h: inner.offsetHeight });
+    const measure = () => setBox({ avail: outer.clientWidth, h: inner.offsetHeight });
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(outer);
@@ -2165,7 +2177,7 @@ function QuestionAnnotator({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const dpr = window.devicePixelRatio || 1;
-    const w = ANNOTATE_WIDTH;
+    const w = Math.max(1, lockWidth);
     const h = Math.max(1, box.h);
     if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
       canvas.width = Math.round(w * dpr);
@@ -2179,7 +2191,7 @@ function QuestionAnnotator({
     ctx.clearRect(0, 0, w, h);
     const list = liveRef.current ? [...strokes, liveRef.current] : strokes;
     drawAllStrokes(ctx, list, 1);
-  }, [strokes, box.h]);
+  }, [strokes, box.h, lockWidth]);
 
   useEffect(() => {
     paint();
@@ -2203,7 +2215,7 @@ function QuestionAnnotator({
       <div
         ref={innerRef}
         className="scratchpad-annotate-inner"
-        style={{ width: ANNOTATE_WIDTH, transform: scale < 1 ? `scale(${scale})` : undefined }}
+        style={{ width: lockWidth, transform: scale < 1 ? `scale(${scale})` : undefined }}
       >
         {content}
         <canvas
@@ -2280,11 +2292,23 @@ export function ScratchPadModal({
   const questionRef = useRef<HTMLDivElement>(null);
   const [questionMaxH, setQuestionMaxH] = useState<number | null>(null);
   const [annotating, setAnnotating] = useState(false);
-  const [annotations, setAnnotationsState] = useState<Stroke[]>(() => questionAnnotations.get(questionText) ?? []);
+  const [marks, setMarksState] = useState<QuestionMarks>(
+    () => questionAnnotations.get(questionText) ?? { width: null, strokes: [] },
+  );
+  const annotations = marks.strokes;
   const [look, setLook] = useState<StrokeLook>({ c: DEFAULT_INK, w: DEFAULT_WIDTH });
-  function setAnnotations(next: Stroke[]) {
-    setAnnotationsState(next);
+  function setMarks(next: QuestionMarks) {
+    setMarksState(next);
     questionAnnotations.set(questionText, next);
+  }
+  function setAnnotations(next: Stroke[]) {
+    // Cleared and not annotating: the text goes back to reflowing freely.
+    setMarks({ width: next.length === 0 && !annotating ? null : marks.width, strokes: next });
+  }
+  function toggleAnnotating() {
+    const next = !annotating;
+    setAnnotating(next);
+    if (!next && annotations.length === 0) setMarks({ width: null, strokes: [] });
   }
   const edgeStartRef = useRef<{ w: number; h: number; q: number; c: number } | null>(null);
 
@@ -2399,8 +2423,8 @@ export function ScratchPadModal({
             </span>
             <div
               ref={questionRef}
-              className="scratchpad-question-text"
-              style={questionMaxH != null ? { maxHeight: `${questionMaxH}px`, overflowY: "auto" } : undefined}
+              className={`scratchpad-question-text${annotating ? " is-annotating" : ""}`}
+              style={questionMaxH != null && !annotating ? { maxHeight: `${questionMaxH}px`, overflowY: "auto" } : undefined}
             >
               <QuestionAnnotator
                 questionKey={questionText}
@@ -2408,6 +2432,8 @@ export function ScratchPadModal({
                 active={annotating}
                 look={look}
                 strokes={annotations}
+                width={marks.width}
+                onLock={(width) => setMarks({ width, strokes: annotations })}
                 onStrokesChange={setAnnotations}
               />
             </div>
@@ -2415,7 +2441,7 @@ export function ScratchPadModal({
               <button
                 type="button"
                 className={annotating ? "is-active" : ""}
-                onClick={() => setAnnotating((on) => !on)}
+                onClick={toggleAnnotating}
                 aria-pressed={annotating}
                 title="Mark up the question with the pen or highlighter picked below"
               >
