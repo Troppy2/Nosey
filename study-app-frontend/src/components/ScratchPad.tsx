@@ -535,6 +535,14 @@ type Gesture =
   | { kind: "move"; pointerId: number; startX: number; startY: number; base: Stroke[]; rest: Stroke[]; dx: number; dy: number }
   | { kind: "scale"; pointerId: number; ax: number; ay: number; startDist: number; base: Stroke[]; rest: Stroke[]; factor: number };
 
+// Ink copied in a scratch pad, shared by every pad in the session so a part's
+// work can be pasted into the next part. Never saved or sent anywhere.
+let inkClipboard: { strokes: Stroke[]; source: object | null; version: number } = {
+  strokes: [],
+  source: null,
+  version: 0,
+};
+
 function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLookChange }: CanvasSurfaceProps) {
   // Three stacked canvases. The static one holds committed strokes and gains
   // each new stroke incrementally; the live one holds just the stroke being
@@ -1008,21 +1016,21 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
     setSelection([]);
   }
 
-  // Ink copied inside the pad. The system clipboard cannot hold strokes, so
-  // this is kept here; pasting prefers a picture on the system clipboard (see
-  // the paste handler) and falls back to this.
-  const clipboardInkRef = useRef<Stroke[]>([]);
+  // Ink copied in any pad lives in the shared inkClipboard, so it can be
+  // pasted into another part's (or question's) pad. Pasting prefers a picture
+  // on the system clipboard (see the paste handler) and falls back to this.
+  const padIdRef = useRef({});
   const pasteCountRef = useRef(0);
+  const pasteVersionRef = useRef(-1);
 
   function copySelection(): boolean {
     const sel = selectedRef.current;
     if (sel.length === 0) return false;
-    clipboardInkRef.current = sel;
-    pasteCountRef.current = 0;
+    inkClipboard = { strokes: sel, source: padIdRef.current, version: inkClipboard.version + 1 };
     // Replace any picture on the system clipboard, or the next Ctrl+V would
     // bring that back instead of this ink.
     void navigator.clipboard?.writeText("nosey-ink").catch(() => undefined);
-    setNotice("Copied. Ctrl+V pastes it.");
+    setNotice("Copied. Ctrl+V pastes it here or in another part's pad.");
     return true;
   }
 
@@ -1031,14 +1039,20 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
   }
 
   function pasteInk(): boolean {
-    const source = clipboardInkRef.current;
+    const { strokes: source, source: fromPad, version } = inkClipboard;
     if (source.length === 0) return false;
+    if (pasteVersionRef.current !== version) {
+      // A new copy: pasted into the pad it came from it lands a step along
+      // (not on top of the original); into another pad, where it was.
+      pasteVersionRef.current = version;
+      pasteCountRef.current = fromPad === padIdRef.current ? 0 : -1;
+    }
     const prev = localStrokesRef.current;
     if (prev.length + source.length > MAX_STROKES_PER_QUESTION) {
       setNotice("The page is full. Erase something before pasting.");
       return true;
     }
-    // Each paste lands a little further along, so repeated pastes do not stack.
+    // Each further paste lands a little further along, so pastes do not stack.
     pasteCountRef.current += 1;
     const shift = DUPLICATE_OFFSET * pasteCountRef.current;
     const copies = source.map((st) => translateStroke(st, shift, shift));
