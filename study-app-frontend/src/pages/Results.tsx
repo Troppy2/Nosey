@@ -706,6 +706,12 @@ function ReviewItem({ answer, label }: { answer: AnswerResult; label: string }) 
               </span>
             </div>
           ) : null}
+          {answer.answer_from_sheet ? (
+            <div className="review-inferred-note">
+              <Info size={15} />
+              <span>Graded against your answer sheet.</span>
+            </div>
+          ) : null}
           <div>
             <span>{drawnOnly ? "Your answer (read from your drawing)" : "Your answer"}</span>
             <ClampedBox className={`review-answer-markdown ${drawnOnly ? "review-work-transcript" : "review-answer-text"}`}>

@@ -96,6 +96,8 @@ class AnswerResult(BaseModel):
     # The correct answer was worked out by Nosey, not taken from the uploaded
     # practice test's answer key (GH #133).
     answer_inferred: bool = False
+    # The correct answer came from the student's uploaded answer sheet.
+    answer_from_sheet: bool = False
     # OCR redo state (GH #149): None (no drawing), ok, needs_input, resolved,
     # skipped. While needs_input, correct_answer / feedback / reasoning are
     # redacted so the answer key cannot be copied into the redo.

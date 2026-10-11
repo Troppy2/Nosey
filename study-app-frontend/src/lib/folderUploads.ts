@@ -1,10 +1,12 @@
 import { type SkippedFile, type UploadPurpose, uploadFolderFiles } from "./api";
 
-// Mirrors ALLOWED_FILE_TYPES in study-app-backend/src/utils/validators.py.
+// Mirrors ALLOWED_FILE_TYPES + IMAGE_FILE_TYPES in study-app-backend/src/utils/validators.py.
+// Images are read by a vision model on the server, handwriting included.
 export const ACCEPTED_UPLOAD_EXTENSIONS = [
   "pdf", "docx", "txt", "md", "html", "htm", "pptx",
   "py", "js", "ts", "tsx", "jsx", "java", "c", "cpp", "h", "hpp", "cs", "go", "rs", "swift", "kt",
   "ml", "mli", "scala", "rb", "php", "sql", "json", "xml", "yaml", "yml", "ipynb",
+  "png", "jpg", "jpeg",
 ];
 export const ACCEPTED_UPLOAD_ATTR = ACCEPTED_UPLOAD_EXTENSIONS.map((ext) => `.${ext}`).join(",");
 

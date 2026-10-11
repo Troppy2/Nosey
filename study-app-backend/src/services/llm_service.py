@@ -138,6 +138,10 @@ class GeneratedMCQ:
     group_label: str = ""
     group_stem: str = ""
     seq: Optional[int] = None
+    # The student's uploaded answer sheet answered this question: the answer is
+    # official, and solution holds the sheet's worked solution / marking points.
+    answer_from_sheet: bool = False
+    solution: str = ""
 
 
 @dataclass(frozen=True)
@@ -153,6 +157,8 @@ class GeneratedFRQ:
     group_label: str = ""
     group_stem: str = ""
     seq: Optional[int] = None
+    answer_from_sheet: bool = False
+    solution: str = ""
 
 
 def _practice_item_position(item: dict) -> dict[str, object]:
@@ -520,6 +526,11 @@ _STRONGEST_PROVIDER_ORDER = ("claude", "groq", "minimax", "gemini", "ollama")
 _PARALLEL_BATCH = 8
 _PARALLEL_NOTES_CHARS = 12_000
 _PRACTICE_ANSWER_KEY_CHARS = 6_000
+# A separate answer sheet / mark scheme: sent whole up to this size, otherwise
+# the part that best matches each batch of questions is retrieved.
+_ANSWER_SHEET_CHARS = 30_000
+_ANSWER_SHEET_BATCH = 10
+_ANSWER_SHEET_SOLUTION_CHARS = 3_000
 _PRACTICE_MIN_OPTIONS = 2
 _PRACTICE_MAX_OPTIONS = 6
 # A heading line that starts an answer key section ("Answer Key", "Answers:").
@@ -2001,8 +2012,12 @@ class LLMService:
         provider: Optional[str] = None,
         solve_keyless: bool = True,
         solve_context: str = "",
+        answer_sheet: str = "",
     ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
         """Recreate an uploaded practice test: extract its own questions.
+
+        answer_sheet: the student's separate answer sheet, matched to the
+        questions before anything is solved (see apply_answer_sheet).
 
         solve_context: the folder's notes. Never a source of questions; the
         solver reads them for the course's notation and conventions (in Boyd's
@@ -2099,6 +2114,8 @@ class LLMService:
                     "That practice test has no questions of the type you picked. Try Mixed instead."
                 )
             raise ValidationException(_NO_PRACTICE_QUESTIONS_MESSAGE)
+        if answer_sheet:
+            kept_mcq, kept_frq = await self.apply_answer_sheet(kept_mcq, kept_frq, answer_sheet)
         if solve_keyless:
             kept_mcq, kept_frq = await self._solve_keyless_questions(kept_mcq, kept_frq, solve_context)
         logger.info(
@@ -2497,6 +2514,125 @@ class LLMService:
                         frq[i] = replace(frq[i], expected_answer=answer)
 
         await asyncio.gather(*(solve(batch) for batch in batches))
+        return mcq, frq
+
+    async def apply_answer_sheet(
+        self, mcq: list[GeneratedMCQ], frq: list[GeneratedFRQ], sheet: str
+    ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
+        """Match each question to its entry on the student's answer sheet.
+
+        A matched question takes the sheet's answer as official (answer_inferred
+        off, answer_from_sheet on) and keeps the sheet's worked solution and
+        marking points in solution, which grading and Kojo follow. Questions
+        already matched are skipped; a question the sheet does not cover, or a
+        batch that fails, is left exactly as it was. A bounded loop over
+        question batches; _complete_json_strongest does the provider fallback.
+        """
+        sheet = (sheet or "").strip()
+        if not sheet:
+            return mcq, frq
+        targets: list[tuple[str, int]] = [("mcq", i) for i, q in enumerate(mcq) if not q.answer_from_sheet]
+        targets += [("frq", i) for i, q in enumerate(frq) if not q.answer_from_sheet]
+        if not targets:
+            return mcq, frq
+        mcq, frq = list(mcq), list(frq)
+        batches = [targets[i:i + _ANSWER_SHEET_BATCH] for i in range(0, len(targets), _ANSWER_SHEET_BATCH)]
+        gate = asyncio.Semaphore(_PRACTICE_CHUNK_CONCURRENCY)
+
+        def label(q: "GeneratedMCQ | GeneratedFRQ") -> str:
+            bits = []
+            if q.group_label:
+                bits.append(f"problem {q.group_label}")
+            if q.part_label:
+                bits.append(f"part ({q.part_label})")
+            return f" [{', '.join(bits)}]" if bits else ""
+
+        async def sheet_for(batch: list[tuple[str, int]]) -> str:
+            if len(sheet) <= _ANSWER_SHEET_CHARS:
+                return sheet
+            query = " ".join(
+                f"{(mcq[i] if kind == 'mcq' else frq[i]).group_label} "
+                f"{practice_full_text(mcq[i] if kind == 'mcq' else frq[i])[:200]}"
+                for kind, i in batch
+            )[:4000]
+            try:
+                loop = asyncio.get_event_loop()
+                snippet, _ = await loop.run_in_executor(
+                    None,
+                    lambda: self._retrieve_relevant_context(sheet, query, char_limit=_ANSWER_SHEET_CHARS),
+                )
+                return (snippet or sheet)[:_ANSWER_SHEET_CHARS]
+            except Exception as exc:
+                logger.warning("Answer sheet retrieval failed; using its start: %s", exc)
+                return sheet[:_ANSWER_SHEET_CHARS]
+
+        async def match(batch: list[tuple[str, int]]) -> None:
+            lines: list[str] = []
+            for n, (kind, i) in enumerate(batch, start=1):
+                q = mcq[i] if kind == "mcq" else frq[i]
+                if kind == "mcq":
+                    opts = "\n".join(f"   {chr(65 + j)}. {o}" for j, o in enumerate(mcq[i].options))
+                    lines.append(f"Q{n}{label(q)} (multiple choice):\n{practice_full_text(q)}\n{opts}")
+                else:
+                    lines.append(f"Q{n}{label(q)} (written):\n{practice_full_text(q)}")
+            prompt = (
+                "A student uploaded the official answer sheet (answer key, worked solutions or mark scheme) "
+                "for their practice test. Find each question's entry on the sheet, using the problem number, "
+                "part letter and content.\n\n"
+                f"ANSWER SHEET:\n{await sheet_for(batch)}\n\n"
+                "QUESTIONS:\n" + "\n\n".join(lines) + "\n\n"
+                "For each question:\n"
+                "- found: true only when the sheet clearly gives this question's answer. Never guess, never "
+                "solve it yourself, and never use another question's entry.\n"
+                "- option: for multiple choice, the letter of the option the sheet marks correct.\n"
+                "- answer: for written questions, the sheet's final answer.\n"
+                "- solution: what the sheet shows beyond the bare answer, copied faithfully: the worked "
+                "steps, and every marking point, criterion or point value it lists (for example "
+                "\"1 mark: states the chain rule\"). Math in LaTeX ($...$). Empty when the sheet gives only "
+                "the answer.\n\n"
+                'Return JSON only: {"answers": [{"q": 1, "found": true, "option": "B", "answer": "...", '
+                '"solution": "..."}]}\n'
+            )
+            async with gate:
+                try:
+                    data = await asyncio.wait_for(
+                        self._complete_json_strongest(prompt), _PRACTICE_CHUNK_TIMEOUT_S
+                    )
+                except Exception as exc:
+                    logger.warning("Matching %d questions to the answer sheet failed: %s", len(batch), exc)
+                    return
+            answers = data.get("answers")
+            for entry in answers if isinstance(answers, list) else []:
+                if not isinstance(entry, dict) or entry.get("found") is not True:
+                    continue
+                try:
+                    kind, i = batch[int(entry.get("q", 0)) - 1]
+                except (ValueError, TypeError, IndexError):
+                    continue
+                solution = str(entry.get("solution") or "").strip()[:_ANSWER_SHEET_SOLUTION_CHARS]
+                if kind == "mcq":
+                    letter = str(entry.get("option") or "").strip().upper()[:1]
+                    index = ord(letter) - 65 if letter.isalpha() else -1
+                    if not 0 <= index < len(mcq[i].options):
+                        continue
+                    mcq[i] = replace(
+                        mcq[i], correct_index=index, answer_inferred=False,
+                        answer_from_sheet=True, solution=solution,
+                    )
+                else:
+                    answer = str(entry.get("answer") or "").strip()
+                    if not answer:
+                        continue
+                    frq[i] = replace(
+                        frq[i], expected_answer=answer, answer_inferred=False,
+                        answer_from_sheet=True, solution=solution,
+                    )
+
+        await asyncio.gather(*(match(batch) for batch in batches))
+        logger.info(
+            "Answer sheet matched %d of %d questions",
+            sum(1 for q in [*mcq, *frq] if q.answer_from_sheet), len(mcq) + len(frq),
+        )
         return mcq, frq
 
     async def generate_parallel_practice_test(
@@ -3590,8 +3726,13 @@ Rules:
         user_answer: str,
         is_correct: bool,
         options: Optional[list[str]] = None,
+        sheet_solution: Optional[str] = None,
     ) -> ObjectiveExplanation:
         """Write a short Markdown guide for an objective question (MCQ/TF/MS/Ranking).
+
+        sheet_solution is set when the key came from the student's own answer
+        sheet (it may be empty text): the key is official, so it is never
+        second-guessed, and the explanation follows the sheet's working.
 
         Correctness is decided deterministically by the grading service; this writes
         the "how to solve and why it's correct" explanation AND, when the full option
@@ -3619,6 +3760,17 @@ Rules:
         if options:
             options_lines = "\n".join(f"- {opt}" for opt in options)
             options_block = f"\nALL ANSWER OPTIONS:\n{options_lines}\n"
+        if sheet_solution is not None:
+            verdict_instructions = (
+                "\nThe CORRECT ANSWER above comes from the student's official answer sheet. Treat it as "
+                "correct and explain it the way the sheet does.\n"
+            )
+            if sheet_solution.strip():
+                verdict_instructions += (
+                    f"\nWORKED SOLUTION FROM THE ANSWER SHEET (follow its method and reasoning):\n"
+                    f"{sheet_solution.strip()}\n"
+                )
+        elif options:
             verdict_instructions = (
                 "\nThe CORRECT ANSWER above is the answer key recorded for this question. "
                 "It was generated automatically and may occasionally be wrong. Independently "
@@ -3665,7 +3817,8 @@ Return JSON only:
             reasoning = str(data.get("reasoning", "")).strip()[:2000] or None
             # answer_key_ok defaults to True (trust the stored key) unless the LLM
             # explicitly flags it false. Missing field => no verdict requested/given.
-            answer_key_ok = bool(data.get("answer_key_ok", True))
+            # An answer-sheet key is never overruled.
+            answer_key_ok = sheet_solution is not None or bool(data.get("answer_key_ok", True))
             actual = data.get("actual_correct_answer")
             actual_correct_answer = str(actual).strip()[:500] if actual else None
             return ObjectiveExplanation(

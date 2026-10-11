@@ -42,8 +42,15 @@ describe("isAcceptedUpload", () => {
   });
 
   it("rejects unknown and extensionless files", () => {
-    expect(isAcceptedUpload(file("photo.png"))).toBe(false);
+    expect(isAcceptedUpload(file("song.mp3"))).toBe(false);
+    expect(isAcceptedUpload(file("photo.heic"))).toBe(false);
     expect(isAcceptedUpload(file("pdf"))).toBe(false);
+  });
+
+  it("accepts photos, which the server reads with a vision model", () => {
+    expect(isAcceptedUpload(file("photo.png"))).toBe(true);
+    expect(isAcceptedUpload(file("answers.JPG"))).toBe(true);
+    expect(isAcceptedUpload(file("scan.jpeg"))).toBe(true);
   });
 });
 

@@ -493,6 +493,7 @@ class GradingService:
             is_math=is_math,
             work_transcript=work_transcript,
             answer_inferred=bool(question.answer_inferred) if question is not None else False,
+            answer_from_sheet=bool(question.answer_from_sheet) if question is not None else False,
             ocr_status=ocr_status,
             work_strokes=work_strokes if held else None,
             group_id=group.id if group is not None else None,
@@ -791,7 +792,19 @@ class GradingService:
                 confidence=0.0,
             )
         expected_answer = question.frq_answer.expected_answer
-        if question.answer_inferred:
+        if question.answer_from_sheet:
+            # From the student's own answer sheet: official, and graded the way
+            # its mark scheme grades.
+            expected_answer = f"{expected_answer}\n\n(This answer is from the student's official answer sheet.)"
+            if (question.reference_solution or "").strip():
+                expected_answer += (
+                    "\n\nWORKED SOLUTION AND MARKING POINTS FROM THE ANSWER SHEET:\n"
+                    f"{question.reference_solution.strip()}\n\n"
+                    "Grade the way this mark scheme does: check the student's answer against each marking "
+                    "point, say which ones they hit and which they missed, and base any how-to-solve steps "
+                    "on this worked solution."
+                )
+        elif question.answer_inferred:
             # No answer key backs this one (GH #133): a correct answer that
             # differs from Nosey's own reference must not be marked wrong.
             expected_answer = (
@@ -853,6 +866,7 @@ class GradingService:
             user_answer=user_answer,
             is_correct=grade.is_correct,
             options=options,
+            sheet_solution=(question.reference_solution or "") if question.answer_from_sheet else None,
         )
         if not result.feedback:
             return grade

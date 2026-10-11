@@ -585,6 +585,8 @@ export async function createTest(input: {
   files?: File[];
   fileIds?: number[];
   practiceTestFileId?: number | null;
+  // The practice test's answer sheet (recreate mode), a folder file.
+  answerSheetFileId?: number | null;
   // recreate: rebuild the practice test's own questions. style: new questions
   // from the notes in the practice test's style.
   practiceTestMode?: "recreate" | "style";
@@ -644,6 +646,7 @@ export async function createTest(input: {
   if (input.practiceTestFile) formData.append("practice_test_file", input.practiceTestFile);
   input.fileIds?.forEach((id) => formData.append("file_ids", String(id)));
   if (input.practiceTestFileId != null) formData.append("practice_test_file_id", String(input.practiceTestFileId));
+  if (input.answerSheetFileId != null) formData.append("answer_sheet_file_id", String(input.answerSheetFileId));
   if (input.practiceTestMode) formData.append("practice_test_mode", input.practiceTestMode);
   if (input.practiceTestSections?.length) {
     formData.append("practice_test_sections", input.practiceTestSections.join(","));
@@ -1562,8 +1565,9 @@ export interface UploadResult {
   skipped: SkippedFile[];
 }
 
-// "practice_test" lets the server read math-heavy PDF pages with a vision model.
-export type UploadPurpose = "notes" | "practice_test";
+// "practice_test" and "answer_sheet" let the server read math-heavy PDF pages
+// with a vision model.
+export type UploadPurpose = "notes" | "practice_test" | "answer_sheet";
 
 export async function uploadFolderFiles(
   folderId: number,
@@ -1624,6 +1628,10 @@ export interface DraftQuestion {
   group_key?: string | null;
   group_label?: string;
   group_stem?: string;
+  // Answered by the student's uploaded answer sheet: official answer, plus the
+  // sheet's worked solution / marking points.
+  answer_from_sheet?: boolean;
+  solution?: string;
 }
 
 export interface ParsedProblem {
@@ -1643,11 +1651,13 @@ export async function parsePracticeProblems(
   folderId: number,
   fileId: number,
   problems: PracticeProblem[],
+  answerFileId?: number | null,
 ): Promise<ParsedProblem[]> {
   const result = await request<{ problems: ParsedProblem[] }>(`/folders/${folderId}/files/${fileId}/problems/parse`, {
     method: "POST",
     body: JSON.stringify({
       problems: problems.map((p) => ({ index: p.index, label: p.label, start: p.start, end: p.end })),
+      answer_file_id: answerFileId ?? null,
     }),
   });
   return result.problems;
@@ -1660,6 +1670,7 @@ export async function fixPracticeProblem(
   problem: PracticeProblem,
   current: DraftQuestion[],
   message: string,
+  answerFileId?: number | null,
 ): Promise<DraftQuestion[]> {
   const result = await request<{ questions: DraftQuestion[] }>(`/folders/${folderId}/files/${fileId}/problems/fix`, {
     method: "POST",
@@ -1671,6 +1682,7 @@ export async function fixPracticeProblem(
       message,
       index: problem.index,
       label: problem.label,
+      answer_file_id: answerFileId ?? null,
     }),
   });
   return result.questions;

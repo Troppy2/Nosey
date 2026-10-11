@@ -96,6 +96,9 @@ class Settings(BaseSettings):
     # per window (GH #133), and the page cap per file.
     practice_vision_limit_per_window: int = Field(default=3, alias="PRACTICE_VISION_LIMIT_PER_WINDOW")
     practice_vision_max_pages: int = Field(default=20, alias="PRACTICE_VISION_MAX_PAGES")
+    # Image files (photos of notes, handwriting, answer sheets) uploaded to a
+    # folder are read by a vision model, one call each: this many per window.
+    image_read_limit_per_window: int = Field(default=20, alias="IMAGE_READ_LIMIT_PER_WINDOW")
     kojo_token_limit_per_window: int = Field(default=150_000, alias="KOJO_TOKEN_LIMIT_PER_WINDOW")
     # Optional JSON override of the admin cost-estimate price table (USD per 1M
     # tokens, [input, output]); see services/token_analytics_service.py.

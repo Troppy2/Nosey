@@ -148,6 +148,10 @@ class DraftQuestion(BaseModel):
     group_key: Optional[str] = None
     group_label: str = ""
     group_stem: str = ""
+    # Answered by the student's answer sheet: official answer, plus the sheet's
+    # worked solution / marking points.
+    answer_from_sheet: bool = False
+    solution: str = ""
 
 
 def _drafts(mcq: list[GeneratedMCQ], frq: list[GeneratedFRQ]) -> list[DraftQuestion]:
@@ -156,6 +160,7 @@ def _drafts(mcq: list[GeneratedMCQ], frq: list[GeneratedFRQ]) -> list[DraftQuest
         return {
             "part_label": q.part_label, "group_key": q.group_key,
             "group_label": q.group_label, "group_stem": q.group_stem,
+            "answer_from_sheet": q.answer_from_sheet, "solution": q.solution,
         }
 
     items = [
@@ -186,6 +191,8 @@ class ProblemRange(BaseModel):
 
 class ParseProblemsRequest(BaseModel):
     problems: list[ProblemRange]
+    # The student's answer sheet, a file in the same folder.
+    answer_file_id: Optional[int] = None
 
 
 class ParsedProblem(BaseModel):
@@ -222,6 +229,7 @@ async def parse_practice_problems(
     record = await _ready_practice_file(folder_id, file_id, user, session)
     content = record.content or ""
     items = [(p.index, p.label, _range_text(content, p.start, p.end)) for p in payload.problems]
+    sheet = await _answer_sheet_text(folder_id, payload.answer_file_id, session)
     notes = await _solve_notes(folder_id, file_id, user, session)
     await session.close()
     bind_usage(user.id, "practice_parse")
@@ -233,7 +241,9 @@ async def parse_practice_problems(
         raise HTTPException(
             status_code=503, detail="Nosey couldn't read those problems right now. Try again in a moment."
         )
-    results = await _solve_drafts(llm, results, notes)
+    if sheet:
+        results = await _per_problem(results, lambda m, f: llm.apply_answer_sheet(m, f, sheet))
+    results = await _per_problem(results, lambda m, f: llm._solve_keyless_questions(m, f, notes))
     return ParseProblemsResponse(problems=[
         ParsedProblem(
             index=index,
@@ -243,6 +253,20 @@ async def parse_practice_problems(
         )
         for index, _label, text in items
     ])
+
+
+async def _answer_sheet_text(folder_id: int, answer_file_id: Optional[int], session: AsyncSession) -> str:
+    """The answer sheet's text; the folder's ownership was already checked."""
+    if answer_file_id is None:
+        return ""
+    record = await session.scalar(
+        select(FolderFile).where(FolderFile.id == answer_file_id, FolderFile.folder_id == folder_id)
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Answer sheet not found")
+    if record.upload_status != "ready":
+        raise HTTPException(status_code=409, detail="The answer sheet is still being read.")
+    return (record.content or "").strip()
 
 
 async def _solve_notes(folder_id: int, file_id: int, user: User, session: AsyncSession) -> str:
@@ -259,16 +283,16 @@ async def _solve_notes(folder_id: int, file_id: int, user: User, session: AsyncS
     return await FileService().get_folder_files_content(folder_id, user.id, session, file_ids=other_ids)
 
 
-async def _solve_drafts(
-    llm: LLMService,
+async def _per_problem(
     results: dict[int, Optional[tuple[list[GeneratedMCQ], list[GeneratedFRQ]]]],
-    notes: str,
+    step,
 ) -> dict[int, Optional[tuple[list[GeneratedMCQ], list[GeneratedFRQ]]]]:
-    """Work out the answers the document lacks, here in the review step.
+    """Run one answer step (sheet match or solve) over every problem at once.
 
-    Solving at Create Test made Generate slow (every keyless question on the
-    strongest model) and could change an answer the student had already
-    approved. Solved here, the answer shown in review is the one graded.
+    Answers are settled here in the review step, not at Create Test: solving
+    there made Generate slow (every keyless question on the strongest model)
+    and could change an answer the student had already approved. Settled here,
+    the answer shown in review is the one graded. step keeps list order.
     """
     owners_mcq: list[int] = []
     owners_frq: list[int] = []
@@ -283,7 +307,7 @@ async def _solve_drafts(
         for q in result[1]:
             owners_frq.append(index)
             all_frq.append(q)
-    solved_mcq, solved_frq = await llm._solve_keyless_questions(all_mcq, all_frq, notes)
+    solved_mcq, solved_frq = await step(all_mcq, all_frq)
     out: dict[int, Optional[tuple[list[GeneratedMCQ], list[GeneratedFRQ]]]] = {
         index: (None if result is None else ([], [])) for index, result in results.items()
     }
@@ -302,6 +326,7 @@ class FixProblemRequest(BaseModel):
     # The picked problem's index and label, so a fixed problem keeps its group.
     index: Optional[int] = None
     label: str = ""
+    answer_file_id: Optional[int] = None
 
 
 class FixProblemResponse(BaseModel):
@@ -342,6 +367,7 @@ async def fix_practice_problem(
     record = await _ready_practice_file(folder_id, file_id, user, session)
     content = record.content or ""
     source = _range_text(content, payload.start, payload.end)
+    sheet = await _answer_sheet_text(folder_id, payload.answer_file_id, session)
     notes = await _solve_notes(folder_id, file_id, user, session)
     await session.close()
     bind_usage(user.id, "practice_parse")
@@ -355,7 +381,9 @@ async def fix_practice_problem(
     except LLMException as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     # An answer the student gave in the message counts as from the document,
-    # so only the rest is solved.
+    # so only the rest is matched to the sheet or solved.
+    if sheet:
+        mcq, frq = await llm.apply_answer_sheet(mcq, frq, sheet)
     mcq, frq = await llm._solve_keyless_questions(mcq, frq, notes)
     # Same group key the parse step gave this problem; without an index, a key
     # no other problem can share.
