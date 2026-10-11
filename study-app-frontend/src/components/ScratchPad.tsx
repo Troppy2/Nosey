@@ -35,6 +35,13 @@ import {
 } from "react";
 import { scopeKey } from "../lib/api";
 import { traceInk } from "../lib/inkTrace";
+import {
+  PASTE_TEXT_MAX_CHARS,
+  PASTE_TEXT_MAX_WORDS,
+  countWords,
+  layoutTextAsInk,
+  normalizeForPen,
+} from "../lib/textToInk";
 import { MarkdownContent } from "./MarkdownContent";
 
 // ── Stroke data model ───────────────────────────────────────────────────────
@@ -298,6 +305,11 @@ const HANDLE_PX = 5;
 const HANDLE_HIT_PX = 16;
 const HISTORY_LIMIT = 60;
 const DUPLICATE_OFFSET = 24;
+// Pasted text drawn as ink: pen-font units to page units (cap height ~24).
+const PASTED_TEXT_SCALE = 1.15;
+// What the pad's own Copy puts on the system clipboard, so a Ctrl+V of it
+// means "paste the copied ink", never "draw this text".
+const INK_CLIPBOARD_MARKER = "nosey-ink";
 
 const DEFAULT_INK = "#26301f";
 const DEFAULT_WIDTH = 2.4;
@@ -1029,7 +1041,7 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
     inkClipboard = { strokes: sel, source: padIdRef.current, version: inkClipboard.version + 1 };
     // Replace any picture on the system clipboard, or the next Ctrl+V would
     // bring that back instead of this ink.
-    void navigator.clipboard?.writeText("nosey-ink").catch(() => undefined);
+    void navigator.clipboard?.writeText(INK_CLIPBOARD_MARKER).catch(() => undefined);
     setNotice("Copied. Ctrl+V pastes it here or in another part's pad.");
     return true;
   }
@@ -1106,11 +1118,18 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
             return;
           }
         }
+        if (item.types.includes("text/plain")) {
+          const text = await (await item.getType("text/plain")).text();
+          if (text.trim() && text !== INK_CLIPBOARD_MARKER) {
+            importText(text);
+            return;
+          }
+        }
       }
     } catch {
       /* clipboard read blocked or unsupported: fall through to the pad's own copy */
     }
-    if (!pasteInk()) setNotice("Nothing to paste. Copy a picture, or select some ink and copy it.");
+    if (!pasteInk()) setNotice("Nothing to paste. Copy a picture or some text, or select some ink and copy it.");
   }
 
   function duplicateSelection() {
@@ -1706,6 +1725,55 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
     }
   }
 
+  // Pasted text is written onto the page in pen strokes (lib/textToInk.ts),
+  // below whatever is already there, then selected so it can be moved or
+  // resized. Capped at PASTE_TEXT_MAX_WORDS: longer text is refused whole,
+  // before any layout work, since the pad could not hold it anyway.
+  function importText(raw: string) {
+    const trimmed = raw.trim();
+    if (countWords(trimmed) > PASTE_TEXT_MAX_WORDS || trimmed.length > PASTE_TEXT_MAX_CHARS) {
+      setNotice(`That's too long to draw. Paste up to ${PASTE_TEXT_MAX_WORDS} words.`);
+      return;
+    }
+    const { text, replaced } = normalizeForPen(trimmed);
+    const { w: pageW } = dimsRef.current;
+    const laid = layoutTextAsInk(text, pageW - 80, PASTED_TEXT_SCALE);
+    if (laid.strokes.length === 0) {
+      setNotice("There's no text to draw in what you pasted.");
+      return;
+    }
+    const prev = localStrokesRef.current;
+    const startY = (strokeBounds(prev)?.maxY ?? 0) + 40;
+    if (startY + laid.height > MAX_LOGICAL_HEIGHT - 40) {
+      setNotice("There isn't enough room left on the page for that text.");
+      return;
+    }
+    const imported: Stroke[] = laid.strokes.map((points) => ({
+      points: points.map((v, i) => round1(i % 2 === 0 ? 40 + v : startY + v)),
+    }));
+    const next = [...prev, ...imported];
+    if (next.length > MAX_STROKES_PER_QUESTION || JSON.stringify({ version: 1, strokes: next }).length > MAX_STROKES_JSON_CHARS) {
+      setNotice("The page is too full for that much text. Erase something or paste less.");
+      return;
+    }
+    ensureHeight(startY + laid.height);
+    pushHistory(prev);
+    commitStrokes(next);
+    setTool("select");
+    setSelection(imported);
+    setNotice(
+      replaced > 0
+        ? "Added your text as ink. A few symbols it can't draw show as ?."
+        : "Added your text as ink. Drag it into place or resize it with the corners.",
+    );
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const container = containerRef.current;
+        if (container) container.scrollTo({ top: Math.max(0, (startY - 40) * dimsRef.current.scale), behavior: "smooth" });
+      }),
+    );
+  }
+
   // Pasted content that is not a plain image item: files with no type, or an
   // HTML snippet carrying an <img> (what Samsung Notes and Office put on the
   // clipboard). Each candidate is tried until one reads as a picture.
@@ -1729,8 +1797,8 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
   function zoomBy(factor: number) {
     setZoomTo(factor === 0 ? 1 : zoomRef.current * factor);
   }
-  const actionsRef = useRef({ deleteSelection, undo, importImage, importFromClipboard, setSelection, copySelection, cutSelection, pasteInk, setNotice, zoomBy, setZoomTo, previewZoom });
-  actionsRef.current = { deleteSelection, undo, importImage, importFromClipboard, setSelection, copySelection, cutSelection, pasteInk, setNotice, zoomBy, setZoomTo, previewZoom };
+  const actionsRef = useRef({ deleteSelection, undo, importImage, importFromClipboard, importText, setSelection, copySelection, cutSelection, pasteInk, setNotice, zoomBy, setZoomTo, previewZoom });
+  actionsRef.current = { deleteSelection, undo, importImage, importFromClipboard, importText, setSelection, copySelection, cutSelection, pasteInk, setNotice, zoomBy, setZoomTo, previewZoom };
 
   // Ctrl+wheel (and a trackpad pinch, which arrives the same way) zooms toward
   // the pointer. Attached natively because React's wheel listener is passive
@@ -1808,6 +1876,13 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
       if (files.length > 0 || /<img\b/i.test(html)) {
         e.preventDefault();
         void actionsRef.current.importFromClipboard(files, html, types);
+        return;
+      }
+      // Text (not the pad's own ink marker) is drawn onto the page as ink.
+      const text = data.getData("text/plain");
+      if (text.trim() && text !== INK_CLIPBOARD_MARKER) {
+        e.preventDefault();
+        actionsRef.current.importText(text);
         return;
       }
       // No picture on the clipboard: paste ink copied inside the pad, if any.
