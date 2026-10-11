@@ -31,6 +31,13 @@ class Question(Base):
     answer_inferred: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )
+    # The student's uploaded answer sheet gave this answer, so it is official,
+    # and reference_solution holds the sheet's worked solution / marking points
+    # that grading, "How to solve it" and Kojo follow.
+    answer_from_sheet: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    reference_solution: Mapped[Optional[str]] = mapped_column(Text)
     # Multi-part practice problems (GH #151): the shared setup lives on the
     # group, this row holds one part. Both None for an ordinary question.
     group_id: Mapped[Optional[int]] = mapped_column(

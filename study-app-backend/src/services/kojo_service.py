@@ -98,6 +98,11 @@ def _format_wrong_answers_context(wrong_answers_data: list[tuple]) -> str:
         elif question.question_type == "FRQ":
             if question.frq_answer:
                 lines.append(f"Correct Answer: {question.frq_answer.expected_answer}")
+        if question.answer_from_sheet and (question.reference_solution or "").strip():
+            lines.append(
+                "Answer sheet's worked solution and marking points (coach toward what it rewards):\n"
+                f"{question.reference_solution.strip()[:2000]}"
+            )
 
     return "\n".join(lines)
 

@@ -16,7 +16,7 @@ const MAX_TOTAL_SIZE_MB = 300;
 // are actually sent to the server. Nothing leaves the client until it elapses.
 const UNDO_WINDOW_MS = 6000;
 const ACCEPTED_EXTENSIONS =
-  ".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.ml,.mli,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml,.ipynb";
+  ".pdf,.docx,.txt,.md,.html,.htm,.pptx,.py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.swift,.kt,.ml,.mli,.scala,.rb,.php,.sql,.json,.xml,.yaml,.yml,.ipynb,.png,.jpg,.jpeg";
 const ALLOWED_TYPES = [
   "application/pdf",
   "text/plain",
@@ -24,6 +24,9 @@ const ALLOWED_TYPES = [
   "text/x-markdown",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  // Photos and scans, read by a vision model (handwriting included).
+  "image/png",
+  "image/jpeg",
 ];
 
 function formatBytes(bytes: number): string {
@@ -93,7 +96,7 @@ export function FileManager({ folderId, onClose }: Props) {
 
     Array.from(selected).forEach((f) => {
       const allowed =
-        ALLOWED_TYPES.includes(f.type) || /\.(pdf|txt|md|docx|pptx|ipynb)$/i.test(f.name);
+        ALLOWED_TYPES.includes(f.type) || /\.(pdf|txt|md|docx|pptx|ipynb|png|jpe?g)$/i.test(f.name);
       if (!allowed) { errs.push(`${f.name}: unsupported type`); return; }
       if (f.size > MAX_FILE_SIZE_MB * 1024 * 1024) { errs.push(`${f.name}: exceeds ${MAX_FILE_SIZE_MB} MB`); return; }
       valid.push(f);

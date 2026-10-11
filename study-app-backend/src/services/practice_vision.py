@@ -133,3 +133,64 @@ async def transcribe_math_pages(path: str, page_texts: list[str]) -> dict[int, s
     done = {i: text for i, text in zip(indices, results) if text}
     logger.info("Practice-test vision pass: %d of %d flagged pages transcribed", len(done), len(indices))
     return done
+
+
+# Long edge of an uploaded photo sent to the vision model. Phone photos are
+# 4000+ px and several MB, past the providers' image limits.
+_IMAGE_MAX_EDGE = 2000
+
+_IMAGE_TRANSCRIBE_PROMPT = (
+    "Transcribe this image exactly. It is a photo or scan from a student's studies: notes, a practice test, "
+    "homework, or an answer sheet / mark scheme, printed or handwritten.\n"
+    "- Keep every heading, question, part label such as (a) or (b), answer option, answer, worked step and "
+    "marking point (for example \"1 mark for ...\"), in reading order (finish the left column before the "
+    "right one).\n"
+    "- Write all math in LaTeX: inline math as $...$, and displayed math on a single line as $$...$$. Keep "
+    "subscripts and superscripts.\n"
+    "- Describe a diagram or graph in one short bracketed line, e.g. [Graph: y = x^2, vertex at (0, 0)].\n"
+    "- Do not solve anything and do not add commentary. Leave out words you cannot read rather than guess.\n"
+    "Output only the transcription."
+)
+
+
+def _image_jpeg_b64(path: str) -> str:
+    """The image as a base64 JPEG, scaled down to _IMAGE_MAX_EDGE. Runs in a worker thread."""
+    if fitz is None:
+        raise ValueError("Images can't be read on this server.")
+    try:
+        pixmap = fitz.Pixmap(path)
+    except Exception as exc:
+        raise ValueError("That image could not be opened. Try a PNG or JPG.") from exc
+    if pixmap.alpha:
+        pixmap = fitz.Pixmap(pixmap, 0)
+    if pixmap.colorspace is None or pixmap.colorspace.n not in (1, 3):
+        pixmap = fitz.Pixmap(fitz.csRGB, pixmap)
+    while max(pixmap.width, pixmap.height) > _IMAGE_MAX_EDGE:
+        pixmap.shrink(1)
+    return base64.b64encode(pixmap.tobytes("jpeg", jpg_quality=88)).decode("ascii")
+
+
+async def transcribe_image_file(path: str) -> str:
+    """Read an uploaded image to text with a vision model.
+
+    One call per configured engine, in the OCR engine order (a failure moves
+    on to the next, never re-raised). Raises ValueError when nothing could be
+    read, so the upload row shows why.
+    """
+    from src.services.llm_service import LLMService
+    from src.services.ocr_service import _candidate_ocr_engines, _engine_has_key
+
+    image_b64 = await asyncio.to_thread(_image_jpeg_b64, path)
+    llm = LLMService()
+    calls = {"claude": llm._complete_vision_anthropic, "gemini": llm._complete_vision_gemini}
+    for engine in _candidate_ocr_engines(None):
+        if not _engine_has_key(engine) or engine not in calls:
+            continue
+        try:
+            text = (await calls[engine](image_b64, "image/jpeg", _IMAGE_TRANSCRIBE_PROMPT)).strip()
+        except Exception as exc:
+            logger.warning("Image transcription failed (engine=%s): %s", engine, exc)
+            continue
+        if text:
+            return text
+    raise ValueError("Nosey couldn't read any text in that image. Try a clearer photo.")

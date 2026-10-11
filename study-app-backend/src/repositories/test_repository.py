@@ -181,6 +181,8 @@ class TestRepository(BaseRepository[Test]):
         answer_inferred: bool = False,
         group_id: Optional[int] = None,
         part_label: Optional[str] = None,
+        answer_from_sheet: bool = False,
+        reference_solution: Optional[str] = None,
     ) -> Question:
         question = Question(
             test_id=test_id,
@@ -190,6 +192,8 @@ class TestRepository(BaseRepository[Test]):
             answer_inferred=answer_inferred,
             group_id=group_id,
             part_label=part_label,
+            answer_from_sheet=answer_from_sheet,
+            reference_solution=reference_solution or None,
         )
         self.session.add(question)
         await self.session.flush()
@@ -269,6 +273,8 @@ class TestRepository(BaseRepository[Test]):
         answer_inferred: bool = False,
         group_id: Optional[int] = None,
         part_label: Optional[str] = None,
+        answer_from_sheet: bool = False,
+        reference_solution: Optional[str] = None,
     ) -> Question:
         question = Question(
             test_id=test_id,
@@ -278,6 +284,8 @@ class TestRepository(BaseRepository[Test]):
             answer_inferred=answer_inferred,
             group_id=group_id,
             part_label=part_label,
+            answer_from_sheet=answer_from_sheet,
+            reference_solution=reference_solution or None,
         )
         self.session.add(question)
         await self.session.flush()
@@ -377,16 +385,20 @@ async def add_generated_questions(repo: TestRepository, test_id: int, mcq: list,
                 group_ids[group_key] = group.id
             group_id = group_ids[group_key]
         grouping = {"group_id": group_id, "part_label": part_label} if group_id is not None else {}
+        sheet = {
+            "answer_from_sheet": bool(getattr(item, "answer_from_sheet", False)),
+            "reference_solution": getattr(item, "solution", "") or None,
+        }
         if kind == "mcq":
             options = [(text, index == item.correct_index) for index, text in enumerate(item.options)]
             await repo.add_mcq_question(
                 test_id, item.question_text, display_order, options,
-                answer_inferred=item.answer_inferred, **grouping,
+                answer_inferred=item.answer_inferred, **grouping, **sheet,
             )
         else:
             await repo.add_frq_question(
                 test_id, item.question_text, display_order, item.expected_answer,
-                answer_inferred=item.answer_inferred, **grouping,
+                answer_inferred=item.answer_inferred, **grouping, **sheet,
             )
         display_order += 1
     return display_order

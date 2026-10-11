@@ -1,4 +1,4 @@
-import { ArrowLeft, Atom, Calculator, Code2, FileText, Settings2, Upload } from "lucide-react";
+import { ArrowLeft, Atom, Calculator, CheckCircle2, Code2, FileText, Settings2, Upload, X } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -78,6 +78,13 @@ export default function CreateTest() {
   const practiceRun = useRef(0);
   // The folder the practice test was uploaded into.
   const practiceFolderRef = useRef<number | null>(null);
+  // The practice test's answer sheet / mark scheme, asked for once the test is
+  // read (recreate mode). ask: not answered yet; none: the student has none.
+  const [answerSheetFile, setAnswerSheetFile] = useState<File | null>(null);
+  const [answerSheetFileId, setAnswerSheetFileId] = useState<number | null>(null);
+  const [answerSheetPhase, setAnswerSheetPhase] = useState<"ask" | "none" | "reading" | "ready" | "error">("ask");
+  const [answerSheetStatus, setAnswerSheetStatus] = useState<string | null>(null);
+  const answerSheetRun = useRef(0);
   const [isMathMode, setIsMathMode] = useState(false);
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard" | "mixed">("mixed");
   const [topicFocus, setTopicFocus] = useState("");
@@ -196,6 +203,7 @@ export default function CreateTest() {
   // Both modes work without notes: a parallel version falls back to the exam's
   // own topics when the notes don't cover them.
   const recreatingPracticeTest = activePracticeTest !== null && practiceTestMode === "recreate";
+  const activeAnswerSheetId = answerSheetPhase === "ready" ? answerSheetFileId : null;
 
   // Recreate mode with a review: only problems marked Looks right, with their
   // checked questions. Otherwise the picked problems' ranges alone.
@@ -243,6 +251,9 @@ export default function CreateTest() {
       if (activePracticeTest && (practicePhase !== "ready" || practiceTestFileId === null)) {
         throw new Error("Your practice test is still being read. Generate once it's ready.");
       }
+      if (recreatingPracticeTest && answerSheetPhase === "reading") {
+        throw new Error("Your answer sheet is still being read. Generate once it's ready.");
+      }
       const picked = activePracticeTest ? pickedForSubmit() : null;
       setSubmitPhase("Setting up your test");
       const result = await createTest({
@@ -251,6 +262,7 @@ export default function CreateTest() {
         testType,
         fileIds,
         practiceTestFileId: activePracticeTest ? practiceTestFileId : undefined,
+        answerSheetFileId: recreatingPracticeTest ? activeAnswerSheetId : undefined,
         practiceTestMode: activePracticeTest ? (recreatingPracticeTest ? "recreate" : "style") : undefined,
         practiceTestRanges: picked?.ranges,
         practiceQuestions: picked?.questions,
@@ -329,7 +341,7 @@ export default function CreateTest() {
     const all = Array.from(nextFiles);
     const selected = all.filter(isUploadable);
     if (selected.length === 0) {
-      setError(`Upload PDF, DOCX, PPTX, TXT, Markdown, or code files up to ${MAX_UPLOAD_FILE_SIZE_MB} MB each.`);
+      setError(`Upload PDF, DOCX, PPTX, TXT, Markdown, image (PNG, JPG), or code files up to ${MAX_UPLOAD_FILE_SIZE_MB} MB each.`);
       return;
     }
     setError(
@@ -356,7 +368,7 @@ export default function CreateTest() {
   function acceptPracticeTestFile(file?: File) {
     if (!file) return;
     if (!isUploadable(file)) {
-      setError(`Practice test must be a PDF, DOCX, PPTX, TXT, Markdown, or code file up to ${MAX_UPLOAD_FILE_SIZE_MB} MB.`);
+      setError(`Practice test must be a PDF, DOCX, PPTX, TXT, Markdown, image (PNG, JPG), or code file up to ${MAX_UPLOAD_FILE_SIZE_MB} MB.`);
       return;
     }
     setError(null);
@@ -376,6 +388,57 @@ export default function CreateTest() {
     setPracticePick(null);
     setPickerOpen(false);
     if (practiceTestInputRef.current) practiceTestInputRef.current.value = "";
+    clearAnswerSheet("ask");
+  }
+
+  function clearAnswerSheet(next: "ask" | "none") {
+    answerSheetRun.current += 1;
+    setAnswerSheetFile(null);
+    setAnswerSheetFileId(null);
+    setAnswerSheetPhase(next);
+    setAnswerSheetStatus(null);
+  }
+
+  // Upload the answer sheet through the folder pipeline (photos are read by a
+  // vision model there) and wait until the server has its text.
+  async function readAnswerSheet(file?: File) {
+    if (!file || folderId === null) return;
+    if (!isUploadable(file)) {
+      setAnswerSheetPhase("error");
+      setAnswerSheetStatus(`Answer sheet must be a PDF, DOCX, TXT, PNG or JPG file up to ${MAX_UPLOAD_FILE_SIZE_MB} MB.`);
+      return;
+    }
+    const run = ++answerSheetRun.current;
+    const current = () => run === answerSheetRun.current;
+    const targetFolderId = practiceFolderRef.current ?? folderId;
+    setAnswerSheetFile(file);
+    setAnswerSheetFileId(null);
+    setAnswerSheetPhase("reading");
+    setAnswerSheetStatus("Uploading your answer sheet");
+    try {
+      const upload = await uploadToFolder(targetFolderId, [file], undefined, "answer_sheet");
+      if (!current()) return;
+      if (upload.fileIds.length === 0) throw new Error(describeSkipped(upload.skipped));
+      const fileId = upload.fileIds[0];
+      if (fileId === practiceTestFileId) throw new Error("That's the practice test itself. Pick the answer sheet file.");
+      const deadline = Date.now() + 15 * 60_000;
+      for (;;) {
+        const row = (await fetchFolderFiles(targetFolderId)).find((f) => f.id === fileId);
+        if (!current()) return;
+        if (row?.upload_status === "error") throw new Error(row.upload_error ?? "Nosey couldn't read that file.");
+        if (row && row.upload_status !== "processing") break;
+        setAnswerSheetStatus(row ? describeUploadStatus(row) ?? "Reading your answer sheet" : "Reading your answer sheet");
+        if (Date.now() > deadline) throw new Error("Reading your answer sheet is taking too long. Try again in a moment.");
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+      setAnswerSheetFileId(fileId);
+      setAnswerSheetPhase("ready");
+      setAnswerSheetStatus(null);
+    } catch (err) {
+      if (!current()) return;
+      setAnswerSheetPhase("error");
+      setAnswerSheetStatus(err instanceof Error ? err.message : "Nosey couldn't read that answer sheet.");
+    }
   }
 
   // Upload through the folder pipeline, wait for the server to read it (the
@@ -771,8 +834,14 @@ export default function CreateTest() {
                           <FileText size={14} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
                           {practiceTestFile.name} · {(practiceTestFile.size / (1024 * 1024)).toFixed(1)} MB
                         </span>
-                        <button type="button" onClick={clearPracticeTest}>
-                          Remove
+                        <button
+                          type="button"
+                          className="file-remove-button"
+                          aria-label={`Remove ${practiceTestFile.name}`}
+                          onClick={clearPracticeTest}
+                        >
+                          <X size={14} aria-hidden="true" />
+                          <span>Remove</span>
                         </button>
                       </div>
                       {practicePhase === "reading" ? (
@@ -782,6 +851,71 @@ export default function CreateTest() {
                       ) : null}
                       {practicePhase === "error" ? (
                         <p className="practice-status practice-status--error">{practiceStatus}</p>
+                      ) : null}
+                      {practicePhase === "ready" && recreatingPracticeTest ? (
+                        <div className="answer-sheet">
+                          {answerSheetPhase === "ask" || answerSheetPhase === "error" ? (
+                            <>
+                              <p className="answer-sheet-title">Do you have the answer sheet?</p>
+                              <p className="muted small answer-sheet-copy">
+                                Add the answer key or mark scheme (a PDF, a doc or a photo). Nosey matches it to each
+                                question, then grades and explains the way the rubric wants.
+                              </p>
+                              {answerSheetPhase === "error" ? (
+                                <p className="practice-status practice-status--error">{answerSheetStatus}</p>
+                              ) : null}
+                              <div className="answer-sheet-actions">
+                                <label className="button button-primary answer-sheet-upload">
+                                  <Upload size={14} />
+                                  <span>{answerSheetPhase === "error" ? "Try another file" : "Upload answer sheet"}</span>
+                                  <input
+                                    type="file"
+                                    accept={ACCEPTED_UPLOAD_ATTR}
+                                    style={{ display: "none" }}
+                                    onChange={(e) => {
+                                      void readAnswerSheet(e.target.files?.[0]);
+                                      e.target.value = "";
+                                    }}
+                                  />
+                                </label>
+                                <Button variant="secondary" onClick={() => clearAnswerSheet("none")}>
+                                  No, Nosey works it out
+                                </Button>
+                              </div>
+                            </>
+                          ) : null}
+                          {answerSheetPhase === "none" ? (
+                            <p className="muted small answer-sheet-none">
+                              Nosey works out any answers the test doesn't give.{" "}
+                              <button type="button" className="answer-sheet-link" onClick={() => clearAnswerSheet("ask")}>
+                                Add an answer sheet
+                              </button>
+                            </p>
+                          ) : null}
+                          {answerSheetPhase === "reading" ? (
+                            <p className="practice-status">
+                              <InlineLoading label={answerSheetStatus ?? "Reading your answer sheet"} />
+                            </p>
+                          ) : null}
+                          {answerSheetPhase === "ready" && answerSheetFile ? (
+                            <div className="answer-sheet-ready">
+                              <CheckCircle2 className="answer-sheet-ready-icon" size={18} aria-hidden="true" />
+                              <div className="answer-sheet-ready-text">
+                                <span className="answer-sheet-ready-name">{answerSheetFile.name}</span>
+                                <span className="muted small">Answers and marking come from your sheet</span>
+                              </div>
+                              <button
+                                type="button"
+                                className="file-remove-button"
+                                aria-label={`Remove ${answerSheetFile.name}`}
+                                onClick={() => clearAnswerSheet("ask")}
+                              >
+                                <X size={14} aria-hidden="true" />
+                                <span>Remove</span>
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
                       ) : null}
                       {practicePhase === "ready" && practiceProblems.length > 0 ? (
                         <div className="practice-pick">
@@ -804,6 +938,7 @@ export default function CreateTest() {
                           fileId={practiceTestFileId}
                           problems={practiceProblems}
                           mode={practiceTestMode}
+                          answerFileId={recreatingPracticeTest ? activeAnswerSheetId : null}
                           initial={practicePick ?? { chosen: [], reviews: {} }}
                           onClose={() => setPickerOpen(false)}
                           onDone={(result) => {
@@ -832,7 +967,7 @@ export default function CreateTest() {
                       </div>
                       <p className="muted small practice-mode-note">
                         {recreatingPracticeTest
-                          ? "Every question in the test is kept, with its answers. Where it has no answer key, Nosey works the answers out."
+                          ? "Every question in the test is kept, with its answers. Where neither the test nor your answer sheet has the answer, Nosey works it out."
                           : "A new version of this test: each question gets a twin that tests the same skill in the same format, with new numbers or examples. Uses your notes when they cover the topic."}
                       </p>
                     </>

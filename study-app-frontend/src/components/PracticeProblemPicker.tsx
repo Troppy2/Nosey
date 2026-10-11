@@ -35,6 +35,9 @@ type Props = {
   problems: PracticeProblem[];
   // recreate: pick, then review. style: pick only.
   mode: "recreate" | "style";
+  // The practice test's answer sheet: its answers and marking points are
+  // matched onto the drafts on the server.
+  answerFileId?: number | null;
   initial: PickerResult;
   onClose: () => void;
   onDone: (result: PickerResult) => void;
@@ -57,7 +60,7 @@ function problemName(p: PracticeProblem): string {
   return p.title ? `${p.label} ${p.title}` : p.label;
 }
 
-export function PracticeProblemPicker({ folderId, fileId, problems, mode, initial, onClose, onDone }: Props) {
+export function PracticeProblemPicker({ folderId, fileId, problems, mode, answerFileId, initial, onClose, onDone }: Props) {
   const [step, setStep] = useState<"pick" | "review">("pick");
   const [chosen, setChosen] = useState<Set<number>>(() => new Set(initial.chosen));
   const [query, setQuery] = useState("");
@@ -139,7 +142,7 @@ export function PracticeProblemPicker({ folderId, fileId, problems, mode, initia
     setReading(true);
     setReadError(null);
     try {
-      const parsed = await parsePracticeProblems(folderId, fileId, toRead);
+      const parsed = await parsePracticeProblems(folderId, fileId, toRead, answerFileId);
       setReviews((current) => {
         const next = { ...current };
         for (const item of parsed) {
@@ -177,7 +180,7 @@ export function PracticeProblemPicker({ folderId, fileId, problems, mode, initia
     setFixError(null);
     try {
       const current = reviews[problem.index]?.questions ?? [];
-      const questions = await fixPracticeProblem(folderId, fileId, problem, current, message);
+      const questions = await fixPracticeProblem(folderId, fileId, problem, current, message, answerFileId);
       // A fix comes back for another look: the student confirms it with Looks right.
       setReviews((all) => ({
         ...all,
@@ -330,9 +333,19 @@ export function PracticeProblemPicker({ folderId, fileId, problems, mode, initia
                         <span className="muted small">
                           {q.part_label ? `Part (${q.part_label}) · ` : r.questions.length > 1 ? `Question ${i + 1} · ` : ""}
                           {q.kind === "mcq" ? "Multiple choice" : "Written"}
-                          {q.answer_inferred ? " · Answer worked out by Nosey" : ""}
+                          {q.answer_from_sheet
+                            ? " · Answer from your answer sheet"
+                            : q.answer_inferred
+                              ? " · Answer worked out by Nosey"
+                              : ""}
                         </span>
                         <MarkdownContent content={questionMarkdown(q)} />
+                        {q.answer_from_sheet && q.solution ? (
+                          <details className="pp-source pp-solution">
+                            <summary>Answer sheet working</summary>
+                            <MarkdownContent content={q.solution} />
+                          </details>
+                        ) : null}
                       </div>
                     ))}
                     <details className="pp-source">

@@ -44,6 +44,8 @@ FEATURE_KOJO = "kojo"
 # Practice-test files read with a vision model (GH #133). Charged per file,
 # refunded when no page turned out to need it.
 FEATURE_PRACTICE_VISION = "practice_vision"
+# Image files uploaded to a folder, each read by one vision call.
+FEATURE_IMAGE_READ = "image_read"
 
 # Every Kojo usage-scope feature name starts with this prefix
 # (kojo_chat, kojo_general, kojo_regenerate, kojo_action).
@@ -301,6 +303,29 @@ class QuotaService:
             await session.commit()  # releases the advisory locks; nothing pending
             return False, None
         charge = QuotaCharge(user_id=user.id, device_id=device_id, feature=FEATURE_PRACTICE_VISION, units=1)
+        session.add(charge)
+        await session.commit()
+        return True, charge.id
+
+    async def charge_image_read(self, session: AsyncSession, user: User) -> tuple[bool, Optional[int]]:
+        """May this image upload be read by a vision model? Returns (allowed, charge_id).
+
+        Guests never; admins and beta users always, uncharged; everyone else up
+        to image_read_limit_per_window images per window. Never raises. Commits.
+        """
+        if is_guest(user):
+            return False, None
+        if not self.limits_active(user):
+            return True, None
+        device_id = current_device_id()
+        if device_id is None:
+            return False, None
+        await self._lock(session, user.id, device_id)
+        used, _ = await self._charge_usage_both(session, FEATURE_IMAGE_READ, user.id, device_id)
+        if used >= settings.image_read_limit_per_window:
+            await session.commit()  # releases the advisory locks; nothing pending
+            return False, None
+        charge = QuotaCharge(user_id=user.id, device_id=device_id, feature=FEATURE_IMAGE_READ, units=1)
         session.add(charge)
         await session.commit()
         return True, charge.id

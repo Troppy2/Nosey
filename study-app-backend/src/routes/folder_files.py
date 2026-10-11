@@ -17,8 +17,8 @@ from src.models.folder_file import FolderFile
 from src.models.user import User
 from src.repositories.usage_event_repository import UsageEventRepository
 from src.services.file_service import FileService, ParseProgress, assemble_pdf_pages
-from src.services.practice_vision import transcribe_math_pages
-from src.services.quota_service import QuotaService
+from src.services.practice_vision import transcribe_image_file, transcribe_math_pages
+from src.services.quota_service import QuotaService, is_guest
 from src.utils.usage_context import bind_usage
 from src.services.kojo_context_cache import invalidate_folder
 from src.services.practice_sections import detect_sections
@@ -29,6 +29,7 @@ from src.utils.process_memory import process_rss_mb
 from src.utils.temp_uploads import UploadTooLargeError, remove_temp, save_upload_to_temp
 from src.utils.validators import (
     ALLOWED_FILE_TYPES,
+    IMAGE_FILE_TYPES,
     MAX_UPLOAD_FILE_SIZE_BYTES,
     MAX_UPLOAD_TOTAL_SIZE_BYTES,
     normalize_file_extension,
@@ -196,8 +197,13 @@ async def _extract_and_update(
     user_id: int,
     vision_charge: Optional[int] = None,
     use_vision: bool = False,
+    image_charge: Optional[int] = None,
 ) -> None:
     """Background task: parse the uploaded temp file and update the folder_file record.
+
+    An image (photo of notes, handwriting, an answer sheet) is read by a vision
+    model instead of text extraction; image_charge is its quota charge,
+    refunded if it could not be read.
 
     No DB connection is held during the parse (it can take minutes); progress writes
     and the final update each use a short session. The temp file is always removed.
@@ -205,15 +211,21 @@ async def _extract_and_update(
     import time as _time
     _t0 = _time.monotonic()
     read_more_from: Optional[int] = None
+    is_image = normalize_file_extension(file_name) in IMAGE_FILE_TYPES
     try:
-        result = await FileService().extract_from_path(
-            path,
-            file_name,
-            on_progress=lambda progress: _record_progress(file_id, progress),
-            max_pages=PDF_BOOK_MAX_PAGES,
-        )
-        content = result.text
-        if use_vision:
+        if is_image:
+            bind_usage(user_id, "image_read")
+            result = None
+            content = await transcribe_image_file(path)
+        else:
+            result = await FileService().extract_from_path(
+                path,
+                file_name,
+                on_progress=lambda progress: _record_progress(file_id, progress),
+                max_pages=PDF_BOOK_MAX_PAGES,
+            )
+            content = result.text
+        if use_vision and result is not None:
             # Practice test (GH #133): pages that lost their math are re-read by a
             # vision model before the row turns ready, so a test built from this
             # file never sees the broken text.
@@ -250,7 +262,7 @@ async def _extract_and_update(
                 # (deploy overlap); the real result wins.
                 record.upload_error = None
                 record.upload_note = None
-                if result.pages_read is not None and result.page_count is not None:
+                if result is not None and result.pages_read is not None and result.page_count is not None:
                     # pages_done < pages_total on a ready row means "still reading more".
                     total = min(result.page_count, PDF_BOOK_MAX_PAGES)
                     record.pages_done = result.pages_read
@@ -277,7 +289,7 @@ async def _extract_and_update(
                 extra={"file_id": file_id, "file_name": file_name, "status": record.upload_status},
             )
 
-        if read_more_from is not None and result.page_count is not None:
+        if read_more_from is not None and result is not None and result.page_count is not None:
             try:
                 await _read_remaining_batches(
                     file_id, path, file_name, folder_id, read_more_from, result.page_count
@@ -290,6 +302,8 @@ async def _extract_and_update(
         logger.warning("Background extraction failed for file_id=%s: %s", file_id, exc)
         if use_vision:
             await _refund_vision(vision_charge)
+        if is_image:
+            await _refund_vision(image_charge)
         duration_ms = int((_time.monotonic() - _t0) * 1000)
         async with async_session_maker() as err_session:
             record = await err_session.get(FolderFile, file_id)
@@ -306,6 +320,15 @@ async def _extract_and_update(
             await err_session.commit()
     finally:
         remove_temp(path)
+
+
+async def _fail_upload(file_id: int, reason: str) -> None:
+    async with async_session_maker() as session:
+        record = await session.get(FolderFile, file_id)
+        if record is not None:
+            record.upload_status = "error"
+            record.upload_error = reason
+            await session.commit()
 
 
 async def _refund_vision(charge_id: Optional[int]) -> None:
@@ -411,11 +434,14 @@ async def upload_folder_files(
             name = upload.filename or "untitled"
             file_type = normalize_file_extension(name)
 
-            if file_type not in ALLOWED_FILE_TYPES:
+            if file_type not in ALLOWED_FILE_TYPES and file_type not in IMAGE_FILE_TYPES:
                 skipped.append(SkippedFile(
                     file_name=name,
-                    reason="Supported file types: PDF, DOCX, TXT, MD, HTML, PPTX, and common code files",
+                    reason="Supported file types: PDF, DOCX, TXT, MD, HTML, PPTX, PNG, JPG, and common code files",
                 ))
+                continue
+            if file_type in IMAGE_FILE_TYPES and is_guest(user):
+                skipped.append(SkippedFile(file_name=name, reason="Sign in with Google to upload images"))
                 continue
 
             # Stream to a temp file NOW, before the request context ends. The bytes
@@ -492,7 +518,16 @@ async def upload_folder_files(
     # test that reads these files. A PDF uploaded as a practice test may also
     # get the vision pass for pages that lost their math (GH #133).
     for file_id, path, name in queued:
-        if purpose == "practice_test" and name.lower().endswith(".pdf"):
+        if normalize_file_extension(name) in IMAGE_FILE_TYPES:
+            allowed, charge_id = await QuotaService().charge_image_read(session, user)
+            if allowed:
+                spawn_detached(_extract_and_update(file_id, path, name, folder_id, user.id, image_charge=charge_id))
+            else:
+                remove_temp(path)
+                await _fail_upload(file_id, "Image reading limit reached for now. Try again later, or upload a PDF.")
+            continue
+        # An answer sheet is as math-heavy as the test it answers.
+        if purpose in ("practice_test", "answer_sheet") and name.lower().endswith(".pdf"):
             allowed, charge_id = await QuotaService().charge_practice_vision(session, user)
             if allowed:
                 spawn_detached(_extract_and_update(

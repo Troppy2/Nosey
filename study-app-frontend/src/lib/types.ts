@@ -158,6 +158,8 @@ export type AnswerResult = {
   // The correct answer was worked out by Nosey: the uploaded practice test
   // had no answer key for this question.
   answer_inferred?: boolean;
+  // The correct answer came from the student's uploaded answer sheet.
+  answer_from_sheet?: boolean;
   // OCR redo state (GH #149). While "needs_input" the answer is ungraded and
   // correct_answer / feedback / reasoning are withheld by the server.
   ocr_status?: OcrStatus | null;

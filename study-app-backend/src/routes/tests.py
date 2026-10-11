@@ -127,7 +127,8 @@ def _reviewed_questions_from_form(
     """The questions the student checked in the practice-test review step.
 
     JSON list of {kind, question_text, options, correct_index, expected_answer,
-    answer_inferred, group_key, group_label, group_stem, part_label}, in the
+    answer_inferred, group_key, group_label, group_stem, part_label,
+    answer_from_sheet, solution}, in the
     order to save them. None when absent; a malformed entry is a 400. The
     group fields keep a multi-part problem's parts together under one setup
     (GH #151).
@@ -155,6 +156,8 @@ def _reviewed_questions_from_form(
             "group_label": str(item.get("group_label") or "").strip()[:50],
             "group_stem": str(item.get("group_stem") or "").strip()[:8_000],
             "seq": position,
+            "answer_from_sheet": bool(item.get("answer_from_sheet")),
+            "solution": str(item.get("solution") or "").strip()[:8_000],
         }
         if not text:
             raise StudyAppException("A checked question has no text")
@@ -163,10 +166,15 @@ def _reviewed_questions_from_form(
             index = item.get("correct_index")
             if not 2 <= len(options) <= 6 or not all(options) or not isinstance(index, int) or not 0 <= index < len(options):
                 raise StudyAppException("A checked multiple choice question needs 2-6 options and a correct one")
-            mcq.append(GeneratedMCQ(text, options, index, inferred, **grouping))
+            mcq.append(GeneratedMCQ(text, options, index, inferred and not grouping["answer_from_sheet"], **grouping))
         else:
             answer = str(item.get("expected_answer") or "").strip()[:8_000]
-            frq.append(GeneratedFRQ(text, answer or "(no answer given)", inferred or not answer, **grouping))
+            if not answer:
+                grouping["answer_from_sheet"] = False
+            frq.append(GeneratedFRQ(
+                text, answer or "(no answer given)",
+                (inferred or not answer) and not grouping["answer_from_sheet"], **grouping,
+            ))
     return mcq, frq
 
 
@@ -445,8 +453,13 @@ async def _generate_questions_background(
     practice_solve_context: str = "",
     reviewed_questions: Optional[tuple[list[GeneratedMCQ], list[GeneratedFRQ]]] = None,
     multi_part: bool = False,
+    answer_sheet: str = "",
 ) -> None:
     """Run LLM generation and save questions; called as a FastAPI background task.
+
+    answer_sheet: the student's answer sheet for a recreated practice test. Its
+    answers and marking points are matched onto the questions (official, never
+    second-guessed); questions it does not cover are solved as before.
 
     practice_test_mode: "recreate" (the document's own questions) or "style" (a
     parallel version of them). None infers it the way regenerate_test must:
@@ -490,6 +503,10 @@ async def _generate_questions_background(
                 raise StudyAppException(
                     "None of the questions you checked fit this test type. Try Mixed instead."
                 )
+            if answer_sheet:
+                # Only questions the review step did not already match (the
+                # sheet may have been added after the problems were checked).
+                r_mcq, r_frq = await llm.apply_answer_sheet(r_mcq, r_frq, answer_sheet)
             return r_mcq, r_frq
         if practice_test_content and practice_test_mode == "style":
             # One new question per original; the counts do not apply.
@@ -513,6 +530,7 @@ async def _generate_questions_background(
                 include_frq=test_type not in ("MCQ_only", "Extreme"),
                 provider=provider,
                 solve_context=practice_solve_context,
+                answer_sheet=answer_sheet,
             )
         return await llm.generate_test_questions(
             notes=notes_content,
@@ -788,6 +806,7 @@ async def _extract_and_generate_background(
     practice_test_ranges: Optional[list[tuple[int, int]]] = None,
     reviewed_questions: Optional[tuple[list[GeneratedMCQ], list[GeneratedFRQ]]] = None,
     multi_part: bool = False,
+    answer_sheet_file_id: Optional[int] = None,
 ) -> None:
     """Extract uploaded files, persist notes, then run generation.
 
@@ -823,6 +842,8 @@ async def _extract_and_generate_background(
         waited_ids = list(folder_file_ids or [])
         if practice_test_file_id is not None:
             waited_ids.append(practice_test_file_id)
+        if answer_sheet_file_id is not None:
+            waited_ids.append(answer_sheet_file_id)
         rows = await _wait_for_folder_files(folder_id, waited_ids) if waited_ids else {}
 
         def _ready(file_id: int) -> bool:
@@ -849,6 +870,15 @@ async def _extract_and_generate_background(
                 pt_name = rows[practice_test_file_id].file_name
                 if not practice_test_content:
                     raise StudyAppException(f"{pt_name} has no readable text")
+            answer_sheet = ""
+            if answer_sheet_file_id is not None and practice_test_only:
+                # A sheet that could not be read is skipped, not fatal: the
+                # questions are solved the way they are without one.
+                if _ready(answer_sheet_file_id):
+                    sheet_row = await session.get(FolderFile, answer_sheet_file_id)
+                    answer_sheet = ((sheet_row.content or "") if sheet_row else "").strip()
+                else:
+                    logger.warning("Answer sheet %s unreadable for test_id=%s", answer_sheet_file_id, test_id)
             if pt_raw and practice_test_ranges:
                 # Only the problems the student picked (GH #138), plus the
                 # answer key. Stored as the test's note, so regenerate reads
@@ -876,7 +906,7 @@ async def _extract_and_generate_background(
                 other_ids = list(await session.scalars(
                     select(FolderFile.id).where(
                         FolderFile.folder_id == folder_id,
-                        FolderFile.id != (practice_test_file_id or -1),
+                        FolderFile.id.notin_([practice_test_file_id or -1, answer_sheet_file_id or -1]),
                         FolderFile.upload_status == "ready",
                     )
                 ))
@@ -926,6 +956,11 @@ async def _extract_and_generate_background(
                 # Stored as "pdf": regenerate_test reads that type back as the practice test.
                 pt_label = practice_test_path[1] if practice_test_path else (pt_name or "practice_test")
                 await repo.add_note(test_id, pt_label[:255], "pdf", practice_test_content)
+            if answer_sheet:
+                # Stored as "answers": regenerate_test reads it back as the sheet,
+                # never as study notes.
+                sheet_label = rows[answer_sheet_file_id].file_name if answer_sheet_file_id in rows else "answer_sheet"
+                await repo.add_note(test_id, sheet_label[:255], "answers", answer_sheet)
 
             prior_questions: list[str] = []
             if notes_hash and avoid_repeat:
@@ -973,6 +1008,7 @@ async def _extract_and_generate_background(
         practice_solve_context=solve_context,
         reviewed_questions=reviewed_questions,
         multi_part=multi_part,
+        answer_sheet=answer_sheet,
     )
 
 
@@ -1014,8 +1050,12 @@ async def create_test(
             ))
             pt_id_raw = str(form.get("practice_test_file_id") or "").strip()
             practice_test_file_id = int(pt_id_raw) if pt_id_raw else None
+            sheet_id_raw = str(form.get("answer_sheet_file_id") or "").strip()
+            answer_sheet_file_id = int(sheet_id_raw) if sheet_id_raw else None
         except ValueError as exc:
-            raise StudyAppException("file_ids and practice_test_file_id must be numbers") from exc
+            raise StudyAppException(
+                "file_ids, practice_test_file_id and answer_sheet_file_id must be numbers"
+            ) from exc
         # recreate: rebuild the practice test's own questions. style: write new
         # questions from the notes in the practice test's style.
         practice_test_mode = str(form.get("practice_test_mode", "recreate")).strip().lower()
@@ -1101,6 +1141,8 @@ async def create_test(
         referenced_ids = set(file_ids)
         if practice_test_file_id is not None:
             referenced_ids.add(practice_test_file_id)
+        if answer_sheet_file_id is not None:
+            referenced_ids.add(answer_sheet_file_id)
         if referenced_ids:
             found_ids = set(await session.scalars(
                 select(FolderFile.id).where(
@@ -1212,6 +1254,7 @@ async def create_test(
                 practice_test_ranges=practice_test_ranges or None,
                 reviewed_questions=reviewed_questions if practice_test_only else None,
                 multi_part=multi_part,
+                answer_sheet_file_id=answer_sheet_file_id if practice_test_only else None,
             )
         )
         handed_off = True
@@ -1263,8 +1306,9 @@ async def regenerate_test(
         # Reconstruct the source material from the persisted Note rows. create_test
         # stores combined notes under file_type "combined" and a practice test under "pdf".
         notes_content = "\n\n---\n\n".join(
-            n.content for n in test.notes if n.file_type != "pdf" and n.content
+            n.content for n in test.notes if n.file_type not in ("pdf", "answers") and n.content
         )
+        answer_sheet = "\n\n".join(n.content for n in test.notes if n.file_type == "answers" and n.content)
         practice_test_content = "\n\n---\n\n".join(
             n.content for n in test.notes if n.file_type == "pdf" and n.content
         )
@@ -1339,6 +1383,7 @@ async def regenerate_test(
                 count_rank=data.count_rank,
                 prior_questions=prior_questions,
                 quota_charge_id=quota_charge_id,
+                answer_sheet=answer_sheet,
             )
         )
 
