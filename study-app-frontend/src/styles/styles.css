@@ -768,6 +768,15 @@
   gap: 44px;
 }
 
+/* Grid items default to min-width: auto, so one unbreakable test title
+   ("CSCI2033_Midterm1_Targeted_Worksheet") made the main column wider than
+   its track and it slid under Review These whenever the open sidebar left
+   less room. Both columns now shrink to their tracks. */
+.dashboard-layout > .dashboard-main,
+.dashboard-layout > aside {
+  min-width: 0;
+}
+
 .text-link {
   color: var(--green-dark);
   font-size: 0.92rem;
@@ -829,6 +838,16 @@
   gap: 16px;
   min-width: 0;
   flex: 1;
+}
+
+/* The title block shrinks and long file-name titles wrap instead of pushing
+   the row (and the page column) wider. */
+.test-row-main > div:first-child {
+  min-width: 0;
+}
+
+.test-row-main h3 {
+  overflow-wrap: anywhere;
 }
 
 /* The "Resume" affordance on a Continue Test row. Was an inline style object in
