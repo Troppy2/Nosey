@@ -26154,6 +26154,12 @@ a.sd-chip.is-done:hover {
   color: var(--green-dark);
 }
 
+.lm-dock-speed-note {
+  margin: 0.4rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
 /* The article must not end underneath the pill. Both classes are chained on
    one element deliberately: .shell--mobile .page in mobile-shell.css sets the
    same property at the same specificity and is imported later, so an unchained
@@ -28449,4 +28455,8 @@ a.sd-chip.is-done:hover {
   .dropdown-chevron {
     transition: none;
   }
+}
+
+.lm-reformat-note {
+  margin: 0 0 0.75rem;
 }

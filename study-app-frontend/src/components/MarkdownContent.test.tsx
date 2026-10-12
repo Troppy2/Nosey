@@ -531,3 +531,24 @@ describe("geometry label cleanup", () => {
     expect(t).toBeGreaterThan(4);
   });
 });
+
+// Real lesson output that KaTeX rejected and showed as red source.
+describe("TeX the model gets wrong still renders", () => {
+  const B = "\\";
+  const cases = [
+    "$$P(E) = " + B + "frac{" + B + "text{# favorable outcomes}}{" + B + "text{# total outcomes}}$$",
+    "$P(" + B + "text{" + B + "sum} " + B + "ge 4)$",
+    "$$P(" + B + "text{" + B + "sum} " + B + "le 3) = 1 - " + B + "frac{3}{36}$$",
+    "$50% + 50%$",
+  ];
+  it.each(cases)("renders %s without a KaTeX error", (content) => {
+    const { container } = render(<MarkdownContent content={content} />);
+    expect(container.querySelector(".katex")).toBeTruthy();
+    expect(container.querySelector(".katex-error")).toBeNull();
+  });
+
+  it("leaves valid TeX untouched", () => {
+    const { container } = render(<MarkdownContent content={"$" + B + "# x$"} />);
+    expect(container.querySelector(".katex-error")).toBeNull();
+  });
+});

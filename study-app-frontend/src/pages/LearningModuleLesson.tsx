@@ -125,6 +125,98 @@ function alignParagraphsToBlocks(paragraphs: string[], blocks: string[]): number
   });
 }
 
+// Maps each block of the stored lesson to the displayed (repaired) block that
+// holds the same text. Repair leaves most blocks byte-identical, so an exact
+// match wins; otherwise the closest block by word Jaccard, which unlike
+// contentWords keeps short tokens, so code like "xs = [1]" still matches.
+function alignRawToDisplayBlocks(rawBlocks: string[], displayBlocks: string[]): number[] {
+  const tokens = (text: string) => new Set(text.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+  const displayTokens = displayBlocks.map(tokens);
+  const lookahead = 4;
+  let cursor = 0;
+  return rawBlocks.map((raw) => {
+    const end = Math.min(displayBlocks.length - 1, cursor + lookahead);
+    const trimmed = raw.trim();
+    for (let b = cursor; b <= end; b++) {
+      if (displayBlocks[b].trim() === trimmed) return (cursor = b);
+    }
+    const words = tokens(raw);
+    let best = -1;
+    let bestScore = 0;
+    for (let b = cursor; b <= end; b++) {
+      let shared = 0;
+      for (const w of words) if (displayTokens[b].has(w)) shared++;
+      const union = words.size + displayTokens[b].size - shared;
+      const score = union ? shared / union : 0;
+      if (score > bestScore) {
+        bestScore = score;
+        best = b;
+      }
+    }
+    if (best >= 0) cursor = best;
+    return cursor;
+  });
+}
+
+// Pairs each narration paragraph with the displayed lesson block it covers.
+//
+// New scripts are a JSON array with one entry per block of the STORED lesson
+// (the backend counts blocks with a port of splitLessonBlocks, see
+// study-app-backend/src/utils/lesson_blocks.py), so entry i narrates raw
+// block i exactly. The page renders the REPAIRED lesson, which can cut blocks
+// differently, so raw blocks are aligned to displayed ones by word overlap.
+// That step compares near-identical text and is reliable, unlike aligning a
+// spoken rewrite. Legacy string scripts and miscounted arrays fall back to
+// aligning the script itself.
+export function mapScriptToBlocks(
+  script: string,
+  rawLesson: string,
+  displayBlocks: string[],
+): { text: string; blockIndex: number }[] {
+  let entries: string[] | null = null;
+  if (script.trimStart().startsWith("[")) {
+    try {
+      const parsed: unknown = JSON.parse(script);
+      if (Array.isArray(parsed)) entries = parsed.map((e) => (typeof e === "string" ? e : ""));
+    } catch {
+      entries = null;
+    }
+  }
+
+  if (entries) {
+    const rawBlocks = splitLessonBlocks(rawLesson);
+    let blockFor: number[] | null = null;
+    if (entries.length === displayBlocks.length) {
+      blockFor = entries.map((_, i) => i);
+    } else if (entries.length === rawBlocks.length) {
+      blockFor =
+        rawBlocks.length === displayBlocks.length
+          ? rawBlocks.map((_, i) => i)
+          : alignRawToDisplayBlocks(rawBlocks, displayBlocks);
+    }
+    if (blockFor) {
+      const mapped = blockFor;
+      return entries
+        .map((entry, i) => ({ text: markdownToSpeech(entry), blockIndex: mapped[i] ?? 0 }))
+        .filter((p) => p.text);
+    }
+  }
+
+  // Legacy (or miscounted) script. Models sometimes separate paragraphs with a
+  // single newline, which a blank-line split would merge into one paragraph
+  // pinned to one block for the whole narration.
+  const source = entries ? entries.join("\n\n") : script;
+  const byBlank = source.split(/\n\s*\n/);
+  const paragraphs = (byBlank.length > 1 ? byBlank : source.split(/\n/))
+    .map((p) => markdownToSpeech(p))
+    .filter(Boolean);
+  const blockFor =
+    paragraphs.length === displayBlocks.length
+      ? paragraphs.map((_, i) => i)
+      : alignParagraphsToBlocks(paragraphs, displayBlocks);
+  return paragraphs.map((text, i) => ({ text, blockIndex: blockFor[i] ?? 0 }));
+}
+
 // Turns a pasted video URL into an embeddable player source. YouTube and
 // Vimeo pages cannot be iframed directly, so they map to their embed hosts;
 // direct media files play in a <video> tag; anything else renders as a link.
@@ -169,9 +261,36 @@ function formatClock(seconds: number): string {
 // wants 1.7x can actually have it. The ceiling is 3x because Web Speech voices
 // turn to mush above it on most platforms, and the floor is 0.5x because slower
 // than that stops sounding like speech.
+// Keys that move a range input. Any other key-up (Tab leaving the slider)
+// must not commit a seek, or the rounded fractional position could skip ahead.
+const SEEK_KEYS = new Set(["Home", "End", "PageUp", "PageDown"]);
+
+// Maps elapsed/estimated time for a chunk to how full the bar is. Linear up to
+// 80%, then it eases toward (never reaching) 99%, with the same speed at the
+// join so there is no visible kink. The estimate is rough, so the bar slows
+// down near the end instead of stopping dead or running into the next chunk.
+const EASE_START = 0.8;
+const EASE_ROOM = 0.19;
+export function easeChunkProgress(ratio: number): number {
+  if (ratio <= 0) return 0;
+  if (ratio <= EASE_START) return ratio;
+  return EASE_START + EASE_ROOM * (1 - Math.exp(-(ratio - EASE_START) / EASE_ROOM));
+}
+
 const RATE_MIN = 0.5;
 const RATE_MAX = 3;
 const RATE_STEP = 0.05;
+// Chrome's Google voices stream from Google's servers and stop speeding up
+// near 2x: any higher rate is clamped silently, so the chip would say 3x while
+// the audio plays at 2x. Voices installed on the device (localService, e.g.
+// Microsoft David on Windows or Samantha on macOS) honour the full range.
+const NETWORK_VOICE_RATE_MAX = 2;
+
+// The speed ceiling for the voice that will actually speak: the picked one,
+// else the browser default. Unknown until the voice list loads.
+function maxRateFor(voice: SpeechSynthesisVoice | null): number {
+  return voice && !voice.localService ? NETWORK_VOICE_RATE_MAX : RATE_MAX;
+}
 
 // Trailing zeros dropped, so 1.7 reads "1.7x" and 1 reads "1x".
 function formatRate(rate: number): string {
@@ -276,6 +395,9 @@ export default function LearningModuleLesson() {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [savingRebuild, setSavingRebuild] = useState(false);
+  const [reformatting, setReformatting] = useState(false);
+  const [reformatNote, setReformatNote] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
 
   // ── Video resource ──────────────────────────────────────────────────────────
@@ -344,6 +466,23 @@ export default function LearningModuleLesson() {
     voiceRef.current = voices.find((v) => v.voiceURI === voiceURI) ?? null;
   }, [voices, voiceURI]);
 
+  const rateMax = maxRateFor(
+    voices.find((v) => v.voiceURI === voiceURI) ?? voices.find((v) => v.default) ?? null,
+  );
+
+  // A saved 3x carried onto a voice that tops out at 2x would show a speed
+  // nobody hears. Clamp and persist so the chip always tells the truth.
+  useEffect(() => {
+    if (rate <= rateMax) return;
+    setRate(rateMax);
+    rateRef.current = rateMax;
+    try {
+      localStorage.setItem(scopeKey("nosey_lm_rate"), String(rateMax));
+    } catch {
+      // Private mode or a full quota.
+    }
+  }, [rate, rateMax]);
+
   // English voices first (lessons are English), Google voices first within
   // that, so Chrome users see the good options at the top.
   const voiceOptions = useMemo(() => {
@@ -377,6 +516,7 @@ export default function LearningModuleLesson() {
   useEffect(() => {
     if (numericModuleId == null) return;
     window.scrollTo({ top: 0, behavior: "auto" });
+    setReformatNote(null);
   }, [numericModuleId]);
 
   const module = useMemo(
@@ -406,30 +546,18 @@ export default function LearningModuleLesson() {
   // paragraphs too as a safety net against stray markdown or LaTeX.
   //
   // Each chunk carries the lesson block it narrates so the article can
-  // highlight the paragraph currently being read: script paragraphs map to
-  // blocks 1:1 when the counts line up and proportionally when they drift
-  // (the script mirrors the lesson paragraph by paragraph, so this is
-  // paragraph-accurate even though the wording is a spoken rewrite).
+  // highlight the paragraph currently being read (see mapScriptToBlocks).
   const speechChunks = useMemo(() => {
     if (module?.tts_script) {
-      const paragraphs = module.tts_script
-        .split(/\n\s*\n/)
-        .map((p) => markdownToSpeech(p))
-        .filter(Boolean);
-      const blockForParagraph =
-        paragraphs.length === lessonBlocks.length
-          ? paragraphs.map((_, i) => i)
-          : alignParagraphsToBlocks(paragraphs, lessonBlocks);
-      return paragraphs.flatMap((paragraph, i) => {
-        const blockIndex = blockForParagraph[i] ?? 0;
-        return splitForSpeech(paragraph).map((text) => ({ text, blockIndex }));
-      });
+      return mapScriptToBlocks(module.tts_script, module.lesson_content ?? "", lessonBlocks).flatMap(
+        ({ text: paragraph, blockIndex }) => splitForSpeech(paragraph).map((text) => ({ text, blockIndex })),
+      );
     }
     return lessonBlocks.flatMap((block, blockIndex) => {
       const text = markdownToSpeech(block);
       return text ? splitForSpeech(text).map((t) => ({ text: t, blockIndex })) : [];
     });
-  }, [module?.tts_script, lessonBlocks]);
+  }, [module?.tts_script, module?.lesson_content, lessonBlocks]);
 
   // The paragraph the player is on, for the article highlight.
   const currentBlock = speechChunks[chunkPos]?.blockIndex ?? 0;
@@ -453,13 +581,71 @@ export default function LearningModuleLesson() {
   // Dividing by the rate is what makes the speed buttons legible: picking 2x
   // visibly halves the total.
   const secondsForWords = (words: number) => (words / 170) * 60 / rate;
-  const elapsedSeconds = secondsForWords(wordsBeforeChunk[chunkPos] ?? 0);
   const totalSeconds = secondsForWords(wordsBeforeChunk[wordsBeforeChunk.length - 1] ?? 0);
+
+  // How far through the current chunk playback is, 0..1. Web Speech gives no
+  // playback clock, so this is the estimated chunk length ticking down from
+  // when the chunk started. Without it the bar and clock sat still for a whole
+  // chunk and then jumped.
+  //
+  // Tagged with the chunk it belongs to: the reset runs in an effect, AFTER
+  // the render that shows the new chunk, so an untagged fraction painted one
+  // frame of "next chunk + 0.97" and the bar visibly jumped back.
+  const [chunkProgress, setChunkProgress] = useState({ pos: -1, frac: 0 });
+  const chunkSeconds = secondsForWords(
+    (wordsBeforeChunk[chunkPos + 1] ?? 0) - (wordsBeforeChunk[chunkPos] ?? 0),
+  );
+  useEffect(() => {
+    if (speech !== "playing" || chunkSeconds <= 0) {
+      setChunkProgress({ pos: chunkPos, frac: 0 });
+      return;
+    }
+    const started = performance.now();
+    const timer = window.setInterval(() => {
+      const ratio = (performance.now() - started) / 1000 / chunkSeconds;
+      setChunkProgress({ pos: chunkPos, frac: easeChunkProgress(ratio) });
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [chunkPos, speech, chunkSeconds]);
+  const chunkFrac = chunkProgress.pos === chunkPos ? chunkProgress.frac : 0;
+
+  // While the thumb is held it follows the pointer exactly (fractional), so a
+  // drag glides instead of snapping chunk to chunk. Only the chunk it rounds
+  // to is applied, and only release commits the seek.
+  const [dragPos, setDragPos] = useState<number | null>(null);
+  // The drag ends on a release ANYWHERE. A mouse released outside the slider
+  // never reaches the input's own onPointerUp, which left dragPos set and froze
+  // the bar at the drag point for good. The release commits the seek; a
+  // cancel (or the window losing focus) only ends the drag.
+  const dragPosRef = useRef<number | null>(null);
+  dragPosRef.current = dragPos;
+  const commitDragRef = useRef<(index: number) => void>(() => {});
+  const dragging = dragPos !== null;
+  useEffect(() => {
+    if (!dragging) return;
+    const release = () => {
+      const pos = dragPosRef.current;
+      setDragPos(null);
+      if (pos !== null) commitDragRef.current(Math.round(pos));
+    };
+    const cancel = () => setDragPos(null);
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", cancel);
+    window.addEventListener("blur", cancel);
+    return () => {
+      window.removeEventListener("pointerup", release);
+      window.removeEventListener("pointercancel", cancel);
+      window.removeEventListener("blur", cancel);
+    };
+  }, [dragging]);
+  const position = dragPos ?? chunkPos + chunkFrac;
+  const elapsedSeconds =
+    secondsForWords(wordsBeforeChunk[chunkPos] ?? 0) + chunkFrac * chunkSeconds;
 
   // Filled portion of the seek track. Guarded at one chunk, where the range
   // input's min and max are both 0 and the ratio would be NaN.
   const seekPercent =
-    speechChunks.length > 1 ? (chunkPos / (speechChunks.length - 1)) * 100 : 0;
+    speechChunks.length > 1 ? Math.min(100, (position / (speechChunks.length - 1)) * 100) : 0;
 
   // The key is kept in a ref so the stable speech callbacks can persist the
   // position without being recreated per module.
@@ -507,6 +693,9 @@ export default function LearningModuleLesson() {
     utterance.onend = () => {
       if (playSessionRef.current !== session || stoppedRef.current) return;
       chunkIndexRef.current += 1;
+      // Advance here too, not only in onstart: Chrome's network voices can
+      // skip onstart, which froze the bar and highlight on the old chunk.
+      if (chunkIndexRef.current < chunksRef.current.length) updateChunkPos(chunkIndexRef.current);
       speakChunk();
     };
     utterance.onerror = () => {
@@ -563,7 +752,7 @@ export default function LearningModuleLesson() {
   // per step, and restarting the utterance on every one of those would stutter
   // the narration badly, so only the release restarts it.
   function changeRate(newRate: number, commit: boolean) {
-    const clamped = Math.min(RATE_MAX, Math.max(RATE_MIN, newRate));
+    const clamped = Math.min(rateMax, Math.max(RATE_MIN, newRate));
     setRate(clamped);
     rateRef.current = clamped;
     try {
@@ -652,6 +841,9 @@ export default function LearningModuleLesson() {
       startSpeechFrom(clamped);
     }
   }
+  // Refreshed every render so the window release listener commits with the
+  // current playback state, not the one from when the drag began.
+  commitDragRef.current = (index) => seekTo(index, true);
 
   function previewVoice() {
     if (!ttsSupported) return;
@@ -796,21 +988,36 @@ export default function LearningModuleLesson() {
     setEditing(true);
   }
 
-  // Repairs the stored article's mangled escape sequences and drops the result
-  // into the edit view rather than saving it. Nothing is written until you read
-  // the diff and press Save, because this overwrites the article.
-  //
-  // Deterministic and local: no LLM call, so it cannot reword anything. See
-  // repairLessonMarkdown.ts for what it does and does not touch.
-  function startReformat() {
-    if (!module?.lesson_content) return;
-    stopSpeech();
-    setDraft(repairLessonFully(module.lesson_content));
-    setEditError(null);
-    setEditing(true);
+  // Repairs the stored article's broken formatting (mangled escapes, unbalanced
+  // maths delimiters) and saves it in place. Deterministic and local: no LLM
+  // call, so it cannot reword anything (see repairLessonMarkdown.ts), which is
+  // why it saves straight away instead of asking for review. Text only: the
+  // content is unchanged, so the script and quiz are kept, not rebuilt.
+  async function runReformat() {
+    if (!module?.lesson_content || reformatting) return;
+    const repaired = repairLessonFully(module.lesson_content).trim();
+    setReformatNote(null);
+    if (repaired === module.lesson_content.trim()) {
+      setReformatNote("Formatting already looks right. Nothing to fix.");
+      return;
+    }
+    setReformatting(true);
+    try {
+      const updated = await updateModuleLesson(module.id, repaired, false);
+      if (track) {
+        setTrack({ ...track, modules: track.modules.map((m) => (m.id === updated.id ? updated : m)) });
+      }
+      setReformatNote("Article reformatted.");
+    } catch (err) {
+      setReformatNote(err instanceof Error ? err.message : "Could not reformat the article. Try again.");
+    } finally {
+      setReformatting(false);
+    }
   }
 
-  async function handleSaveEdit() {
+  // rebuild=false saves the text only (script and quiz kept as they are);
+  // rebuild=true also regenerates both from the new text, which takes a minute.
+  async function handleSaveEdit(rebuild: boolean) {
     if (!module || savingEdit) return;
     const lesson = draft.trim();
     if (!lesson) {
@@ -818,9 +1025,10 @@ export default function LearningModuleLesson() {
       return;
     }
     setSavingEdit(true);
+    setSavingRebuild(rebuild);
     setEditError(null);
     try {
-      const updated = await updateModuleLesson(module.id, lesson);
+      const updated = await updateModuleLesson(module.id, lesson, rebuild);
       // Swap the fresh module (new lesson, narration script, and quiz) into
       // the track and clear any in-progress quiz state, which referred to the
       // old questions.
@@ -830,8 +1038,11 @@ export default function LearningModuleLesson() {
           modules: track.modules.map((m) => (m.id === updated.id ? updated : m)),
         });
       }
-      setAnswers({});
-      setResult(null);
+      // A rebuilt quiz has new questions, so old answers no longer apply.
+      if (rebuild) {
+        setAnswers({});
+        setResult(null);
+      }
       updateChunkPos(0);
       setEditing(false);
     } catch (err) {
@@ -948,8 +1159,9 @@ export default function LearningModuleLesson() {
                 the button is. */}
             <button
               className={`flash-icon-btn lm-reformat-btn ${articleMangled ? "is-needed" : ""}`}
-              onClick={startReformat}
+              onClick={() => void runReformat()}
               type="button"
+              disabled={reformatting || savingEdit}
               aria-label="Reformat article"
               title={
                 articleMangled
@@ -991,7 +1203,7 @@ export default function LearningModuleLesson() {
                     onClick={() => {
                       setMenuOpen(false);
                       setVoiceFormOpen(false);
-                      startReformat();
+                      void runReformat();
                     }}
                   >
                     <RotateCcw size={15} /> Reformat article
@@ -1012,6 +1224,12 @@ export default function LearningModuleLesson() {
           </div>
         ) : null}
       </header>
+
+      {!editing && (reformatting || reformatNote) ? (
+        <p className="muted small lm-reformat-note" role="status">
+          {reformatting ? "Reformatting the article…" : reformatNote}
+        </p>
+      ) : null}
 
       {!editing && voiceFormOpen ? (
         <Card className="lm-voice-form">
@@ -1066,16 +1284,35 @@ export default function LearningModuleLesson() {
               type="range"
               min={0}
               max={Math.max(0, speechChunks.length - 1)}
-              value={chunkPos}
+              // Fractional so the thumb glides with the fill; seeks round to
+              // the nearest chunk, the only place speech can start from.
+              step="any"
+              value={Math.min(position, Math.max(0, speechChunks.length - 1))}
               aria-label="Seek position in the narration"
               // WebKit has no ::-moz-range-progress equivalent, so the filled
               // portion is painted as a hard-stop gradient on the track at
               // this percentage. Firefox uses the real pseudo-element and
               // ignores it.
               style={{ "--seek-pct": `${seekPercent}%` } as CSSProperties}
-              onChange={(e) => seekTo(Number(e.target.value), false)}
-              onPointerUp={(e) => seekTo(Number((e.target as HTMLInputElement).value), true)}
-              onKeyUp={(e) => seekTo(Number((e.target as HTMLInputElement).value), true)}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                setDragPos(value);
+                if (Math.round(value) !== chunkPos) seekTo(Math.round(value), false);
+              }}
+              // step="any" leaves the browser's arrow-key step undefined, so
+              // arrows move one chunk explicitly.
+              onKeyDown={(e) => {
+                const delta = e.key === "ArrowLeft" || e.key === "ArrowDown" ? -1 : e.key === "ArrowRight" || e.key === "ArrowUp" ? 1 : 0;
+                if (!delta) return;
+                e.preventDefault();
+                setDragPos(null);
+                seekTo(chunkPos + delta, true);
+              }}
+              onKeyUp={(e) => {
+                if (!SEEK_KEYS.has(e.key)) return;
+                setDragPos(null);
+                seekTo(Math.round(Number((e.target as HTMLInputElement).value)), true);
+              }}
             />
             <span className="lm-dock-clock">
               {formatClock(elapsedSeconds)} / {formatClock(totalSeconds)}
@@ -1124,13 +1361,13 @@ export default function LearningModuleLesson() {
                     className="lm-dock-speed-range"
                     type="range"
                     min={RATE_MIN}
-                    max={RATE_MAX}
+                    max={rateMax}
                     step={RATE_STEP}
                     value={rate}
                     autoFocus
                     aria-label="Playback speed"
                     aria-valuetext={formatRate(rate)}
-                    style={{ "--seek-pct": `${((rate - RATE_MIN) / (RATE_MAX - RATE_MIN)) * 100}%` } as CSSProperties}
+                    style={{ "--seek-pct": `${((rate - RATE_MIN) / (rateMax - RATE_MIN)) * 100}%` } as CSSProperties}
                     onChange={(e) => changeRate(Number(e.target.value), false)}
                     onPointerUp={(e) => changeRate(Number((e.target as HTMLInputElement).value), true)}
                     onKeyUp={(e) => changeRate(Number((e.target as HTMLInputElement).value), true)}
@@ -1138,8 +1375,13 @@ export default function LearningModuleLesson() {
                   <div className="lm-dock-speed-scale">
                     <span>{formatRate(RATE_MIN)}</span>
                     <strong>{formatRate(rate)}</strong>
-                    <span>{formatRate(RATE_MAX)}</span>
+                    <span>{formatRate(rateMax)}</span>
                   </div>
+                  {rateMax < RATE_MAX ? (
+                    <p className="muted small lm-dock-speed-note">
+                      This voice tops out at {formatRate(rateMax)}. Pick a device voice for up to {formatRate(RATE_MAX)}.
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -1190,8 +1432,8 @@ export default function LearningModuleLesson() {
             Edit article
           </label>
           <p className="muted small">
-            Plain markdown. When you save, the audio script and quiz are rebuilt to match your
-            version, which can take a minute.
+            Plain markdown. Save article keeps the current audio script and quiz. Save and rebuild
+            also writes a new script and quiz from your version, which can take a minute.
           </p>
           <textarea
             id="lm-edit-area"
@@ -1201,7 +1443,7 @@ export default function LearningModuleLesson() {
             disabled={savingEdit}
           />
           <FormError message={editError} />
-          {savingEdit ? (
+          {savingEdit && savingRebuild ? (
             <LoadingNotice
               compact
               title="Rebuilding the audio script and quiz"
@@ -1216,8 +1458,15 @@ export default function LearningModuleLesson() {
                 read as two unrelated loaders, and because the button is
                 disabled while saving its faded style left the ring looking
                 like it was floating on its own next to Cancel. */}
-            <Button onClick={() => void handleSaveEdit()} disabled={savingEdit || !draft.trim()}>
-              {savingEdit ? "Saving…" : "Save article"}
+            <Button onClick={() => void handleSaveEdit(false)} disabled={savingEdit || !draft.trim()}>
+              {savingEdit && !savingRebuild ? "Saving…" : "Save article"}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => void handleSaveEdit(true)}
+              disabled={savingEdit || !draft.trim()}
+            >
+              {savingEdit && savingRebuild ? "Rebuilding…" : "Save and rebuild audio + quiz"}
             </Button>
             <Button variant="secondary" onClick={() => setEditing(false)} disabled={savingEdit}>
               Cancel

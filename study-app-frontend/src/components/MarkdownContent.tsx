@@ -9,11 +9,30 @@ import { replaceTikz } from "../lib/tikz";
 
 // ── KaTeX ─────────────────────────────────────────────────────────────────────
 
+// Repairs for TeX that models commonly get wrong, which KaTeX otherwise shows
+// as raw source in red. Only tried after a failed render, so valid TeX is
+// never touched:
+// - A bare # is a macro parameter and % starts a comment: "\text{# outcomes}",
+//   "50%". Escape them.
+// - A math-only command alone inside \text: "\text{\sum}" means the word
+//   "sum". Drop the backslash.
+export function repairTexForKatex(src: string): string {
+  return src
+    .replace(/\\text\{\\([a-zA-Z]+)\}/g, "\\text{$1}")
+    .replace(/(?<!\\)[#%]/g, (ch) => `\\${ch}`);
+}
+
 function rkx(src: string, display: boolean): string {
+  const render = (tex: string) =>
+    katex.renderToString(tex, { displayMode: display, throwOnError: true, output: "html" });
   try {
-    return katex.renderToString(src, { displayMode: display, throwOnError: false, output: "html" });
+    return render(src);
   } catch {
-    return src;
+    try {
+      return render(repairTexForKatex(src));
+    } catch {
+      return katex.renderToString(src, { displayMode: display, throwOnError: false, output: "html" });
+    }
   }
 }
 

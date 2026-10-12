@@ -995,10 +995,15 @@ export async function deleteTrackById(trackId: number): Promise<void> {
 
 // Saves a user-edited lesson; the backend rebuilds the narration script and
 // quiz from it before responding, so this call can take LLM-generation time.
-export async function updateModuleLesson(moduleId: number, lessonContent: string): Promise<LearningModule> {
+// rebuild=false saves the text only and keeps the narration script and quiz.
+export async function updateModuleLesson(
+  moduleId: number,
+  lessonContent: string,
+  rebuild = true,
+): Promise<LearningModule> {
   return request<LearningModule>(`/learning-modules/${moduleId}`, {
     method: "PATCH",
-    body: JSON.stringify({ lesson_content: lessonContent }),
+    body: JSON.stringify({ lesson_content: lessonContent, rebuild }),
   });
 }
 

@@ -27,7 +27,7 @@ vi.mock("../lib/api", async () => {
 vi.mock("../lib/useSettings", () => ({ useSettings: () => ({ betaMode: true }) }));
 
 import { fetchTrackForModule, updateModuleLesson } from "../lib/api";
-import LearningModuleLesson, { splitLessonBlocks } from "./LearningModuleLesson";
+import LearningModuleLesson, { easeChunkProgress, mapScriptToBlocks, splitLessonBlocks } from "./LearningModuleLesson";
 
 const BS = "\\";
 
@@ -195,7 +195,7 @@ describe("LearningModuleLesson", () => {
     expect(button.getAttribute("title")).toBe("Reformat article");
   });
 
-  it("shows exactly one spinner while saving a reformatted article", async () => {
+  it("shows exactly one spinner while saving and rebuilding an edited article", async () => {
     // The LoadingNotice owns the spinner and the explanation. The Save button
     // used to render its own InlineLoading as well, and since the button is
     // disabled while saving, its faded style left that ring looking like it was
@@ -203,15 +203,60 @@ describe("LearningModuleLesson", () => {
     vi.mocked(updateModuleLesson).mockReturnValue(new Promise(() => {}) as never);
 
     const { container } = renderPage();
-    const reformat = await waitFor(() => screen.getByLabelText("Reformat article"));
-    fireEvent.click(reformat);
-
-    const save = await waitFor(() => screen.getByText("Save article"));
-    fireEvent.click(save);
+    fireEvent.click(await waitFor(() => screen.getByLabelText("Lesson options")));
+    fireEvent.click(screen.getByText("Edit article"));
+    fireEvent.click(await waitFor(() => screen.getByText("Save and rebuild audio + quiz")));
 
     await waitFor(() => expect(screen.getByText(/Rebuilding the audio script/i)).toBeTruthy());
     expect(container.querySelectorAll(".loader")).toHaveLength(1);
-    expect(screen.getByText("Saving…")).toBeTruthy();
+    expect(screen.getByText("Rebuilding…")).toBeTruthy();
+    expect(vi.mocked(updateModuleLesson).mock.lastCall?.[2]).toBe(true);
+  });
+
+  it("Save article saves the text only, with no rebuild", async () => {
+    vi.mocked(updateModuleLesson).mockReturnValue(new Promise(() => {}) as never);
+    renderPage();
+    fireEvent.click(await waitFor(() => screen.getByLabelText("Lesson options")));
+    fireEvent.click(screen.getByText("Edit article"));
+    fireEvent.click(await waitFor(() => screen.getByText("Save article")));
+
+    await waitFor(() => expect(screen.getByText("Saving…")).toBeTruthy());
+    expect(screen.queryByText(/Rebuilding the audio script/i)).toBeNull();
+    expect(vi.mocked(updateModuleLesson).mock.lastCall?.[2]).toBe(false);
+  });
+
+  it("Reformat on a clean article saves nothing and says so", async () => {
+    vi.mocked(updateModuleLesson).mockClear();
+    renderPage();
+    fireEvent.click(await waitFor(() => screen.getByLabelText("Reformat article")));
+    await waitFor(() => expect(screen.getByText(/Nothing to fix/i)).toBeTruthy());
+    expect(updateModuleLesson).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("Edit article")).toBeNull();
+  });
+
+  it("Reformat repairs a broken article in place without opening the editor", async () => {
+    const mangled = { ...TRACK.modules[0], lesson_content: "## Intro" + BS + "n" + BS + "nText." };
+    vi.mocked(fetchTrackForModule).mockResolvedValue({ ...TRACK, modules: [mangled] } as never);
+    vi.mocked(updateModuleLesson).mockClear();
+    vi.mocked(updateModuleLesson).mockResolvedValue({ ...mangled, lesson_content: "## Intro\n\nText." } as never);
+
+    renderPage();
+    fireEvent.click(await waitFor(() => screen.getByLabelText("Reformat article")));
+
+    await waitFor(() => expect(screen.getByText("Article reformatted.")).toBeTruthy());
+    expect(vi.mocked(updateModuleLesson).mock.lastCall).toEqual([42, "## Intro\n\nText.", false]);
+    expect(screen.queryByText("Edit article", { selector: "label" })).toBeNull();
+  });
+
+  it("lets the seek thumb glide while dragging instead of snapping to a chunk", async () => {
+    renderPage();
+    const seek = (await waitFor(() => screen.getByLabelText("Seek position in the narration"))) as HTMLInputElement;
+    fireEvent.change(seek, { target: { value: "0.4" } });
+    expect(Number(seek.value)).toBeCloseTo(0.4);
+    // Released anywhere, not only over the slider: a release outside it used
+    // to leave the drag stuck and the bar frozen.
+    fireEvent.pointerUp(window);
+    await waitFor(() => expect(Number(seek.value)).toBe(0));
   });
 
   it("starts with the dock shown, not hidden behind the quiz", async () => {
@@ -274,5 +319,56 @@ describe("splitLessonBlocks", () => {
     const blocks = splitLessonBlocks(article);
     expect(blocks).toContain("## A heading");
     expect(blocks).toContain("More prose.");
+  });
+});
+
+// Same cases as study-app-backend/tests/test_lesson_blocks.py. The backend
+// counts blocks to tell the model how many script entries to write, so both
+// splitters must cut in the same places. Change both tests together.
+describe("block split parity with the backend", () => {
+  const cases: [string, string[]][] = [
+    ["## Intro\n\nFirst para.\nStill first.\n\nSecond.", ["## Intro", "First para.\nStill first.", "Second."]],
+    ["Text.\n\n```py\nx = 1\n\ny = 2\n```\n\nAfter.", ["Text.", "```py\nx = 1\n\ny = 2\n```", "After."]],
+    ["Before.\n\n$$\na = b\n\nc = d\n$$\n\nAfter.", ["Before.", "$$\na = b\n\nc = d\n$$", "After."]],
+    ["Open.\n\n$$\nx = 1\n## Next\n\nBody.", ["Open.", "$$\nx = 1", "## Next", "Body."]],
+    ["\n\n- a\n- b\n\n\n\nEnd.\n", ["- a\n- b", "End."]],
+  ];
+  it.each(cases)("splits %j", (markdown, expected) => {
+    expect(splitLessonBlocks(markdown)).toEqual(expected);
+  });
+});
+
+describe("mapScriptToBlocks", () => {
+  const lesson = "## Arrays\n\nArrays store items in order.\n\n```py\nxs = [1]\n```\n\nIndexing is constant time.";
+  const blocks = splitLessonBlocks(lesson);
+
+  it("maps a JSON-array script entry by entry and skips empty entries", () => {
+    const script = JSON.stringify(["Let's talk arrays.", "An array keeps items in order.", "", "Reading one slot is fast."]);
+    expect(mapScriptToBlocks(script, lesson, blocks).map((p) => p.blockIndex)).toEqual([0, 1, 3]);
+  });
+
+  it("maps through raw blocks when the displayed lesson splits differently", () => {
+    // The page shows a repaired lesson with an extra block in front.
+    const display = ["Note.", ...blocks];
+    const script = JSON.stringify(["Arrays.", "Items in order.", "Code.", "Constant time."]);
+    expect(mapScriptToBlocks(script, lesson, display).map((p) => p.blockIndex)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("splits a legacy script on single newlines when it has no blank lines", () => {
+    const script = "Arrays.\nArrays store items in order.\nThe code makes a list.\nIndexing is constant time.";
+    expect(mapScriptToBlocks(script, lesson, blocks).map((p) => p.blockIndex)).toEqual([0, 1, 2, 3]);
+  });
+});
+
+describe("easeChunkProgress", () => {
+  it("is linear early, then slows and never reaches the end of the chunk", () => {
+    expect(easeChunkProgress(0.5)).toBe(0.5);
+    const samples = [0.8, 0.9, 1, 1.5, 3].map(easeChunkProgress);
+    for (let i = 1; i < samples.length; i++) {
+      expect(samples[i]).toBeGreaterThan(samples[i - 1]);
+      expect(samples[i]).toBeLessThanOrEqual(0.99);
+    }
+    // Same speed on both sides of 0.8, so no kink.
+    expect(easeChunkProgress(0.801) - easeChunkProgress(0.8)).toBeCloseTo(0.001, 4);
   });
 });
