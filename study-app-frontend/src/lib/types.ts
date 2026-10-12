@@ -259,6 +259,14 @@ export type Flashcard = {
   last_attempted?: string | null;
 };
 
+// Kojo's tidy pass over a messy flashcard paste. `verbatim` is false when the
+// pair can't be found word for word in the pasted text.
+export type TidiedCard = {
+  front: string;
+  back: string;
+  verbatim: boolean;
+};
+
 export type LearningQuizQuestion = {
   question: string;
   options: string[];

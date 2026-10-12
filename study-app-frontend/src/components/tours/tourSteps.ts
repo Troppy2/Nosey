@@ -308,4 +308,19 @@ export const TOURS: Record<TourId, TourDef> = {
       },
     ],
   },
+
+  // Its own tour so users who already saw the Folders tour still get it. The
+  // Folders page holds it back until that tour has been seen, so the two never
+  // open at once.
+  "quizlet-import": {
+    steps: [
+      {
+        element: t("folders-quizlet"),
+        title: "Coming from Quizlet?",
+        body: "Export a set on Quizlet, then paste it here to turn it into Nosey flashcards. You can send cards back to Quizlet from Manage Flashcards anytime.",
+        side: "bottom",
+        align: "end",
+      },
+    ],
+  },
 };

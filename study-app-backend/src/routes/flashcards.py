@@ -11,15 +11,18 @@ from src.utils.provider_policy import resolve_request_provider
 from src.utils.usage_context import bind_usage
 from src.schemas.flashcard_schema import (
     FlashcardAttemptCreate,
+    FlashcardBulkImportRequest,
     FlashcardCreate,
     FlashcardGenerateRequest,
     FlashcardResponse,
+    FlashcardTidyRequest,
+    FlashcardTidyResponse,
     FlashcardUpdate,
 )
 from src.limiter import limiter
 from src.services.flashcard_service import FlashcardService
 from src.services.quota_service import QuotaService
-from src.utils.exceptions import ResourceNotFoundException, StudyAppException
+from src.utils.exceptions import LLMException, ResourceNotFoundException, StudyAppException
 from typing import Optional
 
 router = APIRouter(tags=["flashcards"])
@@ -65,6 +68,77 @@ async def create_flashcard(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except StudyAppException as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post(
+    "/folders/{folder_id}/flashcards/import",
+    response_model=list[FlashcardResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+@limiter.limit("10/minute")
+async def import_flashcards(
+    request: Request,
+    response: Response,
+    folder_id: int,
+    data: FlashcardBulkImportRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[FlashcardResponse]:
+    """Save cards the student reviewed in the Quizlet import modal. No LLM call,
+    so no usage charge."""
+    try:
+        return await FlashcardService().bulk_import(folder_id, user.id, data.cards, data.source, session)
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except StudyAppException as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/flashcards/import/tidy", response_model=FlashcardTidyResponse)
+@limiter.limit("5/minute")
+async def tidy_flashcard_paste(
+    request: Request,
+    response: Response,
+    data: FlashcardTidyRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> FlashcardTidyResponse:
+    """Kojo pulls term/definition pairs out of a paste the parser couldn't read.
+
+    Counts toward the Kojo token budget (feature name starts with "kojo_"). The
+    gate runs before the try so its 429 is not remapped; the slot is released
+    in the finally.
+    """
+    provider = resolve_request_provider(user, None)
+    slot = await QuotaService().acquire_kojo(session, user)
+    bind_usage(user.id, "kojo_flashcard_tidy")
+    _t0 = time.monotonic()
+    try:
+        cards = await FlashcardService().tidy_paste(data.text, provider=provider)
+        duration_ms = int((time.monotonic() - _t0) * 1000)
+        try:
+            await UsageEventRepository(session).log_event(
+                user.id, "kojo_flashcard_tidy", duration_ms, provider=provider
+            )
+            await session.commit()
+        except Exception:
+            pass
+        return FlashcardTidyResponse(cards=cards)
+    except LLMException as exc:
+        duration_ms = int((time.monotonic() - _t0) * 1000)
+        try:
+            await UsageEventRepository(session).log_event(
+                user.id, "kojo_flashcard_tidy", duration_ms, provider=provider,
+                success=False, error_type="LLMException",
+            )
+            await session.commit()
+        except Exception:
+            pass
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except StudyAppException as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        slot.release()
 
 
 @router.post("/folders/{folder_id}/flashcards/generate", response_model=list[FlashcardResponse])

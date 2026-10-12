@@ -394,6 +394,9 @@
 }
 
 .button-ghost:hover:not(:disabled) {
+  /* Ghost buttons (Manage, Swap term and definition) only tint on hover, app-wide
+     by request; the base .button lift reads as a jump on a borderless button. */
+  transform: none;
   background: rgba(113, 131, 85, 0.1);
 }
 
@@ -550,10 +553,6 @@
   min-height: 210px;
   resize: vertical;
   line-height: 1.6;
-}
-
-.select {
-  cursor: pointer;
 }
 
 .section-title {
@@ -8381,7 +8380,7 @@ select[class*="lc-"]:focus-visible {
 
 /* Persona picker */
 .folder-kojo-persona-select {
-  padding: 7px 28px 7px 12px;
+  padding: 7px 10px 7px 12px;
   border: 1px solid rgba(113, 131, 85, 0.25);
   border-radius: var(--radius-md);
   background: var(--white);
@@ -21480,7 +21479,7 @@ button.lc-reminder-feature-cta:disabled {
   gap: 4px;
 }
 
-.lc-bank-add-count span {
+.lc-bank-add-count > span {
   font-family: var(--font-mono);
   font-size: 0.62rem;
   letter-spacing: 0.02em;
@@ -21489,7 +21488,7 @@ button.lc-reminder-feature-cta:disabled {
 }
 
 .lc-bank-add-count input,
-.lc-bank-add-count select {
+.lc-bank-add-count .dropdown-trigger {
   padding: 10px;
   border: 1px solid var(--border, #d8dfd0);
   border-radius: var(--radius-md);
@@ -21503,8 +21502,8 @@ button.lc-reminder-feature-cta:disabled {
   width: 78px;
 }
 
-.lc-bank-add-count select {
-  cursor: pointer;
+.lc-bank-add-count .dropdown-trigger {
+  min-width: 110px;
 }
 
 /* Sized to sit level with the dropdown + count inputs (global .button is 48px tall). */
@@ -27924,11 +27923,129 @@ a.sd-chip.is-done:hover {
 }
 
 .answer-sheet-link {
+/* Quizlet import/export: modals (QuizletImportModal, QuizletExportModal) and
+   the Create Folder link. */
+.modal-card.qz-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 100%);
+  max-height: 88vh;
+  gap: 12px;
+  padding: 20px;
+}
+
+.modal-card.qz-modal--export {
+  width: min(640px, 100%);
+}
+
+.qz-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.qz-header h2 {
+  margin: 0 0 4px;
+  font-size: 1.15rem;
+}
+
+.qz-header p {
+  margin: 0;
+}
+
+.qz-close,
+.qz-remove {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 6px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--green-dark);
+  cursor: pointer;
+}
+
+.qz-close:hover:not(:disabled),
+.qz-remove:hover:not(:disabled) {
+  background: var(--green-light);
+}
+
+.qz-close:focus-visible,
+.qz-remove:focus-visible,
+.qz-link:focus-visible,
+.qz-create-link:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.qz-body {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.qz-body > p {
+  margin: 0;
+}
+
+.qz-steps {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 20px;
+  color: var(--ink);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.qz-paste {
+  min-height: 180px;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  tab-size: 4;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+}
+
+.qz-export-text {
+  min-height: 220px;
+}
+
+.qz-seps {
+  padding: 8px 12px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.52);
+  font-size: 0.88rem;
+}
+
+.qz-seps summary {
+  color: var(--green-dark);
+  cursor: pointer;
+}
+
+.qz-seps-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.qz-link {
+  margin-top: 8px;
   padding: 0;
   border: 0;
   background: none;
   color: var(--green-dark);
   font: inherit;
+  font-weight: 600;
   text-decoration: underline;
   cursor: pointer;
 }
@@ -27960,6 +28077,247 @@ a.sd-chip.is-done:hover {
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--ink);
+.qz-found {
+  margin: 0;
+  color: var(--accent-positive-strong);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.qz-found--warn {
+  color: var(--accent-caution-strong);
+}
+
+.qz-tidy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--accent-caution-tint);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent-caution-tint) 60%, white);
+}
+
+.qz-tidy p {
+  margin: 2px 0 0;
+}
+
+.qz-review-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.qz-check-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.qz-check-all input,
+.qz-row > input {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  accent-color: var(--green-dark);
+}
+
+.qz-rows {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qz-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.qz-row > input {
+  margin-top: 11px;
+}
+
+.qz-row.is-on {
+  border-color: var(--green-dark);
+  background: var(--white);
+}
+
+.qz-row-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 6px 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.qz-field {
+  min-height: 38px;
+  max-height: 9em;
+  padding: 8px 10px;
+  resize: vertical;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  field-sizing: content;
+}
+
+.qz-issue {
+  grid-column: 1 / -1;
+  justify-self: start;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.qz-issue--missing,
+.qz-issue--too-long {
+  background: var(--accent-danger-tint);
+  color: var(--accent-danger-strong);
+}
+
+.qz-issue--duplicate {
+  background: var(--accent-info-tint);
+  color: var(--accent-info-strong);
+}
+
+.qz-issue--reworded {
+  background: var(--accent-caution-tint);
+  color: var(--accent-caution-strong);
+}
+
+.qz-remove {
+  margin-top: 4px;
+}
+
+.qz-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding-top: 10px;
+  border-top: 1px solid var(--green-light-mid);
+}
+
+.qz-footer .button-row {
+  margin-left: auto;
+}
+
+.qz-destination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.qz-destination .field {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+
+.qz-create-link {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--green-dark);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.qz-create-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .modal-backdrop:has(.qz-modal) {
+    padding: 0;
+  }
+
+  .modal-card.qz-modal {
+    height: 100%;
+    max-height: 100vh;
+    /* iOS Safari: 100vh runs under the toolbar and would hide the footer. */
+    max-height: 100dvh;
+    border-radius: 0;
+    padding: 16px;
+  }
+
+  .qz-seps-grid,
+  .qz-row-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .qz-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .qz-footer .button-row {
+    margin-left: 0;
+  }
+
+  /* Column layout: the row's 320px basis would become a height here. */
+  .qz-destination {
+    flex: 0 0 auto;
+  }
+
+  .qz-footer .button-row > * {
+    flex: 1 1 auto;
+  }
+}
+
+/* Dropdown (components/Dropdown.tsx): custom single-select. The trigger reuses
+   .input so it lines up with text fields; the panel is portalled to <body>
+   and positioned fixed, above modals (.modal-backdrop is z-index 1000). */
+.dropdown-trigger {
+  /* Inline like the native select it replaces; the context class (or .input)
+     sets width, padding and font size, so no font override here. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dropdown-trigger.is-placeholder .dropdown-value {
+  color: var(--muted);
+}
+
+.dropdown-trigger[aria-expanded="true"] {
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.14);
+}
+
+.dropdown-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.dropdown-value {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -28012,4 +28370,63 @@ a.sd-chip.is-done:hover {
 /* Picker review: the answer sheet's working for one question. */
 .pp-solution {
   margin-top: 6px;
+}
+.dropdown-chevron {
+  flex-shrink: 0;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.dropdown-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.dropdown-panel {
+  position: fixed;
+  z-index: 1100;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 264px;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--white);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  outline: none;
+}
+
+.dropdown-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+
+.dropdown-option.is-active {
+  background: var(--green-lightest);
+}
+
+.dropdown-option[aria-selected="true"] {
+  color: var(--green-dark);
+  font-weight: 600;
+}
+
+.dropdown-check {
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-chevron {
+    transition: none;
+  }
 }

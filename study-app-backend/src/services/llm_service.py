@@ -4350,6 +4350,38 @@ Return JSON only with these exact keys:
         logger.warning("LLM flashcard generation failed; using fallback")
         return self._fallback_flashcards(content, count, prompt)
 
+    async def extract_flashcard_pairs(self, text: str, provider: Optional[str] = None) -> list[GeneratedFlashcard]:
+        """Pull term/definition pairs out of a messy paste (a hand-copied Quizlet
+        set page, a doc, a spreadsheet) for the flashcard import review.
+
+        One _complete_json call, which owns the provider fallback. The model
+        copies pairs, it never writes them: the caller flags any pair it can't
+        find in the paste. Raises LLMException when every provider fails;
+        returns [] when the reply has no usable pairs.
+        """
+        prompt = (
+            "The text below was pasted by a student who wants to import flashcards. It holds "
+            "term and definition pairs, possibly mixed with leftover page text from a study "
+            "site (set titles, usernames, counts like \"Terms in this set (24)\", button "
+            "labels, ads, navigation).\n"
+            "Extract every term and definition pair, in the order they appear.\n"
+            "Rules:\n"
+            "- Copy each term and definition WORD FOR WORD from the text. Never reword, "
+            "summarise, translate, correct, or complete them.\n"
+            "- Never invent a pair or a missing side. Skip anything that is not clearly a pair.\n"
+            "- Drop the leftover page text.\n"
+            "- Keep any math or symbols exactly as written.\n\n"
+            "PASTED TEXT:\n<<<\n"
+            f"{text}\n"
+            ">>>\n\n"
+            'Return JSON only: {"flashcards": [{"front": "term", "back": "definition"}]}\n'
+        )
+        data = await self._complete_json(prompt, provider=provider)
+        try:
+            return self._parse_generated_flashcards(data)
+        except ValueError:
+            return []
+
     # ── Learning Modules (lesson track authoring) ────────────────────────────
     # One outline call, then ONE bundled call per module returning
     # {lesson, tts_script, quiz}. Bundling is safe here (unlike mixing tests and

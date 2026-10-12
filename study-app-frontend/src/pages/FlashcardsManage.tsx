@@ -1,4 +1,4 @@
-import { ArrowLeft, Edit3, Plus, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, Edit3, FileDown, FileUp, Plus, Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -8,6 +8,8 @@ import { ConfirmModal } from "../components/ConfirmModal";
 import { TextInput } from "../components/Field";
 import { InlineLoading, LoadingNotice } from "../components/Loaders";
 import { MarkdownContent } from "../components/MarkdownContent";
+import { QuizletExportModal } from "../components/QuizletExportModal";
+import { QuizletImportModal, type QuizletImportResult } from "../components/QuizletImportModal";
 import {
   createFlashcard,
   deleteAllFlashcards,
@@ -49,6 +51,7 @@ export default function FlashcardsManage() {
   const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [confirmDeleteCard, setConfirmDeleteCard] = useState<Flashcard | null>(null);
+  const [quizletModal, setQuizletModal] = useState<"import" | "export" | null>(null);
   const { generationProvider } = useSettings();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -228,6 +231,23 @@ export default function FlashcardsManage() {
     }
   }
 
+  // An import that failed partway may still have saved cards here.
+  function reloadFirstPage() {
+    fetchFlashcards(id, { limit: MANAGE_PAGE_SIZE, offset: 0 }).then((data) => {
+      setCards(data);
+      setNextOffset(data.length);
+      setHasMore(data.length === MANAGE_PAGE_SIZE);
+    });
+  }
+
+  function handleQuizletImported({ folderId: targetId, cards: imported }: QuizletImportResult) {
+    setQuizletModal(null);
+    if (targetId !== id) return;
+    setCards((prev) => [...imported, ...prev]);
+    // Newest cards list first, so the next server page starts after them.
+    setNextOffset((offset) => offset + imported.length);
+  }
+
   usePageTour("manage-flashcards");
 
   return (
@@ -245,6 +265,17 @@ export default function FlashcardsManage() {
           </p>
         </div>
         <div className="toolbar">
+          <Button icon={<FileUp size={18} />} onClick={() => setQuizletModal("import")} variant="secondary">
+            Import from Quizlet
+          </Button>
+          <Button
+            icon={<FileDown size={18} />}
+            onClick={() => setQuizletModal("export")}
+            variant="secondary"
+            disabled={cards.length === 0}
+          >
+            Export to Quizlet
+          </Button>
           <Button
             icon={<Trash2 size={18} />}
             onClick={() => setShowDeleteAllModal(true)}
@@ -429,6 +460,19 @@ export default function FlashcardsManage() {
           onConfirm={handleDeleteAllFlashcards}
           onCancel={() => setShowDeleteAllModal(false)}
         />
+      ) : null}
+
+      {quizletModal === "import" ? (
+        <QuizletImportModal
+          folderId={id}
+          onClose={() => setQuizletModal(null)}
+          onImported={handleQuizletImported}
+          onPartialSave={reloadFirstPage}
+        />
+      ) : null}
+
+      {quizletModal === "export" ? (
+        <QuizletExportModal folderId={id} onClose={() => setQuizletModal(null)} />
       ) : null}
     </div>
   );
