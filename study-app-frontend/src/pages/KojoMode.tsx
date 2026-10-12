@@ -39,6 +39,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { usePageTour } from "../components/tours/usePageTour";
 import { Button } from "../components/Button";
+import { Dropdown, type DropdownOption } from "../components/Dropdown";
 import KojoActionCard from "../components/KojoActionCard";
 import KojoMascot from "../components/KojoMascot";
 import { KojoHintCarousel } from "../components/KojoHintCarousel";
@@ -153,6 +154,19 @@ const ACTION_MENU_ITEMS: Array<{ actionType: KojoActionType; label: string }> = 
 
 // folderId = null means "General" mode (no folder)
 const GENERAL_FOLDER_ID = null;
+
+const BLUEPRINT_TYPE_OPTIONS: DropdownOption<TestBlueprint["test_type"]>[] = [
+  { value: "mixed", label: "Mixed" },
+  { value: "MCQ_only", label: "Multiple choice" },
+  { value: "FRQ_only", label: "Written" },
+];
+
+const BLUEPRINT_DIFFICULTY_OPTIONS: DropdownOption<TestBlueprint["difficulty"]>[] = [
+  { value: "easy", label: "Easy" },
+  { value: "medium", label: "Medium" },
+  { value: "hard", label: "Hard" },
+  { value: "mixed", label: "Mixed" },
+];
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
@@ -384,20 +398,27 @@ function BlueprintCard({ message, folderId, provider, onGenerate, onCancel }: Bl
         <div className="kojo-blueprint-row">
           <label className="kojo-blueprint-label">
             <span>Type</span>
-            <select className="kojo-blueprint-select" value={testType} onChange={(e) => handleTypeChange(e.target.value)} disabled={generating}>
-              <option value="mixed">Mixed</option>
-              <option value="MCQ_only">Multiple choice</option>
-              <option value="FRQ_only">Written</option>
-            </select>
+            <Dropdown
+              bare
+              label="Type"
+              className="kojo-blueprint-select"
+              value={testType}
+              options={BLUEPRINT_TYPE_OPTIONS}
+              onChange={handleTypeChange}
+              disabled={generating}
+            />
           </label>
           <label className="kojo-blueprint-label">
             <span>Difficulty</span>
-            <select className="kojo-blueprint-select" value={difficulty} onChange={(e) => setDifficulty(e.target.value as TestBlueprint["difficulty"])} disabled={generating}>
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
-              <option value="mixed">Mixed</option>
-            </select>
+            <Dropdown
+              bare
+              label="Difficulty"
+              className="kojo-blueprint-select"
+              value={difficulty}
+              options={BLUEPRINT_DIFFICULTY_OPTIONS}
+              onChange={setDifficulty}
+              disabled={generating}
+            />
           </label>
         </div>
         <div className="kojo-blueprint-row">

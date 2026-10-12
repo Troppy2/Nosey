@@ -5,6 +5,24 @@
 // display only. Anything already structured, or that does not look like a
 // coding problem, comes back unchanged.
 
+// Languages offered for coding-mode tests (Create Test and the Results
+// targeted-test modal). The backend takes the name as written.
+export const CODING_LANGUAGES = [
+  "Python",
+  "JavaScript",
+  "TypeScript",
+  "Java",
+  "C++",
+  "C",
+  "C#",
+  "Go",
+  "Rust",
+  "Swift",
+  "Kotlin",
+  "OCaml",
+  "SQL",
+];
+
 const MARKER_RE = /\b(Input\s+Format|Output\s+Format|Input|Output|Constraints?|Example\s*\d+|Explanation)\s*:/gi;
 const RESULT_RE = /^(.*?)\s+(?:returns|should\s+return|outputs|evaluates\s+to|gives|=>|->)\s+(.+)$/i;
 

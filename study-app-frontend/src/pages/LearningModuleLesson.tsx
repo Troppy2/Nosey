@@ -16,6 +16,7 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { FormError } from "../components/FormError";
 import { Card } from "../components/Card";
+import { Dropdown } from "../components/Dropdown";
 import { useConfetti } from "../components/Confetti";
 import { InlineLoading, LoadingNotice } from "../components/Loaders";
 import { MarkdownContent } from "../components/MarkdownContent";
@@ -1021,19 +1022,18 @@ export default function LearningModuleLesson() {
             Voices come from your browser: Chrome includes Google voices, other browsers offer
             their own. Your pick applies to every lesson on this device.
           </p>
-          <select
+          <Dropdown
+            bare
             id="lm-voice-select"
+            label="Narration voice"
             className="lm-voice-select"
             value={voiceURI}
-            onChange={(e) => selectVoice(e.target.value)}
-          >
-            <option value="">Browser default</option>
-            {voiceOptions.map((voice) => (
-              <option key={voice.voiceURI} value={voice.voiceURI}>
-                {voice.name} ({voice.lang})
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: "", label: "Browser default" },
+              ...voiceOptions.map((voice) => ({ value: voice.voiceURI, label: `${voice.name} (${voice.lang})` })),
+            ]}
+            onChange={selectVoice}
+          />
           <div className="button-row">
             <Button variant="secondary" onClick={previewVoice}>
               Preview voice

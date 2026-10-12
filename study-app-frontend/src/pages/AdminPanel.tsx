@@ -13,6 +13,7 @@ import {
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
+import { Dropdown } from "../components/Dropdown";
 import { Spinner } from "../components/Loaders";
 import { SkeletonList, SkeletonStatGrid } from "../components/Skeletons";
 import { AdminTokenUsage } from "../components/AdminTokenUsage";
@@ -31,6 +32,10 @@ import type { AdminStats, AdminSurveysResponse, AdminUserRow } from "../lib/type
 
 const ADMIN_EMAILS = ["jamesinah34@gmail.com", "jamesinah883@gmail.com"];
 const REAUTH_WARN_SECONDS = 60;
+const BETA_OPTIONS = [
+  { value: "true", label: "True" },
+  { value: "false", label: "False" },
+];
 
 function formatMs(ms: number): string {
   if (ms < 1000) return `${Math.round(ms)}ms`;
@@ -610,17 +615,16 @@ export default function AdminPanel() {
                                 Yes (admin)
                               </span>
                             ) : (
-                              <select
+                              <Dropdown
+                                bare
+                                label={`Beta access for ${u.email}`}
                                 className={`admin-beta-select ${u.is_beta ? "admin-beta-select--on" : ""}`}
                                 value={u.is_beta ? "true" : "false"}
-                                onChange={(e) => handleSetBeta(u, e.target.value === "true")}
+                                options={BETA_OPTIONS}
+                                onChange={(value) => handleSetBeta(u, value === "true")}
                                 disabled={betaUpdating === u.id}
                                 title="Set beta access for this user"
-                                aria-label={`Beta access for ${u.email}`}
-                              >
-                                <option value="true">True</option>
-                                <option value="false">False</option>
-                              </select>
+                              />
                             )}
                           </td>
                           <td className="admin-cell-date">

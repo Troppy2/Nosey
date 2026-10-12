@@ -56,6 +56,7 @@ import { MarkdownContent } from "../components/MarkdownContent";
 import { LoadingNotice } from "../components/Loaders";
 import { SkeletonList } from "../components/Skeletons";
 import { ConfirmModal } from "../components/ConfirmModal";
+import { Dropdown, type DropdownOption } from "../components/Dropdown";
 import { ToggleSwitch } from "../components/ToggleSwitch";
 import CodingTabs from "../components/Tab";
 import { type CommandOption as SlashCommand } from "../components/SlashCommandMenu";
@@ -471,6 +472,20 @@ function chooseDailySeed(
 const LEETCODE_BASE_URL = "https://leetcode.com/problems";
 const CUSTOM_CATEGORY_ID = "custom";
 const CUSTOM_CATEGORY_LABEL = "Custom Questions";
+
+const CUSTOM_DIFFICULTY_OPTIONS: DropdownOption<CustomFormState["difficulty"]>[] = [
+  { value: "unknown", label: "Unknown" },
+  { value: "Easy", label: "Easy" },
+  { value: "Medium", label: "Medium" },
+  { value: "Hard", label: "Hard" },
+];
+
+const BANK_DIFFICULTY_OPTIONS: DropdownOption<"any" | "Easy" | "Medium" | "Hard">[] = [
+  { value: "any", label: "Any" },
+  { value: "Easy", label: "Easy" },
+  { value: "Medium", label: "Medium" },
+  { value: "Hard", label: "Hard" },
+];
 const CUSTOM_PROBLEMS_KEY_PREFIX = "nosey_lc_custom_problems";
 const CUSTOM_TEST_LIMIT = 2;
 const MAX_CODE_TABS = 5;
@@ -5007,16 +5022,14 @@ export default function LeetCodeMode() {
             </label>
             <label className="lc-custom-field">
               <span>Difficulty</span>
-              <select
+              <Dropdown
+                bare
+                label="Difficulty"
                 className="lc-custom-input"
                 value={customForm.difficulty}
-                onChange={(event) => updateCustomForm("difficulty", event.target.value as CustomFormState["difficulty"])}
-              >
-                <option value="unknown">Unknown</option>
-                <option value="Easy">Easy</option>
-                <option value="Medium">Medium</option>
-                <option value="Hard">Hard</option>
-              </select>
+                options={CUSTOM_DIFFICULTY_OPTIONS}
+                onChange={(value) => updateCustomForm("difficulty", value)}
+              />
             </label>
           </div>
 
@@ -6078,15 +6091,14 @@ export default function LeetCodeMode() {
                       />
                       <label className="lc-bank-add-count">
                         <span>Difficulty</span>
-                        <select
+                        <Dropdown
+                          bare
+                          label="Difficulty"
+                          className=""
                           value={bankAddDifficulty}
-                          onChange={(event) => setBankAddDifficulty(event.target.value as "any" | "Easy" | "Medium" | "Hard")}
-                        >
-                          <option value="any">Any</option>
-                          <option value="Easy">Easy</option>
-                          <option value="Medium">Medium</option>
-                          <option value="Hard">Hard</option>
-                        </select>
+                          options={BANK_DIFFICULTY_OPTIONS}
+                          onChange={setBankAddDifficulty}
+                        />
                       </label>
                       <label className="lc-bank-add-count">
                         <span>Problems</span>

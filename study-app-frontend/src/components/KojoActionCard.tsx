@@ -18,6 +18,7 @@ import {
   resolveKojoActionCard,
 } from "../lib/api";
 import type { Folder, KojoActionCard as KojoActionCardType } from "../lib/types";
+import { Dropdown } from "./Dropdown";
 
 // Chat-embedded action proposal card (extends the BlueprintCard UX shape):
 // propose -> edit -> confirm/dismiss, persisted server-side so it survives
@@ -284,17 +285,16 @@ export function KojoActionCard({ card, folders, scopedFolderId, provider, onReso
                   </div>
                 ) : (
                   <div className="kojo-action-folderpick">
-                    <select
+                    <Dropdown
+                      bare
+                      label="Folder"
                       className="kojo-blueprint-select"
-                      value={folderId}
-                      onChange={(e) => setFolderId(e.target.value === "" ? "" : Number(e.target.value))}
+                      value={folderId === "" ? "" : String(folderId)}
+                      placeholder="Pick a folder…"
+                      options={folders.map((f) => ({ value: String(f.id), label: f.name }))}
+                      onChange={(value) => setFolderId(Number(value))}
                       disabled={working}
-                    >
-                      <option value="">Pick a folder…</option>
-                      {folders.map((f) => (
-                        <option key={f.id} value={f.id}>{f.name}</option>
-                      ))}
-                    </select>
+                    />
                     <button type="button" className="kojo-action-newfolder-btn" onClick={() => setCreatingFolder(true)} disabled={working}>
                       <FolderPlus size={13} />
                       new
