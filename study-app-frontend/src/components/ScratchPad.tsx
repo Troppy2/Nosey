@@ -2408,7 +2408,14 @@ export function ScratchPadModal({
     const maxH = window.innerHeight * MODAL_MAX_VIEWPORT;
     const minH = Math.max(280, start.h - Math.max(0, start.c - CANVAS_MIN_HEIGHT));
     const clampH = (h: number) => Math.min(maxH, Math.max(minH, h));
+    // Full screen stays full screen: the grips only trade space between the
+    // question and the drawing area, never resize the pad itself.
+    const isFull = size === "full" && !customSize;
     if (edge === "bottom") {
+      if (isFull) {
+        setQuestionMaxH(Math.max(QUESTION_MIN_HEIGHT, start.q - Math.min(dy, Math.max(0, start.c - CANVAS_MIN_HEIGHT))));
+        return;
+      }
       setCustomSize({ w: start.w, h: clampH(start.h + dy) });
       return;
     }
@@ -2422,7 +2429,7 @@ export function ScratchPadModal({
     }
     const fromQuestion = Math.min(want, Math.max(0, start.q - QUESTION_MIN_HEIGHT));
     setQuestionMaxH(start.q - fromQuestion);
-    if (want > fromQuestion) setCustomSize({ w: start.w, h: clampH(start.h + (want - fromQuestion)) });
+    if (want > fromQuestion && !isFull) setCustomSize({ w: start.w, h: clampH(start.h + (want - fromQuestion)) });
   }
   // The question runs through KaTeX, which is not cheap. Without this it would
   // re-typeset on every stroke, since a stroke updates the parent's state.

@@ -24084,9 +24084,15 @@ button.lc-official-link:disabled:hover {
   width: min(1040px, 96vw);
   height: min(760px, 92vh);
 }
-.scratchpad-modal--full {
+/* Doubled class: beats the phone-width .scratchpad-modal size rule and the
+   mobile shell's card radius, which used to shrink full screen to 96vw x 88vh. */
+.scratchpad-modal.scratchpad-modal--full {
   width: 100vw;
   height: 100vh;
+  /* Fills the visible area on phones and in a shrunk window, where 100vh
+     runs past the browser bars. */
+  height: 100dvh;
+  max-height: 100dvh;
   max-width: none;
   border-radius: 0;
 }
@@ -24436,7 +24442,7 @@ button.lc-official-link:disabled:hover {
 }
 
 @media (max-width: 640px) {
-  .scratchpad-modal,
+  .scratchpad-modal:not(.scratchpad-modal--full),
   .scratchpad-modal--comfortable,
   .scratchpad-modal--large {
     width: 96vw;
