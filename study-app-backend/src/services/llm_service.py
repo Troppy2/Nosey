@@ -23,6 +23,7 @@ from src.services.lc_taxonomy import (
 )
 from src.services.rag_service import HybridRAGService
 from src.utils.logger import get_logger
+from src.utils.lesson_blocks import normalize_tts_script, numbered_blocks, split_lesson_blocks, tts_entry_count
 from src.utils.latex_utils import format_final_answer as _format_final_answer, normalize_latex, replace_tikz
 from src.utils.serialization import safe_serialize_payload
 from src.utils.usage_context import (
@@ -4566,17 +4567,23 @@ Return JSON only with these exact keys:
             "equation opens AND closes with $$. Never use a $ sign for money: write 'USD 5000' or "
             "'5000 dollars'. If the material is "
             "code, use fenced code blocks with a language tag. Do not include a quiz or exercises.\n\n"
-            "2. \"tts_script\": the same article rewritten as a spoken narration script. Plain prose only: no "
+            "2. \"tts_script\": the same article rewritten as a spoken narration script, returned as a JSON "
+            "ARRAY OF STRINGS with exactly one entry per lesson block, in order. A block is whatever sits "
+            "between blank lines in your lesson: every ## heading is its own block, every paragraph is a "
+            "block, a list with no blank lines inside is one block, a fenced code block is one block, and a "
+            "$$...$$ display equation is one block. For a heading entry, say a short spoken lead-in to that "
+            "section. For a code or equation block, say in words what it shows. Use \"\" only for a block "
+            "that has nothing worth saying. Each entry is plain prose only: no "
             "markdown syntax, no LaTeX, no code fences. Say every piece of notation the way a teacher says it "
             "aloud, never as raw symbols. Examples of the required style: 'O(n)' becomes 'O of n', "
             "'O(n log n)' becomes 'O of n log n', 'O(1)' becomes 'O of 1, constant time', '$x^2 + 2x$' becomes "
             "'x squared plus two x', 'a_i' becomes 'a sub i', 'f(x)' becomes 'f of x', 'n!' becomes "
             "'n factorial', '<=' becomes 'less than or equal to', 'arr[i]' becomes 'arr at index i', "
             "'append()' becomes 'the append method'. Walk through code examples in words (e.g. 'the function "
-            "loops over each item and returns the total'). Mirror the lesson paragraph by paragraph: one spoken "
-            "paragraph per lesson paragraph or heading block, in the same order, separated by blank lines, so "
-            "the on-screen text can be highlighted in sync while it is read aloud. Cover the full content of "
-            "the lesson; do not abbreviate it.\n\n"
+            "loops over each item and returns the total'). The array length MUST equal the number of lesson "
+            "blocks: the page highlights block N while entry N is read aloud, so a merged or skipped block "
+            "puts the highlight on the wrong paragraph. Cover the full content of the lesson; do not "
+            "abbreviate it.\n\n"
             f"3. \"questions\": a {count}-question multiple-choice quiz checking that the student understood the "
             "lesson. Every question must be answerable from the lesson alone. Each item is an object with:\n"
             "- \"question\": the question text.\n"
@@ -4597,7 +4604,7 @@ Return JSON only with these exact keys:
             if not lesson:
                 raise LLMException("The AI returned an empty lesson. Try again.")
 
-            tts_script = str(data.get("tts_script") or "").strip()
+            tts_script = self._checked_tts_script(data.get("tts_script"), len(split_lesson_blocks(lesson)))
 
             quiz = self._parse_module_quiz(data.get("questions"), count)
             if not quiz:
@@ -4627,20 +4634,24 @@ Return JSON only with these exact keys:
         from src.utils.exceptions import LLMException
 
         count = max(1, min(10, int(quiz_count)))
+        block_count = len(split_lesson_blocks(lesson_content[:24000]))
         prompt = (
             "A student has edited one lesson article in their learning track. Produce TWO companion "
             "pieces for the edited article below and return them as ONE JSON object with keys "
             "\"tts_script\" and \"questions\".\n\n"
-            "1. \"tts_script\": the article rewritten as a spoken narration script. Plain prose only: no "
+            "1. \"tts_script\": the article rewritten as a spoken narration script, returned as a JSON "
+            f"ARRAY OF EXACTLY {block_count} STRINGS: entry N narrates article block [N] below, in order. "
+            "For a heading block, say a short spoken lead-in to that section. For a code or equation block, "
+            "say in words what it shows. Use \"\" only for a block that has nothing worth saying. Each "
+            "entry is plain prose only: no "
             "markdown syntax, no LaTeX, no code fences. Say every piece of notation the way a teacher says it "
             "aloud, never as raw symbols. Examples of the required style: 'O(n)' becomes 'O of n', "
             "'O(n log n)' becomes 'O of n log n', 'O(1)' becomes 'O of 1, constant time', '$x^2 + 2x$' becomes "
             "'x squared plus two x', 'a_i' becomes 'a sub i', 'f(x)' becomes 'f of x', 'n!' becomes "
             "'n factorial', '<=' becomes 'less than or equal to', 'arr[i]' becomes 'arr at index i', "
-            "'append()' becomes 'the append method'. Walk through code examples in words. Mirror the article "
-            "paragraph by paragraph: one spoken paragraph per article paragraph or heading block, in the "
-            "same order, separated by blank lines, so the on-screen text can be highlighted in sync while "
-            "it is read aloud. Cover the full content of the article; do not abbreviate it.\n\n"
+            "'append()' becomes 'the append method'. Walk through code examples in words. Never merge, "
+            "split, or skip blocks: the page highlights block N while entry N is read aloud. Cover the full "
+            "content of the article; do not abbreviate it.\n\n"
             f"2. \"questions\": a {count}-question multiple-choice quiz checking that the student understood "
             "the article. Every question must be answerable from the article alone. Each item is an object with:\n"
             "- \"question\": the question text.\n"
@@ -4650,11 +4661,12 @@ Return JSON only with these exact keys:
             "If a question or option contains math, write it as LaTeX delimited with $...$ (inline only, "
             "no $$ blocks). Use backtick code spans for identifiers or short code.\n\n"
             f"{self._module_instructions_block(custom_instructions)}"
-            f"ARTICLE ({module_title}):\n{lesson_content[:24000]}"
+            f"ARTICLE ({module_title}), split into {block_count} numbered blocks:\n"
+            f"{numbered_blocks(lesson_content[:24000])}"
         )
 
         def _parse(data: dict[str, object]) -> dict[str, object]:
-            tts_script = str(data.get("tts_script") or "").strip()
+            tts_script = self._checked_tts_script(data.get("tts_script"), block_count)
 
             quiz = self._parse_module_quiz(data.get("questions"), count)
             if not quiz:
@@ -4665,6 +4677,23 @@ Return JSON only with these exact keys:
         return await self._complete_module_json(
             prompt, provider, _parse, max_tokens=_MODULE_CONTENT_MAX_TOKENS
         )
+
+    @staticmethod
+    def _checked_tts_script(raw: object, block_count: int) -> str:
+        """Normalize a narration script and log when it will not align.
+
+        A count mismatch is still stored: the frontend falls back to its
+        word-overlap alignment, which beats losing the narration entirely.
+        """
+        script = normalize_tts_script(raw)
+        entries = tts_entry_count(script)
+        if entries is not None and entries != block_count:
+            logger.warning(
+                "tts_script has %d entries for %d lesson blocks; highlight will fall back to alignment",
+                entries,
+                block_count,
+            )
+        return script
 
     @staticmethod
     def _parse_quiz_explanations(

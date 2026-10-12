@@ -24,6 +24,11 @@ class UpdateLearningModuleRequest(BaseModel):
     # User-edited lesson markdown; replaces lesson_content wholesale. The
     # narration script and quiz are regenerated from it server-side.
     lesson_content: str = Field(min_length=1, max_length=100000)
+    # False saves the text only and keeps the existing script and quiz: used
+    # by Reformat (same content, fixed formatting) and by small edits that do
+    # not need a fresh quiz. The page re-aligns the kept script to the new
+    # blocks, so a cosmetic change does not break the highlight.
+    rebuild: bool = True
 
 
 class ArchiveTrackRequest(BaseModel):

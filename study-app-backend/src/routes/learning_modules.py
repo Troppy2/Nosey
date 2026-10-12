@@ -763,6 +763,8 @@ async def update_module_lesson(
 ) -> LearningModuleResponse:
     """Save a user-edited lesson, then rebuild its narration script and quiz.
 
+    With rebuild=False only the lesson text is saved (Reformat, small edits).
+
     The edit is committed BEFORE the LLM call so the user's writing is never
     lost. If the regen call fails, the edited lesson stays saved with the old
     quiz and a cleared tts_script (the frontend's stripped-markdown TTS
@@ -778,6 +780,12 @@ async def update_module_lesson(
         lesson = data.lesson_content.strip()
         if not lesson:
             raise StudyAppException("The lesson cannot be empty.")
+
+        if not data.rebuild:
+            # Text-only save: no LLM call, script and quiz stay as they are.
+            module.lesson_content = lesson
+            await session.commit()
+            return _module_to_response(module)
 
         track = await session.get(LearningTrack, module.track_id)
 
