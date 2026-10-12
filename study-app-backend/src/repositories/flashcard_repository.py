@@ -14,6 +14,15 @@ class FlashcardRepository(BaseRepository[Flashcard]):
         await self.session.flush()
         return flashcard
 
+    async def create_many(
+        self, folder_id: int, pairs: list[tuple[str, str]], source: Optional[str]
+    ) -> list[Flashcard]:
+        """Insert many cards in one flush (Quizlet import), in the given order."""
+        cards = [Flashcard(folder_id=folder_id, front=front, back=back, source=source) for front, back in pairs]
+        self.session.add_all(cards)
+        await self.session.flush()
+        return cards
+
     async def get(self, flashcard_id: int) -> Optional[Flashcard]:
         return await self.session.scalar(select(Flashcard).where(Flashcard.id == flashcard_id))
 
@@ -65,7 +74,7 @@ class FlashcardRepository(BaseRepository[Flashcard]):
             )
             .where(Flashcard.folder_id == folder_id)
             .group_by(Flashcard.id)
-            .order_by(Flashcard.created_at.desc())
+            .order_by(Flashcard.created_at.desc(), Flashcard.id.desc())
         )
         if offset is not None:
             stmt = stmt.offset(offset)
@@ -93,7 +102,7 @@ class FlashcardRepository(BaseRepository[Flashcard]):
             )
             .where(Flashcard.folder.has(user_id=user_id))
             .group_by(Flashcard.id)
-            .order_by(Flashcard.created_at.desc())
+            .order_by(Flashcard.created_at.desc(), Flashcard.id.desc())
         )
         rows = await self.session.execute(stmt)
         return list(rows.all())

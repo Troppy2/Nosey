@@ -1,6 +1,6 @@
-import { Edit3, FolderOpen, Grid3X3, List, Plus, Trash2 } from "lucide-react";
+import { Edit3, FileUp, FolderOpen, Grid3X3, List, Plus, Trash2 } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { FormError } from "../components/FormError";
 import { Card } from "../components/Card";
@@ -9,7 +9,8 @@ import { EmptyState } from "../components/EmptyState";
 import { TextInput } from "../components/Field";
 import { SkeletonFolderGrid } from "../components/Skeletons";
 import { PullToRefreshIndicator } from "../components/PullToRefreshIndicator";
-import { createFolder, deleteFolder, fetchFolders, scopeKey, updateFolder } from "../lib/api";
+import { QuizletImportModal, type QuizletImportResult } from "../components/QuizletImportModal";
+import { createFolder, deleteFolder, fetchFolders, hasSeenTour, scopeKey, updateFolder } from "../lib/api";
 import { toast } from "../lib/toast";
 import { usePullToRefresh } from "../lib/usePullToRefresh";
 import { usePageTour } from "../components/tours/usePageTour";
@@ -30,6 +31,9 @@ export default function Folders() {
   const [name, setName] = useState("");
   const [subject, setSubject] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // Open import modal; newFolderName is set when it came from Create Folder.
+  const [quizletImport, setQuizletImport] = useState<{ newFolderName?: string } | null>(null);
+  const navigate = useNavigate();
 
   async function refreshFolders() {
     const data = await fetchFolders();
@@ -42,6 +46,11 @@ export default function Folders() {
 
   const { pullPx, isRefreshing } = usePullToRefresh(refreshFolders);
   usePageTour("folders", !isLoading);
+  // Read once at mount: the Folders tour marks itself seen as it opens, so a
+  // live check would start this one right after (over the Create Folder modal
+  // its last step opens). Brand-new users get it on a later visit instead.
+  const [foldersTourSeenAtMount] = useState(() => hasSeenTour("folders"));
+  usePageTour("quizlet-import", !isLoading && foldersTourSeenAtMount);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -57,6 +66,27 @@ export default function Folders() {
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Unable to create that folder.");
     }
+  }
+
+  function openQuizletFromCreate() {
+    setIsModalOpen(false);
+    setQuizletImport({ newFolderName: name.trim() });
+  }
+
+  function handleQuizletImported({ folderId, cards, createdFolder }: QuizletImportResult) {
+    setQuizletImport(null);
+    if (createdFolder) {
+      setName("");
+      setSubject("");
+    }
+    setFolders((current) =>
+      createdFolder
+        ? [{ ...createdFolder, flashcard_count: cards.length }, ...current]
+        : current.map((item) =>
+            item.id === folderId ? { ...item, flashcard_count: item.flashcard_count + cards.length } : item,
+          ),
+    );
+    navigate(`/folders/${folderId}`);
   }
 
   async function handleRename(folder: Folder) {
@@ -122,6 +152,14 @@ export default function Folders() {
               <List size={18} />
             </button>
           </div>
+          <Button
+            data-tour="folders-quizlet"
+            variant="secondary"
+            icon={<FileUp size={18} />}
+            onClick={() => setQuizletImport({})}
+          >
+            Import from Quizlet
+          </Button>
           <Button data-tour="folders-new" icon={<Plus size={18} />} onClick={() => setIsModalOpen(true)}>
             New Folder
           </Button>
@@ -129,6 +167,7 @@ export default function Folders() {
       </header>
 
       <FormError message={error} />
+
 
       {/* Without this the empty state flashes on every visit before the fetch
           lands, telling the user they have no folders when they do. */}
@@ -164,6 +203,10 @@ export default function Folders() {
             <h2>Create Folder</h2>
             <TextInput label="Name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Discrete Structures" />
             <TextInput label="Subject" value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="Math" />
+            <button className="qz-create-link" type="button" onClick={openQuizletFromCreate}>
+              <FileUp size={16} />
+              Have a Quizlet set? Import it into a new folder
+            </button>
             <div className="button-row">
               <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
                 Cancel
@@ -196,6 +239,15 @@ export default function Folders() {
             </div>
           </form>
         </div>
+      ) : null}
+
+      {quizletImport ? (
+        <QuizletImportModal
+          newFolderName={quizletImport.newFolderName}
+          onClose={() => setQuizletImport(null)}
+          onImported={handleQuizletImported}
+          onPartialSave={() => void refreshFolders()}
+        />
       ) : null}
 
       {folderAction?.type === "delete" ? (

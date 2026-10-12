@@ -9,11 +9,31 @@ from fastapi import UploadFile
 from src.repositories.flashcard_repository import FlashcardRepository
 from src.repositories.folder_repository import FolderRepository
 from src.repositories.test_repository import TestRepository
-from src.schemas.flashcard_schema import FlashcardCreate, FlashcardResponse, FlashcardUpdate
+from src.schemas.flashcard_schema import (
+    FlashcardCreate,
+    FlashcardImportItem,
+    FlashcardResponse,
+    FlashcardTidyItem,
+    FlashcardUpdate,
+)
 from src.services.file_service import FileService
 from src.services.llm_service import LLMService
 from src.utils.exceptions import ResourceNotFoundException, ValidationException
 from typing import Optional
+
+
+def _match_key(text: str) -> str:
+    """Lowercase with whitespace collapsed, for the tidy pass's word-for-word check."""
+    return " ".join(text.lower().split())
+
+
+def _copied_in_order(source: str, front: str, back: str) -> bool:
+    """Both sides appear in the paste, the definition after the term. Checking
+    each side on its own would pass a real term paired with the wrong (also
+    real) definition."""
+    term, definition = _match_key(front), _match_key(back)
+    at = source.find(term)
+    return at >= 0 and source.find(definition, at + len(term)) >= 0
 
 
 class FlashcardService:
@@ -36,6 +56,39 @@ class FlashcardService:
         await session.commit()
         await session.refresh(card)
         return FlashcardResponse.model_validate(card)
+
+    async def bulk_import(
+        self,
+        folder_id: int,
+        user_id: int,
+        items: list[FlashcardImportItem],
+        source: str,
+        session: AsyncSession,
+    ) -> list[FlashcardResponse]:
+        """Save reviewed cards from a Quizlet (or any tab-separated) import."""
+        folder = await FolderRepository(session).get_owned(folder_id, user_id)
+        if folder is None:
+            raise ResourceNotFoundException("Folder")
+        cards = await FlashcardRepository(session).create_many(
+            folder_id, [(item.front, item.back) for item in items], source
+        )
+        await session.commit()
+        return [FlashcardResponse.model_validate(card) for card in cards]
+
+    async def tidy_paste(self, text: str, provider: Optional[str] = None) -> list[FlashcardTidyItem]:
+        """Have Kojo pull term/definition pairs out of a messy paste.
+
+        A pair Kojo did not copy word for word from the paste comes back with
+        verbatim=False so the review step flags it.
+        """
+        pairs = await self.llm_service.extract_flashcard_pairs(text, provider=provider)
+        if not pairs:
+            raise ValidationException("Kojo couldn't find any terms and definitions in that text.")
+        source = _match_key(text)
+        return [
+            FlashcardTidyItem(front=pair.front, back=pair.back, verbatim=_copied_in_order(source, pair.front, pair.back))
+            for pair in pairs
+        ]
 
     async def generate_from_test(
         self,

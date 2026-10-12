@@ -18,6 +18,7 @@ import type {
   KojoClearedConversation,
   Flashcard,
   FlashcardUpdate,
+  TidiedCard,
   Folder,
   KojoActionCard,
   KojoActionType,
@@ -370,7 +371,8 @@ export type TourId =
   | "flashcard-review"
   | "matching"
   | "manage-flashcards"
-  | "kojo";
+  | "kojo"
+  | "quizlet-import";
 
 // Same-tab mirror of users.tours_seen, so a tour cannot replay in the moment
 // before the POST lands. The account is the source of truth.
@@ -833,6 +835,27 @@ export async function createFlashcard(folderId: number, data: { front: string; b
     method: "POST",
     body: JSON.stringify(data),
   });
+}
+
+// Quizlet import: save the cards the student reviewed. No LLM, no usage charge.
+export async function importFlashcards(
+  folderId: number,
+  cards: { front: string; back: string }[],
+): Promise<Flashcard[]> {
+  return request<Flashcard[]>(`/folders/${folderId}/flashcards/import`, {
+    method: "POST",
+    body: JSON.stringify({ cards, source: "quizlet_import" }),
+  });
+}
+
+// Kojo pulls term/definition pairs out of a paste the parser couldn't read.
+// Counts toward the Kojo allowance.
+export async function tidyFlashcardPaste(text: string): Promise<TidiedCard[]> {
+  const result = await request<{ cards: TidiedCard[] }>("/flashcards/import/tidy", {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+  return result.cards;
 }
 
 export async function generateFlashcards(

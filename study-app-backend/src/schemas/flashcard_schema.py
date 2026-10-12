@@ -1,9 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+# Quizlet import caps: one request holds at most this many cards, each side at
+# most this long. The tidy pass reads at most TIDY_MAX_CHARS of pasted text so
+# its JSON reply fits the default generation token budget.
+IMPORT_MAX_CARDS = 1000
+IMPORT_MAX_SIDE_CHARS = 5000
+TIDY_MAX_CHARS = 12000
 
 
 class FlashcardCreate(BaseModel):
@@ -42,6 +49,34 @@ class FlashcardGenerateRequest(BaseModel):
 class FlashcardUpdate(BaseModel):
     front: str = Field(..., min_length=1)
     back: str = Field(..., min_length=1)
+
+
+class FlashcardImportItem(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    front: str = Field(..., min_length=1, max_length=IMPORT_MAX_SIDE_CHARS)
+    back: str = Field(..., min_length=1, max_length=IMPORT_MAX_SIDE_CHARS)
+
+
+class FlashcardBulkImportRequest(BaseModel):
+    cards: list[FlashcardImportItem] = Field(..., min_length=1, max_length=IMPORT_MAX_CARDS)
+    source: Literal["quizlet_import"] = "quizlet_import"
+
+
+class FlashcardTidyRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=TIDY_MAX_CHARS)
+
+
+class FlashcardTidyItem(BaseModel):
+    front: str
+    back: str
+    # False when Kojo's pair can't be found word for word in the pasted text,
+    # so the review step asks the student to check it.
+    verbatim: bool
+
+
+class FlashcardTidyResponse(BaseModel):
+    cards: list[FlashcardTidyItem]
 
 
 class FlashcardAttemptCreate(BaseModel):
