@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { Dropdown } from "../components/Dropdown";
 import { ConfirmModal, RenameModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
 import { FileManager } from "../components/FileManager";
@@ -15,6 +16,13 @@ import { formatDate, formatPercent } from "../lib/format";
 import { toast } from "../lib/toast";
 import { usePageTour } from "../components/tours/usePageTour";
 import type { AttemptSummary, Flashcard, Folder, TestCreationParams, TestSummary } from "../lib/types";
+
+const PERSONA_OPTIONS = [
+  { value: "balanced", label: "Balanced" },
+  { value: "concise", label: "Concise" },
+  { value: "tutorial", label: "Tutorial" },
+  { value: "socratic", label: "Socratic" },
+];
 
 const PERSONA_DESCRIPTIONS: Record<string, string> = {
   balanced: "Conversational and thorough. Explains concepts clearly, gives examples, and checks understanding without being overwhelming.",
@@ -420,16 +428,14 @@ export default function FolderDetail() {
                 <span className="folder-kojo-toggle-desc">How Kojo responds in chat sessions for this folder.</span>
               </div>
               <div className="folder-kojo-persona-field">
-                <select
+                <Dropdown
+                  bare
+                  label="Default persona style"
                   className="folder-kojo-persona-select"
                   value={folder.kojo_persona ?? "balanced"}
-                  onChange={(e) => void updateKojoSetting({ kojo_persona: e.target.value })}
-                >
-                  <option value="balanced">Balanced</option>
-                  <option value="concise">Concise</option>
-                  <option value="tutorial">Tutorial</option>
-                  <option value="socratic">Socratic</option>
-                </select>
+                  options={PERSONA_OPTIONS}
+                  onChange={(value) => void updateKojoSetting({ kojo_persona: value })}
+                />
                 <span className="folder-kojo-persona-tooltip-wrap">
                   <Info size={15} className="folder-kojo-persona-info-icon" />
                   <span className="folder-kojo-persona-tooltip">

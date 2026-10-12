@@ -5,7 +5,8 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { FeatureSurvey } from "../components/FeatureSurvey";
-import { SelectInput, TextInput } from "../components/Field";
+import { Dropdown } from "../components/Dropdown";
+import { TextInput } from "../components/Field";
 import { LoadingNotice } from "../components/Loaders";
 import { MarkdownContent } from "../components/MarkdownContent";
 import {
@@ -29,7 +30,7 @@ import {
   scopeKey,
   skipUnreadableAnswers,
 } from "../lib/api";
-import { formatCodingProblem } from "../lib/codingProblemFormat";
+import { CODING_LANGUAGES, formatCodingProblem } from "../lib/codingProblemFormat";
 import { isReadFromDrawing } from "../lib/drawnAnswer";
 import { scoreTone } from "../lib/format";
 import { useSettings } from "../lib/useSettings";
@@ -494,15 +495,12 @@ export default function Results() {
                       </div>
                     </div>
                     {targetedMode === "coding" ? (
-                      <SelectInput
+                      <Dropdown
                         label="Language"
                         value={targetedLanguage}
-                        onChange={(e) => setTargetedLanguage(e.target.value)}
-                      >
-                        {["Python", "JavaScript", "TypeScript", "Java", "C++", "C", "C#", "Go", "Rust", "Swift", "Kotlin", "OCaml", "SQL"].map((lang) => (
-                          <option key={lang} value={lang}>{lang}</option>
-                        ))}
-                      </SelectInput>
+                        options={CODING_LANGUAGES.map((lang) => ({ value: lang, label: lang }))}
+                        onChange={setTargetedLanguage}
+                      />
                     ) : null}
                     {canMultiPart ? (
                       <label className="multipart-toggle tp-multipart">

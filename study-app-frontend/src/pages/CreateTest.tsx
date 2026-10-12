@@ -5,7 +5,8 @@ import { Button } from "../components/Button";
 import { FormError } from "../components/FormError";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
-import { SelectInput, TextInput } from "../components/Field";
+import { Dropdown } from "../components/Dropdown";
+import { TextInput } from "../components/Field";
 import { InlineLoading, LoadingNotice } from "../components/Loaders";
 import {
   createTest,
@@ -31,6 +32,7 @@ import { useSettings } from "../lib/useSettings";
 import { toast } from "../lib/toast";
 import { usePageTour } from "../components/tours/usePageTour";
 import type { Folder, ProviderStatus, TestCreationParams } from "../lib/types";
+import { CODING_LANGUAGES } from "../lib/codingProblemFormat";
 
 // Matches _CUSTOM_INSTRUCTIONS_MAX in study-app-backend/src/routes/tests.py.
 const CUSTOM_INSTRUCTIONS_MAX = 10_000;
@@ -555,20 +557,13 @@ export default function CreateTest() {
               }}
               placeholder="Midterm Practice"
             />
-            <SelectInput
+            <Dropdown
               label="Folder"
-              value={folderId ?? ""}
-              onChange={(e) => setFolderId(Number(e.target.value))}
-            >
-              <option value="" disabled>
-                Select a folder
-              </option>
-              {folders.map((folder) => (
-                <option key={folder.id} value={folder.id}>
-                  {folder.name}
-                </option>
-              ))}
-            </SelectInput>
+              value={folderId == null ? "" : String(folderId)}
+              placeholder="Select a folder"
+              options={folders.map((folder) => ({ value: String(folder.id), label: folder.name }))}
+              onChange={(value) => setFolderId(Number(value))}
+            />
             <p className="muted small" style={{ marginTop: -8 }}>
               {folderFileCount > 0
                 ? `${folderFileCount} saved file${folderFileCount === 1 ? "" : "s"} available in this folder.`
@@ -632,18 +627,13 @@ export default function CreateTest() {
                   </span>
                 </button>
                 {isCodingMode && (
-                  <div className="field" style={{ marginTop: 4 }}>
-                    <label className="field-label" htmlFor="coding-lang">Language</label>
-                    <select
-                      id="coding-lang"
-                      className="input"
+                  <div style={{ marginTop: 4 }}>
+                    <Dropdown
+                      label="Language"
                       value={codingLanguage}
-                      onChange={(e) => setCodingLanguage(e.target.value)}
-                    >
-                      {["Python", "JavaScript", "TypeScript", "Java", "C++", "C", "C#", "Go", "Rust", "Swift", "Kotlin", "OCaml", "SQL"].map((lang) => (
-                        <option key={lang} value={lang}>{lang}</option>
-                      ))}
-                    </select>
+                      options={CODING_LANGUAGES.map((lang) => ({ value: lang, label: lang }))}
+                      onChange={setCodingLanguage}
+                    />
                   </div>
                 )}
               </div>

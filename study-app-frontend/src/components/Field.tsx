@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react";
 
 type FieldShellProps = {
   label: string;
@@ -31,21 +31,7 @@ export function TextInput({ label, hint, id, ...props }: InputProps) {
   );
 }
 
-type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & {
-  label: string;
-  hint?: string;
-};
-
-export function SelectInput({ label, hint, id, children, ...props }: SelectProps) {
-  const inputId = id ?? props.name ?? label;
-  return (
-    <FieldShell label={label} htmlFor={inputId} hint={hint}>
-      <select id={inputId} className="input select" {...props}>
-        {children}
-      </select>
-    </FieldShell>
-  );
-}
+// Dropdowns: use components/Dropdown.tsx (custom listbox), not a native <select>.
 
 type TextAreaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   label?: string;

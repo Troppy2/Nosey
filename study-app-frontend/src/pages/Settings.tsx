@@ -4,7 +4,8 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { CollapsibleSection } from "../components/CollapsibleSection";
 import { ConfirmModal, TypeToConfirmModal } from "../components/ConfirmModal";
-import { SelectInput, TextInput } from "../components/Field";
+import { Dropdown } from "../components/Dropdown";
+import { TextInput } from "../components/Field";
 import { SkeletonList } from "../components/Skeletons";
 import {
   deleteAccount,
@@ -360,17 +361,14 @@ export default function Settings() {
             <p className="muted small">
               Choose the default provider Nosey should use for all LLM-powered features.
             </p>
-            <SelectInput
+            {/* Admin and beta users get full override, Claude included. */}
+            <Dropdown
               label="Default provider"
               value={generationProvider}
-              onChange={(event) => handleChangeGenerationProvider(event.target.value)}
+              options={GENERATION_PROVIDER_OPTIONS}
+              onChange={handleChangeGenerationProvider}
               hint="This setting feeds Create Test, Flashcards, Kojo, and other AI workflows."
-            >
-              {/* Admin and beta users get full override, Claude included. */}
-              {GENERATION_PROVIDER_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </SelectInput>
+            />
           </CollapsibleSection>
         ) : null}
 
