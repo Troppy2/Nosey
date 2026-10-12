@@ -781,11 +781,10 @@ function FolderHome({ folder, conversations, files, disabled, uploading, uploadE
 
 // ── Main page ────────────────────────────────────────────────────────────────
 
+// The age gate lives in its own component: returning early here, before the
+// page's hooks, broke the rules of hooks (caught by oxlint).
 export default function KojoMode() {
-  const { generationProvider, kojoStrictness, kojoCustomInstruction, betaMode } = useSettings();
-
-  const storedUser = getStoredUser();
-  if (storedUser?.kojo_enabled === false) {
+  if (getStoredUser()?.kojo_enabled === false) {
     return (
       <div className="page page-narrow">
         <div className="page-header">
@@ -795,6 +794,11 @@ export default function KojoMode() {
       </div>
     );
   }
+  return <KojoChatPage />;
+}
+
+function KojoChatPage() {
+  const { generationProvider, kojoStrictness, kojoCustomInstruction, betaMode } = useSettings();
 
   // Remembered chat location, read once so reopening chat mode lands the user
   // back in the folder + conversation they left. The conversation id is applied

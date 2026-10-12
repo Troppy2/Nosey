@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "react",
+    "typescript",
+    "unicorn",
+    "oxc"
+  ],
+  "rules": {
+    "react/rules-of-hooks": "error"
+  },
+  "ignorePatterns": [
+    "dist",
+    "node_modules",
+    "public"
+  ]
+}
