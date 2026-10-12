@@ -37,7 +37,7 @@ jobs:
           ADMIN_EMAIL: ci-admin@example.com
 
   frontend:
-    name: Frontend — lint + type check
+    name: Frontend — lint, type check, build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -60,3 +60,6 @@ jobs:
 
       - name: Type check
         run: npx tsc -p tsconfig.app.json
+
+      - name: Build
+        run: npm run build
