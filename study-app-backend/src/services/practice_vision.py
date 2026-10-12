@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import math
 import re
+import warnings
 from typing import Optional
 
 from src.config import settings
@@ -32,6 +34,11 @@ _CONCURRENCY = 3
 # 2x the PDF's 72 dpi: a letter page renders at about 1224x1584, which Claude
 # reads comfortably (it downscales past 1568 px on the long edge).
 _RENDER_ZOOM = 2.0
+# A PDF page can declare up to 14400x14400 pt, which at 2x is a 3.3 GB pixmap
+# and kills the 512 MB instance (GH #171). Pages are rendered at whatever zoom
+# keeps them under this many pixels; a normal letter page at 2x is ~1.9 MP, so
+# only oversized pages are ever scaled down.
+_RENDER_MAX_PIXELS = 8_000_000
 # TeX math fonts (Computer Modern / Latin Modern / AMS / STIX). Extension fonts
 # draw the brackets, radicals and big operators text extraction cannot place;
 # math italic and symbol fonts carry the variables whose subscripts and
@@ -83,13 +90,22 @@ def pages_needing_vision(path: str, page_texts: list[str], max_pages: int) -> li
     return flagged
 
 
+def _render_zoom(width_pt: float, height_pt: float) -> float:
+    """_RENDER_ZOOM, reduced so the rendered page stays under _RENDER_MAX_PIXELS."""
+    area = max(width_pt, 1.0) * max(height_pt, 1.0)
+    # 0.995: MuPDF rounds the pixel box up, which can push an exact fit over.
+    return min(_RENDER_ZOOM, 0.995 * math.sqrt(_RENDER_MAX_PIXELS / area))
+
+
 def _render_pages(path: str, indices: list[int]) -> dict[int, str]:
     """Base64 PNGs of the given pages. Runs in a worker thread."""
     images: dict[int, str] = {}
     document = fitz.open(path)
     try:
         for index in indices:
-            pixmap = document.load_page(index).get_pixmap(matrix=fitz.Matrix(_RENDER_ZOOM, _RENDER_ZOOM))
+            page = document.load_page(index)
+            zoom = _render_zoom(page.rect.width, page.rect.height)
+            pixmap = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
             images[index] = base64.b64encode(pixmap.tobytes("png")).decode("ascii")
     finally:
         document.close()
@@ -138,6 +154,37 @@ async def transcribe_math_pages(path: str, page_texts: list[str]) -> dict[int, s
 # Long edge of an uploaded photo sent to the vision model. Phone photos are
 # 4000+ px and several MB, past the providers' image limits.
 _IMAGE_MAX_EDGE = 2000
+# Decoding is width x height x 4 bytes no matter how small the file is: a 60 KB
+# PNG can declare 40000x40000 px and decode to 6 GB (GH #171). 40 MP covers
+# phone photos (12-24 MP, some 48 MP modes excepted) at ~160 MB peak.
+_IMAGE_MAX_PIXELS = 40_000_000
+_IMAGE_TOO_LARGE = "That image is too large to read. Try a smaller photo (under 40 megapixels)."
+_IMAGE_FORMATS = {"PNG", "JPEG"}
+
+
+def _check_image_header(path: str) -> None:
+    """Refuse an image before decoding it if its declared size is over the cap.
+
+    Pillow's Image.open reads only the header (no pixel decode), so the size
+    check costs nothing however large the declared image is. Pillow's own
+    decompression-bomb guard is promoted to an error as a second net.
+    """
+    from PIL import Image
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", Image.DecompressionBombWarning)
+        try:
+            with Image.open(path) as img:
+                width, height = img.size
+                fmt = img.format
+        except (Image.DecompressionBombError, Image.DecompressionBombWarning) as exc:
+            raise ValueError(_IMAGE_TOO_LARGE) from exc
+        except Exception as exc:
+            raise ValueError("That image could not be opened. Try a PNG or JPG.") from exc
+    if fmt not in _IMAGE_FORMATS:
+        raise ValueError("That image could not be opened. Try a PNG or JPG.")
+    if width * height > _IMAGE_MAX_PIXELS:
+        raise ValueError(_IMAGE_TOO_LARGE)
 
 _IMAGE_TRANSCRIBE_PROMPT = (
     "Transcribe this image exactly. It is a photo or scan from a student's studies: notes, a practice test, "
@@ -157,10 +204,13 @@ def _image_jpeg_b64(path: str) -> str:
     """The image as a base64 JPEG, scaled down to _IMAGE_MAX_EDGE. Runs in a worker thread."""
     if fitz is None:
         raise ValueError("Images can't be read on this server.")
+    _check_image_header(path)
     try:
         pixmap = fitz.Pixmap(path)
     except Exception as exc:
         raise ValueError("That image could not be opened. Try a PNG or JPG.") from exc
+    # Each conversion makes a full-size copy. Rebinding frees the previous one
+    # as soon as the new one exists, so at most two are alive at once.
     if pixmap.alpha:
         pixmap = fitz.Pixmap(pixmap, 0)
     if pixmap.colorspace is None or pixmap.colorspace.n not in (1, 3):
