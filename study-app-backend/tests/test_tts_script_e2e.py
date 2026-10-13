@@ -16,6 +16,7 @@ model compliance with the prompt, which mocks cannot exercise.
 """
 from __future__ import annotations
 
+import json
 import re
 
 import pytest
@@ -91,6 +92,10 @@ FORBIDDEN_IN_SPEECH = [
 
 
 def _assert_speakable(script: str, source: str) -> None:
+    # New scripts are a JSON array, one entry per lesson block. Check what is
+    # actually spoken, not its JSON encoding (escapes read as LaTeX commands).
+    if script.startswith("["):
+        script = "\n\n".join(json.loads(script))
     assert script, f"{source}: tts_script came back empty"
     # A narration of these notes should be substantial prose, not a stub.
     assert len(script.split()) > 80, (
