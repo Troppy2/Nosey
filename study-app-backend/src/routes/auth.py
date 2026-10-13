@@ -21,7 +21,14 @@ from src.schemas.auth_schema import (
 from src.services.auth_service import AuthService
 from src.services.rag_service import HybridRAGService
 from src.limiter import limiter
-from src.utils.exceptions import StudyAppException
+from src.services.account_safety_service import (
+    SUSPENDED_MESSAGE,
+    add_deletion_tombstone,
+    is_device_banned,
+)
+from src.services.quota_service import normalize_device_id
+from src.utils.exceptions import ForbiddenException, StudyAppException
+from src.utils.safety_notice import SAFETY_HEADER
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +49,14 @@ async def google_auth(
         raise HTTPException(status_code=401, detail="Invalid Google token") from exc
     except httpx.RequestError as exc:
         raise HTTPException(status_code=503, detail="Could not reach Google authentication service") from exc
+    except ForbiddenException as exc:
+        # Banned account, or a new account inside the deletion cooldown.
+        suspended = str(exc) == SUSPENDED_MESSAGE
+        raise HTTPException(
+            status_code=403,
+            detail=str(exc),
+            headers={SAFETY_HEADER: "suspended"} if suspended else None,
+        ) from exc
     except StudyAppException as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
@@ -58,6 +73,10 @@ async def guest_auth(
     response: Response,
     session: AsyncSession = Depends(get_session),
 ) -> AuthResponse:
+    # GH #173: a browser whose account was banned cannot start over as a guest.
+    device_id = normalize_device_id(request.headers.get("X-Device-Id"))
+    if await is_device_banned(session, device_id):
+        raise HTTPException(status_code=403, detail=SUSPENDED_MESSAGE, headers={SAFETY_HEADER: "suspended"})
     try:
         user = await UserRepository(session).create_guest_user()
         await session.commit()
@@ -184,6 +203,9 @@ async def delete_account(
         ) from exc
 
     try:
+        # GH #172: the same Google account cannot sign up again for the
+        # cooldown. Same transaction as the delete, so neither lands alone.
+        add_deletion_tombstone(session, current_user.google_id)
         await UserRepository(session).delete_user(current_user)
         await session.commit()
     except Exception as exc:

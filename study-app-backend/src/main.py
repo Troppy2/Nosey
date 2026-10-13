@@ -31,6 +31,7 @@ from src.config import settings
 from src.limiter import limiter
 from src.routes import admin, attempts, auth, flashcards, folder_files, folders, health, job_descriptions, kojo, learning_modules, leetcode, mock_interview, practice_problems, slash_commands, surveys, system_design, tests, usage
 from src.services import upload_recovery
+from src.utils.safety_notice import SAFETY_HEADER, SafetyNoticeMiddleware
 from src.utils.validators import MAX_UPLOAD_TOTAL_SIZE_BYTES
 
 _MAX_REQUEST_BODY_BYTES = MAX_UPLOAD_TOTAL_SIZE_BYTES
@@ -96,6 +97,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # ContentSizeLimitMiddleware is added first so that CORSMiddleware (added second)
 # becomes the outermost wrapper. This ensures 413 responses include CORS headers
 # and the frontend error handler can read the "detail" field.
+app.add_middleware(SafetyNoticeMiddleware)
 app.add_middleware(ContentSizeLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
@@ -103,6 +105,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # The app reads this to show the support / warning / suspended modal.
+    expose_headers=[SAFETY_HEADER],
 )
 
 app.include_router(health.router)

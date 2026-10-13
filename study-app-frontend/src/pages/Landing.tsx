@@ -141,7 +141,7 @@ export default function Landing() {
               </button>
             </div>
             <div className="privacy-modal-body">
-              <p className="muted small">Last updated: September 25, 2026</p>
+              <p className="muted small">Last updated: October 12, 2026</p>
 
               <p>
                 Nosey is an open source study tool. This page explains what we collect, how your
@@ -256,6 +256,16 @@ export default function Landing() {
                 <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google</a>,{" "}
                 <a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener noreferrer">Anthropic</a>.
               </p>
+              <p>
+                <strong>Safety screening.</strong> Before Kojo or any other feature uses something
+                you typed (chat messages, custom instructions, prompts, written answers), the text
+                is checked by OpenAI's moderation service for serious harm such as child sexual
+                content, weapons or violence instructions, threats, and self-harm. OpenAI may keep
+                what it checks for up to 30 days for abuse monitoring under its{" "}
+                <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener noreferrer">privacy policy</a>.
+                If something is flagged, we store a short excerpt of it with your account so an
+                administrator can review it (see sections 6 and 8).
+              </p>
 
               <h3>3. Search indexing of your notes</h3>
               <p>
@@ -306,6 +316,11 @@ export default function Landing() {
                   but as operators of the database they are technically able to access stored
                   content. We do so only when strictly necessary to fix a fault.
                 </li>
+                <li>
+                  Nosey administrators can read the excerpts our safety screening flags (section 2),
+                  together with the account's earlier flags, to decide whether to dismiss them or
+                  suspend the account.
+                </li>
                 <li>Law enforcement, if we are legally compelled.</li>
               </ul>
 
@@ -336,6 +351,16 @@ export default function Landing() {
                 delete your account. They contain none of your content, and we keep them so usage
                 limits cannot be reset by deleting and recreating an account, and for cost
                 records.
+              </p>
+              <p>
+                After you delete your account we keep a one-way, keyed hash of your Google account
+                ID for 24 hours, so the same Google account cannot sign up again during that time.
+                It cannot be turned back into your ID or email and is erased when the 24 hours end.
+                If an account is suspended, that hash is kept for as long as the suspension stands.
+              </p>
+              <p>
+                Flagged excerpts from safety screening are deleted after one year, except those tied
+                to a suspended account, which we keep while the suspension stands.
               </p>
 
               <h3>9. Age requirement</h3>
@@ -390,7 +415,7 @@ export default function Landing() {
               <hr className="policy-divider" />
 
               <h2 className="policy-section-title" id="terms">Terms of Service</h2>
-              <p className="muted small">Last updated: September 25, 2026</p>
+              <p className="muted small">Last updated: October 12, 2026</p>
 
               <h3>1. Agreement</h3>
               <p>
@@ -441,11 +466,20 @@ export default function Landing() {
                   or automate access in a way that runs up our API costs.
                 </li>
                 <li>Generate content that is illegal, harassing, or designed to harm others.</li>
+                <li>
+                  Request or share sexual content involving minors, instructions for weapons or
+                  violence, threats against anyone, or graphic violence.
+                </li>
                 <li>Resell or rebrand the hosted service as your own.</li>
               </ul>
               <p>
                 We may suspend or delete accounts that break these rules, in serious cases without
-                notice.
+                notice. What you type is screened automatically (privacy policy, section 2). Requests
+                that break these rules are refused with a warning and reviewed by a person, and
+                repeated ones can lead to suspension. Any request involving sexual content about
+                minors suspends the account immediately. A suspended account cannot be recreated
+                with the same Google account, and new guest sessions from the same browser are
+                refused. If you believe a suspension is a mistake, contact us.
               </p>
 
               <h3>6. AI output, accuracy, and academic integrity</h3>

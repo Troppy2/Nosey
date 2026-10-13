@@ -710,7 +710,7 @@ export default function Settings() {
             <h2 className="settings-group-title settings-group-title--danger">Danger zone</h2>
             <CollapsibleSection title="Delete Account">
               <p className="muted small">
-                Permanently delete your account and all associated data , classes, tests, flashcards, and chat history. This cannot be undone.
+                Permanently delete your account and all associated data: classes, tests, flashcards, and chat history. This cannot be undone, and the same Google account can't sign up again for 24 hours.
               </p>
               <div className="settings-reset-row">
                 <Button type="button" variant="danger" onClick={() => setDeleteStep(1)}>
@@ -725,7 +725,7 @@ export default function Settings() {
       {deleteStep === 1 ? (
         <ConfirmModal
           title="Delete your account?"
-          message="This will permanently delete your account, all classes, tests, flashcards, and chat history. This action cannot be undone."
+          message="This will permanently delete your account, all classes, tests, flashcards, and chat history. This action cannot be undone, and this Google account can't sign up again for 24 hours."
           confirmLabel="Continue"
           danger
           onConfirm={() => { setDeleteStep(2); setDeleteError(null); }}

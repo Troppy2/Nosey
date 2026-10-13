@@ -4,12 +4,16 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import case, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_session
 from src.dependencies import get_admin_user, get_current_user
+from src.models.account_safety import ContentFlag
 from src.models.user import User
+from src.services.account_safety_service import ban_user, unban_user
+from src.utils.time import utcnow_naive
 from src.repositories.survey_repository import SurveyRepository
 from src.repositories.usage_event_repository import UsageEventRepository
 from src.repositories.user_repository import UserRepository
@@ -36,10 +40,14 @@ class AdminUserRow(BaseModel):
     email_verified: bool
     created_at: str
     updated_at: str
+    banned_at: Optional[str] = None
+    ban_reason: Optional[str] = None
 
     @classmethod
     def from_user(cls, user: User) -> "AdminUserRow":
         return cls(
+            banned_at=user.banned_at.isoformat() if user.banned_at else None,
+            ban_reason=user.ban_reason,
             id=user.id,
             email=user.email,
             full_name=user.full_name,
@@ -278,3 +286,132 @@ async def get_token_usage(
         by_feature=[TokenFeatureDTO(**row) for row in report.by_feature],
         by_provider=[TokenProviderDTO(**row) for row in report.by_provider],
     )
+
+
+# ── Moderation: bans and the flag queue (GH #173) ────────────────────────────
+
+
+class BanRequest(BaseModel):
+    reason: str = Field(..., min_length=1, max_length=500)
+
+
+@router.post("/users/{user_id}/ban", response_model=AdminUserRow)
+async def ban_user_route(
+    user_id: int,
+    payload: BanRequest,
+    admin_user: User = Depends(get_admin_user),
+    session: AsyncSession = Depends(get_session),
+) -> AdminUserRow:
+    user = await UserRepository(session).get_by_id(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.is_admin:
+        raise HTTPException(status_code=400, detail="Admins cannot be banned.")
+    if user.banned_at is None:
+        await ban_user(session, user, reason=payload.reason.strip(), banned_by=admin_user.id)
+    # Reviewing the user's open flags is part of the ban decision.
+    await session.execute(
+        update(ContentFlag)
+        .where(ContentFlag.user_id == user.id, ContentFlag.reviewed_at.is_(None))
+        .values(reviewed_at=utcnow_naive(), reviewed_by=admin_user.id, action="banned")
+    )
+    await session.commit()
+    return AdminUserRow.from_user(user)
+
+
+@router.post("/users/{user_id}/unban", response_model=AdminUserRow)
+async def unban_user_route(
+    user_id: int,
+    admin_user: User = Depends(get_admin_user),
+    session: AsyncSession = Depends(get_session),
+) -> AdminUserRow:
+    user = await UserRepository(session).get_by_id(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    await unban_user(session, user)
+    await session.commit()
+    return AdminUserRow.from_user(user)
+
+
+class ContentFlagRow(BaseModel):
+    id: int
+    user_id: int
+    user_email: str
+    user_banned: bool
+    user_is_admin: bool
+    feature: str
+    severity: str
+    categories: str
+    score: float
+    excerpt: str
+    created_at: str
+    reviewed_at: Optional[str]
+    action: Optional[str]
+
+
+class FlagQueueResponse(BaseModel):
+    flags: list[ContentFlagRow]
+    open_count: int
+
+
+@router.get("/flags", response_model=FlagQueueResponse)
+async def list_flags(
+    status: str = "open",
+    user_id: Optional[int] = None,
+    admin_user: User = Depends(get_admin_user),
+    session: AsyncSession = Depends(get_session),
+) -> FlagQueueResponse:
+    """Open flags (default) or all, newest and most severe first.
+
+    Pass user_id for one account's full flag history: the context an admin
+    needs before banning.
+    """
+    query = select(ContentFlag, User).join(User, User.id == ContentFlag.user_id)
+    if user_id is not None:
+        query = query.where(ContentFlag.user_id == user_id)
+    elif status == "open":
+        query = query.where(ContentFlag.reviewed_at.is_(None))
+    severity_order = case(
+        (ContentFlag.severity == "minors", 0), (ContentFlag.severity == "harmful", 1), else_=2
+    )
+    rows = (await session.execute(query.order_by(severity_order, ContentFlag.created_at.desc()).limit(200))).all()
+    open_count = await session.scalar(
+        select(func.count()).select_from(ContentFlag).where(ContentFlag.reviewed_at.is_(None))
+    )
+    return FlagQueueResponse(
+        flags=[
+            ContentFlagRow(
+                id=flag.id,
+                user_id=flag.user_id,
+                user_email=user.email,
+                user_banned=user.banned_at is not None,
+                user_is_admin=user.is_admin,
+                feature=flag.feature,
+                severity=flag.severity,
+                categories=flag.categories,
+                score=flag.score,
+                excerpt=flag.excerpt,
+                created_at=flag.created_at.isoformat(),
+                reviewed_at=flag.reviewed_at.isoformat() if flag.reviewed_at else None,
+                action=flag.action,
+            )
+            for flag, user in rows
+        ],
+        open_count=int(open_count or 0),
+    )
+
+
+@router.post("/flags/{flag_id}/dismiss")
+async def dismiss_flag(
+    flag_id: int,
+    admin_user: User = Depends(get_admin_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    flag = await session.get(ContentFlag, flag_id)
+    if flag is None:
+        raise HTTPException(status_code=404, detail="Flag not found")
+    flag.reviewed_at = utcnow_naive()
+    flag.reviewed_by = admin_user.id
+    flag.action = "dismissed"
+    await session.commit()
+    return {"status": "dismissed"}

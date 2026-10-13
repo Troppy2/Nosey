@@ -4678,6 +4678,33 @@ Return JSON only with these exact keys:
             prompt, provider, _parse, max_tokens=_MODULE_CONTENT_MAX_TOKENS
         )
 
+    async def moderate(self, texts: list[str]) -> list[dict[str, object]]:
+        """Classify texts with OpenAI's moderation endpoint (GH #173).
+
+        One request for the whole batch; returns one {"flagged", "categories",
+        "category_scores"} dict per input, in order. Raises LLMException when
+        the key is missing or the call fails; callers decide to fail open.
+        Not a provider-loop call: there is exactly one moderation engine.
+        """
+        from src.utils.exceptions import LLMException
+
+        if not settings.openai_api_key:
+            raise LLMException("Moderation is not configured (OPENAI_API_KEY unset).")
+        try:
+            async with httpx.AsyncClient(timeout=settings.moderation_timeout_seconds) as client:
+                response = await client.post(
+                    "https://api.openai.com/v1/moderations",
+                    headers={"Authorization": f"Bearer {settings.openai_api_key}"},
+                    json={"model": settings.openai_moderation_model, "input": texts},
+                )
+                response.raise_for_status()
+                results = response.json().get("results") or []
+        except Exception as exc:
+            raise LLMException(f"Moderation call failed: {type(exc).__name__}") from exc
+        if len(results) != len(texts):
+            raise LLMException("Moderation returned the wrong number of results.")
+        return results
+
     @staticmethod
     def _checked_tts_script(raw: object, block_count: int) -> str:
         """Normalize a narration script and log when it will not align.

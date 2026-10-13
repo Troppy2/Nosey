@@ -18,6 +18,7 @@ from src.schemas.job_description_schema import (
     JobDescriptionUpdateRequest,
     SavedJDParsed,
 )
+from src.services.account_safety_service import screen_user_input
 
 # Its own prefix rather than a path under /mock-interview: that router already owns
 # GET /mock-interview/{session_id}, whose int converter would reject a nested literal
@@ -86,6 +87,7 @@ async def create_job_description(
     db: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> JobDescriptionResponse:
+    await screen_user_input(user, "job_description", body.name, body.company_name, body.jd_text)
     count = (
         await db.execute(
             select(func.count())
@@ -125,6 +127,7 @@ async def update_job_description(
     db: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> JobDescriptionResponse:
+    await screen_user_input(user, "job_description", body.name, body.company_name, body.jd_text)
     row = await _load_jd(jd_id, user, db)
     if body.name is not None:
         row.name = body.name.strip()

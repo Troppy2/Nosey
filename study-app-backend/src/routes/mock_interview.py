@@ -43,6 +43,7 @@ from src.services.leetcode_service import LeetCodeService
 from src.services.llm_service import LLMService
 from src.utils.exceptions import LLMException, ValidationException
 from src.utils.provider_policy import resolve_request_provider
+from src.services.account_safety_service import screen_user_input
 
 # SECURITY: beta-only feature, enforced server-side (see dependencies.get_beta_user).
 # It is excluded from usage limits, so basic users must not be able to reach it.
@@ -219,6 +220,7 @@ async def create_session(
     db: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> MockInterviewSessionResponse:
+    await screen_user_input(user, "mock_interview", body.custom_company, body.jd_text)
     stages = [s for s in body.stages if s in ("resume", "stage1", "stage2", "stage3")]
     if not stages:
         stages = ["resume", "stage1", "stage2", "stage3"]
@@ -315,6 +317,7 @@ async def parse_job_description(
     body: JDParseRequest,
     user: User = Depends(get_current_user),
 ) -> JDParseResponse:
+    await screen_user_input(user, "mock_interview", body.jd_text)
     # Constrain the model to real catalog topics: prefer the ids the client sent
     # (its live taxonomy), fall back to the backend's canonical set.
     menu = [t for t in body.available_topics if lc_taxonomy.canonical_topic(t)]
@@ -521,6 +524,7 @@ async def resume_grill_message(
     """Conversational follow-up to the ATS scan: the interviewer picks real lines out of
     the candidate's resume and pushes on them. Same contract as the Stage 2/3 chats
     (client echoes history and covered goals, server enforces advancement and a cap)."""
+    await screen_user_input(user, "mock_interview", body.message)
     row = await _load_session(session_id, user, db)
     provider = resolve_request_provider(user, body.provider)
     company_label = _company_label(row)
@@ -811,6 +815,7 @@ async def stage2_message(
     db: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> Stage2MessageResponse:
+    await screen_user_input(user, "mock_interview", body.message)
     row = await _load_session(session_id, user, db)
     company_label = _company_label(row)
     candidate = _candidate_name(user)
@@ -969,6 +974,7 @@ async def stage3_message(
     db: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> Stage3MessageResponse:
+    await screen_user_input(user, "mock_interview", body.message)
     row = await _load_session(session_id, user, db)
     provider = resolve_request_provider(user, body.provider)
     company_label = _company_label(row)

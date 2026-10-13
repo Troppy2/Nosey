@@ -27,6 +27,7 @@ from src.services.grading_service import GradingService
 from src.services.llm_service import LLMService
 from src.utils.exceptions import LLMException, ResourceNotFoundException, StudyAppException
 from src.utils.provider_policy import can_submit_scratch_pad_work, resolve_ocr_engine
+from src.services.account_safety_service import screen_user_input
 
 router = APIRouter(tags=["attempts"])
 
@@ -44,6 +45,7 @@ async def submit_attempt(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> AttemptResult:
+    await screen_user_input(user, "test_answers", *(a.answer for a in body.answers), block_harmful=False)
     _t0 = time.monotonic()
     try:
         # Beta gate for the scratch-pad feature: a work_image from a
@@ -85,6 +87,7 @@ async def redo_answer(
     user: User = Depends(get_current_user),
 ) -> RedoAnswerResponse:
     """Fix or type an answer whose drawing OCR could not read, then regrade it (GH #149)."""
+    await screen_user_input(user, "test_answers", body.answer, block_harmful=False)
     try:
         # Same beta gate as a submission: only scratch-pad users send a drawing.
         if body.work_image and not can_submit_scratch_pad_work(user):

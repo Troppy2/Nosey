@@ -1,4 +1,5 @@
 """ORM models for the Study App backend."""
+from src.models.account_safety import AccountTombstone, ContentFlag
 from src.models.base import Base
 from src.models.conversation_file import ConversationFile
 from src.models.flashcard import Flashcard, FlashcardAttempt
@@ -41,6 +42,8 @@ from src.models.user_attempt import UserAttempt
 from src.models.user_memory import UserMemory
 
 __all__ = [
+    "AccountTombstone",
+    "ContentFlag",
     "Base",
     "ConversationFile",
     "Flashcard",

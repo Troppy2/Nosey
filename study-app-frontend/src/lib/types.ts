@@ -446,6 +446,30 @@ export type AdminUserRow = {
   email_verified: boolean;
   created_at: string;
   updated_at: string;
+  banned_at: string | null;
+  ban_reason: string | null;
+};
+
+// A moderation hit on something a user typed (GH #173).
+export type ContentFlagRow = {
+  id: ID;
+  user_id: ID;
+  user_email: string;
+  user_banned: boolean;
+  user_is_admin: boolean;
+  feature: string;
+  severity: "minors" | "harmful" | "self_harm";
+  categories: string;
+  score: number;
+  excerpt: string;
+  created_at: string;
+  reviewed_at: string | null;
+  action: string | null;
+};
+
+export type FlagQueueResponse = {
+  flags: ContentFlagRow[];
+  open_count: number;
 };
 
 export type FeatureTiming = {

@@ -43,6 +43,7 @@ from src.services.mcq_verification_service import MCQVerificationService
 from src.utils.exceptions import LLMException, ResourceNotFoundException, StudyAppException
 from src.utils.logger import get_logger
 from src.utils.provider_policy import resolve_request_provider
+from src.services.account_safety_service import screen_user_input
 
 # SECURITY: beta-only feature, enforced server-side (see dependencies.get_beta_user).
 # It is excluded from usage limits, so basic users must not be able to reach it.
@@ -448,6 +449,7 @@ async def create_learning_track(
     user: User = Depends(get_current_user),
 ) -> LearningTrackResponse:
     """Create (or rebuild) the folder's learning track and start generation."""
+    await screen_user_input(user, "learning_track", data.custom_instructions)
     try:
         await _get_owned_folder(folder_id, user.id, session)
 
@@ -770,6 +772,7 @@ async def update_module_lesson(
     quiz and a cleared tts_script (the frontend's stripped-markdown TTS
     fallback keeps working), and the client gets a 503 explaining that.
     """
+    await screen_user_input(user, "learning_lesson_edit", data.lesson_content)
     try:
         module = await _get_owned_module(module_id, user.id, session)
         if module is None:
