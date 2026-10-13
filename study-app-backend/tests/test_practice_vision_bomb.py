@@ -53,14 +53,33 @@ def test_non_image_with_image_extension_is_refused(tmp_path):
         pv._image_jpeg_b64(str(path))
 
 
-def test_normal_photo_still_reads(tmp_path):
+def test_normal_photo_still_reads(tmp_path, monkeypatch):
     from PIL import Image
+
+    # The parser that checked the size must be the one that decodes: MuPDF is
+    # never involved in reading an uploaded image.
+    monkeypatch.setattr(pv.fitz, "Pixmap", lambda *a, **k: (_ for _ in ()).throw(AssertionError("fitz used")))
 
     path = tmp_path / "photo.jpg"
     Image.new("RGB", (3000, 4000), (200, 210, 220)).save(path, "JPEG")
     encoded = pv._image_jpeg_b64(str(path))
     out = Image.open(__import__("io").BytesIO(base64.b64decode(encoded)))
     assert max(out.size) <= pv._IMAGE_MAX_EDGE
+
+
+def test_png_with_alpha_and_exif_rotation(tmp_path):
+    from PIL import Image
+
+    rgba = tmp_path / "notes.png"
+    Image.new("RGBA", (300, 200), (10, 20, 30, 128)).save(rgba, "PNG")
+    assert pv._image_jpeg_b64(str(rgba))
+
+    rotated = tmp_path / "rotated.jpg"
+    exif = Image.Exif()
+    exif[0x0112] = 6  # Orientation: rotate 90 CW
+    Image.new("RGB", (400, 100)).save(rotated, "JPEG", exif=exif)
+    out = Image.open(__import__("io").BytesIO(base64.b64decode(pv._image_jpeg_b64(str(rotated)))))
+    assert out.size == (100, 400)
 
 
 def test_giant_pdf_page_renders_under_the_pixel_cap(tmp_path):
