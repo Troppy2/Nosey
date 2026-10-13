@@ -24,13 +24,14 @@ from datetime import timedelta
 from typing import Iterable, Optional
 
 from fastapi import HTTPException
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import set_committed_value
 
 from src.config import settings
 from src.database import async_session_maker
 from src.models.account_safety import AccountTombstone, ContentFlag
+from src.models.usage_event import UsageEvent
 from src.models.user import User
 from src.repositories.usage_event_repository import UsageEventRepository
 from src.utils.exceptions import LLMException
@@ -127,8 +128,18 @@ async def screen_user_input(
         for start in range(0, len(chunks), _CHUNKS_PER_CALL):
             results.extend(await llm.moderate(chunks[start:start + _CHUNKS_PER_CALL]))
     except LLMException as exc:
-        logger.warning("Moderation unavailable, failing open for %s: %s", feature, exc)
         await _log_moderation_failure(user.id, type(exc.__cause__ or exc).__name__)
+        if len(chunks) > _CHUNKS_PER_CALL or await _failures_look_forced(user.id):
+            # Fail CLOSED when the failure could have been provoked: a very long
+            # input (several calls, the easiest to time out) or one account
+            # failing repeatedly while others are fine. Real outages hit many
+            # accounts at once and still fail open below.
+            logger.warning("Moderation failed for %s and looks forced; refusing user=%s", feature, user.id)
+            raise HTTPException(
+                status_code=503,
+                detail="Nosey couldn't run its safety check just now. Please try again in a moment.",
+            ) from exc
+        logger.warning("Moderation unavailable, failing open for %s: %s", feature, exc)
         return
 
     worst: Optional[tuple[str, list[str], float, str]] = None
@@ -143,6 +154,8 @@ async def screen_user_input(
     async with async_session_maker() as session:
         flag = ContentFlag(
             user_id=user.id,
+            # Lets the flag outlive account deletion and relink on re-sign-up.
+            subject_hash=None if user.google_id.startswith("guest_") else subject_hash(user.google_id),
             feature=feature[:40],
             severity=severity,
             categories=",".join(names)[:255],
@@ -168,6 +181,52 @@ async def screen_user_input(
     # "warning-allowed": the submission went through but broke the rules, so
     # the app must not say it was blocked.
     set_safety_notice("warning-allowed" if severity == "harmful" else "self-harm")
+
+
+# Forced-failure heuristic: this many failures for one account inside the
+# window, while fewer than _OUTAGE_ACCOUNTS accounts are failing overall.
+_FORCED_WINDOW = timedelta(minutes=10)
+_FORCED_USER_FAILURES = 3
+_OUTAGE_ACCOUNTS = 5
+
+
+async def _failures_look_forced(user_id: int) -> bool:
+    try:
+        since = utcnow_naive() - _FORCED_WINDOW
+        async with async_session_maker() as session:
+            recent = (
+                UsageEvent.feature == "moderation",
+                UsageEvent.success.is_(False),
+                UsageEvent.created_at >= since,
+            )
+            mine = await session.scalar(
+                select(func.count()).select_from(UsageEvent).where(*recent, UsageEvent.user_id == user_id)
+            )
+            accounts = await session.scalar(
+                select(func.count(func.distinct(UsageEvent.user_id))).where(*recent)
+            )
+        return int(mine or 0) >= _FORCED_USER_FAILURES and int(accounts or 0) < _OUTAGE_ACCOUNTS
+    except Exception:
+        logger.exception("Could not evaluate moderation failures; treating as an outage")
+        return False
+
+
+async def relink_flags(session: AsyncSession, user: User) -> int:
+    """Attach flags left by a deleted account to the same Google account's new row."""
+    if user.google_id.startswith("guest_"):
+        return 0
+    result = await session.execute(
+        update(ContentFlag)
+        .where(ContentFlag.user_id.is_(None), ContentFlag.subject_hash == subject_hash(user.google_id))
+        .values(user_id=user.id)
+    )
+    return result.rowcount or 0
+
+
+async def detach_flags(session: AsyncSession, user_id: int) -> None:
+    """Keep a deleting account's flags (the FK does this on Postgres; explicit
+    here so it never depends on the database enforcing ON DELETE SET NULL)."""
+    await session.execute(update(ContentFlag).where(ContentFlag.user_id == user_id).values(user_id=None))
 
 
 async def _log_moderation_failure(user_id: int, error_type: str) -> None:
@@ -283,7 +342,9 @@ async def purge_expired_safety_rows(session: AsyncSession) -> tuple[int, int]:
     flags = await session.execute(
         delete(ContentFlag).where(
             ContentFlag.created_at < cutoff,
-            ContentFlag.user_id.not_in(banned_users),
+            # Explicit NULL branch: "NULL NOT IN (...)" is NULL, so flags of
+            # deleted accounts would otherwise never be purged.
+            ContentFlag.user_id.is_(None) | ContentFlag.user_id.not_in(banned_users),
         )
     )
     return tombstones.rowcount or 0, flags.rowcount or 0

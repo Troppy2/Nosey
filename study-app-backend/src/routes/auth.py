@@ -24,6 +24,7 @@ from src.limiter import limiter
 from src.services.account_safety_service import (
     SUSPENDED_MESSAGE,
     add_deletion_tombstone,
+    detach_flags,
     is_device_banned,
 )
 from src.services.quota_service import normalize_device_id
@@ -206,6 +207,8 @@ async def delete_account(
         # GH #172: the same Google account cannot sign up again for the
         # cooldown. Same transaction as the delete, so neither lands alone.
         add_deletion_tombstone(session, current_user.google_id)
+        # Unreviewed moderation flags outlive the account (GH #173 review).
+        await detach_flags(session, current_user.id)
         await UserRepository(session).delete_user(current_user)
         await session.commit()
     except Exception as exc:
