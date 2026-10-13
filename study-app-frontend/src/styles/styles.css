@@ -28535,3 +28535,19 @@ a.sd-chip.is-done:hover {
   align-items: center;
   gap: 6px;
 }
+
+/* ── Sign-in terms notice ── */
+.signin-terms {
+  margin: 0;
+  text-align: center;
+}
+
+.signin-terms-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--green-dark);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

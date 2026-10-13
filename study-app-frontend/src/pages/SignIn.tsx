@@ -1,6 +1,7 @@
 import { ArrowLeft, LogIn, ShieldCheck } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "../components/Button";
+import { PrivacyTermsModal } from "../components/PrivacyTermsModal";
 import { Card } from "../components/Card";
 import { InlineLoading } from "../components/Loaders";
 import {
@@ -25,6 +26,7 @@ export default function SignIn() {
   const redirectTo = sanitizeRedirect(searchParams.get("redirect"));
 
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
   const [showDobModal, setShowDobModal] = useState(false);
   const [dob, setDob] = useState("");
   const [dobError, setDobError] = useState<string | null>(null);
@@ -155,12 +157,21 @@ export default function SignIn() {
               </Button>
             )}
           </div>
+          <p className="small muted signin-terms">
+            By signing in with Google, you agree to our{" "}
+            <button type="button" className="signin-terms-link" onClick={() => setTermsOpen(true)}>
+              Terms of Service and Privacy Policy
+            </button>
+            .
+          </p>
           <div className="trust-note">
             <ShieldCheck size={17} />
             <span>Your notes stay tied to your account and are never sold.</span>
           </div>
         </Card>
       </section>
+
+      {termsOpen && <PrivacyTermsModal onClose={() => setTermsOpen(false)} />}
 
       {showDobModal && (
         <div className="modal-backdrop">
