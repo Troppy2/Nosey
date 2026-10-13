@@ -12,6 +12,7 @@ from starlette.datastructures import UploadFile
 from src.config import settings
 from src.database import async_session_maker, get_session
 from src.limiter import limiter
+from src.services.account_safety_service import screen_user_input
 from src.dependencies import get_beta_user, get_current_user
 from src.models.folder import Folder
 from src.models.folder_file import FolderFile
@@ -1113,6 +1114,8 @@ async def create_test(
         coding_language = str(coding_language_raw).strip()[:50] if coding_language_raw else "Python"
         custom_instructions_raw = form.get("custom_instructions")
         custom_instructions = str(custom_instructions_raw).strip()[:_CUSTOM_INSTRUCTIONS_MAX] if custom_instructions_raw else None
+        # GH #173: typed instructions are screened before quota or any AI call.
+        await screen_user_input(user, "test_create", title, description, topic_focus, custom_instructions)
         provider_raw = form.get("provider")
         provider = str(provider_raw).strip().lower() if provider_raw else None
         provider_aliases = {"google": "gemini", "anthropic": "claude"}
@@ -1297,6 +1300,7 @@ async def regenerate_test(
     It reuses the notes persisted on the test (no re-upload), clears any stale
     questions, resets the test to "generating", and schedules a fresh background run.
     """
+    await screen_user_input(user, "test_regenerate", data.topic_focus, data.custom_instructions)
     try:
         repo = TestRepository(session)
         test = await repo.get_owned_with_questions(test_id, user.id)

@@ -23,6 +23,7 @@ from src.limiter import limiter
 from src.services.flashcard_service import FlashcardService
 from src.services.quota_service import QuotaService
 from src.utils.exceptions import LLMException, ResourceNotFoundException, StudyAppException
+from src.services.account_safety_service import screen_user_input
 from typing import Optional
 
 router = APIRouter(tags=["flashcards"])
@@ -109,6 +110,7 @@ async def tidy_flashcard_paste(
     gate runs before the try so its 429 is not remapped; the slot is released
     in the finally.
     """
+    await screen_user_input(user, "flashcard_tidy", data.text)
     provider = resolve_request_provider(user, None)
     slot = await QuotaService().acquire_kojo(session, user)
     bind_usage(user.id, "kojo_flashcard_tidy")
@@ -151,6 +153,7 @@ async def generate_flashcards(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> list[FlashcardResponse]:
+    await screen_user_input(user, "flashcard_generate", data.prompt)
     provider = resolve_request_provider(user, data.provider)
     # Usage limit: clamps the count to what is left in the window, 429 at zero.
     count, charge_id = await QuotaService().charge_flashcards(session, user, data.count)

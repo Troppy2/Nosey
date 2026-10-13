@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 from src.database import get_session
+from src.services.account_safety_service import screen_user_input
 from src.dependencies import get_current_user
 from src.models.user import User
 from src.repositories.usage_event_repository import UsageEventRepository
@@ -122,6 +123,8 @@ async def kojo_chat(
     if user.age is not None and user.age < 15:
         raise HTTPException(status_code=403, detail="Kojo chat is not available for users under 15")
     provider = resolve_request_provider(user, body.provider)
+    # GH #173: screened before the quota gate and any AI call.
+    await screen_user_input(user, "kojo_chat", body.message, body.custom_instruction)
     slot = await _kojo_gate(session, user, "kojo_chat")
     try:
         _t0 = time.monotonic()
@@ -187,6 +190,8 @@ async def kojo_chat_stream(
         raise HTTPException(status_code=403, detail="Kojo chat is not available for users under 15")
 
     provider = resolve_request_provider(user, body.provider)
+    # GH #173: screened before the quota gate and any AI call.
+    await screen_user_input(user, "kojo_chat", body.message, body.custom_instruction)
     slot = await _kojo_gate(session, user, "kojo_chat")
 
     async def event_stream() -> AsyncIterator[str]:
@@ -293,6 +298,8 @@ async def test_blueprint(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> TestBlueprintResponse:
+    # GH #173: screened before the quota gate and any AI call.
+    await screen_user_input(user, "kojo_action", body.message)
     slot = await _kojo_gate(session, user, "kojo_action")
     try:
         return await KojoService().propose_test_blueprint(
@@ -440,6 +447,8 @@ async def general_chat(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> KojoChatResponse:
+    # GH #173: screened before the quota gate and any AI call.
+    await screen_user_input(user, "kojo_general", body.message, body.custom_instruction, body.context)
     slot = await _kojo_gate(session, user, "kojo_general")
     try:
         _t0 = time.monotonic()
@@ -485,6 +494,8 @@ async def general_chat_stream(
     user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     provider = resolve_request_provider(user, body.provider)
+    # GH #173: screened before the quota gate and any AI call.
+    await screen_user_input(user, "kojo_general", body.message, body.custom_instruction, body.context)
     slot = await _kojo_gate(session, user, "kojo_general")
 
     async def event_stream() -> AsyncIterator[str]:
@@ -550,6 +561,8 @@ async def regenerate_stream(
         raise HTTPException(status_code=403, detail="Kojo chat is not available for users under 15")
 
     provider = resolve_request_provider(user, body.provider)
+    # GH #173: screened before the quota gate and any AI call.
+    await screen_user_input(user, "kojo_regenerate", body.custom_instruction)
     slot = await _kojo_gate(session, user, "kojo_regenerate")
 
     async def event_stream() -> AsyncIterator[str]:
@@ -638,6 +651,8 @@ async def propose_action_card(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> KojoActionCardDTO:
+    # GH #173: screened before the quota gate and any AI call.
+    await screen_user_input(user, "kojo_action", body.message)
     slot = await _kojo_gate(session, user, "kojo_action")
     try:
         return await KojoService().propose_action(

@@ -9,10 +9,12 @@ from src.config import settings
 from src.database import get_session
 from src.models.user import User
 from src.repositories.user_repository import UserRepository
+from src.services.account_safety_service import SUSPENDED_MESSAGE, remember_device
 from src.services.auth_service import AuthService
 from src.utils.exceptions import ValidationException
 from src.services.quota_service import is_exempt, normalize_device_id
 from src.utils.provider_policy import user_can_override_provider
+from src.utils.safety_notice import SAFETY_HEADER
 from src.utils.usage_context import bind_usage
 
 
@@ -33,6 +35,13 @@ async def get_current_user(
         user = await user_repo.get_by_id(user_id)
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
+        if user.banned_at is not None:
+            # GH #173: a ban takes effect on the very next request. No token
+            # revocation needed, the user row is loaded on every call anyway.
+            raise HTTPException(
+                status_code=403, detail=SUSPENDED_MESSAGE, headers={SAFETY_HEADER: "suspended"}
+            )
+        await remember_device(user, normalize_device_id(x_device_id))
         # Attribute any LLM tokens this request spends to the user (and, for
         # usage-limited users, the device, so per-device limits see them).
         # Limited routes (tests, flashcards, Kojo) re-bind with a feature name.

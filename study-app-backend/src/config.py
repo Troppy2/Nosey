@@ -57,6 +57,19 @@ class Settings(BaseSettings):
     # auto chain on 2026-09-25. Model id is env config like the Groq ones.
     openrouter_api_key: Optional[str] = Field(default=None, alias="OPENROUTER_API_KEY")
     openrouter_model: str = Field(default="minimax/minimax-m3", alias="OPENROUTER_MODEL")
+    # Content moderation (GH #173). OpenAI's moderation endpoint is free; it is
+    # the only thing this key is used for. Unset means moderation is off and
+    # every check fails open (logged as a moderation usage error).
+    openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
+    openai_moderation_model: str = Field(default="omni-moderation-latest", alias="OPENAI_MODERATION_MODEL")
+    moderation_timeout_seconds: float = Field(default=4.0, alias="MODERATION_TIMEOUT_SECONDS")
+    # Flags not tied to a standing ban are deleted after this many days.
+    content_flag_retention_days: int = Field(default=365, alias="CONTENT_FLAG_RETENTION_DAYS")
+    # GH #172: a deleted Google account cannot sign up again for this long.
+    account_recreate_cooldown_hours: int = Field(default=24, alias="ACCOUNT_RECREATE_COOLDOWN_HOURS")
+    # Keys the HMAC of Google ids kept in account_tombstones. Unset derives a
+    # key from JWT_SECRET, so rotating JWT_SECRET also forgets every tombstone.
+    tombstone_hmac_key: Optional[str] = Field(default=None, alias="TOMBSTONE_HMAC_KEY")
     environment: str = Field(default="production", alias="ENVIRONMENT")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     cors_origins: Any = Field(

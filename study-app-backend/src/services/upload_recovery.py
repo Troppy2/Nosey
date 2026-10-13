@@ -117,7 +117,7 @@ async def run_periodic_sweep(
     interval_s: float = SWEEP_INTERVAL_S,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
 ) -> None:
-    """Fail uploads stuck past the threshold, forever, until cancelled."""
+    """Fail uploads stuck past the threshold (and purge expired safety rows), forever, until cancelled."""
     while True:
         await sleep(interval_s)
         try:
@@ -128,3 +128,15 @@ async def run_periodic_sweep(
                 logger.warning("Upload sweep: %d uploads stuck in processing were failed", failed)
         except Exception as exc:
             logger.warning("Upload sweep failed: %r", exc)
+        # Same heartbeat: drop expired sign-up cooldowns and moderation flags
+        # past retention (GH #172/#173). Separate try so one never blocks the other.
+        try:
+            from src.services.account_safety_service import purge_expired_safety_rows
+
+            async with async_session_maker() as session:
+                tombstones, flags = await purge_expired_safety_rows(session)
+                await session.commit()
+            if tombstones or flags:
+                logger.info("Safety purge: %d expired tombstones, %d old flags", tombstones, flags)
+        except Exception as exc:
+            logger.warning("Safety purge failed: %r", exc)

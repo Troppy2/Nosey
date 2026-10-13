@@ -7,6 +7,7 @@ from src.models.user import User
 from src.schemas.folder_schema import FolderCreate, FolderResponse, FolderUpdate
 from src.services.folder_service import FolderService
 from src.utils.exceptions import ResourceNotFoundException, StudyAppException
+from src.services.account_safety_service import screen_user_input
 
 router = APIRouter(prefix="/folders", tags=["folders"])
 
@@ -25,6 +26,7 @@ async def create_folder(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> FolderResponse:
+    await screen_user_input(user, "folder", data.name, data.subject, data.description)
     try:
         return await FolderService().create_folder(user.id, data, session)
     except StudyAppException as exc:
@@ -58,6 +60,7 @@ async def update_folder(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> FolderResponse:
+    await screen_user_input(user, "folder", data.name, data.subject, data.description, data.kojo_persona)
     try:
         return await FolderService().update_folder(folder_id, user.id, data, session)
     except ResourceNotFoundException as exc:

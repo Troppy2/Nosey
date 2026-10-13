@@ -76,6 +76,15 @@ class User(Base, TimestampMixin):
     # reason as onboarding_completed_at: a per-browser flag replays every tour
     # on a new device.
     tours_seen: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # GH #173. A set banned_at locks the account out of every route (see
+    # get_current_user). banned_by is the admin's user id, NULL for an
+    # automatic ban by moderation.
+    banned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    ban_reason: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    banned_by: Mapped[Optional[int]] = mapped_column(BIGINT_ID, nullable=True)
+    # Last X-Device-Id seen, so a ban can also refuse guest sign-ups from that
+    # browser. A weak signal (clearing storage resets it), on purpose cheap.
+    last_device_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
 
     folders: Mapped[list[Folder]] = relationship(
         "Folder", back_populates="user", cascade="all, delete-orphan"

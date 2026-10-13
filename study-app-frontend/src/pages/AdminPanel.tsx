@@ -17,6 +17,7 @@ import { Dropdown } from "../components/Dropdown";
 import { Spinner } from "../components/Loaders";
 import { SkeletonList, SkeletonStatGrid } from "../components/Skeletons";
 import { AdminTokenUsage } from "../components/AdminTokenUsage";
+import { AdminModeration, BanModal } from "../components/AdminModeration";
 import {
   adminAuthenticate,
   clearAdminToken,
@@ -26,7 +27,9 @@ import {
   getAdminToken,
   getAdminTokenExpiresAt,
   getStoredUser,
+  banUser,
   setUserBeta,
+  unbanUser,
 } from "../lib/api";
 import type { AdminStats, AdminSurveysResponse, AdminUserRow } from "../lib/types";
 
@@ -115,6 +118,46 @@ export default function AdminPanel() {
   const [reauthing, setReauthing] = useState(false);
   const [betaUpdating, setBetaUpdating] = useState<AdminUserRow["id"] | null>(null);
   const [betaError, setBetaError] = useState<string | null>(null);
+  const [banTarget, setBanTarget] = useState<AdminUserRow | null>(null);
+  const [unbanning, setUnbanning] = useState<AdminUserRow["id"] | null>(null);
+
+  function replaceUser(updated: AdminUserRow) {
+    setUsers((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+  }
+
+  async function handleUnban(u: AdminUserRow) {
+    setBetaError(null);
+    setUnbanning(u.id);
+    try {
+      replaceUser(await unbanUser(u.id));
+    } catch (e) {
+      setBetaError(e instanceof Error ? e.message : "Failed to unban");
+    } finally {
+      setUnbanning(null);
+    }
+  }
+
+  // Ban / Unban cell shared by both rosters (GH #173). Admins cannot be banned.
+  function banCell(u: AdminUserRow) {
+    if (u.is_admin) return <span className="muted">-</span>;
+    if (u.banned_at) {
+      return (
+        <span className="admin-ban-cell">
+          <span className="admin-badge admin-badge--red" title={u.ban_reason ?? undefined}>
+            Banned
+          </span>
+          <Button variant="ghost" onClick={() => void handleUnban(u)} disabled={unbanning === u.id}>
+            Unban
+          </Button>
+        </span>
+      );
+    }
+    return (
+      <Button variant="danger-outline" onClick={() => setBanTarget(u)}>
+        Ban
+      </Button>
+    );
+  }
 
   async function handleSetBeta(u: AdminUserRow, isBeta: boolean) {
     if (isBeta === u.is_beta) return;
@@ -566,6 +609,19 @@ export default function AdminPanel() {
         </section>
       ) : null}
 
+      {authed ? <AdminModeration onUserChanged={replaceUser} /> : null}
+
+      {banTarget ? (
+        <BanModal
+          email={banTarget.email}
+          onCancel={() => setBanTarget(null)}
+          onConfirm={async (reason) => {
+            replaceUser(await banUser(banTarget.id, reason));
+            setBanTarget(null);
+          }}
+        />
+      ) : null}
+
       {/* Authenticated user roster */}
       {(() => {
         const realUsers = users.filter((u) => !u.email.endsWith("@nosey.guest"));
@@ -588,6 +644,7 @@ export default function AdminPanel() {
                         <th>Verified</th>
                         <th>Admin</th>
                         <th>Beta</th>
+                        <th>Status</th>
                         <th>Joined</th>
                       </tr>
                     </thead>
@@ -627,6 +684,7 @@ export default function AdminPanel() {
                               />
                             )}
                           </td>
+                          <td>{banCell(u)}</td>
                           <td className="admin-cell-date">
                             {new Date(u.created_at).toLocaleDateString()}
                           </td>
@@ -649,6 +707,7 @@ export default function AdminPanel() {
                       <tr>
                         <th>ID</th>
                         <th>Token (email)</th>
+                        <th>Status</th>
                         <th>Created</th>
                       </tr>
                     </thead>
@@ -657,6 +716,7 @@ export default function AdminPanel() {
                         <tr key={u.id}>
                           <td className="admin-cell-id">#{u.id}</td>
                           <td className="admin-cell-email">{u.email}</td>
+                          <td>{banCell(u)}</td>
                           <td className="admin-cell-date">
                             {new Date(u.created_at).toLocaleDateString()}
                           </td>

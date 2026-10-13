@@ -1,5 +1,6 @@
 import type {
   AdminStats,
+  FlagQueueResponse,
   AdminSurveysResponse,
   AdminTokenResponse,
   AdminUserRow,
@@ -74,6 +75,7 @@ import type {
 } from "./types";
 import { reportBackendHttpFailure, reportBackendNetworkFailure } from "./backendStatus";
 import { getDeviceId } from "./deviceId";
+import { reportSafety, SAFETY_HEADER } from "./safetyEvents";
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "https://noesy.onrender.com";
 const TOKEN_KEY = "nosey_access_token";
@@ -150,6 +152,8 @@ async function guardedFetch(url: string, init: RequestInit): Promise<Response> {
   try {
     const response = await fetch(url, { ...init, headers });
     reportBackendHttpFailure(response.status);
+    // Moderation outcome (support / warning / suspended), shown by SafetyModal.
+    reportSafety(response.headers.get(SAFETY_HEADER));
     return response;
   } catch (err) {
     const name = (err as { name?: string } | null)?.name;
@@ -2571,6 +2575,27 @@ export async function setUserBeta(userId: ID, isBeta: boolean): Promise<AdminUse
     method: "PATCH",
     body: JSON.stringify({ is_beta: isBeta }),
   });
+}
+
+// ── Moderation (GH #173) ──
+export async function banUser(userId: ID, reason: string): Promise<AdminUserRow> {
+  return adminRequest<AdminUserRow>(`/admin/users/${userId}/ban`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function unbanUser(userId: ID): Promise<AdminUserRow> {
+  return adminRequest<AdminUserRow>(`/admin/users/${userId}/unban`, { method: "POST" });
+}
+
+// Open flags by default; pass userId for one account's whole flag history.
+export async function fetchContentFlags(userId?: ID): Promise<FlagQueueResponse> {
+  return adminRequest<FlagQueueResponse>(userId != null ? `/admin/flags?user_id=${userId}` : "/admin/flags");
+}
+
+export async function dismissContentFlag(flagId: ID): Promise<void> {
+  await adminRequest<{ status: string }>(`/admin/flags/${flagId}/dismiss`, { method: "POST" });
 }
 
 export async function fetchAdminSurveys(): Promise<AdminSurveysResponse> {

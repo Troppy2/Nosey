@@ -106,6 +106,7 @@ _CLIENT_STRUGGLE_EVENTS = frozenset(
 from src.utils.exceptions import LLMException, ResourceNotFoundException
 from src.utils.logger import get_logger
 from src.utils.provider_policy import resolve_request_provider
+from src.services.account_safety_service import screen_user_input
 
 logger = get_logger(__name__)
 
@@ -139,6 +140,7 @@ async def kojo_leetcode_hint(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> LeetCodeHintResponse:
+    await screen_user_input(user, "leetcode_hint", body.message)
     try:
         result = await LeetCodeService().hint(
             title_slug=body.title_slug,
@@ -734,6 +736,7 @@ async def generate_custom_problem(
     body: LCGenerateCustomProblemRequest,
     user: User = Depends(get_current_user),
 ) -> LCGeneratedCustomProblem:
+    await screen_user_input(user, "leetcode_custom", body.hint, body.code)
     if not body.code.strip() and not body.hint.strip():
         raise HTTPException(status_code=400, detail="Paste some code or describe the problem first.")
     try:
@@ -766,6 +769,7 @@ async def generate_custom_problems_stream(
     as an SSE event the moment it finishes streaming so the UI can render them live.
     Errors are emitted as an "error" event (the stream itself stays 200), matching the
     Kojo chat stream contract."""
+    await screen_user_input(user, "leetcode_custom", *body.topics)
     topics_text = ", ".join(t.strip() for t in body.topics if t.strip()) or "general coding interview"
     provider = resolve_request_provider(user, body.provider)
 

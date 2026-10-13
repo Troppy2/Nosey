@@ -45,6 +45,7 @@ class AuthService:
         google_user = await self.verify_google_token(token)
         is_admin = str(google_user["email"]).lower() in settings.admin_emails
         repo = UserRepository(session)
+        await self._check_account_allowed(session, repo, str(google_user["google_id"]))
         user = await repo.create_or_update(
             google_id=str(google_user["google_id"]),
             email=str(google_user["email"]),
@@ -56,6 +57,31 @@ class AuthService:
         await repo.refresh_age_if_birthday(user)
         await session.commit()
         return self._token_response(user)
+
+    @staticmethod
+    async def _check_account_allowed(session: AsyncSession, repo: UserRepository, google_id: str) -> None:
+        """Refuse a banned account, or a NEW account inside the deletion cooldown.
+
+        GH #172/#173. An existing, unbanned user is never affected by a
+        tombstone: tombstones only stop a row from being created.
+        """
+        from src.services.account_safety_service import SUSPENDED_MESSAGE, active_tombstone
+        from src.utils.exceptions import ForbiddenException
+
+        existing = await repo.get_by_google_id(google_id)
+        if existing is not None:
+            if existing.banned_at is not None:
+                raise ForbiddenException(SUSPENDED_MESSAGE)
+            return
+        tombstone = await active_tombstone(session, google_id)
+        if tombstone is None:
+            return
+        if tombstone.reason == "banned":
+            raise ForbiddenException(SUSPENDED_MESSAGE)
+        until = tombstone.expires_at.strftime("%b %d, %H:%M UTC") if tombstone.expires_at else "later"
+        raise ForbiddenException(
+            f"This Google account was deleted recently. You can sign up again after {until}."
+        )
 
     def generate_jwt(self, user_id: int) -> str:
         expires_at = datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expiration_hours)

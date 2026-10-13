@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Sidebar } from "../components/Sidebar";
 import WaitingScreen from "../components/WaitingScreen";
 import { ToastHost } from "../components/ToastHost";
+import { SafetyModal } from "../components/SafetyModal";
 import {
   getBackendStatus,
   startBackendWatcher,
@@ -91,6 +92,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <ToastHost />
+      <SafetyModal />
       <BackendGate>
         <Routes>
         <Route path="/" element={<Landing />} />

@@ -19,6 +19,7 @@ from src.services.system_design_quiz_service import SystemDesignQuizService
 from src.services.system_design_service import SystemDesignService
 from src.utils.exceptions import LLMException, ResourceNotFoundException, StudyAppException
 from src.utils.logger import get_logger
+from src.services.account_safety_service import screen_user_input
 
 logger = get_logger(__name__)
 
@@ -120,6 +121,7 @@ async def grade_sd_quiz(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> SDQuizGradeResponse:
+    await screen_user_input(user, "system_design", body.notes, *(f.answer for f in body.frq), block_harmful=False)
     try:
         return await SystemDesignQuizService().grade(user.id, concept_id, body, session)
     except Exception as exc:

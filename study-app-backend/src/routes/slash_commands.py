@@ -14,6 +14,7 @@ from src.schemas.slash_command_schema import (
     SlashCommandResponse,
     SlashCommandUpdate,
 )
+from src.services.account_safety_service import screen_user_input
 
 router = APIRouter(prefix="/slash-commands", tags=["slash-commands"])
 
@@ -50,6 +51,7 @@ async def create_slash_command(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> SlashCommandResponse:
+    await screen_user_input(user, "slash_command", data.description, data.prompt)
     command = SlashCommand(user_id=user.id, **data.model_dump())
     session.add(command)
     try:
@@ -68,6 +70,7 @@ async def update_slash_command(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> SlashCommandResponse:
+    await screen_user_input(user, "slash_command", data.description, data.prompt)
     command = await get_user_command(command_id, user.id, session)
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(command, key, value)
