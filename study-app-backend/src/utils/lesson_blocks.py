@@ -57,7 +57,9 @@ def normalize_tts_script(raw: object) -> str:
     """
     if isinstance(raw, list):
         entries = [str(item or "").strip() for item in raw]
-        return json.dumps(entries) if any(entries) else ""
+        # ensure_ascii=False stores dashes and accents as themselves, not as
+        # backslash-u escapes: shorter, and readable in the database.
+        return json.dumps(entries, ensure_ascii=False) if any(entries) else ""
     return str(raw or "").strip()
 
 
