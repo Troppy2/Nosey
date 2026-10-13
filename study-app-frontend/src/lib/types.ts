@@ -453,7 +453,8 @@ export type AdminUserRow = {
 // A moderation hit on something a user typed (GH #173).
 export type ContentFlagRow = {
   id: ID;
-  user_id: ID;
+  // null when the account was deleted; the flag is kept for review.
+  user_id: ID | null;
   user_email: string;
   user_banned: boolean;
   user_is_admin: boolean;

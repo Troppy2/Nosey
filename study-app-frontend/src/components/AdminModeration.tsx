@@ -165,8 +165,11 @@ export function AdminModeration({ onUserChanged }: { onUserChanged: (user: Admin
             </div>
             <blockquote className="admin-flag-excerpt">{flag.excerpt}</blockquote>
             <div className="button-row">
-              {!historyFor ? (
-                <Button variant="ghost" onClick={() => setHistoryFor({ id: flag.user_id, email: flag.user_email })}>
+              {!historyFor && flag.user_id != null ? (
+                <Button
+                  variant="ghost"
+                  onClick={() => setHistoryFor({ id: flag.user_id as ID, email: flag.user_email })}
+                >
                   History
                 </Button>
               ) : null}
@@ -175,14 +178,20 @@ export function AdminModeration({ onUserChanged }: { onUserChanged: (user: Admin
                   Dismiss
                 </Button>
               ) : null}
-              {flag.user_is_admin ? null : flag.user_banned ? (
-                <Button variant="secondary" onClick={() => void unban(flag.user_id)} disabled={busyId === flag.user_id}>
+              {/* A deleted account has nothing to ban yet: its flags relink if
+                  the same Google account signs up again. */}
+              {flag.user_id == null || flag.user_is_admin ? null : flag.user_banned ? (
+                <Button
+                  variant="secondary"
+                  onClick={() => void unban(flag.user_id as ID)}
+                  disabled={busyId === flag.user_id}
+                >
                   Unban
                 </Button>
               ) : (
                 <Button
                   variant="danger-outline"
-                  onClick={() => setBanTarget({ id: flag.user_id, email: flag.user_email })}
+                  onClick={() => setBanTarget({ id: flag.user_id as ID, email: flag.user_email })}
                 >
                   Ban
                 </Button>

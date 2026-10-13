@@ -45,7 +45,7 @@ class AuthService:
         google_user = await self.verify_google_token(token)
         is_admin = str(google_user["email"]).lower() in settings.admin_emails
         repo = UserRepository(session)
-        await self._check_account_allowed(session, repo, str(google_user["google_id"]))
+        is_new = await self._check_account_allowed(session, repo, str(google_user["google_id"]))
         user = await repo.create_or_update(
             google_id=str(google_user["google_id"]),
             email=str(google_user["email"]),
@@ -55,15 +55,22 @@ class AuthService:
             is_admin=is_admin,
         )
         await repo.refresh_age_if_birthday(user)
+        if is_new:
+            # Flags a deleted account left behind follow the same Google
+            # account to its new row, so deleting can't reset the history.
+            from src.services.account_safety_service import relink_flags
+
+            await relink_flags(session, user)
         await session.commit()
         return self._token_response(user)
 
     @staticmethod
-    async def _check_account_allowed(session: AsyncSession, repo: UserRepository, google_id: str) -> None:
+    async def _check_account_allowed(session: AsyncSession, repo: UserRepository, google_id: str) -> bool:
         """Refuse a banned account, or a NEW account inside the deletion cooldown.
 
         GH #172/#173. An existing, unbanned user is never affected by a
-        tombstone: tombstones only stop a row from being created.
+        tombstone: tombstones only stop a row from being created. Returns True
+        when this sign-in will create a new account.
         """
         from src.services.account_safety_service import SUSPENDED_MESSAGE, active_tombstone
         from src.utils.exceptions import ForbiddenException
@@ -72,10 +79,10 @@ class AuthService:
         if existing is not None:
             if existing.banned_at is not None:
                 raise ForbiddenException(SUSPENDED_MESSAGE)
-            return
+            return False
         tombstone = await active_tombstone(session, google_id)
         if tombstone is None:
-            return
+            return True
         if tombstone.reason == "banned":
             raise ForbiddenException(SUSPENDED_MESSAGE)
         until = tombstone.expires_at.strftime("%b %d, %H:%M UTC") if tombstone.expires_at else "later"

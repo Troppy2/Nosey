@@ -6,7 +6,9 @@ GH #172 and GH #173.
   from the same browser.
 - account_tombstones: HMAC of the Google id of a deleted (24h cooldown) or
   banned (no expiry) account, checked before a new account is created.
-- content_flags: moderation hits on typed input, for admin review.
+- content_flags: moderation hits on typed input, for admin review. They
+  survive account deletion (user_id SET NULL) and relink by subject_hash if
+  the same Google account signs up again.
 
 Revision ID: 066_account_safety
 Revises: 065_question_answer_sheet
@@ -45,7 +47,8 @@ def upgrade() -> None:
     op.create_table(
         "content_flags",
         sa.Column("id", BIGINT, primary_key=True, autoincrement=True),
-        sa.Column("user_id", BIGINT, sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("user_id", BIGINT, sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("subject_hash", sa.String(length=64), nullable=True),
         sa.Column("feature", sa.String(length=40), nullable=False),
         sa.Column("severity", sa.String(length=16), nullable=False),
         sa.Column("categories", sa.String(length=255), nullable=False),
@@ -58,9 +61,11 @@ def upgrade() -> None:
     )
     op.create_index("ix_content_flags_user_created", "content_flags", ["user_id", "created_at"])
     op.create_index("ix_content_flags_unreviewed", "content_flags", ["reviewed_at", "created_at"])
+    op.create_index("ix_content_flags_subject_hash", "content_flags", ["subject_hash"])
 
 
 def downgrade() -> None:
+    op.drop_index("ix_content_flags_subject_hash", table_name="content_flags")
     op.drop_index("ix_content_flags_unreviewed", table_name="content_flags")
     op.drop_index("ix_content_flags_user_created", table_name="content_flags")
     op.drop_table("content_flags")

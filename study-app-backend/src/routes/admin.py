@@ -335,7 +335,8 @@ async def unban_user_route(
 
 class ContentFlagRow(BaseModel):
     id: int
-    user_id: int
+    # NULL when the account was deleted; the flag is kept for review.
+    user_id: Optional[int]
     user_email: str
     user_banned: bool
     user_is_admin: bool
@@ -366,7 +367,7 @@ async def list_flags(
     Pass user_id for one account's full flag history: the context an admin
     needs before banning.
     """
-    query = select(ContentFlag, User).join(User, User.id == ContentFlag.user_id)
+    query = select(ContentFlag, User).outerjoin(User, User.id == ContentFlag.user_id)
     if user_id is not None:
         query = query.where(ContentFlag.user_id == user_id)
     elif status == "open":
@@ -383,9 +384,9 @@ async def list_flags(
             ContentFlagRow(
                 id=flag.id,
                 user_id=flag.user_id,
-                user_email=user.email,
-                user_banned=user.banned_at is not None,
-                user_is_admin=user.is_admin,
+                user_email=user.email if user is not None else "(deleted account)",
+                user_banned=user is not None and user.banned_at is not None,
+                user_is_admin=user is not None and user.is_admin,
                 feature=flag.feature,
                 severity=flag.severity,
                 categories=flag.categories,

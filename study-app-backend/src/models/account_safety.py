@@ -41,9 +41,13 @@ class ContentFlag(Base):
     )
 
     id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(
-        BIGINT_ID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    # SET NULL, not CASCADE: deleting an account must not wipe flags an admin
+    # has not reviewed yet. subject_hash (HMAC of the Google id, as in
+    # account_tombstones) links them back if the same account signs up again.
+    user_id: Mapped[Optional[int]] = mapped_column(
+        BIGINT_ID, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    subject_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     # Where the text came from, e.g. "kojo_chat", "learning_track", "flashcards".
     feature: Mapped[str] = mapped_column(String(40), nullable=False)
     # "minors" | "harmful" | "self_harm"; drives what the user was shown.

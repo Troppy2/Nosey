@@ -322,3 +322,79 @@ def test_safety_notice_header_on_success_and_on_refusal():
     assert client.get("/notice").headers[SAFETY_HEADER] == "self-harm"
     assert SAFETY_HEADER not in client.get("/plain").headers
     assert client.get("/refused").headers[SAFETY_HEADER] == "warning"
+
+
+# ── Fail closed when a moderation failure looks forced (security review) ─────
+
+
+@pytest.mark.asyncio
+async def test_failure_on_very_long_input_fails_closed(maker, monkeypatch):
+    user = await _user(maker)
+    _moderation_returns(monkeypatch, LLMException("timeout"))
+    padding = "x" * (8000 * 17)  # needs more than one moderation call
+    with pytest.raises(HTTPException) as caught:
+        await safety.screen_user_input(user, "learning_lesson_edit", padding)
+    assert caught.value.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_one_account_failing_repeatedly_fails_closed(maker, monkeypatch):
+    user = await _user(maker)
+    _moderation_returns(monkeypatch, LLMException("rate limited"))
+    await safety.screen_user_input(user, "kojo_chat", "hi")  # 1st: open
+    await safety.screen_user_input(user, "kojo_chat", "hi")  # 2nd: open
+    with pytest.raises(HTTPException) as caught:  # 3rd from the same account
+        await safety.screen_user_input(user, "kojo_chat", "hi")
+    assert caught.value.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_real_outage_across_accounts_still_fails_open(maker, monkeypatch):
+    async with maker() as session:
+        session.add_all([
+            UsageEvent(user_id=900 + i, feature="moderation", duration_ms=0, success=False)
+            for i in range(6)
+        ])
+        await session.commit()
+    user = await _user(maker)
+    _moderation_returns(monkeypatch, LLMException("down"))
+    for _ in range(4):
+        await safety.screen_user_input(user, "kojo_chat", "hi")  # never raises
+
+
+# ── Flags outlive account deletion and relink (review finding 7) ─────────────
+
+
+@pytest.mark.asyncio
+async def test_flags_survive_deletion_and_relink_on_re_sign_up(maker, monkeypatch):
+    user = await _user(maker)
+    _moderation_returns(monkeypatch, _result(**{"illicit/violent": True}))
+    with pytest.raises(HTTPException):
+        await safety.screen_user_input(user, "kojo_chat", "weapon")
+
+    async with maker() as session:
+        await safety.detach_flags(session, user.id)
+        await session.delete(await session.get(User, user.id))
+        await session.commit()
+        flag = (await session.scalars(select(ContentFlag))).one()
+        assert flag.user_id is None and flag.subject_hash == safety.subject_hash("g1")
+
+        again = User(email="g1@x.com", google_id="g1")
+        session.add(again)
+        await session.flush()
+        assert await safety.relink_flags(session, again) == 1
+        await session.commit()
+        assert (await session.scalars(select(ContentFlag))).one().user_id == again.id
+
+
+@pytest.mark.asyncio
+async def test_purge_removes_old_flags_of_deleted_accounts(maker):
+    async with maker() as session:
+        session.add(ContentFlag(
+            user_id=None, subject_hash="c" * 64, feature="f", severity="harmful",
+            categories="c", excerpt="e", created_at=utcnow_naive() - timedelta(days=400),
+        ))
+        await session.commit()
+        _, flags = await safety.purge_expired_safety_rows(session)
+        await session.commit()
+        assert flags == 1
