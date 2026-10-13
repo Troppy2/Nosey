@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import io
 import math
 import re
 import warnings
@@ -162,30 +163,6 @@ _IMAGE_TOO_LARGE = "That image is too large to read. Try a smaller photo (under 
 _IMAGE_FORMATS = {"PNG", "JPEG"}
 
 
-def _check_image_header(path: str) -> None:
-    """Refuse an image before decoding it if its declared size is over the cap.
-
-    Pillow's Image.open reads only the header (no pixel decode), so the size
-    check costs nothing however large the declared image is. Pillow's own
-    decompression-bomb guard is promoted to an error as a second net.
-    """
-    from PIL import Image
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", Image.DecompressionBombWarning)
-        try:
-            with Image.open(path) as img:
-                width, height = img.size
-                fmt = img.format
-        except (Image.DecompressionBombError, Image.DecompressionBombWarning) as exc:
-            raise ValueError(_IMAGE_TOO_LARGE) from exc
-        except Exception as exc:
-            raise ValueError("That image could not be opened. Try a PNG or JPG.") from exc
-    if fmt not in _IMAGE_FORMATS:
-        raise ValueError("That image could not be opened. Try a PNG or JPG.")
-    if width * height > _IMAGE_MAX_PIXELS:
-        raise ValueError(_IMAGE_TOO_LARGE)
-
 _IMAGE_TRANSCRIBE_PROMPT = (
     "Transcribe this image exactly. It is a photo or scan from a student's studies: notes, a practice test, "
     "homework, or an answer sheet / mark scheme, printed or handwritten.\n"
@@ -200,24 +177,48 @@ _IMAGE_TRANSCRIBE_PROMPT = (
 )
 
 
+_IMAGE_UNREADABLE = "That image could not be opened. Try a PNG or JPG."
+
+
 def _image_jpeg_b64(path: str) -> str:
-    """The image as a base64 JPEG, scaled down to _IMAGE_MAX_EDGE. Runs in a worker thread."""
-    if fitz is None:
-        raise ValueError("Images can't be read on this server.")
-    _check_image_header(path)
-    try:
-        pixmap = fitz.Pixmap(path)
-    except Exception as exc:
-        raise ValueError("That image could not be opened. Try a PNG or JPG.") from exc
-    # Each conversion makes a full-size copy. Rebinding frees the previous one
-    # as soon as the new one exists, so at most two are alive at once.
-    if pixmap.alpha:
-        pixmap = fitz.Pixmap(pixmap, 0)
-    if pixmap.colorspace is None or pixmap.colorspace.n not in (1, 3):
-        pixmap = fitz.Pixmap(fitz.csRGB, pixmap)
-    while max(pixmap.width, pixmap.height) > _IMAGE_MAX_EDGE:
-        pixmap.shrink(1)
-    return base64.b64encode(pixmap.tobytes("jpeg", jpg_quality=88)).decode("ascii")
+    """The image as a base64 JPEG, scaled down to _IMAGE_MAX_EDGE. Runs in a worker thread.
+
+    One parser end to end (GH #171). The size check and the decode both run in
+    Pillow on the same open file: when one library checked the header and
+    another (MuPDF) decoded the pixels, a file the two read differently could
+    pass the check and still decode huge. Image.open reads only the header, so
+    an oversized image is refused before any pixel is decoded. Pillow's own
+    decompression-bomb guard is promoted to an error as a second net.
+    """
+    from PIL import Image, ImageOps
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", Image.DecompressionBombWarning)
+        try:
+            with Image.open(path) as img:
+                if img.format not in _IMAGE_FORMATS:
+                    raise ValueError(_IMAGE_UNREADABLE)
+                width, height = img.size
+                if width * height > _IMAGE_MAX_PIXELS:
+                    raise ValueError(_IMAGE_TOO_LARGE)
+                # JPEG can decode straight at a reduced scale (1/2, 1/4, 1/8),
+                # so a 48 MP photo never needs its full-size pixels in memory.
+                img.draft("RGB", (_IMAGE_MAX_EDGE, _IMAGE_MAX_EDGE))
+                img.load()
+                # Phone photos store rotation in EXIF; apply it so the vision
+                # model reads the page upright.
+                upright = ImageOps.exif_transpose(img)
+                rgb = upright.convert("RGB")
+                rgb.thumbnail((_IMAGE_MAX_EDGE, _IMAGE_MAX_EDGE))
+                buffer = io.BytesIO()
+                rgb.save(buffer, "JPEG", quality=88)
+        except ValueError:
+            raise
+        except (Image.DecompressionBombError, Image.DecompressionBombWarning) as exc:
+            raise ValueError(_IMAGE_TOO_LARGE) from exc
+        except Exception as exc:
+            raise ValueError(_IMAGE_UNREADABLE) from exc
+    return base64.b64encode(buffer.getvalue()).decode("ascii")
 
 
 async def transcribe_image_file(path: str) -> str:
