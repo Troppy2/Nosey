@@ -367,6 +367,39 @@ class McpOAuthService:
             token.revoked_at = utcnow_naive()
             await session.commit()
 
+    async def list_connections(self, session: AsyncSession, user_id: int) -> list[tuple[McpOAuthToken, str]]:
+        """The user's live connections (token row, app name), newest first.
+
+        Live = not revoked and the refresh token not expired; an expired one can
+        never call again, so listing it would only offer a pointless Disconnect.
+        """
+        rows = await session.execute(
+            select(McpOAuthToken, McpOAuthClient.client_name)
+            .join(McpOAuthClient, McpOAuthClient.client_id == McpOAuthToken.client_id)
+            .where(
+                McpOAuthToken.user_id == user_id,
+                McpOAuthToken.revoked_at.is_(None),
+                McpOAuthToken.refresh_expires_at > utcnow_naive(),
+            )
+            .order_by(McpOAuthToken.created_at.desc(), McpOAuthToken.id.desc())
+        )
+        return [(token, name) for token, name in rows.all()]
+
+    async def revoke_connection(self, session: AsyncSession, user_id: int, connection_id: int) -> bool:
+        """Disconnect one app (Settings). False when it is not the user's or already gone."""
+        result = await session.execute(
+            update(McpOAuthToken)
+            .where(
+                McpOAuthToken.id == connection_id,
+                McpOAuthToken.user_id == user_id,
+                McpOAuthToken.revoked_at.is_(None),
+            )
+            .values(revoked_at=utcnow_naive())
+            .execution_options(synchronize_session=False)
+        )
+        await session.commit()
+        return result.rowcount == 1
+
     async def authenticate(self, session: AsyncSession, raw_token: str) -> Optional[User]:
         """The user behind a live access token, or None. Ban checks are the caller's."""
         token = await session.scalar(

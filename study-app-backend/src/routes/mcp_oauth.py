@@ -6,10 +6,10 @@ The AI app talks to /.well-known/*, /oauth/register, /oauth/authorize,
 """
 import hashlib
 import json
-from datetime import timezone
+from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from slowapi.util import get_remote_address
@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
 from src.database import get_session
-from src.dependencies import get_beta_user
+from src.dependencies import get_beta_user, get_current_user
 from src.limiter import limiter
 from src.models.user import User
 from src.services.mcp_oauth_service import (
@@ -299,3 +299,37 @@ async def revoke(
 ) -> JSONResponse:
     await McpOAuthService().revoke(session, token)
     return JSONResponse(content={}, headers=_NO_STORE)
+
+
+# ---------------------------------------------------------------- Settings: connected apps
+
+class ConnectionResponse(BaseModel):
+    id: int
+    client_name: str
+    connected_at: datetime
+    last_used_at: Optional[datetime] = None
+
+
+@router.get("/oauth/connections", response_model=list[ConnectionResponse])
+async def list_connections(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[ConnectionResponse]:
+    rows = await McpOAuthService().list_connections(session, user.id)
+    return [
+        ConnectionResponse(
+            id=token.id, client_name=name, connected_at=token.created_at, last_used_at=token.last_used_at
+        )
+        for token, name in rows
+    ]
+
+
+@router.delete("/oauth/connections/{connection_id}", status_code=204, response_model=None)
+async def revoke_connection(
+    connection_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> None:
+    # Not beta-gated: a user who lost beta must still be able to disconnect.
+    if not await McpOAuthService().revoke_connection(session, user.id, connection_id):
+        raise HTTPException(status_code=404, detail="Connection not found")

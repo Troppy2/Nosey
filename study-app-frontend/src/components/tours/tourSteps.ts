@@ -28,6 +28,18 @@ const t = (name: string) => `[data-tour="${name}"]`;
 // Every claim here was checked against the code it describes. Keep it that
 // way: the practice run once shipped a line about flashcards that was false.
 export const TOURS: Record<TourId, TourDef> = {
+  settings: {
+    signedInOnly: true,
+    steps: [
+      {
+        element: t("connected-apps"),
+        title: "Connect Claude or ChatGPT",
+        body: "Copy the link here into Claude or ChatGPT as a custom connector. It can then read your folders and results, and build tests, flashcards and lessons for you. Disconnect it here any time.",
+        side: "top",
+        align: "start",
+      },
+    ],
+  },
   folders: {
     steps: [
       {

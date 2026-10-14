@@ -1136,3 +1136,11 @@ export type McpConsentRequest = {
   redirect_host: string;
   trust: "verified" | "local" | "unverified";
 };
+
+// Settings > Connected apps: one app the user connected through the MCP connector.
+export type McpConnection = {
+  id: number;
+  client_name: string;
+  connected_at: string;
+  last_used_at?: string | null;
+};

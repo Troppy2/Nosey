@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { CollapsibleSection } from "../components/CollapsibleSection";
+import { ConnectedApps } from "../components/ConnectedApps";
+import { usePageTour } from "../components/tours/usePageTour";
 import { ConfirmModal, TypeToConfirmModal } from "../components/ConfirmModal";
 import { Dropdown } from "../components/Dropdown";
 import { TextInput } from "../components/Field";
@@ -92,6 +94,8 @@ export default function Settings() {
   const ADMIN_EMAILS = ["jamesinah34@gmail.com", "jamesinah883@gmail.com"];
   const isAdmin = !guest && !!user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  // Only the Connected apps step so far, and that section is beta-only.
+  usePageTour("settings", !guest && betaMode);
   const initialized = useRef(false);
 
   async function loadClearedConversations() {
@@ -591,6 +595,8 @@ export default function Settings() {
             </Button>
           </div>
         </CollapsibleSection>
+
+        {!guest && betaMode ? <ConnectedApps /> : null}
 
         <h2 className="settings-group-title">Data &amp; history</h2>
 

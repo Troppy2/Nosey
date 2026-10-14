@@ -72,6 +72,7 @@ import type {
   TestTake,
   TokenUsageReport,
   UsageLimits,
+  McpConnection,
   McpConsentRequest,
 } from "./types";
 import { reportBackendHttpFailure, reportBackendNetworkFailure } from "./backendStatus";
@@ -377,7 +378,8 @@ export type TourId =
   | "matching"
   | "manage-flashcards"
   | "kojo"
-  | "quizlet-import";
+  | "quizlet-import"
+  | "settings";
 
 // Same-tab mirror of users.tours_seen, so a tour cannot replay in the moment
 // before the POST lands. The account is the source of truth.
@@ -2672,4 +2674,13 @@ export async function decideMcpConsentRequest(requestId: string, approve: boolea
     { method: "POST" },
   );
   return data.redirect_url;
+}
+
+// Settings > Connected apps (MCP connector).
+export async function fetchMcpConnections(): Promise<McpConnection[]> {
+  return request<McpConnection[]>("/oauth/connections");
+}
+
+export async function revokeMcpConnection(connectionId: number): Promise<void> {
+  await request<void>(`/oauth/connections/${connectionId}`, { method: "DELETE" });
 }

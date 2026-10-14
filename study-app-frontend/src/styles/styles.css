@@ -28618,3 +28618,24 @@ a.sd-chip.is-done:hover {
   background: var(--accent-info-tint);
   color: var(--accent-info-strong);
 }
+
+/* Settings > Connected apps (ConnectedApps.tsx): the connector link to copy */
+.connected-apps-url {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 14px;
+}
+
+.connected-apps-url code {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 8px 10px;
+  overflow-wrap: anywhere;
+  border-radius: var(--radius-lg);
+  background: var(--green-lightest);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}

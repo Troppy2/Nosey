@@ -123,7 +123,8 @@ export default function ConnectAuthorize() {
                 </li>
               </ul>
               <p className="small muted">
-                After you choose, you go back to <strong>{destination}</strong>.
+                After you choose, you go back to <strong>{destination}</strong>. You can disconnect it any time in
+                Settings.
               </p>
               <div className="button-row connect-actions">
                 <Button variant="ghost" disabled={deciding !== null} onClick={() => decide(false)}>
