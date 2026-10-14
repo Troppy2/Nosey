@@ -402,3 +402,78 @@ async def test_read_tools_for_tests_cards_and_modules(client, seeded, db_session
 
     lesson = await call("get_learning_module", {"module_id": module_id})
     assert lesson["lesson_markdown"] == "# Atoms" and lesson["quiz"][0]["correct_index"] == 1
+
+
+async def _approved_code(client: AsyncClient, redirect: str = REDIRECT) -> tuple[str, str, str]:
+    """Register + authorize + approve. Returns (client_id, code, verifier)."""
+    client_id = (await client.post("/oauth/register", json={"redirect_uris": [redirect]})).json()["client_id"]
+    verifier, challenge = _pkce()
+    auth = await client.get(
+        "/oauth/authorize",
+        params={
+            "response_type": "code",
+            "client_id": client_id,
+            "redirect_uri": redirect,
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+        },
+    )
+    request_id = parse_qs(urlsplit(auth.headers["location"]).query)["request"][0]
+    url = (await client.post(f"/oauth/requests/{request_id}/approve")).json()["redirect_url"]
+    return client_id, parse_qs(urlsplit(url).query)["code"][0], verifier
+
+
+async def test_code_redeemed_concurrently_mints_one_token_pair(client) -> None:
+    import asyncio
+
+    client_id, code, verifier = await _approved_code(client)
+    form = {"grant_type": "authorization_code", "code": code, "client_id": client_id, "code_verifier": verifier}
+    results = await asyncio.gather(*(client.post("/oauth/token", data=form) for _ in range(4)))
+    assert sorted(r.status_code for r in results) == [200, 400, 400, 400]
+
+
+async def test_refresh_used_concurrently_rotates_once(client) -> None:
+    import asyncio
+
+    tokens = await _connect(client)
+    form = {"grant_type": "refresh_token", "refresh_token": tokens["refresh_token"], "client_id": tokens["client_id"]}
+    results = await asyncio.gather(*(client.post("/oauth/token", data=form) for _ in range(4)))
+    assert sorted(r.status_code for r in results) == [200, 400, 400, 400]
+    winner = next(r for r in results if r.status_code == 200).json()
+    assert (await _rpc(client, winner["access_token"], "ping")).status_code == 200
+
+
+@pytest.mark.parametrize(
+    "redirect,trust",
+    [
+        ("https://claude.ai/api/mcp/auth_callback", "verified"),
+        ("https://chatgpt.com/connector_platform_oauth_redirect", "verified"),
+        ("http://localhost:33418/callback", "local"),
+        ("https://claude.ai.evil.example/cb", "unverified"),
+        ("cursor://anysphere.cursor-retrieval/oauth/callback", "unverified"),
+    ],
+)
+async def test_consent_trust_comes_from_redirect_host_not_name(client, redirect, trust) -> None:
+    # A phisher can name its client "Claude"; only the redirect host decides trust.
+    client_id = (
+        await client.post("/oauth/register", json={"client_name": "Claude", "redirect_uris": [redirect]})
+    ).json()["client_id"]
+    _, challenge = _pkce()
+    auth = await client.get(
+        "/oauth/authorize",
+        params={
+            "response_type": "code",
+            "client_id": client_id,
+            "redirect_uri": redirect,
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+        },
+    )
+    request_id = parse_qs(urlsplit(auth.headers["location"]).query)["request"][0]
+    assert (await client.get(f"/oauth/requests/{request_id}")).json()["trust"] == trust
+
+
+async def test_client_name_control_characters_stripped(client) -> None:
+    name = "Cla" + chr(7) + "ude" + chr(0)
+    reg = await client.post("/oauth/register", json={"client_name": name, "redirect_uris": [REDIRECT]})
+    assert reg.json()["client_name"] == "Claude"

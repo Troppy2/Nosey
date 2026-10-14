@@ -1123,6 +1123,8 @@ export type TokenUsageReport = {
 // A pending "connect an AI app" request on the MCP consent page.
 export type McpConsentRequest = {
   request_id: string;
+  // Self-declared by whoever registered the app; trust comes from the host.
   client_name: string;
   redirect_host: string;
+  trust: "verified" | "local" | "unverified";
 };

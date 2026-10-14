@@ -26,6 +26,7 @@ from src.services.mcp_oauth_service import (
     McpOAuthService,
     OAuthError,
     describe_redirect,
+    redirect_trust,
 )
 
 router = APIRouter(tags=["mcp-oauth"])
@@ -207,8 +208,11 @@ async def authorize(
 
 class ConsentRequestResponse(BaseModel):
     request_id: str
+    # Self-declared by whoever registered the client; never proof of identity.
     client_name: str
     redirect_host: str
+    # "verified" | "local" | "unverified": see redirect_trust.
+    trust: str
 
 
 class ConsentDecisionResponse(BaseModel):
@@ -229,6 +233,7 @@ async def get_consent_request(
         request_id=req.request_id,
         client_name=client.client_name,
         redirect_host=describe_redirect(req.redirect_uri),
+        trust=redirect_trust(req.redirect_uri),
     )
 
 

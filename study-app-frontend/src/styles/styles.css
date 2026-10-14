@@ -28584,6 +28584,27 @@ a.sd-chip.is-done:hover {
   justify-content: flex-end;
 }
 
+.connect-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  border-radius: var(--radius-lg);
+  background: rgba(217, 119, 6, 0.08);
+  line-height: 1.45;
+}
+
+.connect-warning svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--warning);
+}
+
+.connect-warning p {
+  margin: 0;
+}
+
 .connect-error {
   display: grid;
   gap: 14px;

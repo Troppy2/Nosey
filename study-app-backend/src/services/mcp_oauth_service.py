@@ -25,7 +25,7 @@ from datetime import timedelta
 from typing import Optional
 from urllib.parse import urlencode, urlsplit
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
@@ -48,6 +48,12 @@ _CUSTOM_SCHEME = re.compile(r"^[a-z][a-z0-9+.\-]*$")
 # the redirect URI, so javascript:/data: here would run script on Nosey's origin.
 _BLOCKED_SCHEMES = {"javascript", "data", "vbscript", "file", "about", "blob", "ftp", "ws", "wss"}
 _LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
+_CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
+# Callback hosts of AI apps we recognise. client_name is whatever the
+# registering party typed, so a phisher can register "Claude" with their own
+# redirect URI and send a victim the authorize link. The consent page therefore
+# trusts the destination host, never the name, and flags any other host.
+VERIFIED_REDIRECT_HOSTS = {"claude.ai", "claude.com", "chatgpt.com", "chat.openai.com"}
 
 
 class OAuthError(Exception):
@@ -114,6 +120,21 @@ def describe_redirect(redirect_uri: str) -> str:
     return parts.hostname or f"{parts.scheme}:"
 
 
+def redirect_trust(redirect_uri: str) -> str:
+    """How far the consent page can vouch for where the code goes.
+
+    "verified": a known AI app's https host. "local": loopback, an app on the
+    user's own computer (Claude Code); a remote attacker cannot receive it.
+    "unverified": anything else, shown with a warning.
+    """
+    parts = urlsplit(redirect_uri)
+    if parts.scheme == "https" and parts.hostname in VERIFIED_REDIRECT_HOSTS:
+        return "verified"
+    if parts.scheme == "http" and parts.hostname in _LOOPBACK_HOSTS:
+        return "local"
+    return "unverified"
+
+
 class McpOAuthService:
     async def register_client(
         self, session: AsyncSession, client_name: Optional[str], redirect_uris: list[str]
@@ -124,7 +145,7 @@ class McpOAuthService:
             validate_redirect_uri(uri)
         client = McpOAuthClient(
             client_id=f"nosey-{secrets.token_urlsafe(24)}",
-            client_name=(client_name or "").strip()[:120] or "AI app",
+            client_name=_CONTROL_CHARS.sub("", client_name or "").strip()[:120] or "AI app",
             redirect_uris=json.dumps(redirect_uris),
         )
         session.add(client)
@@ -195,12 +216,20 @@ class McpOAuthService:
 
     async def approve(self, session: AsyncSession, request_id: str, user: User) -> str:
         req, _ = await self.get_pending(session, request_id)
+        redirect_uri, state = req.redirect_uri, req.state
         code = secrets.token_urlsafe(32)
-        req.user_id = user.id
-        req.code_hash = hash_secret(code)
-        req.expires_at = utcnow_naive() + CODE_TTL
+        # Conditional update: of two concurrent approvals, only one mints a code.
+        minted = await session.execute(
+            update(McpOAuthRequest)
+            .where(McpOAuthRequest.id == req.id, McpOAuthRequest.code_hash.is_(None))
+            .values(user_id=user.id, code_hash=hash_secret(code), expires_at=utcnow_naive() + CODE_TTL)
+            .execution_options(synchronize_session=False)
+        )
+        if minted.rowcount != 1:
+            await session.rollback()
+            raise OAuthError("invalid_request", "This connection request was already used.", status_code=404)
         await session.commit()
-        return redirect_with(req.redirect_uri, {"code": code, "state": req.state})
+        return redirect_with(redirect_uri, {"code": code, "state": state})
 
     async def deny(self, session: AsyncSession, request_id: str) -> str:
         req, _ = await self.get_pending(session, request_id)
@@ -235,7 +264,18 @@ class McpOAuthService:
         if not hmac.compare_digest(_pkce_challenge(code_verifier), req.code_challenge):
             raise OAuthError("invalid_grant", "PKCE verification failed.")
 
-        req.used_at = now
+        # Claim the code atomically. Checking used_at above is not enough: two
+        # concurrent redemptions can both read it as unused. Only one of them
+        # flips it here, so one code can never mint two token pairs.
+        claimed = await session.execute(
+            update(McpOAuthRequest)
+            .where(McpOAuthRequest.id == req.id, McpOAuthRequest.used_at.is_(None))
+            .values(used_at=now)
+            .execution_options(synchronize_session=False)
+        )
+        if claimed.rowcount != 1:
+            await session.rollback()
+            raise OAuthError("invalid_grant", "The authorization code is invalid, expired or already used.")
         access, refresh = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
         session.add(
             McpOAuthToken(
@@ -256,9 +296,8 @@ class McpOAuthService:
     ) -> dict[str, object]:
         if not refresh_token or not client_id:
             raise OAuthError("invalid_request", "refresh_token and client_id are required.")
-        token = await session.scalar(
-            select(McpOAuthToken).where(McpOAuthToken.refresh_hash == hash_secret(refresh_token))
-        )
+        old_hash = hash_secret(refresh_token)
+        token = await session.scalar(select(McpOAuthToken).where(McpOAuthToken.refresh_hash == old_hash))
         now = utcnow_naive()
         if (
             token is None
@@ -267,14 +306,30 @@ class McpOAuthService:
             or token.client_id != client_id
         ):
             raise OAuthError("invalid_grant", "The refresh token is invalid, expired or revoked.")
-        # Rotate both in place: the old refresh token stops working now.
+        scope = token.scope
+        # Rotate both in place, conditional on the old refresh hash: of two
+        # concurrent refreshes with the same token, only one gets a new pair.
         access, refresh = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
-        token.access_hash = hash_secret(access)
-        token.refresh_hash = hash_secret(refresh)
-        token.access_expires_at = now + timedelta(seconds=settings.mcp_access_token_ttl_seconds)
-        token.refresh_expires_at = now + timedelta(days=settings.mcp_refresh_token_ttl_days)
+        rotated = await session.execute(
+            update(McpOAuthToken)
+            .where(
+                McpOAuthToken.id == token.id,
+                McpOAuthToken.refresh_hash == old_hash,
+                McpOAuthToken.revoked_at.is_(None),
+            )
+            .values(
+                access_hash=hash_secret(access),
+                refresh_hash=hash_secret(refresh),
+                access_expires_at=now + timedelta(seconds=settings.mcp_access_token_ttl_seconds),
+                refresh_expires_at=now + timedelta(days=settings.mcp_refresh_token_ttl_days),
+            )
+            .execution_options(synchronize_session=False)
+        )
+        if rotated.rowcount != 1:
+            await session.rollback()
+            raise OAuthError("invalid_grant", "The refresh token is invalid, expired or revoked.")
         await session.commit()
-        return self._token_response(access, refresh, token.scope)
+        return self._token_response(access, refresh, scope)
 
     async def revoke(self, session: AsyncSession, raw_token: Optional[str]) -> None:
         """RFC 7009: revoking an unknown token is not an error."""
