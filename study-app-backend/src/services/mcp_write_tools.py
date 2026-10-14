@@ -57,12 +57,12 @@ CONFIRM_FIELD = Field(
 )
 
 
-def _require_confirm(confirm: bool) -> None:
+def require_confirm(confirm: bool) -> None:
     if confirm is not True:
         raise ToolInputError("Nothing was deleted. Set confirm to true only after the user asked for this delete.")
 
 
-async def _screen(ctx: McpContext, *texts: Optional[str]) -> None:
+async def screen(ctx: McpContext, *texts: Optional[str]) -> None:
     """Same moderation as text typed into Nosey (off when no key is set)."""
     await screen_user_input(ctx.user, MODERATION_FEATURE, *texts)
 
@@ -248,7 +248,7 @@ class CreateTestArgs(ToolArgs):
 async def create_test(ctx: McpContext, args: CreateTestArgs) -> dict[str, Any]:
     await owned_folder(ctx, args.folder_id)
     _check_item_limits(args.items)
-    await _screen(ctx, args.title, args.description, *_all_texts(args.items))
+    await screen(ctx, args.title, args.description, *_all_texts(args.items))
     test = Test(
         folder_id=args.folder_id,
         title=args.title.strip(),
@@ -286,7 +286,7 @@ async def add_questions(ctx: McpContext, args: AddQuestionsArgs) -> dict[str, An
     if test is None:
         raise ResourceNotFoundException("Test")
     _check_item_limits(args.items)
-    await _screen(ctx, *_all_texts(args.items))
+    await screen(ctx, *_all_texts(args.items))
     written = await _write_items(ctx, test.id, args.items, start_order=await repo.get_max_display_order(test.id))
     questions = (await ctx.session.scalars(select(Question).where(Question.test_id == test.id))).all()
     test.test_type = _test_type(list(questions))
@@ -301,7 +301,7 @@ class EditTestArgs(ToolArgs):
 
 
 async def edit_test(ctx: McpContext, args: EditTestArgs) -> dict[str, Any]:
-    await _screen(ctx, args.title, args.description)
+    await screen(ctx, args.title, args.description)
     updated = await TestService().update_test(
         args.test_id, ctx.user.id, TestUpdate(title=args.title, description=args.description), ctx.session
     )
@@ -326,7 +326,7 @@ async def edit_question(ctx: McpContext, args: EditQuestionArgs) -> dict[str, An
     if question is None:
         raise ResourceNotFoundException("Question")
     qtype = question.question_type
-    await _screen(ctx, args.text, args.expected_answer, *((o.text for o in args.options) if args.options else ()))
+    await screen(ctx, args.text, args.expected_answer, *((o.text for o in args.options) if args.options else ()))
 
     if args.text is not None:
         question.question_text = args.text
@@ -377,7 +377,7 @@ async def edit_question_group(ctx: McpContext, args: EditGroupArgs) -> dict[str,
     group = await TestRepository(ctx.session).get_group_owned(args.group_id, args.test_id, ctx.user.id)
     if group is None:
         raise ResourceNotFoundException("Problem")
-    await _screen(ctx, args.setup, args.label)
+    await screen(ctx, args.setup, args.label)
     if args.setup is not None:
         group.stem = args.setup.strip()
     if args.label is not None:
@@ -392,7 +392,7 @@ class DeleteQuestionArgs(ToolArgs):
 
 
 async def delete_question(ctx: McpContext, args: DeleteQuestionArgs) -> dict[str, Any]:
-    _require_confirm(args.confirm)
+    require_confirm(args.confirm)
     await TestService().delete_question(args.question_id, ctx.user.id, ctx.session)
     return {"deleted_question_id": args.question_id}
 
@@ -403,7 +403,7 @@ class DeleteTestArgs(ToolArgs):
 
 
 async def delete_test(ctx: McpContext, args: DeleteTestArgs) -> dict[str, Any]:
-    _require_confirm(args.confirm)
+    require_confirm(args.confirm)
     await TestService().delete_test(args.test_id, ctx.user.id, ctx.session)
     return {"deleted_test_id": args.test_id}
 
@@ -422,7 +422,7 @@ class CreateFlashcardsArgs(ToolArgs):
 
 async def create_flashcards(ctx: McpContext, args: CreateFlashcardsArgs) -> dict[str, Any]:
     await owned_folder(ctx, args.folder_id)
-    await _screen(ctx, *(t for c in args.cards for t in (c.front, c.back)))
+    await screen(ctx, *(t for c in args.cards for t in (c.front, c.back)))
     cards = await FlashcardRepository(ctx.session).create_many(
         args.folder_id, [(c.front.strip(), c.back.strip()) for c in args.cards], CREATED_VIA
     )
@@ -449,7 +449,7 @@ class EditFlashcardArgs(ToolArgs):
 
 async def edit_flashcard(ctx: McpContext, args: EditFlashcardArgs) -> dict[str, Any]:
     card = await _owned_card(ctx, args.flashcard_id)
-    await _screen(ctx, args.front, args.back)
+    await screen(ctx, args.front, args.back)
     await FlashcardRepository(ctx.session).update(card, args.front or card.front, args.back or card.back)
     await ctx.session.commit()
     return {"flashcard_id": card.id, "front": card.front, "back": card.back}
@@ -461,7 +461,7 @@ class DeleteFlashcardsArgs(ToolArgs):
 
 
 async def delete_flashcards(ctx: McpContext, args: DeleteFlashcardsArgs) -> dict[str, Any]:
-    _require_confirm(args.confirm)
+    require_confirm(args.confirm)
     cards = (
         await ctx.session.scalars(
             select(Flashcard)
@@ -504,7 +504,7 @@ async def add_note(ctx: McpContext, args: AddNoteArgs) -> dict[str, Any]:
     )
     if duplicate is not None:
         raise ToolInputError(f"Identical content already exists as '{duplicate.file_name}' (note_id {duplicate.id}).")
-    await _screen(ctx, args.title, content)
+    await screen(ctx, args.title, content)
     title = (args.title or "").strip()
     if not title:
         first_line = next((line.strip() for line in content.splitlines() if line.strip()), "")
@@ -530,7 +530,7 @@ class DeleteNoteArgs(ToolArgs):
 
 
 async def delete_note(ctx: McpContext, args: DeleteNoteArgs) -> dict[str, Any]:
-    _require_confirm(args.confirm)
+    require_confirm(args.confirm)
     note = await ctx.session.scalar(
         select(FolderFile)
         .join(Folder, Folder.id == FolderFile.folder_id)
@@ -554,7 +554,7 @@ class CreateFolderArgs(ToolArgs):
 
 
 async def create_folder(ctx: McpContext, args: CreateFolderArgs) -> dict[str, Any]:
-    await _screen(ctx, args.name, args.subject, args.description)
+    await screen(ctx, args.name, args.subject, args.description)
     folder = await FolderService().create_folder(
         ctx.user.id, FolderCreate(name=args.name.strip(), subject=args.subject, description=args.description), ctx.session
     )
@@ -571,7 +571,7 @@ class RenameFolderArgs(ToolArgs):
 
 
 async def rename_folder(ctx: McpContext, args: RenameFolderArgs) -> dict[str, Any]:
-    await _screen(ctx, args.name, args.subject, args.description)
+    await screen(ctx, args.name, args.subject, args.description)
     folder = await FolderService().update_folder(
         args.folder_id,
         ctx.user.id,
