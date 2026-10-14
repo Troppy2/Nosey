@@ -66,6 +66,9 @@ class LearningTrack(Base, TimestampMixin):
     # Soft-archive: an archived track drops out of the folder's active slot
     # (freeing it for a new build) but is kept so the user can revisit it.
     is_archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    # How it was made: "mcp" when an AI app created it through the connector,
+    # NULL for everything made in Nosey. Analytics/debug only, never shown.
+    created_via: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
 
     folder: Mapped[Folder] = relationship("Folder")
     modules: Mapped[list[LearningModule]] = relationship(

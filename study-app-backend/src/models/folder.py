@@ -32,6 +32,9 @@ class Folder(Base, TimestampMixin):
     kojo_persona: Mapped[Optional[str]] = mapped_column(String(32))
     is_archived: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     avoid_repeat_questions: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # How it was made: "mcp" when an AI app created it through the connector,
+    # NULL for everything made in Nosey. Analytics/debug only, never shown.
+    created_via: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
 
     user: Mapped[User] = relationship("User", back_populates="folders")
     tests: Mapped[list[Test]] = relationship(

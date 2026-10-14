@@ -52,7 +52,7 @@ def _validate_mcq_options(options) -> None:
         raise ValidationException("Exactly one option must be marked correct")
 
 
-def _validate_answer_input(question_type: str, answer_input, code_language) -> None:
+def validate_answer_input(question_type: str, answer_input, code_language) -> None:
     """Custom mode: objective types answer by choice, FRQs by text/math/code."""
     if answer_input is None:
         if code_language:
@@ -425,7 +425,7 @@ class TestService:
             else:
                 # A stored language only carries over while the input stays code.
                 code_language = question.code_language if answer_input == "code" else None
-            _validate_answer_input(qtype, answer_input, code_language)
+            validate_answer_input(qtype, answer_input, code_language)
             question.answer_input = answer_input
             question.code_language = code_language if answer_input == "code" else None
         await session.commit()
@@ -463,7 +463,7 @@ class TestService:
         test = await session.scalar(stmt)
         if test is None:
             raise ResourceNotFoundException("Test")
-        _validate_answer_input(data.type, data.answer_input, data.code_language)
+        validate_answer_input(data.type, data.answer_input, data.code_language)
         display_order = await repo.get_max_display_order(test_id) + 1
         if data.type == "MCQ":
             _validate_mcq_options(data.options)

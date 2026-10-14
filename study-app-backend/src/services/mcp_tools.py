@@ -1,98 +1,45 @@
 """Tools the Nosey MCP connector exposes to AI apps (Claude, ChatGPT).
 
-The connecting app's own model writes the study content; these tools only
-read the user's library and (in later PRs) validate and save what the model
-wrote. No tool here calls Nosey's LLM providers.
-
-Each tool is a pydantic args model plus an async handler. The args model is
-both the advertised JSON Schema and the validator, so the two never drift.
-Handlers return a JSON-able dict; StudyAppException subclasses become tool
-errors the model can read and recover from.
+The connecting app's own model writes the study content; Nosey only reads the
+user's library (this module) and validates and saves what the model wrote
+(mcp_write_tools). No tool calls Nosey's LLM providers. The registry and
+call_tool live here; shared types are in mcp_tool_base.
 """
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Optional
+import logging
+from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from fastapi import HTTPException
+from limits import parse as parse_limit
+from pydantic import Field, ValidationError
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.models.folder import Folder
 from src.models.folder_file import FolderFile
 from src.models.learning_module import LearningModule, LearningTrack
-from src.models.user import User
-from src.repositories.folder_repository import FolderRepository
+from src.limiter import limiter
 from src.repositories.test_repository import TestRepository
 from src.services.flashcard_service import FlashcardService
 from src.services.folder_service import FolderService
 from src.services.grading_service import GradingService
+from src.services.mcp_tool_base import McpContext, McpTool, ToolArgs, dump, owned_folder
+from src.services.mcp_write_tools import WRITE_TOOLS
 from src.services.test_service import TestService
 from src.utils.exceptions import ResourceNotFoundException, StudyAppException
+
+logger = logging.getLogger(__name__)
 
 NOTE_PREVIEW_CHARS = 300
 NOTE_PAGE_DEFAULT = 40_000
 NOTE_PAGE_MAX = 100_000
 
 
-class ToolInputError(StudyAppException):
-    """Bad tool arguments; the message is shown to the model so it can retry."""
-
-
-@dataclass(frozen=True)
-class McpContext:
-    user: User
-    session: AsyncSession
-
-
-@dataclass(frozen=True)
-class McpTool:
-    name: str
-    title: str
-    description: str
-    args: type[BaseModel]
-    handler: Callable[[McpContext, Any], Awaitable[dict[str, Any]]]
-    read_only: bool = True
-    destructive: bool = False
-
-    def describe(self) -> dict[str, Any]:
-        schema = self.args.model_json_schema()
-        schema.pop("title", None)
-        return {
-            "name": self.name,
-            "title": self.title,
-            "description": self.description,
-            "inputSchema": schema,
-            "annotations": {
-                "title": self.title,
-                "readOnlyHint": self.read_only,
-                "destructiveHint": self.destructive,
-                "idempotentHint": self.read_only,
-                "openWorldHint": False,
-            },
-        }
-
-
-class _Args(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-
-def _dump(model: BaseModel) -> dict[str, Any]:
-    return model.model_dump(mode="json")
-
-
-async def _owned_folder(ctx: McpContext, folder_id: int) -> Folder:
-    folder = await FolderRepository(ctx.session).get_owned(folder_id, ctx.user.id)
-    if folder is None:
-        raise ResourceNotFoundException("Folder")
-    return folder
-
-
 # ---------------------------------------------------------------- folders
 
-class ListFoldersArgs(_Args):
+class ListFoldersArgs(ToolArgs):
     include_archived: bool = Field(default=False, description="Also list archived folders.")
 
 
@@ -119,12 +66,12 @@ async def list_folders(ctx: McpContext, args: ListFoldersArgs) -> dict[str, Any]
 
 # ---------------------------------------------------------------- notes
 
-class FolderArgs(_Args):
+class FolderArgs(ToolArgs):
     folder_id: int = Field(description="Folder id from list_folders.")
 
 
 async def list_folder_notes(ctx: McpContext, args: FolderArgs) -> dict[str, Any]:
-    await _owned_folder(ctx, args.folder_id)
+    await owned_folder(ctx, args.folder_id)
     rows = (
         await ctx.session.execute(
             select(
@@ -154,7 +101,7 @@ async def list_folder_notes(ctx: McpContext, args: FolderArgs) -> dict[str, Any]
     }
 
 
-class ReadNoteArgs(_Args):
+class ReadNoteArgs(ToolArgs):
     note_id: int = Field(description="note_id from list_folder_notes.")
     offset: int = Field(default=0, ge=0, description="Character offset to start reading from.")
     max_chars: int = Field(default=NOTE_PAGE_DEFAULT, ge=1, le=NOTE_PAGE_MAX)
@@ -185,10 +132,10 @@ async def read_note(ctx: McpContext, args: ReadNoteArgs) -> dict[str, Any]:
 
 async def list_tests(ctx: McpContext, args: FolderArgs) -> dict[str, Any]:
     tests = await TestService().list_tests(args.folder_id, ctx.user.id, ctx.session)
-    return {"tests": [_dump(t) for t in tests]}
+    return {"tests": [dump(t) for t in tests]}
 
 
-class TestArgs(_Args):
+class TestArgs(ToolArgs):
     test_id: int = Field(description="Test id from list_tests.")
 
 
@@ -212,7 +159,7 @@ async def get_test(ctx: McpContext, args: TestArgs) -> dict[str, Any]:
         "mode": _test_mode(test),
         "coding_language": test.coding_language,
         "generation_status": test.generation_status,
-        "questions": [_dump(q) for q in questions],
+        "questions": [dump(q) for q in questions],
     }
 
 
@@ -227,41 +174,41 @@ def _without_ink(row: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in row.items() if k not in _INK_FIELDS}
 
 
-class NoArgs(_Args):
+class NoArgs(ToolArgs):
     pass
 
 
 async def list_drafts(ctx: McpContext, args: NoArgs) -> dict[str, Any]:
     drafts = await GradingService().get_resumable_tests(ctx.user.id, ctx.session)
-    return {"drafts": [_dump(d) for d in drafts]}
+    return {"drafts": [dump(d) for d in drafts]}
 
 
 async def get_test_draft(ctx: McpContext, args: TestArgs) -> dict[str, Any]:
     draft = await GradingService().get_draft_attempt(args.test_id, ctx.user.id, ctx.session)
-    payload = _dump(draft)
+    payload = dump(draft)
     payload["answers"] = [_without_ink(a) for a in payload["answers"]]
     return payload
 
 
 async def list_test_attempts(ctx: McpContext, args: TestArgs) -> dict[str, Any]:
     attempts = await GradingService().list_attempts(args.test_id, ctx.user.id, ctx.session)
-    return {"attempts": [_dump(a) for a in attempts]}
+    return {"attempts": [dump(a) for a in attempts]}
 
 
-class AttemptArgs(_Args):
+class AttemptArgs(ToolArgs):
     attempt_id: int = Field(description="Attempt id from list_test_attempts.")
 
 
 async def get_attempt_result(ctx: McpContext, args: AttemptArgs) -> dict[str, Any]:
     detail = await GradingService().get_attempt_detail(args.attempt_id, ctx.user.id, ctx.session)
-    payload = _dump(detail)
+    payload = dump(detail)
     payload["answers"] = [_without_ink(a) for a in payload["answers"]]
     return payload
 
 
 # ---------------------------------------------------------------- flashcards
 
-class ListFlashcardsArgs(_Args):
+class ListFlashcardsArgs(ToolArgs):
     folder_id: int = Field(description="Folder id from list_folders.")
     limit: int = Field(default=200, ge=1, le=500)
     offset: int = Field(default=0, ge=0)
@@ -288,13 +235,13 @@ async def list_flashcards(ctx: McpContext, args: ListFlashcardsArgs) -> dict[str
 
 # ---------------------------------------------------------------- learning modules
 
-class ListTracksArgs(_Args):
+class ListTracksArgs(ToolArgs):
     folder_id: int = Field(description="Folder id from list_folders.")
     include_archived: bool = Field(default=False, description="Also list archived tracks.")
 
 
 async def list_learning_tracks(ctx: McpContext, args: ListTracksArgs) -> dict[str, Any]:
-    await _owned_folder(ctx, args.folder_id)
+    await owned_folder(ctx, args.folder_id)
     stmt = (
         select(LearningTrack)
         .where(LearningTrack.folder_id == args.folder_id)
@@ -328,7 +275,7 @@ async def list_learning_tracks(ctx: McpContext, args: ListTracksArgs) -> dict[st
     }
 
 
-class ModuleArgs(_Args):
+class ModuleArgs(ToolArgs):
     module_id: int = Field(description="Module id from list_learning_tracks.")
 
 
@@ -465,8 +412,14 @@ TOOLS: dict[str, McpTool] = {
             ModuleArgs,
             get_learning_module,
         ),
+        *WRITE_TOOLS,
     )
 }
+
+# Writes are capped per user on top of the per-token request limit on /mcp:
+# one call can create a whole test, so 30 a minute is plenty for real use and
+# keeps a runaway agent loop from flooding the library.
+_WRITE_LIMITS = (parse_limit("30/minute"), parse_limit("600/day"))
 
 
 def _format_validation_error(exc: ValidationError) -> str:
@@ -484,6 +437,11 @@ async def call_tool(ctx: McpContext, name: str, arguments: Any) -> tuple[dict[st
         args = tool.args.model_validate(arguments or {})
     except ValidationError as exc:
         return {"error": _format_validation_error(exc)}, True
+    user_id = ctx.user.id  # read now: a rollback below expires the user
+    if not tool.read_only:
+        for limit in _WRITE_LIMITS:
+            if not limiter.limiter.hit(limit, "mcp-write", str(user_id)):
+                return {"error": f"Too many changes in a short time (limit {limit}). Wait, then try again."}, True
     try:
         return await tool.handler(ctx, args), False
     except ResourceNotFoundException as exc:
@@ -491,3 +449,9 @@ async def call_tool(ctx: McpContext, name: str, arguments: Any) -> tuple[dict[st
     except StudyAppException as exc:
         await ctx.session.rollback()
         return {"error": str(exc)}, True
+    except HTTPException as exc:
+        # Moderation (screen_user_input) refuses with an HTTPException. Over
+        # MCP it becomes a tool error; the flag and any ban are already saved.
+        await ctx.session.rollback()
+        logger.info("MCP write %s refused for user %s: %s", name, user_id, exc.status_code)
+        return {"error": str(exc.detail)}, True

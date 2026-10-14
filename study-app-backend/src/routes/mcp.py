@@ -38,7 +38,10 @@ SERVER_INSTRUCTIONS = (
     "Nosey is the user's study app. Content is organized in folders; each folder holds "
     "uploaded notes, practice tests, flashcards and learning module tracks. Call "
     "list_folders first to find ids. Use read_note to ground new study material in what "
-    "the user uploaded."
+    "the user uploaded, and get_attempt_result to see what they got wrong. You write the "
+    "content; create_test, create_flashcards and add_note save it. Folders can be created "
+    "and renamed but never deleted. Only delete anything (confirm=true) when the user asked "
+    "for it. Share the url create_test returns."
 )
 
 # JSON-RPC error codes.
@@ -144,9 +147,13 @@ async def mcp_post(request: Request, session: AsyncSession = Depends(get_session
         name = params.get("name")
         if not isinstance(name, str) or name not in TOOLS:
             return _rpc_error(msg_id, INVALID_PARAMS, f"Unknown tool: {name}")
+        # Read before the call: a failed tool rolls the session back, which
+        # expires the loaded user, and touching user.id after that would lazy
+        # load outside the async context.
+        user_id = user.id
         payload, is_error = await call_tool(McpContext(user=user, session=session), name, params.get("arguments"))
         if is_error:
-            logger.info("MCP tool %s failed for user %s: %s", name, user.id, payload.get("error"))
+            logger.info("MCP tool %s failed for user %s: %s", name, user_id, payload.get("error"))
         return _rpc_result(
             msg_id,
             {

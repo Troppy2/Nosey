@@ -36,6 +36,9 @@ class Test(Base, TimestampMixin):
     # SHA-256 of the source notes used to generate this test. Lets a later test built
     # from the SAME notes find and avoid repeating these questions ("fresh questions").
     notes_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    # How it was made: "mcp" when an AI app created it through the connector,
+    # NULL for everything made in Nosey. Analytics/debug only, never shown.
+    created_via: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
 
     folder: Mapped[Folder] = relationship("Folder", back_populates="tests")
     questions: Mapped[list[Question]] = relationship(
