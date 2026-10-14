@@ -27,6 +27,7 @@ from src.services.file_service import FileService
 from src.services.kojo_context_cache import invalidate_folder
 from src.services.llm_service import LLMService
 from src.services.mcq_verification_service import MCQVerificationService, inflated_mcq_count
+from src.utils.answer_input import OBJECTIVE_TYPES, is_custom_mode
 from src.utils.exceptions import ResourceNotFoundException, ValidationException
 from src.utils.logger import get_logger
 from src.utils.validators import VALID_TEST_TYPES
@@ -49,6 +50,20 @@ def _validate_mcq_options(options) -> None:
         raise ValidationException("Options cannot be empty")
     if sum(1 for o in options if o.is_correct) != 1:
         raise ValidationException("Exactly one option must be marked correct")
+
+
+def _validate_answer_input(question_type: str, answer_input, code_language) -> None:
+    """Custom mode: objective types answer by choice, FRQs by text/math/code."""
+    if answer_input is None:
+        if code_language:
+            raise ValidationException("code_language needs answer_input 'code'")
+        return
+    if question_type in OBJECTIVE_TYPES and answer_input != "choice":
+        raise ValidationException(f"{question_type} questions are answered by choice, not '{answer_input}'")
+    if question_type not in OBJECTIVE_TYPES and answer_input == "choice":
+        raise ValidationException("A written question needs answer_input 'text', 'math' or 'code'")
+    if code_language and answer_input != "code":
+        raise ValidationException("code_language is only for answer_input 'code'")
 
 
 class TestService:
@@ -94,18 +109,23 @@ class TestService:
             "part_label": q.part_label,
         }
 
+    @staticmethod
+    def _input_fields(q) -> dict:
+        """Custom mode: the question's own input, None when it uses the test's."""
+        return {"answer_input": q.answer_input, "code_language": q.code_language}
+
     def _serialize_question_editable(self, q) -> QuestionEditable:
         qtype = q.question_type
         if qtype == "MCQ":
             return QuestionEditable(
                 id=q.id, type="MCQ", question_text=q.question_text,
                 options=[MCQOptionEditable(id=opt.id, text=opt.option_text, is_correct=opt.is_correct) for opt in q.mcq_options],
-                **self._group_fields(q),
+                **self._group_fields(q), **self._input_fields(q),
             )
         return QuestionEditable(
             id=q.id, type=qtype or "FRQ", question_text=q.question_text,
             expected_answer=q.frq_answer.expected_answer if q.frq_answer else None,
-            **self._group_fields(q),
+            **self._group_fields(q), **self._input_fields(q),
         )
 
     def _serialize_question_public(self, q) -> QuestionPublic:
@@ -115,7 +135,7 @@ class TestService:
             return QuestionPublic(
                 id=q.id, type=qtype, question_text=q.question_text,
                 options=[MCQOptionPublic(id=opt.id, text=opt.option_text) for opt in q.mcq_options],
-                **self._group_fields(q),
+                **self._group_fields(q), **self._input_fields(q),
             )
         # Ranking: shuffle so the stored correct order (display_order) is never revealed.
         if qtype == "RANK":
@@ -124,9 +144,12 @@ class TestService:
             return QuestionPublic(
                 id=q.id, type="RANK", question_text=q.question_text,
                 options=[MCQOptionPublic(id=opt.id, text=opt.option_text) for opt in shuffled],
-                **self._group_fields(q),
+                **self._group_fields(q), **self._input_fields(q),
             )
-        return QuestionPublic(id=q.id, type=qtype or "FRQ", question_text=q.question_text, **self._group_fields(q))
+        return QuestionPublic(
+            id=q.id, type=qtype or "FRQ", question_text=q.question_text,
+            **self._group_fields(q), **self._input_fields(q),
+        )
 
     async def create_test(
         self,
@@ -395,6 +418,16 @@ class TestService:
             await repo.update_mcq_options(question, [(o.text, o.is_correct) for o in data.options])
         elif qtype == "FRQ" and data.expected_answer is not None and question.frq_answer is not None:
             question.frq_answer.expected_answer = data.expected_answer
+        if "answer_input" in data.model_fields_set or "code_language" in data.model_fields_set:
+            answer_input = data.answer_input if "answer_input" in data.model_fields_set else question.answer_input
+            if "code_language" in data.model_fields_set:
+                code_language = data.code_language
+            else:
+                # A stored language only carries over while the input stays code.
+                code_language = question.code_language if answer_input == "code" else None
+            _validate_answer_input(qtype, answer_input, code_language)
+            question.answer_input = answer_input
+            question.code_language = code_language if answer_input == "code" else None
         await session.commit()
         refreshed = await repo.get_question_owned(question.id, user_id)
         assert refreshed is not None
@@ -430,6 +463,7 @@ class TestService:
         test = await session.scalar(stmt)
         if test is None:
             raise ResourceNotFoundException("Test")
+        _validate_answer_input(data.type, data.answer_input, data.code_language)
         display_order = await repo.get_max_display_order(test_id) + 1
         if data.type == "MCQ":
             _validate_mcq_options(data.options)
@@ -445,6 +479,8 @@ class TestService:
             )
         else:
             raise ValidationException("type must be MCQ or FRQ")
+        question.answer_input = data.answer_input
+        question.code_language = data.code_language if data.answer_input == "code" else None
         await session.commit()
         refreshed = await repo.get_question_owned(question.id, user_id)
         assert refreshed is not None
@@ -516,6 +552,7 @@ class TestService:
             is_math_mode=test.is_math_mode,
             is_coding_mode=test.is_coding_mode,
             coding_language=test.coding_language,
+            is_custom_mode=is_custom_mode(test.questions),
             questions=questions,
             generation_status=test.generation_status,
             generation_error=test.generation_error,

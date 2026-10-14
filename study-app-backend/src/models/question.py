@@ -44,6 +44,12 @@ class Question(Base):
         BIGINT_ID, ForeignKey("question_groups.id", ondelete="SET NULL"), nullable=True, index=True
     )
     part_label: Mapped[Optional[str]] = mapped_column(String(8))
+    # Custom mode: how this question is answered, one of "choice", "text",
+    # "math", "code" (see utils/answer_input.py). None = use the test's mode,
+    # which is every question Nosey generates and every pre-Custom question.
+    answer_input: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
+    # Language of a "code" question; None falls back to tests.coding_language.
+    code_language: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
     test: Mapped[Test] = relationship("Test", back_populates="questions")
     mcq_options: Mapped[list[MCQOption]] = relationship(

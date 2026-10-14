@@ -79,7 +79,13 @@ export type Question = {
   expected_answer?: string | null;
   group?: QuestionGroup | null;
   part_label?: string | null;
+  // Custom mode: how this question is answered. null = the test's mode.
+  answer_input?: AnswerInput | null;
+  code_language?: string | null;
 };
+
+// "choice" is for MCQ/TF/MS/RANK; written questions use text, math or code.
+export type AnswerInput = "choice" | "text" | "math" | "code";
 
 export type MCQOptionEditable = {
   id: ID;
@@ -125,6 +131,8 @@ export type TestTake = {
   is_math_mode?: boolean;
   is_coding_mode?: boolean;
   coding_language?: string | null;
+  // True when any question sets its own input: shows the "Custom" badge.
+  is_custom_mode?: boolean;
   questions: Question[];
   // Streaming generation: present while/after the test is generated in the background.
   generation_status?: string;

@@ -28610,3 +28610,11 @@ a.sd-chip.is-done:hover {
   gap: 14px;
   justify-items: start;
 }
+
+/* Custom mode badge (TakeTest header): a test whose questions each pick their
+   own input. Same shape as .math-mode-badge, in the info accent so it reads
+   apart from STEM green. */
+.custom-mode-badge {
+  background: var(--accent-info-tint);
+  color: var(--accent-info-strong);
+}

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -47,6 +47,9 @@ class QuestionPublic(BaseModel):
     # group are shown together under its setup.
     group: Optional[QuestionGroupPublic] = None
     part_label: Optional[str] = None
+    # Custom mode (utils/answer_input.py): None = use the test's mode.
+    answer_input: Optional[str] = None
+    code_language: Optional[str] = None
 
 
 class QuestionEditable(BaseModel):
@@ -57,6 +60,9 @@ class QuestionEditable(BaseModel):
     expected_answer: Optional[str] = None
     group: Optional[QuestionGroupPublic] = None
     part_label: Optional[str] = None
+    # Custom mode (utils/answer_input.py): None = use the test's mode.
+    answer_input: Optional[str] = None
+    code_language: Optional[str] = None
 
 
 class QuestionCreate(BaseModel):
@@ -64,6 +70,8 @@ class QuestionCreate(BaseModel):
     question_text: str = Field(min_length=1)
     options: list[MCQOptionInput] = Field(default_factory=list)
     expected_answer: Optional[str] = None
+    answer_input: Optional[Literal["choice", "text", "math", "code"]] = None
+    code_language: Optional[str] = Field(default=None, max_length=50)
 
 
 class PrettierProposal(BaseModel):
@@ -78,6 +86,9 @@ class QuestionUpdate(BaseModel):
     question_text: Optional[str] = Field(default=None, min_length=1)
     options: Optional[list[MCQOptionInput]] = None
     expected_answer: Optional[str] = None
+    # Sent explicitly as null to clear back to the test's mode.
+    answer_input: Optional[Literal["choice", "text", "math", "code"]] = None
+    code_language: Optional[str] = Field(default=None, max_length=50)
 
 
 class TestResponse(BaseModel):
@@ -143,6 +154,8 @@ class TestTakeResponse(BaseModel):
     is_math_mode: bool = False
     is_coding_mode: bool = False
     coding_language: Optional[str] = None
+    # True when any question sets its own input: shows the "Custom" badge.
+    is_custom_mode: bool = False
     questions: list[QuestionPublic]
     # Streaming generation: lets the take-test screen render questions as they arrive
     # and keep polling until generation finishes.

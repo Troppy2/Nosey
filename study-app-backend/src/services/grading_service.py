@@ -37,6 +37,7 @@ from src.schemas.attempt_schema import (
 from src.schemas.test_schema import WeaknessResponse
 from src.services.llm_service import LLMService
 from src.services.ocr_service import OcrService, is_read_from_drawing
+from src.utils.answer_input import question_modes
 from src.utils.exceptions import ResourceNotFoundException, ValidationException
 from src.utils.logger import get_logger
 from typing import Optional
@@ -206,9 +207,9 @@ class GradingService:
         await session.commit()
         notes = "\n\n".join(note.content for note in test.notes)
 
-        is_math_mode = getattr(test, "is_math_mode", False)
-        is_coding_mode = getattr(test, "is_coding_mode", False)
-        coding_language = getattr(test, "coding_language", None) or "Python"
+        # Math/coding handling is decided per question (question_modes): a
+        # Custom-mode test mixes inputs, and a question without its own input
+        # uses the test's mode, exactly as before Custom mode.
 
         # Transcribe any scratch-pad drawings first, bounded by a semaphore so
         # a submission with several drawings does not fire unbounded
@@ -234,7 +235,7 @@ class GradingService:
             qid
             for qid, ans in submitted_by_id.items()
             if ans.work_image
-            and self._drawing_matters(question_by_id[qid], ans.answer, is_math_mode, is_coding_mode)
+            and self._drawing_matters(question_by_id[qid], ans.answer, *question_modes(question_by_id[qid], test)[:2])
             and not self._readable(work_by_question_id.get(qid))
         }
 
@@ -258,13 +259,14 @@ class GradingService:
             if question.id in needs_input:
                 return None
             work = work_by_question_id.get(question.id)
+            q_math, q_coding, q_language = question_modes(question, test)
             grade = await self._grade_question(
                 question,
-                self._answer_for_grading(question, submitted.answer, work, is_math_mode, is_coding_mode),
+                self._answer_for_grading(question, submitted.answer, work, q_math, q_coding),
                 notes,
-                is_math_mode=is_math_mode,
-                is_coding_mode=is_coding_mode,
-                coding_language=coding_language,
+                is_math_mode=q_math,
+                is_coding_mode=q_coding,
+                coding_language=q_language,
                 work=work,
                 related=related_context(question, ordered, context_answers, verdicts),
             )
@@ -311,7 +313,7 @@ class GradingService:
                     question,
                     user_answer=submitted.answer,
                     is_correct=False,
-                    is_math=is_math_mode and question.question_type == "FRQ",
+                    is_math=question_modes(question, test)[0] and question.question_type == "FRQ",
                     work_transcript=work_transcript,
                     ocr_status=OCR_STATUS_NEEDS_INPUT,
                     work_strokes=strokes,
@@ -343,7 +345,7 @@ class GradingService:
                 reasoning=grade.reasoning,
                 confidence=grade.confidence,
                 flagged_uncertain=grade.flagged_uncertain,
-                is_math=is_math_mode and question.question_type == "FRQ",
+                is_math=question_modes(question, test)[0] and question.question_type == "FRQ",
                 work_transcript=work_transcript,
                 ocr_status=ocr_status,
             ))
@@ -550,8 +552,7 @@ class GradingService:
         if row.ocr_status != OCR_STATUS_NEEDS_INPUT:
             raise ValidationException("This answer is not waiting for a redo")
 
-        is_math_mode = getattr(test, "is_math_mode", False)
-        is_coding_mode = getattr(test, "is_coding_mode", False)
+        q_math, q_coding, q_language = question_modes(question, test)
         work = await self._transcribe(question_id, body.work_image, ocr_engine) if body.work_image else None
         if work is not None and not work.transcript:
             work = None
@@ -567,11 +568,11 @@ class GradingService:
             answers, verdicts = await self._stored_context(attempt.id, session)
             grade = await self._grade_question(
                 question,
-                self._answer_for_grading(question, body.answer, work, is_math_mode, is_coding_mode),
+                self._answer_for_grading(question, body.answer, work, q_math, q_coding),
                 notes,
-                is_math_mode=is_math_mode,
-                is_coding_mode=is_coding_mode,
-                coding_language=getattr(test, "coding_language", None) or "Python",
+                is_math_mode=q_math,
+                is_coding_mode=q_coding,
+                coding_language=q_language,
                 work=work,
                 related=related_context(question, list(test.questions), answers, verdicts),
             )
@@ -605,7 +606,7 @@ class GradingService:
                 reasoning=grade.reasoning,
                 confidence=grade.confidence,
                 flagged_uncertain=grade.flagged_uncertain,
-                is_math=is_math_mode and question.question_type == "FRQ",
+                is_math=question_modes(question, test)[0] and question.question_type == "FRQ",
                 work_transcript=work_transcript,
                 ocr_status=OCR_STATUS_RESOLVED,
             )] + later,
@@ -632,9 +633,8 @@ class GradingService:
         """
         ordered = list(test.questions)
         changed = [q for q in ordered if q.id in changed_ids and q.group_id is not None]
-        if not changed or getattr(test, "is_coding_mode", False):
+        if not changed:
             return []
-        is_math_mode = getattr(test, "is_math_mode", False)
         notes = "\n\n".join(note.content for note in test.notes)
         repo = AttemptRepository(session)
         answers, verdicts = await self._stored_context(attempt_id, session)
@@ -645,6 +645,11 @@ class GradingService:
             for question in parts[first + 1:]:
                 if question.id in changed_ids or question.question_type != "FRQ":
                     continue
+                # Code parts are not regraded with context, as for a whole
+                # coding test before Custom mode.
+                q_math, q_coding, _ = question_modes(question, test)
+                if q_coding:
+                    continue
                 row = await repo.get_answer(attempt_id, question.id)
                 if row is None or row.ocr_status == OCR_STATUS_NEEDS_INPUT:
                     continue
@@ -653,9 +658,9 @@ class GradingService:
                 work = OcrResult(transcript=transcript, confidence=1.0, engine="stored") if transcript else None
                 grade = await self._grade_question(
                     question,
-                    self._answer_for_grading(question, typed, work, is_math_mode, False),
+                    self._answer_for_grading(question, typed, work, q_math, False),
                     notes,
-                    is_math_mode=is_math_mode,
+                    is_math_mode=q_math,
                     work=work,
                     related=related_context(question, ordered, answers, verdicts),
                 )
@@ -673,7 +678,7 @@ class GradingService:
                     reasoning=grade.reasoning,
                     confidence=grade.confidence,
                     flagged_uncertain=grade.flagged_uncertain,
-                    is_math=is_math_mode and question.question_type == "FRQ",
+                    is_math=question_modes(question, test)[0] and question.question_type == "FRQ",
                     work_transcript=row.work_transcript,
                     ocr_status=row.ocr_status,
                 ))
@@ -700,8 +705,6 @@ class GradingService:
             a for a in await repo.list_answers(attempt.id)
             if a.ocr_status == OCR_STATUS_NEEDS_INPUT and (not wanted or a.question_id in wanted)
         ]
-        is_math_mode = getattr(test, "is_math_mode", False)
-        is_coding_mode = getattr(test, "is_coding_mode", False)
         notes = "\n\n".join(note.content for note in test.notes)
 
         async def _grade(row) -> FRQGrade:
@@ -712,11 +715,12 @@ class GradingService:
                     feedback="Skipped. Your drawing couldn't be read, so this answer was graded as blank.",
                     confidence=0.0,
                 )
+            q_math, q_coding, q_language = question_modes(question, test)
             return await self._grade_question(
                 question, row.user_answer, notes,
-                is_math_mode=is_math_mode,
-                is_coding_mode=is_coding_mode,
-                coding_language=getattr(test, "coding_language", None) or "Python",
+                is_math_mode=q_math,
+                is_coding_mode=q_coding,
+                coding_language=q_language,
                 work=None,
             )
 
@@ -740,7 +744,7 @@ class GradingService:
                 reasoning=grade.reasoning,
                 confidence=grade.confidence,
                 flagged_uncertain=grade.flagged_uncertain,
-                is_math=bool(question and is_math_mode and question.question_type == "FRQ"),
+                is_math=bool(question and question_modes(question, test)[0] and question.question_type == "FRQ"),
                 work_transcript=row.work_transcript,
                 ocr_status=OCR_STATUS_SKIPPED,
             ))
@@ -1050,7 +1054,6 @@ class GradingService:
             raise ResourceNotFoundException("Attempt")
         held = any(answer.ocr_status == OCR_STATUS_NEEDS_INPUT for answer in attempt.answers)
         pending_strokes = await repo.get_pending_strokes(attempt.id) if held else {}
-        is_math_mode = bool(attempt.test and getattr(attempt.test, "is_math_mode", False))
         return AttemptDetail(
             id=attempt.id,
             attempt_number=attempt.attempt_number,
@@ -1073,7 +1076,12 @@ class GradingService:
                     if answer.confidence_score is not None
                     else None,
                     flagged_uncertain=answer.flagged_uncertain,
-                    is_math=bool(is_math_mode and answer.question and answer.question.question_type == "FRQ"),
+                    is_math=bool(
+                        attempt.test
+                        and answer.question
+                        and answer.question.question_type == "FRQ"
+                        and question_modes(answer.question, attempt.test)[0]
+                    ),
                     work_transcript=answer.work_transcript,
                     ocr_status=answer.ocr_status,
                     work_strokes=pending_strokes.get(answer.question_id),

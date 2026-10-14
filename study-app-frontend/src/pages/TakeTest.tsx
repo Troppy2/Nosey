@@ -1,6 +1,6 @@
 import Editor from "@monaco-editor/react";
 import KojoMascot from "../components/KojoMascot";
-import { AlertCircle, ArrowLeft, ArrowRight, Atom, Bookmark, Calculator, Check, ChevronDown, ChevronUp, Code2, Eraser, Flag, GraduationCap, Highlighter, LayoutGrid, Loader2, NotebookPen, Send, Sparkles, Strikethrough, Undo2, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, Atom, Bookmark, Calculator, Check, ChevronDown, ChevronUp, Code2, Eraser, Flag, GraduationCap, Highlighter, LayoutGrid, Loader2, NotebookPen, Send, SlidersHorizontal, Sparkles, Strikethrough, Undo2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -30,7 +30,7 @@ import { applyTextHighlights, clearTextHighlights, getSelectionSignature, HIGHLI
 import { buildScreens, fullQuestionText, screenAnchor, type QuestionScreens } from "../lib/questionScreens";
 import { formatCodingProblem } from "../lib/codingProblemFormat";
 import { useSettings } from "../lib/useSettings";
-import type { DraftAttemptAnswer, KojoTestRef, Question, SubmittedAnswer, TestTake } from "../lib/types";
+import type { AnswerInput, DraftAttemptAnswer, KojoTestRef, Question, SubmittedAnswer, TestTake } from "../lib/types";
 
 // Monaco ids that differ from the lowercased display name. Monaco has no OCaml
 // grammar, so it borrows F# (same ML family) for highlighting.
@@ -539,6 +539,12 @@ export default function TakeTest() {
   const isMathMode = Boolean(test?.is_math_mode);
   const isCodingMode = Boolean(test?.is_coding_mode);
   const codingLanguage = test?.coding_language ?? "python";
+  const isCustomMode = Boolean(test?.is_custom_mode);
+  // Custom mode: a question's own input wins; without one it uses the test's
+  // mode, so every non-Custom test renders exactly as before.
+  const inputFor = (item: Question): AnswerInput =>
+    item.answer_input ?? (isCodingMode ? "code" : isMathMode ? "math" : "text");
+  const languageFor = (item: Question) => item.code_language ?? codingLanguage;
 
   // Letter keys A-D to select MCQ options
   useEffect(() => {
@@ -765,13 +771,13 @@ export default function TakeTest() {
           <MSQuestion question={item} answer={answers[item.id]} onAnswer={setAnswer} />
         ) : item.type === "RANK" ? (
           <RankQuestion question={item} answer={answers[item.id]} onAnswer={setAnswer} />
-        ) : isCodingMode ? (
+        ) : inputFor(item) === "code" ? (
           <div className="code-editor-wrap">
             <label className="field-label">Your code</label>
             <div className="code-editor-frame">
               <Editor
                 height="320px"
-                language={MONACO_LANGUAGE_IDS[codingLanguage.toLowerCase()] ?? codingLanguage.toLowerCase()}
+                language={MONACO_LANGUAGE_IDS[languageFor(item).toLowerCase()] ?? languageFor(item).toLowerCase()}
                 value={answers[item.id] ?? ""}
                 onChange={(val) => setAnswer(val ?? "")}
                 theme="vs-dark"
@@ -786,10 +792,10 @@ export default function TakeTest() {
               />
             </div>
             <p className="muted" style={{ fontSize: "0.8rem", marginTop: 6 }}>
-              Write your solution in {codingLanguage}. Your code will be reviewed by AI.
+              Write your solution in {languageFor(item)}. Your code will be reviewed by AI.
             </p>
           </div>
-        ) : isMathMode ? (
+        ) : inputFor(item) === "math" ? (
           <MathInput
             key={item.id}
             value={answers[item.id] ?? ""}
@@ -804,7 +810,7 @@ export default function TakeTest() {
             placeholder="Use the details from your notes..."
           />
         )}
-        {isMathMode && betaMode ? (
+        {inputFor(item) === "math" && betaMode ? (
           <ScratchPadTrigger
             questionText={fullQuestionText(item)}
             data={workStrokes[item.id] ?? EMPTY_SCRATCH_PAD}
@@ -868,13 +874,19 @@ export default function TakeTest() {
           <div>
             <strong>
               {test.title}
-              {isMathMode && (
+              {isCustomMode && (
+                <span className="math-mode-badge custom-mode-badge">
+                  <SlidersHorizontal size={12} />
+                  Custom
+                </span>
+              )}
+              {isMathMode && !isCustomMode && (
                 <span className="math-mode-badge">
                   <Atom size={12} />
                   STEM
                 </span>
               )}
-              {isCodingMode && (
+              {isCodingMode && !isCustomMode && (
                 <span className="math-mode-badge" style={{ background: "var(--blue-light, #ebf8ff)", color: "var(--blue-dark, #2b6cb0)" }}>
                   <Code2 size={12} />
                   {codingLanguage}
@@ -1109,7 +1121,7 @@ export default function TakeTest() {
                 onTouchEnd={toolsEnabled ? captureHighlight : undefined}
               >
                 {/* Older coding problems are one run-on paragraph; lay them out in sections. */}
-                <MarkdownContent content={isCodingMode ? formatCodingProblem(question.question_text) : question.question_text} />
+                <MarkdownContent content={inputFor(question) === "code" ? formatCodingProblem(question.question_text) : question.question_text} />
               </div>
               {renderAnswer(question)}
             </Card>
