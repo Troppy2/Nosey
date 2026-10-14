@@ -91,10 +91,18 @@ def validate_redirect_uri(uri: str) -> None:
     """https anywhere, http only on loopback, or a private-use app scheme."""
     if not uri or len(uri) > _MAX_URI_LENGTH:
         raise OAuthError("invalid_redirect_uri", "Redirect URI is missing or too long.")
+    # Parser differentials: browsers treat "\" as "/" and drop tabs/newlines,
+    # Python's urlsplit does not. "https://evil.com\@claude.ai/cb" is host
+    # claude.ai to Python but evil.com to a browser, which would let a phisher
+    # pass as a verified app. Refuse anything the two could read differently.
+    if "\\" in uri or any(ch.isspace() or ord(ch) < 0x20 or ord(ch) == 0x7F for ch in uri):
+        raise OAuthError("invalid_redirect_uri", "Redirect URI contains characters that are not allowed.")
     parts = urlsplit(uri)
     scheme = parts.scheme.lower()
     if parts.fragment:
         raise OAuthError("invalid_redirect_uri", "Redirect URI must not contain a fragment.")
+    if "@" in parts.netloc:
+        raise OAuthError("invalid_redirect_uri", "Redirect URI must not contain a user name or password.")
     if scheme == "https":
         if not parts.hostname:
             raise OAuthError("invalid_redirect_uri", "Redirect URI needs a host.")
@@ -128,6 +136,20 @@ def redirect_trust(redirect_uri: str) -> str:
     "unverified": anything else, shown with a warning.
     """
     parts = urlsplit(redirect_uri)
+    # Only vouch when Python and a browser must agree on the host: no "\",
+    # no whitespace, no userinfo, and the netloc is exactly host[:port].
+    netloc = parts.netloc.lower()
+    if netloc.startswith("[") and "]" in netloc:
+        bare_host = netloc[1 : netloc.index("]")]
+    else:
+        bare_host = netloc.rsplit(":", 1)[0] if ":" in netloc else netloc
+    if (
+        "\\" in redirect_uri
+        or "@" in netloc
+        or any(ch.isspace() or ord(ch) < 0x20 for ch in redirect_uri)
+        or bare_host != (parts.hostname or "")
+    ):
+        return "unverified"
     if parts.scheme == "https" and parts.hostname in VERIFIED_REDIRECT_HOSTS:
         return "verified"
     if parts.scheme == "http" and parts.hostname in _LOOPBACK_HOSTS:

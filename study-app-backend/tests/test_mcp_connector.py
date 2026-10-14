@@ -329,7 +329,18 @@ async def test_non_beta_user_is_refused(client, db_session_maker) -> None:
 
 @pytest.mark.parametrize(
     "uri",
-    ["javascript:alert(1)", "data:text/html,x", "http://evil.example/cb", "https://claude.ai/cb#frag", ""],
+    [
+        "javascript:alert(1)",
+        "data:text/html,x",
+        "http://evil.example/cb",
+        "https://claude.ai/cb#frag",
+        "",
+        # Parser differentials: Python sees host claude.ai, a browser sees evil.com.
+        "https://evil.com\\@claude.ai/cb",
+        "https://evil.com@claude.ai/cb",
+        "https://claude.ai/c b",
+        "https://claude.ai/cb" + chr(9),
+    ],
 )
 async def test_redirect_uri_rejects_dangerous_values(uri) -> None:
     with pytest.raises(OAuthError):
@@ -477,3 +488,14 @@ async def test_client_name_control_characters_stripped(client) -> None:
     name = "Cla" + chr(7) + "ude" + chr(0)
     reg = await client.post("/oauth/register", json={"client_name": name, "redirect_uris": [REDIRECT]})
     assert reg.json()["client_name"] == "Claude"
+
+
+async def test_redirect_trust_refuses_parser_differentials() -> None:
+    from src.services.mcp_oauth_service import redirect_trust
+
+    assert redirect_trust("https://claude.ai/api/mcp/auth_callback") == "verified"
+    assert redirect_trust("https://claude.ai:443/cb") == "verified"
+    assert redirect_trust("http://[::1]:5000/cb") == "local"
+    # A row stored before registration-time checks must still not pass as verified.
+    assert redirect_trust("https://evil.com\\@claude.ai/cb") == "unverified"
+    assert redirect_trust("https://evil.com@claude.ai/cb") == "unverified"
