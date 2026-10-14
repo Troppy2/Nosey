@@ -28,6 +28,7 @@ from src.repositories.folder_repository import FolderRepository
 from src.repositories.test_repository import TestRepository
 from src.services.flashcard_service import FlashcardService
 from src.services.folder_service import FolderService
+from src.services.grading_service import GradingService
 from src.services.test_service import TestService
 from src.utils.exceptions import ResourceNotFoundException, StudyAppException
 
@@ -215,6 +216,49 @@ async def get_test(ctx: McpContext, args: TestArgs) -> dict[str, Any]:
     }
 
 
+# ---------------------------------------------------------------- drafts + results
+
+# Scratch-pad ink (stroke JSON) is large and useless to a model; the OCR
+# transcript of the same drawing stays in the result.
+_INK_FIELDS = ("work_strokes",)
+
+
+def _without_ink(row: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in row.items() if k not in _INK_FIELDS}
+
+
+class NoArgs(_Args):
+    pass
+
+
+async def list_drafts(ctx: McpContext, args: NoArgs) -> dict[str, Any]:
+    drafts = await GradingService().get_resumable_tests(ctx.user.id, ctx.session)
+    return {"drafts": [_dump(d) for d in drafts]}
+
+
+async def get_test_draft(ctx: McpContext, args: TestArgs) -> dict[str, Any]:
+    draft = await GradingService().get_draft_attempt(args.test_id, ctx.user.id, ctx.session)
+    payload = _dump(draft)
+    payload["answers"] = [_without_ink(a) for a in payload["answers"]]
+    return payload
+
+
+async def list_test_attempts(ctx: McpContext, args: TestArgs) -> dict[str, Any]:
+    attempts = await GradingService().list_attempts(args.test_id, ctx.user.id, ctx.session)
+    return {"attempts": [_dump(a) for a in attempts]}
+
+
+class AttemptArgs(_Args):
+    attempt_id: int = Field(description="Attempt id from list_test_attempts.")
+
+
+async def get_attempt_result(ctx: McpContext, args: AttemptArgs) -> dict[str, Any]:
+    detail = await GradingService().get_attempt_detail(args.attempt_id, ctx.user.id, ctx.session)
+    payload = _dump(detail)
+    payload["answers"] = [_without_ink(a) for a in payload["answers"]]
+    return payload
+
+
 # ---------------------------------------------------------------- flashcards
 
 class ListFlashcardsArgs(_Args):
@@ -365,6 +409,38 @@ TOOLS: dict[str, McpTool] = {
             "FRQ answers, and multi-part group setups.",
             TestArgs,
             get_test,
+        ),
+        McpTool(
+            "list_drafts",
+            "List unfinished tests",
+            "List every test the user started and left unfinished, with how many questions "
+            "they answered so far. Read one with get_test_draft.",
+            NoArgs,
+            list_drafts,
+        ),
+        McpTool(
+            "get_test_draft",
+            "Get a test draft",
+            "Get the answers the user has typed so far on an unfinished test. Pair with "
+            "get_test to see the questions they belong to.",
+            TestArgs,
+            get_test_draft,
+        ),
+        McpTool(
+            "list_test_attempts",
+            "List results for a test",
+            "List every submitted attempt of a test, newest first, with score and date.",
+            TestArgs,
+            list_test_attempts,
+        ),
+        McpTool(
+            "get_attempt_result",
+            "Get an attempt's results",
+            "Get one submitted attempt question by question: the user's answer, the correct "
+            "answer, whether it was right, and the grader's feedback. Use it to find what the "
+            "user gets wrong before building new practice.",
+            AttemptArgs,
+            get_attempt_result,
         ),
         McpTool(
             "list_flashcards",

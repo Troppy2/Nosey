@@ -112,7 +112,8 @@ export default function ConnectAuthorize() {
               )}
               <ul className="connect-scopes">
                 <li>
-                  <Check size={16} /> Read your folders, notes, tests, flashcards and learning modules
+                  <Check size={16} /> Read your folders, notes, tests, flashcards and learning modules, plus your
+                  unfinished tests and past results
                 </li>
                 <li>
                   <Check size={16} /> Create and rename folders (never delete them)

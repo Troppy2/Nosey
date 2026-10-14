@@ -499,3 +499,63 @@ async def test_redirect_trust_refuses_parser_differentials() -> None:
     # A row stored before registration-time checks must still not pass as verified.
     assert redirect_trust("https://evil.com\\@claude.ai/cb") == "unverified"
     assert redirect_trust("https://evil.com@claude.ai/cb") == "unverified"
+
+
+async def test_drafts_and_results_are_readable(client, seeded, db_session_maker) -> None:
+    from datetime import datetime
+
+    from src.models.question import Question
+    from src.models.test import Test as TestRow
+    from src.models.user_answer import UserAnswer
+    from src.models.user_attempt import UserAttempt
+
+    user_id = seeded["beta"].id
+    async with db_session_maker() as session:
+        test = TestRow(folder_id=seeded["folder_id"], title="Unit 2", test_type="FRQ_only")
+        session.add(test)
+        await session.flush()
+        question = Question(test_id=test.id, question_text="Define osmosis", question_type="FRQ", display_order=0)
+        session.add(question)
+        await session.flush()
+        done = UserAttempt(
+            user_id=user_id, test_id=test.id, attempt_number=1, status="submitted",
+            total_score=0, total_questions=1, correct_count=0,
+        )
+        draft = UserAttempt(
+            user_id=user_id, test_id=test.id, attempt_number=2, status="in_progress", exited_at=datetime(2026, 10, 1),
+        )
+        session.add_all([done, draft])
+        await session.flush()
+        session.add_all(
+            [
+                UserAnswer(
+                    attempt_id=done.id, question_id=question.id, user_answer="water moves",
+                    is_correct=False, ai_feedback="Mention the membrane.", work_strokes="[[1,2,3]]",
+                ),
+                UserAnswer(attempt_id=draft.id, question_id=question.id, user_answer="half typed", work_strokes="[[9]]"),
+            ]
+        )
+        await session.commit()
+        test_id, attempt_id = test.id, done.id
+
+    access = (await _connect(client))["access_token"]
+
+    async def call(name: str, arguments: dict) -> dict:
+        result = (await _rpc(client, access, "tools/call", {"name": name, "arguments": arguments})).json()["result"]
+        assert result["isError"] is False, result
+        return result["structuredContent"]
+
+    drafts = await call("list_drafts", {})
+    assert [d["test_id"] for d in drafts["drafts"]] == [test_id]
+
+    draft_view = await call("get_test_draft", {"test_id": test_id})
+    assert draft_view["answers"][0]["user_answer"] == "half typed"
+    assert "work_strokes" not in draft_view["answers"][0]
+
+    attempts = await call("list_test_attempts", {"test_id": test_id})
+    assert [a["id"] for a in attempts["attempts"]] == [attempt_id]
+
+    result = await call("get_attempt_result", {"attempt_id": attempt_id})
+    answer = result["answers"][0]
+    assert answer["user_answer"] == "water moves" and answer["feedback"] == "Mention the membrane."
+    assert "work_strokes" not in answer
