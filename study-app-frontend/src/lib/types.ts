@@ -1119,3 +1119,10 @@ export type TokenUsageReport = {
   by_feature: Array<TokenBucket & { feature: string }>;
   by_provider: Array<TokenBucket & { provider: string }>;
 };
+
+// A pending "connect an AI app" request on the MCP consent page.
+export type McpConsentRequest = {
+  request_id: string;
+  client_name: string;
+  redirect_host: string;
+};

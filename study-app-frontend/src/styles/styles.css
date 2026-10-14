@@ -28551,3 +28551,41 @@ a.sd-chip.is-done:hover {
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* MCP connector consent page (ConnectAuthorize.tsx), reuses the sign-in shell */
+.connect-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.connect-scopes {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.connect-scopes li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.45;
+}
+
+.connect-scopes svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--green-dark);
+}
+
+.connect-actions {
+  justify-content: flex-end;
+}
+
+.connect-error {
+  display: grid;
+  gap: 14px;
+  justify-items: start;
+}

@@ -70,6 +70,15 @@ class Settings(BaseSettings):
     # Keys the HMAC of Google ids kept in account_tombstones. Unset derives a
     # key from JWT_SECRET, so rotating JWT_SECRET also forgets every tombstone.
     tombstone_hmac_key: Optional[str] = Field(default=None, alias="TOMBSTONE_HMAC_KEY")
+    # MCP connector (Claude, ChatGPT). FRONTEND_URL hosts the consent page the
+    # OAuth flow sends the user to. MCP_ISSUER_URL is this backend's public
+    # base URL, used as the OAuth issuer and the MCP resource; unset falls back
+    # to the request's own base URL, which is fine locally but not behind a
+    # proxy that terminates TLS.
+    frontend_url: str = Field(default="https://nosey.lol", alias="FRONTEND_URL")
+    mcp_issuer_url: Optional[str] = Field(default=None, alias="MCP_ISSUER_URL")
+    mcp_access_token_ttl_seconds: int = Field(default=3600, alias="MCP_ACCESS_TOKEN_TTL_SECONDS")
+    mcp_refresh_token_ttl_days: int = Field(default=30, alias="MCP_REFRESH_TOKEN_TTL_DAYS")
     environment: str = Field(default="production", alias="ENVIRONMENT")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     cors_origins: Any = Field(

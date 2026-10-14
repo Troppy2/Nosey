@@ -25,6 +25,7 @@ from src.models.lc_sync import (
 )
 from src.models.learning_module import LearningModule, LearningTrack
 from src.models.llm_token_usage import LLMTokenUsage
+from src.models.mcp_oauth import McpOAuthClient, McpOAuthRequest, McpOAuthToken
 from src.models.mcq_option import MCQOption
 from src.models.mock_interview import MockInterviewSession
 from src.models.note import Note
@@ -68,6 +69,9 @@ __all__ = [
     "LearningModule",
     "LearningTrack",
     "LLMTokenUsage",
+    "McpOAuthClient",
+    "McpOAuthRequest",
+    "McpOAuthToken",
     "MCQOption",
     "MockInterviewSession",
     "SDConceptProgress",

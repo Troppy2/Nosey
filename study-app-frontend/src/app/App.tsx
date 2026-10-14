@@ -23,6 +23,7 @@ import FolderDetail from "../pages/FolderDetail";
 import Folders from "../pages/Folders";
 import Landing from "../pages/Landing";
 import SignIn from "../pages/SignIn";
+import ConnectAuthorize from "../pages/ConnectAuthorize";
 import KojoMode from "../pages/KojoMode";
 import LeetCodeMode from "../pages/LeetCodeMode";
 import { isAuthenticated, isGuestSession, scopeKey } from "../lib/api";
@@ -97,6 +98,7 @@ export default function App() {
         <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/sign-in" element={<SignIn />} />
+        <Route path="/connect/authorize" element={<ConnectAuthorize />} />
         <Route element={<RequireAuth><Sidebar /></RequireAuth>}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/folders" element={<Folders />} />

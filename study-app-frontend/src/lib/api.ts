@@ -72,6 +72,7 @@ import type {
   TestTake,
   TokenUsageReport,
   UsageLimits,
+  McpConsentRequest,
 } from "./types";
 import { reportBackendHttpFailure, reportBackendNetworkFailure } from "./backendStatus";
 import { getDeviceId } from "./deviceId";
@@ -2656,4 +2657,19 @@ export async function gradeSystemDesignQuiz(
     `/system-design/quiz/${encodeURIComponent(conceptId)}/grade`,
     { method: "POST", body: JSON.stringify(payload) },
   );
+}
+
+// MCP connector consent page: an AI app (Claude, ChatGPT) asked to connect to
+// the user's Nosey library. Approving returns the app's callback URL with a
+// one-time code; denying returns it with access_denied.
+export async function fetchMcpConsentRequest(requestId: string): Promise<McpConsentRequest> {
+  return request<McpConsentRequest>(`/oauth/requests/${encodeURIComponent(requestId)}`);
+}
+
+export async function decideMcpConsentRequest(requestId: string, approve: boolean): Promise<string> {
+  const data = await request<{ redirect_url: string }>(
+    `/oauth/requests/${encodeURIComponent(requestId)}/${approve ? "approve" : "deny"}`,
+    { method: "POST" },
+  );
+  return data.redirect_url;
 }
