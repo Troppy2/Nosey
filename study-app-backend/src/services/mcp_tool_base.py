@@ -62,7 +62,9 @@ class ToolArgs(BaseModel):
 
 
 def dump(model: BaseModel) -> dict[str, Any]:
-    return model.model_dump(mode="json")
+    # Nulls are dropped: a missing key reads the same to a model and every
+    # null field is tokens the connecting app pays for on each call.
+    return model.model_dump(mode="json", exclude_none=True)
 
 
 async def owned_folder(ctx: McpContext, folder_id: int) -> Folder:

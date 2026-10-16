@@ -157,8 +157,9 @@ async def mcp_post(request: Request, session: AsyncSession = Depends(get_session
         return _rpc_result(
             msg_id,
             {
-                "content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False)}],
-                "structuredContent": payload,
+                # Text only, compact separators. Also sending structuredContent
+                # makes some clients pass the payload to the model twice.
+                "content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False, separators=(",", ":"))}],
                 "isError": is_error,
             },
         )
