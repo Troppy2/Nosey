@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
 from src.database import get_session
-from src.dependencies import get_beta_user, get_current_user
+from src.dependencies import get_account_user, get_current_user
 from src.limiter import limiter
 from src.models.user import User
 from src.services.mcp_oauth_service import (
@@ -223,7 +223,7 @@ class ConsentDecisionResponse(BaseModel):
 async def get_consent_request(
     request_id: str,
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_beta_user),
+    user: User = Depends(get_account_user),
 ):
     try:
         req, client = await McpOAuthService().get_pending(session, request_id)
@@ -241,7 +241,7 @@ async def get_consent_request(
 async def approve_consent_request(
     request_id: str,
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_beta_user),
+    user: User = Depends(get_account_user),
 ):
     try:
         url = await McpOAuthService().approve(session, request_id, user)
@@ -254,7 +254,7 @@ async def approve_consent_request(
 async def deny_consent_request(
     request_id: str,
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_beta_user),
+    user: User = Depends(get_account_user),
 ):
     try:
         url = await McpOAuthService().deny(session, request_id)
@@ -330,6 +330,6 @@ async def revoke_connection(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> None:
-    # Not beta-gated: a user who lost beta must still be able to disconnect.
+    # Any user, guests included: disconnecting must never be refused.
     if not await McpOAuthService().revoke_connection(session, user.id, connection_id):
         raise HTTPException(status_code=404, detail="Connection not found")

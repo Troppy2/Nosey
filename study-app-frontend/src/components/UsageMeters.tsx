@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchUsageLimits } from "../lib/api";
+import { fetchUsageLimits, isGuestSession } from "../lib/api";
 import type { UsageFeature, UsageLimits } from "../lib/types";
 
 const FEATURE_COPY: Record<UsageFeature["feature"], { name: string; hint: string }> = {
@@ -120,6 +120,12 @@ export function UsageMeters() {
   }
 
   const exempt = usage.exempt || !usage.limits_enabled;
+  // Tip once any meter is at 80%+: work done over the connector runs on the
+  // other app's model, so it never touches Nosey's usage limits.
+  const showHandoffTip =
+    !exempt
+    && !isGuestSession()
+    && usage.features.some((f) => f.limit > 0 && f.used / f.limit >= 0.8);
 
   return (
     <div className="usage-meters">
@@ -135,6 +141,13 @@ export function UsageMeters() {
           <UsageRow key={feature.feature} feature={feature} exempt={exempt} />
         ))}
       </ul>
+      {showHandoffTip ? (
+        <p className="usage-handoff-tip small">
+          Running low? Connect ChatGPT, Gemini or Claude under Connected apps below. Their free plans
+          work: they write the tests, flashcards and lessons, Nosey saves them, and none of it counts
+          toward these limits.
+        </p>
+      ) : null}
     </div>
   );
 }

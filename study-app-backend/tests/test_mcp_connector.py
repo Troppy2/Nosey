@@ -320,14 +320,19 @@ async def test_deny_returns_access_denied(client) -> None:
     assert (await client.post(f"/oauth/requests/{request_id}/approve")).status_code == 404
 
 
-async def test_non_beta_user_is_refused(client, db_session_maker) -> None:
+async def test_any_signed_in_user_can_connect_but_guests_cannot(client, db_session_maker) -> None:
     tokens = await _connect(client)
     async with db_session_maker() as session:
         user = await session.get(User, client.state["user"].id)
         user.is_beta = False
         await session.commit()
-    resp = await _rpc(client, tokens["access_token"], "ping")
-    assert resp.status_code == 403
+    assert (await _rpc(client, tokens["access_token"], "ping")).status_code == 200
+
+    async with db_session_maker() as session:
+        user = await session.get(User, client.state["user"].id)
+        user.email = "guest_abc@nosey.guest"
+        await session.commit()
+    assert (await _rpc(client, tokens["access_token"], "ping")).status_code == 403
 
 
 @pytest.mark.parametrize(

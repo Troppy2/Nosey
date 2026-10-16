@@ -52,6 +52,15 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
+async def get_account_user(user: User = Depends(get_current_user)) -> User:
+    """Signed-in Google account, not a guest session (e.g. the MCP connector)."""
+    from src.services.quota_service import is_guest
+
+    if is_guest(user):
+        raise HTTPException(status_code=403, detail="Sign in with Google to use this feature.")
+    return user
+
+
 async def get_beta_user(user: User = Depends(get_current_user)) -> User:
     """Server-side gate for beta features (admins and beta users only).
 

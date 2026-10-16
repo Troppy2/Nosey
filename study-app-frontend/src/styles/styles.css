@@ -28646,3 +28646,12 @@ a.sd-chip.is-done:hover {
   vertical-align: middle;
   font-size: 0.75rem;
 }
+
+/* Usage meters: hand-off tip shown near a limit */
+.usage-handoff-tip {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--green-lightest);
+  color: var(--ink);
+}

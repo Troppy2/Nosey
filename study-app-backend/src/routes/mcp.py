@@ -26,7 +26,7 @@ from src.routes.mcp_oauth import client_key, public_base_url
 from src.services.account_safety_service import SUSPENDED_MESSAGE
 from src.services.mcp_oauth_service import McpOAuthService
 from src.services.mcp_tools import TOOLS, McpContext, call_tool
-from src.utils.provider_policy import user_can_override_provider
+from src.services.quota_service import is_guest
 
 logger = logging.getLogger(__name__)
 
@@ -104,8 +104,8 @@ async def mcp_post(request: Request, session: AsyncSession = Depends(get_session
         return _unauthorized(request, "The access token is invalid or expired.")
     if user.banned_at is not None:
         return _forbidden(SUSPENDED_MESSAGE)
-    if not user_can_override_provider(user):
-        return _forbidden("The Nosey connector is only available to beta users.")
+    if is_guest(user):
+        return _forbidden("Sign in to Nosey with Google to use this connector.")
 
     version_header = request.headers.get("mcp-protocol-version")
     if version_header and version_header not in SUPPORTED_PROTOCOL_VERSIONS:

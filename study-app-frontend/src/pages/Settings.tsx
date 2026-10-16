@@ -94,8 +94,8 @@ export default function Settings() {
   const ADMIN_EMAILS = ["jamesinah34@gmail.com", "jamesinah883@gmail.com"];
   const isAdmin = !guest && !!user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  // Only the Connected apps step so far, and that section is beta-only.
-  usePageTour("settings", !guest && betaMode);
+  // Only the Connected apps step so far, and that section needs a real account.
+  usePageTour("settings", !guest);
   const initialized = useRef(false);
 
   async function loadClearedConversations() {
@@ -596,7 +596,7 @@ export default function Settings() {
           </div>
         </CollapsibleSection>
 
-        {!guest && betaMode ? <ConnectedApps /> : null}
+        {!guest ? <ConnectedApps /> : null}
 
         <h2 className="settings-group-title">Data &amp; history</h2>
 

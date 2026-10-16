@@ -32,7 +32,7 @@ function formatAgo(value: string): string {
 // Settings > Connected apps: apps (Claude, ChatGPT) the user let into their
 // library through the MCP connector, with a Disconnect per app. Disconnecting
 // revokes that app's tokens on the next call; connecting again is one click
-// from the app. Beta-only, like the connector itself.
+// from the app. Signed-in accounts only, like the connector itself.
 export function ConnectedApps() {
   const [connections, setConnections] = useState<McpConnection[]>([]);
   const [loading, setLoading] = useState(true);
