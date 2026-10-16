@@ -33,7 +33,7 @@ async def call(client):  # noqa: F811
     async def _call(name: str, arguments: dict, expect_error: bool = False) -> dict:
         result = (await _rpc(client, access, "tools/call", {"name": name, "arguments": arguments})).json()["result"]
         assert result["isError"] is expect_error, result
-        return result["structuredContent"]
+        return json.loads(result["content"][0]["text"])
 
     return _call
 

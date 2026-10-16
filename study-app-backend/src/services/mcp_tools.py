@@ -34,7 +34,9 @@ from src.utils.exceptions import ResourceNotFoundException, StudyAppException
 logger = logging.getLogger(__name__)
 
 NOTE_PREVIEW_CHARS = 300
-NOTE_PAGE_DEFAULT = 40_000
+# Small default page: most notes are skimmed, and every char returned is
+# context the connecting app pays for. Callers can still ask for up to MAX.
+NOTE_PAGE_DEFAULT = 8_000
 NOTE_PAGE_MAX = 100_000
 
 
@@ -198,12 +200,19 @@ async def list_test_attempts(ctx: McpContext, args: TestArgs) -> dict[str, Any]:
 
 class AttemptArgs(ToolArgs):
     attempt_id: int = Field(description="Attempt id from list_test_attempts.")
+    wrong_only: bool = Field(
+        default=True,
+        description="Only return the questions the user got wrong. Set false for every question.",
+    )
 
 
 async def get_attempt_result(ctx: McpContext, args: AttemptArgs) -> dict[str, Any]:
     detail = await GradingService().get_attempt_detail(args.attempt_id, ctx.user.id, ctx.session)
     payload = dump(detail)
-    payload["answers"] = [_without_ink(a) for a in payload["answers"]]
+    answers = payload["answers"]
+    if args.wrong_only:
+        answers = [a for a in answers if not a.get("is_correct")]
+    payload["answers"] = [_without_ink(a) for a in answers]
     return payload
 
 
@@ -338,8 +347,9 @@ TOOLS: dict[str, McpTool] = {
         McpTool(
             "read_note",
             "Read a note",
-            "Read the extracted text of one uploaded note. Long notes come back in pages: "
-            "call again with offset=next_offset until next_offset is null.",
+            "Read the extracted text of one uploaded note in pages of 8,000 chars. Check the "
+            "preview from list_folder_notes first; only page on with offset=next_offset "
+            "when you need more.",
             ReadNoteArgs,
             read_note,
         ),
@@ -386,7 +396,8 @@ TOOLS: dict[str, McpTool] = {
             "Get an attempt's results",
             "Get one submitted attempt question by question: the user's answer, the correct "
             "answer, whether it was right, and the grader's feedback. Use it to find what the "
-            "user gets wrong before building new practice.",
+            "user gets wrong before building new practice. Returns only wrong answers unless "
+            "wrong_only=false.",
             AttemptArgs,
             get_attempt_result,
         ),

@@ -1,6 +1,8 @@
 """MCP write tools, end to end over /mcp (OAuth flow from test_mcp_connector)."""
 from __future__ import annotations
 
+import json
+
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -25,7 +27,7 @@ async def call(client):  # noqa: F811
     async def _call(name: str, arguments: dict, expect_error: bool = False) -> dict:
         result = (await _rpc(client, access, "tools/call", {"name": name, "arguments": arguments})).json()["result"]
         assert result["isError"] is expect_error, result
-        return result["structuredContent"]
+        return json.loads(result["content"][0]["text"])
 
     _call.access = access  # type: ignore[attr-defined]
     return _call

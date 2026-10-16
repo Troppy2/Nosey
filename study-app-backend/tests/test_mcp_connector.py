@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import secrets
 from urllib.parse import parse_qs, urlsplit
 
@@ -187,25 +188,27 @@ async def test_full_flow_then_tools(client, seeded) -> None:
     assert all(t["inputSchema"]["type"] == "object" for t in listed)
 
     folders = (await _rpc(client, access, "tools/call", {"name": "list_folders", "arguments": {}})).json()
-    payload = folders["result"]["structuredContent"]
+    payload = json.loads(folders["result"]["content"][0]["text"])
     assert [f["name"] for f in payload["folders"]] == ["Chemistry"]
 
     notes = (
         await _rpc(client, access, "tools/call", {"name": "list_folder_notes", "arguments": {"folder_id": seeded["folder_id"]}})
-    ).json()["result"]["structuredContent"]["notes"]
+    ).json()["result"]
+    notes = json.loads(notes["content"][0]["text"])["notes"]
     assert notes[0]["total_chars"] == 100
     note_id = notes[0]["note_id"]
 
     page = (
         await _rpc(client, access, "tools/call", {"name": "read_note", "arguments": {"note_id": note_id, "max_chars": 60}})
-    ).json()["result"]["structuredContent"]
+    ).json()["result"]
+    page = json.loads(page["content"][0]["text"])
     assert page["content"] == "A" * 50 + "B" * 10 and page["next_offset"] == 60
 
     # Another user's folder is invisible, reported as a tool error the model can read.
     foreign = (
         await _rpc(client, access, "tools/call", {"name": "list_tests", "arguments": {"folder_id": seeded["foreign_id"]}})
     ).json()["result"]
-    assert foreign["isError"] is True and "not found" in foreign["structuredContent"]["error"]
+    assert foreign["isError"] is True and "not found" in json.loads(foreign["content"][0]["text"])["error"]
 
     # Bad arguments are a tool error too, not a protocol error.
     bad_args = (
@@ -396,7 +399,7 @@ async def test_read_tools_for_tests_cards_and_modules(client, seeded, db_session
     async def call(name: str, arguments: dict) -> dict:
         result = (await _rpc(client, access, "tools/call", {"name": name, "arguments": arguments})).json()["result"]
         assert result["isError"] is False, result
-        return result["structuredContent"]
+        return json.loads(result["content"][0]["text"])
 
     tests = await call("list_tests", {"folder_id": seeded["folder_id"]})
     assert tests["tests"][0]["question_count"] == 1
@@ -543,7 +546,7 @@ async def test_drafts_and_results_are_readable(client, seeded, db_session_maker)
     async def call(name: str, arguments: dict) -> dict:
         result = (await _rpc(client, access, "tools/call", {"name": name, "arguments": arguments})).json()["result"]
         assert result["isError"] is False, result
-        return result["structuredContent"]
+        return json.loads(result["content"][0]["text"])
 
     drafts = await call("list_drafts", {})
     assert [d["test_id"] for d in drafts["drafts"]] == [test_id]
