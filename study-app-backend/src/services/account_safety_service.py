@@ -17,6 +17,7 @@ request raises, which would roll back anything written in the route's session.
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import logging
@@ -25,7 +26,6 @@ from typing import Iterable, Optional
 
 from fastapi import HTTPException
 from sqlalchemy import delete, func, or_, select, text, update
-from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import set_committed_value
 
@@ -196,8 +196,10 @@ _RATE_LIMITED = "RateLimited"
 _RATE_LIMITED_MESSAGE = "Too many changes at once. Please wait a few seconds and try again."
 # Namespace for pg_advisory_xact_lock(int, int), distinct from quota_service's.
 _MODERATION_LOCK_NAMESPACE = 5603
-# Longest one serialized check waits for the account's earlier ones.
-_MODERATION_LOCK_TIMEOUT = "15s"
+# Longest one serialized check waits for the account's earlier ones, and how
+# often it retries the lock while waiting (no DB connection held in between).
+_MODERATION_LOCK_WAIT_S = 15.0
+_MODERATION_LOCK_POLL_S = 0.5
 
 
 async def _moderate(chunks: list[str]) -> list[dict]:
@@ -211,24 +213,28 @@ async def _moderate(chunks: list[str]) -> list[dict]:
 
 
 async def _moderate_serialized(user_id: int, chunks: list[str]) -> list[dict]:
-    """_moderate under a per-account Postgres advisory lock, held by its own
-    transaction so it works across workers. No lock on SQLite."""
-    async with async_session_maker() as session:
-        if session.bind is None or session.bind.dialect.name != "postgresql":
-            return await _moderate(chunks)
-        try:
-            await session.execute(text(f"SET LOCAL lock_timeout = '{_MODERATION_LOCK_TIMEOUT}'"))
-            await session.execute(
-                text("SELECT pg_advisory_xact_lock(:ns, :key)"),
+    """_moderate under a per-account Postgres advisory lock so it works across
+    workers. The lock is only TRIED: a busy account's waiters give their pooled
+    connection back between attempts, so a burst holds one connection per
+    account, never one per request. No lock on SQLite."""
+    deadline = asyncio.get_running_loop().time() + _MODERATION_LOCK_WAIT_S
+    while True:
+        async with async_session_maker() as session:
+            if session.bind is None or session.bind.dialect.name != "postgresql":
+                return await _moderate(chunks)
+            got = await session.scalar(
+                text("SELECT pg_try_advisory_xact_lock(:ns, :key)"),
                 {"ns": _MODERATION_LOCK_NAMESPACE, "key": int(user_id) % 2_147_483_647},
             )
-        except DBAPIError as exc:
+            if got:
+                try:
+                    return await _moderate(chunks)
+                finally:
+                    await session.rollback()  # releases the lock
+        if asyncio.get_running_loop().time() >= deadline:
             logger.warning("Moderation queue wait timed out for user=%s", user_id)
-            raise HTTPException(status_code=503, detail=_RATE_LIMITED_MESSAGE) from exc
-        try:
-            return await _moderate(chunks)
-        finally:
-            await session.rollback()  # releases the lock
+            raise HTTPException(status_code=503, detail=_RATE_LIMITED_MESSAGE)
+        await asyncio.sleep(_MODERATION_LOCK_POLL_S)
 
 
 # Forced-failure heuristic: this many failures for one account inside the
