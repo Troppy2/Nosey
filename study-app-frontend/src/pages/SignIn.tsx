@@ -81,7 +81,8 @@ export default function SignIn() {
         text: "continue_with",
         shape: "pill",
         logo_alignment: "center",
-        width: 300,
+        // Google clamps width to 200-400px; size to the card so phones do not overflow.
+        width: Math.max(200, Math.min(400, googleButtonRef.current.clientWidth || 300)),
       });
     };
 
@@ -136,7 +137,7 @@ export default function SignIn() {
           <div className="signin-actions">
             {clientId ? (
               <div className="google-btn-wrap">
-                <div ref={googleButtonRef} />
+                <div ref={googleButtonRef} className="google-btn-host" />
                 {googleLoading && (
                   <p className="small muted signin-loading">
                     <InlineLoading label="Signing you in" />

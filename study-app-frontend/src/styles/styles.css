@@ -637,6 +637,7 @@
 
 .landing {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   min-height: 100vh;
   place-items: center;
   padding: 40px 16px;
@@ -14066,7 +14067,19 @@ select.lc-custom-input {
   align-items: center;
   gap: 8px;
   width: 100%;
+  min-width: 0;
   min-height: 44px;
+}
+
+.google-btn-host {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+/* Google sets an inline iframe width; keep it inside narrow cards */
+.google-btn-wrap iframe {
+  max-width: 100% !important;
 }
 
 .signin-loading {
