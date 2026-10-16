@@ -765,7 +765,14 @@ export default function LearningModulesPage() {
         </Link>
         <div className="lm-header-main">
           <span className="eyebrow">Learning Modules</span>
-          <h1>Your track</h1>
+          <h1>
+            Your track
+            {track.unlocked ? (
+              <span className="pill lm-unlocked-pill" title="Open modules in any order">
+                Unlocked
+              </span>
+            ) : null}
+          </h1>
           <p className="muted">
             {track.status === "generating"
               ? `Building your lessons: ${readyCount} of ${targetCount} modules ready.`
@@ -866,7 +873,8 @@ export default function LearningModulesPage() {
 
       <ol className="lm-module-list">
         {track.modules.map((module, index) => {
-          const unlocked = index === 0 || (firstLockedIndex !== -1 ? index <= firstLockedIndex : true);
+          const unlocked =
+            track.unlocked || index === 0 || (firstLockedIndex !== -1 ? index <= firstLockedIndex : true);
           const openable = module.ready && unlocked;
           const stateClass = module.passed
             ? "is-passed"

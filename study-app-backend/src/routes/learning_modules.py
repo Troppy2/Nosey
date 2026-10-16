@@ -381,6 +381,9 @@ def _track_to_response(track: LearningTrack, notes_stale: bool = False) -> Learn
         notes_stale=notes_stale,
         is_archived=track.is_archived,
         created_at=track.created_at.isoformat() if track.created_at else None,
+        # Same value as mcp_write_tools.CREATED_VIA (not imported: that module
+        # pulls in the whole MCP tool stack).
+        unlocked=track.created_via == "mcp",
         modules=[_module_to_response(m) for m in track.modules],
     )
 

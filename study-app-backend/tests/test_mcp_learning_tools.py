@@ -57,6 +57,7 @@ async def test_track_works_with_nosey_reader_and_quiz_gate(client, call, seeded,
 
     track = (await client.get(f"/folders/{seeded['folder_id']}/learning-track")).json()
     assert track["status"] == "ready" and track["notes_stale"] is False
+    assert track["unlocked"] is True  # MCP-built: no pass-to-unlock gate
     assert [m["title"] for m in track["modules"]] == ["Cells", "Atoms"]
     assert json.loads(track["modules"][0]["tts_script"])[2] == "Energy equals m c squared."
     assert track["modules"][1]["tts_script"] is None  # reader falls back to the lesson text

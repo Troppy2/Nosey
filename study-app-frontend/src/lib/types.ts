@@ -317,6 +317,8 @@ export type LearningTrack = {
   // slot. The hub lists them under an "Archived" section.
   is_archived?: boolean;
   created_at?: string | null;
+  // Built over MCP: every module is open, no pass-to-unlock order.
+  unlocked?: boolean;
   modules: LearningModule[];
 };
 

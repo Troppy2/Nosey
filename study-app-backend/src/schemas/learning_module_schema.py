@@ -82,6 +82,9 @@ class LearningTrackResponse(BaseModel):
     is_archived: bool = False
     # ISO timestamp used to label archived tracks in the hub list.
     created_at: Optional[str] = None
+    # True for tracks built over MCP (created_via="mcp"): every module is open,
+    # no pass-to-unlock order. Progress (passed, best_score) is still real.
+    unlocked: bool = False
     modules: list[LearningModuleResponse]
 
 

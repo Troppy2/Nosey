@@ -28639,3 +28639,10 @@ a.sd-chip.is-done:hover {
   font-family: var(--font-mono);
   font-size: 0.85rem;
 }
+
+/* Learning modules: "Unlocked" pill on MCP-built tracks */
+.lm-unlocked-pill {
+  margin-left: 10px;
+  vertical-align: middle;
+  font-size: 0.75rem;
+}
