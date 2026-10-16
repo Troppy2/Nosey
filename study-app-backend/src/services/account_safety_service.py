@@ -24,7 +24,8 @@ from datetime import timedelta
 from typing import Iterable, Optional
 
 from fastapi import HTTPException
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, or_, select, text, update
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import set_committed_value
 
@@ -34,7 +35,7 @@ from src.models.account_safety import AccountTombstone, ContentFlag
 from src.models.usage_event import UsageEvent
 from src.models.user import User
 from src.repositories.usage_event_repository import UsageEventRepository
-from src.utils.exceptions import LLMException
+from src.utils.exceptions import LLMException, ModerationRateLimited
 from src.utils.safety_notice import SAFETY_HEADER, set_safety_notice
 from src.utils.time import utcnow_naive
 
@@ -102,7 +103,7 @@ if not settings.openai_api_key:
 
 
 async def screen_user_input(
-    user: User, feature: str, *texts: Optional[str], block_harmful: bool = True
+    user: User, feature: str, *texts: Optional[str], block_harmful: bool = True, serialize: bool = False
 ) -> None:
     """Moderate text a user typed before it reaches any AI model.
 
@@ -113,9 +114,11 @@ async def screen_user_input(
     block_harmful=False is for submissions that must not be lost (a whole test
     attempt): a "harmful" hit is still flagged and the warning still shown, but
     the request goes through. A minors hit is refused and banned regardless.
-    """
-    from src.services.llm_service import LLMService
 
+    serialize=True runs this account's checks one at a time (MCP writes, where
+    a client fires many in parallel), so one account cannot burst the shared
+    moderation rate limit.
+    """
     if not settings.openai_api_key:
         # Moderation not configured: off, not failing. Warned once at import.
         return
@@ -123,10 +126,16 @@ async def screen_user_input(
     if not chunks:
         return
     try:
-        llm = LLMService()
-        results: list[dict] = []
-        for start in range(0, len(chunks), _CHUNKS_PER_CALL):
-            results.extend(await llm.moderate(chunks[start:start + _CHUNKS_PER_CALL]))
+        if serialize:
+            results = await _moderate_serialized(user.id, chunks)
+        else:
+            results = await _moderate(chunks)
+    except ModerationRateLimited as exc:
+        # Fail CLOSED: failing open here would let a flood skip the check.
+        # Not counted toward the forced-failure heuristic (a burst is not an attack).
+        await _log_moderation_failure(user.id, _RATE_LIMITED)
+        logger.warning("Moderation rate limited for %s; refusing user=%s", feature, user.id)
+        raise HTTPException(status_code=503, detail=_RATE_LIMITED_MESSAGE) from exc
     except LLMException as exc:
         await _log_moderation_failure(user.id, type(exc.__cause__ or exc).__name__)
         if len(chunks) > _CHUNKS_PER_CALL or await _failures_look_forced(user.id):
@@ -183,6 +192,45 @@ async def screen_user_input(
     set_safety_notice("warning-allowed" if severity == "harmful" else "self-harm")
 
 
+_RATE_LIMITED = "RateLimited"
+_RATE_LIMITED_MESSAGE = "Too many changes at once. Please wait a few seconds and try again."
+# Namespace for pg_advisory_xact_lock(int, int), distinct from quota_service's.
+_MODERATION_LOCK_NAMESPACE = 5603
+# Longest one serialized check waits for the account's earlier ones.
+_MODERATION_LOCK_TIMEOUT = "15s"
+
+
+async def _moderate(chunks: list[str]) -> list[dict]:
+    from src.services.llm_service import LLMService
+
+    llm = LLMService()
+    results: list[dict] = []
+    for start in range(0, len(chunks), _CHUNKS_PER_CALL):
+        results.extend(await llm.moderate(chunks[start:start + _CHUNKS_PER_CALL]))
+    return results
+
+
+async def _moderate_serialized(user_id: int, chunks: list[str]) -> list[dict]:
+    """_moderate under a per-account Postgres advisory lock, held by its own
+    transaction so it works across workers. No lock on SQLite."""
+    async with async_session_maker() as session:
+        if session.bind is None or session.bind.dialect.name != "postgresql":
+            return await _moderate(chunks)
+        try:
+            await session.execute(text(f"SET LOCAL lock_timeout = '{_MODERATION_LOCK_TIMEOUT}'"))
+            await session.execute(
+                text("SELECT pg_advisory_xact_lock(:ns, :key)"),
+                {"ns": _MODERATION_LOCK_NAMESPACE, "key": int(user_id) % 2_147_483_647},
+            )
+        except DBAPIError as exc:
+            logger.warning("Moderation queue wait timed out for user=%s", user_id)
+            raise HTTPException(status_code=503, detail=_RATE_LIMITED_MESSAGE) from exc
+        try:
+            return await _moderate(chunks)
+        finally:
+            await session.rollback()  # releases the lock
+
+
 # Forced-failure heuristic: this many failures for one account inside the
 # window, while fewer than _OUTAGE_ACCOUNTS accounts are failing overall.
 _FORCED_WINDOW = timedelta(minutes=10)
@@ -198,6 +246,7 @@ async def _failures_look_forced(user_id: int) -> bool:
                 UsageEvent.feature == "moderation",
                 UsageEvent.success.is_(False),
                 UsageEvent.created_at >= since,
+                or_(UsageEvent.error_type.is_(None), UsageEvent.error_type != _RATE_LIMITED),
             )
             mine = await session.scalar(
                 select(func.count()).select_from(UsageEvent).where(*recent, UsageEvent.user_id == user_id)

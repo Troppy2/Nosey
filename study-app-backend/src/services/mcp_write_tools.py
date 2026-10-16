@@ -64,7 +64,7 @@ def require_confirm(confirm: bool) -> None:
 
 async def screen(ctx: McpContext, *texts: Optional[str]) -> None:
     """Same moderation as text typed into Nosey (off when no key is set)."""
-    await screen_user_input(ctx.user, MODERATION_FEATURE, *texts)
+    await screen_user_input(ctx.user, MODERATION_FEATURE, *texts, serialize=True)
 
 
 def _test_url(test_id: int) -> str:

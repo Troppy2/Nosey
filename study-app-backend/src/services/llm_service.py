@@ -51,6 +51,17 @@ _MODULE_CONTENT_MAX_TOKENS = 16384
 # HTTP statuses _with_retry backs off and retries: rate limit and overload.
 _TRANSIENT_STATUSES = frozenset({429, 503, 529})
 
+# Moderation 429s: total attempts, and the most one Retry-After wait may take.
+_MODERATION_ATTEMPTS = 3
+_MODERATION_MAX_WAIT_S = 5.0
+
+
+def _retry_after_seconds(header: Optional[str]) -> float:
+    try:
+        return min(max(float(header), 0.5), _MODERATION_MAX_WAIT_S) if header else 1.0
+    except ValueError:
+        return 1.0
+
 
 def _groq_reasoning_params(model: str) -> dict[str, object]:
     """Reasoning controls for Groq's reasoning models.
@@ -4686,19 +4697,29 @@ Return JSON only with these exact keys:
         the key is missing or the call fails; callers decide to fail open.
         Not a provider-loop call: there is exactly one moderation engine.
         """
-        from src.utils.exceptions import LLMException
+        from src.utils.exceptions import LLMException, ModerationRateLimited
 
         if not settings.openai_api_key:
             raise LLMException("Moderation is not configured (OPENAI_API_KEY unset).")
         try:
             async with httpx.AsyncClient(timeout=settings.moderation_timeout_seconds) as client:
-                response = await client.post(
-                    "https://api.openai.com/v1/moderations",
-                    headers={"Authorization": f"Bearer {settings.openai_api_key}"},
-                    json={"model": settings.openai_moderation_model, "input": texts},
-                )
+                # A 429 is retried (Retry-After honoured, capped) so a burst of
+                # writes is slowed down rather than refused.
+                for attempt in range(_MODERATION_ATTEMPTS):
+                    response = await client.post(
+                        "https://api.openai.com/v1/moderations",
+                        headers={"Authorization": f"Bearer {settings.openai_api_key}"},
+                        json={"model": settings.openai_moderation_model, "input": texts},
+                    )
+                    if response.status_code != 429:
+                        break
+                    if attempt == _MODERATION_ATTEMPTS - 1:
+                        raise ModerationRateLimited("Moderation is rate limited.")
+                    await asyncio.sleep(_retry_after_seconds(response.headers.get("retry-after")))
                 response.raise_for_status()
                 results = response.json().get("results") or []
+        except ModerationRateLimited:
+            raise
         except Exception as exc:
             raise LLMException(f"Moderation call failed: {type(exc).__name__}") from exc
         if len(results) != len(texts):

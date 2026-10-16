@@ -20,5 +20,9 @@ class LLMException(StudyAppException):
     pass
 
 
+class ModerationRateLimited(LLMException):
+    """OpenAI moderation answered 429 even after retries."""
+
+
 class SerializationError(StudyAppException):
     pass
