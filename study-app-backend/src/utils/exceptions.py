@@ -24,5 +24,10 @@ class ModerationRateLimited(LLMException):
     """OpenAI moderation answered 429 even after retries."""
 
 
+class ModerationQuotaExhausted(LLMException):
+    """OpenAI moderation answered 429 with a reset hours away: the key's
+    quota is spent, not a burst. Retrying cannot help."""
+
+
 class SerializationError(StudyAppException):
     pass

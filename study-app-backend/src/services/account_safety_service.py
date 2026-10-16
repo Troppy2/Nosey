@@ -35,7 +35,7 @@ from src.models.account_safety import AccountTombstone, ContentFlag
 from src.models.usage_event import UsageEvent
 from src.models.user import User
 from src.repositories.usage_event_repository import UsageEventRepository
-from src.utils.exceptions import LLMException, ModerationRateLimited
+from src.utils.exceptions import LLMException, ModerationQuotaExhausted, ModerationRateLimited
 from src.utils.safety_notice import SAFETY_HEADER, set_safety_notice
 from src.utils.time import utcnow_naive
 
@@ -130,6 +130,13 @@ async def screen_user_input(
             results = await _moderate_serialized(user.id, chunks)
         else:
             results = await _moderate(chunks)
+    except ModerationQuotaExhausted as exc:
+        # The key's quota is spent: an outage for every account, not something
+        # this user provoked. Fail OPEN like an outage (refusing would block all
+        # of Nosey), and log loudly so it is fixed in the OpenAI dashboard.
+        await _log_moderation_failure(user.id, _QUOTA_EXHAUSTED)
+        logger.error("Moderation quota exhausted, failing open for %s: %s", feature, exc)
+        return
     except ModerationRateLimited as exc:
         # Fail CLOSED: failing open here would let a flood skip the check.
         # Not counted toward the forced-failure heuristic (a burst is not an attack).
@@ -193,6 +200,7 @@ async def screen_user_input(
 
 
 _RATE_LIMITED = "RateLimited"
+_QUOTA_EXHAUSTED = "QuotaExhausted"
 _RATE_LIMITED_MESSAGE = "Too many changes at once. Please wait a few seconds and try again."
 # Namespace for pg_advisory_xact_lock(int, int), distinct from quota_service's.
 _MODERATION_LOCK_NAMESPACE = 5603
@@ -252,7 +260,10 @@ async def _failures_look_forced(user_id: int) -> bool:
                 UsageEvent.feature == "moderation",
                 UsageEvent.success.is_(False),
                 UsageEvent.created_at >= since,
-                or_(UsageEvent.error_type.is_(None), UsageEvent.error_type != _RATE_LIMITED),
+                or_(
+                    UsageEvent.error_type.is_(None),
+                    UsageEvent.error_type.not_in((_RATE_LIMITED, _QUOTA_EXHAUSTED)),
+                ),
             )
             mine = await session.scalar(
                 select(func.count()).select_from(UsageEvent).where(*recent, UsageEvent.user_id == user_id)

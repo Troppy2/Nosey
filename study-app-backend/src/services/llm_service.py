@@ -56,11 +56,31 @@ _MODERATION_ATTEMPTS = 3
 _MODERATION_MAX_WAIT_S = 5.0
 
 
-def _retry_after_seconds(header: Optional[str]) -> float:
+# A 429 asking to wait longer than this is a spent quota (OpenAI sends a
+# Retry-After of hours, x-ratelimit-reset-tokens of days), not a burst.
+_MODERATION_QUOTA_WAIT_S = 60.0
+
+
+def _retry_after_raw(header: Optional[str]) -> Optional[float]:
     try:
-        return min(max(float(header), 0.5), _MODERATION_MAX_WAIT_S) if header else 1.0
+        return float(header) if header else None
     except ValueError:
-        return 1.0
+        return None
+
+
+_DURATION_RE = re.compile(r"(\d+(?:\.\d+)?)(ms|h|m|s)")
+_DURATION_UNITS = {"h": 3600.0, "m": 60.0, "s": 1.0, "ms": 0.001}
+
+
+def _reset_seconds(header: Optional[str]) -> Optional[float]:
+    """OpenAI x-ratelimit-reset-* value ("715h9m50.6s", "2m9s", "120ms") in seconds."""
+    parts = _DURATION_RE.findall(header or "")
+    return sum(float(n) * _DURATION_UNITS[u] for n, u in parts) if parts else None
+
+
+def _retry_after_seconds(header: Optional[str]) -> float:
+    raw = _retry_after_raw(header)
+    return min(max(raw, 0.5), _MODERATION_MAX_WAIT_S) if raw is not None else 1.0
 
 
 def _groq_reasoning_params(model: str) -> dict[str, object]:
@@ -4697,7 +4717,7 @@ Return JSON only with these exact keys:
         the key is missing or the call fails; callers decide to fail open.
         Not a provider-loop call: there is exactly one moderation engine.
         """
-        from src.utils.exceptions import LLMException, ModerationRateLimited
+        from src.utils.exceptions import LLMException, ModerationQuotaExhausted, ModerationRateLimited
 
         if not settings.openai_api_key:
             raise LLMException("Moderation is not configured (OPENAI_API_KEY unset).")
@@ -4713,12 +4733,21 @@ Return JSON only with these exact keys:
                     )
                     if response.status_code != 429:
                         break
+                    wait = max(
+                        _retry_after_raw(response.headers.get("retry-after")) or 0.0,
+                        _reset_seconds(response.headers.get("x-ratelimit-reset-tokens")) or 0.0,
+                    )
+                    if wait > _MODERATION_QUOTA_WAIT_S:
+                        raise ModerationQuotaExhausted(
+                            f"Moderation quota exhausted (retry-after {int(wait)}s, "
+                            f"tokens left {response.headers.get('x-ratelimit-remaining-tokens', '?')})."
+                        )
                     if attempt == _MODERATION_ATTEMPTS - 1:
                         raise ModerationRateLimited("Moderation is rate limited.")
                     await asyncio.sleep(_retry_after_seconds(response.headers.get("retry-after")))
                 response.raise_for_status()
                 results = response.json().get("results") or []
-        except ModerationRateLimited:
+        except (ModerationRateLimited, ModerationQuotaExhausted):
             raise
         except Exception as exc:
             raise LLMException(f"Moderation call failed: {type(exc).__name__}") from exc
