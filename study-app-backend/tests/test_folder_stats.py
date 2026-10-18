@@ -191,3 +191,35 @@ async def test_todays_quiz_finds_only_todays_non_failed_daily(db_session_maker, 
         session.add(UserAttempt(user_id=user.id, test_id=today.id, attempt_number=1, status="submitted", total_score=80))
         await session.commit()
         assert (await todays_quiz(session, folder.id, user.id, 0)).completed is True
+
+
+# ---- dashboard weak spots (chunk 6)
+
+@pytest.mark.asyncio
+async def test_weak_spots_across_folders_skip_archived(db_session_maker):
+    async with db_session_maker() as session:
+        user = User(email="u@example.com", google_id="g1")
+        session.add(user)
+        await session.flush()
+        # Explicit False: SQLite reads the "false" server default back as truthy.
+        bio = Folder(user_id=user.id, name="Bio", is_archived=False)
+        chem = Folder(user_id=user.id, name="Chem", is_archived=False)
+        old = Folder(user_id=user.id, name="Old", is_archived=True)
+        session.add_all([bio, chem, old])
+        await session.flush()
+        cards = {
+            "bio": Flashcard(folder_id=bio.id, front="f", back="b", topic="Meiosis"),
+            "chem": Flashcard(folder_id=chem.id, front="f", back="b", topic="Bonds"),
+            "chem_ok": Flashcard(folder_id=chem.id, front="f", back="b", topic="Moles"),
+            "old": Flashcard(folder_id=old.id, front="f", back="b", topic="Ancient"),
+        }
+        session.add_all(cards.values())
+        await session.flush()
+        marks = {"bio": [True, False, False, False], "chem": [False, False, False], "chem_ok": [True] * 3, "old": [False] * 3}
+        for key, results in marks.items():
+            session.add_all([FlashcardAttempt(user_id=user.id, flashcard_id=cards[key].id, correct=c) for c in results])
+        await session.commit()
+
+        spots = await FolderStatsService().weak_spots(user.id, session)
+        assert [(s.topic, s.folder_name) for s in spots] == [("Bonds", "Chem"), ("Meiosis", "Bio")]
+        assert spots[0].accuracy == 0.0 and spots[1].accuracy == 0.25

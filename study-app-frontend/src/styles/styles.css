@@ -762,6 +762,7 @@
 
 .dashboard-main {
   display: grid;
+  align-content: start;
   gap: 44px;
 }
 
@@ -29413,4 +29414,57 @@ a.sd-chip.is-done:hover {
 
 @media (prefers-reduced-motion: reduce) {
   .folder-stats--loading .skel { animation: none; }
+}
+
+/* Dashboard Weak Spots (folder stats chunk 6): under Review These */
+.weak-spots {
+  margin-top: 28px;
+}
+
+.weak-spots-card {
+  padding: 18px 20px;
+}
+
+.weak-spots-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.weak-spots-item {
+  display: block;
+  margin: 0 -10px;
+  padding: 10px;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+
+.weak-spots-item:hover,
+.weak-spots-item:focus-visible {
+  background: var(--green-lightest);
+}
+
+.weak-spots-bar span {
+  background: var(--warning);
+}
+
+.weak-spots-skel {
+  display: grid;
+  gap: 8px;
+  padding: 10px 0;
+}
+
+.weak-spots-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: var(--green-dark);
+}
+
+.weak-spots-empty p {
+  margin: 0;
 }

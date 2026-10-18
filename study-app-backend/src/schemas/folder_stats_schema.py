@@ -28,6 +28,12 @@ class TopicStat(BaseModel):
     last_seen: datetime
 
 
+class WeakSpot(TopicStat):
+    """A weak topic with the folder it lives in (Dashboard Weak Spots)."""
+    folder_id: int
+    folder_name: str
+
+
 class TodayQuiz(BaseModel):
     test_id: int
     generation_status: str

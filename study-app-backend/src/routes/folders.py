@@ -5,7 +5,7 @@ from src.database import get_session
 from src.dependencies import get_current_user
 from src.models.user import User
 from src.schemas.folder_schema import FolderCreate, FolderResponse, FolderUpdate
-from src.schemas.folder_stats_schema import FolderStatsResponse
+from src.schemas.folder_stats_schema import FolderStatsResponse, WeakSpot
 from src.services.folder_service import FolderService
 from src.services.folder_stats_service import FolderStatsService
 from src.utils.exceptions import ResourceNotFoundException, StudyAppException
@@ -41,6 +41,15 @@ async def list_archived_folders(
     user: User = Depends(get_current_user),
 ) -> list[FolderResponse]:
     return await FolderService().list_archived_folders(user.id, session)
+
+
+@router.get("/weak-spots", response_model=list[WeakSpot])
+async def get_weak_spots(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[WeakSpot]:
+    """Weakest topics across all active folders, for the Dashboard."""
+    return await FolderStatsService().weak_spots(user.id, session)
 
 
 @router.get("/{folder_id}", response_model=FolderResponse)
