@@ -1,0 +1,1504 @@
+/* ── Simulation timeline ────────────────────────────────────────────────────── */
+
+.sd-timeline--empty { color: var(--muted); }
+
+.sd-timeline-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+
+.sd-timeline-count {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--green-light-mid);
+  color: var(--muted);
+}
+
+.sd-timeline-count b { color: var(--ink); }
+
+.sd-timeline-final {
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+  background: var(--green-lightest);
+}
+
+.sd-timeline-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.sd-timeline-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: var(--space-2);
+  align-items: baseline;
+  padding: var(--space-1) var(--space-2);
+  border-left: 2px solid var(--green-light);
+  font-size: var(--text-sm);
+}
+
+.sd-timeline-row.is-snapshot {
+  border-left-color: var(--green-dark);
+  background: var(--green-lightest);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+.sd-timeline-t {
+  font-family: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.sd-timeline-kind {
+  font-family: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--green-light);
+  color: var(--ink);
+}
+
+.sd-timeline-snapshot-label {
+  font-weight: 600;
+  font-size: var(--text-xs);
+}
+
+.sd-timeline-payload {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+}
+
+.sd-timeline-pair {
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: baseline;
+}
+
+.sd-timeline-pair dt {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.sd-timeline-pair dd {
+  margin: 0;
+  font-family: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
+  font-size: var(--text-xs);
+  word-break: break-all;
+}
+
+/* ── One pane at a time on narrow screens ───────────────────────────────────── */
+
+/* Hidden by default: above the breakpoint every pane is on screen, so the
+   switch would be a control with nothing to do. */
+.sd-pane-switch { display: none; }
+
+/* Same query as useMobileShell.ts (see rules-gotchas 11a): width alone is not a
+   safe test for a phone, because Android page-zoom widens the layout viewport. */
+@media (max-width: 1100px), (hover: none) and (pointer: coarse) and (max-width: 1100px) {
+  .sd-exercise-grid { grid-template-columns: 1fr; }
+
+  .sd-pane-switch {
+    display: flex;
+    gap: var(--space-1);
+    padding: var(--space-1);
+    border-radius: var(--radius-md);
+    background: var(--green-light);
+  }
+
+  .sd-pane-tab {
+    flex: 1;
+    min-height: 40px;
+    padding: var(--space-2) var(--space-3);
+    border: 0;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--green-dark);
+    font-weight: 600;
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+
+  .sd-pane-tab.is-active {
+    background: var(--white);
+    color: var(--ink);
+  }
+
+  .sd-pane-tab:disabled { opacity: 0.45; cursor: default; }
+
+  .sd-workspace-body,
+  .sd-workspace-body[data-has-result="true"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sd-workspace-body[data-pane="brief"] .sd-editor-pane,
+  .sd-workspace-body[data-pane="brief"] .sd-results,
+  .sd-workspace-body[data-pane="code"] .sd-brief,
+  .sd-workspace-body[data-pane="code"] .sd-results,
+  .sd-workspace-body[data-pane="results"] .sd-brief,
+  .sd-workspace-body[data-pane="results"] .sd-editor-pane {
+    display: none;
+  }
+
+  /* The results pane is a real destination on this shell, so it shows its empty
+     state rather than vanishing the way it does beside the editor. */
+  .sd-workspace-body[data-pane="results"][data-has-result="false"] .sd-results {
+    display: block;
+  }
+}
+
+@media (max-width: 760px), (hover: none) and (pointer: coarse) and (max-width: 1100px) {
+  /* No dock clearance here: the workspace is registered as an immersive route
+     in MobileDock.tsx precisely so the floating dock never covers the editor,
+     and reserving space for a dock that is not rendered wastes a band of screen
+     on the shortest viewport there is. */
+  .sd-workspace-bar {
+    gap: var(--space-2);
+  }
+
+  .sd-workspace-actions {
+    width: 100%;
+  }
+
+  .sd-workspace-actions .sd-action-btn { flex: 1; }
+
+  .sd-quiz-actions .button { flex: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sd-card { transition: none; }
+  .sd-card:hover { transform: none; }
+}
+
+/* ── Learning module quiz: answer explanations ──────────────────────────────
+   Shown only under a question the student got wrong. Mirrors the episode
+   player's .lm-checkpoint-explain surface so the two quiz formats read the
+   same, with the per-option rows added. */
+.lm-quiz-explain {
+  margin-top: 0.85rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--radius-lg);
+  background: var(--green-lightest);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.lm-quiz-explain > :first-child { margin-top: 0; }
+.lm-quiz-explain p { margin: 0; }
+
+.lm-quiz-explain-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--border);
+}
+
+.lm-quiz-explain-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-size: 0.86rem;
+}
+
+.lm-quiz-explain-label {
+  flex: none;
+  font-weight: 600;
+}
+
+.lm-quiz-explain-row.is-correct .lm-quiz-explain-label { color: var(--success); }
+.lm-quiz-explain-row.is-wrong .lm-quiz-explain-label { color: var(--error); }
+
+.lm-quiz-explain-review {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.7rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--green-dark);
+  font-size: 0.83rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.lm-quiz-explain-review:hover { opacity: 0.8; }
+
+/* ── Lesson audio player: fixed dock pill ────────────────────────────────────
+   Deliberately a visual sibling of MobileDock rather than its own look: the
+   rail below copies .dock-rail's recipe, so a phone shows two stacked pills
+   that read as one system instead of two competing floating widgets.
+
+   It is fixed because the complaint it fixes is "I have to scroll up to pause".
+   For the same reason it does NOT copy the dock's scroll-hide: a control that
+   disappears while you read is the bug, not the feature. When the nav dock
+   slides away beneath it, this stays put and a gap opens below it. A stable
+   control is worth more than a tight edge.
+
+   Its own namespace (.lm-dock-*), not the shared .lm-audio-* classes the
+   episode player uses: the sizing, the layout and the seek painting all differ,
+   and overriding a shared base in two directions is how those rules rot. */
+.lm-audio-player {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 110;
+  display: flex;
+  justify-content: center;
+  padding: 0 12px calc(var(--lm-player-pad-bottom) + env(safe-area-inset-bottom));
+  /* Let clicks through either side of the pill on a wide screen. */
+  pointer-events: none;
+}
+
+.lm-dock-rail {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: min(760px, 100%);
+  height: var(--lm-player-rail-height);
+  padding: 0 0.5rem 0 0.35rem;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(16px);
+  pointer-events: auto;
+}
+
+.lm-dock-toggle {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--green-dark);
+  color: var(--white);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.lm-dock-toggle:hover { background: var(--green-dark-mid); }
+.lm-dock-toggle:focus-visible { outline: 2px solid var(--green-dark); outline-offset: 2px; }
+
+/* The seek bar, fully custom. A native range input only lets accent-color
+   paint the fill and the thumb, so the unfilled half rendered in the browser's
+   default grey: the one non-green surface on an all-green page. */
+.lm-dock-seek {
+  flex: 1;
+  min-width: 0;
+  height: 20px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* WebKit has no ::-moz-range-progress equivalent, so the filled portion is a
+   hard-stop gradient at --seek-pct, set inline from React. */
+.lm-dock-seek::-webkit-slider-runnable-track,
+.lm-dock-speed-range::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(
+    to right,
+    var(--green-dark) var(--seek-pct, 0%),
+    var(--green-light) var(--seek-pct, 0%)
+  );
+}
+
+.lm-dock-seek::-webkit-slider-thumb,
+.lm-dock-speed-range::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  /* (track height - thumb height) / 2 centres the thumb on the track. */
+  margin-top: -4px;
+  border-radius: var(--radius-pill);
+  background: var(--green-dark);
+  border: 2px solid var(--white);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Firefox paints the fill itself and ignores the gradient above. */
+.lm-dock-seek::-moz-range-track,
+.lm-dock-speed-range::-moz-range-track {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--green-light);
+}
+
+.lm-dock-seek::-moz-range-progress,
+.lm-dock-speed-range::-moz-range-progress {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--green-dark);
+}
+
+.lm-dock-seek::-moz-range-thumb,
+.lm-dock-speed-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  background: var(--green-dark);
+  border: 2px solid var(--white);
+  box-shadow: var(--shadow-sm);
+}
+
+.lm-dock-seek:focus-visible,
+.lm-dock-speed-range:focus-visible { outline: 2px solid var(--green-dark); outline-offset: 2px; }
+
+/* Tabular figures: without them the digits change width as the clock ticks and
+   the bar next to it visibly twitches. */
+.lm-dock-clock {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.lm-dock-restart {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-pill);
+  background: var(--white);
+  color: var(--green-dark);
+  cursor: pointer;
+}
+
+.lm-dock-restart:hover { border-color: var(--green-dark); }
+
+
+
+
+
+/* Hidden while the quiz is on screen, so the pill never sits on top of the
+   questions. Slides down rather than vanishing, same gesture as the nav dock's
+   scroll-hide. Narration keeps playing: this is a layout state, not a
+   playback one. */
+.lm-audio-player[data-hidden="true"] {
+  transform: translateY(120%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The rail re-enables pointer events for itself, so hiding the positioner is
+   not enough on its own: without this the invisible pill still swallows taps
+   over the first quiz question. Same rule MobileDock needs for .dock-rail. */
+.lm-audio-player[data-hidden="true"] .lm-dock-rail {
+  pointer-events: none;
+}
+
+.lm-audio-player {
+  transition: transform var(--transition-normal), opacity var(--transition-normal);
+}
+
+/* ── Speed: a chip that opens a slider ──────────────────────────────────────
+   One control at every width. Presets could not offer 1.7x, and five inline
+   buttons never fit a one-row dock on a phone. */
+.lm-dock-speed {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.lm-dock-rate-chip {
+  display: grid;
+  place-items: center;
+  min-width: 46px;
+  height: 32px;
+  padding: 0 0.45rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-pill);
+  background: var(--white);
+  color: var(--green-dark);
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.lm-dock-rate-chip:hover { border-color: var(--green-dark); }
+
+.lm-dock-rate-chip.is-open {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+  color: var(--white);
+}
+
+.lm-dock-speed-pop {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  z-index: 1;
+  width: 210px;
+  padding: 0.7rem 0.8rem 0.55rem;
+  background: var(--white);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+}
+
+.lm-dock-speed-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lm-dock-speed-reset {
+  border: none;
+  background: transparent;
+  color: var(--green-dark);
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.lm-dock-speed-reset:disabled {
+  color: var(--muted);
+  opacity: 0.5;
+  cursor: default;
+  text-decoration: none;
+}
+
+.lm-dock-speed-range {
+  width: 100%;
+  height: 20px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.lm-dock-speed-scale {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.lm-dock-speed-scale strong {
+  font-size: 0.8rem;
+  color: var(--green-dark);
+}
+
+.lm-dock-speed-note {
+  margin: 0.4rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+/* The article must not end underneath the pill. Both classes are chained on
+   one element deliberately: .shell--mobile .page in mobile-shell.css sets the
+   same property at the same specificity and is imported later, so an unchained
+   selector here silently loses. */
+.page.lm-lesson-page.is-docked { padding-bottom: var(--lm-player-clearance); }
+
+/* Same query as useMobileShell.ts, so the markup and the styling can never
+   disagree about which rate control is showing. */
+@media (max-width: 760px), (hover: none) and (pointer: coarse) and (max-width: 1100px) {
+  /* The player owns the bottom edge here: this route is registered in
+     IMMERSIVE_PATTERNS (MobileDock.tsx), so the nav dock never renders on it
+     and there is nothing to stack above. Getting back to the track is the
+     header's own back button. */
+  /* Sit exactly where the nav rail used to: same bottom padding token it used,
+     so the pill lands in the position the thumb already expects rather than
+     floating a couple of pixels above it. */
+  .lm-audio-player {
+    padding-bottom: calc(var(--dock-pad-bottom) + env(safe-area-inset-bottom));
+  }
+
+  .lm-dock-rail { gap: 0.5rem; }
+
+  /* .shell--mobile .page reserves --dock-clearance for every mobile page, but
+     no dock renders on this one, so that band would be dead space. Replace it
+     with the player's own clearance, or with plain bottom padding mirroring
+     the shell's top padding when the player is not showing (edit mode, or no
+     speech synthesis). */
+  .shell--mobile .page.lm-lesson-page {
+    padding-bottom: clamp(20px, 5vw, 28px);
+  }
+
+  .shell--mobile .page.lm-lesson-page.is-docked {
+    padding-bottom: var(--lm-player-clearance);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lm-dock-toggle,
+  .lm-dock-rate-chip,
+  .lm-audio-player { transition: none; }
+}
+
+/* Reformat button: always present in the lesson header, emphasised only when
+   the article actually shows the mangled-escape damage. Not gated on that
+   detector, because the repair is idempotent and a false negative would hide
+   the fix exactly when it is needed. */
+.lm-reformat-btn.is-needed {
+  border-color: var(--accent-caution);
+  color: var(--accent-caution);
+  background: var(--accent-caution-tint);
+}
+
+/* ── Usage meters (Settings > Usage) ───────────────────────────────────── */
+.usage-meters {
+  display: grid;
+  gap: 12px;
+}
+
+.usage-intro {
+  margin: 0;
+  max-width: 62ch;
+}
+
+.usage-unlimited {
+  justify-self: start;
+}
+
+.usage-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 14px;
+  background: var(--white);
+}
+
+.usage-row {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+}
+
+.usage-row + .usage-row {
+  border-top: 1px solid var(--green-light);
+}
+
+.usage-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.usage-row-name {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.usage-row-count {
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.usage-row-of,
+.usage-row-unit {
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--green-dark);
+}
+
+.usage-row-foot {
+  margin: 0;
+}
+
+.usage-pips {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 6px;
+}
+
+.usage-pip {
+  height: 10px;
+  border-radius: 3px;
+  background: var(--green-lightest);
+  box-shadow: inset 0 0 0 1px var(--green-light-mid);
+  transition: background var(--transition-normal);
+}
+
+.usage-pip--used {
+  background: var(--green-dark);
+  box-shadow: none;
+}
+
+.usage-bar {
+  position: relative;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--green-lightest);
+  box-shadow: inset 0 0 0 1px var(--green-light-mid);
+}
+
+.usage-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--green-dark);
+  transition: width var(--transition-normal);
+}
+
+.usage-row--near .usage-bar-fill,
+.usage-row--near .usage-pip--used {
+  background: var(--accent-caution);
+}
+
+.usage-row--full .usage-bar-fill,
+.usage-row--full .usage-pip--used {
+  background: var(--accent-danger);
+}
+
+.usage-row--full .usage-row-foot {
+  color: var(--accent-danger-strong);
+}
+
+.usage-loading {
+  height: 180px;
+  border-radius: 14px;
+  background: var(--green-lightest);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .usage-pip,
+  .usage-bar-fill {
+    transition: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .usage-row {
+    padding: 12px;
+  }
+
+  .usage-row-count {
+    font-size: 1.15rem;
+  }
+}
+
+/* ── Admin: token usage (AdminTokenUsage.tsx) ──────────────────────────── */
+.token-usage-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin-bottom: 12px;
+}
+
+.token-usage-head .admin-section-title {
+  margin: 0;
+}
+
+.token-usage-head p {
+  margin: 0;
+}
+
+.token-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.token-tile {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.token-tile-label,
+.token-tile-sub {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.token-tile-value {
+  margin: 4px 0 2px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.token-chart-card {
+  padding: 12px 16px 8px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.token-chart-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.token-legend {
+  display: flex;
+  gap: 16px;
+  font-size: 0.8rem;
+  color: var(--ink);
+}
+
+.token-legend > span {
+  display: inline-flex;
+  align-items: center;
+}
+
+.token-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+
+.token-view-toggle {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 0.78rem;
+  color: var(--green-dark);
+  cursor: pointer;
+}
+
+.token-view-toggle:hover {
+  border-color: var(--green-mid);
+}
+
+.token-view-toggle:focus-visible,
+.token-chart-svg rect:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.token-chart {
+  position: relative;
+}
+
+.token-chart-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.token-chart-grid {
+  stroke: var(--green-light);
+  stroke-width: 1;
+}
+
+.token-chart-baseline {
+  stroke: var(--green-light-mid);
+  stroke-width: 1;
+}
+
+.token-chart-axis {
+  font-size: 11px;
+  fill: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.token-chart-tooltip {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  min-width: 170px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--white);
+  box-shadow: var(--shadow-md);
+  font-size: 0.78rem;
+  color: var(--ink);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.token-chart-tooltip p {
+  margin: 0 0 2px;
+}
+
+.token-chart-tooltip strong {
+  float: right;
+  margin-left: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.token-chart-tooltip-title {
+  font-weight: 700;
+}
+
+.token-chart-tooltip-foot {
+  margin-top: 4px !important;
+  color: var(--muted);
+}
+
+.token-empty {
+  padding: 32px 0;
+  text-align: center;
+}
+
+.token-breakdowns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.token-breakdown-title {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.token-share-bar {
+  height: 100%;
+  border-radius: 3px;
+  background: #5b8a2e;
+}
+
+.token-loading {
+  height: 320px;
+  border-radius: var(--radius-md);
+  background: var(--green-lightest);
+}
+
+/* ── File Manager: upload recovery ───────────────────────────────────────────
+   Page-cap note under a ready row ("Read the first 300 of 812 pages."), and the
+   Re-upload pill (a .file-view-pill) on failed rows, disabled while one runs. */
+.file-manager-row-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 0 0;
+  font-size: 0.75rem;
+}
+
+.file-view-pill:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ── Kojo visuals (graph / geometry / mermaid / chart blocks) ───────────── */
+.visual-block {
+  position: relative;
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border, rgba(113, 131, 85, 0.2));
+  border-radius: 12px;
+  background: #fff;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.visual-block-canvas {
+  width: 100%;
+  min-height: 1px;
+}
+.visual-block--mermaid .visual-block-canvas {
+  display: flex;
+  justify-content: center;
+}
+/* Render at natural size (useMaxWidth off) so text never shrinks; wide charts
+   scroll sideways inside .visual-block-canvas instead. */
+.visual-block--mermaid svg {
+  max-width: none;
+  height: auto;
+  flex-shrink: 0;
+}
+.visual-block--mermaid .visual-block-canvas {
+  justify-content: safe center;
+}
+.visual-geometry-board {
+  width: 100%;
+  max-width: 480px;
+  aspect-ratio: 1 / 1;
+  margin: 0 auto;
+  border: none;
+  border-radius: 8px;
+}
+.visual-block-pending {
+  padding: 1.5rem 0;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--green-dark);
+  opacity: 0.75;
+}
+.visual-block--error {
+  background: transparent;
+}
+.visual-block-error-msg {
+  margin-bottom: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--error, #b42318);
+}
+.visual-block--error .kojo-code-block {
+  margin: 0;
+}
+
+/* Mermaid polish: soft rounded nodes, pill edge labels, no runaway height */
+.visual-block--mermaid .visual-block-canvas {
+  max-height: 560px;
+  overflow: auto;
+}
+.visual-block--mermaid .node rect,
+.visual-block--mermaid .node polygon,
+.visual-block--mermaid .node path {
+  filter: none;
+}
+.visual-block--mermaid .node rect:not([rx="0"]) {
+  rx: 8px;
+  ry: 8px;
+}
+.visual-block--mermaid .edgeLabel,
+.visual-block--mermaid .edgeLabel p,
+.visual-block--mermaid .labelBkg {
+  background-color: var(--white) !important;
+  border-radius: 999px;
+  padding: 1px 6px;
+  font-size: 12px;
+  color: var(--green-dark);
+}
+.visual-block--mermaid .flowchart-link {
+  stroke-width: 1.75px;
+}
+
+/* Geometry labels: a white halo so text stays readable where it crosses lines,
+   fills or grid. Beats JSXGraph's presentation attributes. */
+.visual-geometry-board text {
+  paint-order: stroke;
+  stroke: var(--white);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  font-size: 13px;
+}
+
+/* Geometry zoom/pan buttons: top-right instead of JSXGraph's bottom-right,
+   where they covered the x-axis numbers. bottom is cleared in VisualBlock. */
+.visual-geometry-board .JXG_navigation {
+  top: 6px;
+  background: var(--white);
+  border: 1px solid rgba(113, 131, 85, 0.25);
+  border-radius: 999px;
+  padding: 2px 4px;
+  user-select: none;
+}
+.visual-geometry-board .JXG_navigation_button:hover {
+  color: var(--ink);
+}
+
+/* Create Test: practice test mode (recreate vs match style) */
+.practice-mode-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 10px;
+}
+
+.practice-mode-note {
+  margin: 8px 0 0;
+}
+
+.practice-mode-note--above {
+  margin: 0 0 10px;
+}
+
+/* Question editor: read-only previews while the test is still generating */
+.editor-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.editor-preview-text {
+  margin: 0;
+  white-space: pre-wrap;
+  color: var(--ink);
+}
+
+.editor-preview-options {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 20px;
+  color: #596949;
+  font-size: 0.9rem;
+}
+
+.editor-preview-options .is-correct {
+  color: var(--green-dark);
+  font-weight: 700;
+}
+
+/* Results: answer not backed by the uploaded practice test's key (GH #133) */
+.review-detail .review-inferred-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light-mid);
+  color: var(--green-dark);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.review-inferred-note svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* Create Test: reading the practice test and picking its sections (GH #133) */
+.practice-status {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+  color: var(--green-dark);
+}
+
+.practice-status--error {
+  color: var(--error);
+}
+
+.practice-sections {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.practice-sections legend {
+  margin-bottom: 6px;
+}
+
+.practice-section-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.52);
+  cursor: pointer;
+}
+
+.practice-section-option input {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  accent-color: var(--green-dark);
+}
+
+.practice-section-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+/* Kojo: the hint line under the message box alternates with the AI disclaimer.
+   Both messages share one grid cell, so the line keeps the longer one's width
+   and nothing moves when they swap; only opacity changes. */
+.kojo-hint-carousel {
+  display: inline-grid;
+  justify-items: start;
+}
+
+.kojo-hint-carousel-item {
+  grid-area: 1 / 1;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.kojo-hint-carousel-item.is-active {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kojo-hint-carousel-item { transition: none; }
+}
+
+/* Practice test problem picker + review step (GH #138). Opens from Create Test. */
+.practice-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.practice-pick p {
+  flex: 1 1 220px;
+  margin: 0;
+  color: var(--ink);
+}
+
+.modal-card.pp-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 100%);
+  max-height: 88vh;
+  gap: 12px;
+  padding: 20px;
+}
+
+.pp-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pp-header h2 {
+  margin: 0 0 4px;
+  font-size: 1.15rem;
+}
+
+.pp-header p {
+  margin: 0;
+}
+
+.pp-close {
+  display: inline-flex;
+  padding: 6px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--green-dark);
+  cursor: pointer;
+}
+
+.pp-close:hover:not(:disabled) {
+  background: var(--green-light);
+}
+
+.pp-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.pp-search {
+  display: flex;
+  flex: 1 1 220px;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  color: var(--green-dark);
+}
+
+.pp-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  color: var(--ink);
+}
+
+.pp-quick {
+  display: flex;
+  gap: 6px;
+}
+
+.pp-quick button,
+.pp-group-head button,
+.pp-back {
+  padding: 5px 10px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--green-dark);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.pp-quick button:hover,
+.pp-group-head button:hover,
+.pp-back:hover:not(:disabled) {
+  background: var(--green-lightest);
+}
+
+.pp-body {
+  display: grid;
+  gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.pp-group {
+  display: grid;
+  gap: 6px;
+}
+
+.pp-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pp-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.52);
+  cursor: pointer;
+}
+
+.pp-row.is-on {
+  border-color: var(--green-dark);
+  background: var(--white);
+}
+
+.pp-row input {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--green-dark);
+}
+
+.pp-row-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pp-row-title {
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+.pp-row-preview {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 0.8rem;
+  color: var(--green-dark-mid);
+}
+
+.pp-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--green-light-mid);
+}
+
+.pp-footer .button-row {
+  margin: 0;
+}
+
+.pp-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pp-review {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: var(--white);
+}
+
+.pp-review.is-done {
+  border-color: var(--success);
+}
+
+.pp-review.is-error {
+  border-color: var(--error);
+}
+
+.pp-review-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.92rem;
+}
+
+.pp-status--approved {
+  background: var(--green-lightest);
+  color: var(--success);
+}
+
+.pp-status--error {
+  color: var(--error);
+}
+
+.pp-question {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.6);
+  border-left: 3px solid var(--green-light-mid);
+  overflow-x: auto;
+}
+
+.pp-source summary {
+  font-size: 0.8rem;
+  color: var(--green-dark);
+  cursor: pointer;
+}
+
+.pp-source pre {
+  max-height: 220px;
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  overflow: auto;
+  border-radius: var(--radius-md);
+  background: var(--green-lightest);
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.pp-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pp-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--green-dark);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.pp-action:hover:not(:disabled) {
+  background: var(--green-lightest);
+}
+
+.pp-action.is-on {
+  border-color: var(--success);
+  background: var(--green-lightest);
+  color: var(--success);
+}
+
+.pp-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pp-fix {
+  display: grid;
+  gap: 8px;
+}
+
+.pp-fix textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: 0.88rem;
+  resize: vertical;
+}
+
+@media (max-width: 560px) {
+  .modal-backdrop:has(.pp-modal) {
+    padding: 0;
+  }
+
+  .modal-card.pp-modal {
+    max-height: 100vh;
+    height: 100%;
+    border-radius: 0;
+    padding: 16px;
+  }
+
+  .pp-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pp-footer .button-row {
+    justify-content: flex-end;
+  }
+}
+

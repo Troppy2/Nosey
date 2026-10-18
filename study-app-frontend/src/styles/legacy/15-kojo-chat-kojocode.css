@@ -1,0 +1,1239 @@
+/* Chat mode uses the app's global type. The earlier pass set JetBrains Mono on
+   these; they sit above this block, so override rather than delete. */
+.chat-mode-shell .chat-mode-brand-name,
+.chat-mode-shell .chat-mode-new-chat,
+.chat-mode-shell .chat-mode-section-label,
+.chat-mode-shell .kojo-chat-item-date,
+.chat-mode-shell .chat-mode-docs-btn,
+.chat-mode-shell .chat-mode-docs-header,
+.chat-mode-shell .chat-mode-doc-meta,
+.chat-mode-shell .chat-mode-input-hint,
+.chat-mode-shell .kojo-blueprint-head,
+.chat-mode-shell .kojo-message-time,
+.chat-mode-shell .kojo-command-pill,
+.chat-mode-shell .kojo-suggestion,
+.chat-mode-shell .chat-mode-title,
+.chat-mode-shell .chat-mode-folder-pill {
+  font-family: var(--font-sans);
+}
+
+/* -- Kojo action cards (chat-proposed creations) ---------------------------- */
+
+.kojo-action-textarea {
+  resize: vertical;
+  min-height: 56px;
+  font: inherit;
+  line-height: 1.45;
+}
+
+.kojo-action-folderpick {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.kojo-action-folderpick .kojo-blueprint-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.kojo-action-newfolder {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.kojo-action-newfolder .kojo-blueprint-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.kojo-action-newfolder-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border, #d8d3c4);
+  background: transparent;
+  color: inherit;
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.kojo-action-newfolder-btn:hover:not(:disabled) {
+  background: var(--green-lightest, #eef3ea);
+}
+
+.kojo-action-card--deleted {
+  opacity: 0.75;
+}
+
+.kojo-action-deleted-name {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.kojo-action-deleted-note {
+  font-size: 0.75rem;
+  opacity: 0.65;
+  font-style: italic;
+}
+
+/* Section label inside the composer plus-menu ("create") */
+.kojo-attach-menu-label {
+  margin: 6px 0 2px;
+  padding: 0 10px;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  border-top: 1px solid var(--border, #d8d3c4);
+  padding-top: 8px;
+}
+
+/* Learning Modules: archived tracks section (track hub) */
+.lm-archived-section {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1.1rem;
+}
+
+.lm-archived-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--border);
+  background: var(--white);
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.45rem 0.85rem;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.lm-archived-toggle:hover {
+  border-color: var(--green-dark);
+}
+
+.lm-chevron-open {
+  transform: rotate(90deg);
+}
+
+.lm-archived-tracks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+}
+
+.lm-archived-track {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--white);
+  padding: 0.4rem 0.5rem 0.4rem 0.2rem;
+}
+
+.lm-archived-track-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.lm-archived-track-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 0.45rem 0.35rem;
+  text-align: left;
+}
+
+.lm-archived-track-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lm-module-list--archived {
+  margin-top: 0.5rem;
+  padding: 0 0.35rem 0.35rem;
+}
+
+/* ── Kojo streaming: staged thinking, typing caret, reasoning ─────────────────
+   Shown while a Kojo answer streams in. Kept in Kojo's muted-green idiom; the
+   reasoning disclosure reads as a de-emphasized margin note beside the answer. */
+
+.kojo-staged {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.15rem 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.kojo-staged-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.kojo-staged-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--green-dark-mid);
+  animation: kojo-dot 1.1s ease-in-out infinite;
+}
+
+.kojo-staged-dots i:nth-child(2) { animation-delay: 0.15s; }
+.kojo-staged-dots i:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes kojo-dot {
+  0%, 100% { opacity: 0.3; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-3px); }
+}
+
+.kojo-staged-label {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--green-dark);
+  animation: kojo-staged-in 0.34s ease;
+}
+
+@keyframes kojo-staged-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Blinking caret trailing streamed text */
+.kojo-answer { position: relative; }
+
+.kojo-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: var(--green-dark);
+  animation: kojo-caret-blink 1s steps(1) infinite;
+}
+
+@keyframes kojo-caret-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
+
+/* Reasoning disclosure: dehighlighted, collapsible margin note */
+.kojo-reasoning {
+  margin: 0 0 0.4rem;
+}
+
+.kojo-reasoning-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.1rem 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--green-dark-mid);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.8;
+}
+
+.kojo-reasoning-toggle:hover { color: var(--green-dark); opacity: 1; }
+
+.kojo-reasoning-chevron {
+  transition: transform 0.18s ease;
+  flex-shrink: 0;
+}
+
+.kojo-reasoning--open .kojo-reasoning-chevron {
+  transform: rotate(90deg);
+}
+
+.kojo-reasoning-live {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  font-style: italic;
+  color: var(--green-dark-mid);
+  animation: kojo-reasoning-pulse 1.3s ease-in-out infinite;
+}
+
+@keyframes kojo-reasoning-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+.kojo-reasoning-body {
+  margin-top: 0.25rem;
+  padding: 0.05rem 0 0.05rem 0.7rem;
+  border-left: 2px solid var(--green-lightest);
+  color: var(--green-dark-mid);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  opacity: 0.85;
+  animation: kojo-staged-in 0.24s ease;
+}
+
+/* Reasoning text is de-emphasized: quieter and smaller than the answer body */
+.kojo-reasoning-body .kojo-markdown,
+.kojo-reasoning-body p,
+.kojo-reasoning-body li {
+  color: var(--green-dark-mid);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.kojo-reasoning-body .kojo-md-p { margin: 0.25rem 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .kojo-staged-dots i,
+  .kojo-caret,
+  .kojo-reasoning-live,
+  .kojo-staged-label,
+  .kojo-reasoning-body {
+    animation: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   Code-block copy button + chat-mode user-bubble actions
+   (copy prompt, edit + resend, retry, version switcher)
+═══════════════════════════════════════════════════ */
+
+/* ── Code block header (language label + copy) ── */
+.kojo-code-head {
+  position: sticky;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  min-height: 16px;
+}
+
+/* The language label now lives inside the flex header; drop its own margin so
+   spacing comes from the header. Placed after earlier .kojo-code-lang rules so
+   it wins on equal specificity (including the test-option override). */
+.kojo-code-block .kojo-code-head .kojo-code-lang {
+  margin-bottom: 0;
+}
+
+.kojo-code-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: currentColor;
+  opacity: 0.62;
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  line-height: 1;
+  padding: 3px 7px;
+  cursor: pointer;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+
+.kojo-code-copy:hover {
+  opacity: 1;
+  background: rgba(127, 127, 127, 0.16);
+}
+
+.kojo-code-copy:focus-visible {
+  opacity: 1;
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+}
+
+/* ── User bubble action row (chat mode) ── */
+.chat-mode-shell .kojo-user-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* Timestamp sits in the flex meta row now; drop its standalone top margin so it
+   aligns with the action buttons instead of dropping below them. */
+.chat-mode-shell .kojo-user-meta .kojo-message-time--user,
+.chat-mode-shell .kojo-user-meta .kojo-message-time {
+  margin-top: 0;
+}
+
+.chat-mode-shell .kojo-user-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.chat-mode-shell .kojo-user-col:hover .kojo-user-actions,
+.chat-mode-shell .kojo-user-actions:focus-within {
+  opacity: 1;
+}
+
+.chat-mode-shell .kojo-user-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--k-faint);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.chat-mode-shell .kojo-user-action:hover {
+  background: var(--k-hover);
+  color: var(--k-ink);
+}
+
+.chat-mode-shell .kojo-user-action:focus-visible {
+  outline: 2px solid var(--k-accent);
+  outline-offset: 1px;
+}
+
+.chat-mode-shell .kojo-user-action:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── Prompt version switcher ── */
+.chat-mode-shell .kojo-version-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  color: var(--k-faint);
+}
+
+.chat-mode-shell .kojo-version-switch span {
+  min-width: 26px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-mode-shell .kojo-version-switch button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--k-faint);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.chat-mode-shell .kojo-version-switch button:hover:not(:disabled) {
+  background: var(--k-hover);
+  color: var(--k-ink);
+}
+
+.chat-mode-shell .kojo-version-switch button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* ── Failed send + retry ── */
+.chat-mode-shell .kojo-user-bubble--failed {
+  background: #9a4038;
+}
+
+.chat-mode-shell .kojo-user-failed {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  color: #b3352b;
+}
+
+.chat-mode-shell .kojo-user-retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #e2b4ae;
+  border-radius: var(--radius-pill);
+  background: #fdf3f2;
+  color: #b3352b;
+  font-family: inherit;
+  font-size: 0.72rem;
+  padding: 2px 9px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.chat-mode-shell .kojo-user-retry:hover:not(:disabled) {
+  background: #f9e6e4;
+}
+
+.chat-mode-shell .kojo-user-retry:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ── Inline prompt edit ── */
+.chat-mode-shell .kojo-user-col--editing {
+  max-width: 100%;
+  width: 100%;
+  align-items: stretch;
+}
+
+.chat-mode-shell .kojo-user-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.chat-mode-shell .kojo-user-edit-input {
+  width: 100%;
+  border: 1px solid var(--k-line);
+  border-radius: var(--radius-xl);
+  background: var(--k-field);
+  color: var(--k-ink);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.chat-mode-shell .kojo-user-edit-input:focus {
+  outline: none;
+  border-color: var(--k-accent);
+  box-shadow: 0 0 0 3px var(--k-accent-tint);
+}
+
+.chat-mode-shell .kojo-user-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.chat-mode-shell .kojo-user-edit-cancel,
+.chat-mode-shell .kojo-user-edit-send {
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background 0.12s ease, opacity 0.12s ease;
+}
+
+.chat-mode-shell .kojo-user-edit-cancel {
+  border: 1px solid var(--k-line);
+  background: transparent;
+  color: var(--k-muted);
+}
+
+.chat-mode-shell .kojo-user-edit-cancel:hover {
+  background: var(--k-hover);
+}
+
+.chat-mode-shell .kojo-user-edit-send {
+  border: none;
+  background: var(--k-accent);
+  color: #fff;
+}
+
+.chat-mode-shell .kojo-user-edit-send:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Touch devices have no hover: keep the bubble actions visible. */
+@media (hover: none) {
+  .chat-mode-shell .kojo-user-actions {
+    opacity: 1;
+  }
+}
+
+/* ── Assistant answer action row (copy / regenerate / answer switcher) ── */
+.chat-mode-shell .kojo-answer-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.chat-mode-shell .kojo-answer-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.chat-mode-shell .kojo-message--assistant:hover .kojo-answer-actions,
+.chat-mode-shell .kojo-answer-actions:focus-within {
+  opacity: 1;
+}
+
+.chat-mode-shell .kojo-answer-meta .kojo-message-time {
+  margin-top: 0;
+}
+
+@media (hover: none) {
+  .chat-mode-shell .kojo-answer-actions {
+    opacity: 1;
+  }
+}
+
+/* ── Stop button (send button while Kojo is streaming) ── */
+.chat-mode-shell .kojo-send--stop {
+  background: var(--k-ink);
+  color: var(--k-canvas);
+}
+
+.chat-mode-shell .kojo-send--stop:hover {
+  background: var(--k-ink-2);
+}
+
+.chat-mode-shell .kojo-send--stop svg {
+  fill: currentColor;
+}
+
+/* ── Settings: Kojo custom instruction + weekly memory ── */
+.settings-custom-instruction {
+  width: 100%;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-lg);
+  background: var(--white);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  padding: 10px 12px;
+  resize: vertical;
+  margin-top: 8px;
+}
+
+.settings-custom-instruction:focus {
+  outline: none;
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.15);
+}
+
+.settings-custom-instruction-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
+.settings-inline-clear {
+  border: none;
+  background: none;
+  color: var(--green-dark);
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.settings-inline-clear:hover {
+  text-decoration: underline;
+}
+
+.settings-memory-card {
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-lg);
+  background: var(--green-lightest);
+  padding: 12px 14px;
+  margin: 10px 0;
+}
+
+.settings-memory-text {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.settings-memory-date {
+  margin: 8px 0 0;
+}
+
+.settings-secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  color: var(--green-dark);
+  font-family: inherit;
+  font-size: 0.88rem;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.settings-secondary-btn:hover:not(:disabled) {
+  background: var(--green-lightest);
+}
+
+.settings-secondary-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* ── Folder-home Files card: upload target (click + drag-and-drop) ── */
+.chat-mode-shell .kojo-files-card {
+  position: relative;
+}
+
+.chat-mode-shell .kojo-files-card--drag {
+  border-color: var(--k-accent);
+  box-shadow: 0 0 0 3px var(--k-accent-tint);
+}
+
+.chat-mode-shell .kojo-files-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.chat-mode-shell .kojo-files-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--k-line);
+  border-radius: var(--radius-sm);
+  background: var(--k-field);
+  color: var(--k-ink);
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.chat-mode-shell .kojo-files-add:hover:not(:disabled) {
+  background: var(--k-hover);
+  border-color: var(--k-accent);
+}
+
+.chat-mode-shell .kojo-files-add:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.chat-mode-shell .kojo-files-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 18px 12px;
+  border: 1.5px dashed var(--k-line);
+  border-radius: var(--radius-xl);
+  background: transparent;
+  color: var(--k-muted);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.chat-mode-shell .kojo-files-drop:hover:not(:disabled) {
+  border-color: var(--k-accent);
+  background: var(--k-hover);
+  color: var(--k-ink);
+}
+
+.chat-mode-shell .kojo-files-drop:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.chat-mode-shell .kojo-files-drop-main {
+  font-size: 0.82rem;
+}
+
+.chat-mode-shell .kojo-files-drop-link {
+  color: var(--k-accent);
+  font-weight: 600;
+}
+
+.chat-mode-shell .kojo-files-drop-hint {
+  font-size: 0.7rem;
+  color: var(--k-faint);
+}
+
+.chat-mode-shell .kojo-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+}
+
+.chat-mode-shell .kojo-file-row {
+  align-items: center;
+}
+
+.chat-mode-shell .kojo-file-badge {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-family: var(--font-sans);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--k-faint);
+  border: 1px solid var(--k-line);
+  border-radius: var(--radius-xs);
+  padding: 2px 5px;
+}
+
+.chat-mode-shell .kojo-files-error {
+  margin: 8px 0 0;
+  font-size: 0.72rem;
+  color: #b3352b;
+}
+
+.chat-mode-shell .kojo-files-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: var(--radius-xl);
+  background: rgba(246, 249, 241, 0.92);
+  color: var(--k-accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+/* ── LeetCode dashboard: practice-rhythm heatmap (compact card, sits in top row) ── */
+.lc-cadence {
+  min-width: 0;
+  padding: 20px 22px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--shadow-sm);
+}
+
+.lc-cadence-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.lc-cadence-head h2 {
+  margin: 0;
+  font-family: "Lora", Georgia, serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lc-cadence-sub {
+  font-size: 0.72rem;
+  color: var(--muted, #596949);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Stats board: today's tally sits above the calendar, GitHub-summary style. */
+.lc-cadence-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.lc-cadence-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-lg);
+  background: var(--green-lightest, #eef4e4);
+  min-width: 92px;
+}
+
+.lc-cadence-stat strong {
+  font-family: "Lora", Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--green-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-cadence-stat small {
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  color: var(--muted, #596949);
+}
+
+/* "Jump back in" shortcut to the last-opened problem, sitting alongside the stat
+   tiles. Reuses the old browse-all pill look: horizontal, icon-less, arrow on the
+   right that nudges on hover. */
+.lc-cadence-resume {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 160px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--green-dark) 30%, white);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.lc-cadence-resume:hover {
+  border-color: var(--green-dark);
+  box-shadow: var(--shadow-sm);
+}
+
+.lc-cadence-resume-copy {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.lc-cadence-resume-copy small {
+  font-size: 0.66rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted, #596949);
+}
+
+.lc-cadence-resume-copy strong {
+  font-family: "Lora", Georgia, serif;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-cadence-resume > svg {
+  color: var(--green-dark);
+  flex-shrink: 0;
+  transition: transform var(--transition-fast);
+}
+
+.lc-cadence-resume:hover > svg {
+  transform: translateX(3px);
+}
+
+/* Horizontal scroll wrapper so the fixed-size week columns never squash. */
+.lc-cadence-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.lc-cadence-grid {
+  display: grid;
+  grid-template-rows: repeat(7, 16px);
+  grid-auto-flow: column;
+  grid-auto-columns: 16px;
+  gap: 4px;
+  width: max-content;
+}
+
+.lc-cadence-cell {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-xs);
+  /* Level 0 = empty. Levels 1-4 ramp the brand green from pale to deep, matching
+     the GitHub contribution-graph intensity scale. */
+  background: var(--green-lightest, #e9f0dd);
+  box-shadow: inset 0 0 0 1px rgba(27, 55, 24, 0.04);
+  transition: outline-color 0.1s ease;
+}
+
+.lc-cadence-cell[data-level="1"] { background: #b7d89a; }
+.lc-cadence-cell[data-level="2"] { background: #7fb85f; }
+.lc-cadence-cell[data-level="3"] { background: #4f9636; }
+.lc-cadence-cell[data-level="4"] { background: var(--green-dark, #2f5e1f); }
+
+.lc-cadence-cell.is-today {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 1px;
+}
+
+.lc-cadence-cell.is-future {
+  background: transparent;
+  box-shadow: none;
+}
+
+.lc-cadence-scroll .lc-cadence-cell:hover {
+  outline: 1px solid rgba(27, 55, 24, 0.35);
+  outline-offset: 1px;
+}
+
+.lc-cadence-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 14px;
+  font-size: 0.7rem;
+  color: var(--muted, #596949);
+}
+
+.lc-cadence-legend .lc-cadence-cell {
+  width: 16px;
+  height: 16px;
+}
+
+.lc-cadence-legend > span:first-child {
+  margin-right: 2px;
+}
+
+.lc-cadence-legend > span:last-child {
+  margin-left: 2px;
+}
+
+/* ── LeetCode dashboard: two-column rows (heatmap+daily practice, mastery+reminders) ── */
+.lc-dash-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+  align-items: stretch;
+}
+
+@media (max-width: 760px) {
+  .lc-dash-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lc-insight-card {
+  padding: 20px 22px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Zone headings for the dashboard.
+   The page stacks eleven panels, and the only headings on it were the panels'
+   own titles at 1.05rem next to node labels at 1rem, so nothing outranked
+   anything and the column read as one undifferentiated pile. These sit a full
+   step above a panel title and carry a rule, which is what lets the eye find
+   the three groups (where you stand, what to do now, the whole map) without
+   reading every card. */
+.lc-zone-title {
+  margin: 34px 0 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--green-light-mid);
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.lc-zone-title:first-of-type {
+  margin-top: 8px;
+}
+
+.lc-insight-title {
+  margin: 0 0 16px;
+  font-family: "Lora", Georgia, serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lc-mastery-list,
+.lc-focus-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lc-mastery-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 5px;
+}
+
+.lc-mastery-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lc-mastery-count {
+  font-size: 0.72rem;
+  color: var(--muted, #596949);
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-mastery-bar {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: #e3eed3;
+  overflow: hidden;
+}
+
+.lc-mastery-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  transition: width 0.3s ease;
+}
+
+.lc-focus-sub {
+  margin: -8px 0 14px;
+  font-size: 0.72rem;
+  color: var(--muted, #596949);
+}
+
+/* Compact weak-topic chips, replacing the old oversized per-topic bordered rows. */
+.lc-focus-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.lc-focus-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-pill);
+  background: rgba(233, 245, 219, 0.6);
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.13s ease, border-color 0.13s ease;
+}
+
+.lc-focus-chip:hover {
+  background: var(--green-lightest);
+  border-color: var(--green-dark-mid);
+}
+
+.lc-focus-chip-count {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--muted, #596949);
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-focus-generate-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px;
+  margin-top: auto;
+  border: none;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--green-dark), #536342);
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.13s ease;
+}
+
+.lc-focus-generate-btn:hover {
+  filter: brightness(1.06);
+}
+
+.lc-focus-generate-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+  filter: none;
+}
+
+/* Shown in place of the generate button once today's Daily KojoCode problem exists:
+   a full-width "Complete [title]" arrow link that reopens today's problem. */
+.lc-focus-complete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 13px;
+  margin-top: auto;
+  border: 1px solid var(--green-dark);
+  border-radius: var(--radius-lg);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.13s ease, filter 0.13s ease;
+}
+
+.lc-focus-complete:hover {
+  filter: brightness(0.98);
+}
+
+.lc-focus-complete-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-focus-complete svg {
+  flex-shrink: 0;
+}
+
+.lc-focus-card {
+  display: flex;
+  flex-direction: column;
+}
+

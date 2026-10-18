@@ -1,0 +1,1222 @@
+/* Completed-questions history in the settings modal: a collapsible section (chevron
+   toggle) whose list scrolls inside so a long history never blows out the modal. */
+.lc-completed-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.lc-completed-chevron {
+  flex-shrink: 0;
+  color: var(--muted, #6b7280);
+  transition: transform 0.18s ease;
+}
+
+.lc-completed-chevron--open {
+  transform: rotate(180deg);
+}
+
+.lc-completed-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 168px;
+  overflow-y: auto;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: var(--radius-md);
+}
+
+.lc-completed-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.lc-completed-item:last-child {
+  border-bottom: none;
+}
+
+.lc-completed-title {
+  font-family: var(--font-serif, "Lora", serif);
+  font-size: 0.8rem;
+  line-height: 1.3;
+  color: var(--ink, #1f2a1f);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-completed-time {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  color: var(--muted, #6b7280);
+  white-space: nowrap;
+}
+
+/* Post-problem "how hard did that feel?" self-report. Reuses the survey-card shell
+   (.modal-backdrop / .survey-card); these classes style the difficulty buttons. */
+.lc-difficulty-card {
+  text-align: center;
+}
+
+.lc-difficulty-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin: 18px 0 6px;
+}
+
+.lc-difficulty-btn {
+  padding: 14px 12px;
+  border: 1.5px solid rgba(113, 131, 85, 0.28);
+  border-radius: var(--radius-lg);
+  background: var(--white);
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.lc-difficulty-btn:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.lc-difficulty-btn--easy:hover {
+  border-color: var(--accent-positive);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.lc-difficulty-btn--medium:hover {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+}
+
+.lc-difficulty-btn--hard:hover {
+  border-color: var(--accent-caution);
+  background: rgba(217, 119, 6, 0.08);
+}
+
+.lc-difficulty-btn--brutal:hover {
+  border-color: var(--accent-danger);
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.lc-difficulty-skip {
+  margin-top: 6px;
+  border: none;
+  background: transparent;
+  color: var(--muted, #596949);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 10px;
+}
+
+.lc-difficulty-skip:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+/* ── Complexity self-assessment panel ──────────────────────────────
+   Matches the NeetCode solution reveal (.lc-solution-*): a top-bordered
+   collapsible panel at the bottom of the problem pane. */
+.lc-complexity-panel {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(113, 131, 85, 0.18);
+  padding-bottom: 20px;
+}
+
+.lc-complexity-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  background: none;
+  border: 1px solid rgba(113, 131, 85, 0.22);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.lc-complexity-toggle:hover {
+  background: rgba(113, 131, 85, 0.07);
+}
+
+.lc-complexity-done {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #596949;
+  font-family: "JetBrains Mono", monospace;
+  flex-shrink: 0;
+}
+
+.lc-complexity-chevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: transform 0.18s;
+}
+
+/* When a done tag is present it already claims the auto margin, so the chevron
+   sits right after it rather than pushing to the far edge. */
+.lc-complexity-done + .lc-complexity-chevron {
+  margin-left: 6px;
+}
+
+.lc-complexity-chevron--open {
+  transform: rotate(180deg);
+}
+
+.lc-complexity-body {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lc-complexity-intro {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--muted, #596949);
+}
+
+.lc-complexity-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lc-complexity-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #596949;
+}
+
+.lc-complexity-claim {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid rgba(113, 131, 85, 0.28);
+  border-radius: var(--radius-sm);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.85rem;
+  color: var(--ink);
+  background: #fff;
+}
+
+.lc-complexity-why {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(113, 131, 85, 0.22);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--ink);
+  background: #fff;
+  resize: vertical;
+}
+
+.lc-complexity-claim:focus,
+.lc-complexity-why:focus {
+  outline: none;
+  border-color: var(--green-dark, #718355);
+  box-shadow: 0 0 0 2px rgba(113, 131, 85, 0.15);
+}
+
+.lc-complexity-submit {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--green-dark, #718355);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s;
+}
+
+.lc-complexity-submit:hover:not(:disabled) {
+}
+
+.lc-complexity-submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.lc-complexity-spin {
+  animation: lc-complexity-spin 0.9s linear infinite;
+}
+
+@keyframes lc-complexity-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Complexity self-assessment result: a two-row grading card (Time / Space). Each row
+   is scannable at a glance via a status rail; a correct row collapses to one confident
+   Big-O line, a wrong row shows a "you said -> correct" diff. Encouraging amber for
+   "not quite" rather than alarm red, since this is a learning moment. */
+.lc-complexity-result {
+  margin-top: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.lc-cx-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lc-cx-card {
+  position: relative;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-lg);
+  background: #fff;
+  padding: 10px 13px 11px 15px;
+  overflow: hidden;
+}
+
+.lc-cx-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+}
+
+.lc-cx-card--ok {
+  border-color: #bcd9b4;
+  background: #eef6ea;
+}
+
+.lc-cx-card--ok::before {
+  background: #3f7d4e;
+}
+
+.lc-cx-card--off {
+  border-color: #f0d3a6;
+  background: #fdf3e7;
+}
+
+.lc-cx-card--off::before {
+  background: #c2600c;
+}
+
+.lc-cx-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.lc-cx-metric {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #5b6a49;
+}
+
+.lc-cx-status {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.lc-cx-card--ok .lc-cx-status {
+  color: #3f7d4e;
+}
+
+.lc-cx-card--off .lc-cx-status {
+  color: #c2600c;
+}
+
+/* Correct: the single confident Big-O answer is the hero */
+.lc-cx-answer {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+/* Wrong: your answer struck through, the correct one below it */
+.lc-cx-diff {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  align-items: baseline;
+}
+
+.lc-cx-diff-key {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #6f7d5b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.lc-cx-diff-val {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.lc-cx-diff-val--said {
+  color: #c2600c;
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  text-decoration-color: rgba(194, 96, 12, 0.5);
+}
+
+.lc-cx-diff-val--right {
+  color: var(--ink);
+}
+
+/* Confidence: a quiet meter, never louder than the verdict */
+.lc-cx-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: #5b6a49;
+}
+
+.lc-cx-meter {
+  flex: 0 0 66px;
+  height: 5px;
+  border-radius: var(--radius-xs);
+  background: rgba(113, 131, 85, 0.2);
+  overflow: hidden;
+}
+
+.lc-cx-meter > span {
+  display: block;
+  height: 100%;
+  background: var(--green-dark);
+  border-radius: var(--radius-xs);
+}
+
+.lc-cx-meta-label {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.72rem;
+}
+
+.lc-cx-uncertain {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 9px 11px;
+  border-radius: var(--radius-md);
+  background: #fdf3e7;
+  border: 1px solid #f0d3a6;
+  color: #a4560a;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.lc-cx-uncertain svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.lc-cx-divider {
+  height: 1px;
+  background: rgba(113, 131, 85, 0.18);
+  border: 0;
+  margin: 1px 0;
+  width: 100%;
+}
+
+.lc-cx-feedback {
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: #313d27;
+}
+
+/* Mock Interview: level selector (setup) */
+.mock-level-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.mock-level-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 12px 14px;
+  border: 2px solid var(--green-light-mid);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--transition-normal), background var(--transition-normal), box-shadow var(--transition-normal), transform var(--transition-normal);
+}
+.mock-level-btn:hover {
+  border-color: var(--green-mid);
+  box-shadow: var(--shadow-md);
+}
+.mock-level-btn.selected {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+  box-shadow: 0 0 0 3px rgba(113,131,85,0.2), var(--shadow-md);
+}
+.mock-level-label {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+.mock-level-desc {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+/* Mock Interview: per-stage goal progress pill (Stage 2 + Stage 3 topbar) */
+.mock-goal-progress {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light-mid);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  vertical-align: middle;
+}
+
+/* Mock Interview: back-to-KojoCode link at the top of the setup page */
+.mock-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 4px 4px 4px 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--green-dark);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.mock-back-link:hover {
+  color: var(--ink);
+}
+
+/* Mock Interview: custom-company (job description) config panel */
+.mock-custom-panel {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--green-light-mid);
+}
+.mock-custom-label {
+  display: block;
+  margin: 14px 0 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.mock-custom-input,
+.mock-custom-textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 0.9rem;
+  color: var(--ink);
+  font-family: inherit;
+}
+.mock-custom-textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+.mock-custom-input:focus,
+.mock-custom-textarea:focus {
+  outline: none;
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.18);
+}
+.mock-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.mock-chip {
+  padding: 6px 12px;
+  border: 1.5px solid var(--green-light-mid);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  font-size: 0.83rem;
+  font-weight: 500;
+  color: var(--ink);
+  transition: border-color var(--transition-normal), background var(--transition-normal);
+}
+.mock-chip:hover {
+  border-color: var(--green-mid);
+}
+.mock-chip.selected {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-weight: 600;
+}
+.mock-chip-sm {
+  padding: 4px 10px;
+  font-size: 0.76rem;
+}
+.mock-subtopic-group {
+  margin-bottom: 10px;
+}
+.mock-subtopic-group-label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+/* ── KojoCode subtopics: nested topic picker + browse filter chips/tags ─────── */
+
+/* The topic row is now a container: a clickable label (checkbox + name) that flexes
+   to fill, the count, and an expand toggle when the topic has subtopics. */
+.lc-topic-option-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.lc-topic-option-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.lc-topic-expand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--muted, #596949);
+  cursor: pointer;
+}
+
+.lc-topic-expand:hover {
+  background: var(--green-lightest);
+  color: var(--green-dark);
+}
+
+.lc-subtopic-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0 0 4px 26px;
+  padding-left: 8px;
+  border-left: 1px solid var(--lc-border);
+}
+
+.lc-subtopic-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.lc-subtopic-option:hover {
+  background: var(--green-lightest);
+}
+
+.lc-subtopic-option input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--green-dark);
+  cursor: pointer;
+}
+
+/* Browse: subtopic filter chips sit as a lighter tier under the topic chips. */
+.lc-filter-chip--subtopic {
+  font-size: 0.72rem;
+}
+
+/* Browse: small technique tags under each problem title. */
+.lc-subtopic-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.lc-subtopic-tag {
+  padding: 3px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* ── KojoCode solution (custom-problem model solution reveal) ── */
+.lc-kojocode-body {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(113, 131, 85, 0.18);
+  border-radius: var(--radius-lg);
+  background: rgba(113, 131, 85, 0.04);
+}
+
+.lc-kojocode-loading,
+.lc-kojocode-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+.lc-kojocode-error {
+  justify-content: space-between;
+}
+
+.lc-inline-btn {
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  background: rgba(113, 131, 85, 0.1);
+  border: 1px solid rgba(113, 131, 85, 0.28);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+.lc-inline-btn:hover {
+  background: rgba(113, 131, 85, 0.2);
+}
+
+.lc-kojocode-approach-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--green-dark);
+  margin-bottom: 10px;
+}
+
+.lc-kojocode-section {
+  margin-top: 18px;
+}
+
+.lc-kojocode-section:first-of-type {
+  margin-top: 0;
+}
+
+.lc-kojocode-heading {
+  margin: 0 0 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted, #888);
+}
+
+.lc-kojocode-viz-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lc-kojocode-viz-row .lc-kojocode-heading {
+  margin-bottom: 0;
+}
+
+.lc-kojocode-viz-hint {
+  margin: 6px 0 0;
+  word-break: break-word;
+}
+
+/* The solution code renders through the shared KojoCode code block (MarkdownContent
+   .kojo-code-block). Its default is the DARK block; the Kojo chat menu uses the LIGHT
+   variant defined by `.chat-mode-shell .kojo-code-block` (--k-hover bg / --k-ink text).
+   The KojoCode editor is not inside .chat-mode-shell, so mirror those resolved token
+   values here to get the same light chat-style block. */
+.lc-kojocode-body .kojo-code-block {
+  background: rgba(113, 131, 85, 0.1);
+  color: var(--ink);
+}
+
+.lc-kojocode-complexity-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+/* Remove-from-drill X on each 3-Pass Drill card (mirrors .lc-bank-problem-remove). */
+.lc-drill-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted, #596949);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    color var(--transition-normal),
+    background var(--transition-normal),
+    border-color var(--transition-normal);
+}
+
+.lc-drill-remove:hover {
+  color: var(--accent-danger);
+  background: color-mix(in srgb, var(--accent-danger) 8%, white);
+  border-color: color-mix(in srgb, var(--accent-danger) 30%, white);
+}
+
+.lc-drill-remove:focus-visible {
+  outline: 2px solid var(--accent-danger);
+  outline-offset: 2px;
+}
+
+/* ── KojoCode: Random unsolved shortcut ─────────────────────────────────────── */
+/* Matches the .lc-official-link / .lc-toolbar-btn look so the browse toolbar reads as
+   one control set. Disabled means the pool has nothing unsolved left to pick. */
+.lc-random-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 8px 14px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.lc-random-btn:hover:not(:disabled) {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+}
+
+/* The hero shortcut borrows .lc-official-link, which was written for anchors, so the
+   button element needs the inherited font and a disabled state of its own. */
+button.lc-official-link {
+  font-family: inherit;
+}
+
+.lc-random-btn:disabled,
+button.lc-official-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.lc-random-btn:disabled:hover,
+button.lc-official-link:disabled:hover {
+  border-color: var(--lc-border);
+  background: var(--white);
+}
+
+/* ── Mock Interview: past interviews ────────────────────────────────────────── */
+.mock-setup-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.mock-history-link {
+  white-space: nowrap;
+}
+
+.mock-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.mock-history-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+.mock-history-card:hover {
+  border-color: var(--green-dark);
+}
+
+.mock-history-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mock-history-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mock-history-company {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.mock-history-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mock-history-meta span:not(:last-child)::after {
+  content: "·";
+  margin-left: 10px;
+}
+
+/* Pill form of the summary page's recommendation colours. The .rec-* rules there
+   style a full-width card (thick left border, gradient), so the pill restates them. */
+.mock-history-rec {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  background: var(--green-lightest);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.mock-history-rec.rec-strong-hire { background: #ecfdf5; border-color: var(--accent-positive); color: #047857; }
+.mock-history-rec.rec-hire        { background: var(--accent-info-tint); border-color: var(--accent-info); color: var(--accent-info-strong); }
+.mock-history-rec.rec-borderline  { background: var(--accent-caution-tint); border-color: var(--accent-caution); color: var(--accent-caution-strong); }
+.mock-history-rec.rec-no-hire     { background: var(--accent-danger-tint); border-color: var(--accent-danger); color: var(--accent-danger-strong); }
+.mock-history-rec--open           { background: var(--green-lightest); border-color: var(--lc-border); color: #596949; }
+
+.mock-history-chevron {
+  flex-shrink: 0;
+  color: #8a9a7b;
+}
+
+.mock-history-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+/* ── Mock Interview: resume deep dive (grill) ───────────────────────────────── */
+/* Lives inside the Resume Screen page under the ATS report. Reuses the Stage 3 chat
+   bubbles and input row; only the container and thread height are new. */
+.ats-grill {
+  margin-top: 18px;
+  padding: 18px 20px;
+}
+
+.ats-grill-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ats-grill-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 420px;
+  overflow-y: auto;
+  margin-top: 16px;
+  padding: 4px 2px;
+}
+
+.ats-grill .mock-stage3-chat-input-row {
+  border-top: 1px solid var(--green-light-mid);
+  padding: 12px 0 0;
+  margin-top: 12px;
+}
+
+@media (max-width: 700px) {
+  .ats-grill-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* ── Mock Interview: saved job descriptions ─────────────────────────────────── */
+/* Chips in the custom-company panel. Each is a load button plus a delete affordance,
+   so the pair sits in one bordered pill rather than two separate controls. */
+.mock-saved-jd-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.mock-saved-jd {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-pill);
+  background: var(--white);
+  overflow: hidden;
+}
+
+.mock-saved-jd.selected {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+}
+
+.mock-saved-jd-load {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mock-saved-jd-load:hover {
+  color: var(--green-dark);
+}
+
+.mock-saved-jd-delete {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px 6px 4px;
+  border: none;
+  background: transparent;
+  color: #8a9a7b;
+  cursor: pointer;
+}
+
+.mock-saved-jd-delete:hover {
+  color: var(--accent-danger);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MOCK INTERVIEW: THE LOOP SPINE
+   One vertical rail carries the whole feature. Each station is a stage of
+   the loop, and the rail segment beneath it is sized from that stage's real
+   time budget, so the length of the rail is the time estimate. Switching a
+   stage off collapses its segment and visibly shortens the day.
+   Time is always set in mono with tabular figures, here and everywhere else
+   in this feature.
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Deeper than --ink so the spine is the darkest mark on the page. */
+  --loop-ink: #1c2416;
+  --loop-rail-off: rgba(113, 131, 85, 0.28);
+}
+
+.mock-loop-section {
+  padding: 22px 26px 26px;
+}
+
+.mock-loop-section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 18px;
+}
+
+.mock-loop-section-head p {
+  margin: 0;
+  max-width: 60ch;
+}
+
+.loop-spine {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.loop-station {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 0 16px;
+}
+
+/* ── The rail itself ── */
+.loop-gutter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 2px;
+}
+
+.loop-node {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--green-light-mid);
+  background: var(--white);
+  color: var(--green-mid);
+  transition:
+    background var(--transition-normal),
+    border-color var(--transition-normal),
+    color var(--transition-normal);
+}
+
+.loop-station.is-on .loop-node {
+  background: var(--loop-ink);
+  border-color: var(--loop-ink);
+  color: var(--green-lightest);
+}
+
+/* The segment is the time. Its height comes from --station-h, which the
+   component derives from the stage's minute budget; an unselected stage sets
+   it to 0 and the row falls back to its content height. */
+.loop-segment {
+  flex: 1;
+  width: 2px;
+  min-height: var(--station-h, 0px);
+  margin: 6px 0 -2px;
+  border-radius: var(--radius-xs);
+  /* Declared as a gradient in both states so the on/off change interpolates. A
+     flat colour and a gradient are not interpolable, so the transition would
+     otherwise snap halfway through instead of fading. */
+  background: linear-gradient(180deg, var(--loop-rail-off), var(--loop-rail-off));
+  transition: min-height var(--transition-normal), background var(--transition-normal);
+}
+
+.loop-station.is-on .loop-segment {
+  background: linear-gradient(180deg, var(--loop-ink), var(--green-dark));
+}
+
+.loop-station:last-child .loop-segment {
+  display: none;
+}
+
+/* ── Station content ── */
+.loop-station-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 2px 12px 16px 0;
+  border: none;
+  background: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.loop-station-body--static {
+  cursor: default;
+}
+
+.loop-station-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.loop-station-index {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--green-mid);
+  transition: color var(--transition-normal);
+}
+
+.loop-station.is-on .loop-station-index {
+  color: var(--green-dark);
+}
+
+.loop-station-label {
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  transition: color var(--transition-normal);
+}
+
+.loop-station.is-on .loop-station-label {
+  color: var(--loop-ink);
+}
+

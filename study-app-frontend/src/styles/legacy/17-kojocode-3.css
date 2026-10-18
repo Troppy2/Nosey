@@ -1,0 +1,1204 @@
+/* ── Focus areas card (real weakness scoring) ────────────────────────────────
+   Topic in the human voice (serif), weakness score + meter in the machine voice
+   (mono), the meter running the same green -> amber -> red escalation ramp so the
+   hottest topic reads as "work on this now". */
+.lc-focus-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.lc-focus-head .lc-insight-title {
+  margin: 0;
+}
+
+.lc-focus-source {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  color: var(--muted, #596949);
+  white-space: nowrap;
+}
+
+.lc-focus-rows {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lc-focus-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "label score"
+    "meter meter";
+  align-items: center;
+  gap: 4px 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-lg);
+  background: rgba(233, 245, 219, 0.4);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.13s ease, border-color 0.13s ease;
+}
+
+.lc-focus-row:hover {
+  background: var(--green-lightest);
+  border-color: var(--green-dark-mid);
+}
+
+.lc-focus-row-label {
+  grid-area: label;
+  font-family: var(--font-serif);
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lc-focus-row-score {
+  grid-area: score;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--muted, #596949);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-focus-meter {
+  grid-area: meter;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: #e3eed3;
+  overflow: hidden;
+}
+
+.lc-focus-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  transition: width 0.3s ease;
+}
+
+/* ── Improvement chips: positive reinforcement, deliberately separate from the
+   weakness ramp above (green only, never the amber/red struggle colors). ────── */
+.lc-improvement-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 16px;
+}
+
+.lc-improvement-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--green-dark-mid);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ── The pass rung: a compact P1 - P2 - P3 ladder on the escalation ramp ──────
+   Completed passes fill solid in their ramp color, the current pass glows, locked
+   passes stay muted. Machine voice throughout. */
+.lc-rung {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lc-rung-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.lc-rung-step.is-done {
+  background: var(--rung);
+  border-color: var(--rung);
+  color: #ffffff;
+}
+
+.lc-rung-step.is-current {
+  background: color-mix(in srgb, var(--rung) 16%, white);
+  border-color: var(--rung);
+  color: color-mix(in srgb, var(--rung) 72%, black);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--rung) 22%, transparent);
+}
+
+.lc-rung-step.is-locked {
+  background: #eef2e6;
+  border-color: var(--lc-border);
+  color: #a7b394;
+}
+
+/* ── 3-Pass Drills hub: due-today / upcoming split of drill cards ─────────────*/
+.lc-drill-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.lc-drill-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  font-family: var(--font-serif);
+  font-size: 1.02rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lc-drill-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  background: var(--green-lightest);
+  border: 1px solid var(--lc-border);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--green-dark);
+}
+
+.lc-drill-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.lc-drill-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: var(--radius-xl);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Red appears only for a drill due now, so it means "now". */
+.lc-drill-card.is-due {
+  border-color: color-mix(in srgb, var(--accent-danger) 45%, white);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-danger) 22%, transparent), var(--shadow-sm);
+}
+
+.lc-drill-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lc-drill-when {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--muted, #596949);
+  white-space: nowrap;
+}
+
+.lc-drill-card.is-due .lc-drill-when {
+  color: var(--accent-danger);
+}
+
+.lc-drill-title {
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.lc-drill-title:hover {
+  color: var(--green-dark);
+  text-decoration: underline;
+}
+
+.lc-drill-rule {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.lc-drill-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.lc-drill-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--green-dark), #536342);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.13s ease;
+}
+
+.lc-drill-open:hover {
+  filter: brightness(1.06);
+}
+
+.lc-drill-advance {
+  padding: 8px 12px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: var(--radius-md);
+  background: #fff;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.13s ease, background 0.13s ease;
+}
+
+.lc-drill-advance:hover {
+  border-color: var(--green-dark-mid);
+  background: var(--green-lightest);
+}
+
+/* ── Prep Banks gallery (deepened) ───────────────────────────────────────────*/
+
+/* Preset banks assembled from our own catalog: a quick-start row under the create form. */
+.lc-preset-row {
+  margin: 0 0 22px;
+}
+
+.lc-preset-label {
+  display: block;
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  color: var(--muted, #596949);
+}
+
+.lc-preset-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lc-preset-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-pill);
+  background: #fff;
+  color: var(--green-dark);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--transition-normal),
+    box-shadow var(--transition-normal),
+    background var(--transition-normal),
+    border-color var(--transition-normal);
+}
+
+.lc-preset-chip:hover:not(:disabled) {
+  background: var(--green-lightest);
+  border-color: var(--green-dark-mid);
+  box-shadow: var(--shadow-md);
+}
+
+.lc-preset-chip:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.lc-preset-chip svg {
+  color: var(--green-dark-mid);
+}
+
+.lc-preset-chip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.lc-preset-chip-name {
+  font-family: var(--font-serif);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.lc-preset-chip-count {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--muted, #596949);
+}
+
+.lc-bank-empty {
+  margin-top: 6px;
+}
+
+.lc-bank-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.lc-bank-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: var(--radius-xl);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--transition-normal),
+    box-shadow var(--transition-normal),
+    border-color var(--transition-normal);
+}
+
+/* Adopt the app's global float: cards lift on hover. */
+.lc-bank-tile:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+.lc-bank-tile.is-active {
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--green-dark) 30%, transparent), var(--shadow-sm);
+}
+
+.lc-bank-tile.is-active:hover {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--green-dark) 30%, transparent), var(--shadow-lg);
+}
+
+.lc-bank-tile.is-open {
+  border-color: var(--green-dark-mid);
+}
+
+.lc-bank-tile-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lc-bank-tile-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.lc-bank-tile-name {
+  font-family: var(--font-serif);
+  font-size: 1.02rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-bank-tile-target {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--muted, #596949);
+}
+
+.lc-bank-tile-count {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--green-dark);
+}
+
+.lc-bank-active-tag {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--green-dark);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.lc-bank-tile-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--border, #d8dfd0) 70%, white);
+  padding-top: 10px;
+}
+
+.lc-bank-tile-actions button:not(.lc-bank-delete) {
+  padding: 7px 14px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: var(--radius-md);
+  background: #fff;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--transition-normal),
+    box-shadow var(--transition-normal),
+    background var(--transition-normal),
+    border-color var(--transition-normal);
+}
+
+.lc-bank-tile-actions button:not(.lc-bank-delete):hover {
+  border-color: var(--green-dark-mid);
+  background: var(--green-lightest);
+  box-shadow: var(--shadow-md);
+}
+
+.lc-bank-tile-actions button:not(.lc-bank-delete):active {
+  transform: scale(0.96);
+}
+
+/* Active tiles have no "Set active" button, so anchor the row with a status note
+   instead of leaving a lone trash icon adrift. */
+.lc-bank-tile-feeds {
+  margin-right: auto;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--green-dark);
+}
+
+/* Completion ring: donut + centered count in the machine voice. */
+.lc-ring {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.lc-ring-track {
+  stroke: #e3eed3;
+}
+
+.lc-ring-fill {
+  stroke: var(--green-dark);
+  transition: stroke-dashoffset 0.4s ease;
+}
+
+.lc-ring-label {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Bank detail: header, feeds-daily callout, weak-area map, clickable problem rows. */
+.lc-bank-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.lc-bank-detail-name {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.lc-bank-detail-target {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted, #596949);
+}
+
+.lc-bank-detail-count {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  white-space: nowrap;
+}
+
+.lc-bank-feeds {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 12px 0 0;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, #0ea5e9 30%, white);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, #0ea5e9 7%, white);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lc-bank-feeds svg {
+  color: #0369a1;
+}
+
+.lc-bank-feeds-set {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 9px 12px;
+  border: 1px dashed var(--green-dark-mid);
+  border-radius: var(--radius-md);
+  background: rgba(233, 245, 219, 0.5);
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--green-dark);
+  cursor: pointer;
+  transition: background 0.13s ease, border-color 0.13s ease;
+}
+
+.lc-bank-feeds-set:hover {
+  background: var(--green-lightest);
+  border-color: var(--green-dark);
+}
+
+.lc-bank-weakmap {
+  margin-top: 16px;
+  margin-bottom: 24px;
+}
+
+.lc-bank-weakmap-label {
+  display: block;
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  color: var(--muted, #596949);
+}
+
+.lc-bank-weakmap ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lc-bank-weakmap li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  grid-template-areas:
+    "topic level count"
+    "bar bar bar";
+  align-items: center;
+  gap: 7px 10px;
+}
+
+.lc-bank-weakmap-level {
+  grid-area: level;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-bank-weakmap-topic {
+  grid-area: topic;
+  font-family: var(--font-serif);
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lc-bank-weakmap-count {
+  grid-area: count;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--muted, #596949);
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-bank-weakmap-bar {
+  grid-area: bar;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: #e3eed3;
+  overflow: hidden;
+}
+
+.lc-bank-weakmap-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  transition: width 0.3s ease;
+}
+
+.lc-bank-problem-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lc-bank-problem-check {
+  display: inline-flex;
+  color: #b7c4a4;
+  flex-shrink: 0;
+}
+
+.lc-bank-problem-check.is-done {
+  color: var(--green-dark);
+}
+
+.lc-bank-problem-open {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  font-family: var(--font-serif);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-bank-problem-open:hover {
+  color: var(--green-dark);
+  text-decoration: underline;
+}
+
+.lc-bank-problem-link {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.lc-bank-problem-link:hover {
+  text-decoration: underline;
+}
+
+.lc-bank-problem-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted, #596949);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    color var(--transition-normal),
+    background var(--transition-normal),
+    border-color var(--transition-normal);
+}
+
+.lc-bank-problem-remove:hover {
+  color: var(--accent-danger);
+  background: color-mix(in srgb, var(--accent-danger) 8%, white);
+  border-color: color-mix(in srgb, var(--accent-danger) 30%, white);
+}
+
+.lc-bank-problem-remove:focus-visible {
+  outline: 2px solid var(--accent-danger);
+  outline-offset: 2px;
+}
+
+.lc-bank-add-hint {
+  margin-top: 0;
+}
+
+.lc-bank-match-btn {
+  padding: 9px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--green-dark, #1f4d2c);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition:
+    transform var(--transition-normal),
+    box-shadow var(--transition-normal),
+    background var(--transition-normal);
+}
+
+.lc-bank-match-btn:hover:not(:disabled) {
+  background: var(--green-dark-mid);
+  box-shadow: 0 4px 14px rgba(113, 131, 85, 0.35);
+}
+
+.lc-bank-match-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.lc-bank-match-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── KojoCode action-button loading states ───────────────────────────────────
+   Drill and prep-bank buttons gained an inline Loader2 spinner while their
+   network call runs. The text-only ones need to lay the spinner out inline, and
+   every one needs a disabled look so a click that is already running reads as
+   busy rather than dead. */
+.lc-drill-advance,
+.lc-pass-banner-clear,
+.lc-bank-tile-actions button:not(.lc-bank-delete),
+.lc-bank-feeds-set,
+.lc-bank-match-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.lc-drill-advance:disabled,
+.lc-pass-banner-clear:disabled,
+.lc-bank-tile-actions button:disabled,
+.lc-bank-feeds-set:disabled,
+.lc-bank-delete:disabled,
+.lc-bank-problem-remove:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Bank add-by-topic (primary) + paste (secondary) ─────────────────────────*/
+.lc-bank-add {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid color-mix(in srgb, var(--border, #d8dfd0) 70%, white);
+}
+
+.lc-bank-add-title {
+  display: block;
+  margin-bottom: 3px;
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lc-bank-add-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+/* Topic multi-select as a controlled button + panel that closes on outside click
+   (see TopicPicker in LeetCodeMode.tsx). */
+.lc-topic-picker {
+  position: relative;
+}
+
+.lc-topic-summary {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 210px;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: var(--radius-md);
+  background: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+.lc-topic-summary:hover {
+  border-color: var(--green-dark-mid);
+}
+
+.lc-topic-summary[aria-expanded="true"] {
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.14);
+}
+
+.lc-topic-chevron {
+  color: var(--muted, #596949);
+  transition: transform 0.15s ease;
+}
+
+.lc-topic-chevron--open {
+  transform: rotate(180deg);
+}
+
+.lc-topic-panel {
+  position: absolute;
+  z-index: 30;
+  margin-top: 6px;
+  width: 264px;
+  max-height: 264px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-lg);
+  background: #fff;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lc-topic-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.lc-topic-option:hover {
+  background: var(--green-lightest);
+}
+
+.lc-topic-option input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--green-dark);
+  cursor: pointer;
+}
+
+.lc-topic-option-label {
+  flex: 1;
+  font-family: var(--font-serif);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lc-topic-option-count {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--muted, #596949);
+}
+
+.lc-bank-add-count {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lc-bank-add-count > span {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  color: var(--muted, #596949);
+}
+
+.lc-bank-add-count input,
+.lc-bank-add-count .dropdown-trigger {
+  padding: 10px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--ink);
+  background: #fff;
+}
+
+.lc-bank-add-count input {
+  width: 78px;
+}
+
+.lc-bank-add-count .dropdown-trigger {
+  min-width: 110px;
+}
+
+/* Sized to sit level with the dropdown + count inputs (global .button is 48px tall). */
+.lc-bank-add-btn.lc-bank-add-btn {
+  min-height: 42px;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+}
+
+.lc-bank-add-note {
+  margin: 12px 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--green-dark);
+}
+
+.lc-bank-add-paste {
+  margin-top: 18px;
+}
+
+.lc-bank-add-paste > summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--green-dark);
+}
+
+.lc-bank-add-paste > summary::-webkit-details-marker {
+  display: none;
+}
+
+.lc-bank-add-paste > summary::before {
+  content: "+ ";
+  font-family: var(--font-mono);
+}
+
+.lc-bank-add-paste[open] > summary::before {
+  content: "- ";
+}
+
+/* Topic-fill: two explicit choices, reuse (catalog, no AI) vs Create with Kojo (AI). */
+.lc-bank-add-actions,
+.lc-practice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lc-bank-kojo-btn {
+  background: var(--green-lightest);
+  border: 1px solid var(--green-dark);
+  color: var(--green-dark);
+}
+
+.lc-bank-kojo-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* KojoCode settings cog (dashboard hero) + its modal. Sensitivity presets and the
+   "Clear weakness signals" action live here. Every element gets its own class so
+   nothing relies on element selectors inside the container. */
+.lc-cog-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.lc-cog-btn:hover {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+}
+
+.lc-settings-modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 401;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 400px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  /* Keep the modal scrollable when its content is tall (long completed list),
+     but hide the scrollbar chrome so it reads clean. Firefox + legacy IE. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 20px;
+  border: 1px solid rgba(113, 131, 85, 0.28);
+  border-radius: var(--radius-lg);
+  background: var(--white);
+  box-shadow: var(--shadow-lg);
+}
+
+/* WebKit/Blink (Chrome, Safari, Edge): hide the scrollbar track/thumb. */
+.lc-settings-modal::-webkit-scrollbar {
+  display: none;
+}
+
+.lc-settings-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.lc-settings-modal-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-serif);
+  font-size: 1.02rem;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.lc-settings-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted, #596949);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.lc-settings-close:hover {
+  background: var(--green-lightest);
+  color: var(--ink);
+}
+
+.lc-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(113, 131, 85, 0.16);
+}
+
+.lc-settings-label {
+  font-size: 0.9rem;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.lc-settings-help {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  color: var(--muted, #596949);
+}
+
+/* One-line description of the active interviewer style, under its segmented picker. */
+.lc-settings-mode-blurb {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--green-dark-mid, #596949);
+}
+
+.lc-settings-segmented {
+  display: flex;
+  gap: 6px;
+}
+
+.lc-settings-seg-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1.5px solid rgba(113, 131, 85, 0.22);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.84rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+}
+
+.lc-settings-seg-btn:hover {
+  border-color: rgba(113, 131, 85, 0.5);
+  background: rgba(113, 131, 85, 0.05);
+}
+
+.lc-settings-seg-btn--active {
+  border-color: var(--green-dark);
+  background: rgba(113, 131, 85, 0.1);
+  color: var(--green-dark);
+}
+
+.lc-settings-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  align-self: flex-start;
+  padding: 8px 14px;
+  border: 1.5px solid rgba(220, 38, 38, 0.4);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--accent-danger-strong);
+  font-size: 0.84rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.lc-settings-clear-btn:hover {
+  border-color: var(--accent-danger);
+  background: rgba(220, 38, 38, 0.06);
+}
+

@@ -1,0 +1,1233 @@
+/* "Coming up" reminders card: two full feature-preview cards (not thin nav links)
+   that stretch to fill the same height as the Topic Mastery card next to it. */
+.lc-reminders-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.lc-reminders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+}
+
+.lc-reminder-feature {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 8px;
+  width: 100%;
+  padding: 18px 20px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-xl);
+  background: rgba(247, 250, 242, 0.7);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.13s ease, border-color 0.13s ease, box-shadow 0.13s ease;
+}
+
+.lc-reminder-feature:hover {
+  background: var(--green-lightest);
+  border-color: var(--green-dark-mid);
+  box-shadow: var(--shadow-sm);
+}
+
+.lc-reminder-feature-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lc-reminder-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-lg);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+}
+
+.lc-reminder-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--green-dark);
+  background: #ffffff;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-pill);
+  padding: 2px 9px;
+}
+
+.lc-reminder-feature-title {
+  font-family: "Lora", Georgia, serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.lc-reminder-feature-copy {
+  margin: 0;
+  flex: 1;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--muted, #596949);
+}
+
+.lc-reminder-feature-cta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--green-dark);
+}
+
+/* The "Coming up" cards for an active Prep Bank / practice set aren't a single big
+   click target like the preview cards (they hold a difficulty select + a button), so
+   they render as a div wrapper with a smaller real button for the CTA. */
+.lc-reminder-feature--active {
+  cursor: default;
+  border-color: var(--green-dark-mid);
+  background: var(--green-lightest);
+}
+
+.lc-reminder-badge--live {
+  color: #fff;
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+}
+
+.lc-reminder-feature-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+button.lc-reminder-feature-cta {
+  padding: 7px 12px;
+  border: 1px solid var(--green-dark);
+  border-radius: var(--radius-md);
+  background: var(--green-dark);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.13s ease;
+}
+
+button.lc-reminder-feature-cta:hover:not(:disabled) {
+  background: var(--green-darker, #4c5a3c);
+}
+
+button.lc-reminder-feature-cta:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.lc-reminder-feature-note {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--muted, #596949);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-mastery-bar > span {
+    transition: none;
+  }
+
+  .lc-toolbar-btn--timer-alert {
+    animation: none;
+  }
+
+  .lc-timer-ring-progress {
+    transition: none;
+  }
+}
+
+/* ── KojoCode hub shell + left rail (slice 3) ── */
+.lc-shell {
+  display: flex;
+  align-items: flex-start;
+  min-height: 100%;
+}
+
+.lc-shell-body {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Problem editor wrapped in the shell so the rail stays reachable while coding.
+   The rail starts icon-only there (own storage key) to keep the editor immersive;
+   the editor shell becomes the flexible column beside it. */
+.lc-shell--editor {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.lc-shell--editor .lc-editor-shell {
+  flex: 1;
+  min-width: 0;
+  /* As a flex item the shell otherwise resolves to its content's min-content width
+     (wide pre/example blocks pushed it to ~512px on a 390px phone, overflowing the
+     viewport and clipping the editor). Hard-cap it to the wrapper. */
+  max-width: 100%;
+}
+
+/* Match the editor shell's <=1100px behavior (it drops the hard 100dvh and flows),
+   otherwise the wrapper's overflow:hidden clips the scrolling content. */
+@media (max-width: 1100px) {
+  .lc-shell--editor {
+    height: auto;
+    overflow: visible;
+  }
+}
+
+/* Single-pane mobile editor keeps its full width; the back button covers navigation. */
+@media (max-width: 900px) {
+  .lc-shell--editor .lc-rail {
+    display: none;
+  }
+}
+
+/* Rail is pinned to the viewport height (not stretched to match the very tall
+   sibling content column, that bug detached the streak card to the page bottom)
+   and scrolls its own overflow independently of the page. */
+.lc-rail {
+  --lc-rail-w: 184px;
+  --lc-rail-w-collapsed: 60px;
+  position: sticky;
+  top: 0;
+  flex-shrink: 0;
+  width: var(--lc-rail-w);
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 18px 0;
+  background: #ffffff;
+  /* Light green edge so the rail reads as clearly separated from the content column. */
+  border-right: 2px solid var(--green-light-mid);
+  transition: width 0.16s ease;
+}
+
+.lc-rail[data-collapsed="true"] {
+  width: var(--lc-rail-w-collapsed);
+}
+
+.lc-rail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 0 14px;
+  margin-bottom: 22px;
+}
+
+.lc-rail-brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.lc-rail[data-collapsed="true"] .lc-rail-brand {
+  width: 0;
+  opacity: 0;
+}
+
+.lc-rail-brand-name {
+  font-family: "Lora", Georgia, serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--green-dark);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.lc-rail-brand-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--green-dark);
+  background: var(--green-lightest);
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-xs);
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.lc-rail-collapse-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: var(--muted, #596949);
+  cursor: pointer;
+  transition: background 0.13s ease, color 0.13s ease;
+}
+
+.lc-rail-collapse-btn:hover {
+  background: var(--green-lightest);
+  color: var(--green-dark);
+}
+
+.lc-rail-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 10px;
+}
+
+.lc-rail-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--muted, #596949);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.13s ease, color 0.13s ease;
+}
+
+.lc-rail-item:hover {
+  background: #f0f7e6;
+  color: var(--ink);
+}
+
+/* Active state: a solid filled capsule instead of a flat highlighted row, so the
+   current section reads as one deliberate shape rather than a strip of tint. */
+.lc-rail-item.is-active {
+  background: var(--green-dark);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(113, 131, 85, 0.35);
+}
+
+.lc-rail-item.is-active:hover {
+  background: #5f7248;
+  color: #ffffff;
+}
+
+.lc-rail-item-icon {
+  display: flex;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.lc-rail-item.is-active .lc-rail-item-icon {
+  opacity: 1;
+}
+
+.lc-rail-item-label {
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.lc-rail[data-collapsed="true"] .lc-rail-item {
+  justify-content: center;
+  padding: 10px;
+}
+
+.lc-rail[data-collapsed="true"] .lc-rail-item-label {
+  display: none;
+}
+
+.lc-rail-streak {
+  margin: 14px 10px 0;
+  margin-top: auto;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 2px 8px;
+  background: var(--green-lightest);
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-xl);
+}
+
+.lc-rail-streak svg {
+  grid-row: 1 / span 2;
+  color: var(--accent-caution);
+}
+
+.lc-rail-streak strong {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-rail-streak small {
+  font-size: 0.68rem;
+  color: var(--muted, #596949);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.lc-rail[data-collapsed="true"] .lc-rail-streak {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  padding: 10px 4px;
+}
+
+.lc-rail[data-collapsed="true"] .lc-rail-streak svg {
+  grid-row: auto;
+}
+
+.lc-rail[data-collapsed="true"] .lc-rail-streak small {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .lc-shell {
+    flex-direction: column;
+  }
+  .lc-rail {
+    position: static;
+    flex-direction: row;
+    width: 100% !important;
+    height: auto;
+    max-height: none;
+    align-items: center;
+    padding: 10px 12px;
+    /* The horizontal strip scrolls sideways only. `overflow: visible` + `overflow-x:
+       auto` used to compute overflow-y to auto as well, which reserved a scrollbar
+       gutter (a chunky grey bar under the menu on Windows) and clipped the pills.
+       The scrollbar chrome itself is hidden, the edge fade below signals the scroll. */
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    /* Fade the trailing edge so cut-off items read as "more to scroll" instead of
+       looking accidentally chopped. */
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+    border-right: none;
+    border-bottom: 1px solid var(--lc-border);
+  }
+
+  .lc-rail::-webkit-scrollbar {
+    display: none;
+  }
+  .lc-rail-header {
+    margin-bottom: 0;
+    padding: 0 8px 0 4px;
+  }
+  .lc-rail[data-collapsed="true"] .lc-rail-brand {
+    width: auto;
+    opacity: 1;
+  }
+  .lc-rail-collapse-btn {
+    display: none;
+  }
+  .lc-rail-nav {
+    flex-direction: row;
+    gap: 4px;
+    padding: 0 8px;
+  }
+  .lc-rail-item {
+    padding: 8px 12px;
+    white-space: nowrap;
+  }
+  .lc-rail[data-collapsed="true"] .lc-rail-item-label {
+    display: inline;
+  }
+  .lc-rail-streak {
+    flex-shrink: 0;
+    margin: 0 0 0 8px;
+    padding: 6px 12px;
+    grid-template-columns: auto auto auto;
+  }
+  .lc-rail-streak svg {
+    grid-row: auto;
+  }
+  .lc-rail-streak small {
+    display: inline;
+    align-self: center;
+  }
+}
+
+/* On a phone the rail's "KojoCode Beta" wordmark burns ~110px of the strip while the
+   page heading directly below already says it. Dropping it hands that space back to
+   the nav pills, which is what actually needs to be reachable. */
+@media (max-width: 560px) {
+  .lc-rail .lc-rail-brand {
+    display: none;
+  }
+
+  .lc-rail-header {
+    display: none;
+  }
+
+  .lc-rail-nav {
+    padding: 0 4px;
+  }
+}
+
+/* ── KojoCode "coming soon" beta destinations ── */
+.lc-coming {
+  max-width: 640px;
+  margin: 40px auto;
+  padding: 32px 34px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--shadow-sm);
+}
+
+.lc-coming-badge {
+  display: inline-block;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--green-dark);
+  background: var(--green-lightest);
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-pill);
+  padding: 3px 12px;
+  margin-bottom: 16px;
+}
+
+.lc-coming-title {
+  margin: 0 0 8px;
+  font-family: "Lora", Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.lc-coming-sub {
+  margin: 0 0 18px;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--muted, #596949);
+}
+
+.lc-coming-points {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lc-coming-points li {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+/* ── Daily KojoCode: Focus-card error + active-bank source note ───────────────
+   The standalone Daily KojoCode section was folded into the Focus card's
+   "Generate today's question" control; only these two helpers survive. */
+
+.lc-daily-error {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  color: var(--error, var(--accent-danger-strong));
+}
+
+.lc-daily-source-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+  color: var(--green-dark);
+}
+
+.lc-daily-source-note svg {
+  color: #0369a1;
+}
+
+/* ── In-workspace 3-pass drill banner ────────────────────────────────────────
+   Shown at the top of the editor when the open problem is an active drill. States
+   the current pass rule in its escalation-ramp color. */
+.lc-pass-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--pass-color) 40%, white);
+  background: color-mix(in srgb, var(--pass-color) 8%, white);
+}
+
+.lc-pass-banner-rule {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--pass-color) 78%, black);
+}
+
+.lc-pass-banner-clear {
+  padding: 7px 14px;
+  border: 1px solid color-mix(in srgb, var(--pass-color) 45%, white);
+  border-radius: var(--radius-md);
+  background: #fff;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: color-mix(in srgb, var(--pass-color) 78%, black);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-normal), border-color var(--transition-normal);
+}
+
+.lc-pass-banner-clear:hover {
+  background: color-mix(in srgb, var(--pass-color) 12%, white);
+  border-color: var(--pass-color);
+}
+
+.lc-pass-banner-clear:focus-visible {
+  outline: 2px solid var(--pass-color);
+  outline-offset: 2px;
+}
+
+/* ── Weak-Area Practice: builder -> stepped queue -> summary ──────────────────*/
+.lc-practice-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px 24px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-sm);
+}
+
+.lc-practice-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lc-practice-field-label {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  color: var(--muted, #596949);
+}
+
+/* Difficulty segmented control */
+.lc-practice-seg {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 3px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: var(--radius-lg);
+  background: #fff;
+  gap: 2px;
+}
+
+.lc-practice-seg-btn {
+  padding: 7px 16px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: none;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--muted, #596949);
+  cursor: pointer;
+  transition: background var(--transition-normal), color var(--transition-normal);
+}
+
+.lc-practice-seg-btn:hover {
+  color: var(--ink);
+}
+
+.lc-practice-seg-btn.is-active {
+  background: var(--green-dark);
+  color: #fff;
+}
+
+.lc-practice-count {
+  width: 90px;
+  padding: 10px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+/* Ask Kojo hints toggle: shrink the shared switch and align its label to the
+   builder's compact type scale so it reads as part of the same control set. */
+.lc-practice-toggle {
+  align-self: flex-start;
+  gap: 10px;
+  padding: 2px 0;
+}
+
+.lc-practice-toggle .toggle-switch-track {
+  width: 42px;
+  height: 22px;
+  border-radius: var(--radius-lg);
+}
+
+.lc-practice-toggle .toggle-switch-thumb {
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+}
+
+.lc-practice-toggle.toggle-switch--on .toggle-switch-thumb {
+  transform: translateX(20px);
+}
+
+.lc-practice-toggle .toggle-switch-label {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+}
+
+.lc-practice-start {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 11px 20px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+}
+
+.lc-practice-note {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted, #596949);
+}
+
+/* Running queue */
+.lc-practice-run-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.lc-practice-progress {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--green-dark);
+}
+
+.lc-practice-clock {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-practice-finish {
+  margin-left: auto;
+  padding: 8px 16px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: var(--radius-md);
+  background: #fff;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color var(--transition-normal), background var(--transition-normal);
+}
+
+.lc-practice-finish:hover {
+  border-color: var(--green-dark-mid);
+  background: var(--green-lightest);
+}
+
+.lc-practice-queue {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  counter-reset: none;
+}
+
+.lc-practice-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: var(--radius-lg);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.lc-practice-step.is-done {
+  background: color-mix(in srgb, var(--green-dark) 5%, white);
+  border-color: color-mix(in srgb, var(--green-dark) 26%, white);
+}
+
+.lc-practice-step-num {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--muted, #596949);
+  white-space: nowrap;
+}
+
+.lc-practice-step-check {
+  display: inline-flex;
+  color: #b7c4a4;
+  flex-shrink: 0;
+}
+
+.lc-practice-step-check.is-done {
+  color: var(--green-dark);
+}
+
+.lc-practice-step-title {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-practice-step-title:hover {
+  color: var(--green-dark);
+  text-decoration: underline;
+}
+
+/* Summary */
+.lc-practice-summary {
+  padding: 24px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-sm);
+}
+
+.lc-practice-summary-eyebrow {
+  display: block;
+  margin-bottom: 16px;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--green-dark);
+}
+
+.lc-practice-summary-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.lc-practice-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-xl);
+  background: var(--green-lightest);
+}
+
+.lc-practice-tile strong {
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-practice-tile small {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  color: var(--muted, #596949);
+}
+
+.lc-practice-improved {
+  margin: 16px 0 0;
+  font-size: 0.88rem;
+  color: var(--ink);
+}
+
+.lc-practice-summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.lc-practice-summary-actions .button-primary {
+  min-height: 42px;
+  padding: 10px 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+}
+
+.lc-practice-secondary {
+  padding: 10px 18px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: var(--radius-md);
+  background: #fff;
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color var(--transition-normal), background var(--transition-normal);
+}
+
+.lc-practice-secondary:hover {
+  border-color: var(--green-dark-mid);
+  background: var(--green-lightest);
+}
+
+/* ── Add a problem to a category by LeetCode link ────────────────────────────*/
+.lc-add-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: var(--green-dark);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--transition-normal),
+    box-shadow var(--transition-normal),
+    background var(--transition-normal),
+    border-color var(--transition-normal);
+}
+
+.lc-add-link-btn:hover {
+  background: var(--green-lightest);
+  border-color: var(--green-dark-mid);
+  box-shadow: var(--shadow-md);
+}
+
+.lc-add-link-btn:active {
+  transform: scale(0.96);
+}
+
+.lc-add-link-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(20, 28, 14, 0.35);
+}
+
+.lc-add-link-modal {
+  width: min(460px, 100%);
+  padding: 22px 24px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-xl);
+  background: #fff;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lc-add-link-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lc-add-link-head h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.lc-add-link-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: none;
+  color: var(--muted, #596949);
+  cursor: pointer;
+  transition: background var(--transition-normal), color var(--transition-normal);
+}
+
+.lc-add-link-close:hover {
+  background: var(--green-lightest);
+  color: var(--ink);
+}
+
+.lc-add-link-input {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+.lc-add-link-input:focus {
+  outline: none;
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.14);
+}
+
+.lc-add-link-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.lc-add-link-cancel {
+  padding: 10px 16px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: var(--radius-md);
+  background: #fff;
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color var(--transition-normal), background var(--transition-normal);
+}
+
+.lc-add-link-cancel:hover {
+  border-color: var(--green-dark-mid);
+  background: var(--green-lightest);
+}
+
+.lc-add-link-submit.lc-add-link-submit {
+  min-height: 42px;
+  padding: 10px 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+}
+
+/* ── Prep Banks + Drills screens ─────────────────────────────────────────── */
+
+.lc-bank-new {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.lc-bank-new input {
+  flex: 1;
+  min-width: 180px;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: var(--radius-md);
+  font-size: 0.86rem;
+}
+
+.lc-bank-new button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--green-dark);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+/* Darken to the codebase's deeper green (the dark end of the green-dark gradient) on
+   hover and press, so a click reads as landing. Same hue, no lift. */
+.lc-bank-new button:hover:not(:disabled),
+.lc-bank-new button:active:not(:disabled) {
+  background: #536342;
+}
+
+.lc-bank-new button:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.lc-bank-new button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.lc-bank-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lc-bank-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+
+.lc-bank-card.is-active {
+  border-color: var(--green-dark, #1f4d2c);
+  background: color-mix(in srgb, var(--green-dark, #1f4d2c) 6%, white);
+}
+
+.lc-bank-card-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lc-bank-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lc-bank-card-actions button {
+  padding: 6px 12px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+/* Icon button: quiet by default, turns red on hover/focus (no float). The always-on red
+   icon read as an error state; danger now only shows on intent. */
+.lc-bank-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border, #d8dfd0);
+  background: #fff;
+  color: var(--muted, #596949);
+  cursor: pointer;
+  transition:
+    color var(--transition-normal),
+    background var(--transition-normal),
+    border-color var(--transition-normal);
+}
+
+.lc-bank-delete:hover {
+  color: var(--accent-danger);
+  border-color: color-mix(in srgb, var(--accent-danger) 40%, white);
+  background: color-mix(in srgb, var(--accent-danger) 8%, white);
+}
+
+.lc-bank-delete:focus-visible {
+  outline: 2px solid var(--accent-danger);
+  outline-offset: 2px;
+}
+
+/* The opened bank sits in its own card surface so it reads as "the bank you opened",
+   not a loose page fragment below the gallery. */
+.lc-bank-detail {
+  margin-top: 24px;
+  padding: 22px 24px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-sm);
+}
+
+.lc-bank-detail textarea {
+  width: 100%;
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: var(--radius-md);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.82rem;
+  resize: vertical;
+}
+
+.lc-bank-problem-list {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lc-bank-problem-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border, #d8dfd0);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}
+
+.lc-bank-problem-list li button {
+  display: inline-flex;
+  color: var(--muted, #596949);
+}
+

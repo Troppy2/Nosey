@@ -1,0 +1,1322 @@
+/* Timer picker follows the same deliberate, blocking decision-dialog pattern as
+   the timeout prompt. The trigger itself stays icon-sized; its title provides the
+   lightweight hover tooltip, while a click opens this full modal. */
+.lc-timer-backdrop {
+  background: rgba(27, 35, 22, 0.52);
+}
+
+.lc-kojo-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(113, 131, 85, 0.22);
+  background: rgba(233, 245, 219, 0.54);
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.lc-kojo-close {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  margin-left: auto;
+  place-items: center;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: #596949;
+  cursor: pointer;
+}
+
+.lc-kojo-close:hover {
+  background: rgba(113, 131, 85, 0.12);
+  color: var(--ink);
+}
+
+.lc-kojo-folder-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px 0;
+  color: #596949;
+}
+
+.lc-kojo-folder-select {
+  min-width: 0;
+  flex: 1;
+  padding: 7px 9px;
+  font-size: 0.86rem;
+}
+
+.lc-kojo-input {
+  display: block;
+  width: 100%;
+  min-height: 138px;
+  padding: 12px 14px;
+  border: 2px solid var(--green-dark-mid);
+  border-radius: var(--radius-md);
+  background: #f8fbf4;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.lc-kojo-input:focus {
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.18);
+}
+
+.lc-kojo-input::placeholder {
+  color: #627350;
+}
+
+.lc-kojo-response {
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(113, 131, 85, 0.22);
+  font-size: 0.86rem;
+}
+
+.lc-kojo-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 11px 14px;
+}
+
+.lc-kojo-send {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 1180px) {
+  .lc-dashboard {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* At <=1100px the app sidebar becomes a horizontal topbar that sits above the
+   content, so a hard 100dvh editor shell overflows below the fold. Let it flow
+   and derive the editor height from the remaining space instead. The single-pane
+   Problem | Code toggle only kicks in lower down (<=900px). */
+@media (max-width: 1100px) {
+  .lc-editor-shell {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  /* The shell drops its fixed 100dvh height here, so Monaco's height:100% no
+     longer has a definite ancestor to resolve against and collapses to a 0-height
+     black box. Give the editor pane an explicit floor so the surface stays sized.
+     The single-pane toggle below 900px reuses the same idea at 60dvh. */
+  .lc-editor-pane {
+    min-height: 70dvh;
+  }
+}
+
+@media (max-width: 900px) {
+  .lc-roadmap {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding-left: 18px;
+  }
+
+  .lc-roadmap::before {
+    left: 0;
+  }
+
+  .lc-node,
+  .lc-node[data-side="right"],
+  .lc-node[data-side="left"] {
+    grid-column: 1;
+    transform: none;
+  }
+
+  .lc-node:hover,
+  .lc-node[data-side="right"]:hover {
+  }
+
+  .lc-node::after {
+    left: -18px;
+    width: 18px;
+  }
+
+  /* Editor view goes single-pane: the Problem | Code toggle picks which one shows,
+     so the shell flows in the document instead of being pinned to 100dvh under the
+     mobile topbar (which previously pushed the bottom of the editor off-screen). */
+  .lc-editor-shell {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .lc-mobile-pane-toggle {
+    display: flex;
+    gap: 4px;
+    padding: 6px;
+    margin: 10px 14px 0;
+    border: 1px solid var(--lc-border);
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.68);
+  }
+
+  .lc-editor-body {
+    flex-direction: column;
+    flex: 1;
+  }
+
+  .lc-editor-body[data-mobile-pane="problem"] .lc-editor-pane {
+    display: none;
+  }
+
+  .lc-editor-body[data-mobile-pane="code"] .lc-problem-pane {
+    display: none;
+  }
+
+  .lc-problem-pane {
+    width: 100%;
+    min-width: 0;
+    max-height: none;
+    border-right: 0;
+  }
+
+  .lc-editor-pane {
+    flex: 1;
+    min-height: 60dvh;
+  }
+
+  /* Toolbar: one horizontally scrollable row of icon-only buttons (timer keeps its
+     countdown label since that conveys information, not just a name). */
+  .lc-editor-topbar {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .lc-editor-title {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .lc-editor-actions {
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .lc-editor-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .lc-toolbar-btn {
+    flex: 0 0 auto;
+    padding: 8px 9px;
+  }
+
+  .lc-tb-label:not(.lc-tb-label--timer) {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+
+  .lc-hero,
+  .lc-category-tools {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  /* The desktop rule gives the title column `flex: 1 1 320px` so it absorbs reflow
+     while the hero is a row. Once the hero stacks, flex-basis applies to the block
+     axis instead, so that 320px became a fixed minimum HEIGHT and left a large dead
+     gap between the description and the action buttons. Reset it to content height. */
+  .lc-hero > div:first-child {
+    flex: 0 0 auto;
+  }
+
+  /* One row of four buttons cannot fit on a phone, so allow the group to wrap here. */
+  .lc-hero-actions {
+    flex-wrap: wrap;
+  }
+
+  .lc-dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .lc-problem-row {
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+  }
+
+  .lc-extra-pill,
+  .lc-row-link {
+    display: none;
+  }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+.slash-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-lg);
+  background: #fff;
+  box-shadow: 0 8px 32px rgba(38, 48, 31, 0.15);
+  scrollbar-width: none;
+}
+
+.slash-menu::-webkit-scrollbar {
+  display: none;
+}
+
+.slash-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.slash-menu-item:hover,
+.slash-menu-item:focus-visible,
+.slash-menu-item--active {
+  background: rgba(207, 225, 185, 0.52);
+  outline: none;
+}
+
+.slash-menu-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  background: var(--green-dark);
+  color: #fff;
+}
+
+.slash-menu-copy {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.slash-menu-item-top {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-bottom: 1px;
+}
+
+.slash-menu-item-top span {
+  overflow: hidden;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slash-menu-item-top strong {
+  flex-shrink: 0;
+  color: var(--green-dark);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.slash-menu-item small {
+  display: block;
+  overflow: hidden;
+  color: #596949;
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slash-menu-run {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: #b0be9a;
+}
+
+.slash-manager,
+.slash-manager-composer,
+.slash-manager-list {
+  display: grid;
+  gap: 12px;
+}
+
+.slash-manager-header,
+.slash-manager-actions,
+.slash-manager-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.slash-manager-header {
+  justify-content: space-between;
+}
+
+.slash-manager-header h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+
+.slash-manager-counts {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+
+.slash-manager-composer {
+  padding: 12px;
+}
+
+.slash-manager-form-row {
+  gap: 12px;
+}
+
+.slash-manager-composer .textarea {
+  min-height: 92px;
+}
+
+.slash-manager-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.slash-manager-error {
+  margin: 0;
+  color: var(--error);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.slash-manager-search {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.66);
+  margin: 4px 0;
+}
+
+.slash-manager-search input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  outline: 0;
+}
+
+.slash-manager-list {
+  max-height: 340px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  scrollbar-width: none;
+}
+
+.slash-manager-list::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Item card ── */
+.slash-manager-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  overflow: hidden;
+  transition: background 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+
+.slash-manager-item.card:hover {
+  background: rgba(255, 255, 255, 0.93);
+  box-shadow: 0 3px 14px rgba(57, 79, 32, 0.13);
+  border-color: rgba(162, 188, 118, 0.9);
+}
+
+.slash-manager-item--pinned {
+  border-left: 3px solid var(--green-dark);
+}
+
+.slash-manager-item-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 0;
+  min-width: 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+}
+
+.slash-manager-trigger {
+  flex: 0 0 auto;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 4px 9px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-pill);
+  background: rgba(207, 225, 185, 0.72);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--green-dark);
+}
+
+.slash-manager-item-copy {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.slash-manager-item-copy strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.88rem;
+  color: var(--ink);
+}
+
+.slash-manager-item-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.76rem;
+  color: #596949;
+}
+
+/* ── Item actions ── */
+.slash-manager-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+
+.slash-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.slash-action-btn svg {
+  color: #7a8a6e;
+  transition: color 0.12s;
+}
+
+.slash-action-btn:hover {
+  background: rgba(207, 225, 185, 0.55);
+}
+
+.slash-action-btn.action-pin.slash-action-btn--pinned svg { color: var(--green-dark); }
+.slash-action-btn.action-pin:hover svg { color: var(--green-dark); }
+.slash-action-btn.action-edit:hover svg { color: var(--info); }
+.slash-action-btn.action-delete:hover svg { color: #c94040; }
+
+.kojo-command-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px 3px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.92);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+@media (max-width: 720px) {
+  .slash-menu-item-top {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .slash-manager-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .slash-manager-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .slash-manager-item {
+    flex-wrap: wrap;
+  }
+
+  .slash-manager-item-main {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .slash-manager-item-actions {
+    flex: none;
+    margin-left: auto;
+  }
+}
+.lc-statement-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  color: #596949;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.lc-statement-state--error {
+  color: var(--accent-danger-strong);
+}
+
+/* Statement loading skeleton. The heading + difficulty already render from
+   client-side data, so only the fetched body is a placeholder. Reuses the app's
+   existing skeleton shimmer (sel-kojo-shimmer) and sage gradient so it matches the
+   rest of the product rather than introducing a third skeleton style. */
+.lc-statement-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 10px 0 14px;
+}
+
+.lc-statement-skeleton .lc-skeleton-line {
+  height: 13px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, #e4ecda 25%, #eff5e8 50%, #e4ecda 75%);
+  background-size: 600px 100%;
+  animation: sel-kojo-shimmer 1.4s infinite linear;
+}
+
+/* Extra breathing room before the second "paragraph" of placeholder lines. */
+.lc-statement-skeleton .lc-skeleton-line:nth-child(5) {
+  margin-top: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-statement-skeleton .lc-skeleton-line {
+    animation: none;
+  }
+}
+
+.lc-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.lc-topic-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.lc-topic-tags span {
+  min-height: 24px;
+  padding: 4px 9px;
+  border-radius: var(--radius-pill);
+  background: rgba(233, 245, 219, 0.72);
+  color: var(--green-dark);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.lc-official-statement {
+  color: #2d3725;
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+
+.lc-official-statement p,
+.lc-official-statement ul,
+.lc-official-statement ol,
+.lc-official-statement pre {
+  margin: 0 0 14px;
+}
+
+.lc-official-statement pre {
+  padding: 14px;
+  border: 1px solid rgba(113, 131, 85, 0.18);
+  border-radius: var(--radius-md);
+  background: #f7f9f3;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.84rem;
+}
+
+.lc-tests-panel {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(113, 131, 85, 0.18);
+}
+
+.lc-tests-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.lc-tests-header h3 {
+  font-size: 0.98rem;
+}
+
+.lc-add-test-btn,
+.lc-inline-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid rgba(113, 131, 85, 0.22);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.lc-inline-icon-btn {
+  width: 32px;
+  min-width: 32px;
+  padding: 0;
+  color: #596949;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+}
+
+.lc-inline-icon-btn:hover {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+}
+
+.lc-inline-icon-btn--danger:hover {
+  border-color: rgba(220, 38, 38, 0.45);
+  background: var(--accent-danger-tint);
+  color: var(--accent-danger-strong);
+}
+
+.lc-add-test-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.lc-test-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.lc-test-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(113, 131, 85, 0.18);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.lc-test-card--custom {
+  background: rgba(233, 245, 219, 0.32);
+}
+
+.lc-test-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.lc-test-card label {
+  display: grid;
+  gap: 6px;
+}
+
+.lc-test-card label span {
+  color: #596949;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.lc-test-card textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(113, 131, 85, 0.2);
+  border-radius: var(--radius-md);
+  background: #f9fbf7;
+  color: var(--ink);
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.8rem;
+  resize: vertical;
+}
+
+.lc-runner-note {
+  margin-top: 12px;
+  color: #596949;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.lc-runner-result {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(113, 131, 85, 0.18);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.lc-runner-result--ok {
+  border-color: rgba(22, 101, 52, 0.22);
+  background: rgba(220, 252, 231, 0.7);
+}
+
+.lc-runner-result--error {
+  border-color: rgba(153, 27, 27, 0.22);
+  background: rgba(254, 226, 226, 0.64);
+}
+
+.lc-runner-result strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.lc-runner-result pre {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.8);
+  font-size: 0.78rem;
+}
+
+.lc-runner-case-list {
+  display: grid;
+  gap: 8px;
+}
+
+.lc-runner-case {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.lc-runner-case span:first-child {
+  font-weight: 800;
+}
+
+.lc-runner-case span:nth-child(2) {
+  color: #596949;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.lc-runner-case small {
+  color: #7f1d1d;
+  font-size: 0.77rem;
+}
+
+.lc-kojo-contract {
+  padding: 10px 16px;
+  background: rgba(113, 131, 85, 0.06);
+  border-bottom: 1px solid var(--green-light-mid);
+}
+
+.lc-kojo-contract p {
+  color: #596949;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.lc-kojo-input-wrap {
+  position: relative;
+  padding: 10px 14px 14px;
+}
+
+.lc-kojo-input-label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--green-dark-mid);
+}
+
+/* LeetCode grade feedback */
+.lc-grade-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  color: #596949;
+  border-top: 1px solid rgba(113, 131, 85, 0.14);
+  margin-top: 8px;
+}
+
+.lc-grade-feedback {
+  margin-top: 8px;
+  border: 1px solid rgba(113, 131, 85, 0.22);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: rgba(249, 251, 245, 0.7);
+}
+
+.lc-grade-feedback-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #596949;
+  border-bottom: 1px solid rgba(113, 131, 85, 0.14);
+  background: rgba(113, 131, 85, 0.06);
+}
+
+.lc-grade-feedback>div:last-child {
+  padding: 10px 14px;
+  font-size: 0.85rem;
+}
+
+/* ── Modal ─────────────────────────────────────────────── */
+.modal {
+  background: #fff;
+  border-radius: var(--radius-xl);
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
+  animation: modal-slide-in 0.18s ease;
+}
+
+@keyframes modal-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+}
+
+.modal-header h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+}
+
+.modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  color: #888;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.modal-close:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--ink);
+}
+
+.modal-body {
+  padding: 18px 20px;
+}
+
+.modal-body p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.modal-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid rgba(113, 131, 85, 0.35);
+  border-radius: var(--radius-md);
+  font-size: 0.95rem;
+  color: var(--ink);
+  background: #fff;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+}
+
+.modal-input:focus {
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.15);
+}
+
+.modal-type-confirm-error {
+  font-size: 0.8rem;
+  color: #b71c1c;
+  margin: 0;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px 18px;
+}
+
+.modal-btn {
+  padding: 8px 18px;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.modal-btn--secondary {
+  background: rgba(0, 0, 0, 0.06);
+  color: #555;
+}
+
+.modal-btn--secondary:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.modal-btn--primary {
+  background: var(--green-dark);
+  color: #fff;
+}
+
+.modal-btn--primary:hover {
+  opacity: 0.88;
+}
+
+.modal-btn--danger {
+  background: var(--accent-danger);
+  color: #fff;
+}
+
+.modal-btn--danger:hover {
+  opacity: 0.88;
+}
+
+/* ── LeetCode: Next Problem ─────────────────────────────────────── */
+
+.lc-next-problem {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(113, 131, 85, 0.18);
+}
+
+.lc-next-problem-eyebrow {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--green-dark);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.lc-next-problem-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid var(--green-dark);
+  border-radius: var(--radius-lg);
+  background: rgba(233, 245, 219, 0.4);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.lc-next-problem-btn:hover {
+  background: rgba(233, 245, 219, 0.85);
+  box-shadow: 0 2px 8px rgba(76, 110, 40, 0.12);
+}
+
+.lc-next-problem-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.lc-next-problem-title {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lc-next-arrow {
+  flex-shrink: 0;
+  color: var(--green-dark);
+}
+
+/* ── Kojo Blueprint Card ─────────────────────────────────────────────────── */
+
+.kojo-blueprint-card {
+  background: #fff;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-xl);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 440px;
+  box-shadow: 0 2px 8px rgba(38, 48, 31, 0.08);
+}
+
+.kojo-blueprint-card--done {
+  padding: 12px 14px;
+}
+
+.kojo-blueprint-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: var(--ink);
+  line-height: 1.45;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--green-light);
+}
+
+.kojo-blueprint-intro-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--green-dark);
+}
+
+.kojo-blueprint-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.kojo-blueprint-row {
+  display: flex;
+  gap: 10px;
+}
+
+.kojo-blueprint-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.kojo-blueprint-optional {
+  font-weight: 400;
+  color: var(--muted, #888);
+}
+
+.kojo-blueprint-input {
+  background: #fff;
+  border: 1px solid var(--green-light);
+  border-radius: var(--radius-sm);
+  padding: 6px 9px;
+  font-size: 0.85rem;
+  color: var(--ink);
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.kojo-blueprint-input:focus {
+  outline: none;
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--green-dark) 18%, transparent);
+}
+
+.kojo-blueprint-input--num {
+  width: 72px;
+  flex: 0 0 auto;
+  text-align: center;
+}
+
+.kojo-blueprint-select {
+  background: #fff;
+  border: 1px solid var(--green-light);
+  border-radius: var(--radius-sm);
+  padding: 6px 9px;
+  font-size: 0.85rem;
+  color: var(--ink);
+  width: 100%;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.kojo-blueprint-select:focus {
+  outline: none;
+  border-color: var(--green-dark);
+}
+
+.kojo-blueprint-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--accent-danger-strong);
+  background: #fdf0ef;
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+}
+
+.kojo-blueprint-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.kojo-blueprint-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  font-family: inherit;
+}
+
+.kojo-blueprint-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.kojo-blueprint-btn--primary {
+  background: var(--green-dark);
+  color: #fff;
+  font-weight: 600;
+}
+
+.kojo-blueprint-btn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--green-dark) 85%, #000);
+}
+
+.kojo-blueprint-btn--ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--green-light);
+}
+
+.kojo-blueprint-btn--ghost:hover:not(:disabled) {
+  background: var(--green-light);
+}
+
+.kojo-blueprint-done {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: var(--green-dark);
+  font-weight: 500;
+}
+
+.kojo-blueprint-done-icon {
+  color: var(--green-dark);
+}
+
+.kojo-blueprint-test-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--green-dark);
+  text-decoration: underline;
+  margin-left: 4px;
+}
+
+.kojo-blueprint-test-link:hover {
+  opacity: 0.75;
+}
+

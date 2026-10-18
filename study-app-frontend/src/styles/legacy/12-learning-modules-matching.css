@@ -1,0 +1,1201 @@
+/* ── Admin: feature survey results ──
+   Reuses the modal's honey accent (--admin-star) so ratings read consistently
+   app-wide. The star meter turns a bare average into something scannable: a
+   muted 5-star track with a honey overlay clipped to the score. */
+.admin-survey-grid {
+  --admin-star: #e0a12e;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.admin-survey-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--white, #fff);
+}
+
+.admin-survey-feature {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--green-dark-mid);
+}
+
+.admin-survey-score {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-survey-rating {
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.admin-survey-rating-max {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 500;
+  margin-left: 2px;
+}
+
+/* Star meter: two stacked star runs, the fill clipped to width: var(--fill). */
+.admin-rating-meter {
+  --admin-star: #e0a12e;
+  position: relative;
+  display: inline-block;
+  font-size: 0.95rem;
+  line-height: 1;
+  letter-spacing: 2px;
+  white-space: nowrap;
+}
+
+.admin-rating-meter-track {
+  color: var(--green-light-mid);
+}
+
+.admin-rating-meter-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--fill, 0%);
+  overflow: hidden;
+  color: var(--admin-star);
+}
+
+.admin-rating-meter--sm {
+  font-size: 0.82rem;
+  letter-spacing: 1.5px;
+}
+
+.admin-survey-comments {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-survey-comments-title {
+  font-size: 0.95rem;
+  margin: 0 0 4px;
+  color: var(--ink);
+}
+
+.admin-survey-comment {
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--green-light-mid);
+  border-radius: var(--radius-lg);
+  background: var(--white, #fff);
+}
+
+.admin-survey-comment-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+/* Push the date to the right edge of the comment header. */
+.admin-survey-comment-head .admin-cell-date {
+  margin-left: auto;
+}
+
+.admin-survey-comment-text {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+/* ============================================================
+   Learning Modes hub (mode picker)
+   ============================================================ */
+.mode-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+}
+
+.mode-header .flash-back-btn {
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+
+.mode-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+@media (min-width: 620px) {
+  .mode-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.mode-card {
+  --mode-accent: var(--green-dark);
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.4rem;
+  border: 1px solid var(--border);
+  /* Level 3, matching .card-interactive rather than carrying its own values. */
+  border-radius: var(--radius-lg);
+  background: var(--white);
+  box-shadow: var(--shadow-md);
+  text-decoration: none;
+  color: var(--ink);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.mode-card:hover {
+  box-shadow: var(--shadow-lg);
+  border-color: var(--mode-accent);
+}
+
+.mode-card:focus-visible {
+  outline: 2px solid var(--mode-accent);
+  outline-offset: 2px;
+}
+
+.mode-card--disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.mode-card-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-xl);
+  flex-shrink: 0;
+}
+
+/* Status sits beside the title it qualifies, rather than being folded into an
+   eyebrow string like "Lessons / beta" that made the reader parse a category
+   and a status out of one line. */
+/* The badge is taken out of flow and pinned to the card's corner.
+   In the title row it was a flex sibling of the heading, so any title wide
+   enough to fill the line pushed it onto a row of its own, where it read as an
+   orphaned label rather than as a qualifier on the title. The corner is a
+   fixed home that no title length can disturb; the heading reserves room for
+   it so the two can never collide. */
+.mode-card-beta {
+  position: absolute;
+  top: 1.1rem;
+  right: 1.1rem;
+  min-height: 0;
+  padding: 3px 9px;
+}
+
+.mode-card--beta .mode-card-body h2 {
+  padding-right: 3.5rem;
+}
+
+.mode-card-body h2 {
+  margin: 0.15rem 0 0.35rem;
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+}
+
+.mode-card-body p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.mode-empty-note {
+  margin-top: 1.1rem;
+}
+
+/* ============================================================
+   Matching game
+   ============================================================ */
+.match-screen {
+  /* The board is the page. A matching board you have to scroll is broken by
+     definition: you cannot hunt for a pair you cannot see. So the screen is
+     locked to the viewport and the board takes whatever the rail and the
+     reading strip do not, rather than the board growing and the page
+     scrolling. Nothing in here is allowed to overflow. */
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 0.6rem;
+  height: 100dvh;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0.9rem 1rem 1rem;
+  overflow: hidden;
+}
+
+.match-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 4rem 1rem;
+  color: var(--green-dark);
+}
+
+.match-loading svg {
+  animation: match-spin 1.4s ease-in-out infinite;
+}
+
+@keyframes match-spin {
+  0%,
+  100% {
+    transform: rotate(-8deg) scale(1);
+  }
+  50% {
+    transform: rotate(8deg) scale(1.08);
+  }
+}
+
+/* Rail: the entire game chrome on one line. The old header stacked a back
+   button, an eyebrow, a serif h1, a round pill and a three-item HUD, which cost
+   roughly 140px of height that the board needed more. */
+.match-rail {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+  font-size: 0.85rem;
+}
+
+.match-rail-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  color: var(--green-dark);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: var(--white);
+}
+
+.match-rail-back:hover {
+  background: var(--green-lightest);
+}
+
+.match-rail-deck {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.match-rail-round,
+.match-rail-stat {
+  flex: none;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.match-rail-stat {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.match-rail-stat--quiet {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.match-rail-spacer {
+  flex: 1 1 auto;
+}
+
+.match-progress {
+  height: 5px;
+}
+
+/* Board */
+.match-board-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  transition: opacity var(--transition-normal), filter var(--transition-normal);
+}
+
+.match-board-wrap.is-clearing {
+  opacity: 0.4;
+  filter: saturate(0.6);
+}
+
+/* The board fills its row exactly. Columns come from the tile count via
+   --match-cols, chosen so the count always divides evenly and no ragged final
+   row appears. Rows are 1fr of the remaining height, so tiles shrink to fit the
+   viewport instead of pushing the page taller. */
+.match-board {
+  display: grid;
+  grid-template-columns: repeat(var(--match-cols, 4), minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 0.55rem;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  /* Ceilings, not sizes: 1fr rows still shrink the tiles when the viewport is
+     short, these just stop them growing into billboards when it is tall. */
+  max-width: calc(var(--match-cols, 4) * 13rem);
+  max-height: calc(var(--match-rows, 3) * 12rem);
+  margin: auto;
+}
+
+
+@media (min-width: 720px) {
+  .match-board {
+    gap: 0.7rem;
+  }
+}
+
+.match-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  /* No min-height: the grid row decides how tall a tile is. A floor here is
+     what made the board overflow the viewport. */
+  min-height: 0;
+  padding: 0.6rem 0.65rem;
+  border-radius: var(--radius-xl);
+  border: 1.5px solid var(--border);
+  background: var(--white);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast),
+    border-color var(--transition-fast), background var(--transition-fast);
+}
+
+/* Two tile families so the columns read as two things to pair: terms sit on a
+   warm cream tint, definitions on white with a green edge. */
+.match-tile--front {
+  background: var(--green-light);
+  border-color: var(--green-light-mid);
+}
+
+.match-tile--back {
+  background: var(--white);
+  border-color: var(--green-light-mid);
+}
+
+.match-tile:hover:not(:disabled) {
+  box-shadow: var(--shadow-md);
+}
+
+.match-tile:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.match-tile.is-selected {
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.3);
+}
+
+.match-tile.is-mismatch {
+  border-color: var(--error);
+  background: rgba(220, 38, 38, 0.08);
+  animation: match-shake 0.4s ease;
+}
+
+@keyframes match-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-5px);
+  }
+  40%,
+  80% {
+    transform: translateX(5px);
+  }
+}
+
+/* Matched tiles keep their grid slot (no reflow jump) but drop back to a quiet
+   done state with a success tint. */
+.match-tile.is-matched {
+  border-color: var(--success);
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.72;
+  animation: match-pop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.match-tile.is-matched::after {
+  content: "";
+  position: absolute;
+  top: 0.5rem;
+  right: 0.55rem;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-pill);
+  background: var(--success);
+  opacity: 0.9;
+}
+
+@keyframes match-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.match-tile-side {
+  flex: none;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.match-tile--front .match-tile-side {
+  color: var(--green-dark);
+}
+
+.match-tile-text {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  font-size: 0.85rem;
+  line-height: 1.35;
+  /* Fades the last line rather than cutting it mid-stroke, so a clipped
+     definition reads as "there is more" instead of as a rendering fault. */
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 1.1em), transparent 100%);
+}
+
+@supports not (mask-image: linear-gradient(#000, #000)) {
+  .match-tile-text {
+    mask-image: none;
+  }
+}
+
+.match-tile-text .kojo-markdown > *:first-child {
+  margin-top: 0;
+}
+
+.match-tile-text .kojo-markdown > *:last-child {
+  margin-bottom: 0;
+}
+
+.match-tile-text .kojo-md-p {
+  margin: 0.2rem 0;
+}
+
+/* Round-clear toast */
+.match-round-toast {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  animation: match-toast-in 0.3s ease;
+  pointer-events: none;
+}
+
+@keyframes match-toast-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Reading strip. Doubles as the hint line, so showing a clipped definition in
+   full costs no extra chrome and no layout shift: the row is always there. */
+.match-strip {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  /* A reserved height, not a range. If the strip grew when a tile was selected
+     the board above it would resize and every tile would jump under the
+     player's finger mid-move. */
+  height: 4.25rem;
+  /* Scrollable only as a last resort for a pathologically long definition, and
+     never showing scrollbar chrome: visible scrollbars are what this redesign
+     set out to remove. */
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.85rem;
+  text-align: center;
+  justify-content: center;
+  color: var(--muted);
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.match-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.match-strip.is-reading {
+  justify-content: flex-start;
+  text-align: left;
+  color: var(--ink);
+  background: var(--green-lightest);
+}
+
+.match-strip-side {
+  flex: none;
+  font-weight: 600;
+  color: var(--green-dark);
+}
+
+.match-strip-text {
+  min-width: 0;
+}
+
+.match-strip-text .kojo-markdown > *:first-child { margin-top: 0; }
+.match-strip-text .kojo-markdown > *:last-child { margin-bottom: 0; }
+.match-strip-text .kojo-md-p { margin: 0.15rem 0; }
+
+/* Results */
+.match-results {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.6rem;
+  padding: 2.25rem 1.75rem;
+}
+
+.match-results-badge {
+  display: grid;
+  place-items: center;
+  width: 78px;
+  height: 78px;
+  border-radius: var(--radius-pill);
+  background: rgba(217, 119, 6, 0.14);
+  color: var(--warning);
+  margin-bottom: 0.25rem;
+}
+
+.match-results h1 {
+  margin: 0;
+  font-family: var(--font-serif);
+}
+
+.match-record-flag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.85rem;
+  border-radius: var(--radius-pill);
+  background: var(--success);
+  color: var(--white);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.match-stat-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  width: 100%;
+  margin: 1.25rem 0 0.5rem;
+}
+
+@media (min-width: 520px) {
+  .match-stat-row {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.match-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.85rem 0.5rem;
+  border-radius: var(--radius-xl);
+  background: var(--green-lightest);
+}
+
+.match-stat-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.match-stat-value {
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .match-tile,
+  .match-tile.is-matched,
+  .match-tile.is-mismatch,
+  .match-loading svg,
+  .match-round-toast {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* ============================================================
+   Learning Modules
+   ============================================================ */
+.lm-spin {
+  animation: lm-spin 1s linear infinite;
+}
+
+@keyframes lm-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.lm-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 4rem 1rem;
+  color: var(--green-dark);
+}
+
+.lm-header-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Setup card */
+.lm-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1.5rem;
+}
+
+.lm-setup-label {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.lm-count-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.lm-count-slider {
+  flex: 1;
+  accent-color: var(--green-dark);
+}
+
+.lm-count-value {
+  font-family: var(--font-serif);
+  font-size: 1.6rem;
+  font-weight: 700;
+  min-width: 2ch;
+  text-align: center;
+  color: var(--green-dark);
+}
+
+/* Status banners */
+.lm-failed,
+.lm-stale {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1rem 1.15rem;
+  margin-bottom: 1rem;
+}
+
+.lm-failed svg {
+  color: var(--error);
+  flex-shrink: 0;
+}
+
+.lm-failed div {
+  flex: 1;
+  min-width: 0;
+}
+
+.lm-failed p,
+.lm-stale p {
+  margin: 0.15rem 0 0;
+}
+
+.lm-stale {
+  background: rgba(217, 119, 6, 0.08);
+  border-color: rgba(217, 119, 6, 0.35);
+}
+
+.lm-stale svg {
+  color: var(--warning);
+  flex-shrink: 0;
+}
+
+.lm-stale p {
+  flex: 1;
+  font-size: 0.9rem;
+}
+
+.lm-generating-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 1rem;
+  margin-bottom: 1rem;
+  border-radius: var(--radius-xl);
+  background: var(--green-lightest);
+  border: 1px dashed var(--green-light-mid);
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.lm-generating-bar svg {
+  color: var(--green-dark);
+  flex-shrink: 0;
+}
+
+.lm-generating-bar span {
+  flex: 1;
+}
+
+.lm-cancel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: none;
+  background: transparent;
+  color: var(--error);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.25rem 0.4rem;
+  border-radius: var(--radius-md);
+}
+
+.lm-cancel-btn:hover {
+  background: rgba(220, 38, 38, 0.08);
+}
+
+/* Module list */
+.lm-module-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.lm-module-row {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background: var(--white);
+  text-decoration: none;
+  color: var(--ink);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+a.lm-module-row:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--green-dark);
+}
+
+a.lm-module-row:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.lm-module-row.is-locked,
+.lm-module-row.is-pending {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.lm-module-row.is-passed {
+  border-color: rgba(16, 185, 129, 0.45);
+  background: rgba(16, 185, 129, 0.06);
+}
+
+.lm-module-num {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-pill);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-weight: 700;
+  font-size: 0.92rem;
+  flex-shrink: 0;
+}
+
+.lm-module-row.is-passed .lm-module-num {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+}
+
+.lm-module-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.lm-module-title {
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.lm-module-summary {
+  font-size: 0.82rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.lm-module-state {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.lm-module-row.is-passed .lm-module-state {
+  color: var(--success);
+}
+
+.lm-module-row.is-open .lm-module-state {
+  color: var(--green-dark);
+}
+
+.lm-skeleton {
+  display: block;
+  width: 55%;
+  height: 0.95em;
+  border-radius: var(--radius-sm);
+  background: var(--gray-200);
+}
+
+.lm-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.4rem;
+  padding: 1.75rem;
+  margin-top: 1.25rem;
+  color: var(--green-dark);
+}
+
+.lm-done h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+}
+
+/* Lesson page: podcast-style narration player. The script is a spoken rewrite
+   of the article (notation in words), not a word-for-word read, so playback is
+   a player at the top instead of a follow-along text highlight. */
+/* ── Shared audio-control classes ───────────────────────────────────────────
+   These belong to the EPISODE player (EpisodePlayer.tsx) now. The article
+   lesson player used to share them, but it is a fixed dock with different
+   sizing and a custom-painted seek bar, so it was moved to its own .lm-dock-*
+   namespace at the end of this file rather than fighting these rules with
+   overrides. Do not re-point the article player at these. */
+
+.lm-audio-toggle {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--green-dark);
+  color: var(--white);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  outline: none;
+}
+
+.lm-audio-toggle:hover {
+  background: var(--green-dark-mid);
+}
+
+.lm-audio-toggle:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 3px;
+}
+
+.lm-audio-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lm-audio-titles {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.lm-audio-titles strong {
+  font-size: 0.9rem;
+}
+
+/* Draggable seek slider styled as the progress track. */
+.lm-audio-seek {
+  width: 100%;
+  height: 6px;
+  margin: 5px 0;
+  accent-color: var(--green-dark);
+  cursor: pointer;
+}
+
+.lm-audio-seek:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 3px;
+}
+
+.lm-audio-restart {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-pill);
+  background: var(--white);
+  color: var(--green-dark);
+  cursor: pointer;
+}
+
+.lm-audio-restart:hover {
+  border-color: var(--green-dark);
+}
+
+.lm-audio-rates {
+  display: inline-flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.lm-audio-rate {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.3rem 0.5rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.lm-audio-rate.is-active {
+  background: var(--white);
+  color: var(--green-dark);
+  box-shadow: var(--shadow-sm);
+}
+
+
+/* Pencil dropdown: edit article / change voice */
+.lm-menu-wrap {
+  position: relative;
+}
+
+.lm-header-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--white);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.lm-header-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.5rem 0.65rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lm-header-menu button:hover {
+  background: var(--green-lightest);
+}
+
+.lm-header-menu button svg {
+  color: var(--green-dark);
+  flex-shrink: 0;
+}
+
+/* Narration voice picker */
+.lm-voice-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.25rem 1.4rem;
+  margin-bottom: 1rem;
+}
+
+.lm-voice-select {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-lg);
+  border: 1.5px solid var(--border);
+  background: var(--white);
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.lm-voice-select:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 1px;
+}
+
+.lm-lesson-card {
+  padding: 1.5rem 1.6rem;
+  line-height: 1.6;
+}
+
+/* Lesson blocks: one per markdown paragraph, highlighted while the player is
+   reading them (paragraph-level position, driven by the audio player). */
+.lm-lesson-block {
+  padding: 0.35rem 0.6rem;
+  margin: 0 -0.6rem;
+  border-radius: var(--radius-lg);
+  border-left: 3px solid transparent;
+  transition: background var(--transition-normal), border-color var(--transition-normal);
+}
+
+.lm-lesson-block.is-speaking {
+  background: var(--green-lightest);
+  border-left-color: var(--green-dark);
+}
+
+/* Quieter marker for the paused/saved position while not speaking. */
+.lm-lesson-block.is-cursor {
+  border-left-color: var(--green-light-mid);
+}
+
+.lm-lesson-block .kojo-md-p:first-child,
+.lm-lesson-block .kojo-md-heading:first-child {
+  margin-top: 0;
+}
+
+.lm-lesson-block .kojo-md-p:last-child {
+  margin-bottom: 0;
+}
+
+/* Setup: custom instructions */
+.lm-label-optional {
+  font-weight: 500;
+  font-size: 0.8rem;
+}
+
+.lm-instructions-input {
+  width: 100%;
+  resize: vertical;
+  min-height: 70px;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-lg);
+  border: 1.5px solid var(--border);
+  background: var(--white);
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.lm-instructions-input:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 1px;
+}
+
+.lm-char-count {
+  margin: -0.4rem 0 0;
+  text-align: right;
+}
+
+/* Build-time note above 10 modules; same amber idiom as the .lm-stale banner
+   so every "heads up" in Learning Modules reads the same way. */
+.lm-count-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin: -0.3rem 0 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-lg);
+  background: rgba(217, 119, 6, 0.08);
+  border: 1px solid rgba(217, 119, 6, 0.35);
+}
+
+.lm-count-warning svg {
+  color: var(--warning);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.lm-count-warning p {
+  margin: 0;
+}
+
