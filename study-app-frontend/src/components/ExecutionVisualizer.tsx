@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from "../icons";
 import { useEffect, useRef, useState } from "react";
 import type { SerializedValue, TraceResult } from "../lib/pyodideRunner";
 
@@ -139,7 +139,7 @@ export function ExecutionVisualizer({
               {atEnd ? "Finished" : `Step ${stepIdx + 1} / ${totalSteps}`}
             </span>
             <button type="button" className="lc-kojo-close" onClick={onClose} aria-label="Close visualizer">
-              <X size={17} />
+              <CloseIcon size={17} />
             </button>
           </div>
         </div>
@@ -192,7 +192,7 @@ export function ExecutionVisualizer({
             disabled={stepIdx === 0}
             aria-label="Previous step"
           >
-            <ChevronLeft size={18} />
+            <ChevronLeftIcon size={18} />
           </button>
           <input
             type="range"
@@ -210,7 +210,7 @@ export function ExecutionVisualizer({
             disabled={atEnd}
             aria-label="Next step"
           >
-            <ChevronRight size={18} />
+            <ChevronRightIcon size={18} />
           </button>
           <span className="lc-viz-nav-hint">← → to step</span>
         </div>

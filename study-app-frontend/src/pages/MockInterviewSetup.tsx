@@ -1,16 +1,5 @@
-import {
-  ArrowLeft,
-  Building2,
-  ChevronRight,
-  FileText,
-  History,
-  Loader2,
-  Play,
-  Save,
-  Shuffle,
-  Sparkles,
-  X,
-} from "lucide-react";
+import { Building2, FileText, History, Loader2, Play, Save, Shuffle } from "lucide-react";
+import { ArrowLeftIcon, ChevronRightIcon, CloseIcon, SparklesIcon } from "../icons";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -372,7 +361,7 @@ export default function MockInterviewSetup() {
   return (
     <div className="page page-narrow">
       <button className="mock-back-link" onClick={() => navigate("/leetcode")}>
-        <ArrowLeft size={16} /> KojoCode
+        <ArrowLeftIcon size={16} /> KojoCode
       </button>
       <div className="mock-setup-hero">
         <div className="mock-setup-hero-top">
@@ -409,14 +398,14 @@ export default function MockInterviewSetup() {
           </div>
           <div className="mock-resume-banner-actions">
             <button className="button button-primary" onClick={handleResume}>
-              Resume <ChevronRight size={14} />
+              Resume <ChevronRightIcon size={14} />
             </button>
             <button
               className="button button-ghost mock-resume-discard"
               onClick={handleDiscard}
               title="Discard saved progress"
             >
-              <X size={14} /> Discard
+              <CloseIcon size={14} /> Discard
             </button>
           </div>
         </div>
@@ -496,7 +485,7 @@ export default function MockInterviewSetup() {
                         aria-label={`Delete saved job description ${jd.name}`}
                         title="Delete"
                       >
-                        <X size={12} />
+                        <CloseIcon size={12} />
                       </button>
                     </span>
                   ))}
@@ -528,7 +517,7 @@ export default function MockInterviewSetup() {
                 onClick={handleAnalyzeJd}
                 disabled={analyzing}
               >
-                {analyzing ? <Loader2 size={14} className="spin" /> : <Sparkles size={14} />}
+                {analyzing ? <Loader2 size={14} className="spin" /> : <SparklesIcon size={14} />}
                 {analyzing ? "Analyzing" : "Analyze job description"}
               </button>
               <button
@@ -690,7 +679,7 @@ export default function MockInterviewSetup() {
             </>
           ) : (
             <>
-              Start the loop <ChevronRight size={16} />
+              Start the loop <ChevronRightIcon size={16} />
             </>
           )}
         </button>

@@ -1,4 +1,5 @@
-import { AlertCircle, ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, FolderOpen, RotateCcw, Trash2, XCircle } from "lucide-react";
+import { FolderIcon } from "../icons";
+import { AlertIcon, ArrowLeftIcon, CheckCircleIcon, ChevronLeftIcon, ChevronRightIcon, CrossCircleIcon, RetryIcon, TrashIcon } from "../icons";
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -191,7 +192,7 @@ export default function Flashcards() {
           <SkeletonFolderGrid count={4} label="Loading your class folders" />
         ) : folders.length === 0 ? (
           <EmptyState
-            icon={<FolderOpen />}
+            icon={<FolderIcon />}
             title="No class folders yet"
             body="Create a class folder first, then generate or add flashcards in that folder."
             action={
@@ -206,7 +207,7 @@ export default function Flashcards() {
               <Card key={folder.id} interactive className="folder-card flash-folder-card">
                 <Link className="folder-card-main" to={`/flashcards/${folder.id}`}>
                   <div>
-                    <FolderOpen size={34} style={{ color: folder.color ?? "var(--green-dark)" }} />
+                    <FolderIcon size={34} style={{ color: folder.color ?? "var(--green-dark)" }} />
                     <h2>{folder.name}</h2>
                     <p className="muted">{folder.subject ?? "Class folder"}</p>
                   </div>
@@ -237,7 +238,7 @@ export default function Flashcards() {
     return (
       <div className="page page-narrow">
         <EmptyState
-          icon={<AlertCircle />}
+          icon={<AlertIcon />}
           title={`No flashcards available for ${selectedFolder?.name ?? "this class"}`}
           body="There is nothing available for this class right now. Try another class folder."
           action={
@@ -254,11 +255,11 @@ export default function Flashcards() {
     return (
       <div className="page page-narrow">
         <Card className="complete-card">
-          <CheckCircle2 size={54} />
+          <CheckCircleIcon size={54} />
           <h1>Session complete</h1>
           <p>You reviewed {cards.length} cards. The toughest cards stay near the top next time.</p>
           <div className="button-row">
-            <Button icon={<RotateCcw size={18} />} onClick={reset}>
+            <Button icon={<RetryIcon size={18} />} onClick={reset}>
               Study Again
             </Button>
             <Link to="/dashboard">
@@ -276,7 +277,7 @@ export default function Flashcards() {
       <header className="flash-header">
         <div className="flash-header-row">
           <Link className="flash-back-btn" to={selectedFolderId != null ? `/flashcards/${selectedFolderId}` : "/flashcards"} aria-label="Back to modes" title="Back to modes">
-            <ArrowLeft size={18} />
+            <ArrowLeftIcon size={18} />
           </Link>
           <div className="flash-header-title">
             <h1>{selectedFolder?.name ?? "Flashcards"}</h1>
@@ -292,7 +293,7 @@ export default function Flashcards() {
               aria-label="Restart session"
               title="Restart session"
             >
-              <RotateCcw size={17} />
+              <RetryIcon size={17} />
             </button>
             <button
               className="flash-icon-btn flash-icon-btn--danger"
@@ -302,7 +303,7 @@ export default function Flashcards() {
               aria-label="Delete all flashcards"
               title="Delete all flashcards"
             >
-              <Trash2 size={17} />
+              <TrashIcon size={17} />
             </button>
           </div>
         </div>
@@ -345,7 +346,7 @@ export default function Flashcards() {
             type="button"
             aria-label="Previous card"
           >
-            <ChevronLeft size={20} />
+            <ChevronLeftIcon size={20} />
           </button>
           <p className="flash-hint">{flipped ? "How well did you know it?" : "Tap the card to flip it"}</p>
           <button
@@ -355,7 +356,7 @@ export default function Flashcards() {
             type="button"
             aria-label="Next card"
           >
-            <ChevronRight size={20} />
+            <ChevronRightIcon size={20} />
           </button>
         </div>
 
@@ -363,17 +364,17 @@ export default function Flashcards() {
           {flipped ? (
             <div className="confidence-row" data-tour="review-confidence">
               <button className="confidence confidence--hard" onClick={() => mark(false)} type="button">
-                <span className="confidence-icon"><XCircle size={20} /></span>
+                <span className="confidence-icon"><CrossCircleIcon size={20} /></span>
                 <span className="confidence-label">Hard</span>
                 <span className="confidence-sub">Study again</span>
               </button>
               <button className="confidence confidence--medium" onClick={() => mark(false)} type="button">
-                <span className="confidence-icon"><AlertCircle size={20} /></span>
+                <span className="confidence-icon"><AlertIcon size={20} /></span>
                 <span className="confidence-label">Medium</span>
                 <span className="confidence-sub">Almost</span>
               </button>
               <button className="confidence confidence--easy" onClick={() => mark(true)} type="button">
-                <span className="confidence-icon"><CheckCircle2 size={20} /></span>
+                <span className="confidence-icon"><CheckCircleIcon size={20} /></span>
                 <span className="confidence-label">Easy</span>
                 <span className="confidence-sub">Got it</span>
               </button>

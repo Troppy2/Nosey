@@ -18,6 +18,22 @@ const LUCIDE: Record<string, string> = {
   ScoreRiseIcon: "TrendingUp",
   CrownIcon: "Crown",
   SproutIcon: "Sprout",
+  CloseIcon: "X",
+  CheckIcon: "Check",
+  CheckCircleIcon: "CheckCircle2",
+  CrossCircleIcon: "XCircle",
+  AlertIcon: "AlertCircle",
+  InfoIcon: "Info",
+  PlusIcon: "Plus",
+  TrashIcon: "Trash2",
+  SearchIcon: "Search",
+  CopyIcon: "Copy",
+  UploadIcon: "Upload",
+  SparklesIcon: "Sparkles",
+  PencilIcon: "Pencil",
+  RetryIcon: "RotateCcw",
+  ChevronRightIcon: "ChevronRight",
+  ArrowRightIcon: "ArrowRight",
 };
 const Lucide = LucideIcons as unknown as Record<string, ComponentType<{ size?: number }>>;
 
@@ -57,8 +73,8 @@ function Panel({ dark }: { dark: boolean }) {
   return (
     <section data-theme={dark ? "dark" : "light"}
       style={{ background: dark ? "#111214" : "#fafaf9", color: dark ? "#e8e8e6" : "#1c1c1e", padding: 24 }}>
-      {[16, 20, 24].map((s) => <Row key={`o${s}`} size={s} active={false} />)}
-      {[16, 20, 24].map((s) => <Row key={`f${s}`} size={s} active />)}
+      {[12, 16, 20, 24].map((s) => <Row key={`o${s}`} size={s} active={false} />)}
+      {[12, 16, 20, 24].map((s) => <Row key={`f${s}`} size={s} active />)}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 32, marginTop: 24 }}>
         {entries.map(([name, C]) => {
           const L = Lucide && LUCIDE[name] ? Lucide[LUCIDE[name]] : null;

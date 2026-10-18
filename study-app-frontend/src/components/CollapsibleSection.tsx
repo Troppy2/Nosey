@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react";
+import { ChevronDownIcon } from "../icons";
 import { useState, type ReactNode } from "react";
 
 interface Props {
@@ -19,7 +19,7 @@ export function CollapsibleSection({ title, defaultOpen = false, children }: Pro
         aria-expanded={open}
       >
         <span className="settings-collapsible-title">{title}</span>
-        <ChevronDown size={16} className="settings-collapsible-chevron" />
+        <ChevronDownIcon size={16} className="settings-collapsible-chevron" />
       </button>
       {open && <div className="settings-collapsible-body">{children}</div>}
     </div>

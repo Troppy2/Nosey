@@ -1,4 +1,6 @@
-import { ArrowLeft, Atom, Calculator, CheckCircle2, Code2, FileText, Settings2, Upload, X } from "lucide-react";
+import { Atom, Calculator, FileText, Settings2 } from "lucide-react";
+import { CodeIcon } from "../icons";
+import { ArrowLeftIcon, CheckCircleIcon, CloseIcon, UploadIcon } from "../icons";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -555,7 +557,7 @@ export default function CreateTest() {
   return (
     <div className="page page-narrow">
       <Link className="back-link" to={folderId ? `/folders/${folderId}` : "/folders"}>
-        <ArrowLeft size={16} />
+        <ArrowLeftIcon size={16} />
         Folder
       </Link>
       <header className="page-header">
@@ -581,7 +583,7 @@ export default function CreateTest() {
 
       {folders.length === 0 ? (
         <EmptyState
-          icon={<Upload />}
+          icon={<UploadIcon />}
           title="Create a folder first"
           body="You need at least one folder before you can generate a practice test."
           action={
@@ -660,7 +662,7 @@ export default function CreateTest() {
                   className={`math-mode-toggle ${isCodingMode ? "active" : ""}`}
                   onClick={() => { setIsCodingMode((v) => !v); setIsMathMode(false); }}
                 >
-                  <Code2 size={16} />
+                  <CodeIcon size={16} />
                   <span>
                     <strong>Coding mode</strong>
                     <span className="math-mode-toggle-sub">
@@ -858,7 +860,7 @@ export default function CreateTest() {
                           aria-label={`Remove ${practiceTestFile.name}`}
                           onClick={clearPracticeTest}
                         >
-                          <X size={14} aria-hidden="true" />
+                          <CloseIcon size={14} aria-hidden="true" />
                           <span>Remove</span>
                         </button>
                       </div>
@@ -884,7 +886,7 @@ export default function CreateTest() {
                               ) : null}
                               <div className="answer-sheet-actions">
                                 <label className="button button-primary answer-sheet-upload">
-                                  <Upload size={14} />
+                                  <UploadIcon size={14} />
                                   <span>{answerSheetPhase === "error" ? "Try another file" : "Upload answer sheet"}</span>
                                   <input
                                     type="file"
@@ -917,7 +919,7 @@ export default function CreateTest() {
                           ) : null}
                           {answerSheetPhase === "ready" && answerSheetFile ? (
                             <div className="answer-sheet-ready">
-                              <CheckCircle2 className="answer-sheet-ready-icon" size={18} aria-hidden="true" />
+                              <CheckCircleIcon className="answer-sheet-ready-icon" size={18} aria-hidden="true" />
                               <div className="answer-sheet-ready-text">
                                 <span className="answer-sheet-ready-name">{answerSheetFile.name}</span>
                                 <span className="muted small">Answers and marking come from your sheet</span>
@@ -928,7 +930,7 @@ export default function CreateTest() {
                                 aria-label={`Remove ${answerSheetFile.name}`}
                                 onClick={() => clearAnswerSheet("ask")}
                               >
-                                <X size={14} aria-hidden="true" />
+                                <CloseIcon size={14} aria-hidden="true" />
                                 <span>Remove</span>
                               </button>
                             </div>
@@ -998,7 +1000,7 @@ export default function CreateTest() {
                         background: "var(--green-lightest)",
                       }}
                     >
-                      <Upload size={14} />
+                      <UploadIcon size={14} />
                       Choose practice test file
                       <input
                         ref={practiceTestInputRef}
@@ -1081,7 +1083,7 @@ export default function CreateTest() {
               </>
             ) : (
               <>
-                <Upload size={44} />
+                <UploadIcon size={44} />
                 <h2>Drop notes here</h2>
                 <p>PDF, DOCX, PPTX, TXT, Markdown, and code files. They are saved to this folder.</p>
               </>

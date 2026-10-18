@@ -1,4 +1,5 @@
-import { Copy, Download, ExternalLink, X } from "lucide-react";
+import { Download, ExternalLink } from "lucide-react";
+import { CloseIcon, CopyIcon } from "../icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "./Button";
 import { InlineLoading } from "./Loaders";
@@ -94,7 +95,7 @@ export function QuizletExportModal({ folderId, folderName, onClose }: Props) {
             </p>
           </div>
           <button className="qz-close" type="button" aria-label="Close" onClick={onClose}>
-            <X size={18} />
+            <CloseIcon size={18} />
           </button>
         </div>
 
@@ -143,7 +144,7 @@ export function QuizletExportModal({ folderId, folderName, onClose }: Props) {
             <Button variant="secondary" icon={<Download size={16} />} onClick={download} disabled={disabled}>
               Download .txt
             </Button>
-            <Button variant="secondary" icon={<Copy size={16} />} onClick={() => copy(false)} disabled={disabled}>
+            <Button variant="secondary" icon={<CopyIcon size={16} />} onClick={() => copy(false)} disabled={disabled}>
               Copy
             </Button>
             <Button icon={<ExternalLink size={16} />} onClick={() => copy(true)} disabled={disabled}>

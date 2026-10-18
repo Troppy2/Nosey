@@ -1,4 +1,5 @@
-import { AlertCircle, ArrowLeft, Briefcase, ChevronRight, Clock } from "lucide-react";
+import { Briefcase, Clock } from "lucide-react";
+import { AlertIcon, ArrowLeftIcon, ChevronRightIcon } from "../icons";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { SkeletonList } from "../components/Skeletons";
@@ -71,7 +72,7 @@ export default function MockInterviewHistory() {
   return (
     <div className="page page-narrow">
       <button className="mock-back-link" onClick={() => navigate("/mock-interview")}>
-        <ArrowLeft size={16} /> Mock Interview
+        <ArrowLeftIcon size={16} /> Mock Interview
       </button>
 
       <div className="page-header">
@@ -87,7 +88,7 @@ export default function MockInterviewHistory() {
 
       {error ? (
         <div className="card mock-error-card">
-          <AlertCircle size={20} style={{ color: "var(--error)" }} />
+          <AlertIcon size={20} style={{ color: "var(--error)" }} />
           <p>{error}</p>
         </div>
       ) : !sessions ? (
@@ -96,7 +97,7 @@ export default function MockInterviewHistory() {
         <div className="card mock-history-empty">
           <p className="muted">You have not finished a mock interview yet.</p>
           <button className="button button-primary" onClick={() => navigate("/mock-interview")}>
-            Start one <ChevronRight size={14} />
+            Start one <ChevronRightIcon size={14} />
           </button>
         </div>
       ) : (
@@ -141,7 +142,7 @@ export default function MockInterviewHistory() {
                   </div>
                   <MockLoopTrack stages={stages} current={complete ? "done" : "unknown"} compact />
                 </div>
-                <ChevronRight size={16} className="mock-history-chevron" />
+                <ChevronRightIcon size={16} className="mock-history-chevron" />
               </button>
             );
           })}

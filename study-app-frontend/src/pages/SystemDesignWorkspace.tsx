@@ -1,5 +1,6 @@
 import Editor from "@monaco-editor/react";
-import { ArrowLeft, Check, Lock, MessageCircleQuestion, Play, X } from "lucide-react";
+import { Lock, MessageCircleQuestion, Play } from "lucide-react";
+import { ArrowLeftIcon, CheckIcon, CloseIcon } from "../icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 
@@ -162,7 +163,7 @@ export default function SystemDesignWorkspace() {
           aria-label={`Back to ${concept.title}`}
           title={`Back to ${concept.title}`}
         >
-          <ArrowLeft size={18} />
+          <ArrowLeftIcon size={18} />
         </Link>
         <div className="sd-workspace-title">
           <span className="eyebrow">{concept.title}</span>
@@ -188,7 +189,7 @@ export default function SystemDesignWorkspace() {
             onClick={() => void handleDone()}
             disabled={running || !hydrated}
           >
-            <Check size={16} />
+            <CheckIcon size={16} />
             Done
           </button>
         </div>
@@ -321,12 +322,12 @@ export default function SystemDesignWorkspace() {
               <div className={`sd-result-summary${result.ok ? " is-pass" : " is-fail"}`}>
                 {result.ok ? (
                   <>
-                    <Check size={16} />
+                    <CheckIcon size={16} />
                     All {result.cases.length} cases passed. Press Done to record it.
                   </>
                 ) : (
                   <>
-                    <X size={16} />
+                    <CloseIcon size={16} />
                     {failing.length} of {result.cases.length} cases failing.
                   </>
                 )}
@@ -346,7 +347,7 @@ export default function SystemDesignWorkspace() {
                       className={`sd-case${testCase.passed ? " is-pass" : " is-fail"}`}
                       data-passed={testCase.passed ? "true" : "false"}
                     >
-                      {testCase.passed ? <Check size={14} /> : <X size={14} />}
+                      {testCase.passed ? <CheckIcon size={14} /> : <CloseIcon size={14} />}
                       <span className="sd-case-name">{testCase.name}</span>
                       {testCase.message ? (
                         <span className="sd-case-message">{testCase.message}</span>

@@ -1,4 +1,6 @@
-import { CheckCircle, LogIn, LogOut, RotateCcw, ShieldCheck, Sparkles, XCircle } from "lucide-react";
+import { LogIn, LogOut } from "lucide-react";
+import { ShieldIcon } from "../icons";
+import { CheckCircleIcon, CrossCircleIcon, RetryIcon, SparklesIcon } from "../icons";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -317,12 +319,12 @@ export default function Settings() {
 
         {signInSuccess ? (
           <div className="settings-feedback settings-feedback--success">
-            <CheckCircle size={16} />
+            <CheckCircleIcon size={16} />
             <span>Signed in as {user?.full_name ?? user?.email}. Redirecting…</span>
           </div>
         ) : signInError ? (
           <div className="settings-feedback settings-feedback--error">
-            <XCircle size={16} />
+            <CrossCircleIcon size={16} />
             <span>{signInError}</span>
           </div>
         ) : null}
@@ -343,7 +345,7 @@ export default function Settings() {
             away once they have. */}
         {!isSignedIn ? (
           <div className="settings-note">
-            <Sparkles size={18} />
+            <SparklesIcon size={18} />
             <span>Use the guest session to try the full flow before connecting a real account.</span>
           </div>
         ) : null}
@@ -477,7 +479,7 @@ export default function Settings() {
                   onClick={handleRegenerateMemory}
                   disabled={refreshingMemory}
                 >
-                  <RotateCcw size={14} />
+                  <RetryIcon size={14} />
                   {refreshingMemory ? "Regenerating..." : "Regenerate now"}
                 </button>
               </div>
@@ -577,7 +579,7 @@ export default function Settings() {
             <Button
               type="button"
               variant="secondary"
-              icon={<RotateCcw size={16} />}
+              icon={<RetryIcon size={16} />}
               disabled={resettingTours}
               onClick={async () => {
                 setResettingTours(true);
@@ -608,7 +610,7 @@ export default function Settings() {
             <Button
               type="button"
               variant="secondary"
-              icon={<RotateCcw size={16} />}
+              icon={<RetryIcon size={16} />}
               onClick={handleResetStats}
               disabled={resettingStats}
             >
@@ -626,7 +628,7 @@ export default function Settings() {
 
             {restoreError ? (
               <div className="settings-feedback settings-feedback--error">
-                <XCircle size={16} />
+                <CrossCircleIcon size={16} />
                 <span>{restoreError}</span>
               </div>
             ) : null}
@@ -664,7 +666,7 @@ export default function Settings() {
 
           {unarchiveError ? (
             <div className="settings-feedback settings-feedback--error">
-              <XCircle size={16} />
+              <CrossCircleIcon size={16} />
               <span>{unarchiveError}</span>
             </div>
           ) : null}
@@ -703,7 +705,7 @@ export default function Settings() {
               </p>
               <div className="settings-reset-row">
                 <Link to="/admin" className="button button-secondary">
-                  <ShieldCheck size={16} />
+                  <ShieldIcon size={16} />
                   Open admin panel
                 </Link>
               </div>

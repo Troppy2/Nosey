@@ -1,4 +1,4 @@
-import { Check, ChevronDown } from "lucide-react";
+import { CheckIcon, ChevronDownIcon } from "../icons";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 
@@ -186,7 +186,7 @@ export function Dropdown<T extends string>({
       onKeyDown={onTriggerKey}
     >
       <span className="dropdown-value">{shown}</span>
-      <ChevronDown size={16} className={`dropdown-chevron${open ? " is-open" : ""}`} aria-hidden="true" />
+      <ChevronDownIcon size={16} className={`dropdown-chevron${open ? " is-open" : ""}`} aria-hidden="true" />
     </button>
   );
 
@@ -216,7 +216,7 @@ export function Dropdown<T extends string>({
                   onClick={() => choose(index)}
                 >
                   <span>{option.label}</span>
-                  {option.value === value ? <Check size={15} className="dropdown-check" aria-hidden="true" /> : null}
+                  {option.value === value ? <CheckIcon size={15} className="dropdown-check" aria-hidden="true" /> : null}
                 </li>
               ))}
             </ul>,

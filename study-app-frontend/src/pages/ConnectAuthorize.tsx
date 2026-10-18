@@ -1,4 +1,6 @@
-import { AlertTriangle, Check, Link2, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Link2 } from "lucide-react";
+import { ShieldIcon } from "../icons";
+import { CheckIcon } from "../icons";
 import { useEffect, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -112,14 +114,14 @@ export default function ConnectAuthorize() {
               )}
               <ul className="connect-scopes">
                 <li>
-                  <Check size={16} /> Read your folders, notes, tests, flashcards and learning modules, plus your
+                  <CheckIcon size={16} /> Read your folders, notes, tests, flashcards and learning modules, plus your
                   unfinished tests and past results
                 </li>
                 <li>
-                  <Check size={16} /> Create and rename folders (never delete them)
+                  <CheckIcon size={16} /> Create and rename folders (never delete them)
                 </li>
                 <li>
-                  <Check size={16} /> Create, edit and delete tests, flashcards, notes and learning modules
+                  <CheckIcon size={16} /> Create, edit and delete tests, flashcards, notes and learning modules
                 </li>
               </ul>
               <p className="small muted">
@@ -135,7 +137,7 @@ export default function ConnectAuthorize() {
                 </Button>
               </div>
               <div className="trust-note">
-                <ShieldCheck size={17} />
+                <ShieldIcon size={17} />
                 <span>Only allow apps you started connecting yourself.</span>
               </div>
             </>

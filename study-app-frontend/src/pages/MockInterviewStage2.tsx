@@ -1,16 +1,6 @@
 import Editor from "@monaco-editor/react";
-import {
-  AlertCircle,
-  ChevronRight,
-  ExternalLink,
-  Flag,
-  Loader2,
-  LogOut,
-  Send,
-  Users,
-  Volume2,
-  VolumeX,
-} from "lucide-react";
+import { ExternalLink, Flag, Loader2, LogOut, Send, Users, Volume2, VolumeX } from "lucide-react";
+import { AlertIcon, ChevronRightIcon } from "../icons";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { LoadingNotice } from "../components/Loaders";
@@ -229,7 +219,7 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
     return (
       <div className="page page-narrow">
         <div className="card mock-error-card">
-          <AlertCircle size={20} style={{ color: "var(--error)" }} />
+          <AlertIcon size={20} style={{ color: "var(--error)" }} />
           <p>{initError}</p>
           <div className="button-row" style={{ marginTop: 8 }}>
             <button className="button button-ghost" onClick={() => navigate("/mock-interview")}>
@@ -291,7 +281,7 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
               className="button button-primary"
               onClick={() => navigate(nextRoute(), { state: { session: state?.session, selectedStages } })}
             >
-              Continue <ChevronRight size={14} />
+              Continue <ChevronRightIcon size={14} />
             </button>
           )}
         </div>
@@ -431,7 +421,7 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
                         gap: 4,
                       }}
                     >
-                      <AlertCircle size={13} /> {codeError}
+                      <AlertIcon size={13} /> {codeError}
                     </span>
                   )}
                   <div style={{ flex: 1 }} />

@@ -1,15 +1,6 @@
-import {
-  Activity,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  RefreshCw,
-  ShieldCheck,
-  TrendingUp,
-  Users,
-  XCircle,
-  Zap,
-} from "lucide-react";
+import { Activity, AlertTriangle, Clock, RefreshCw, Users, Zap } from "lucide-react";
+import { ScoreRiseIcon, ShieldIcon } from "../icons";
+import { CheckCircleIcon, CrossCircleIcon } from "../icons";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -279,7 +270,7 @@ export default function AdminPanel() {
       <div className="page page-narrow">
         <div className="admin-auth-screen">
           <div className="admin-auth-icon">
-            <ShieldCheck size={40} />
+            <ShieldIcon size={40} />
           </div>
           <h1>Admin access</h1>
           <p className="muted">
@@ -359,7 +350,7 @@ export default function AdminPanel() {
               <p className="admin-stat-label">Active users (7d)</p>
             </div>
             <div className="admin-stat-card">
-              <TrendingUp size={20} className="admin-stat-icon" />
+              <ScoreRiseIcon size={20} className="admin-stat-icon" />
               <p className="admin-stat-value">{stats.total_usage_events.toLocaleString()}</p>
               <p className="admin-stat-label">Feature calls logged</p>
             </div>
@@ -414,7 +405,7 @@ export default function AdminPanel() {
                           <td>
                             {healthy ? (
                               <span className="admin-health admin-health--ok">
-                                <CheckCircle size={13} /> OK
+                                <CheckCircleIcon size={13} /> OK
                               </span>
                             ) : degraded ? (
                               <span className="admin-health admin-health--warn">
@@ -422,7 +413,7 @@ export default function AdminPanel() {
                               </span>
                             ) : (
                               <span className="admin-health admin-health--error">
-                                <XCircle size={13} /> Failing
+                                <CrossCircleIcon size={13} /> Failing
                               </span>
                             )}
                           </td>

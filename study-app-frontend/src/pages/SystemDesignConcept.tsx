@@ -1,4 +1,5 @@
-import { ArrowLeft, Check, Pause, Play, Square } from "lucide-react";
+import { Pause, Play, Square } from "lucide-react";
+import { ArrowLeftIcon, CheckIcon } from "../icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 
@@ -229,7 +230,7 @@ export default function SystemDesignConcept() {
           aria-label="Back to all concepts"
           title="Back to all concepts"
         >
-          <ArrowLeft size={18} />
+          <ArrowLeftIcon size={18} />
         </Link>
         <div className="sd-header-main">
           <span className="eyebrow">System Design</span>
@@ -253,7 +254,7 @@ export default function SystemDesignConcept() {
               data-sub-module={subModule.key}
               data-done={isDone ? "true" : "false"}
             >
-              {isDone ? <Check size={14} /> : <Icon size={14} />}
+              {isDone ? <CheckIcon size={14} /> : <Icon size={14} />}
               {subModule.label}
             </a>
           );
@@ -316,7 +317,7 @@ export default function SystemDesignConcept() {
           {entry.notesDone ? (
             <>
               <span className="sd-done-flag">
-                <Check size={16} />
+                <CheckIcon size={16} />
                 Marked as read
               </span>
               <button
@@ -378,7 +379,7 @@ export default function SystemDesignConcept() {
             <h2>Visualizer</h2>
             {entry.visualizerDone ? (
               <span className="sd-done-flag">
-                <Check size={16} />
+                <CheckIcon size={16} />
                 Passed
               </span>
             ) : null}
@@ -401,7 +402,7 @@ export default function SystemDesignConcept() {
             <h2>Project</h2>
             {entry.projectDone ? (
               <span className="sd-done-flag">
-                <Check size={16} />
+                <CheckIcon size={16} />
                 Passed
               </span>
             ) : null}
@@ -426,7 +427,7 @@ export default function SystemDesignConcept() {
           <div className="sd-panel-head-meta">
             {entry.quizDone ? (
               <span className="sd-done-flag">
-                <Check size={16} />
+                <CheckIcon size={16} />
                 Passed
               </span>
             ) : null}

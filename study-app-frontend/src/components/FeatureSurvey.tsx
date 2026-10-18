@@ -1,4 +1,5 @@
-import { Star, X } from "lucide-react";
+import { Star } from "lucide-react";
+import { CloseIcon } from "../icons";
 import { useEffect, useRef, useState } from "react";
 import { submitSurvey } from "../lib/api";
 import { recordSurveyShown, shouldShowSurvey } from "../lib/surveys";
@@ -87,7 +88,7 @@ export function FeatureSurvey({ feature, trigger, onResolved }: FeatureSurveyPro
         onMouseDown={(e) => e.stopPropagation()}
       >
         <button className="privacy-modal-close survey-close" onClick={resolve} aria-label="Close">
-          <X size={18} />
+          <CloseIcon size={18} />
         </button>
 
         <div className="survey-head">

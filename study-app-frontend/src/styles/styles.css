@@ -29490,3 +29490,9 @@ a.sd-chip.is-done:hover {
   justify-content: flex-end;
   gap: 12px;
 }
+
+/* Custom icon set: empty-state icons were rendering at the 24px default inside a large tile. */
+.empty-icon svg.icon {
+  width: 34px;
+  height: 34px;
+}

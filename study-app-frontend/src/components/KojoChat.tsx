@@ -1,4 +1,5 @@
-import { AlertCircle, ArrowDown, Maximize2, Minimize2, Send, Sparkles, Trash2, X } from "lucide-react";
+import { Maximize2, Minimize2, Send } from "lucide-react";
+import { AlertIcon, ArrowDownIcon, CloseIcon, SparklesIcon, TrashIcon } from "../icons";
 import KojoMascot from "./KojoMascot";
 import { useEffect, useRef, useState } from "react";
 import { clearKojoConversation, fetchKojoConversation, fetchProviderStatus, isGuestSession, kojoChat, kojoChatStream } from "../lib/api";
@@ -213,7 +214,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
             </div>
             <div className="kojo-header-info">
               <span className="kojo-header-name">
-                <Sparkles size={13} className="kojo-title-icon" />
+                <SparklesIcon size={13} className="kojo-title-icon" />
                 Kojo
               </span>
               <span className="kojo-header-sub">{folderName}</span>
@@ -229,7 +230,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
               title="Clear chat"
               disabled={isLoading}
             >
-              <Trash2 size={18} />
+              <TrashIcon size={18} />
             </button>
             <button
               className="kojo-header-btn"
@@ -247,7 +248,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
               aria-label="Close Kojo"
               title="Close"
             >
-              <X size={18} />
+              <CloseIcon size={18} />
             </button>
           </div>
         </div>
@@ -343,7 +344,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
 
             {error && (
               <div className="kojo-error">
-                <AlertCircle size={14} />
+                <AlertIcon size={14} />
                 <span>{error}</span>
               </div>
             )}
@@ -364,7 +365,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
             aria-label="Scroll to latest message"
             title="Scroll to latest message"
           >
-            <ArrowDown size={16} />
+            <ArrowDownIcon size={16} />
           </button>
 
           <p className="kojo-input-label">Message Kojo</p>

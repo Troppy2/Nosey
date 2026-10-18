@@ -1,54 +1,7 @@
 import Editor, { type Monaco } from "@monaco-editor/react";
-import {
-  AlertCircle,
-  ArrowLeft,
-  ArrowRight,
-  Binary,
-  BookOpen,
-  Braces,
-  Calculator,
-  CheckCircle2,
-  XCircle,
-  Gauge,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Circle,
-  Eye,
-  Code2,
-  ExternalLink,
-  Flame,
-  Youtube,
-  GitBranch,
-  Hash,
-  Layers3,
-  Link2,
-  ListChecks,
-  Loader2,
-  Network,
-  PanelRightOpen,
-  Play,
-  Plus,
-  Route,
-  Search,
-  Settings,
-  ShieldAlert,
-  Shuffle,
-  Sparkles,
-  TrendingUp,
-  Trophy,
-  Users,
-  WrapText,
-  X,
-  type LucideIcon,
-  Code,
-  Notebook,
-  Pencil,
-  Trash2,
-  Wand2,
-  Archive,
-  ArchiveRestore,
-} from "lucide-react";
+import { Binary, Braces, Calculator, Gauge, Circle, Eye, ExternalLink, Flame, Youtube, GitBranch, Hash, Layers3, Link2, ListChecks, Loader2, Network, PanelRightOpen, Play, Route, ShieldAlert, Shuffle, Trophy, Users, WrapText, type LucideIcon, Code, Notebook, Wand2, Archive, ArchiveRestore } from "lucide-react";
+import { BookIcon, CodeIcon, ScoreRiseIcon, SettingsIcon } from "../icons";
+import { AlertIcon, ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, CrossCircleIcon, PencilIcon, PlusIcon, SearchIcon, SparklesIcon, TrashIcon } from "../icons";
 import KojoMascot from "../components/KojoMascot";
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -519,15 +472,15 @@ const CATEGORY_META: Record<string, Omit<Category, "problems">> = {
   stack: { id: "stack", label: "Stack", icon: Layers3 },
   "heap-priority-queue": { id: "heap-priority-queue", label: "Heap / Priority Queue", icon: PanelRightOpen },
   tree: { id: "tree", label: "Tree", icon: GitBranch },
-  "binary-search": { id: "binary-search", label: "Binary Search", icon: Search },
+  "binary-search": { id: "binary-search", label: "Binary Search", icon: SearchIcon },
   "sliding-window": { id: "sliding-window", label: "Sliding Window", icon: Route },
   dp: { id: "dp", label: "Dynamic Programming", icon: Binary },
   backtracking: { id: "backtracking", label: "Backtracking", icon: GitBranch },
   graph: { id: "graph", label: "Graph", icon: Network },
-  design: { id: "design", label: "Design", icon: BookOpen },
+  design: { id: "design", label: "Design", icon: BookIcon },
   advanced: { id: "advanced", label: "Advanced", icon: Trophy },
   math: { id: "math", label: "Math", icon: Calculator },
-  "bit-manipulation": { id: "bit-manipulation", label: "Bit Manipulation", icon: Code2 },
+  "bit-manipulation": { id: "bit-manipulation", label: "Bit Manipulation", icon: CodeIcon },
   intervals: { id: "intervals", label: "Intervals", icon: PanelRightOpen },
   extra: { id: "extra", label: "Extra", icon: Trophy },
 };
@@ -582,7 +535,7 @@ function buildCategories(): Category[] {
   });
 
   return Array.from(grouped.entries()).map(([id, problems]) => {
-    const meta = CATEGORY_META[id] ?? { id, label: problems[0]?.categoryLabel ?? id, icon: Code2 };
+    const meta = CATEGORY_META[id] ?? { id, label: problems[0]?.categoryLabel ?? id, icon: CodeIcon };
     return { ...meta, problems };
   });
 }
@@ -1155,7 +1108,7 @@ function ActivityHeatmap({
               <small>Jump back in</small>
               <strong>{lastProblem.title}</strong>
             </span>
-            <ArrowRight size={16} />
+            <ArrowRightIcon size={16} />
           </button>
         ) : null}
       </div>
@@ -1188,10 +1141,10 @@ function ActivityHeatmap({
 // beta stub screens; the immersive problem editor stays full-screen without it.
 const RAIL_ITEMS: { key: string; label: string; icon: LucideIcon; view: View }[] = [
   { key: "dashboard", label: "Dashboard", icon: Layers3, view: { type: "tree" } },
-  { key: "problems", label: "Problems", icon: Search, view: { type: "browse" } },
-  { key: "banks", label: "Prep Banks", icon: BookOpen, view: { type: "banks" } },
+  { key: "problems", label: "Problems", icon: SearchIcon, view: { type: "browse" } },
+  { key: "banks", label: "Prep Banks", icon: BookIcon, view: { type: "banks" } },
   { key: "drills", label: "Drills", icon: Route, view: { type: "drills" } },
-  { key: "practice", label: "Practice", icon: Sparkles, view: { type: "practice" } },
+  { key: "practice", label: "Practice", icon: SparklesIcon, view: { type: "practice" } },
 ];
 
 const RAIL_COLLAPSE_KEY = "nosey_lc_rail_collapsed";
@@ -1257,7 +1210,7 @@ function LeftRail({
             own "Back to dashboard" only switches views inside the mode, so this
             is the way out. Mobile shell only; desktop has the sidebar. */}
         <Link className="lc-rail-back-btn" to="/dashboard" aria-label="Back to dashboard" title="Back to dashboard">
-          <ArrowLeft size={20} />
+          <ArrowLeftIcon size={20} />
         </Link>
         <div className="lc-rail-brand">
           <span className="lc-rail-brand-name">KojoCode</span>
@@ -1271,7 +1224,7 @@ function LeftRail({
           aria-pressed={collapsed}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          {collapsed ? <ChevronRightIcon size={16} /> : <ChevronLeftIcon size={16} />}
         </button>
       </div>
       <nav className="lc-rail-nav">
@@ -1415,7 +1368,7 @@ function TopicPicker({
         onClick={() => setOpen((prev) => !prev)}
       >
         <span>{summary}</span>
-        <ChevronDown size={15} className={open ? "lc-topic-chevron lc-topic-chevron--open" : "lc-topic-chevron"} />
+        <ChevronDownIcon size={15} className={open ? "lc-topic-chevron lc-topic-chevron--open" : "lc-topic-chevron"} />
       </button>
       {open ? (
         <div className="lc-topic-panel">
@@ -1438,7 +1391,7 @@ function TopicPicker({
                       aria-label={isExpanded ? `Hide ${topic.label} subtopics` : `Show ${topic.label} subtopics`}
                       onClick={() => toggleExpanded(topic.id)}
                     >
-                      <ChevronDown size={14} className={isExpanded ? "lc-topic-chevron lc-topic-chevron--open" : "lc-topic-chevron"} />
+                      <ChevronDownIcon size={14} className={isExpanded ? "lc-topic-chevron lc-topic-chevron--open" : "lc-topic-chevron"} />
                     </button>
                   ) : null}
                 </div>
@@ -1819,7 +1772,7 @@ function StreakRescueCard({
           </p>
           <button type="button" className="lc-rescue-action" onClick={onOpen}>
             Start solving
-            <ArrowRight size={16} />
+            <ArrowRightIcon size={16} />
           </button>
         </>
       ) : (
@@ -1936,7 +1889,7 @@ function DailyPracticeCard({
             const reason = topic.reasons[0];
             return (
               <span key={topic.topic} className="lc-improvement-chip" title={reason}>
-                <TrendingUp size={13} />
+                <ScoreRiseIcon size={13} />
                 Improving in {resolved.label}
               </span>
             );
@@ -1948,7 +1901,7 @@ function DailyPracticeCard({
           {dailyProblem && !dailyLoading ? (
             <button type="button" className="lc-focus-complete" onClick={onGenerate}>
               <span className="lc-focus-complete-label">Complete "{dailyProblem.title}"</span>
-              <ArrowRight size={16} />
+              <ArrowRightIcon size={16} />
             </button>
           ) : (
             <button
@@ -1957,13 +1910,13 @@ function DailyPracticeCard({
               onClick={onGenerate}
               disabled={dailyLoading}
             >
-              {dailyLoading ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />}
+              {dailyLoading ? <Loader2 size={15} className="spin" /> : <SparklesIcon size={15} />}
               {dailyLoading ? "Generating today's problem..." : "Generate today's question"}
             </button>
           )}
           {activeBankName ? (
             <p className="lc-daily-source-note">
-              <BookOpen size={13} />
+              <BookIcon size={13} />
               Today's problem is drawn from your active bank: <strong>{activeBankName}</strong>
             </p>
           ) : null}
@@ -2034,7 +1987,7 @@ function RemindersCard({
             <div className="lc-reminder-feature-controls">
               <button type="button" className="lc-reminder-feature-cta" onClick={handleOpenRandomDrill}>
                 Open a problem
-                <ArrowRight size={14} />
+                <ArrowRightIcon size={14} />
               </button>
             </div>
           </div>
@@ -2051,7 +2004,7 @@ function RemindersCard({
             </p>
             <span className="lc-reminder-feature-cta">
               Preview Drills
-              <ArrowRight size={14} />
+              <ArrowRightIcon size={14} />
             </span>
           </button>
         )}
@@ -2059,7 +2012,7 @@ function RemindersCard({
         {activeBank ? (
           <div className="lc-reminder-feature lc-reminder-feature--active">
             <span className="lc-reminder-feature-top">
-              <span className="lc-reminder-icon"><BookOpen size={20} /></span>
+              <span className="lc-reminder-icon"><BookIcon size={20} /></span>
               <span className="lc-reminder-badge lc-reminder-badge--live">Active</span>
             </span>
             <strong className="lc-reminder-feature-title">{activeBank.name}</strong>
@@ -2075,7 +2028,7 @@ function RemindersCard({
                 disabled={!activeBank.problem_slugs.length}
               >
                 Open a problem
-                <ArrowRight size={14} />
+                <ArrowRightIcon size={14} />
               </button>
             </div>
             {!activeBank.problem_slugs.length ? (
@@ -2085,7 +2038,7 @@ function RemindersCard({
         ) : (
           <button type="button" className="lc-reminder-feature" onClick={() => onNavigate({ type: "banks" })}>
             <span className="lc-reminder-feature-top">
-              <span className="lc-reminder-icon"><BookOpen size={20} /></span>
+              <span className="lc-reminder-icon"><BookIcon size={20} /></span>
               <span className="lc-reminder-badge">Beta</span>
             </span>
             <strong className="lc-reminder-feature-title">Prep Banks</strong>
@@ -2095,7 +2048,7 @@ function RemindersCard({
             </p>
             <span className="lc-reminder-feature-cta">
               Preview Prep Banks
-              <ArrowRight size={14} />
+              <ArrowRightIcon size={14} />
             </span>
           </button>
         )}
@@ -2103,7 +2056,7 @@ function RemindersCard({
         {practiceActive && practiceSession ? (
           <button type="button" className="lc-reminder-feature" onClick={() => onNavigate({ type: "practice" })}>
             <span className="lc-reminder-feature-top">
-              <span className="lc-reminder-icon"><Sparkles size={20} /></span>
+              <span className="lc-reminder-icon"><SparklesIcon size={20} /></span>
               <span className="lc-reminder-badge lc-reminder-badge--live">In progress</span>
             </span>
             <strong className="lc-reminder-feature-title">Current practice set</strong>
@@ -2112,13 +2065,13 @@ function RemindersCard({
             </p>
             <span className="lc-reminder-feature-cta">
               Resume practice
-              <ArrowRight size={14} />
+              <ArrowRightIcon size={14} />
             </span>
           </button>
         ) : (
           <button type="button" className="lc-reminder-feature" onClick={() => onNavigate({ type: "practice" })}>
             <span className="lc-reminder-feature-top">
-              <span className="lc-reminder-icon"><Sparkles size={20} /></span>
+              <span className="lc-reminder-icon"><SparklesIcon size={20} /></span>
               <span className="lc-reminder-badge">Beta</span>
             </span>
             <strong className="lc-reminder-feature-title">Weak-Area Practice</strong>
@@ -2128,7 +2081,7 @@ function RemindersCard({
             </p>
             <span className="lc-reminder-feature-cta">
               Preview Practice
-              <ArrowRight size={14} />
+              <ArrowRightIcon size={14} />
             </span>
           </button>
         )}
@@ -4732,7 +4685,7 @@ export default function LeetCodeMode() {
       <div className="lc-settings-modal" role="dialog" aria-label="KojoCode settings">
         <div className="lc-settings-modal-header">
           <div className="lc-settings-modal-title">
-            <Settings size={16} />
+            <SettingsIcon size={16} />
             <span>KojoCode settings</span>
           </div>
           <button
@@ -4741,7 +4694,7 @@ export default function LeetCodeMode() {
             onClick={() => setSettingsOpen(false)}
             aria-label="Close settings"
           >
-            <X size={16} />
+            <CloseIcon size={16} />
           </button>
         </div>
 
@@ -4817,7 +4770,7 @@ export default function LeetCodeMode() {
             className="lc-settings-clear-btn"
             onClick={() => setClearWeaknessConfirm(true)}
           >
-            <Trash2 size={14} />
+            <TrashIcon size={14} />
             Clear weakness signals
           </button>
         </div>
@@ -4833,7 +4786,7 @@ export default function LeetCodeMode() {
               Completed questions
               {completedQuestions.length > 0 ? ` (${completedQuestions.length})` : ""}
             </span>
-            <ChevronDown
+            <ChevronDownIcon
               size={16}
               className={completedOpen ? "lc-completed-chevron lc-completed-chevron--open" : "lc-completed-chevron"}
             />
@@ -4966,7 +4919,7 @@ export default function LeetCodeMode() {
           <div className="kojo-avatar lc-custom-avatar"><Code size={16} /></div>
           <span>{editingSlug ? "Edit custom question" : "Add custom question"}</span>
           <button type="button" className="lc-kojo-close" onClick={closeCustomModal} aria-label="Close">
-            <X size={17} />
+            <CloseIcon size={17} />
           </button>
         </div>
 
@@ -4991,9 +4944,9 @@ export default function LeetCodeMode() {
               onChange={(event) => setAiHint(event.target.value)}
               placeholder="Optional: one line on what it should do"
             />
-            {aiError ? <div className="kojo-error"><AlertCircle size={14} /><span>{aiError}</span></div> : null}
+            {aiError ? <div className="kojo-error"><AlertIcon size={14} /><span>{aiError}</span></div> : null}
             <button type="button" className="button lc-custom-ai-btn" onClick={() => void runCustomAiGenerate()} disabled={aiLoading}>
-              {aiLoading ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />}
+              {aiLoading ? <Loader2 size={15} className="spin" /> : <SparklesIcon size={15} />}
               {aiLoading ? "Generating…" : "Generate with AI"}
             </button>
           </div>
@@ -5086,7 +5039,7 @@ export default function LeetCodeMode() {
             <div className="lc-custom-cases-head">
               <span>Test cases</span>
               <button type="button" className="lc-add-test-btn" onClick={addFormTestCase}>
-                <Plus size={14} />
+                <PlusIcon size={14} />
                 Add case
               </button>
             </div>
@@ -5099,7 +5052,7 @@ export default function LeetCodeMode() {
                   <div className="lc-custom-case-top">
                     <strong>Case {index + 1}</strong>
                     <button type="button" className="lc-inline-icon-btn" onClick={() => removeFormTestCase(index)} aria-label="Remove test case">
-                      <X size={14} />
+                      <CloseIcon size={14} />
                     </button>
                   </div>
                   <label>
@@ -5136,7 +5089,7 @@ export default function LeetCodeMode() {
             )}
           </div>
 
-          {customError ? <div className="kojo-error"><AlertCircle size={14} /><span>{customError}</span></div> : null}
+          {customError ? <div className="kojo-error"><AlertIcon size={14} /><span>{customError}</span></div> : null}
         </div>
 
         <div className="lc-custom-modal-footer">
@@ -5208,7 +5161,7 @@ export default function LeetCodeMode() {
   const STATUS_OPTIONS: { value: Filter; label: string; Icon: LucideIcon }[] = [
     { value: "all", label: "All", Icon: ListChecks },
     { value: "todo", label: "To do", Icon: Circle },
-    { value: "done", label: "Done", Icon: CheckCircle2 },
+    { value: "done", label: "Done", Icon: CheckCircleIcon },
   ];
 
   // Shared combinable filter bar. `showTopic` adds the cross-category topic chips (browse
@@ -5306,7 +5259,7 @@ export default function LeetCodeMode() {
         {anyActive ? (
           <div className="lc-filter-actions">
             <button type="button" className="lc-filter-clear" onClick={() => clearFilters(showTopic)}>
-              <X size={13} />
+              <CloseIcon size={13} />
               Clear filters
             </button>
           </div>
@@ -5432,7 +5385,7 @@ export default function LeetCodeMode() {
         {drillFiltersActive ? (
           <div className="lc-filter-actions">
             <button type="button" className="lc-filter-clear" onClick={clearDrillFilters}>
-              <X size={13} />
+              <CloseIcon size={13} />
               Clear filters
             </button>
           </div>
@@ -5446,11 +5399,11 @@ export default function LeetCodeMode() {
   function renderFilterEmpty(onReset: () => void) {
     return (
       <div className="lc-empty">
-        <span className="lc-empty-icon"><Search size={26} /></span>
+        <span className="lc-empty-icon"><SearchIcon size={26} /></span>
         <p className="lc-empty-title">Whoops, looks like there's nothing here...</p>
         <small className="lc-empty-sub">No problems match these filters.</small>
         <button type="button" className="lc-empty-reset" onClick={onReset}>
-          <X size={14} />
+          <CloseIcon size={14} />
           Clear filters
         </button>
       </div>
@@ -5506,7 +5459,7 @@ export default function LeetCodeMode() {
               aria-label="KojoCode settings"
               title="KojoCode settings"
             >
-              <Settings size={16} />
+              <SettingsIcon size={16} />
             </button>
           </div>
         </header>
@@ -5609,7 +5562,7 @@ export default function LeetCodeMode() {
                   <span className="lc-node-progress"><span style={{ width: `${customPct}%` }} /></span>
                 </button>
                 <button type="button" className="lc-custom-add-btn" onClick={() => openCustomModal()}>
-                  <Plus size={16} />
+                  <PlusIcon size={16} />
                   Add question
                 </button>
               </div>
@@ -5672,7 +5625,7 @@ export default function LeetCodeMode() {
         <div className="page page-narrow lc-page lc-shell-body">
           <header className="lc-category-header">
             <div className="lc-category-title-row" style={{ "--lc-accent": "var(--green-dark)" } as CSSProperties}>
-              <span className="lc-node-icon"><Sparkles size={22} /></span>
+              <span className="lc-node-icon"><SparklesIcon size={22} /></span>
               <div>
                 <h1>Weak-Area Practice</h1>
                 <p className="muted">Pick the topics that need work, run a guided queue, finish on a session recap.</p>
@@ -5754,7 +5707,7 @@ export default function LeetCodeMode() {
                   onClick={startPracticeSession}
                   disabled={practiceTopics.size === 0 || practiceKojoLoading}
                 >
-                  <Plus size={16} />
+                  <PlusIcon size={16} />
                   Continue from selection
                 </button>
                 <button
@@ -5763,7 +5716,7 @@ export default function LeetCodeMode() {
                   onClick={() => void startKojoPracticeSession()}
                   disabled={practiceTopics.size === 0 || practiceKojoLoading}
                 >
-                  <Sparkles size={16} />
+                  <SparklesIcon size={16} />
                   {practiceKojoLoading ? `Creating ${practiceKojoProgress ?? ""}...` : "Create with Kojo"}
                 </button>
               </div>
@@ -5796,7 +5749,7 @@ export default function LeetCodeMode() {
                         <li key={slug} className={`lc-practice-step${isSolved ? " is-done" : ""}`}>
                           <span className="lc-practice-step-num">step {String(index + 1).padStart(2, "0")}</span>
                           <span className={`lc-practice-step-check${isSolved ? " is-done" : ""}`} aria-hidden="true">
-                            {isSolved ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+                            {isSolved ? <CheckCircleIcon size={16} /> : <Circle size={16} />}
                           </span>
                           <button
                             type="button"
@@ -5878,7 +5831,7 @@ export default function LeetCodeMode() {
         <div className="page page-narrow lc-page lc-shell-body">
           <header className="lc-category-header">
             <div className="lc-category-title-row" style={{ "--lc-accent": "var(--green-dark)" } as CSSProperties}>
-              <span className="lc-node-icon"><BookOpen size={22} /></span>
+              <span className="lc-node-icon"><BookIcon size={22} /></span>
               <div>
                 <h1>Interview Prep Banks</h1>
                 <p className="muted">Named problem sets for a specific interview. The active bank feeds Daily KojoCode.</p>
@@ -5898,7 +5851,7 @@ export default function LeetCodeMode() {
               placeholder="Target (optional), e.g. meta / onsite"
             />
             <button type="button" onClick={() => void handleCreateBank()} disabled={!newBankName.trim() || banksLoading}>
-              <Plus size={16} />
+              <PlusIcon size={16} />
               New bank
             </button>
           </div>
@@ -5916,7 +5869,7 @@ export default function LeetCodeMode() {
                     disabled={banksLoading}
                     title={`Create "${preset.name}" from our catalog`}
                   >
-                    <Plus size={13} />
+                    <PlusIcon size={13} />
                     <span className="lc-preset-chip-name">{preset.name}</span>
                     <span className="lc-preset-chip-count">{preset.slugs.length}</span>
                   </button>
@@ -5929,7 +5882,7 @@ export default function LeetCodeMode() {
             <SkeletonList rows={3} label="Loading your prep banks" />
           ) : prepBanks.length === 0 ? (
             <div className="lc-empty lc-bank-empty">
-              <span className="lc-empty-icon"><BookOpen size={26} /></span>
+              <span className="lc-empty-icon"><BookIcon size={26} /></span>
               <p className="lc-empty-title">No prep banks yet</p>
               <small className="lc-empty-sub">Name one above, or start from a preset to build a scoped problem set.</small>
             </div>
@@ -5963,7 +5916,7 @@ export default function LeetCodeMode() {
                         </button>
                       )}
                       <button type="button" className="lc-bank-delete" onClick={() => void handleDeleteBank(bank.id as number)} disabled={deletingBankId === bank.id} aria-label={`Delete ${bank.name}`}>
-                        {deletingBankId === bank.id ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} />}
+                        {deletingBankId === bank.id ? <Loader2 size={14} className="spin" /> : <TrashIcon size={14} />}
                       </button>
                     </div>
                   </article>
@@ -6003,7 +5956,7 @@ export default function LeetCodeMode() {
 
                   {selectedBank.is_active ? (
                     <p className="lc-bank-feeds">
-                      <Sparkles size={14} />
+                      <SparklesIcon size={14} />
                       Today's KojoCode is coming from this bank.
                     </p>
                   ) : (
@@ -6051,7 +6004,7 @@ export default function LeetCodeMode() {
                         return (
                           <li key={slug} className="lc-bank-problem-row">
                             <span className={`lc-bank-problem-check${solved ? " is-done" : ""}`} aria-hidden="true">
-                              {solved ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+                              {solved ? <CheckCircleIcon size={16} /> : <Circle size={16} />}
                             </span>
                             <button
                               type="button"
@@ -6067,7 +6020,7 @@ export default function LeetCodeMode() {
                               </a>
                             ) : null}
                             <button type="button" className="lc-bank-problem-remove" onClick={() => void handleRemoveBankProblem(selectedBank.id as number, slug)} disabled={removingBankSlug === slug} aria-label="Remove from bank">
-                              {removingBankSlug === slug ? <Loader2 size={14} className="spin" /> : <X size={14} />}
+                              {removingBankSlug === slug ? <Loader2 size={14} className="spin" /> : <CloseIcon size={14} />}
                             </button>
                           </li>
                         );
@@ -6127,7 +6080,7 @@ export default function LeetCodeMode() {
                           onClick={() => void handleAddByTopic(selectedBank.id as number)}
                           disabled={bankAddTopics.size === 0 || bankKojoLoading || bankTopicAdding}
                         >
-                          {bankTopicAdding ? <Loader2 size={16} className="spin" /> : <Plus size={16} />}
+                          {bankTopicAdding ? <Loader2 size={16} className="spin" /> : <PlusIcon size={16} />}
                           {bankTopicAdding ? "Adding…" : "Continue from selection"}
                         </button>
                         <button
@@ -6136,7 +6089,7 @@ export default function LeetCodeMode() {
                           onClick={() => void handleCreateWithKojoForBank(selectedBank.id as number)}
                           disabled={bankAddTopics.size === 0 || bankKojoLoading}
                         >
-                          <Sparkles size={16} />
+                          <SparklesIcon size={16} />
                           {bankKojoLoading ? `Creating ${bankKojoProgress ?? ""}...` : "Create with Kojo"}
                         </button>
                       </div>
@@ -6198,7 +6151,7 @@ export default function LeetCodeMode() {
               placeholder="Problem title to drill, e.g. Two Sum"
             />
             <button type="button" onClick={() => void handleAddDrillManual()} disabled={!drillAddText.trim() || drillAdding}>
-              {drillAdding ? <Loader2 size={16} className="spin" /> : <Plus size={16} />}
+              {drillAdding ? <Loader2 size={16} className="spin" /> : <PlusIcon size={16} />}
               {drillAdding ? "Adding…" : "Drill this"}
             </button>
           </div>
@@ -6245,7 +6198,7 @@ export default function LeetCodeMode() {
                         aria-label="Remove from 3-Pass Drill"
                         title="Remove from 3-Pass Drill"
                       >
-                        <X size={14} />
+                        <CloseIcon size={14} />
                       </button>
                     </div>
                     <button
@@ -6265,7 +6218,7 @@ export default function LeetCodeMode() {
                         onClick={() => openProblem(findProblemCategory(drill.problem_slug), drill.problem_slug)}
                       >
                         Open
-                        <ArrowRight size={14} />
+                        <ArrowRightIcon size={14} />
                       </button>
                       <button
                         type="button"
@@ -6329,11 +6282,11 @@ export default function LeetCodeMode() {
       <div className="page page-narrow lc-page lc-shell-body">
         <header className="lc-category-header">
           <button type="button" className="lc-back-btn" onClick={() => setView({ type: "tree" })}>
-            <ChevronLeft size={16} />
+            <ChevronLeftIcon size={16} />
             Dashboard
           </button>
           <div className="lc-category-title-row" style={{ "--lc-accent": "var(--green-dark)" } as CSSProperties}>
-            <span className="lc-node-icon"><Search size={22} /></span>
+            <span className="lc-node-icon"><SearchIcon size={22} /></span>
             <div>
               <h1>Browse all problems</h1>
               <p className="muted">{visibleProblems.length} shown · {solvedCount}/{browseProblems.length} complete</p>
@@ -6341,7 +6294,7 @@ export default function LeetCodeMode() {
           </div>
           <div className="lc-category-tools">
             <div className="lc-search">
-              <Search size={16} />
+              <SearchIcon size={16} />
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search problems" />
             </div>
             {/* Draws from the filtered list, so an active difficulty or topic filter still
@@ -6369,7 +6322,7 @@ export default function LeetCodeMode() {
               aria-label="KojoCode settings"
               title="KojoCode settings"
             >
-              <Settings size={16} />
+              <SettingsIcon size={16} />
             </button>
           </div>
           {renderFilterBar(true)}
@@ -6388,7 +6341,7 @@ export default function LeetCodeMode() {
               return (
                 <div key={`${problem.categoryId}-${problem.slug}`} className={solved ? "lc-problem-row lc-problem-row--done" : "lc-problem-row"}>
                   <button type="button" className="lc-problem-check" onClick={() => toggleProgress(problem)} title={solved ? "Mark incomplete" : "Mark complete"}>
-                    {solved ? <CheckCircle2 size={20} className="lc-check-done" /> : <Circle size={20} className="lc-check-empty" />}
+                    {solved ? <CheckCircleIcon size={20} className="lc-check-done" /> : <Circle size={20} className="lc-check-empty" />}
                   </button>
                   <button type="button" className="lc-problem-title-btn" onClick={() => openProblem(problem.categoryId, problem.slug)}>
                     <span>{problem.title}</span>
@@ -6426,7 +6379,7 @@ export default function LeetCodeMode() {
       <div className="page page-narrow lc-page lc-shell-body">
         <header className="lc-category-header">
           <button type="button" className="lc-back-btn" onClick={() => setView({ type: "tree" })}>
-            <ChevronLeft size={16} />
+            <ChevronLeftIcon size={16} />
             Dashboard
           </button>
           <div className="lc-category-title-row" style={{ "--lc-accent": "var(--accent-caution)" } as CSSProperties}>
@@ -6438,7 +6391,7 @@ export default function LeetCodeMode() {
           </div>
           <div className="lc-category-tools">
             <div className="lc-search">
-              <Search size={16} />
+              <SearchIcon size={16} />
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search problems" />
             </div>
             {betaMode && !isGuestSession() && (
@@ -6449,12 +6402,12 @@ export default function LeetCodeMode() {
                 disabled={reclassifying}
                 title="Classify your existing custom problems with topics and subtopics"
               >
-                <Sparkles size={16} />
+                <SparklesIcon size={16} />
                 {reclassifying ? "Regenerating..." : "Regenerate topics"}
               </button>
             )}
             <button type="button" className="lc-custom-add-btn" onClick={() => openCustomModal()}>
-              <Plus size={16} />
+              <PlusIcon size={16} />
               Add question
             </button>
           </div>
@@ -6470,7 +6423,7 @@ export default function LeetCodeMode() {
                 : "No custom questions yet. Paste a function and let Kojo turn it into a full problem with a walkthrough and test cases, or write one by hand."}
             </p>
             <button type="button" className="lc-custom-add-btn" onClick={() => openCustomModal()}>
-              <Plus size={16} />
+              <PlusIcon size={16} />
               {archivedProblemList.length > 0 ? "Add a question" : "Add your first question"}
             </button>
           </div>
@@ -6484,7 +6437,7 @@ export default function LeetCodeMode() {
               return (
                 <div key={problem.slug} className={solved ? "lc-problem-row lc-problem-row--done" : "lc-problem-row"}>
                   <button type="button" className="lc-problem-check" onClick={() => toggleProgress(problem)} title={solved ? "Mark incomplete" : "Mark complete"}>
-                    {solved ? <CheckCircle2 size={20} className="lc-check-done" /> : <Circle size={20} className="lc-check-empty" />}
+                    {solved ? <CheckCircleIcon size={20} className="lc-check-done" /> : <Circle size={20} className="lc-check-empty" />}
                   </button>
                   <button type="button" className="lc-problem-title-btn" onClick={() => openProblem(CUSTOM_CATEGORY_ID, problem.slug)}>
                     <span>{problem.title}</span>
@@ -6493,13 +6446,13 @@ export default function LeetCodeMode() {
                   <span className={`lc-difficulty lc-difficulty--${difficultyClass(problem.difficulty)}`}>{problem.difficulty}</span>
                   <div className="lc-row-actions">
                     <button type="button" className="lc-inline-icon-btn" onClick={() => cp && openCustomModal(cp)} aria-label="Edit custom question" title="Edit">
-                      <Pencil size={16} />
+                      <PencilIcon size={16} />
                     </button>
                     <button type="button" className="lc-inline-icon-btn" onClick={() => setCustomProblemArchived(problem.slug, true)} aria-label="Archive custom question" title="Archive">
                       <Archive size={16} />
                     </button>
                     <button type="button" className="lc-inline-icon-btn lc-inline-icon-btn--danger" onClick={() => handleDeleteCustomProblem(problem.slug)} aria-label="Delete custom question" title="Delete permanently">
-                      <Trash2 size={16} />
+                      <TrashIcon size={16} />
                     </button>
                   </div>
                 </div>
@@ -6538,7 +6491,7 @@ export default function LeetCodeMode() {
                             <ArchiveRestore size={16} />
                           </button>
                           <button type="button" className="lc-inline-icon-btn lc-inline-icon-btn--danger" onClick={() => handleDeleteCustomProblem(problem.slug)} aria-label="Delete custom question" title="Delete permanently">
-                            <Trash2 size={16} />
+                            <TrashIcon size={16} />
                           </button>
                         </div>
                       </div>
@@ -6571,7 +6524,7 @@ export default function LeetCodeMode() {
       <div className="page page-narrow lc-page lc-shell-body">
         <header className="lc-category-header">
           <button type="button" className="lc-back-btn" onClick={() => setView({ type: "tree" })}>
-            <ChevronLeft size={16} />
+            <ChevronLeftIcon size={16} />
             Dashboard
           </button>
           <div className="lc-category-title-row" style={{ "--lc-accent": masteryColor(categoryProblems.length ? done / categoryProblems.length : 0) } as CSSProperties}>
@@ -6583,7 +6536,7 @@ export default function LeetCodeMode() {
           </div>
           <div className="lc-category-tools">
             <div className="lc-search">
-              <Search size={16} />
+              <SearchIcon size={16} />
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search problems" />
             </div>
             <button
@@ -6593,7 +6546,7 @@ export default function LeetCodeMode() {
               title={`Add a problem to ${category.label} by LeetCode link`}
               aria-label="Add a problem by LeetCode link"
             >
-              <Plus size={18} />
+              <PlusIcon size={18} />
             </button>
           </div>
           {renderFilterBar(false)}
@@ -6608,7 +6561,7 @@ export default function LeetCodeMode() {
               return (
                 <div key={`${problem.categoryId}-${problem.slug}`} className={solved ? "lc-problem-row lc-problem-row--done" : "lc-problem-row"}>
                   <button type="button" className="lc-problem-check" onClick={() => toggleProgress(problem)} title={solved ? "Mark incomplete" : "Mark complete"}>
-                    {solved ? <CheckCircle2 size={20} className="lc-check-done" /> : <Circle size={20} className="lc-check-empty" />}
+                    {solved ? <CheckCircleIcon size={20} className="lc-check-done" /> : <Circle size={20} className="lc-check-empty" />}
                   </button>
                   <button type="button" className="lc-problem-title-btn" onClick={() => openProblem(category.id, problem.slug)}>
                     <span>{problem.title}</span>
@@ -6634,7 +6587,7 @@ export default function LeetCodeMode() {
               <div className="lc-add-link-head">
                 <h2>Add a problem</h2>
                 <button type="button" className="lc-add-link-close" onClick={closeAddLink} aria-label="Close">
-                  <X size={16} />
+                  <CloseIcon size={16} />
                 </button>
               </div>
               <p className="muted small">Paste a LeetCode problem link. We fetch it once and add it to <strong>{category.label}</strong>, counting toward your totals.</p>
@@ -6655,7 +6608,7 @@ export default function LeetCodeMode() {
                   onClick={() => void handleAddProblemFromLink()}
                   disabled={addLinkLoading || !addLinkUrl.trim()}
                 >
-                  {addLinkLoading ? <Loader2 size={16} className="spin" /> : <Plus size={16} />}
+                  {addLinkLoading ? <Loader2 size={16} className="spin" /> : <PlusIcon size={16} />}
                   {addLinkLoading ? "Adding..." : "Add problem"}
                 </button>
               </div>
@@ -6748,12 +6701,12 @@ export default function LeetCodeMode() {
             plain route back to the dashboard. */}
         {interviewRealism ? (
           <button type="button" className="lc-back-btn" onClick={() => setView({ type: "tree" })} aria-label="Back to KojoCode dashboard">
-            <ChevronLeft size={16} />
+            <ChevronLeftIcon size={16} />
             <span className="lc-tb-label">Dashboard</span>
           </button>
         ) : (
           <button type="button" className="lc-back-btn" onClick={() => setView({ type: "category", categoryId: currentProblem.categoryId })} aria-label={`Back to ${currentProblem.categoryLabel}`}>
-            <ChevronLeft size={16} />
+            <ChevronLeftIcon size={16} />
             <span className="lc-tb-label">{currentProblem.categoryLabel}</span>
           </button>
         )}
@@ -6787,7 +6740,7 @@ export default function LeetCodeMode() {
               <span className="lc-tb-label">Run code</span>
             </button>
             <button type="button" className={progress[currentProblem.slug] ? "lc-toolbar-btn lc-toolbar-btn--done" : "lc-toolbar-btn"} onClick={() => toggleProgress(currentProblem)} aria-label={progress[currentProblem.slug] ? "Mark incomplete" : "Mark done"}>
-              {progress[currentProblem.slug] ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+              {progress[currentProblem.slug] ? <CheckCircleIcon size={16} /> : <Circle size={16} />}
               <span className="lc-tb-label">{progress[currentProblem.slug] ? "Done" : "Mark done"}</span>
             </button>
           </div>
@@ -6831,7 +6784,7 @@ export default function LeetCodeMode() {
                       : "Ask Kojo for a hint"
                 }
               >
-                <Sparkles size={16} />
+                <SparklesIcon size={16} />
                 <span className="lc-tb-label">Ask Kojo</span>
               </button>
             </div>
@@ -6864,7 +6817,7 @@ export default function LeetCodeMode() {
           onClick={() => setMobilePane("problem")}
           aria-pressed={mobilePane === "problem"}
         >
-          <BookOpen size={15} />
+          <BookIcon size={15} />
           Problem
         </button>
         <button
@@ -6873,7 +6826,7 @@ export default function LeetCodeMode() {
           onClick={() => setMobilePane("code")}
           aria-pressed={mobilePane === "code"}
         >
-          <Code2 size={15} />
+          <CodeIcon size={15} />
           Code
         </button>
       </div>
@@ -6889,7 +6842,7 @@ export default function LeetCodeMode() {
               {isCustomProblem && currentCustomProblem ? (
                 <>
                   <button type="button" className="lc-inline-icon-btn" onClick={() => openCustomModal(currentCustomProblem)} aria-label="Edit custom question" title="Edit">
-                    <Pencil size={15} />
+                    <PencilIcon size={15} />
                   </button>
                   {currentCustomProblem.is_archived ? (
                     <button type="button" className="lc-inline-icon-btn" onClick={() => setCustomProblemArchived(currentCustomProblem.slug, false)} aria-label="Restore custom question" title="Restore">
@@ -6929,7 +6882,7 @@ export default function LeetCodeMode() {
           ) : null}
 
           {problemError ? (
-            <div className="lc-statement-state lc-statement-state--error"><AlertCircle size={18} /><span>{problemError}</span></div>
+            <div className="lc-statement-state lc-statement-state--error"><AlertIcon size={18} /><span>{problemError}</span></div>
           ) : null}
 
           {!currentProblem.isOfficial && !isCustomProblem ? (
@@ -6967,7 +6920,7 @@ export default function LeetCodeMode() {
             <div className="lc-tests-header">
               <h3>Tests</h3>
               <button type="button" className="lc-add-test-btn" onClick={addCustomCase} disabled={currentCustomCases.length >= CUSTOM_TEST_LIMIT}>
-                <Plus size={14} />
+                <PlusIcon size={14} />
                 Add custom
               </button>
             </div>
@@ -7024,7 +6977,7 @@ export default function LeetCodeMode() {
                         </button>
                       ) : null}
                       <button type="button" className="lc-inline-icon-btn" onClick={() => removeCustomCase(testCase.id)} aria-label="Remove custom test case">
-                        <X size={14} />
+                        <CloseIcon size={14} />
                       </button>
                     </div>
                   </div>
@@ -7122,7 +7075,7 @@ export default function LeetCodeMode() {
                   )}`}>
                     {nextProblemInCategory ? nextProblemInCategory.difficulty : suggestedNext!.problem.difficulty}
                   </span>
-                  <ArrowRight size={16} className="lc-next-arrow" />
+                  <ArrowRightIcon size={16} className="lc-next-arrow" />
                 </button>
               </div>
             ) : null}
@@ -7170,7 +7123,7 @@ export default function LeetCodeMode() {
                 ) : !hasAttempted ? (
                   <small className="lc-solution-locked">Attempt first to unlock</small>
                 ) : (
-                  <ChevronDown size={14} className={solutionOpen ? "lc-solution-chevron lc-solution-chevron--open" : "lc-solution-chevron"} />
+                  <ChevronDownIcon size={14} className={solutionOpen ? "lc-solution-chevron lc-solution-chevron--open" : "lc-solution-chevron"} />
                 )}
               </button>
               {solutionOpen && hasAttempted && !assistsLocked ? (
@@ -7214,14 +7167,14 @@ export default function LeetCodeMode() {
                           : "Attempt the problem to unlock"
                     }
                   >
-                    <Sparkles size={15} />
+                    <SparklesIcon size={15} />
                     <span>KojoCode solution</span>
                     {activePass > 1 ? (
                       <small className="lc-solution-locked">Locked on Pass {activePass}</small>
                     ) : !problemAttempted ? (
                       <small className="lc-solution-locked">Attempt first to unlock</small>
                     ) : (
-                      <ChevronDown size={14} className={kojoSolutionOpen ? "lc-solution-chevron lc-solution-chevron--open" : "lc-solution-chevron"} />
+                      <ChevronDownIcon size={14} className={kojoSolutionOpen ? "lc-solution-chevron lc-solution-chevron--open" : "lc-solution-chevron"} />
                     )}
                   </button>
                   {kojoSolutionOpen && kojoSolutionUnlocked ? (
@@ -7310,7 +7263,7 @@ export default function LeetCodeMode() {
                     {complexityResult.time_correct && complexityResult.space_correct ? "Both correct" : "Reviewed"}
                   </small>
                 ) : null}
-                <ChevronDown
+                <ChevronDownIcon
                   size={14}
                   className={complexityOpen ? "lc-complexity-chevron lc-complexity-chevron--open" : "lc-complexity-chevron"}
                 />
@@ -7396,7 +7349,7 @@ export default function LeetCodeMode() {
                             <div className="lc-cx-card-top">
                               <span className="lc-cx-metric">{row.metric}</span>
                               <span className="lc-cx-status">
-                                {row.correct ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
+                                {row.correct ? <CheckCircleIcon size={15} /> : <CrossCircleIcon size={15} />}
                                 {row.correct ? "Correct" : "Not quite"}
                               </span>
                             </div>
@@ -7425,7 +7378,7 @@ export default function LeetCodeMode() {
 
                       {complexityResult.flagged_uncertain ? (
                         <div className="lc-cx-uncertain">
-                          <AlertCircle size={15} />
+                          <AlertIcon size={15} />
                           <span>Kojo isn't fully sure of this grade. Double-check the analysis against your own reasoning.</span>
                         </div>
                       ) : null}
@@ -7534,7 +7487,7 @@ export default function LeetCodeMode() {
               <span className="lc-timer-modal-eyebrow">Interview clock</span>
               <h2 id="timer-modal-title">How long do you have?</h2>
               <button type="button" className="lc-kojo-close" onClick={closeTimerPicker} aria-label="Close timer modal">
-                <X size={17} />
+                <CloseIcon size={17} />
               </button>
             </div>
 
@@ -7589,7 +7542,7 @@ export default function LeetCodeMode() {
               <div className="kojo-avatar"><Notebook size={16} /></div>
               <span>Notes</span>
               <button type="button" className="lc-kojo-close" onClick={() => setNotesOpen(false)} aria-label="Close notes">
-                <X size={17} />
+                <CloseIcon size={17} />
               </button>
             </div>
             <div className="lc-notes-body">
@@ -7610,7 +7563,7 @@ export default function LeetCodeMode() {
           <div className="lc-kojo-backdrop" onClick={closeTimeoutModal} />
           <div className="lc-kojo-modal lc-timeout-modal">
             <div className="lc-kojo-modal-header lc-timeout-modal-header">
-              <div className="kojo-avatar lc-timeout-avatar"><AlertCircle size={16} /></div>
+              <div className="kojo-avatar lc-timeout-avatar"><AlertIcon size={16} /></div>
               <span>Time&apos;s up</span>
               <button
                 type="button"
@@ -7618,7 +7571,7 @@ export default function LeetCodeMode() {
                 onClick={closeTimeoutModal}
                 aria-label="Close timeout modal"
               >
-                <X size={17} />
+                <CloseIcon size={17} />
               </button>
             </div>
 

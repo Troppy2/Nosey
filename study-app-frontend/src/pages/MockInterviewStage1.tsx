@@ -1,19 +1,7 @@
 import Editor from "@monaco-editor/react";
-import {
-  AlertCircle,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  Code2,
-  ExternalLink,
-  Flag,
-  Loader2,
-  LogOut,
-  PenLine,
-  Play,
-  XCircle,
-} from "lucide-react";
+import { Clock, ExternalLink, Flag, Loader2, LogOut, Play } from "lucide-react";
+import { CodeIcon } from "../icons";
+import { AlertIcon, CheckCircleIcon, ChevronLeftIcon, ChevronRightIcon, CrossCircleIcon, PencilIcon } from "../icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { LoadingNotice } from "../components/Loaders";
@@ -467,7 +455,7 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
       <div className="mock-stage1-topbar">
         <div className="mock-stage1-topbar-left">
           <div className="mock-stage1-company-badge">
-            <Code2 size={11} />
+            <CodeIcon size={11} />
             {companyLabel}
           </div>
           <span className="mock-stage1-stage-label">Stage 1: Online Assessment</span>
@@ -537,7 +525,7 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
           {current.isExpired && (
             <div className="mock-stage1-panel-section" style={{ paddingBottom: 10 }}>
               <div className="mock-stage1-expired-banner">
-                <AlertCircle size={14} />
+                <AlertIcon size={14} />
                 Time expired. Submit what you have or move on.
               </div>
             </div>
@@ -563,7 +551,7 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
             )}
             {problemError && (
               <div className="mock-stage1-statement-error">
-                <AlertCircle size={14} /> {problemError}
+                <AlertIcon size={14} /> {problemError}
               </div>
             )}
             {curData && (
@@ -606,7 +594,7 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
           {/* Scratch pad */}
           <div className="mock-stage1-scratch-section">
             <span className="mock-stage1-section-label">
-              <PenLine size={11} /> Scratch Pad
+              <PencilIcon size={11} /> Scratch Pad
             </span>
             <textarea
               className="mock-stage1-scratch-input"
@@ -668,18 +656,18 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
             <div className="mock-stage1-console">
               {curResult.error ? (
                 <div className="mock-stage1-console-error">
-                  <AlertCircle size={13} /> {curResult.error}
+                  <AlertIcon size={13} /> {curResult.error}
                 </div>
               ) : (
                 <>
                   <div className="mock-stage1-console-summary">
                     {curResult.ok ? (
                       <span className="mock-stage1-console-pass">
-                        <CheckCircle2 size={14} /> Passed {curPassed}/{curTotal} sample cases
+                        <CheckCircleIcon size={14} /> Passed {curPassed}/{curTotal} sample cases
                       </span>
                     ) : (
                       <span className="mock-stage1-console-fail">
-                        <XCircle size={14} /> Passed {curPassed}/{curTotal} sample cases
+                        <CrossCircleIcon size={14} /> Passed {curPassed}/{curTotal} sample cases
                       </span>
                     )}
                   </div>
@@ -717,7 +705,7 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
           disabled={currentIdx === 0}
           title="Previous problem"
         >
-          <ChevronLeft size={15} />
+          <ChevronLeftIcon size={15} />
         </button>
         <button
           className="button button-ghost"
@@ -726,7 +714,7 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
           disabled={currentIdx === questions.length - 1}
           title="Next problem"
         >
-          <ChevronRight size={15} />
+          <ChevronRightIcon size={15} />
         </button>
 
         <div className="mock-stage1-q-status-row">
@@ -761,7 +749,7 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
 
         {submitError && (
           <span className="mock-stage1-submit-error">
-            <AlertCircle size={13} /> {submitError}
+            <AlertIcon size={13} /> {submitError}
           </span>
         )}
 

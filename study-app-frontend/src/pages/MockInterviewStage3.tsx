@@ -1,4 +1,5 @@
-import { AlertCircle, ChevronRight, Loader2, LogOut, MessageSquare, Send } from "lucide-react";
+import { Loader2, LogOut, MessageSquare, Send } from "lucide-react";
+import { AlertIcon, ChevronRightIcon } from "../icons";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { LoadingNotice } from "../components/Loaders";
@@ -156,7 +157,7 @@ function Stage3Runner({ stored }: { stored: MockProgress | null }) {
     return (
       <div className="page page-narrow">
         <div className="card mock-error-card">
-          <AlertCircle size={20} style={{ color: "var(--error)" }} />
+          <AlertIcon size={20} style={{ color: "var(--error)" }} />
           <p>{initError}</p>
           <div className="button-row" style={{ marginTop: 8 }}>
             <button className="button button-ghost" onClick={() => navigate("/mock-interview")}>
@@ -210,7 +211,7 @@ function Stage3Runner({ stored }: { stored: MockProgress | null }) {
                 })
               }
             >
-              View Summary <ChevronRight size={14} />
+              View Summary <ChevronRightIcon size={14} />
             </button>
           )}
         </div>

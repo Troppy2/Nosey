@@ -1,4 +1,5 @@
-import { ChevronDown, Pause, Play, RotateCcw, Square } from "lucide-react";
+import { Pause, Play, Square } from "lucide-react";
+import { ChevronDownIcon, RetryIcon } from "../icons";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { toast } from "../lib/toast";
 import { formatClock, useTestTimer, type TimerMode } from "../lib/useTestTimer";
@@ -87,7 +88,7 @@ export function TestTimer({ storageKey }: { storageKey: string }) {
             aria-label="Restart timer"
             title="Restart from the beginning"
           >
-            <RotateCcw size={14} />
+            <RetryIcon size={14} />
           </button>
           <button
             type="button"
@@ -108,7 +109,7 @@ export function TestTimer({ storageKey }: { storageKey: string }) {
             aria-label="Timer settings"
             title="Stopwatch or countdown"
           >
-            <ChevronDown size={14} />
+            <ChevronDownIcon size={14} />
           </button>
         </span>
       </div>

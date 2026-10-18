@@ -1,4 +1,5 @@
-import { Copy, Link2Off } from "lucide-react";
+import { Link2Off } from "lucide-react";
+import { CopyIcon } from "../icons";
 import { useEffect, useState } from "react";
 import { Button } from "./Button";
 import { CollapsibleSection } from "./CollapsibleSection";
@@ -86,7 +87,7 @@ export function ConnectedApps() {
         </p>
         <div className="connected-apps-url">
           <code>{CONNECTOR_URL}</code>
-          <Button type="button" variant="secondary" icon={<Copy size={16} />} onClick={() => void copyUrl()}>
+          <Button type="button" variant="secondary" icon={<CopyIcon size={16} />} onClick={() => void copyUrl()}>
             Copy
           </Button>
         </div>

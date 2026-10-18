@@ -1,27 +1,6 @@
-import {
-  BoxSelect,
-  ChevronDown,
-  Clipboard,
-  ClipboardPaste,
-  Copy,
-  Delete,
-  Eraser,
-  Hand,
-  Highlighter,
-  ImageDown,
-  LassoSelect,
-  Maximize2,
-  Minimize2,
-  PanelTopClose,
-  PanelTopOpen,
-  PenLine,
-  Plus,
-  Trash2,
-  Undo2,
-  X,
-  ZoomIn,
-  ZoomOut,
-} from "lucide-react";
+import { BoxSelect, Clipboard, ClipboardPaste, Delete, Eraser, Hand, Highlighter, ImageDown, LassoSelect, Maximize2, Minimize2, PanelTopClose, PanelTopOpen, ZoomIn, ZoomOut } from "lucide-react";
+import { UndoIcon } from "../icons";
+import { ChevronDownIcon, CloseIcon, CopyIcon, PencilIcon, PlusIcon, TrashIcon } from "../icons";
 import { createPortal } from "react-dom";
 import {
   useCallback,
@@ -1912,7 +1891,7 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
     <div className="scratchpad-canvas-wrap">
       <div className="scratchpad-canvas-toolbar">
         <button type="button" className="scratchpad-tool-btn" onClick={undo} disabled={history.length === 0} aria-label="Undo" title="Undo (Ctrl+Z)">
-          <Undo2 size={16} />
+          <UndoIcon size={16} />
         </button>
         <button
           type="button"
@@ -1922,7 +1901,7 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
           aria-label="Pen"
           title="Pen"
         >
-          <PenLine size={16} />
+          <PencilIcon size={16} />
         </button>
         <button
           type="button"
@@ -1988,7 +1967,7 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
               <ImageDown size={16} />
             </button>
             <button type="button" className="scratchpad-tool-btn" onClick={duplicateSelection} aria-label="Duplicate selection" title="Duplicate">
-              <Copy size={16} />
+              <CopyIcon size={16} />
             </button>
             <button type="button" className="scratchpad-tool-btn" onClick={deleteSelection} aria-label="Delete selection" title="Delete selection (Del)">
               <Delete size={16} />
@@ -2003,7 +1982,7 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
           aria-label="Clear the page"
           title="Clear the page"
         >
-          <Trash2 size={16} />
+          <TrashIcon size={16} />
         </button>
         <div className="scratchpad-zoom" role="group" aria-label="Zoom">
           <button type="button" className="scratchpad-tool-btn" onClick={() => zoomBy(1 / ZOOM_STEP)} disabled={zoom <= MIN_ZOOM} aria-label="Zoom out" title="Zoom out (Ctrl+-)">
@@ -2143,7 +2122,7 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
       </div>
       {onEdgeDrag ? <EdgeGrip edge="bottom" onDrag={onEdgeDrag} /> : null}
       <button type="button" className="scratchpad-extend-btn" onClick={addSpace} disabled={atMaxHeight}>
-        <Plus size={13} />
+        <PlusIcon size={13} />
         {atMaxHeight ? "Page is at its full length" : "Add more space"}
       </button>
     </div>
@@ -2502,7 +2481,7 @@ export function ScratchPadModal({
         <div className="scratchpad-header">
           <div className="scratchpad-header-main">
             <span className="eyebrow">
-              <PenLine size={13} /> Scratch pad
+              <PencilIcon size={13} /> Scratch pad
             </span>
             <div
               ref={questionRef}
@@ -2533,10 +2512,10 @@ export function ScratchPadModal({
               {annotations.length > 0 ? (
                 <>
                   <button type="button" onClick={() => setAnnotations(annotations.slice(0, -1))} title="Undo last mark">
-                    <Undo2 size={13} /> Undo
+                    <UndoIcon size={13} /> Undo
                   </button>
                   <button type="button" onClick={() => setAnnotations([])} title="Clear all marks on the question">
-                    <Trash2 size={13} /> Clear
+                    <TrashIcon size={13} /> Clear
                   </button>
                 </>
               ) : null}
@@ -2569,7 +2548,7 @@ export function ScratchPadModal({
                 aria-label="Full screen"
                 title="Full screen"
               >
-                <ChevronDown size={14} style={{ transform: "rotate(45deg)" }} />
+                <ChevronDownIcon size={14} style={{ transform: "rotate(45deg)" }} />
               </button>
               <button
                 type="button"
@@ -2583,7 +2562,7 @@ export function ScratchPadModal({
               </button>
             </div>
             <button type="button" className="scratchpad-minimize" onClick={onClose} aria-label="Minimize scratch pad">
-              <X size={18} />
+              <CloseIcon size={18} />
             </button>
           </div>
         </div>
@@ -2639,7 +2618,7 @@ export function ScratchPadTrigger({ questionText, data, onChange, paperStyle, on
   return (
     <>
       <button type="button" className="scratchpad-open-btn" onClick={() => setOpen(true)}>
-        <PenLine size={14} />
+        <PencilIcon size={14} />
         {hasWork ? "Continue your scratch work" : "Show your work"}
       </button>
       {/* Portaled so host page rules (e.g. .review-detail div on Results) cannot restyle the modal. */}

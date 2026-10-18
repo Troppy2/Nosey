@@ -1,4 +1,6 @@
-import { Edit3, FileUp, FolderOpen, Grid3X3, List, Plus, Trash2 } from "lucide-react";
+import { FileUp, Grid3X3, List } from "lucide-react";
+import { FolderIcon } from "../icons";
+import { PencilIcon, PlusIcon, TrashIcon } from "../icons";
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -160,7 +162,7 @@ export default function Folders() {
           >
             Import from Quizlet
           </Button>
-          <Button data-tour="folders-new" icon={<Plus size={18} />} onClick={() => setIsModalOpen(true)}>
+          <Button data-tour="folders-new" icon={<PlusIcon size={18} />} onClick={() => setIsModalOpen(true)}>
             New Folder
           </Button>
         </div>
@@ -175,11 +177,11 @@ export default function Folders() {
         <SkeletonFolderGrid count={4} label="Loading your folders" />
       ) : folders.length === 0 ? (
         <EmptyState
-          icon={<FolderOpen />}
+          icon={<FolderIcon />}
           title="No folders yet"
           body="Create your first folder to organize tests and flashcards."
           action={
-            <Button data-tour="folders-new" icon={<Plus size={18} />} onClick={() => setIsModalOpen(true)}>
+            <Button data-tour="folders-new" icon={<PlusIcon size={18} />} onClick={() => setIsModalOpen(true)}>
               New Folder
             </Button>
           }
@@ -277,7 +279,7 @@ function FolderGridCard({
     <Card interactive className="folder-card">
       <Link className="folder-card-main" to={`/folders/${folder.id}`}>
         <div>
-          <FolderOpen size={34} style={{ color: folder.color ?? "var(--green-dark)" }} />
+          <FolderIcon size={34} style={{ color: folder.color ?? "var(--green-dark)" }} />
           <h2>{folder.name}</h2>
           <p className="muted">{folder.description ?? folder.subject ?? "Study folder"}</p>
         </div>
@@ -289,10 +291,10 @@ function FolderGridCard({
         </div>
         <div className="row-actions folder-card-actions">
           <button aria-label={`Rename ${folder.name}`} onClick={() => onRename(folder)} type="button">
-            <Edit3 size={17} />
+            <PencilIcon size={17} />
           </button>
           <button aria-label={`Delete ${folder.name}`} onClick={() => onDelete(folder)} type="button">
-            <Trash2 size={17} />
+            <TrashIcon size={17} />
           </button>
         </div>
       </div>
@@ -312,7 +314,7 @@ function FolderListCard({
   return (
     <Card interactive className="folder-list-row">
       <Link className="folder-list-main" to={`/folders/${folder.id}`}>
-        <FolderOpen size={30} style={{ color: folder.color ?? "var(--green-dark)" }} />
+        <FolderIcon size={30} style={{ color: folder.color ?? "var(--green-dark)" }} />
         <div>
           <h3>{folder.name}</h3>
           <p className="muted small">{folder.subject ?? "General"}</p>
@@ -324,10 +326,10 @@ function FolderListCard({
       </div>
       <div className="row-actions">
         <button type="button" aria-label={`Rename ${folder.name}`} onClick={() => onRename(folder)}>
-          <Edit3 size={17} />
+          <PencilIcon size={17} />
         </button>
         <button type="button" aria-label={`Delete ${folder.name}`} onClick={() => onDelete(folder)}>
-          <Trash2 size={17} />
+          <TrashIcon size={17} />
         </button>
       </div>
     </Card>

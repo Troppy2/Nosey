@@ -13,7 +13,7 @@
  * raw divs in Flashcards/Matching/TakeTest keep working unchanged.
  */
 
-import { Check } from "lucide-react";
+import { CheckIcon } from "../icons";
 import { useEffect, useMemo, useState } from "react";
 
 type ProgressBarProps = {
@@ -158,7 +158,7 @@ export function ProgressOverlay({
             return (
               <li key={stage.label} className={`progress-stage progress-stage--${state}`}>
                 <span className="progress-stage-mark" aria-hidden="true">
-                  {state === "done" ? <Check size={12} strokeWidth={3} /> : null}
+                  {state === "done" ? <CheckIcon size={12} strokeWidth={3} /> : null}
                   {state === "active" ? <span className="loader loader--xs" /> : null}
                 </span>
                 {stage.label}

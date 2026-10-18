@@ -76,7 +76,7 @@ export function MobileDock({ items }: { items: DockItem[] }) {
           const Icon = item.icon;
           return (
             <NavLink key={item.to} id={item.tourId} className="dock-link" to={item.to} title={item.label}>
-              <Icon className="dock-icon" size={21} aria-hidden="true" />
+              <Icon className="dock-icon" size={24} aria-hidden="true" />
               <span className="dock-label">{item.label}</span>
             </NavLink>
           );

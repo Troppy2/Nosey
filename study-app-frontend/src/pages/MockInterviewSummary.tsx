@@ -1,4 +1,5 @@
-import { AlertCircle, RefreshCw, Trophy } from "lucide-react";
+import { RefreshCw, Trophy } from "lucide-react";
+import { AlertIcon } from "../icons";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { LoadingNotice } from "../components/Loaders";
@@ -80,7 +81,7 @@ function SummaryView({ stored }: { stored: MockProgress | null }) {
     return (
       <div className="page page-narrow">
         <div className="card mock-error-card">
-          <AlertCircle size={20} style={{ color: "var(--error)" }} />
+          <AlertIcon size={20} style={{ color: "var(--error)" }} />
           <p>{loadError ?? "Could not generate summary."}</p>
           <div className="button-row" style={{ marginTop: 8 }}>
             <button className="button button-ghost" onClick={() => navigate("/mock-interview")}>

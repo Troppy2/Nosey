@@ -1,6 +1,8 @@
 import Editor from "@monaco-editor/react";
 import KojoMascot from "../components/KojoMascot";
-import { AlertCircle, ArrowLeft, ArrowRight, Atom, Bookmark, Calculator, Check, ChevronDown, ChevronUp, Code2, Eraser, Flag, GraduationCap, Highlighter, LayoutGrid, Loader2, NotebookPen, Send, SlidersHorizontal, Sparkles, Strikethrough, Undo2, X } from "lucide-react";
+import { Atom, Bookmark, Calculator, Eraser, Flag, GraduationCap, Highlighter, LayoutGrid, Loader2, NotebookPen, Send, SlidersHorizontal, Strikethrough } from "lucide-react";
+import { CodeIcon, UndoIcon } from "../icons";
+import { AlertIcon, ArrowLeftIcon, ArrowRightIcon, CheckIcon, ChevronDownIcon, ChevronUpIcon, CloseIcon, SparklesIcon } from "../icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -668,7 +670,7 @@ export default function TakeTest() {
       return (
         <div className="page page-narrow">
           <EmptyState
-            icon={<ArrowLeft />}
+            icon={<ArrowLeftIcon />}
             title="Test not available"
             body={error}
             action={
@@ -700,7 +702,7 @@ export default function TakeTest() {
       return (
         <div className="page page-narrow">
           <EmptyState
-            icon={<AlertCircle />}
+            icon={<AlertIcon />}
             title={genFailed ? "Generation failed" : "No questions were generated"}
             body={
               test.generation_error ||
@@ -736,7 +738,7 @@ export default function TakeTest() {
             to={test.folder_id ? `/folders/${test.folder_id}` : "/dashboard"}
             style={{ marginTop: 12 }}
           >
-            <ArrowLeft size={16} />
+            <ArrowLeftIcon size={16} />
             {test.folder_id ? "Back to folder" : "Back to dashboard"}
           </Link>
         </div>
@@ -855,7 +857,7 @@ export default function TakeTest() {
               <Button variant="secondary" onClick={handleStartFresh}>
                 Start Fresh
               </Button>
-              <Button icon={<Undo2 size={16} />} onClick={handleResume}>
+              <Button icon={<UndoIcon size={16} />} onClick={handleResume}>
                 Resume
               </Button>
             </div>
@@ -868,7 +870,7 @@ export default function TakeTest() {
         </div>
         <header>
           <Link className="back-link" to={test.folder_id ? `/folders/${test.folder_id}` : "/folders"}>
-            <ArrowLeft size={16} />
+            <ArrowLeftIcon size={16} />
             Folder
           </Link>
           <div>
@@ -888,7 +890,7 @@ export default function TakeTest() {
               )}
               {isCodingMode && !isCustomMode && (
                 <span className="math-mode-badge" style={{ background: "var(--blue-light, #ebf8ff)", color: "var(--blue-dark, #2b6cb0)" }}>
-                  <Code2 size={12} />
+                  <CodeIcon size={12} />
                   {codingLanguage}
                 </span>
               )}
@@ -960,7 +962,7 @@ export default function TakeTest() {
                 <div className="test-nav-pop-head">
                   <span>Jump to question</span>
                   <button type="button" className="test-nav-pop-close" onClick={() => setNavOpen(false)} aria-label="Close">
-                    <X size={15} />
+                    <CloseIcon size={15} />
                   </button>
                 </div>
                 <div className="test-nav-grid">
@@ -1019,7 +1021,7 @@ export default function TakeTest() {
         {learningActive && (
           <div className="learning-mode-bar">
             <span className="learning-mode-bar-hint">
-              <Sparkles size={14} />
+              <SparklesIcon size={14} />
               Highlight any text to ask Kojo, grounded in your notes.
             </span>
             <button type="button" className="learning-mode-ask-btn" onClick={() => setKojoOpen(true)}>
@@ -1146,7 +1148,7 @@ export default function TakeTest() {
         )}
 
         <div className="question-nav">
-          <Button variant="secondary" disabled={previousIndex === index} icon={<ArrowLeft size={18} />} onClick={() => setIndex(previousIndex)}>
+          <Button variant="secondary" disabled={previousIndex === index} icon={<ArrowLeftIcon size={18} />} onClick={() => setIndex(previousIndex)}>
             Previous
           </Button>
           {onLastReal ? (
@@ -1158,7 +1160,7 @@ export default function TakeTest() {
               Generating...
             </Button>
           ) : (
-            <Button icon={<ArrowRight size={18} />} onClick={() => setIndex(nextIndex)}>
+            <Button icon={<ArrowRightIcon size={18} />} onClick={() => setIndex(nextIndex)}>
               Next
             </Button>
           )}
@@ -1170,7 +1172,7 @@ export default function TakeTest() {
           <div className="test-notes-head">
             <span><NotebookPen size={15} /> Scratch notes</span>
             <button type="button" className="test-notes-close" onClick={() => setNotesOpen(false)} aria-label="Close notes">
-              <X size={16} />
+              <CloseIcon size={16} />
             </button>
           </div>
           <textarea
@@ -1250,7 +1252,7 @@ function MCQQuestion({
               <div className="test-option-markdown">
                 <MarkdownContent content={option.text} />
               </div>
-              {selected ? <Check size={18} /> : null}
+              {selected ? <CheckIcon size={18} /> : null}
             </button>
             {toolsEnabled && onToggleCross ? (
               <button
@@ -1292,7 +1294,7 @@ function TFQuestion({
             className={`tf-button${isTrue ? " tf-true" : " tf-false"}${selected ? " selected" : ""}`}
             onClick={() => onAnswer(option.text)}
           >
-            {isTrue ? <Check size={22} /> : <X size={22} />}
+            {isTrue ? <CheckIcon size={22} /> : <CloseIcon size={22} />}
             <span>{option.text}</span>
           </button>
         );
@@ -1338,7 +1340,7 @@ function MSQuestion({
             className={`option-button ms-option ${isSelected ? "selected" : ""}`}
             onClick={() => toggle(option.text)}
           >
-            <span className={`ms-check${isSelected ? " on" : ""}`}>{isSelected ? <Check size={15} /> : null}</span>
+            <span className={`ms-check${isSelected ? " on" : ""}`}>{isSelected ? <CheckIcon size={15} /> : null}</span>
             <div className="test-option-markdown">
               <MarkdownContent content={option.text} />
             </div>
@@ -1397,10 +1399,10 @@ function RankQuestion({
           </div>
           <div className="rank-item-actions">
             <button type="button" onClick={() => move(position, -1)} disabled={position === 0} aria-label="Move up">
-              <ChevronUp size={16} />
+              <ChevronUpIcon size={16} />
             </button>
             <button type="button" onClick={() => move(position, 1)} disabled={position === order.length - 1} aria-label="Move down">
-              <ChevronDown size={16} />
+              <ChevronDownIcon size={16} />
             </button>
           </div>
         </div>

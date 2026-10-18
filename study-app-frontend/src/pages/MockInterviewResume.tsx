@@ -1,18 +1,5 @@
-import {
-  AlertCircle,
-  CheckCircle2,
-  ChevronRight,
-  FileText,
-  Loader2,
-  LogOut,
-  MessagesSquare,
-  ScanLine,
-  Send,
-  Type,
-  Upload,
-  X,
-  XCircle,
-} from "lucide-react";
+import { FileText, Loader2, LogOut, MessagesSquare, ScanLine, Send, Type } from "lucide-react";
+import { AlertIcon, CheckCircleIcon, ChevronRightIcon, CloseIcon, CrossCircleIcon, UploadIcon } from "../icons";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { screenResume, sendResumeGrillMessage } from "../lib/api";
@@ -286,7 +273,7 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
               className={`ats-mode${mode === "upload" ? " active" : ""}`}
               onClick={() => setMode("upload")}
             >
-              <Upload size={14} /> Upload file
+              <UploadIcon size={14} /> Upload file
             </button>
             <button
               role="tab"
@@ -311,7 +298,7 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
                   <span className="ats-file-hint">Ready to scan</span>
                 </div>
                 <button className="ats-file-remove" onClick={clearFile} title="Remove file">
-                  <X size={16} />
+                  <CloseIcon size={16} />
                 </button>
               </div>
             ) : (
@@ -328,7 +315,7 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
                 onDrop={handleDrop}
               >
                 <span className="ats-drop-icon">
-                  <Upload size={22} />
+                  <UploadIcon size={22} />
                 </span>
                 <span className="ats-drop-title">Drop your resume here</span>
                 <span className="ats-drop-sub">or click to browse. PDF or DOCX</span>
@@ -362,7 +349,7 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
 
           {error && (
             <div className="ats-error">
-              <AlertCircle size={15} /> {error}
+              <AlertIcon size={15} /> {error}
             </div>
           )}
 
@@ -417,7 +404,7 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
 
             <div className="ats-report-headline">
               <div className={`ats-stamp ${result.passes_oa ? "pass" : "fail"}`}>
-                {result.passes_oa ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
+                {result.passes_oa ? <CheckCircleIcon size={15} /> : <CrossCircleIcon size={15} />}
                 {result.passes_oa ? "OA Likely" : "OA Unlikely"}
               </div>
               <p className="ats-verdict">{result.verdict}</p>
@@ -548,7 +535,7 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
 
               {grillError && (
                 <div className="ats-error">
-                  <AlertCircle size={15} /> {grillError}
+                  <AlertIcon size={15} /> {grillError}
                 </div>
               )}
 
@@ -585,7 +572,7 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
         <span className="ats-footer-note">The resume screen never blocks your interview.</span>
         <button className="button button-primary ats-continue" onClick={handleContinue}>
           {result ? "Continue to next stage" : "Skip to next stage"}
-          <ChevronRight size={15} />
+          <ChevronRightIcon size={15} />
         </button>
       </div>
     </div>

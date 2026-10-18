@@ -1,4 +1,5 @@
-import { BookOpen, Brain, Edit3, FolderOpen, Plus, Trash2, TrendingUp, Undo2, X, FileCheck, Folder as FolderIcon } from "lucide-react";
+import { BookIcon, BrainIcon, FolderIcon, ScoreRiseIcon, TestsTakenIcon, UndoIcon } from "../icons";
+import { CloseIcon, PencilIcon, PlusIcon, TrashIcon } from "../icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { WeakSpots } from "../components/WeakSpots";
@@ -295,9 +296,9 @@ export default function Dashboard() {
     const scoreCount = Math.max(0, scored.length - baseline.scoreCount);
     const average = scoreCount > 0 ? Math.round(scoreSum / scoreCount) : null;
     return [
-      { label: "Tests Taken", value: attempts.toString(), icon: FileCheck },
+      { label: "Tests Taken", value: attempts.toString(), icon: TestsTakenIcon },
       { label: "Cards Reviewed", value: cardsReviewed.toString(), icon: FlashcardsIcon, iconSize: 30 },
-      { label: "Average Score", value: average ? `${average}%` : "-", icon: TrendingUp },
+      { label: "Average Score", value: average ? `${average}%` : "-", icon: ScoreRiseIcon },
     ];
   }, [flashcards, tests, statsResetVersion]);
 
@@ -377,7 +378,7 @@ export default function Dashboard() {
             <p className="muted">Recent tests, active folders, and weak concepts in one place.</p>
           </div>
           <Link id="tour-new-test" to="/create-test">
-            <Button icon={<Plus size={18} />}>New Test</Button>
+            <Button icon={<PlusIcon size={18} />}>New Test</Button>
           </Link>
         </header>
 
@@ -441,7 +442,7 @@ export default function Dashboard() {
                   </div>
                   {folders.length === 0 ? (
                     <EmptyState
-                      icon={<FolderOpen />}
+                      icon={<FolderIcon />}
                       title="No folders yet"
                       body="Folders group a subject's tests and flashcards. Create one to get started."
                       action={
@@ -488,7 +489,7 @@ export default function Dashboard() {
                               </p>
                             </div>
                             <div className="test-row-resume">
-                              <Undo2 size={18} />
+                              <UndoIcon size={18} />
                               <span>Resume</span>
                             </div>
                           </Link>
@@ -498,7 +499,7 @@ export default function Dashboard() {
                               onClick={(e) => { e.preventDefault(); dismissResumableTest(test.test_id); }}
                               type="button"
                             >
-                              <X size={17} />
+                              <CloseIcon size={17} />
                             </button>
                           </div>
                         </Card>
@@ -516,7 +517,7 @@ export default function Dashboard() {
                   </div>
                   {tests.length === 0 ? (
                     <EmptyState
-                      icon={<BookOpen />}
+                      icon={<BookIcon />}
                       title="No tests yet"
                       body="Upload notes to generate your first practice test."
                       action={
@@ -540,10 +541,10 @@ export default function Dashboard() {
                           <div className="score-badge">{formatPercent(test.best_score)}</div>
                           <div className="row-actions">
                             <button aria-label={`Rename ${test.title}`} onClick={() => setRenamingTest(test)} type="button">
-                              <Edit3 size={17} />
+                              <PencilIcon size={17} />
                             </button>
                             <button aria-label={`Delete ${test.title}`} onClick={() => setDeletingTest(test)} type="button">
-                              <Trash2 size={17} />
+                              <TrashIcon size={17} />
                             </button>
                           </div>
                         </Card>
@@ -563,7 +564,7 @@ export default function Dashboard() {
                 <div className="weak-stack">
                   {weakCards.length === 0 ? (
                     <EmptyState
-                      icon={<Brain />}
+                      icon={<BrainIcon />}
                       title="No flashcards yet"
                       body="Create a test or add flashcards to see weak topics here."
                       action={

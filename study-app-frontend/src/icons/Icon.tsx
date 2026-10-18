@@ -9,20 +9,28 @@ export type IconProps = Omit<SVGProps<SVGSVGElement>, "children"> & {
 
 type BaseProps = IconProps & { name: string; children: ReactNode };
 
+// The folder stats icons were drawn to fill the 24 grid. The rest of the set is
+// drawn inside the live area, so it renders through a cropped viewBox (about
+// 14% larger in the same box) with the stroke scaled down to stay 2px on screen.
+const FULL_GRID = new Set(["tests-taken", "score-rise", "crown", "sprout"]);
+const CROP = 21 / 24;
+
 /**
  * Base for every icon in the set: 24 grid, currentColor, 2px round stroke,
  * outline at rest, filled when active. Import ./icons.css once at app root.
  */
 export const Icon = forwardRef<SVGSVGElement, BaseProps>(function Icon(
-  { name, size = 24, title, active, className, children, style, ...rest },
+  { name, size = 24, title, active, className, children, style, strokeWidth, ...rest },
   ref
 ) {
   const labelled = Boolean(title);
+  const full = FULL_GRID.has(name);
+  const stroke = strokeWidth ?? "var(--icon-stroke, 2)";
   return (
     <svg
       ref={ref}
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
+      viewBox={full ? "0 0 24 24" : "1.5 1.5 21 21"}
       width={size}
       height={size}
       fill="none"
@@ -30,7 +38,7 @@ export const Icon = forwardRef<SVGSVGElement, BaseProps>(function Icon(
       strokeLinecap="round"
       strokeLinejoin="round"
       className={["icon", `icon-${name}`, className].filter(Boolean).join(" ")}
-      style={{ strokeWidth: "var(--icon-stroke, 2)", ...style }}
+      style={{ strokeWidth: full ? stroke : `calc(${stroke} * ${CROP})`, ...style }}
       data-active={active ? "" : undefined}
       role={labelled ? "img" : undefined}
       aria-hidden={labelled ? undefined : true}

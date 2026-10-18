@@ -1,4 +1,5 @@
-import { AlertCircle, Check, Eye, FileText, Info, Loader2, Minus, RotateCcw, StickyNote, Trash2, Upload, X } from "lucide-react";
+import { Eye, FileText, Loader2, Minus, StickyNote } from "lucide-react";
+import { AlertIcon, CheckIcon, CloseIcon, InfoIcon, RetryIcon, TrashIcon, UploadIcon } from "../icons";
 import { useEffect, useRef, useState } from "react";
 import { type FolderFile, type SkippedFile, addFolderTextNote, deleteFolderFile, fetchFolderFiles, uploadFolderFiles } from "../lib/api";
 import { describeUploadStatus, isReadingMore, isUploadActive } from "../lib/uploadStatus";
@@ -289,7 +290,7 @@ export function FileManager({ folderId, onClose }: Props) {
             onClick={onClose}
             aria-label="Close file manager"
           >
-            <X size={18} />
+            <CloseIcon size={18} />
           </button>
         </div>
 
@@ -300,7 +301,7 @@ export function FileManager({ folderId, onClose }: Props) {
             className={`file-manager-tab${mode === "upload" ? " file-manager-tab--active" : ""}`}
             onClick={() => { setMode("upload"); setError(null); }}
           >
-            <Upload size={15} />
+            <UploadIcon size={15} />
             Upload Files
           </button>
           <button
@@ -319,7 +320,7 @@ export function FileManager({ folderId, onClose }: Props) {
           className="file-manager-upload-zone"
           style={{ cursor: isUploading ? "not-allowed" : "pointer", opacity: isUploading ? 0.6 : 1 }}
         >
-          <Upload size={16} style={{ color: "var(--green-dark)", flexShrink: 0 }} />
+          <UploadIcon size={16} style={{ color: "var(--green-dark)", flexShrink: 0 }} />
           <span className="file-manager-upload-label">
             {isUploading ? "Uploading…" : "Choose files to upload"}
           </span>
@@ -436,14 +437,14 @@ export function FileManager({ folderId, onClose }: Props) {
                 className={`fm-check${allSelected ? " is-checked" : someSelected ? " is-indeterminate" : ""}`}
                 aria-hidden="true"
               >
-                {allSelected ? <Check size={11} strokeWidth={3} /> : someSelected ? <Minus size={11} strokeWidth={3} /> : null}
+                {allSelected ? <CheckIcon size={11} strokeWidth={3} /> : someSelected ? <Minus size={11} strokeWidth={3} /> : null}
               </span>
               {someSelected ? `${selectedCount} selected` : "Select all"}
             </button>
             {someSelected && (
               <Button
                 variant="danger-outline"
-                icon={<Trash2 size={14} />}
+                icon={<TrashIcon size={14} />}
                 className="file-manager-bulk-delete"
                 onClick={startBulkDelete}
               >
@@ -501,7 +502,7 @@ export function FileManager({ folderId, onClose }: Props) {
                         </span>
                       ) : f.upload_status === "error" ? (
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--red, #e53e3e)" }} title={f.upload_error ?? undefined}>
-                          <AlertCircle size={11} />
+                          <AlertIcon size={11} />
                           {describeUploadStatus(f)}
                         </span>
                       ) : (
@@ -515,7 +516,7 @@ export function FileManager({ folderId, onClose }: Props) {
                       </p>
                     ) : f.upload_status === "ready" && f.upload_note ? (
                       <p className="muted file-manager-row-note">
-                        <Info size={11} aria-hidden="true" />
+                        <InfoIcon size={11} aria-hidden="true" />
                         {f.upload_note}
                       </p>
                     ) : null}
@@ -528,7 +529,7 @@ export function FileManager({ folderId, onClose }: Props) {
                       disabled={reuploadingId !== null}
                       onClick={() => startReupload(f)}
                     >
-                      {reuploadingId === f.id ? <Loader2 size={13} className="spin" /> : <RotateCcw size={13} />}
+                      {reuploadingId === f.id ? <Loader2 size={13} className="spin" /> : <RetryIcon size={13} />}
                       Re-upload
                     </button>
                   ) : null}
@@ -551,7 +552,7 @@ export function FileManager({ folderId, onClose }: Props) {
                     onClick={() => setConfirmDelete(f)}
                     style={{ color: "var(--red, #e53e3e)", opacity: deletingId === f.id ? 0.4 : 1 }}
                   >
-                    <Trash2 size={15} />
+                    <TrashIcon size={15} />
                   </button>
                 </div>
                 );

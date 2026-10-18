@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, FileText, FolderPlus, Paperclip, Sparkles, X } from "lucide-react";
+import { FileText, FolderPlus, Paperclip } from "lucide-react";
+import { CheckIcon, CloseIcon, SparklesIcon } from "../../icons";
 import {
   SANDBOX_FOLDER_NAME,
   SANDBOX_NOTES,
@@ -157,7 +158,7 @@ export function OnboardingSandbox({ onClose, onCreateTest }: Props) {
             {/* ---------------- Intro ---------------- */}
             {stage === "intro" ? (
               <div className="ob-poster">
-                <Sparkles size={28} strokeWidth={1.5} />
+                <SparklesIcon size={28} strokeWidth={1.5} />
                 <p className="ob-poster-line">
                   Nosey turns the notes you already have into tests you can actually sit.
                 </p>
@@ -283,7 +284,7 @@ export function OnboardingSandbox({ onClose, onCreateTest }: Props) {
                       className="ob-btn ob-btn--primary ob-target"
                       onClick={runGeneration}
                     >
-                      <Sparkles size={16} /> Generate test
+                      <SparklesIcon size={16} /> Generate test
                     </button>
                   ) : (
                     <ol className="ob-stream">
@@ -340,7 +341,7 @@ export function OnboardingSandbox({ onClose, onCreateTest }: Props) {
                                 disabled={mcqSubmitted}
                                 onClick={() => setMcqChoice(i)}
                               >
-                                <span className="ob-option-mark">{showKey ? <Check size={14} /> : showWrong ? <X size={14} /> : null}</span>
+                                <span className="ob-option-mark">{showKey ? <CheckIcon size={14} /> : showWrong ? <CloseIcon size={14} /> : null}</span>
                                 {opt}
                               </button>
                             </li>
@@ -453,7 +454,7 @@ export function OnboardingSandbox({ onClose, onCreateTest }: Props) {
             {/* ---------------- Done ---------------- */}
             {stage === "done" ? (
               <div className="ob-poster">
-                <Check size={28} strokeWidth={1.5} />
+                <CheckIcon size={28} strokeWidth={1.5} />
                 <p className="ob-poster-line">That is the whole loop.</p>
                 <p className="ob-poster-sub">
                   Folder, notes, generate, answer, review. The rest of Nosey hangs off it: the same

@@ -1,4 +1,6 @@
-import { AlertTriangle, Atom, Brain, Calculator, CheckCircle2, ChevronDown, Info, Loader2, PenLine, RotateCcw, Sparkles, Target, X, XCircle } from "lucide-react";
+import { AlertTriangle, Atom, Calculator, Loader2, Target } from "lucide-react";
+import { BrainIcon } from "../icons";
+import { CheckCircleIcon, ChevronDownIcon, CloseIcon, CrossCircleIcon, InfoIcon, PencilIcon, RetryIcon, SparklesIcon } from "../icons";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -136,7 +138,7 @@ export default function Results() {
     return (
       <div className="page page-narrow">
         <EmptyState
-          icon={<Brain />}
+          icon={<BrainIcon />}
           title="No saved attempt"
           body={error}
           action={
@@ -264,7 +266,7 @@ export default function Results() {
 
       {held.length > 0 ? (
         <Card className="needs-input-banner">
-          <PenLine size={20} />
+          <PencilIcon size={20} />
           <div className="needs-input-banner-text">
             <h2>
               {held.length === 1 ? "1 answer needs" : `${held.length} answers need`} your input
@@ -320,7 +322,7 @@ export default function Results() {
             {!reviewSummary && (
               <Button
                 variant="secondary"
-                icon={loadingReview ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} />}
+                icon={loadingReview ? <Loader2 size={16} className="spin" /> : <SparklesIcon size={16} />}
                 onClick={() => void handleGenerateReview()}
                 disabled={loadingReview}
               >
@@ -350,10 +352,10 @@ export default function Results() {
 
       <div className="button-row result-actions">
         <Link to="/flashcards">
-          <Button icon={<Brain size={18} />}>Study Weak Topics</Button>
+          <Button icon={<BrainIcon size={18} />}>Study Weak Topics</Button>
         </Link>
         <Link to="/create-test">
-          <Button variant="secondary" icon={<RotateCcw size={18} />}>
+          <Button variant="secondary" icon={<RetryIcon size={18} />}>
             Try Another Test
           </Button>
         </Link>
@@ -398,7 +400,7 @@ export default function Results() {
                   <div className="targeted-topics-list">
                     {missed.slice(0, 6).map((a, i) => (
                       <div key={a.question_id} className="targeted-topic-item">
-                        <XCircle size={15} className="targeted-topic-icon" />
+                        <CrossCircleIcon size={15} className="targeted-topic-icon" />
                         <span className="targeted-topic-text">
                           {/* Rendered, not sliced: a hard character cut lands in the
                               middle of a $...$ pair on math questions and leaves raw
@@ -419,7 +421,7 @@ export default function Results() {
             <div className="targeted-topics-list">
               {missed.slice(0, 6).map((a, i) => (
                 <div key={a.question_id} className="targeted-topic-item">
-                  <XCircle size={15} className="targeted-topic-icon" />
+                  <CrossCircleIcon size={15} className="targeted-topic-icon" />
                   <span className="targeted-topic-text">
                     {/* Rendered, not sliced: a hard character cut lands in the
                         middle of a $...$ pair on math questions and leaves raw
@@ -454,7 +456,7 @@ export default function Results() {
                     </p>
                   </div>
                   <button className="tp-close" onClick={() => setShowTargetedModal(false)} aria-label="Close">
-                    <X size={18} />
+                    <CloseIcon size={18} />
                   </button>
                 </header>
 
@@ -726,7 +728,7 @@ function ClampedBox({ className, children }: { className: string; children: Reac
 function ReviewItem({ answer, label }: { answer: AnswerResult; label: string }) {
   const [open, setOpen] = useState(false);
   const [reasoningOpen, setReasoningOpen] = useState(false);
-  const Icon = answer.is_correct ? CheckCircle2 : XCircle;
+  const Icon = answer.is_correct ? CheckCircleIcon : CrossCircleIcon;
   const reasoning = answer.reasoning?.trim();
   const [fullReadOpen, setFullReadOpen] = useState(false);
   const transcript = answer.work_transcript?.trim();
@@ -746,7 +748,7 @@ function ReviewItem({ answer, label }: { answer: AnswerResult; label: string }) 
             <MarkdownContent content={formatCodingProblem(answer.question_text ?? `Question ${answer.question_id}`)} />
           </div>
         </div>
-        <ChevronDown className={open ? "rotated" : ""} size={20} />
+        <ChevronDownIcon className={open ? "rotated" : ""} size={20} />
       </button>
       {open ? (
         <div className="review-detail">
@@ -762,7 +764,7 @@ function ReviewItem({ answer, label }: { answer: AnswerResult; label: string }) 
           ) : null}
           {answer.answer_inferred ? (
             <div className="review-inferred-note">
-              <Info size={15} />
+              <InfoIcon size={15} />
               <span>
                 Answer worked out by Nosey. Your practice test had no answer key for this question,
                 so check it against your notes if it looks off.
@@ -771,7 +773,7 @@ function ReviewItem({ answer, label }: { answer: AnswerResult; label: string }) 
           ) : null}
           {answer.answer_from_sheet ? (
             <div className="review-inferred-note">
-              <Info size={15} />
+              <InfoIcon size={15} />
               <span>Graded against your answer sheet.</span>
             </div>
           ) : null}
@@ -783,7 +785,7 @@ function ReviewItem({ answer, label }: { answer: AnswerResult; label: string }) 
             {trimmed ? (
               <button className="review-full-read-toggle" onClick={() => setFullReadOpen(!fullReadOpen)} type="button">
                 {fullReadOpen ? "Hide everything Kojo read" : "Show everything Kojo read"}
-                <ChevronDown className={fullReadOpen ? "rotated" : ""} size={14} />
+                <ChevronDownIcon className={fullReadOpen ? "rotated" : ""} size={14} />
               </button>
             ) : null}
             {trimmed && fullReadOpen && transcript ? (
@@ -811,9 +813,9 @@ function ReviewItem({ answer, label }: { answer: AnswerResult; label: string }) 
                 onClick={() => setReasoningOpen(!reasoningOpen)}
                 type="button"
               >
-                <Brain size={15} />
+                <BrainIcon size={15} />
                 <span>AI-Reasoning</span>
-                <ChevronDown className={reasoningOpen ? "rotated" : ""} size={15} />
+                <ChevronDownIcon className={reasoningOpen ? "rotated" : ""} size={15} />
               </button>
               {reasoningOpen ? (
                 <div className="answer-reasoning-body">
@@ -900,7 +902,7 @@ function NeedsInputItem({
   return (
     <Card className="review-item needs-input">
       <div className="review-trigger needs-input-head">
-        <PenLine size={22} />
+        <PencilIcon size={22} />
         <div>
           <span className="small muted">{label}, needs your input</span>
           <div className="review-question-markdown">
@@ -910,7 +912,7 @@ function NeedsInputItem({
       </div>
       <div className="review-detail">
         <div className="needs-input-notice">
-          <Info size={15} />
+          <InfoIcon size={15} />
           <span>
             {transcript
               ? "Kojo wasn't sure what it read. Check it, then redraw or type your answer."

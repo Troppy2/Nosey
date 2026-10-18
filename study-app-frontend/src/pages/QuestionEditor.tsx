@@ -1,4 +1,5 @@
-import { ArrowLeft, Plus, Save, Sparkles, Trash2 } from "lucide-react";
+import { Save } from "lucide-react";
+import { ArrowLeftIcon, PlusIcon, SparklesIcon, TrashIcon } from "../icons";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -130,7 +131,7 @@ function MCQCard({
             opacity: deleting ? 0.5 : 1,
           }}
         >
-          <Trash2 size={13} /> Delete
+          <TrashIcon size={13} /> Delete
         </button>
       </div>
 
@@ -259,7 +260,7 @@ function FRQCard({
             opacity: deleting ? 0.5 : 1,
           }}
         >
-          <Trash2 size={13} /> Delete
+          <TrashIcon size={13} /> Delete
         </button>
       </div>
 
@@ -410,7 +411,7 @@ function AddQuestionPanel({
 
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <Button onClick={handleAdd} disabled={adding || !canAdd}>
-          <Plus size={14} />
+          <PlusIcon size={14} />
           {adding ? "Adding…" : "Add question"}
         </Button>
       </div>
@@ -692,7 +693,7 @@ export default function QuestionEditor() {
   return (
     <div className="page page-narrow">
       <Link className="back-link" to={backTo}>
-        <ArrowLeft size={16} />
+        <ArrowLeftIcon size={16} />
         {test?.folder_name ?? "Folder"}
       </Link>
 
@@ -707,7 +708,7 @@ export default function QuestionEditor() {
         <div className="button-row">
           {betaMode && !generating && questions.length > 0 ? (
             <Button variant="secondary" onClick={() => void handlePrettier()} disabled={prettying || proposals !== null}>
-              <Sparkles size={16} />
+              <SparklesIcon size={16} />
               {prettying ? "Tidying..." : "Prettier"}
             </Button>
           ) : null}

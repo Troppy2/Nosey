@@ -1,14 +1,5 @@
-import {
-  AlertCircle,
-  ArrowLeft,
-  CheckCircle2,
-  Music2,
-  Pause,
-  Play,
-  Presentation,
-  RotateCcw,
-  XCircle,
-} from "lucide-react";
+import { Music2, Pause, Play, Presentation } from "lucide-react";
+import { AlertIcon, ArrowLeftIcon, CheckCircleIcon, CrossCircleIcon, RetryIcon } from "../icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -398,7 +389,7 @@ function EpisodePlayerInner({
           aria-label="Back to track"
           title="Back to track"
         >
-          <ArrowLeft size={18} />
+          <ArrowLeftIcon size={18} />
         </Link>
         <div className="lm-header-main">
           <span className="eyebrow">{episode.format === "podcast" ? "Podcast" : "Slide deck"}</span>
@@ -409,7 +400,7 @@ function EpisodePlayerInner({
 
       {!speechUsable ? (
         <Card className="lm-speech-notice">
-          <AlertCircle size={18} />
+          <AlertIcon size={18} />
           <p>
             Audio playback is not available in this browser. You can still read the transcript and
             answer the checkpoint questions.
@@ -448,8 +439,8 @@ function EpisodePlayerInner({
                           {String.fromCharCode(65 + oIndex)}
                         </span>
                         <span>{option}</span>
-                        {local && oIndex === local.correct_index ? <CheckCircle2 size={16} /> : null}
-                        {local && !local.correct && oIndex === chosen ? <XCircle size={16} /> : null}
+                        {local && oIndex === local.correct_index ? <CheckCircleIcon size={16} /> : null}
+                        {local && !local.correct && oIndex === chosen ? <CrossCircleIcon size={16} /> : null}
                       </button>
                     );
                   })}
@@ -556,7 +547,7 @@ function EpisodePlayerInner({
               aria-label="Start over from the beginning"
               title="Start over"
             >
-              <RotateCcw size={15} />
+              <RetryIcon size={15} />
             </button>
           ) : null}
         </div>
@@ -688,9 +679,9 @@ function EpisodePlayerInner({
                 <div key={i} className="lm-review-row">
                   <span className="lm-review-status">
                     {state.correct ? (
-                      <CheckCircle2 size={16} className="is-correct" />
+                      <CheckCircleIcon size={16} className="is-correct" />
                     ) : state.seen ? (
-                      <XCircle size={16} className="is-wrong" />
+                      <CrossCircleIcon size={16} className="is-wrong" />
                     ) : (
                       <span className="lm-review-empty" aria-hidden="true" />
                     )}
@@ -718,7 +709,7 @@ function EpisodePlayerInner({
 
           {score >= episode.pass_threshold ? (
             <div className="lm-passed">
-              <CheckCircle2 size={22} />
+              <CheckCircleIcon size={22} />
               <p>
                 <strong>Module passed.</strong> Track progress is saved; the hub shows this as
                 completed by listening.
@@ -745,7 +736,7 @@ function EpisodePlayerInner({
                     <div className="lm-missed-actions">
                       <Button
                         variant="secondary"
-                        icon={<RotateCcw size={15} />}
+                        icon={<RetryIcon size={15} />}
                         onClick={() => {
                           setShowSummary(false);
                           setActiveCheckpoint(i);

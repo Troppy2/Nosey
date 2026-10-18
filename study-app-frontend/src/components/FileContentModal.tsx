@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { CloseIcon } from "../icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type FolderFileContent, fetchFolderFileContent } from "../lib/api";
 import { InlineLoading } from "./Loaders";
@@ -76,7 +76,7 @@ export function FileContentModal({ folderId, fileId, fileName, onClose }: Props)
             <h2 className="file-view-title">{fileName}</h2>
           </div>
           <button type="button" className="kojo-header-btn" onClick={onClose} aria-label="Close file view">
-            <X size={18} />
+            <CloseIcon size={18} />
           </button>
         </div>
 
