@@ -28706,3 +28706,29 @@ a.sd-chip.is-done:hover {
   padding: 0;
   background: none;
 }
+
+/* Phone page-header toolbars: the 2-col grid leaves ~170px per button and the
+   labels wrap into uneven shapes. Stack one full-width button per row. */
+@media (max-width: 480px) {
+  .page-header .toolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .page-header .toolbar .button {
+    white-space: nowrap;
+  }
+}
+
+/* Kojo chat on touch screens: icon controls were 26-32px. Give them a 40px
+   hit area; desktop (fine pointer) keeps the dense sizes. */
+@media (pointer: coarse) {
+  .kojo-user-action,
+  .kojo-chat-item-delete,
+  .chat-mode-sidebar-close,
+  .kojo-attach-btn,
+  .kojo-send,
+  .tt-btn {
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
