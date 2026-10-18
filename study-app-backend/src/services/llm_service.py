@@ -156,10 +156,14 @@ def _gemini_headers() -> dict[str, str]:
 
 
 # Asked of every generation prompt so folder stats can group answers by topic.
+# Topics must be broad enough to repeat: stats only judge a topic after 3
+# answers, so one topic per question never becomes weak or strong (e2e run,
+# 2026-10-17: 7 topics for 8 math questions).
 _TOPIC_TAG_RULE = (
-    'TOPIC TAG: give every item a "topic": the concept it tests, 2 to 4 plain words '
-    '(e.g. "Cell Respiration", "Supply and Demand"). Items on the same concept share '
-    "the exact same topic name.\n"
+    'TOPIC TAG: give every item a "topic": the broad concept it tests, 1 to 4 plain words, '
+    'like a chapter heading (e.g. "Cellular Respiration", "Derivatives", "World War II"). '
+    "Use few topics: about one topic for every 3 or 4 items. Items on the same concept "
+    "must use the exact same topic name, spelled the same way every time.\n"
 )
 
 
@@ -3169,9 +3173,10 @@ class LLMService:
             f"{mcq_instructions}\n"
             f"{frq_instructions}\n"
             f"{self._student_instructions_block(custom_instructions)}"
+            f"{_TOPIC_TAG_RULE}"
             "Return JSON only with keys mcq and frq.\n"
-            "mcq items: {question_text, options: [4 strings], correct_index: 0-3}\n"
-            "frq items: {question_text, expected_answer}\n"
+            "mcq items: {question_text, options: [4 strings], correct_index: 0-3, topic}\n"
+            "frq items: {question_text, expected_answer, topic}\n"
         )
         
         diagnostics: dict[str, object] = {
@@ -3394,9 +3399,10 @@ If the notes do not support grading, set flagged_uncertain true and confidence 0
             f"{mcq_block}\n"
             f"{frq_block}\n"
             f"{self._student_instructions_block(custom_instructions)}"
+            f"{_TOPIC_TAG_RULE}"
             "Return JSON only with keys mcq and frq.\n"
-            "mcq items: {question_text (include code snippets where appropriate), options: [4 strings], correct_index: 0-3}\n"
-            "frq items: {question_text, expected_answer}\n\n"
+            "mcq items: {question_text (include code snippets where appropriate), options: [4 strings], correct_index: 0-3, topic}\n"
+            "frq items: {question_text, expected_answer, topic}\n\n"
             f"CS NOTES:\n{notes[:self._context_budget(custom_instructions)[0]]}"
         )
 
@@ -3569,9 +3575,10 @@ Be lenient on minor syntax errors if the logic is correct. Accept equivalent sol
             f"{mcq_block}\n"
             f"{frq_block}\n"
             f"{self._student_instructions_block(custom_instructions)}"
+            f"{_TOPIC_TAG_RULE}"
             "Return JSON only with keys mcq and frq.\n"
-            "mcq items: {question_text, options: [4 strings], correct_index: 0-3}\n"
-            "frq items: {question_text, expected_answer}\n\n"
+            "mcq items: {question_text, options: [4 strings], correct_index: 0-3, topic}\n"
+            "frq items: {question_text, expected_answer, topic}\n\n"
             f"MATH NOTES:\n{notes[:self._context_budget(custom_instructions)[0]]}"
         )
 

@@ -248,3 +248,18 @@ async def test_update_folder_test_instructions_and_default_view(db_session_maker
         assert out.test_instructions is None and out.default_view == "flashcards"
         with pytest.raises(Exception):
             FolderUpdate(default_view="grid")
+
+
+# ---- every MCQ/FRQ generation prompt asks for a topic (e2e found math/coding missing)
+
+def test_generation_prompts_ask_for_topic():
+    from src.services.llm_service import _TOPIC_TAG_RULE, LLMService
+
+    llm = LLMService()
+    prompts = {
+        "math": llm._build_math_generation_prompt("notes", 2, 1, "mixed"),
+        "coding": llm._build_coding_generation_prompt("notes", 2, 1, "mixed", "Python"),
+    }
+    for name, prompt in prompts.items():
+        assert _TOPIC_TAG_RULE in prompt, name
+        assert "correct_index: 0-3, topic" in prompt and "expected_answer, topic" in prompt, name
