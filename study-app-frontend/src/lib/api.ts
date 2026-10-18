@@ -540,7 +540,7 @@ export async function createFolder(input: Pick<Folder, "name" | "subject" | "des
 
 export async function updateFolder(
   folderId: number,
-  input: Partial<Pick<Folder, "name" | "subject" | "description" | "kojo_sync_default" | "kojo_allow_artifacts" | "kojo_auto_index" | "kojo_persona" | "is_archived">>,
+  input: Partial<Pick<Folder, "name" | "subject" | "description" | "kojo_sync_default" | "kojo_allow_artifacts" | "kojo_auto_index" | "kojo_persona" | "is_archived" | "avoid_repeat_questions" | "default_view" | "test_instructions">>,
 ): Promise<Folder> {
   return request<Folder>(`/folders/${folderId}`, {
     method: "PATCH",

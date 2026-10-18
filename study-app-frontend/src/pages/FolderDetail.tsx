@@ -54,6 +54,10 @@ export default function FolderDetail() {
   const [kojoSettingsOpen, setKojoSettingsOpen] = useState(false);
   // Stats or flashcards panel; null until the folder loads its default_view.
   const [panel, setPanel] = useState<FolderPanel | null>(null);
+  // Folder Settings "How Kojo makes tests": edited locally, saved on demand.
+  const [instructionsDraft, setInstructionsDraft] = useState("");
+  const [instructionsSaving, setInstructionsSaving] = useState(false);
+  const [instructionsMessage, setInstructionsMessage] = useState<string | null>(null);
   const [renamingTest, setRenamingTest] = useState<TestSummary | null>(null);
   const [deletingTest, setDeletingTest] = useState<TestSummary | null>(null);
   const [retryingTestId, setRetryingTestId] = useState<number | null>(null);
@@ -80,6 +84,7 @@ export default function FolderDetail() {
       .then((data) => {
         setFolder(data);
         setPanel(data.default_view === "flashcards" ? "flashcards" : "stats");
+        setInstructionsDraft(data.test_instructions ?? "");
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Unable to load folder."))
       .finally(() => setIsLoading(false));
@@ -256,6 +261,23 @@ export default function FolderDetail() {
       setFolder(updated);
     } catch {
       // non-critical , silently ignore
+    }
+  }
+
+  async function saveTestInstructions() {
+    if (!folder) return;
+    setInstructionsSaving(true);
+    setInstructionsMessage(null);
+    try {
+      // "" clears the folder's instructions on the server.
+      const updated = await updateFolder(id, { test_instructions: instructionsDraft.trim() });
+      setFolder(updated);
+      setInstructionsDraft(updated.test_instructions ?? "");
+      setInstructionsMessage("Saved. New tests in this folder start with these instructions.");
+    } catch (err) {
+      setInstructionsMessage(err instanceof Error ? err.message : "Could not save. Try again.");
+    } finally {
+      setInstructionsSaving(false);
     }
   }
 
@@ -474,6 +496,39 @@ export default function FolderDetail() {
                 <span className="folder-kojo-toggle-thumb" />
               </button>
             </label>
+
+            <div className="folder-test-instructions-row">
+              <div className="folder-kojo-toggle-info">
+                <label className="folder-kojo-toggle-label" htmlFor="folder-test-instructions">How Kojo makes tests</label>
+                <span className="folder-kojo-toggle-desc">
+                  Instructions for every test in this folder, like "focus on chapters 3 to 5" or "always include one proof question".
+                  They fill the custom instructions box when you make a test, where you can still change them.
+                </span>
+              </div>
+              <textarea
+                id="folder-test-instructions"
+                className="input"
+                rows={4}
+                maxLength={10000}
+                value={instructionsDraft}
+                onChange={(e) => {
+                  setInstructionsDraft(e.target.value);
+                  setInstructionsMessage(null);
+                }}
+                placeholder="e.g. Use exam-style wording and make wrong answers close to the right one."
+              />
+              <div className="folder-test-instructions-actions">
+                {instructionsMessage ? <span className="muted small">{instructionsMessage}</span> : null}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => void saveTestInstructions()}
+                  disabled={instructionsSaving || instructionsDraft.trim() === (folder.test_instructions ?? "")}
+                >
+                  {instructionsSaving ? "Saving..." : "Save instructions"}
+                </Button>
+              </div>
+            </div>
 
             <div className="folder-kojo-persona-row">
               <div className="folder-kojo-toggle-info">

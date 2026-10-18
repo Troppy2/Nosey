@@ -172,10 +172,28 @@ export default function CreateTest() {
     fetchProviderStatus().then(setProviderStatus).catch(() => {});
   }, []);
 
+  // Folder test instructions ("How Kojo makes tests" in Folder Settings) fill
+  // the custom instructions box when it is empty or still holds the previous
+  // folder's prefill. A saved draft or anything the user typed is kept.
+  const folderInstructions = folders.find((f) => f.id === folderId)?.test_instructions?.trim() ?? "";
+  const prefilledRef = useRef("");
+  useEffect(() => {
+    setCustomInstructions((current) => {
+      const untouched = !current.trim() || current === prefilledRef.current;
+      prefilledRef.current = folderInstructions;
+      return untouched ? folderInstructions : current;
+    });
+  }, [folderId, folderInstructions]);
+  // The box shows in simple mode too when the folder has instructions, so they
+  // are never applied without the user seeing them.
+  const showInstructions = advancedMode || folderInstructions.length > 0;
+
   // Persist form state to localStorage while the user fills in the form
   useEffect(() => {
     if (!folderId) return;
-    if (!title.trim() && !topicFocus.trim() && !customInstructions.trim()) return;
+    // A prefill from the folder's instructions alone is not user input: no draft.
+    const typedInstructions = customInstructions.trim() && customInstructions !== prefilledRef.current;
+    if (!title.trim() && !topicFocus.trim() && !typedInstructions) return;
     const draft: TestCreationParams = {
       title, folderId, testType, countMcq, countFrq,
       countTf, countMs, countRank,
@@ -185,6 +203,7 @@ export default function CreateTest() {
     };
     localStorage.setItem(scopeKey(`nosey_create_test_form_${folderId}`), JSON.stringify(draft));
   }, [title, folderId, testType, countMcq, countFrq, countTf, countMs, countRank, isMathMode, isCodingMode, codingLanguage, difficulty, topicFocus, customInstructions, advancedMode]);
+
 
   // If the user's saved provider is currently unavailable, fall back to "auto" for THIS
   // request only. Do not rewrite the shared `nosey_generation_provider` setting: it is read
@@ -280,7 +299,7 @@ export default function CreateTest() {
         codingLanguage: isCodingMode ? codingLanguage : undefined,
         difficulty: advancedMode ? difficulty : undefined,
         topicFocus: advancedMode && topicFocus.trim() ? topicFocus.trim() : undefined,
-        customInstructions: advancedMode && customInstructions.trim() ? customInstructions.trim() : undefined,
+        customInstructions: showInstructions && customInstructions.trim() ? customInstructions.trim() : undefined,
         generationProvider: effectiveProvider,
         enableFallback: localStorage.getItem(scopeKey("nosey_question_fallback")) === "true",
       });
@@ -507,6 +526,32 @@ export default function CreateTest() {
 
   usePageTour("create-test", folders.length > 0);
 
+  const instructionsField = (
+    <div data-tour="create-instructions" className="field">
+      <label className="field-label" htmlFor="custom-instructions">
+        Custom instructions <span className="muted" style={{ fontWeight: 400 }}>(optional)</span>
+      </label>
+      <textarea
+        id="custom-instructions"
+        className="input"
+        rows={6}
+        placeholder="e.g. Generate 5 word problems involving integration by parts, make all answer choices close in value, include at least 2 proof questions…"
+        value={customInstructions}
+        onChange={(e) => setCustomInstructions(e.target.value)}
+        maxLength={CUSTOM_INSTRUCTIONS_MAX}
+        style={{ resize: "vertical", fontFamily: "inherit" }}
+      />
+      <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.8rem" }}>
+        {folderInstructions && customInstructions === folderInstructions
+          ? "Filled in from this folder's test instructions. Edit or clear it for this test only."
+          : "Natural language instructions that guide how questions are generated. Overrides topic focus when both are set."}
+        <br />
+        {countWords(customInstructions)} word{countWords(customInstructions) !== 1 ? "s" : ""} used,{" "}
+        {customInstructions.length.toLocaleString()} / {CUSTOM_INSTRUCTIONS_MAX.toLocaleString()} characters.
+      </p>
+    </div>
+  );
+
   return (
     <div className="page page-narrow">
       <Link className="back-link" to={folderId ? `/folders/${folderId}` : "/folders"}>
@@ -646,6 +691,10 @@ export default function CreateTest() {
             ) : null}
           </Card>
 
+          {!advancedMode && showInstructions ? (
+            <Card className="form-panel">{instructionsField}</Card>
+          ) : null}
+
           {/* Advanced Mode panel */}
           {advancedMode && (
             <Card data-tour="create-advanced-panel" className="form-panel">
@@ -689,28 +738,7 @@ export default function CreateTest() {
                   </p>
                 </div>
 
-                {/* Custom instructions */}
-                <div data-tour="create-instructions" className="field">
-                  <label className="field-label" htmlFor="custom-instructions">
-                    Custom instructions <span className="muted" style={{ fontWeight: 400 }}>(optional)</span>
-                  </label>
-                  <textarea
-                    id="custom-instructions"
-                    className="input"
-                    rows={6}
-                    placeholder="e.g. Generate 5 word problems involving integration by parts, make all answer choices close in value, include at least 2 proof questions…"
-                    value={customInstructions}
-                    onChange={(e) => setCustomInstructions(e.target.value)}
-                    maxLength={CUSTOM_INSTRUCTIONS_MAX}
-                    style={{ resize: "vertical", fontFamily: "inherit" }}
-                  />
-                  <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.8rem" }}>
-                    Natural language instructions that guide how questions are generated. Overrides topic focus when both are set.
-                    <br />
-                    {countWords(customInstructions)} word{countWords(customInstructions) !== 1 ? "s" : ""} used,{" "}
-                    {customInstructions.length.toLocaleString()} / {CUSTOM_INSTRUCTIONS_MAX.toLocaleString()} characters.
-                  </p>
-                </div>
+                {instructionsField}
 
                 {/* Question counts */}
                 <div data-tour="create-counts">
