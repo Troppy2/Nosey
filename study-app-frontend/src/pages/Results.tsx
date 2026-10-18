@@ -36,6 +36,25 @@ import { scoreTone } from "../lib/format";
 import { useSettings } from "../lib/useSettings";
 import type { AnswerResult, AttemptDetail, RedoAnswerResponse } from "../lib/types";
 
+type MissedTopicCount = { topic: string; missed: number; total: number };
+
+// Tagged topics with at least one graded miss, most missed first. Held
+// (needs_input) answers are not graded yet, so they are left out.
+function summarizeMissedTopics(answers: AnswerResult[]): MissedTopicCount[] {
+  const byKey = new Map<string, MissedTopicCount>();
+  for (const answer of answers) {
+    if (!answer.topic || answer.ocr_status === "needs_input") continue;
+    const key = answer.topic.toLowerCase();
+    const entry = byKey.get(key) ?? { topic: answer.topic, missed: 0, total: 0 };
+    entry.total += 1;
+    if (!answer.is_correct) entry.missed += 1;
+    byKey.set(key, entry);
+  }
+  return [...byKey.values()]
+    .filter((t) => t.missed > 0)
+    .sort((a, b) => b.missed - a.missed || b.missed / b.total - a.missed / a.total || a.topic.localeCompare(b.topic));
+}
+
 export default function Results() {
   const { attemptId } = useParams();
   const navigate = useNavigate();
@@ -145,6 +164,9 @@ export default function Results() {
   const held = attempt.answers.filter((answer) => answer.ocr_status === "needs_input");
   const missed = attempt.answers.filter((answer) => !answer.is_correct && answer.ocr_status !== "needs_input");
   const hasMath = attempt.answers.some((a) => a.is_math);
+  // Topic tags (folder stats): computed here, not read from
+  // attempt.missed_topics, so a redo / skip updates them in place.
+  const missedTopics = summarizeMissedTopics(attempt.answers);
 
   // Merge a redo / skip response into the attempt in place: the score and the
   // regraded answers change, everything else stays.
@@ -197,9 +219,10 @@ export default function Results() {
     setIsCreatingTargeted(true);
     setTargetedError(null);
     try {
-      const topics = missed
-        .map((a) => a.question_text ?? "")
-        .filter(Boolean)
+      const topics = (missedTopics.length
+        ? missedTopics.map((t) => t.topic)
+        : missed.map((a) => a.question_text ?? "").filter(Boolean)
+      )
         .slice(0, 8)
         .join("; ");
       await createTest({
@@ -358,6 +381,41 @@ export default function Results() {
                 Generate Targeted Test
               </Button>
             </div>
+            {missedTopics.length > 0 ? (
+              <>
+                <div className="missed-topic-chips">
+                  {missedTopics.map((t) => (
+                    <span key={t.topic} className="missed-topic-chip">
+                      <span className="missed-topic-name">{t.topic}</span>
+                      <span className="missed-topic-count">
+                        {t.missed}/{t.total} missed
+                      </span>
+                    </span>
+                  ))}
+                </div>
+                <details className="missed-questions-details">
+                  <summary>Questions you missed ({missed.length})</summary>
+                  <div className="targeted-topics-list">
+                    {missed.slice(0, 6).map((a, i) => (
+                      <div key={a.question_id} className="targeted-topic-item">
+                        <XCircle size={15} className="targeted-topic-icon" />
+                        <span className="targeted-topic-text">
+                          {/* Rendered, not sliced: a hard character cut lands in the
+                              middle of a $...$ pair on math questions and leaves raw
+                              LaTeX on screen. CSS line-clamps the overflow instead. */}
+                          <MarkdownContent content={a.question_text ?? `Question ${i + 1}`} />
+                        </span>
+                      </div>
+                    ))}
+                    {missed.length > 6 && (
+                      <p className="muted small" style={{ margin: "4px 0 0" }}>
+                        +{missed.length - 6} more weak areas will be included
+                      </p>
+                    )}
+                  </div>
+                </details>
+              </>
+            ) : (
             <div className="targeted-topics-list">
               {missed.slice(0, 6).map((a, i) => (
                 <div key={a.question_id} className="targeted-topic-item">
@@ -376,6 +434,7 @@ export default function Results() {
                 </p>
               )}
             </div>
+            )}
           </div>
 
           {showTargetedModal && (

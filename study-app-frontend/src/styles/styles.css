@@ -29026,3 +29026,45 @@ a.sd-chip.is-done:hover {
     height: 40px;
   }
 }
+
+/* Results: missed topic chips (folder stats chunk 3) */
+.missed-topic-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.missed-topic-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  max-width: 100%;
+  padding: 7px 12px;
+  background: rgba(220, 38, 38, 0.04);
+  border: 1px solid rgba(220, 38, 38, 0.14);
+  border-radius: 999px;
+}
+
+.missed-topic-name {
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.missed-topic-count {
+  font-size: 0.8rem;
+  color: var(--error);
+  white-space: nowrap;
+}
+
+.missed-questions-details {
+  margin-top: 12px;
+}
+
+.missed-questions-details > summary {
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--green-dark);
+  padding: 6px 0;
+}
