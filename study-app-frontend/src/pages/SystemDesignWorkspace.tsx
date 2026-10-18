@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 
 import { KojoHelpChat } from "../components/KojoHelpChat";
+import { SkeletonText } from "../components/Skeletons";
 import { MarkdownContent } from "../components/MarkdownContent";
 import SimTimelinePanel from "../components/SimTimelinePanel";
 import { exerciseId as buildExerciseId, getConcept, resolveMockPackages } from "../data/systemDesign";
@@ -291,7 +292,7 @@ export default function SystemDesignWorkspace() {
                 }}
               />
             ) : (
-              <div className="sd-skeleton">Loading your workspace...</div>
+              <SkeletonText lines={4} label="Loading your workspace" />
             )}
           </div>
         </section>

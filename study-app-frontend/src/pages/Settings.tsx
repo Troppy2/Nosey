@@ -455,7 +455,7 @@ export default function Settings() {
                 it to remember your work and personalize its answers.
               </p>
               {loadingMemory ? (
-                <p className="muted small">Loading your memory...</p>
+                <SkeletonList rows={2} label="Loading your memory" />
               ) : memory?.content ? (
                 <div className="settings-memory-card">
                   <p className="settings-memory-text">{memory.content}</p>

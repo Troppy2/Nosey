@@ -1,7 +1,7 @@
 import { AlertCircle, ArrowLeft, Briefcase, ChevronRight, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LoadingNotice } from "../components/Loaders";
+import { SkeletonList } from "../components/Skeletons";
 import { listMockInterviewSessions } from "../lib/api";
 import type { MockInterviewSession } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
@@ -91,7 +91,7 @@ export default function MockInterviewHistory() {
           <p>{error}</p>
         </div>
       ) : !sessions ? (
-        <LoadingNotice title="Loading your interviews" estimate="Reading your account history." />
+        <SkeletonList rows={4} label="Loading your interviews" />
       ) : sessions.length === 0 ? (
         <div className="card mock-history-empty">
           <p className="muted">You have not finished a mock interview yet.</p>
