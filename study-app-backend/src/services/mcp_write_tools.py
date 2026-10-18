@@ -40,6 +40,7 @@ from src.services.kojo_context_cache import invalidate_folder
 from src.services.mcp_tool_base import McpContext, McpTool, ToolArgs, ToolInputError, owned_folder
 from src.services.test_service import TestService, validate_answer_input
 from src.utils.exceptions import ResourceNotFoundException
+from src.utils.topics import normalize_topic
 from src.utils.validators import MAX_UPLOAD_FILE_SIZE_BYTES, MAX_UPLOAD_TOTAL_SIZE_BYTES
 
 CREATED_VIA = "mcp"
@@ -102,6 +103,11 @@ class QuestionIn(ToolArgs):
     )
     code_language: Optional[str] = Field(
         default=None, max_length=50, description="For input=code, e.g. Python, Java. Defaults to the test's language."
+    )
+    topic: Optional[str] = Field(
+        default=None, max_length=80,
+        description="The concept this question tests, 2 to 4 words. Reuse the same name across questions "
+        "on one concept; Nosey groups results by it to find weak topics.",
     )
 
     @model_validator(mode="after")
@@ -171,6 +177,7 @@ async def _add_question(
         part_label=part_label,
         answer_input=q.input if q.type == "FRQ" else None,
         code_language=q.code_language if q.input == "code" else None,
+        topic=normalize_topic(q.topic),
     )
     ctx.session.add(question)
     await ctx.session.flush()
@@ -413,6 +420,7 @@ async def delete_test(ctx: McpContext, args: DeleteTestArgs) -> dict[str, Any]:
 class CardIn(ToolArgs):
     front: str = Field(min_length=1, max_length=IMPORT_MAX_SIDE_CHARS)
     back: str = Field(min_length=1, max_length=IMPORT_MAX_SIDE_CHARS)
+    topic: Optional[str] = Field(default=None, max_length=80, description="The concept this card covers, 2 to 4 words.")
 
 
 class CreateFlashcardsArgs(ToolArgs):
@@ -426,6 +434,8 @@ async def create_flashcards(ctx: McpContext, args: CreateFlashcardsArgs) -> dict
     cards = await FlashcardRepository(ctx.session).create_many(
         args.folder_id, [(c.front.strip(), c.back.strip()) for c in args.cards], CREATED_VIA
     )
+    for card, arg in zip(cards, args.cards):
+        card.topic = normalize_topic(arg.topic)
     await ctx.session.commit()
     return {"folder_id": args.folder_id, "created": len(cards), "flashcard_ids": [c.id for c in cards]}
 

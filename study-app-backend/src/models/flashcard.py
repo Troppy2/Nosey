@@ -23,6 +23,8 @@ class Flashcard(Base, TimestampMixin):
     back: Mapped[str] = mapped_column(Text, nullable=False)
     source: Mapped[Optional[str]] = mapped_column(String(50))
     difficulty: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    # Short topic name (migration 071); folder stats group attempts by it.
+    topic: Mapped[Optional[str]] = mapped_column(String(80), nullable=True, index=True)
 
     folder: Mapped[Folder] = relationship("Folder", back_populates="flashcards")
     attempts: Mapped[list[FlashcardAttempt]] = relationship(

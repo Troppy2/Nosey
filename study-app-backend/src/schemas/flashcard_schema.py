@@ -17,6 +17,7 @@ class FlashcardCreate(BaseModel):
     front: str = Field(..., min_length=1)
     back: str = Field(..., min_length=1)
     source: str = Field(default="user_created", max_length=50)
+    topic: Optional[str] = Field(default=None, max_length=80)
 
 
 class FlashcardGenerateRequest(BaseModel):
@@ -92,6 +93,7 @@ class FlashcardResponse(BaseModel):
     front: str
     back: str
     source: Optional[str] = None
+    topic: Optional[str] = None
     difficulty: int
     created_at: datetime
     updated_at: datetime

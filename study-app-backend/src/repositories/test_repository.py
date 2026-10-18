@@ -183,6 +183,7 @@ class TestRepository(BaseRepository[Test]):
         part_label: Optional[str] = None,
         answer_from_sheet: bool = False,
         reference_solution: Optional[str] = None,
+        topic: Optional[str] = None,
     ) -> Question:
         question = Question(
             test_id=test_id,
@@ -194,6 +195,7 @@ class TestRepository(BaseRepository[Test]):
             part_label=part_label,
             answer_from_sheet=answer_from_sheet,
             reference_solution=reference_solution or None,
+            topic=topic,
         )
         self.session.add(question)
         await self.session.flush()
@@ -209,7 +211,8 @@ class TestRepository(BaseRepository[Test]):
         return question
 
     async def add_tf_question(
-        self, test_id: int, text: str, display_order: int, correct_answer: bool
+        self, test_id: int, text: str, display_order: int, correct_answer: bool,
+        topic: Optional[str] = None,
     ) -> Question:
         """True/False: stored as two MCQOptions ("True"/"False"), one marked correct."""
         question = Question(
@@ -217,6 +220,7 @@ class TestRepository(BaseRepository[Test]):
             question_text=text,
             question_type="TF",
             display_order=display_order,
+            topic=topic,
         )
         self.session.add(question)
         await self.session.flush()
@@ -225,7 +229,8 @@ class TestRepository(BaseRepository[Test]):
         return question
 
     async def add_ms_question(
-        self, test_id: int, text: str, display_order: int, options: list[tuple[str, bool]]
+        self, test_id: int, text: str, display_order: int, options: list[tuple[str, bool]],
+        topic: Optional[str] = None,
     ) -> Question:
         """Multiple Select: MCQOptions with one OR MORE marked correct."""
         question = Question(
@@ -233,6 +238,7 @@ class TestRepository(BaseRepository[Test]):
             question_text=text,
             question_type="MS",
             display_order=display_order,
+            topic=topic,
         )
         self.session.add(question)
         await self.session.flush()
@@ -243,7 +249,8 @@ class TestRepository(BaseRepository[Test]):
         return question
 
     async def add_rank_question(
-        self, test_id: int, text: str, display_order: int, items_in_correct_order: list[str]
+        self, test_id: int, text: str, display_order: int, items_in_correct_order: list[str],
+        topic: Optional[str] = None,
     ) -> Question:
         """Ranking: MCQOptions whose display_order ENCODES the correct sequence.
 
@@ -255,6 +262,7 @@ class TestRepository(BaseRepository[Test]):
             question_text=text,
             question_type="RANK",
             display_order=display_order,
+            topic=topic,
         )
         self.session.add(question)
         await self.session.flush()
@@ -275,6 +283,7 @@ class TestRepository(BaseRepository[Test]):
         part_label: Optional[str] = None,
         answer_from_sheet: bool = False,
         reference_solution: Optional[str] = None,
+        topic: Optional[str] = None,
     ) -> Question:
         question = Question(
             test_id=test_id,
@@ -286,6 +295,7 @@ class TestRepository(BaseRepository[Test]):
             part_label=part_label,
             answer_from_sheet=answer_from_sheet,
             reference_solution=reference_solution or None,
+            topic=topic,
         )
         self.session.add(question)
         await self.session.flush()
@@ -388,6 +398,7 @@ async def add_generated_questions(repo: TestRepository, test_id: int, mcq: list,
         sheet = {
             "answer_from_sheet": bool(getattr(item, "answer_from_sheet", False)),
             "reference_solution": getattr(item, "solution", "") or None,
+            "topic": getattr(item, "topic", None),
         }
         if kind == "mcq":
             options = [(text, index == item.correct_index) for index, text in enumerate(item.options)]

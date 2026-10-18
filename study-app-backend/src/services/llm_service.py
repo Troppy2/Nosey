@@ -22,6 +22,7 @@ from src.services.lc_taxonomy import (
     canonical_topic,
 )
 from src.services.rag_service import HybridRAGService
+from src.utils.topics import normalize_topic
 from src.utils.logger import get_logger
 from src.utils.lesson_blocks import normalize_tts_script, numbered_blocks, split_lesson_blocks, tts_entry_count
 from src.utils.latex_utils import format_final_answer as _format_final_answer, normalize_latex, replace_tikz
@@ -154,6 +155,14 @@ def _gemini_headers() -> dict[str, str]:
     }
 
 
+# Asked of every generation prompt so folder stats can group answers by topic.
+_TOPIC_TAG_RULE = (
+    'TOPIC TAG: give every item a "topic": the concept it tests, 2 to 4 plain words '
+    '(e.g. "Cell Respiration", "Supply and Demand"). Items on the same concept share '
+    "the exact same topic name.\n"
+)
+
+
 @dataclass(frozen=True)
 class GeneratedMCQ:
     question_text: str
@@ -174,6 +183,8 @@ class GeneratedMCQ:
     # official, and solution holds the sheet's worked solution / marking points.
     answer_from_sheet: bool = False
     solution: str = ""
+    # Short topic name for folder stats (migration 071); None when untagged.
+    topic: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -191,6 +202,7 @@ class GeneratedFRQ:
     seq: Optional[int] = None
     answer_from_sheet: bool = False
     solution: str = ""
+    topic: Optional[str] = None
 
 
 def _practice_item_position(item: dict) -> dict[str, object]:
@@ -311,6 +323,7 @@ _MULTIPART_PART_CAP = 12
 class GeneratedTF:
     question_text: str
     correct_answer: bool
+    topic: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -318,18 +331,21 @@ class GeneratedMS:
     question_text: str
     options: list[str]
     correct_indices: list[int]
+    topic: Optional[str] = None
 
 
 @dataclass(frozen=True)
 class GeneratedRank:
     question_text: str
     items_in_correct_order: list[str]
+    topic: Optional[str] = None
 
 
 @dataclass(frozen=True)
 class GeneratedFlashcard:
     front: str
     back: str
+    topic: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -1634,8 +1650,9 @@ class LLMService:
             f"DIFFICULTY: {difficulty_map.get(difficulty, difficulty_map['mixed'])}\n"
             f"{topic_line}{math_line}\n"
             f"{self._student_instructions_block(custom_instructions)}"
+            f"{_TOPIC_TAG_RULE}"
             "Return ONLY valid JSON, no markdown, exactly this shape:\n"
-            '{"problems": [{"setup": "...", "parts": [{"question_text": "...", "expected_answer": "..."}, '
+            '{"problems": [{"setup": "...", "topic": "...", "parts": [{"question_text": "...", "expected_answer": "..."}, '
             '{"question_text": "...", "expected_answer": "..."}]}]}\n\n'
             f"STUDY NOTES:\n{self._strip_metadata(notes)[:self._context_budget(custom_instructions)[0]]}"
         )
@@ -1666,6 +1683,7 @@ class LLMService:
             if len(parts) < 2:
                 continue
             number += 1
+            topic = normalize_topic(problem.get("topic"))
             for index, (text, answer) in enumerate(parts):
                 out.append(GeneratedFRQ(
                     question_text=text,
@@ -1675,6 +1693,7 @@ class LLMService:
                     group_label=str(number),
                     group_stem=setup[:8_000],
                     seq=len(out),
+                    topic=topic,
                 ))
             if len(out) >= part_count:
                 break
@@ -1706,7 +1725,7 @@ class LLMService:
                 f"- Generate exactly {count_tf} true/false statements. Each must be clearly true "
                 "or clearly false based on the source. Avoid trick wording."
             )
-            example_keys.append('"tf": [{"question_text": "...", "correct_answer": true}]')
+            example_keys.append('"tf": [{"question_text": "...", "correct_answer": true, "topic": "..."}]')
         if count_ms > 0:
             sections.append(
                 f"- Generate exactly {count_ms} multiple-select questions. Each has 4 to 6 options "
@@ -1714,7 +1733,7 @@ class LLMService:
                 "correct option."
             )
             example_keys.append(
-                '"ms": [{"question_text": "...", "options": ["a","b","c","d"], "correct_indices": [0,2]}]'
+                '"ms": [{"question_text": "...", "options": ["a","b","c","d"], "correct_indices": [0,2], "topic": "..."}]'
             )
         if count_rank > 0:
             sections.append(
@@ -1723,7 +1742,7 @@ class LLMService:
                 "(e.g. 'Order these steps from first to last')."
             )
             example_keys.append(
-                '"rank": [{"question_text": "...", "items": ["first","second","third"]}]'
+                '"rank": [{"question_text": "...", "items": ["first","second","third"], "topic": "..."}]'
             )
 
         rules = "\n".join(sections)
@@ -1736,6 +1755,7 @@ class LLMService:
             "\nQUESTION REQUIREMENTS:\n"
             f"{rules}\n\n"
             f"{self._student_instructions_block(custom_instructions)}"
+            f"{_TOPIC_TAG_RULE}"
             "CRITICAL: Return ONLY valid JSON, no markdown, no text before or after. "
             "Include only the keys you were asked to generate. "
             "Response must match EXACTLY this shape:\n"
@@ -1770,7 +1790,7 @@ class LLMService:
                 else:
                     continue
                 if question_text:
-                    tf.append(GeneratedTF(question_text=question_text, correct_answer=correct))
+                    tf.append(GeneratedTF(question_text=question_text, correct_answer=correct, topic=normalize_topic(item.get("topic"))))
                 if len(tf) >= count_tf:
                     break
 
@@ -1788,7 +1808,7 @@ class LLMService:
                 # Require a real multiple-select: at least 3 options and 2..len-1 correct.
                 if len(options) < 3 or len(indices) < 2 or len(indices) >= len(options):
                     continue
-                ms.append(GeneratedMS(question_text=question_text, options=options, correct_indices=indices))
+                ms.append(GeneratedMS(question_text=question_text, options=options, correct_indices=indices, topic=normalize_topic(item.get("topic"))))
                 if len(ms) >= count_ms:
                     break
 
@@ -1804,7 +1824,7 @@ class LLMService:
                 # Need at least 3 distinct items to be a meaningful ordering.
                 if len(items) < 3 or len(set(items)) != len(items):
                     continue
-                rank.append(GeneratedRank(question_text=question_text, items_in_correct_order=items))
+                rank.append(GeneratedRank(question_text=question_text, items_in_correct_order=items, topic=normalize_topic(item.get("topic"))))
                 if len(rank) >= count_rank:
                     break
 
@@ -1973,9 +1993,10 @@ class LLMService:
             f"{frq_instructions}\n"
             f"{self._code_formatting_guidance()}\n"
             f"{self._student_instructions_block(custom_instructions)}"
+            f"{_TOPIC_TAG_RULE}"
             "CRITICAL: Return ONLY valid JSON. No markdown, no text before or after.\n"
             "Response must be EXACTLY this format:\n"
-            '{"mcq": [{"question_text": "...", "options": ["a", "b", "c", "d"], "correct_index": 0}], "frq": [{"question_text": "...", "expected_answer": "..."}]}\n'
+            '{"mcq": [{"question_text": "...", "options": ["a", "b", "c", "d"], "correct_index": 0, "topic": "..."}], "frq": [{"question_text": "...", "expected_answer": "...", "topic": "..."}]}\n'
         )
 
     def _build_source_context_generation_prompt(
@@ -2031,9 +2052,10 @@ class LLMService:
             f"{frq_instructions}\n"
             f"{self._code_formatting_guidance()}\n"
             f"{self._student_instructions_block(custom_instructions)}"
+            f"{_TOPIC_TAG_RULE}"
             "CRITICAL: Return ONLY valid JSON. No markdown, no text before or after.\n"
             "Response must be EXACTLY this format:\n"
-            '{"mcq": [{"question_text": "...", "options": ["a", "b", "c", "d"], "correct_index": 0}], "frq": [{"question_text": "...", "expected_answer": "..."}]}\n'
+            '{"mcq": [{"question_text": "...", "options": ["a", "b", "c", "d"], "correct_index": 0, "topic": "..."}], "frq": [{"question_text": "...", "expected_answer": "...", "topic": "..."}]}\n'
         )
 
     async def parse_practice_test(
@@ -4333,6 +4355,7 @@ Return JSON only with these exact keys:
         existing_flashcards: Optional[list[str]] = None,
         provider: Optional[str] = None,
         enable_fallback: bool = True,
+        known_topics: Optional[list[str]] = None,
     ) -> list[GeneratedFlashcard]:
         existing_flashcards = [item.strip() for item in (existing_flashcards or []) if item and item.strip()]
         existing_block = ""
@@ -4344,7 +4367,9 @@ Return JSON only with these exact keys:
             )
         llm_prompt = (
             f"Generate {count} flashcards that are new, specific, and clearly different from any existing cards. Return JSON only with key flashcards, "
-            "an array of objects with front and back.\n"
+            "an array of objects with front, back and topic.\n"
+            f"{_TOPIC_TAG_RULE}"
+            f"{self._known_topics_block(known_topics)}"
             f"{existing_block}"
             f"TOPIC: {prompt or 'Use the provided study content'}\nCONTENT:\n{content[:12000]}"
         )
@@ -7924,6 +7949,7 @@ Return only the JSON object."""
             question_text=self._strip_source_references(normalize_latex(str(item.get("question_text", "Study question")))),  # type: ignore[union-attr]
             options=options,
             correct_index=index,
+            topic=normalize_topic(item.get("topic")),  # type: ignore[union-attr]
         )
 
     def _build_frq_from_item(self, item: object, math_mode: bool = False) -> Optional[GeneratedFRQ]:
@@ -7935,6 +7961,7 @@ Return only the JSON object."""
         return GeneratedFRQ(
             question_text=self._strip_source_references(normalize_latex(str(item.get("question_text", "")).strip())),  # type: ignore[union-attr]
             expected_answer=self._strip_source_references(normalize_latex(str(item.get("expected_answer", "")).strip())),  # type: ignore[union-attr]
+            topic=normalize_topic(item.get("topic")),  # type: ignore[union-attr]
         )
 
     def _parse_generated_test(
@@ -8350,12 +8377,24 @@ Return only the JSON object."""
             for index in range(count)
         ]
 
+    @staticmethod
+    def _known_topics_block(known_topics: Optional[list[str]]) -> str:
+        """The folder's existing topic names, so new tags reuse them."""
+        names = [t for t in (known_topics or []) if t][:40]
+        if not names:
+            return ""
+        return "EXISTING TOPICS IN THIS FOLDER (reuse one of these names when it fits): " + "; ".join(names) + "\n"
+
     def _parse_generated_flashcards(self, data: dict[str, object]) -> list[GeneratedFlashcard]:
         cards = data.get("flashcards", [])
         if not isinstance(cards, list):
             raise ValueError("flashcards was not a list")
         return [
-            GeneratedFlashcard(front=str(card.get("front", "")).strip(), back=str(card.get("back", "")).strip())
+            GeneratedFlashcard(
+                front=str(card.get("front", "")).strip(),
+                back=str(card.get("back", "")).strip(),
+                topic=normalize_topic(card.get("topic")),
+            )
             for card in cards
             if isinstance(card, dict) and card.get("front") and card.get("back")
         ]

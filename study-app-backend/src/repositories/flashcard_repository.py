@@ -8,8 +8,10 @@ from typing import Optional
 
 
 class FlashcardRepository(BaseRepository[Flashcard]):
-    async def create(self, folder_id: int, front: str, back: str, source: Optional[str]) -> Flashcard:
-        flashcard = Flashcard(folder_id=folder_id, front=front, back=back, source=source)
+    async def create(
+        self, folder_id: int, front: str, back: str, source: Optional[str], topic: Optional[str] = None
+    ) -> Flashcard:
+        flashcard = Flashcard(folder_id=folder_id, front=front, back=back, source=source, topic=topic)
         self.session.add(flashcard)
         await self.session.flush()
         return flashcard
@@ -22,6 +24,20 @@ class FlashcardRepository(BaseRepository[Flashcard]):
         self.session.add_all(cards)
         await self.session.flush()
         return cards
+
+    async def list_topics(self, folder_id: int) -> list[str]:
+        """Distinct topic names already used in a folder, flashcards and test questions."""
+        from src.models.question import Question
+        from src.models.test import Test
+
+        card_topics = select(Flashcard.topic).where(Flashcard.folder_id == folder_id, Flashcard.topic.is_not(None))
+        question_topics = (
+            select(Question.topic)
+            .join(Test, Test.id == Question.test_id)
+            .where(Test.folder_id == folder_id, Question.topic.is_not(None))
+        )
+        rows = await self.session.scalars(card_topics.union(question_topics))
+        return sorted({t for t in rows if t}, key=str.lower)
 
     async def get(self, flashcard_id: int) -> Optional[Flashcard]:
         return await self.session.scalar(select(Flashcard).where(Flashcard.id == flashcard_id))
