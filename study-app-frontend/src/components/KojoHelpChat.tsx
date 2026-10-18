@@ -238,7 +238,7 @@ export function KojoHelpChat({
     <>
       {!isFullscreen && <div className="kojo-backdrop" onClick={onClose} aria-hidden="true" />}
       <div
-        className={`kojo-panel${isFullscreen ? " kojo-panel--fullscreen" : ""}`}
+        className={`kojo-panel kojo-panel--help${isFullscreen ? " kojo-panel--fullscreen" : ""}`}
         role="dialog"
         aria-label="Ask Kojo"
       >
@@ -370,15 +370,11 @@ export function KojoHelpChat({
             <ArrowDown size={16} />
           </button>
 
-          <p className={`kojo-input-label${disabled && disabledNote ? " kojo-input-label--locked" : ""}`}>
-            {disabled && disabledNote ? (
-              <>
-                <Lock size={11} /> {disabledNote}
-              </>
-            ) : (
-              "Message Kojo"
-            )}
-          </p>
+          {disabled && disabledNote ? (
+            <p className="kojo-input-label kojo-input-label--locked">
+              <Lock size={11} /> {disabledNote}
+            </p>
+          ) : null}
           <div className={isFullscreen ? "kojo-input-row" : undefined}>
             <div className="kojo-input-wrap">
               <textarea
