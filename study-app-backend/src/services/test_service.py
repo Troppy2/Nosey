@@ -513,6 +513,7 @@ class TestService:
                 created_at=test.created_at,
                 generation_status=test.generation_status,
                 generation_error=test.generation_error,
+                kind=test.kind,
             )
             for test, question_count, best_score, attempt_count in rows
         ]
@@ -531,6 +532,7 @@ class TestService:
                 created_at=test.created_at,
                 generation_status=test.generation_status,
                 generation_error=test.generation_error,
+                kind=test.kind,
             )
             for test, question_count, best_score, attempt_count in rows
         ]

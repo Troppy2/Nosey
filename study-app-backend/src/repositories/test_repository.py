@@ -33,6 +33,7 @@ class TestRepository(BaseRepository[Test]):
         is_coding_mode: bool = False,
         coding_language: Optional[str] = None,
         notes_hash: Optional[str] = None,
+        kind: Optional[str] = None,
     ) -> Test:
         test = Test(
             folder_id=folder_id,
@@ -43,6 +44,7 @@ class TestRepository(BaseRepository[Test]):
             is_coding_mode=is_coding_mode,
             coding_language=coding_language,
             notes_hash=notes_hash,
+            kind=kind,
         )
         self.session.add(test)
         await self.session.flush()

@@ -117,6 +117,8 @@ class TestSummary(BaseModel):
     created_at: datetime
     generation_status: str = "ready"
     generation_error: Optional[str] = None
+    # "daily" for the folder's daily weak-spot quiz, else None (migration 072).
+    kind: Optional[str] = None
 
 
 class RegenerateTestRequest(BaseModel):

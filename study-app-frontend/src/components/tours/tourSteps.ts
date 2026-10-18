@@ -83,6 +83,13 @@ export const TOURS: Record<TourId, TourDef> = {
         align: "end",
       },
       {
+        element: t("folder-stats"),
+        title: "See how you are doing",
+        body: "Your scores, weak topics and strong topics live here. Once a day, Kojo can build a quick quiz that hits your weak spots.",
+        side: "top",
+        align: "start",
+      },
+      {
         element: t("folder-flashcards"),
         title: "Flashcards",
         body: "Generate cards from your notes or write your own.",

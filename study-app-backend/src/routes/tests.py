@@ -2,6 +2,7 @@ import asyncio
 import json
 import hashlib
 import time
+from datetime import timedelta
 from typing import Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -37,7 +38,17 @@ from src.schemas.test_schema import (
     TestUpdate,
     WeaknessResponse,
 )
+from src.schemas.folder_stats_schema import DailyQuizRequest, DailyQuizResponse
 from src.services.file_service import PARSE_DEADLINE_S, FileService
+from src.services.folder_stats_service import (
+    DAILY_FRQ,
+    DAILY_MCQ,
+    DAILY_QUIZ_KIND,
+    FolderStatsService,
+    local_day_window,
+    plan_daily_quiz,
+    todays_quiz,
+)
 from src.services.grading_service import GradingService
 from src.services.kojo_context_cache import invalidate_folder
 from src.services.llm_service import GeneratedFRQ, GeneratedMCQ, LLMService, practice_part_label
@@ -1284,6 +1295,96 @@ async def create_test(
                 remove_temp(path)
             if practice_test_path is not None:
                 remove_temp(practice_test_path[0])
+
+
+@router.post("/folders/{folder_id}/daily-quiz", response_model=DailyQuizResponse)
+@limiter.limit("5/minute")
+async def create_daily_quiz(
+    folder_id: int,
+    data: DailyQuizRequest,
+    request: Request,
+    response: Response,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> DailyQuizResponse:
+    """One weak-spot quiz per folder per local day.
+
+    Today's quiz already exists: return it (the student retakes it, no new LLM
+    call). Otherwise build 10 questions from the folder's notes, about 70% on
+    weak topics and 30% on strong ones, through the normal generation task.
+    """
+    try:
+        folder = await session.scalar(select(Folder).where(Folder.id == folder_id, Folder.user_id == user.id))
+        if folder is None:
+            raise ResourceNotFoundException("Folder")
+        existing = await todays_quiz(session, folder_id, user.id, data.tz_offset_minutes)
+        if existing is not None:
+            return DailyQuizResponse(
+                test_id=existing.test_id, generation_status=existing.generation_status, created=False
+            )
+        stats = await FolderStatsService().get_stats(folder_id, user.id, session, data.tz_offset_minutes)
+        plan = plan_daily_quiz(stats.topics)
+        if plan is None:
+            raise StudyAppException(
+                "Take a test or review some flashcards in this folder first, so Kojo knows what to quiz you on."
+            )
+        folder_file_count = await session.scalar(
+            select(func.count()).select_from(FolderFile).where(FolderFile.folder_id == folder_id)
+        )
+        if not folder_file_count:
+            raise StudyAppException("Add notes to this folder so Kojo has something to build your quiz from.")
+
+        instructions = plan.instructions()
+        if folder.test_instructions:
+            instructions = f"{folder.test_instructions.strip()}\n\n{instructions}"
+        provider = resolve_request_provider(user, None)
+        quota_charge_id = await QuotaService().charge_test(session, user)
+        bind_usage(user.id, "test_generation")
+
+        start, _ = local_day_window(data.tz_offset_minutes)
+        local_day = start - timedelta(minutes=data.tz_offset_minutes)
+        test = await TestRepository(session).create(
+            folder_id,
+            f"Daily Quiz, {local_day.strftime('%b')} {local_day.day}",
+            "mixed",
+            "Your daily weak-spot practice: " + ", ".join(plan.focus),
+            kind=DAILY_QUIZ_KIND,
+        )
+        test.generation_status = "generating"
+        test.expected_question_count = DAILY_MCQ + DAILY_FRQ
+        await session.commit()
+
+        _spawn_generation(
+            _extract_and_generate_background(
+                test_id=test.id,
+                user_id=user.id,
+                folder_id=folder_id,
+                notes_paths=[],
+                practice_test_path=None,
+                use_folder_files=True,
+                avoid_repeat=True,
+                test_type="mixed",
+                count_mcq=DAILY_MCQ,
+                count_frq=DAILY_FRQ,
+                is_math_mode=False,
+                difficulty="mixed",
+                topic_focus=None,
+                is_coding_mode=False,
+                coding_language="Python",
+                custom_instructions=instructions[:_CUSTOM_INSTRUCTIONS_MAX],
+                provider=provider,
+                enable_fallback=True,
+                count_tf=0,
+                count_ms=0,
+                count_rank=0,
+                quota_charge_id=quota_charge_id,
+            )
+        )
+        return DailyQuizResponse(test_id=test.id, generation_status="generating", created=True)
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except StudyAppException as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/tests/{test_id}/regenerate", response_model=CreateTestResponse)

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Iterable, Optional
 
 from sqlalchemy import or_, select
@@ -22,12 +22,14 @@ from src.models.test import Test
 from src.models.user_answer import UserAnswer
 from src.models.user_attempt import UserAttempt
 from src.repositories.folder_repository import FolderRepository
+from src.utils.time import utcnow_naive
 from src.schemas.attempt_schema import OCR_STATUS_NEEDS_INPUT
 from src.schemas.folder_stats_schema import (
     Encouragement,
     FolderStatsResponse,
     MissedTopic,
     ScorePoint,
+    TodayQuiz,
     TopicStat,
     TopicStatus,
 )
@@ -42,6 +44,12 @@ STRONG_FROM = 0.80
 # A latest score this many points above / below the recent average.
 TREND_POINTS = 5.0
 TREND_LOOKBACK = 3
+# Daily quiz: 10 questions, about 70% on weak topics and 30% on strong ones.
+DAILY_QUIZ_KIND = "daily"
+DAILY_MCQ = 8
+DAILY_FRQ = 2
+DAILY_WEAK_SHARE = 7
+DAILY_TOPICS_PER_SIDE = 4
 
 
 @dataclass(frozen=True)
@@ -118,8 +126,89 @@ def missed_topics(rows: Iterable[tuple[Optional[str], bool]]) -> list[MissedTopi
     return out
 
 
+def local_day_window(tz_offset_minutes: int, now: Optional[datetime] = None) -> tuple[datetime, datetime]:
+    """[start, end) of the user's local calendar day, as naive UTC (how rows are stored)."""
+    now = now or utcnow_naive()
+    offset = timedelta(minutes=tz_offset_minutes)
+    local_now = now - offset
+    local_start = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    start = local_start + offset
+    return start, start + timedelta(days=1)
+
+
+@dataclass(frozen=True)
+class DailyQuizPlan:
+    focus: list[str]
+    review: list[str]
+
+    def instructions(self) -> str:
+        """Custom instructions for the generator: which topics, in what proportion."""
+        review_count = 10 - DAILY_WEAK_SHARE if self.review else 0
+        focus_count = 10 - review_count
+        lines = [
+            "This is the student's daily practice quiz. It targets the topics they find hardest.",
+            f"- About {focus_count} of the 10 questions must cover these topics: {'; '.join(self.focus)}.",
+        ]
+        if self.review:
+            lines.append(
+                f"- The other {review_count} questions are a quick review of topics they already know: "
+                f"{'; '.join(self.review)}."
+            )
+        lines.append("- Use each topic name above exactly as written for the question's topic tag.")
+        return "\n".join(lines)
+
+
+def plan_daily_quiz(topics: list[TopicStat]) -> Optional[DailyQuizPlan]:
+    """Weak topics first (lowest accuracy), topped up with the next weakest; strong ones for review.
+
+    None when the folder has no topic data yet.
+    """
+    if not topics:
+        return None
+    weak = sorted((t for t in topics if t.status == "weak"), key=lambda t: t.accuracy)
+    rest = sorted((t for t in topics if t.status in ("neutral", "new")), key=lambda t: t.accuracy)
+    strong = sorted((t for t in topics if t.status == "strong"), key=lambda t: t.accuracy)
+    focus = (weak + rest)[:DAILY_TOPICS_PER_SIDE]
+    if not focus:
+        # Everything is strong: practice the least strong ones.
+        focus, strong = strong[:DAILY_TOPICS_PER_SIDE], strong[DAILY_TOPICS_PER_SIDE:]
+    review = [t for t in strong if t not in focus][:DAILY_TOPICS_PER_SIDE]
+    return DailyQuizPlan(focus=[t.topic for t in focus], review=[t.topic for t in review])
+
+
+async def todays_quiz(
+    session: AsyncSession, folder_id: int, user_id: int, tz_offset_minutes: int
+) -> Optional[TodayQuiz]:
+    """The newest daily quiz made today in the user's local day, skipping failed ones."""
+    start, end = local_day_window(tz_offset_minutes)
+    test = await session.scalar(
+        select(Test)
+        .where(
+            Test.folder_id == folder_id,
+            Test.kind == DAILY_QUIZ_KIND,
+            Test.generation_status != "failed",
+            Test.created_at >= start,
+            Test.created_at < end,
+        )
+        .order_by(Test.created_at.desc())
+        .limit(1)
+    )
+    if test is None:
+        return None
+    completed = await session.scalar(
+        select(UserAttempt.id).where(
+            UserAttempt.test_id == test.id,
+            UserAttempt.user_id == user_id,
+            UserAttempt.status == "submitted",
+        ).limit(1)
+    )
+    return TodayQuiz(test_id=test.id, generation_status=test.generation_status, completed=completed is not None)
+
+
 class FolderStatsService:
-    async def get_stats(self, folder_id: int, user_id: int, session: AsyncSession) -> FolderStatsResponse:
+    async def get_stats(
+        self, folder_id: int, user_id: int, session: AsyncSession, tz_offset_minutes: int = 0
+    ) -> FolderStatsResponse:
         if await FolderRepository(session).get_owned(folder_id, user_id) is None:
             raise ResourceNotFoundException("Folder")
 
@@ -176,4 +265,5 @@ class FolderStatsService:
             score_progression=progression,
             topics=summarize_topics(marks),
             encouragement=encouragement_for(scores),
+            today_quiz=await todays_quiz(session, folder_id, user_id, tz_offset_minutes),
         )
