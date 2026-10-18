@@ -204,6 +204,48 @@ export function SkeletonTestRows({
 }
 
 /**
+ * Folder Stats stand-in, built from the same card shells as the loaded panel
+ * (banner, three tiles, chart card, weak / strong cards) so nothing jumps
+ * when the data lands. Bars sit where the text will.
+ */
+export function SkeletonFolderStats() {
+  return (
+    <div className="folder-stats folder-stats--loading" role="status" aria-label="Loading your stats">
+      <div className="folder-stats-message">
+        <Skeleton width="34%" height="1.05rem" />
+        <Skeleton width="62%" height="0.8rem" />
+      </div>
+      <div className="folder-stats-tiles">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="card card-soft folder-stats-tile">
+            <Skeleton width="58%" height="0.8rem" />
+            <Skeleton width="32%" height="1.7rem" />
+          </div>
+        ))}
+      </div>
+      <div className="card card-plain folder-stats-chart-card">
+        <Skeleton width="30%" height="0.95rem" />
+        <div className="folder-stats-skel-chart">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} width="100%" height="2px" />
+          ))}
+        </div>
+      </div>
+      <div className="folder-stats-topics">
+        {[0, 1].map((i) => (
+          <div key={i} className="card card-plain folder-stats-topic-card">
+            <Skeleton width="40%" height="0.95rem" />
+            <Skeleton width="30%" height="0.85rem" />
+            <Skeleton width="100%" height="6px" />
+            <Skeleton width="22%" height="0.75rem" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Results page stand-in, shaped like what lands there: the green score hero
  * with its huge centered number, the three-up stat row, then the answer list.
  * The hero keeps its soft green wash so the page reads as Results even while

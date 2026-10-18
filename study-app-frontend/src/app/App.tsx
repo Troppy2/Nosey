@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Sidebar } from "../components/Sidebar";
 import WaitingScreen from "../components/WaitingScreen";
@@ -37,6 +37,8 @@ import MockInterviewSummary from "../pages/MockInterviewSummary";
 import MockInterviewHistory from "../pages/MockInterviewHistory";
 import QuestionEditor from "../pages/QuestionEditor";
 import Results from "../pages/Results";
+// Dev-only icon review sheet (custom icon set); tree-shaken from prod builds.
+const IconReviewSheet = import.meta.env.DEV ? lazy(() => import("../icons/IconReviewSheet")) : null;
 import TakeTest from "../pages/TakeTest";
 import AdminPanel from "../pages/AdminPanel";
 import Settings from "../pages/Settings";
@@ -107,6 +109,7 @@ export default function App() {
           <Route path="/test/:testId" element={<TakeTest />} />
           <Route path="/test/:testId/edit" element={<QuestionEditor />} />
           <Route path="/results/:attemptId" element={<Results />} />
+          {IconReviewSheet ? <Route path="/__icons" element={<Suspense fallback={null}><IconReviewSheet /></Suspense>} /> : null}
           <Route path="/flashcards" element={<LearningModes />} />
           <Route path="/flashcards/:folderId" element={<LearningModes />} />
           <Route path="/flashcards/:folderId/review" element={<Flashcards />} />

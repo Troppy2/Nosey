@@ -1,0 +1,52 @@
+/* Import once at the app root. Default spec: soft & friendly. */
+:root {
+  --icon-stroke: 2;
+  --icon-nudge-dur: 160ms;
+  --icon-fill-dur: 200ms;
+  --icon-ease: cubic-bezier(0.3, 0, 0, 1);
+}
+
+.icon { overflow: visible; }
+
+/* Fill layers: invisible at rest */
+.icon .icon-fill { fill-opacity: 0; transition: fill-opacity var(--icon-fill-dur) var(--icon-ease); }
+.icon .icon-detail { stroke-opacity: 1; transition: stroke-opacity var(--icon-fill-dur) var(--icon-ease); }
+.icon .icon-fill-solid { fill: currentColor; stroke: none; }
+
+/* Movable parts */
+.icon [class*="icon-part-"] {
+  transform-box: view-box;
+  transition: transform var(--icon-nudge-dur) var(--icon-ease);
+}
+
+/* Active → filled */
+:is([aria-pressed="true"], [aria-selected="true"], [aria-current]:not([aria-current="false"])) .icon .icon-fill,
+.icon[data-active] .icon-fill { fill-opacity: 1; }
+:is([aria-pressed="true"], [aria-selected="true"], [aria-current]:not([aria-current="false"])) .icon .icon-detail,
+.icon[data-active] .icon-detail { stroke-opacity: 0; }
+
+/* ── Per-icon nudges (add one block per icon that has a nudge) ── */
+/* Hover targets: a control around the icon, or a stat tile / card that holds it. */
+.icon-tests-taken .icon-part-back { transform-origin: 12px 4px; }
+:is(button, a, [role="button"], [role="tab"], .icon-hover):is(:hover, :focus-visible) .icon-tests-taken .icon-part-back {
+  transform: translateY(-1px);
+}
+
+.icon-score-rise .icon-part-top { transform-origin: 16px 15px; }
+:is(button, a, [role="button"], [role="tab"], .icon-hover):is(:hover, :focus-visible) .icon-score-rise .icon-part-top {
+  transform: translateY(-1px);
+}
+
+.icon-crown .icon-part-crown { transform-origin: 12px 18px; }
+:is(button, a, [role="button"], [role="tab"], .icon-hover):is(:hover, :focus-visible) .icon-crown .icon-part-crown {
+  transform: rotate(-6deg);
+}
+
+.icon-sprout .icon-part-leaves { transform-origin: 12px 15px; }
+:is(button, a, [role="button"], [role="tab"], .icon-hover):is(:hover, :focus-visible) .icon-sprout .icon-part-leaves {
+  transform: rotate(6deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon, .icon * { transition: none !important; animation: none !important; }
+}

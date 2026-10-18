@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -22,6 +22,9 @@ class FolderUpdate(BaseModel):
     kojo_persona: Optional[str] = Field(default=None, max_length=32)
     is_archived: Optional[bool] = None
     avoid_repeat_questions: Optional[bool] = None
+    default_view: Optional[Literal["stats", "flashcards"]] = None
+    # "" clears it. Same cap as Create Test's custom instructions.
+    test_instructions: Optional[str] = Field(default=None, max_length=10_000)
 
 
 class FolderResponse(BaseModel):
@@ -37,6 +40,8 @@ class FolderResponse(BaseModel):
     kojo_persona: Optional[str] = None
     is_archived: bool = False
     avoid_repeat_questions: bool = False
+    default_view: str = "stats"
+    test_instructions: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     test_count: int = 0
