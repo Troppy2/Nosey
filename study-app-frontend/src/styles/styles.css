@@ -29237,8 +29237,9 @@ a.sd-chip.is-done:hover {
   gap: 14px;
 }
 
+/* Weak = still growing: amber, not error red. */
 .folder-stats-topic-card--weak .folder-stats-heading svg {
-  color: var(--error);
+  color: var(--warning);
 }
 
 .folder-stats-topic-card--strong .folder-stats-heading svg {
@@ -29287,7 +29288,7 @@ a.sd-chip.is-done:hover {
 }
 
 .folder-stats-topic-card--weak .folder-stats-bar span {
-  background: var(--error);
+  background: var(--warning);
 }
 
 .sr-only {
@@ -29323,4 +29324,41 @@ a.sd-chip.is-done:hover {
   .folder-stats-topics {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* Folder Stats loading: same shells as the loaded panel. Bars use a
+   translucent ink wash so they sit naturally on the tinted tiles, the banner
+   and the white cards alike, instead of one flat grey-green. */
+.folder-stats--loading .skel {
+  display: block;
+  background: linear-gradient(90deg, rgba(113, 131, 85, 0.14) 30%, rgba(113, 131, 85, 0.06) 50%, rgba(113, 131, 85, 0.14) 70%);
+  background-size: 300% 100%;
+}
+
+.folder-stats--loading .folder-stats-message,
+.folder-stats--loading .folder-stats-tile,
+.folder-stats--loading .folder-stats-topic-card {
+  gap: 12px;
+}
+
+.folder-stats--loading .folder-stats-topic-card {
+  display: grid;
+}
+
+.folder-stats--loading .folder-stats-tile {
+  min-height: 118px;
+}
+
+/* The chart's three gridlines (100 / 50 / 0%), at the chart's own height. */
+.folder-stats-skel-chart {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 200px;
+  margin-top: 12px;
+  padding: 12px 12px 12px 40px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .folder-stats--loading .skel { animation: none; }
 }

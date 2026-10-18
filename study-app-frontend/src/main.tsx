@@ -6,6 +6,7 @@ import App from "./app/App";
 import "./styles/base.css";
 import "./styles/layout.css";
 import "./styles/styles.css";
+import "./icons/icons.css";
 import "./styles/components/mobile-shell.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

@@ -1,4 +1,4 @@
-import { Award, ClipboardList, Plus, Target, TrendingUp } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchFolderStats } from "../lib/api";
@@ -7,7 +7,8 @@ import type { FolderStats as FolderStatsData, ScorePoint, TopicStat } from "../l
 import { Button } from "./Button";
 import { Card } from "./Card";
 import { EmptyState } from "./EmptyState";
-import { Skeleton } from "./Skeletons";
+import { CrownIcon, ScoreRiseIcon, SproutIcon, TestsTakenIcon } from "../icons";
+import { SkeletonFolderStats } from "./Skeletons";
 
 // Shown above the stats, keyed on the backend's score trend. Always upbeat:
 // a dip is framed as "this is what practice is for", never as failure.
@@ -43,19 +44,14 @@ export function FolderStats({ folderId }: { folderId: number }) {
 
   if (error) return <p className="muted small">{error}</p>;
   if (!stats) {
-    return (
-      <div className="folder-stats" aria-busy="true" aria-label="Loading your stats">
-        <Skeleton height="64px" />
-        <Skeleton height="180px" />
-      </div>
-    );
+    return <SkeletonFolderStats />;
   }
 
   const message = ENCOURAGEMENT[stats.encouragement];
   if (stats.tests_taken === 0 && stats.topics.length === 0) {
     return (
       <EmptyState
-        icon={<TrendingUp />}
+        icon={<ScoreRiseIcon />}
         title={message.title}
         body={message.body}
         action={
@@ -79,17 +75,17 @@ export function FolderStats({ folderId }: { folderId: number }) {
       </div>
 
       <div className="folder-stats-tiles">
-        <Card tone="soft" className="folder-stats-tile">
-          <span className="folder-stats-tile-label"><ClipboardList size={16} /> Tests taken</span>
+        <Card tone="soft" className="folder-stats-tile icon-hover">
+          <span className="folder-stats-tile-label"><TestsTakenIcon size={18} /> Tests taken</span>
           <strong>{stats.tests_taken}</strong>
         </Card>
-        <Card tone="soft" className="folder-stats-tile">
-          <span className="folder-stats-tile-label"><TrendingUp size={16} /> Latest score</span>
+        <Card tone="soft" className="folder-stats-tile icon-hover">
+          <span className="folder-stats-tile-label"><ScoreRiseIcon size={18} /> Latest score</span>
           <strong>{pct(stats.latest_score)}</strong>
           <span className="muted small">Average {pct(stats.average_score)}</span>
         </Card>
-        <Card tone="soft" className="folder-stats-tile">
-          <span className="folder-stats-tile-label"><Award size={16} /> Topics mastered</span>
+        <Card tone="soft" className="folder-stats-tile icon-hover">
+          <span className="folder-stats-tile-label"><CrownIcon size={18} /> Topics mastered</span>
           <strong>{mastered}</strong>
           <span className="muted small">of {stats.topics.length} tracked</span>
         </Card>
@@ -125,9 +121,9 @@ export function FolderStats({ folderId }: { folderId: number }) {
 
 function TopicList({ title, tone, topics, empty }: { title: string; tone: "weak" | "strong"; topics: TopicStat[]; empty: string }) {
   return (
-    <Card className={`folder-stats-topic-card folder-stats-topic-card--${tone}`}>
+    <Card className={`folder-stats-topic-card folder-stats-topic-card--${tone} icon-hover`}>
       <h3 className="folder-stats-heading">
-        {tone === "weak" ? <Target size={16} /> : <Award size={16} />} {title}
+        {tone === "weak" ? <SproutIcon size={18} /> : <CrownIcon size={18} />} {title}
       </h3>
       {topics.length === 0 ? (
         <p className="muted small">{empty}</p>
