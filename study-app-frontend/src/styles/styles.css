@@ -16230,17 +16230,19 @@ a.lm-module-row:focus-visible {
   border-radius: var(--radius-xl);
 }
 
+/* Matches the live chat: Kojo replies are unboxed text, user turns are dark bubbles. */
 .skel-chat-bubble--kojo {
   width: min(72%, 420px);
-  background: rgba(255, 255, 255, 0.72);
-  border-bottom-left-radius: 4px;
+  padding: 4px 0;
+  border: none;
+  background: transparent;
 }
 
 .skel-chat-bubble--user {
   align-self: flex-end;
   width: min(52%, 300px);
-  background: var(--green-lightest);
-  border-bottom-right-radius: 4px;
+  border: none;
+  background: rgba(38, 48, 31, 0.14);
 }
 
 @media (max-width: 720px) {
