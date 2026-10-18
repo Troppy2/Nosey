@@ -29068,3 +29068,259 @@ a.sd-chip.is-done:hover {
   color: var(--green-dark);
   padding: 6px 0;
 }
+
+/* Folder page: Stats | Flashcards panel (folder stats chunk 4) */
+.segmented--text button {
+  width: auto;
+  height: 36px;
+  padding: 0 16px;
+  font-weight: 600;
+}
+
+.folder-panel-title {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* Matches the practice test rows below: 20px side padding, 14px gaps. */
+.folder-stats {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.folder-stats-message {
+  display: grid;
+  gap: 4px;
+  padding: 16px 20px;
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+}
+
+.folder-stats-message strong {
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+}
+
+.folder-stats-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.folder-stats-tile {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 18px 20px;
+  background: rgba(181, 201, 154, 0.3);
+  border: 1px solid var(--green-light-mid);
+  box-shadow: none;
+}
+
+.folder-stats-tile-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #596949;
+  font-size: 0.875rem;
+}
+
+.folder-stats-tile-label svg {
+  color: var(--green-dark);
+}
+
+.folder-stats-tile strong {
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: 1.9rem;
+  line-height: 1.1;
+}
+
+.folder-stats-chart-card,
+.folder-stats-topic-card {
+  padding: 18px 20px;
+}
+
+.folder-stats-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 1rem;
+  color: var(--ink);
+}
+
+.folder-stats-chart {
+  position: relative;
+  width: 100%;
+  height: 200px;
+}
+
+.folder-stats-chart svg {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: visible;
+}
+
+.folder-stats > *,
+.folder-stats-chart-card {
+  min-width: 0;
+}
+
+.folder-stats-grid {
+  stroke: var(--green-light-mid);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.folder-stats-axis {
+  fill: #7f8b6f;
+  font-size: 11px;
+}
+
+.folder-stats-line {
+  fill: none;
+  stroke: var(--green-dark);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.folder-stats-hit {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.folder-stats-dot {
+  fill: var(--green-dark);
+  stroke: var(--white);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.folder-stats-chart g:focus {
+  outline: none;
+}
+
+.folder-stats-tooltip {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  gap: 2px;
+  min-width: 160px;
+  max-width: 220px;
+  padding: 8px 10px;
+  font-size: 0.8rem;
+  color: var(--ink);
+  background: var(--white);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  transform: translate(-50%, calc(-100% - 12px));
+  pointer-events: none;
+}
+
+.folder-stats-tooltip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-stats-topics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.folder-stats-topic-card--weak .folder-stats-heading svg {
+  color: var(--error);
+}
+
+.folder-stats-topic-card--strong .folder-stats-heading svg {
+  color: var(--green-dark);
+}
+
+.folder-stats-topic-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.folder-stats-topic-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.folder-stats-topic-name {
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.folder-stats-topic-pct {
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.folder-stats-bar {
+  height: 6px;
+  margin: 6px 0 4px;
+  background: var(--green-lightest);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.folder-stats-bar span {
+  display: block;
+  height: 100%;
+  background: var(--green-dark);
+  border-radius: 999px;
+}
+
+.folder-stats-topic-card--weak .folder-stats-bar span {
+  background: var(--error);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 640px) {
+  .folder-stats-tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .folder-stats-tile {
+    padding: 12px;
+  }
+
+  .folder-stats-tile strong {
+    font-size: 1.4rem;
+  }
+
+  .folder-stats-tile-label {
+    font-size: 0.75rem;
+  }
+
+  .folder-stats-topics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

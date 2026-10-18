@@ -83,6 +83,10 @@ class FolderService:
             folder.is_archived = data.is_archived
         if data.avoid_repeat_questions is not None:
             folder.avoid_repeat_questions = data.avoid_repeat_questions
+        if data.default_view is not None:
+            folder.default_view = data.default_view
+        if data.test_instructions is not None:
+            folder.test_instructions = data.test_instructions.strip() or None
         try:
             await session.commit()
         except IntegrityError as exc:

@@ -32,6 +32,10 @@ class Folder(Base, TimestampMixin):
     kojo_persona: Mapped[Optional[str]] = mapped_column(String(32))
     is_archived: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     avoid_repeat_questions: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # Which panel the folder page opens on: "stats" or "flashcards" (migration 072).
+    default_view: Mapped[str] = mapped_column(String(16), nullable=False, default="stats", server_default="stats")
+    # Folder-level "how Kojo makes tests"; Create Test prefills custom instructions with it.
+    test_instructions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # How it was made: "mcp" when an AI app created it through the connector,
     # NULL for everything made in Nosey. Analytics/debug only, never shown.
     created_via: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)

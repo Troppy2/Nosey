@@ -16,6 +16,10 @@ export type Folder = {
   kojo_persona?: string | null;
   is_archived?: boolean;
   avoid_repeat_questions?: boolean;
+  // Which panel the folder page opens on.
+  default_view?: "stats" | "flashcards";
+  // Folder-level test instructions, prefilled into Create Test.
+  test_instructions?: string | null;
 };
 
 export type TestSummary = {

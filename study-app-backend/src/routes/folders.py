@@ -74,7 +74,9 @@ async def update_folder(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> FolderResponse:
-    await screen_user_input(user, "folder", data.name, data.subject, data.description, data.kojo_persona)
+    await screen_user_input(
+        user, "folder", data.name, data.subject, data.description, data.kojo_persona, data.test_instructions
+    )
     try:
         return await FolderService().update_folder(folder_id, user.id, data, session)
     except ResourceNotFoundException as exc:

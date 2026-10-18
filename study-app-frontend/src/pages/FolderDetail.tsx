@@ -9,6 +9,7 @@ import { Dropdown } from "../components/Dropdown";
 import { ConfirmModal, RenameModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
 import { FileManager } from "../components/FileManager";
+import { FolderStats } from "../components/FolderStats";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { Skeleton, SkeletonTestRows } from "../components/Skeletons";
 import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, prefetchAttemptDetail, regenerateTest, reindexFolderFiles, scopeKey, updateFolder, updateTest } from "../lib/api";
@@ -16,6 +17,13 @@ import { formatDate, formatPercent } from "../lib/format";
 import { toast } from "../lib/toast";
 import { usePageTour } from "../components/tours/usePageTour";
 import type { AttemptSummary, Flashcard, Folder, TestCreationParams, TestSummary } from "../lib/types";
+
+const DEFAULT_VIEW_OPTIONS = [
+  { value: "stats", label: "Stats" },
+  { value: "flashcards", label: "Flashcards" },
+];
+
+type FolderPanel = "stats" | "flashcards";
 
 const PERSONA_OPTIONS = [
   { value: "balanced", label: "Balanced" },
@@ -44,6 +52,8 @@ export default function FolderDetail() {
   const [error, setError] = useState<string | null>(null);
   const [filesOpen, setFilesOpen] = useState(false);
   const [kojoSettingsOpen, setKojoSettingsOpen] = useState(false);
+  // Stats or flashcards panel; null until the folder loads its default_view.
+  const [panel, setPanel] = useState<FolderPanel | null>(null);
   const [renamingTest, setRenamingTest] = useState<TestSummary | null>(null);
   const [deletingTest, setDeletingTest] = useState<TestSummary | null>(null);
   const [retryingTestId, setRetryingTestId] = useState<number | null>(null);
@@ -65,8 +75,12 @@ export default function FolderDetail() {
     // on that alone. Tests and flashcards load independently so a slow GET /tests
     // never freezes the whole folder page.
     setIsLoading(true);
+    setPanel(null);
     fetchFolder(id)
-      .then(setFolder)
+      .then((data) => {
+        setFolder(data);
+        setPanel(data.default_view === "flashcards" ? "flashcards" : "stats");
+      })
       .catch((err) => setError(err instanceof Error ? err.message : "Unable to load folder."))
       .finally(() => setIsLoading(false));
 
@@ -235,7 +249,7 @@ export default function FolderDetail() {
       });
   }
 
-  async function updateKojoSetting(patch: Partial<Pick<Folder, "kojo_sync_default" | "kojo_allow_artifacts" | "kojo_auto_index" | "kojo_persona" | "avoid_repeat_questions">>) {
+  async function updateKojoSetting(patch: Partial<Pick<Folder, "kojo_sync_default" | "kojo_allow_artifacts" | "kojo_auto_index" | "kojo_persona" | "avoid_repeat_questions" | "default_view">>) {
     if (!folder) return;
     try {
       const updated = await updateFolder(id, patch);
@@ -461,6 +475,23 @@ export default function FolderDetail() {
               </button>
             </label>
 
+            <div className="folder-kojo-persona-row">
+              <div className="folder-kojo-toggle-info">
+                <span className="folder-kojo-toggle-label">Folder opens on</span>
+                <span className="folder-kojo-toggle-desc">What you see first in this folder: your progress stats or your flashcards.</span>
+              </div>
+              <div className="folder-kojo-persona-field">
+                <Dropdown
+                  bare
+                  label="Folder opens on"
+                  className="folder-kojo-persona-select"
+                  value={folder.default_view ?? "stats"}
+                  options={DEFAULT_VIEW_OPTIONS}
+                  onChange={(value) => void updateKojoSetting({ default_view: value as FolderPanel })}
+                />
+              </div>
+            </div>
+
             <div className="folder-archive-row">
               <div className="folder-kojo-toggle-info">
                 <span className="folder-kojo-toggle-label folder-archive-label">Archive this class</span>
@@ -495,9 +526,17 @@ export default function FolderDetail() {
 
       <FormError message={error} />
 
-      <section>
-        <div className="section-title">
-          <h2>Flashcards</h2>
+      <section data-tour="folder-stats">
+        <div className="section-title folder-panel-title">
+          <div className="segmented segmented--text" role="tablist" aria-label="Folder view">
+            <button type="button" role="tab" aria-selected={panel === "stats"} className={panel === "stats" ? "active" : ""} onClick={() => setPanel("stats")}>
+              Stats
+            </button>
+            <button type="button" role="tab" aria-selected={panel === "flashcards"} className={panel === "flashcards" ? "active" : ""} onClick={() => setPanel("flashcards")}>
+              Flashcards
+            </button>
+          </div>
+          {panel === "flashcards" ? (
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
             <span className="muted small">
               {flashcards.length} card{flashcards.length === 1 ? "" : "s"}
@@ -508,8 +547,11 @@ export default function FolderDetail() {
               </Button>
             </Link>
           </div>
+          ) : null}
         </div>
-        {flashcards.length === 0 ? (
+        {panel === "stats" ? (
+          <FolderStats folderId={id} />
+        ) : panel === null ? null : flashcards.length === 0 ? (
           <EmptyState
             icon={<Brain />}
             title="No flashcards yet"
