@@ -6,6 +6,8 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from src.schemas.folder_stats_schema import MissedTopic
+
 
 # Decoded-byte guards for a scratch-pad drawing (STEM Scratch Pad feature).
 # max_length on `work_image` below is a CHARACTER count on the base64 string,
@@ -98,6 +100,8 @@ class AnswerResult(BaseModel):
     answer_inferred: bool = False
     # The correct answer came from the student's uploaded answer sheet.
     answer_from_sheet: bool = False
+    # The question's topic tag (migration 071); None when untagged.
+    topic: Optional[str] = None
     # OCR redo state (GH #149): None (no drawing), ok, needs_input, resolved,
     # skipped. While needs_input, correct_answer / feedback / reasoning are
     # redacted so the answer key cannot be copied into the redo.
@@ -137,6 +141,9 @@ class AttemptDetail(AttemptSummary):
     folder_id: Optional[int] = None
     test_title: str = ""
     answers: list[AnswerResult]
+    # Topics with at least one wrong answer in this attempt, most missed
+    # first. Empty when the test's questions are untagged.
+    missed_topics: list["MissedTopic"] = Field(default_factory=list)
 
 
 class FRQGrade(BaseModel):

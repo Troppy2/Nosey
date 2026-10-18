@@ -14,6 +14,7 @@ from src.models.user_answer import UserAnswer
 from src.models.user_attempt import UserAttempt
 from src.repositories.attempt_repository import AttemptRepository
 from src.repositories.test_repository import TestRepository
+from src.services.folder_stats_service import missed_topics
 from src.schemas.attempt_schema import (
     AnswerResult,
     AttemptDetail,
@@ -1054,7 +1055,7 @@ class GradingService:
             raise ResourceNotFoundException("Attempt")
         held = any(answer.ocr_status == OCR_STATUS_NEEDS_INPUT for answer in attempt.answers)
         pending_strokes = await repo.get_pending_strokes(attempt.id) if held else {}
-        return AttemptDetail(
+        detail = AttemptDetail(
             id=attempt.id,
             attempt_number=attempt.attempt_number,
             score=float(attempt.total_score or 0),
@@ -1090,6 +1091,13 @@ class GradingService:
             ],
             is_provisional=held,
         )
+        topics = {a.question_id: a.question.topic if a.question else None for a in attempt.answers}
+        for result in detail.answers:
+            result.topic = topics.get(result.question_id)
+        detail.missed_topics = missed_topics(
+            (r.topic, r.is_correct) for r in detail.answers if r.ocr_status != OCR_STATUS_NEEDS_INPUT
+        )
+        return detail
 
     async def get_weakness_detection(
         self, test_id: int, user_id: int, session: AsyncSession

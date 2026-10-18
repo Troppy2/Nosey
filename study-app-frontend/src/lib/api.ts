@@ -1,4 +1,5 @@
 import type {
+  FolderStats,
   AdminStats,
   FlagQueueResponse,
   AdminSurveysResponse,
@@ -495,6 +496,10 @@ export async function fetchFolders(): Promise<Folder[]> {
 
 export async function fetchFolder(folderId: number): Promise<Folder> {
   return request<Folder>(`/folders/${folderId}`);
+}
+
+export async function fetchFolderStats(folderId: number): Promise<FolderStats> {
+  return request<FolderStats>(`/folders/${folderId}/stats`);
 }
 
 export async function createFolder(input: Pick<Folder, "name" | "subject" | "description">): Promise<Folder> {

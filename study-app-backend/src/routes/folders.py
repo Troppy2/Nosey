@@ -5,7 +5,9 @@ from src.database import get_session
 from src.dependencies import get_current_user
 from src.models.user import User
 from src.schemas.folder_schema import FolderCreate, FolderResponse, FolderUpdate
+from src.schemas.folder_stats_schema import FolderStatsResponse
 from src.services.folder_service import FolderService
+from src.services.folder_stats_service import FolderStatsService
 from src.utils.exceptions import ResourceNotFoundException, StudyAppException
 from src.services.account_safety_service import screen_user_input
 
@@ -49,6 +51,18 @@ async def get_folder(
 ) -> FolderResponse:
     try:
         return await FolderService().get_folder(folder_id, user.id, session)
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/{folder_id}/stats", response_model=FolderStatsResponse)
+async def get_folder_stats(
+    folder_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> FolderStatsResponse:
+    try:
+        return await FolderStatsService().get_stats(folder_id, user.id, session)
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

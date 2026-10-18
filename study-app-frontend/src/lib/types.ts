@@ -168,6 +168,8 @@ export type AnswerResult = {
   answer_inferred?: boolean;
   // The correct answer came from the student's uploaded answer sheet.
   answer_from_sheet?: boolean;
+  // The question's topic tag; null for older, untagged questions.
+  topic?: string | null;
   // OCR redo state (GH #149). While "needs_input" the answer is ungraded and
   // correct_answer / feedback / reasoning are withheld by the server.
   ocr_status?: OcrStatus | null;
@@ -219,6 +221,46 @@ export type AttemptDetail = AttemptSummary & {
   folder_id?: ID | null;
   test_title: string;
   answers: AnswerResult[];
+  // Topics with at least one miss, most missed first. Empty when untagged.
+  missed_topics?: MissedTopic[];
+};
+
+export type MissedTopic = {
+  topic: string;
+  missed: number;
+  total: number;
+};
+
+// Folder stats: score history and weak / strong topics (GET /folders/:id/stats).
+export type TopicStatus = "weak" | "strong" | "neutral" | "new";
+
+export type TopicStat = {
+  topic: string;
+  accuracy: number;
+  answers: number;
+  test_answers: number;
+  flashcard_answers: number;
+  status: TopicStatus;
+  last_seen: string;
+};
+
+export type ScorePoint = {
+  attempt_id: ID;
+  test_id: ID;
+  test_title: string;
+  score: number;
+  created_at: string;
+};
+
+export type FolderStats = {
+  folder_id: ID;
+  tests_taken: number;
+  average_score: number | null;
+  best_score: number | null;
+  latest_score: number | null;
+  score_progression: ScorePoint[];
+  topics: TopicStat[];
+  encouragement: "empty" | "first" | "improving" | "dipping" | "steady";
 };
 
 export type DraftAttemptAnswer = {
@@ -258,6 +300,7 @@ export type Flashcard = {
   front: string;
   back: string;
   source?: string | null;
+  topic?: string | null;
   difficulty: number;
   created_at: string;
   updated_at: string;
