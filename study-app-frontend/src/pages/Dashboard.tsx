@@ -302,6 +302,11 @@ export default function Dashboard() {
 
   const weakCards = [...flashcards].sort((a, b) => b.difficulty - a.difficulty).slice(0, 3);
   const pendingResumableTests = resumableTests.filter((t) => !dismissedTestIds.has(t.test_id));
+  // Only the 5 most recently exited tests render; older ones stay resumable from their folder.
+  const MAX_RESUMABLE_SHOWN = 5;
+  const shownResumableTests = [...pendingResumableTests]
+    .sort((a, b) => Date.parse(b.exited_at) - Date.parse(a.exited_at))
+    .slice(0, MAX_RESUMABLE_SHOWN);
 
   function dismissResumableTest(testId: number) {
     const next = new Set([...dismissedTestIds, testId]);
@@ -472,7 +477,7 @@ export default function Dashboard() {
                       <span style={{ fontSize: "14px", color: "var(--gray-600)" }}>{pendingResumableTests.length} in progress</span>
                     </div>
                     <div className="test-list">
-                      {pendingResumableTests.map((test) => (
+                      {shownResumableTests.map((test) => (
                         <Card key={test.attempt_id} interactive className="test-row">
                           <Link className="test-row-main" to={`/test/${test.test_id}`}>
                             <div>
