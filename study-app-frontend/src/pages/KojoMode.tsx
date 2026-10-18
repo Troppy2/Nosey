@@ -19,13 +19,14 @@ import {
   Lightbulb,
   ListChecks,
   Menu,
-  Pencil,
-  Puzzle,
   MessageSquarePlus,
+  Minus,
   PanelLeftClose,
   PanelLeftOpen,
   Paperclip,
+  Pencil,
   Plus,
+  Puzzle,
   RotateCcw,
   Search,
   Sparkles,
@@ -57,6 +58,7 @@ import {
   createKojoConversation,
   createTest,
   deleteConversationFile,
+  bulkDeleteKojoConversations,
   deleteKojoConversation,
   fetchConversationFiles,
   fetchFolders,
@@ -75,6 +77,8 @@ import {
   renameKojoConversation,
   uploadConversationFiles,
 } from "../lib/api";
+import { createPortal } from "react-dom";
+import { ConfirmModal } from "../components/ConfirmModal";
 import type {
   ConversationFile,
   Folder,
@@ -595,6 +599,7 @@ type FolderHomeProps = {
   uploading: boolean;
   uploadError: string | null;
   onUpload: (files: FileList | File[]) => void;
+  onRemoveFile: (fileId: number) => Promise<void>;
   onBack: () => void;
   onOpenConversation: (conv: KojoConversationSummary) => void;
   onStartChat: (text: string) => void;
@@ -602,8 +607,18 @@ type FolderHomeProps = {
 
 const FILE_ACCEPT = ".pdf,.md,.txt,.tex,.html,.docx,.pptx";
 
-function FolderHome({ folder, conversations, files, disabled, uploading, uploadError, onUpload, onBack, onOpenConversation, onStartChat }: FolderHomeProps) {
+function FolderHome({ folder, conversations, files, disabled, uploading, uploadError, onUpload, onRemoveFile, onBack, onOpenConversation, onStartChat }: FolderHomeProps) {
   const [draft, setDraft] = useState("");
+  const [removingFile, setRemovingFile] = useState<ConversationFile | null>(null);
+  const [removingBusy, setRemovingBusy] = useState(false);
+
+  async function confirmRemoveFile() {
+    if (!removingFile) return;
+    setRemovingBusy(true);
+    await onRemoveFile(removingFile.id);
+    setRemovingBusy(false);
+    setRemovingFile(null);
+  }
   const [dragging, setDragging] = useState(false);
   const filesInputRef = useRef<HTMLInputElement>(null);
   // Drag enter/leave fire per child element; a depth counter keeps the dropzone
@@ -765,6 +780,15 @@ function FolderHome({ folder, conversations, files, disabled, uploading, uploadE
                       <span className="chat-mode-doc-meta">{formatFileSize(f.size_bytes)}</span>
                     </span>
                     <span className="kojo-file-badge">{fileBadge(f)}</span>
+                    <button
+                      type="button"
+                      className="kojo-file-remove"
+                      onClick={() => setRemovingFile(f)}
+                      aria-label={`Remove ${f.file_name}`}
+                      title="Remove file"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -773,6 +797,21 @@ function FolderHome({ folder, conversations, files, disabled, uploading, uploadE
             {uploadError && <p className="kojo-files-error">{uploadError}</p>}
             {dragging && <div className="kojo-files-overlay" aria-hidden="true"><Upload size={20} /><span>Drop to add</span></div>}
           </section>
+          {removingFile
+            ? createPortal(
+                <ConfirmModal
+                  title="Remove this file?"
+                  message={`Kojo will stop using ${removingFile.file_name} in this folder's chat. This can't be undone.`}
+                  confirmLabel="Remove"
+                  danger
+                  busy={removingBusy}
+                  busyLabel="Removing"
+                  onConfirm={() => void confirmRemoveFile()}
+                  onCancel={() => setRemovingFile(null)}
+                />,
+                document.body,
+              )
+            : null}
         </aside>
       </div>
     </div>
@@ -833,6 +872,11 @@ function KojoChatPage() {
   const [slashActiveIndex, setSlashActiveIndex] = useState(0);
   // ID of the conversation showing the delete confirmation inline
   const [deletingConvId, setDeletingConvId] = useState<number | null>(null);
+  // Bulk delete: "Select" in the Recent header turns on checkboxes.
+  const [selectingChats, setSelectingChats] = useState(false);
+  const [selectedChatIds, setSelectedChatIds] = useState<Set<number>>(new Set());
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   // Mobile: whether the off-canvas sidebar drawer is open
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // Desktop: whether the sidebar column is collapsed
@@ -1568,44 +1612,78 @@ function KojoChatPage() {
     fetchKojoActionCards(conv.id).then(setActionCards);
   }
 
+  // After chats are removed: if the open one went with them, open the next one
+  // or drop into a pending new chat rather than creating a row nobody asked for.
+  async function afterChatsRemoved(removedIds: Set<number>) {
+    const remaining = conversations.filter((c) => !removedIds.has(c.id));
+    setConversations(remaining);
+    if (conversationId == null || !removedIds.has(conversationId)) return;
+    if (remaining.length > 0) {
+      setConversationId(remaining[0].id);
+      const c = await fetchKojoConversationById(remaining[0].id);
+      if (c) setMessages(c.messages);
+      fetchConversationFiles(remaining[0].id).then(setSessionFiles);
+      fetchKojoActionCards(remaining[0].id).then(setActionCards);
+    } else {
+      setConversationId(null);
+      setPendingNewChat(true);
+      setMessages([]);
+      setSessionFiles([]);
+      setActionCards([]);
+    }
+  }
+
   async function handleDeleteConversation(id: number) {
     try {
       await deleteKojoConversation(id);
-      const remaining = conversations.filter((c) => c.id !== id);
-      setConversations(remaining);
       setDeletingConvId(null);
-
-      if (id === conversationId) {
-        // Deleted the active conversation , switch to next or create fresh
-        if (remaining.length > 0) {
-          setConversationId(remaining[0].id);
-          const c = await fetchKojoConversationById(remaining[0].id);
-          if (c) setMessages(c.messages);
-          fetchConversationFiles(remaining[0].id).then(setSessionFiles);
-          fetchKojoActionCards(remaining[0].id).then(setActionCards);
-        } else {
-          // No conversations left. Drop into a pending new chat rather than
-          // creating a replacement row the user never asked for.
-          setConversations([]);
-          setConversationId(null);
-          setPendingNewChat(true);
-          setMessages([]);
-          setSessionFiles([]);
-          setActionCards([]);
-        }
-      }
+      await afterChatsRemoved(new Set([id]));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete chat.");
       setDeletingConvId(null);
     }
   }
 
+  function exitChatSelection() {
+    setSelectingChats(false);
+    setSelectedChatIds(new Set());
+  }
+
+  function toggleChatSelected(id: number) {
+    setSelectedChatIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleBulkDelete() {
+    const ids = new Set(selectedChatIds);
+    setBulkDeleting(true);
+    try {
+      await bulkDeleteKojoConversations([...ids]);
+      setConfirmBulkDelete(false);
+      exitChatSelection();
+      await afterChatsRemoved(ids);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete those chats.");
+      setConfirmBulkDelete(false);
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
+
   async function handleDeleteFile(fileId: number) {
     if (conversationId === null) return;
+    setUploadError(null);
     try {
       await deleteConversationFile(conversationId, fileId);
       setSessionFiles((prev) => prev.filter((f) => f.id !== fileId));
-    } catch { /* silently ignore */ }
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Could not remove that file.");
+    }
   }
 
   async function handleUpload(files: FileList | File[]) {
@@ -1746,7 +1824,6 @@ function KojoChatPage() {
       <aside className={`chat-mode-sidebar${sidebarOpen ? " chat-mode-sidebar--open" : ""}`}>
         {/* Brand row */}
         <div className="chat-mode-brand">
-          <span className="chat-mode-brand-name">Kojo</span>
           <button
             type="button"
             className="chat-mode-sidebar-close"
@@ -1793,23 +1870,90 @@ function KojoChatPage() {
           {/* Recent chats in the current context */}
           {conversations.length > 0 && (
             <>
-              <p className="chat-mode-section-label">recent</p>
+              <div className="kojo-recent-head">
+                <p className="chat-mode-section-label kojo-recent-label">Recent</p>
+                <button
+                  type="button"
+                  className="kojo-recent-link"
+                  onClick={selectingChats ? exitChatSelection : () => setSelectingChats(true)}
+                >
+                  {selectingChats ? "Cancel" : "Select"}
+                </button>
+              </div>
+              {selectingChats ? (
+                <div className="file-manager-select-bar kojo-select-bar">
+                  <button
+                    type="button"
+                    className="file-manager-select-toggle"
+                    data-active={selectedChatIds.size > 0 ? "true" : "false"}
+                    aria-pressed={selectedChatIds.size === conversations.length}
+                    onClick={() =>
+                      setSelectedChatIds(
+                        selectedChatIds.size === conversations.length ? new Set() : new Set(conversations.map((c) => c.id)),
+                      )
+                    }
+                  >
+                    <span
+                      className={`fm-check${
+                        selectedChatIds.size === conversations.length
+                          ? " is-checked"
+                          : selectedChatIds.size > 0
+                            ? " is-indeterminate"
+                            : ""
+                      }`}
+                      aria-hidden="true"
+                    >
+                      {selectedChatIds.size === conversations.length ? (
+                        <Check size={11} strokeWidth={3} />
+                      ) : selectedChatIds.size > 0 ? (
+                        <Minus size={11} strokeWidth={3} />
+                      ) : null}
+                    </span>
+                    {selectedChatIds.size > 0 ? `${selectedChatIds.size} selected` : "Select all"}
+                  </button>
+                  {selectedChatIds.size > 0 ? (
+                    <Button
+                      variant="danger-outline"
+                      icon={<Trash2 size={14} />}
+                      className="file-manager-bulk-delete"
+                      onClick={() => setConfirmBulkDelete(true)}
+                    >
+                      Delete
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="kojo-chat-list">
                 {conversations.map((conv) => (
                   <div
                     key={conv.id}
-                    className={`kojo-chat-item${conv.id === conversationId ? " kojo-chat-item--active" : ""}`}
+                    className={`kojo-chat-item${conv.id === conversationId ? " kojo-chat-item--active" : ""}${
+                      selectingChats && selectedChatIds.has(conv.id) ? " kojo-chat-item--selected" : ""
+                    }`}
                   >
-                    <button
-                      type="button"
-                      className="kojo-chat-item-btn"
-                      onClick={() => void handleSwitchConversation(conv)}
-                    >
-                      <span className="kojo-chat-item-name">{conv.name ?? "Untitled"}</span>
-                      <span className="kojo-chat-item-date">{relativeTime(conv.created_at)}</span>
-                    </button>
+                    {selectingChats ? (
+                      <label className="kojo-chat-item-btn kojo-chat-item-check">
+                        <input
+                          type="checkbox"
+                          className="checkbox-input"
+                          checked={selectedChatIds.has(conv.id)}
+                          onChange={() => toggleChatSelected(conv.id)}
+                        />
+                        <span className="kojo-chat-item-name">{conv.name ?? "Untitled"}</span>
+                        <span className="kojo-chat-item-date">{relativeTime(conv.created_at)}</span>
+                      </label>
+                    ) : (
+                      <button
+                        type="button"
+                        className="kojo-chat-item-btn"
+                        onClick={() => void handleSwitchConversation(conv)}
+                      >
+                        <span className="kojo-chat-item-name">{conv.name ?? "Untitled"}</span>
+                        <span className="kojo-chat-item-date">{relativeTime(conv.created_at)}</span>
+                      </button>
+                    )}
 
-                    {deletingConvId === conv.id ? (
+                    {selectingChats ? null : deletingConvId === conv.id ? (
                       <div className="kojo-chat-item-confirm">
                         <button
                           type="button"
@@ -1843,6 +1987,21 @@ function KojoChatPage() {
           )}
         </div>
       </aside>
+      {confirmBulkDelete
+        ? createPortal(
+            <ConfirmModal
+              title={`Delete ${selectedChatIds.size} chat${selectedChatIds.size === 1 ? "" : "s"}?`}
+              message="This can't be undone."
+              confirmLabel="Delete"
+              danger
+              busy={bulkDeleting}
+              busyLabel="Deleting"
+              onConfirm={() => void handleBulkDelete()}
+              onCancel={() => setConfirmBulkDelete(false)}
+            />,
+            document.body,
+          )
+        : null}
 
       {/* ── Main chat area ── */}
       <div className="chat-mode-main">
@@ -1898,7 +2057,7 @@ function KojoChatPage() {
                   title={view === "chat" && conversationId !== null ? "Double-click to rename" : undefined}
                 >
                   {view === "folders"
-                    ? "folders"
+                    ? null
                     : view === "home"
                       ? selectedFolder?.name ?? "folder"
                       : conversations.find((c) => c.id === conversationId)?.name ?? "New chat"}
@@ -1957,6 +2116,7 @@ function KojoChatPage() {
             uploading={isUploading}
             uploadError={uploadError}
             onUpload={handleUpload}
+            onRemoveFile={handleDeleteFile}
             onBack={() => setView("folders")}
             onOpenConversation={handleOpenConversationFromHome}
             onStartChat={handleStartChatFromHome}

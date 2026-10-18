@@ -302,6 +302,24 @@ class KojoRepository(BaseRepository[KojoConversation]):
         await self.session.flush()
         return True
 
+    async def delete_conversations(self, conversation_ids: list[int], user_id: int) -> int:
+        """Hard-delete the given conversations the user owns; ids they don't own are skipped."""
+        stmt = (
+            select(KojoConversation)
+            .where(
+                and_(KojoConversation.id.in_(conversation_ids), KojoConversation.user_id == user_id)
+            )
+            .options(
+                selectinload(KojoConversation.messages),
+                selectinload(KojoConversation.conversation_files),
+            )
+        )
+        conversations = (await self.session.scalars(stmt)).all()
+        for conversation in conversations:
+            await self.session.delete(conversation)
+        await self.session.flush()
+        return len(conversations)
+
     async def delete_conversation_files(self, conversation_id: int) -> None:
         """Delete all session files for a conversation (called on clear/new chat)."""
         stmt = select(ConversationFile).where(ConversationFile.conversation_id == conversation_id)

@@ -1293,6 +1293,13 @@ export async function deleteKojoConversation(conversationId: number): Promise<vo
   await request(`/kojo/conversations/${conversationId}`, { method: "DELETE" });
 }
 
+export async function bulkDeleteKojoConversations(ids: number[]): Promise<{ deleted: number }> {
+  return request<{ deleted: number }>("/kojo/conversations/bulk-delete", {
+    method: "POST",
+    body: JSON.stringify({ ids }),
+  });
+}
+
 export async function renameKojoConversation(
   conversationId: number,
   name: string,

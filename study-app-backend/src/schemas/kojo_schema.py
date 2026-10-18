@@ -38,6 +38,14 @@ class RenameConversationRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
 
 
+class BulkDeleteConversationsRequest(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=200)
+
+
+class BulkDeleteConversationsResponse(BaseModel):
+    deleted: int
+
+
 class KojoChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=80000)
     provider: Optional[str] = Field(default=None, description="Optional LLM provider override: 'auto', 'groq', 'ollama', 'gemini', 'claude', or 'minimax'")

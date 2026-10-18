@@ -1242,6 +1242,18 @@ class KojoService:
             raise ResourceNotFoundException("Conversation")
         await session.commit()
 
+    async def bulk_delete_conversations(
+        self,
+        user_id: int,
+        conversation_ids: list[int],
+        session: AsyncSession,
+    ) -> int:
+        deleted = await KojoRepository(session).delete_conversations(
+            list(set(conversation_ids)), user_id
+        )
+        await session.commit()
+        return deleted
+
     async def rename_conversation(
         self,
         user_id: int,

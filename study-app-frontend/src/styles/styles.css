@@ -28906,3 +28906,123 @@ a.sd-chip.is-done:hover {
   color: rgba(89, 105, 73, 0.5);
   font-size: 0.7rem;
 }
+
+/* Kojo chat: bulk delete (Select in the Recent header). Bar, toggle,
+   checkbox and delete button are the shared file-manager / .checkbox-input
+   pieces; only sidebar placement lives here. */
+.kojo-recent-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 10px;
+}
+
+.kojo-recent-head {
+  margin: 8px 0 4px;
+}
+
+.kojo-recent-head .chat-mode-section-label {
+  margin: 0 14px;
+}
+
+.kojo-recent-link {
+  min-height: 32px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--k-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.kojo-recent-link:hover {
+  background: var(--k-hover);
+  color: var(--k-ink);
+}
+
+.kojo-select-bar {
+  gap: 6px;
+  margin: 0 12px 6px;
+}
+
+/* The sidebar is ~250px: keep both controls on one line. */
+.kojo-select-bar .file-manager-select-toggle,
+.kojo-select-bar .file-manager-bulk-delete {
+  min-height: 32px;
+  padding: 5px 10px 5px 8px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.kojo-chat-item-check {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.kojo-chat-item-check .checkbox-input {
+  grid-row: span 2;
+}
+
+.kojo-chat-item--selected {
+  background: var(--green-lightest);
+}
+
+@media (pointer: coarse) {
+  .kojo-recent-link {
+    min-height: 40px;
+  }
+}
+
+/* Sidebar brand row only carries the phone close button now; hide it on desktop. */
+@media (min-width: 761px) {
+  .chat-mode-brand {
+    display: none;
+  }
+}
+
+/* "Recent" in sentence case, Kojo chat's sans, not the mono all-caps label. */
+.kojo-recent-head .kojo-recent-label {
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--k-muted);
+}
+
+/* Chat names in the sidebar use the serif display face. */
+.chat-mode-shell .kojo-chat-item-name {
+  font-family: var(--font-serif);
+}
+
+/* Kojo folder FILES card: remove control, quiet until hovered (always visible on touch). */
+.kojo-file-remove {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--k-faint);
+  cursor: pointer;
+}
+
+.kojo-file-remove:hover,
+.kojo-file-remove:focus-visible {
+  background: var(--k-danger-tint);
+  color: var(--red, #c53030);
+}
+
+@media (pointer: coarse) {
+  .kojo-file-remove {
+    width: 40px;
+    height: 40px;
+  }
+}
