@@ -332,7 +332,15 @@ async def _verify_persisted_mcqs(
     )
     logger.info("MCQ verification for test_id=%s: %s", test_id, stats)
 
-    if not dropped_keys and not new_items and stats.get("recorrected", 0) == 0:
+    # Nothing to write only when the test also holds no spares: MCQs are
+    # over-generated (inflated_mcq_count), so a run that keeps every one still
+    # has to trim back to the requested count below.
+    if (
+        not dropped_keys
+        and not new_items
+        and stats.get("recorrected", 0) == 0
+        and len(mcq_rows) <= requested_mcq
+    ):
         return  # nothing to write
 
     # Write phase: one session, one commit.

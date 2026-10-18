@@ -314,3 +314,37 @@ class TestVerifyPersistedMcqs:
         async with db_session_maker() as session:
             test = await session.get(TestRow, test_id)
             assert test.expected_question_count is None  # never touched
+
+    async def test_all_kept_still_trims_spares_to_requested(self, db_session_maker):
+        """Verification keeps every over-generated MCQ (no drops, no repairs,
+        no recorrections): the spares beyond the request must still be trimmed.
+        Found end to end: a 10-question daily quiz came back with 13."""
+        from src.routes.tests import _verify_persisted_mcqs
+
+        test_id = await _seed_test_with_mcqs(db_session_maker, [("Q1?", 0), ("Q2?", 1), ("Q3?", 2)])
+        async with db_session_maker() as session:
+            rows = (await session.execute(
+                Question.__table__.select().where(Question.test_id == test_id).order_by(Question.display_order)
+            )).all()
+        kept = [
+            VerifiableMCQ(key=row.id, question_text=row.question_text, options=["A", "B", "C", "D"], correct_index=i)
+            for i, row in enumerate(rows)
+        ]
+        fake = _fake_verifier(kept=kept, dropped_keys=[], new_items=[])
+
+        with (
+            patch("src.routes.tests.async_session_maker", db_session_maker),
+            patch("src.routes.tests.MCQVerificationService", return_value=fake),
+        ):
+            await _verify_persisted_mcqs(
+                test_id=test_id, source_content="notes", variant="prose", provider=None,
+                requested_mcq=2, coding_language=None, test_type="MCQ_only", difficulty="mixed",
+                topic_focus=None, custom_instructions=None,
+            )
+
+        async with db_session_maker() as session:
+            remaining = (await session.execute(
+                Question.__table__.select().where(Question.test_id == test_id).order_by(Question.display_order)
+            )).all()
+            assert [r.question_text for r in remaining] == ["Q1?", "Q2?"]
+            assert [r.display_order for r in remaining] == [1, 2]
