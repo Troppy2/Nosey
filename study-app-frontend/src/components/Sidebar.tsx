@@ -1,4 +1,5 @@
-import { ChevronLeft, ChevronRight, Code2, Folder, LayoutDashboard, Menu, MessageCircle, Settings, ShieldCheck, Sprout, X } from "lucide-react";
+import { ChatIcon, CodeIcon, DashboardIcon, FolderIcon, MenuIcon, SettingsIcon, ShieldIcon, SproutIcon } from "../icons";
+import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from "../icons";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { useSettings } from "../lib/useSettings";
@@ -13,12 +14,12 @@ const ADMIN_EMAILS = ["jamesinah34@gmail.com", "jamesinah883@gmail.com"];
 const sidebarStorageKey = "nosey_sidebar_collapsed";
 
 const BASE_NAV_ITEMS = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, beta: false, guestHidden: false, tourId: undefined },
-  { to: "/folders", label: "Folders", icon: Folder, beta: false, guestHidden: false, tourId: "tour-nav-folders" },
-  { to: "/flashcards", label: "Learning Modes", icon: Sprout, beta: false, guestHidden: false, tourId: undefined },
-  { to: "/leetcode", label: "KojoCode", icon: Code2, beta: true, guestHidden: true, tourId: undefined },
-  { to: "/kojo/chat", label: "Chat", icon: MessageCircle, beta: false, guestHidden: true, tourId: "tour-nav-kojo" },
-  { to: "/settings", label: "Settings", icon: Settings, beta: false, guestHidden: false, tourId: undefined },
+  { to: "/dashboard", label: "Dashboard", icon: DashboardIcon, beta: false, guestHidden: false, tourId: undefined },
+  { to: "/folders", label: "Folders", icon: FolderIcon, beta: false, guestHidden: false, tourId: "tour-nav-folders" },
+  { to: "/flashcards", label: "Learning Modes", icon: SproutIcon, beta: false, guestHidden: false, tourId: undefined },
+  { to: "/leetcode", label: "KojoCode", icon: CodeIcon, beta: true, guestHidden: true, tourId: undefined },
+  { to: "/kojo/chat", label: "Chat", icon: ChatIcon, beta: false, guestHidden: true, tourId: "tour-nav-kojo" },
+  { to: "/settings", label: "Settings", icon: SettingsIcon, beta: false, guestHidden: false, tourId: undefined },
 ];
 
 export function Sidebar() {
@@ -27,7 +28,7 @@ export function Sidebar() {
   const guest = isGuestSession();
   const currentUser = getStoredUser();
   const isAdmin = !!currentUser?.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase());
-  const adminItem = { to: "/admin", label: "Admin", icon: ShieldCheck, beta: false, guestHidden: true, tourId: undefined };
+  const adminItem = { to: "/admin", label: "Admin", icon: ShieldIcon, beta: false, guestHidden: true, tourId: undefined };
   const kojoEnabled = currentUser?.kojo_enabled !== false;
   const visibleBaseItems = BASE_NAV_ITEMS.filter((item) =>
     (!item.beta || betaMode) &&
@@ -125,7 +126,7 @@ export function Sidebar() {
               aria-label="Open navigation"
               aria-expanded={isDrawerOpen}
             >
-              <Menu size={22} />
+              <MenuIcon size={22} />
             </button>
           </div>
 
@@ -160,14 +161,14 @@ export function Sidebar() {
                 aria-pressed={isSidebarCollapsed}
                 title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
               >
-                {isSidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+                {isSidebarCollapsed ? <ChevronRightIcon size={18} /> : <ChevronLeftIcon size={18} />}
               </button>
               <button
                 className="drawer-close-btn"
                 onClick={() => setIsDrawerOpen(false)}
                 aria-label="Close navigation"
               >
-                <X size={20} />
+                <CloseIcon size={20} />
               </button>
             </div>
 
@@ -183,7 +184,7 @@ export function Sidebar() {
                     aria-label={item.label}
                     title={isSidebarCollapsed ? item.label : undefined}
                   >
-                    <Icon size={19} />
+                    <Icon size={22} />
                     <span className="nav-label">{item.label}</span>
                   </NavLink>
                 );

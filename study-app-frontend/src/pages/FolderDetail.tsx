@@ -1,4 +1,6 @@
-import { Archive, BookOpen, Brain, ChevronDown, ChevronUp, Edit3, FilePenLine, Files, FolderOpen, History, Info, Loader2, Plus, RotateCcw, ScrollText, Settings, Trash2, X } from "lucide-react";
+import { Archive, FilePenLine, Files, History, Loader2, ScrollText } from "lucide-react";
+import { BookIcon, BrainIcon, FolderIcon, SettingsIcon } from "../icons";
+import { ChevronDownIcon, ChevronUpIcon, CloseIcon, InfoIcon, PencilIcon, PlusIcon, RetryIcon, TrashIcon } from "../icons";
 import KojoMascot from "../components/KojoMascot";
 import { FormError } from "../components/FormError";
 import { useEffect, useRef, useState } from "react";
@@ -363,18 +365,18 @@ export default function FolderDetail() {
           <Button
             data-tour="folder-settings"
             variant="secondary"
-            icon={kojoSettingsOpen ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+            icon={kojoSettingsOpen ? <ChevronUpIcon size={24} /> : <ChevronDownIcon size={24} />}
             onClick={() => setKojoSettingsOpen((o) => !o)}
           >
             Folder Settings
           </Button>
           <Link to={`/folders/${id}/flashcards/manage`} data-tour="folder-flashcards">
-            <Button variant="secondary" icon={<Settings size={24} />}>
+            <Button variant="secondary" icon={<SettingsIcon size={24} />}>
               Manage Flashcards
             </Button>
           </Link>
           <Link to={`/create-test?folderId=${id}`} data-tour="folder-new-test">
-            <Button icon={<Plus size={24} />}>New Test</Button>
+            <Button icon={<PlusIcon size={24} />}>New Test</Button>
           </Link>
         </div>
       </header>
@@ -448,7 +450,7 @@ export default function FolderDetail() {
                 <Button
                   type="button"
                   variant="secondary"
-                  icon={<RotateCcw size={15} />}
+                  icon={<RetryIcon size={15} />}
                   onClick={() => void handleReindex()}
                   disabled={reindexing}
                 >
@@ -473,7 +475,7 @@ export default function FolderDetail() {
                   onChange={(value) => void updateKojoSetting({ kojo_persona: value })}
                 />
                 <span className="folder-kojo-persona-tooltip-wrap">
-                  <Info size={15} className="folder-kojo-persona-info-icon" />
+                  <InfoIcon size={15} className="folder-kojo-persona-info-icon" />
                   <span className="folder-kojo-persona-tooltip">
                     {PERSONA_DESCRIPTIONS[folder.kojo_persona ?? "balanced"]}
                   </span>
@@ -597,7 +599,7 @@ export default function FolderDetail() {
               {flashcards.length} card{flashcards.length === 1 ? "" : "s"}
             </span>
             <Link to={`/folders/${id}/flashcards/manage`}>
-              <Button variant="ghost" icon={<Settings size={15} />} style={{ minHeight: 36, padding: "6px 12px", fontSize: "0.85rem" }}>
+              <Button variant="ghost" icon={<SettingsIcon size={15} />} style={{ minHeight: 36, padding: "6px 12px", fontSize: "0.85rem" }}>
                 Manage
               </Button>
             </Link>
@@ -608,12 +610,12 @@ export default function FolderDetail() {
           <FolderStats folderId={id} />
         ) : panel === null ? null : flashcards.length === 0 ? (
           <EmptyState
-            icon={<Brain />}
+            icon={<BrainIcon />}
             title="No flashcards yet"
             body="Generate flashcards from your notes or add them manually."
             action={
               <Link to={`/folders/${id}/flashcards/manage`}>
-                <Button variant="secondary" icon={<Plus size={16} />}>Add Flashcards</Button>
+                <Button variant="secondary" icon={<PlusIcon size={16} />}>Add Flashcards</Button>
               </Link>
             }
           />
@@ -656,7 +658,7 @@ export default function FolderDetail() {
               </section>
             ) : activeTests.length === 0 && failedTests.length === 0 ? (
               <EmptyState
-                icon={<BookOpen />}
+                icon={<BookIcon />}
                 title="No tests yet"
                 body="Upload notes to generate a practice test for this folder."
                 action={
@@ -706,14 +708,14 @@ export default function FolderDetail() {
                       <div className="draft-card-actions">
                         <Button
                           variant="secondary"
-                          icon={<RotateCcw size={14} />}
+                          icon={<RetryIcon size={14} />}
                           onClick={() => handleRetryTest(test)}
                           disabled={retryingTestId === test.id}
                         >
                           {retryingTestId === test.id ? "Retrying…" : "Retry"}
                         </Button>
                         <button aria-label={`Delete ${test.title}`} onClick={() => setDeletingTest(test)} type="button">
-                          <Trash2 size={16} />
+                          <TrashIcon size={16} />
                         </button>
                       </div>
                     </div>
@@ -728,10 +730,10 @@ export default function FolderDetail() {
                       </div>
                       <div className="draft-card-actions">
                         <Link to={`/create-test?folderId=${id}`}>
-                          <Button variant="secondary" icon={<Edit3 size={14} />}>Continue</Button>
+                          <Button variant="secondary" icon={<PencilIcon size={14} />}>Continue</Button>
                         </Link>
                         <button aria-label="Clear draft" onClick={clearFormDraft} type="button">
-                          <Trash2 size={16} />
+                          <TrashIcon size={16} />
                         </button>
                       </div>
                     </div>
@@ -744,7 +746,7 @@ export default function FolderDetail() {
       })()}
 
       <div className="folder-detail-footer">
-        <FolderOpen size={24} style={{ color: folder?.color ?? "var(--green-dark)" }} />
+        <FolderIcon size={24} style={{ color: folder?.color ?? "var(--green-dark)" }} />
         <span className="muted small">
           {folder?.test_count ?? 0} tests · {folder?.flashcard_count ?? 0} flashcards
         </span>
@@ -913,11 +915,11 @@ function TestRow({
         ) : null}
         {!isGenerating && (
           <button aria-label={`Rename ${test.title}`} onClick={() => onRename(test)} type="button">
-            <Edit3 size={17} />
+            <PencilIcon size={17} />
           </button>
         )}
         <button aria-label={`Delete ${test.title}`} onClick={() => onDelete(test)} type="button">
-          <Trash2 size={17} />
+          <TrashIcon size={17} />
         </button>
       </div>
       {showAttempts ? (
@@ -993,7 +995,7 @@ function PromptModal({
             <p className="muted small">{test.title}</p>
           </div>
           <button className="prompt-modal-close" onClick={onClose} type="button" aria-label="Close">
-            <X size={24} />
+            <CloseIcon size={24} />
           </button>
         </div>
         <div className="prompt-modal-body">

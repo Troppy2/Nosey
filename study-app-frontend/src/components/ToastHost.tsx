@@ -1,12 +1,12 @@
-import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
+import { AlertIcon, CheckCircleIcon, CloseIcon, InfoIcon } from "../icons";
 import { useEffect, useState } from "react";
 import { dismissToast, subscribeToasts, type Toast, type ToastKind } from "../lib/toast";
 import "../styles/components/toast.css";
 
-const ICONS: Record<ToastKind, typeof Info> = {
-  success: CheckCircle2,
-  error: AlertCircle,
-  info: Info,
+const ICONS: Record<ToastKind, typeof InfoIcon> = {
+  success: CheckCircleIcon,
+  error: AlertIcon,
+  info: InfoIcon,
 };
 
 // Errors interrupt; everything else is announced without stealing focus.
@@ -31,7 +31,7 @@ function ToastRow({ item }: { item: Toast }) {
         onClick={() => dismissToast(item.id)}
         aria-label={`Dismiss: ${item.title}`}
       >
-        <X size={15} />
+        <CloseIcon size={15} />
       </button>
     </div>
   );

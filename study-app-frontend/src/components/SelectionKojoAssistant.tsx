@@ -1,4 +1,5 @@
-import { ChevronDown, ChevronUp, Layers, MessageSquare, Sparkles, X } from "lucide-react";
+import { Layers, MessageSquare } from "lucide-react";
+import { ChevronDownIcon, ChevronUpIcon, CloseIcon, SparklesIcon } from "../icons";
 import KojoMascot from "./KojoMascot";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { createFlashcard, kojoChat, kojoChatStream } from "../lib/api";
@@ -275,7 +276,7 @@ export function SelectionKojoAssistant({ folderId, folderName, children, onAskKo
           }}
         >
           <button className="sel-kojo-btn sel-kojo-btn--primary" type="button" onClick={handleAskKojo}>
-            <Sparkles size={12} />
+            <SparklesIcon size={12} />
             Ask Kojo
           </button>
           <div className="sel-kojo-toolbar-sep" />
@@ -293,7 +294,7 @@ export function SelectionKojoAssistant({ folderId, folderName, children, onAskKo
           )}
           <div className="sel-kojo-toolbar-sep" />
           <button className="sel-kojo-btn sel-kojo-btn--close" type="button" onClick={close} aria-label="Close">
-            <X size={12} />
+            <CloseIcon size={12} />
           </button>
         </div>
       </div>
@@ -321,7 +322,7 @@ export function SelectionKojoAssistant({ folderId, folderName, children, onAskKo
             </div>
             <div className="kojo-header-info">
               <span className="kojo-header-name">
-                <Sparkles size={13} className="kojo-title-icon" />
+                <SparklesIcon size={13} className="kojo-title-icon" />
                 Kojo
               </span>
               <span className="kojo-header-sub">{folderName}</span>
@@ -339,7 +340,7 @@ export function SelectionKojoAssistant({ folderId, folderName, children, onAskKo
               <MessageSquare size={16} />
             </button>
             <button className="kojo-header-btn" type="button" onClick={close} aria-label="Close">
-              <X size={18} />
+              <CloseIcon size={18} />
             </button>
           </div>
         </div>
@@ -357,9 +358,9 @@ export function SelectionKojoAssistant({ folderId, folderName, children, onAskKo
                 onClick={() => setTextExpanded((v) => !v)}
               >
                 {textExpanded ? (
-                  <><ChevronUp size={13} /> Show less</>
+                  <><ChevronUpIcon size={13} /> Show less</>
                 ) : (
-                  <><ChevronDown size={13} /> See more</>
+                  <><ChevronDownIcon size={13} /> See more</>
                 )}
               </button>
             )}

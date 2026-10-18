@@ -1,4 +1,4 @@
-import { ChevronRight } from "lucide-react";
+import { ChevronRightIcon } from "../icons";
 import { useEffect, useRef, useState } from "react";
 import { MarkdownContent } from "./MarkdownContent";
 
@@ -68,7 +68,7 @@ export function KojoReasoning({ text, live }: { text: string; live: boolean }) {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
       >
-        <ChevronRight size={13} className="kojo-reasoning-chevron" aria-hidden="true" />
+        <ChevronRightIcon size={13} className="kojo-reasoning-chevron" aria-hidden="true" />
         <span className="kojo-reasoning-label">Reasoning</span>
         {live && <span className="kojo-reasoning-live">thinking</span>}
       </button>

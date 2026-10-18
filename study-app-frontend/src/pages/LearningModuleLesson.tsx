@@ -1,15 +1,5 @@
-import {
-  ArrowLeft,
-  ArrowRight,
-  CheckCircle2,
-  Pause,
-  Pencil,
-  Play,
-  RotateCcw,
-  Video,
-  Volume2,
-  XCircle,
-} from "lucide-react";
+import { Pause, Play, Video, Volume2 } from "lucide-react";
+import { ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, CrossCircleIcon, PencilIcon, RetryIcon } from "../icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
@@ -1127,7 +1117,7 @@ export default function LearningModuleLesson() {
           aria-label="Back to track"
           title="Back to track"
         >
-          <ArrowLeft size={18} />
+          <ArrowLeftIcon size={18} />
         </Link>
         <div className="lm-header-main">
           <span className="eyebrow">
@@ -1169,7 +1159,7 @@ export default function LearningModuleLesson() {
                   : "Reformat article"
               }
             >
-              <RotateCcw size={17} />
+              <RetryIcon size={17} />
             </button>
             <div className="lm-menu-wrap">
               <button
@@ -1182,7 +1172,7 @@ export default function LearningModuleLesson() {
                 title="Lesson options"
                 disabled={savingEdit}
               >
-                <Pencil size={17} />
+                <PencilIcon size={17} />
               </button>
               {menuOpen ? (
                 <div className="lm-header-menu" role="menu">
@@ -1195,7 +1185,7 @@ export default function LearningModuleLesson() {
                       startEditing();
                     }}
                   >
-                    <Pencil size={15} /> Edit article
+                    <PencilIcon size={15} /> Edit article
                   </button>
                   <button
                     role="menuitem"
@@ -1206,7 +1196,7 @@ export default function LearningModuleLesson() {
                       void runReformat();
                     }}
                   >
-                    <RotateCcw size={15} /> Reformat article
+                    <RetryIcon size={15} /> Reformat article
                   </button>
                   <button
                     role="menuitem"
@@ -1325,7 +1315,7 @@ export default function LearningModuleLesson() {
                 aria-label="Start over from the beginning"
                 title="Start over"
               >
-                <RotateCcw size={15} />
+                <RetryIcon size={15} />
               </button>
             ) : null}
             {/* One speed control at every width: a chip that opens a slider.
@@ -1596,8 +1586,8 @@ export default function LearningModuleLesson() {
                       <span className="lm-quiz-option-text">
                         <MarkdownContent content={option} />
                       </span>
-                      {result && oIndex === correctIndex ? <CheckCircle2 size={16} /> : null}
-                      {result && oIndex === chosen && oIndex !== correctIndex ? <XCircle size={16} /> : null}
+                      {result && oIndex === correctIndex ? <CheckCircleIcon size={16} /> : null}
+                      {result && oIndex === chosen && oIndex !== correctIndex ? <CrossCircleIcon size={16} /> : null}
                     </button>
                   );
                 })}
@@ -1628,7 +1618,7 @@ export default function LearningModuleLesson() {
                       className="lm-quiz-explain-review"
                       onClick={() => reviewSection(explanation.lesson_section)}
                     >
-                      <ArrowLeft size={14} />
+                      <ArrowLeftIcon size={14} />
                       Review: {explanation.lesson_section.replace(/^#+\s*/, "")}
                     </button>
                   ) : null}
@@ -1648,7 +1638,7 @@ export default function LearningModuleLesson() {
           </div>
         ) : (
           <Card className={`lm-quiz-result ${result.passed ? "is-pass" : "is-fail"}`}>
-            {result.passed ? <CheckCircle2 size={30} /> : <XCircle size={30} />}
+            {result.passed ? <CheckCircleIcon size={30} /> : <CrossCircleIcon size={30} />}
             <div className="lm-quiz-result-body">
               <strong>
                 {result.score} / {result.total} {result.passed ? "- module passed" : "- not quite"}
@@ -1663,14 +1653,14 @@ export default function LearningModuleLesson() {
             </div>
             <div className="button-row">
               {!result.passed ? (
-                <Button variant="secondary" icon={<RotateCcw size={16} />} onClick={retryQuiz}>
+                <Button variant="secondary" icon={<RetryIcon size={16} />} onClick={retryQuiz}>
                   Retry quiz
                 </Button>
               ) : null}
               {result.passed && nextModule ? (
                 nextModule.ready ? (
                   <Link to={`/flashcards/${numericFolderId}/modules/${nextModule.id}`} onClick={retryQuiz}>
-                    <Button icon={<ArrowRight size={16} />}>Next module</Button>
+                    <Button icon={<ArrowRightIcon size={16} />}>Next module</Button>
                   </Link>
                 ) : (
                   <Button disabled>Next module is generating…</Button>

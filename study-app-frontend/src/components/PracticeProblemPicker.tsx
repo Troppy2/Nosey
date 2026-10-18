@@ -1,4 +1,4 @@
-import { Check, ChevronLeft, Pencil, Search, X } from "lucide-react";
+import { CheckIcon, ChevronLeftIcon, CloseIcon, PencilIcon, SearchIcon } from "../icons";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "./Button";
 import { InlineLoading } from "./Loaders";
@@ -237,7 +237,7 @@ export function PracticeProblemPicker({ folderId, fileId, problems, mode, answer
             </p>
           </div>
           <button type="button" className="pp-close" aria-label="Close" onClick={onClose} disabled={busy}>
-            <X size={18} />
+            <CloseIcon size={18} />
           </button>
         </header>
 
@@ -245,7 +245,7 @@ export function PracticeProblemPicker({ folderId, fileId, problems, mode, answer
           <>
             <div className="pp-toolbar">
               <label className="pp-search">
-                <Search size={14} />
+                <SearchIcon size={14} />
                 <input
                   type="search"
                   placeholder="Search problems"
@@ -380,10 +380,10 @@ export function PracticeProblemPicker({ folderId, fileId, problems, mode, answer
                           disabled={r.questions.length === 0 || busy}
                           aria-pressed={done}
                         >
-                          <Check size={14} /> Looks right
+                          <CheckIcon size={14} /> Looks right
                         </button>
                         <button type="button" className="pp-action" onClick={() => openFix(p.index)} disabled={busy}>
-                          <Pencil size={14} /> Fix it
+                          <PencilIcon size={14} /> Fix it
                         </button>
                       </div>
                     )}
@@ -393,7 +393,7 @@ export function PracticeProblemPicker({ folderId, fileId, problems, mode, answer
             </div>
             <footer className="pp-footer">
               <button type="button" className="pp-back" onClick={() => setStep("pick")} disabled={busy}>
-                <ChevronLeft size={14} /> Change picks
+                <ChevronLeftIcon size={14} /> Change picks
               </button>
               <div className="button-row">
                 {pendingCount > 0 ? (

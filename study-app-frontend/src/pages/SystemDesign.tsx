@@ -1,13 +1,7 @@
-import {
-  ArrowLeft,
-  BookOpen,
-  Check,
-  ClipboardCheck,
-  Hammer,
-  PlayCircle,
-  Radar,
-} from "lucide-react";
-import { useEffect, useState } from "react";
+import { ClipboardCheck, Hammer, PlayCircle, Radar } from "lucide-react";
+import { BookIcon } from "../icons";
+import { ArrowLeftIcon, CheckIcon } from "../icons";
+import { useEffect, useState, type ComponentType } from "react";
 import { Link, Navigate } from "react-router-dom";
 
 import { SD_CONCEPTS } from "../data/systemDesign";
@@ -18,9 +12,9 @@ import type { SystemDesignProgressEntry, SystemDesignSubModule } from "../lib/ty
 export const SD_SUB_MODULES: Array<{
   key: SystemDesignSubModule;
   label: string;
-  icon: typeof BookOpen;
+  icon: ComponentType<{ size?: number | string }>;
 }> = [
-  { key: "notes", label: "Notes", icon: BookOpen },
+  { key: "notes", label: "Notes", icon: BookIcon },
   { key: "video", label: "Video", icon: PlayCircle },
   { key: "visualizer", label: "Visualizer", icon: Radar },
   { key: "project", label: "Project", icon: Hammer },
@@ -98,7 +92,7 @@ export default function SystemDesign() {
     <div className="page page-narrow sd-page">
       <header className="page-header mode-header">
         <Link className="flash-back-btn" to="/leetcode" aria-label="Back to KojoCode" title="Back to KojoCode">
-          <ArrowLeft size={18} />
+          <ArrowLeftIcon size={18} />
         </Link>
         <div className="sd-header-main">
           <span className="eyebrow">KojoCode</span>
@@ -136,7 +130,7 @@ export default function SystemDesign() {
                   <span className={`sd-card-count${done === SD_SUB_MODULES.length ? " is-complete" : ""}`}>
                     {done === SD_SUB_MODULES.length ? (
                       <>
-                        <Check size={14} />
+                        <CheckIcon size={14} />
                         Complete
                       </>
                     ) : (
@@ -157,7 +151,7 @@ export default function SystemDesign() {
                         data-sub-module={subModule.key}
                         data-done={isDone ? "true" : "false"}
                       >
-                        {isDone ? <Check size={14} /> : <Icon size={14} />}
+                        {isDone ? <CheckIcon size={14} /> : <Icon size={14} />}
                         {subModule.label}
                       </li>
                     );

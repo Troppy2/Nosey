@@ -47,6 +47,50 @@
   transform: rotate(6deg);
 }
 
+/* Core set (2026-10-18). Motion only where it carries meaning; static glyphs (close, plus, search, copy, edit, nav) do not move. Arrows nudge along their own axis: drawn pointing right, rotated by the parent group. */
+.icon-trash .icon-part-lid { transform-origin: 19.5px 6.5px; }
+:is(button, a, [role="button"], [role="tab"], .icon-hover):is(:hover, :focus-visible) .icon-trash .icon-part-lid { transform: rotate(8deg); }
+
+.icon-upload .icon-part-arrow { transform-origin: 12px 12px; }
+:is(button, a, [role="button"], [role="tab"], .icon-hover):is(:hover, :focus-visible) .icon-upload .icon-part-arrow { transform: translateY(-1.5px); }
+
+.icon-retry .icon-part-loop { transform-origin: 12px 12px; }
+:is(button, a, [role="button"], [role="tab"], .icon-hover):is(:hover, :focus-visible) .icon-retry .icon-part-loop { transform: rotate(-10deg); }
+
+.icon-arrow .icon-part-arrow { transform-origin: 12px 12px; }
+:is(button, a, [role="button"], [role="tab"], .icon-hover):is(:hover, :focus-visible) .icon-arrow .icon-part-arrow { transform: translateX(1.5px); }
+.icon-settings .icon-part-gear { transform-origin: 12px 12px; }
+:is(.nav-link, .dock-link):is(:hover, :focus-visible) .icon-settings .icon-part-gear { transform: rotate(10deg); }
+
+/* Dashboard: deliberate exception to the 1.5px nudge rule (user request): tiles shuffle on hover. */
+.icon-dashboard [class*="icon-part-"] { transition-duration: 260ms; }
+:is(.nav-link, .dock-link):is(:hover, :focus-visible) .icon-dashboard .icon-part-tl { transform: translateY(9px); }
+:is(.nav-link, .dock-link):is(:hover, :focus-visible) .icon-dashboard .icon-part-bl { transform: translateY(-13px); }
+:is(.nav-link, .dock-link):is(:hover, :focus-visible) .icon-dashboard .icon-part-tr { transform: translateY(13px); }
+:is(.nav-link, .dock-link):is(:hover, :focus-visible) .icon-dashboard .icon-part-br { transform: translateY(-9px); }
+
+/* Nav icons (dashboard, folder, settings) only animate in the sidebar nav and phone dock. */
+/* Folder: paths morph closed -> open (front panel slants forward, back sides re-meet it).
+   Open twins must keep the same command letters as the closed paths in FolderIcon.tsx. */
+.icon-folder .folder-front,
+.icon-folder .folder-back { transition: d 220ms var(--icon-ease); }
+:is(.nav-link, .dock-link):is(:hover, :focus-visible) .icon-folder .folder-back {
+  d: path("M3 18.2L3 8.5Q3 5 6.5 5H9.3Q10.3 5 11 5.8L12 7H17.5Q21 7 21 10.5L21 12");
+}
+:is(.nav-link, .dock-link):is(:hover, :focus-visible) .icon-folder .folder-front {
+  d: path("M7.1 12H22.4Q23.1 12 22.9 12.7L21.6 16.8Q20.8 19.5 17.5 19.5H6.5Q3.2 19.5 4 17.6L5.8 12.7Q6.1 12 7.1 12Z");
+}
+
+/* More nav-only hovers. */
+.icon-chat .icon-part-bubble { transform-origin: 6px 19px; }
+:is(.nav-link, .dock-link):is(:hover, :focus-visible) .icon-chat .icon-part-bubble { transform: rotate(-8deg); }
+:is(.nav-link, .dock-link):is(:hover, :focus-visible) .icon-code .icon-part-left { transform: translateX(-1.5px); }
+:is(.nav-link, .dock-link):is(:hover, :focus-visible) .icon-code .icon-part-right { transform: translateX(1.5px); }
+:is(.nav-link, .dock-link):is(:hover, :focus-visible) .icon-shield .icon-part-shield { transform: translateY(-1.5px); }
+.icon-menu .icon-part-short { transform-origin: 5px 17px; }
+:is(.nav-link, .dock-link):is(:hover, :focus-visible) .icon-menu .icon-part-short { transform: scaleX(1.75); }
+
 @media (prefers-reduced-motion: reduce) {
   .icon, .icon * { transition: none !important; animation: none !important; }
 }
+

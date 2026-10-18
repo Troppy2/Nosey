@@ -1,14 +1,6 @@
-import {
-  CheckCircle2,
-  Code2,
-  FileText,
-  MessageSquare,
-  Minus,
-  ScrollText,
-  Users,
-  XCircle,
-  type LucideIcon,
-} from "lucide-react";
+import { FileText, MessageSquare, Minus, ScrollText, Users, type LucideIcon } from "lucide-react";
+import { CodeIcon } from "../icons";
+import { CheckCircleIcon, CrossCircleIcon } from "../icons";
 
 /**
  * The vocabulary of a mock interview loop: the stages, their time budgets, and the
@@ -51,7 +43,7 @@ export const LOOP_STAGES: LoopStage[] = [
     short: "OA",
     minutes: 90,
     verdictKey: "stage1_verdict",
-    icon: Code2,
+    icon: CodeIcon,
     description: "Two to three problems in a real in-app editor, each on its own clock. No hints.",
   },
   {
@@ -106,10 +98,10 @@ export const VERDICT_META: Record<
   string,
   { label: string; className: string; icon: LucideIcon; color: string }
 > = {
-  strong: { label: "Strong Pass", className: "verdict-strong", icon: CheckCircle2, color: "#10b981" },
-  pass: { label: "Pass", className: "verdict-pass", icon: CheckCircle2, color: "#3b82f6" },
+  strong: { label: "Strong Pass", className: "verdict-strong", icon: CheckCircleIcon, color: "#10b981" },
+  pass: { label: "Pass", className: "verdict-pass", icon: CheckCircleIcon, color: "#3b82f6" },
   borderline: { label: "Borderline", className: "verdict-borderline", icon: Minus, color: "#f59e0b" },
-  needs_work: { label: "Needs Work", className: "verdict-needs-work", icon: XCircle, color: "#ef4444" },
+  needs_work: { label: "Needs Work", className: "verdict-needs-work", icon: CrossCircleIcon, color: "#ef4444" },
 };
 
 export function verdictMeta(verdict?: string | null) {
@@ -131,13 +123,13 @@ export const RECOMMENDATION_META: Record<
   "STRONG HIRE": {
     label: "Strong Hire",
     className: "rec-strong-hire",
-    icon: CheckCircle2,
+    icon: CheckCircleIcon,
     description: "Exceptional performance across all stages.",
   },
   HIRE: {
     label: "Hire",
     className: "rec-hire",
-    icon: CheckCircle2,
+    icon: CheckCircleIcon,
     description: "Solid performance. Ready for the role.",
   },
   BORDERLINE: {
@@ -149,7 +141,7 @@ export const RECOMMENDATION_META: Record<
   "NO HIRE": {
     label: "No Hire",
     className: "rec-no-hire",
-    icon: XCircle,
+    icon: CrossCircleIcon,
     description: "Significant gaps identified. Keep practicing.",
   },
 };

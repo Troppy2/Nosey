@@ -1,14 +1,6 @@
-import {
-  AlertCircle,
-  BookOpen,
-  Check,
-  ExternalLink,
-  FolderPlus,
-  GraduationCap,
-  Layers,
-  Puzzle,
-  X,
-} from "lucide-react";
+import { ExternalLink, FolderPlus, GraduationCap, Layers, Puzzle } from "lucide-react";
+import { BookIcon } from "../icons";
+import { AlertIcon, CheckIcon, CloseIcon } from "../icons";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -69,7 +61,7 @@ function doneLink(card: KojoActionCardType): { to: string; label: string } | nul
 
 export function KojoActionCard({ card, folders, scopedFolderId, provider, onResolved, onFolderCreated }: Props) {
   const navigate = useNavigate();
-  const meta = ACTION_META[card.action_type] ?? { label: card.action_type, icon: <BookOpen size={13} /> };
+  const meta = ACTION_META[card.action_type] ?? { label: card.action_type, icon: <BookIcon size={13} /> };
   const needsFolder = card.action_type !== "create_folder";
   const p = card.payload;
 
@@ -101,7 +93,7 @@ export function KojoActionCard({ card, folders, scopedFolderId, provider, onReso
           {meta.icon}
           <span className="kojo-blueprint-head-label">{meta.label}</span>
           <span className="kojo-blueprint-head-status">
-            {card.entity_deleted ? <><AlertCircle size={11} /> deleted</> : <><Check size={11} /> {card.action_type === "start_matching" ? "started" : "created"}</>}
+            {card.entity_deleted ? <><AlertIcon size={11} /> deleted</> : <><CheckIcon size={11} /> {card.action_type === "start_matching" ? "started" : "created"}</>}
           </span>
         </div>
         <div className="kojo-blueprint-done">
@@ -277,10 +269,10 @@ export function KojoActionCard({ card, folders, scopedFolderId, provider, onReso
                       autoFocus
                     />
                     <button type="button" className="kojo-blueprint-btn kojo-blueprint-btn--primary" onClick={() => void handleCreateFolderInline()} disabled={!newFolderName.trim() || working}>
-                      <Check size={13} />
+                      <CheckIcon size={13} />
                     </button>
                     <button type="button" className="kojo-blueprint-btn kojo-blueprint-btn--ghost" onClick={() => setCreatingFolder(false)} disabled={working}>
-                      <X size={13} />
+                      <CloseIcon size={13} />
                     </button>
                   </div>
                 ) : (
@@ -338,15 +330,15 @@ export function KojoActionCard({ card, folders, scopedFolderId, provider, onReso
           </div>
 
           {error && (
-            <div className="kojo-blueprint-error"><AlertCircle size={13} /><span>{error}</span></div>
+            <div className="kojo-blueprint-error"><AlertIcon size={13} /><span>{error}</span></div>
           )}
           <div className="kojo-blueprint-actions">
             <button type="button" className="kojo-blueprint-btn kojo-blueprint-btn--primary" onClick={() => void handleConfirm()} disabled={working || (needsFolder && folderId === "")}>
-              {working ? <span className="loader loader--sm" /> : <Check size={13} />}
+              {working ? <span className="loader loader--sm" /> : <CheckIcon size={13} />}
               {working ? "Working…" : confirmLabel}
             </button>
             <button type="button" className="kojo-blueprint-btn kojo-blueprint-btn--ghost" onClick={() => void handleDismiss()} disabled={working}>
-              <X size={13} />Dismiss
+              <CloseIcon size={13} />Dismiss
             </button>
           </div>
         </div>

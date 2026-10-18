@@ -1,4 +1,5 @@
-import { AlertCircle, ArrowDown, Lock, Maximize2, Minimize2, Send, Sparkles, X } from "lucide-react";
+import { Lock, Maximize2, Minimize2, Send } from "lucide-react";
+import { AlertIcon, ArrowDownIcon, CloseIcon, SparklesIcon } from "../icons";
 import KojoMascot from "./KojoMascot";
 import { KojoHintCarousel } from "./KojoHintCarousel";
 import { useEffect, useRef, useState } from "react";
@@ -250,7 +251,7 @@ export function KojoHelpChat({
             </div>
             <div className="kojo-header-info">
               <span className="kojo-header-name">
-                <Sparkles size={13} className="kojo-title-icon" />
+                <SparklesIcon size={13} className="kojo-title-icon" />
                 Kojo
               </span>
               <span className="kojo-header-sub">{subtitle}</span>
@@ -268,7 +269,7 @@ export function KojoHelpChat({
               {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
             </button>
             <button className="kojo-header-btn" onClick={onClose} type="button" aria-label="Close Kojo" title="Close">
-              <X size={18} />
+              <CloseIcon size={18} />
             </button>
           </div>
         </div>
@@ -348,7 +349,7 @@ export function KojoHelpChat({
 
             {error && (
               <div className="kojo-error">
-                <AlertCircle size={14} />
+                <AlertIcon size={14} />
                 <span>{error}</span>
               </div>
             )}
@@ -367,7 +368,7 @@ export function KojoHelpChat({
             aria-label="Scroll to latest message"
             title="Scroll to latest message"
           >
-            <ArrowDown size={16} />
+            <ArrowDownIcon size={16} />
           </button>
 
           {disabled && disabledNote ? (

@@ -1,41 +1,6 @@
-import {
-  AlertCircle,
-  ArrowDown,
-  ArrowLeft,
-  ArrowUp,
-  BookOpen,
-  Check,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  ClipboardList,
-  Copy,
-  ExternalLink,
-  Files,
-  FolderOpen,
-  FolderPlus,
-  GraduationCap,
-  Layers,
-  Lightbulb,
-  ListChecks,
-  Menu,
-  MessageSquarePlus,
-  Minus,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Paperclip,
-  Pencil,
-  Plus,
-  Puzzle,
-  RotateCcw,
-  Search,
-  Sparkles,
-  Square,
-  Target,
-  Trash2,
-  Upload,
-  X,
-} from "lucide-react";
+import { ClipboardList, ExternalLink, Files, FolderPlus, GraduationCap, Layers, Lightbulb, ListChecks, MessageSquarePlus, Minus, PanelLeftClose, PanelLeftOpen, Paperclip, Puzzle, Square, Target } from "lucide-react";
+import { BookIcon, FolderIcon, MenuIcon } from "../icons";
+import { AlertIcon, ArrowDownIcon, ArrowLeftIcon, ArrowUpIcon, CheckCircleIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, CopyIcon, PencilIcon, PlusIcon, RetryIcon, SearchIcon, SparklesIcon, TrashIcon, UploadIcon } from "../icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { usePageTour } from "../components/tours/usePageTour";
@@ -362,7 +327,7 @@ function BlueprintCard({ message, folderId, provider, onGenerate, onCancel }: Bl
         <div className="kojo-blueprint-head kojo-blueprint-head--static">
           <ClipboardList size={13} />
           <span className="kojo-blueprint-head-label">practice test</span>
-          <span className="kojo-blueprint-head-status"><Check size={11} /> created</span>
+          <span className="kojo-blueprint-head-status"><CheckIcon size={11} /> created</span>
         </div>
         <div className="kojo-blueprint-done">
           <span>{title || "Practice Test"}</span>
@@ -445,15 +410,15 @@ function BlueprintCard({ message, folderId, provider, onGenerate, onCancel }: Bl
         </label>
       </div>
       {genError && (
-        <div className="kojo-blueprint-error"><AlertCircle size={13} /><span>{genError}</span></div>
+        <div className="kojo-blueprint-error"><AlertIcon size={13} /><span>{genError}</span></div>
       )}
       <div className="kojo-blueprint-actions">
         <button type="button" className="kojo-blueprint-btn kojo-blueprint-btn--primary" onClick={handleGenerate} disabled={generating}>
-          {generating ? <span className="loader loader--sm" /> : <Check size={13} />}
+          {generating ? <span className="loader loader--sm" /> : <CheckIcon size={13} />}
           {generating ? "Generating…" : "Generate Test"}
         </button>
         <button type="button" className="kojo-blueprint-btn kojo-blueprint-btn--ghost" onClick={() => onCancel(message.id)} disabled={generating}>
-          <X size={13} />Dismiss
+          <CloseIcon size={13} />Dismiss
         </button>
       </div>
       </div>
@@ -519,7 +484,7 @@ function FolderBrowser({ folders, onOpen, onCreate }: FolderBrowserProps) {
         <div className="kojo-browse-head">
           <h1>Folders</h1>
           <button type="button" className="kojo-browse-new" onClick={() => setCreating((c) => !c)}>
-            <Plus size={15} />
+            <PlusIcon size={15} />
             New folder
           </button>
         </div>
@@ -552,7 +517,7 @@ function FolderBrowser({ folders, onOpen, onCreate }: FolderBrowserProps) {
         )}
 
         <div className="kojo-browse-search">
-          <Search size={16} />
+          <SearchIcon size={16} />
           <input
             type="search"
             value={query}
@@ -651,7 +616,7 @@ function FolderHome({ folder, conversations, files, disabled, uploading, uploadE
       <div className="kojo-home-inner">
         <div className="kojo-home-main">
           <button type="button" className="kojo-home-back" onClick={onBack}>
-            <ArrowLeft size={14} />
+            <ArrowLeftIcon size={14} />
             All folders
           </button>
 
@@ -681,7 +646,7 @@ function FolderHome({ folder, conversations, files, disabled, uploading, uploadE
               disabled={!draft.trim() || disabled}
               aria-label="Start chat"
             >
-              <ArrowUp size={16} />
+              <ArrowUpIcon size={16} />
             </button>
           </div>
 
@@ -746,7 +711,7 @@ function FolderHome({ folder, conversations, files, disabled, uploading, uploadE
                 aria-label="Add files"
                 title="Add files"
               >
-                {uploading ? <span className="loader loader--sm" /> : <Plus size={15} />}
+                {uploading ? <span className="loader loader--sm" /> : <PlusIcon size={15} />}
               </button>
             </div>
 
@@ -764,7 +729,7 @@ function FolderHome({ folder, conversations, files, disabled, uploading, uploadE
 
             {files.length === 0 ? (
               <button type="button" className="kojo-files-drop" onClick={pickFiles} disabled={!canUpload}>
-                <Upload size={18} />
+                <UploadIcon size={18} />
                 <span className="kojo-files-drop-main">
                   Drop files here or <span className="kojo-files-drop-link">browse</span>
                 </span>
@@ -787,7 +752,7 @@ function FolderHome({ folder, conversations, files, disabled, uploading, uploadE
                       aria-label={`Remove ${f.file_name}`}
                       title="Remove file"
                     >
-                      <Trash2 size={14} />
+                      <TrashIcon size={14} />
                     </button>
                   </div>
                 ))}
@@ -795,7 +760,7 @@ function FolderHome({ folder, conversations, files, disabled, uploading, uploadE
             )}
 
             {uploadError && <p className="kojo-files-error">{uploadError}</p>}
-            {dragging && <div className="kojo-files-overlay" aria-hidden="true"><Upload size={20} /><span>Drop to add</span></div>}
+            {dragging && <div className="kojo-files-overlay" aria-hidden="true"><UploadIcon size={20} /><span>Drop to add</span></div>}
           </section>
           {removingFile
             ? createPortal(
@@ -1830,7 +1795,7 @@ function KojoChatPage() {
             onClick={() => setSidebarOpen(false)}
             aria-label="Close menu"
           >
-            <X size={18} />
+            <CloseIcon size={18} />
           </button>
         </div>
 
@@ -1841,7 +1806,7 @@ function KojoChatPage() {
           onClick={() => void handleNewChat()}
           disabled={isLoading}
         >
-          <Plus size={14} />
+          <PlusIcon size={14} />
           new chat
         </button>
 
@@ -1861,7 +1826,7 @@ function KojoChatPage() {
             className={`chat-mode-nav-btn${view === "folders" || view === "home" ? " chat-mode-nav-btn--active" : ""}`}
             onClick={() => { setView("folders"); setSidebarOpen(false); }}
           >
-            <FolderOpen size={14} />
+            <FolderIcon size={14} />
             folders
           </button>
         </nav>
@@ -1904,7 +1869,7 @@ function KojoChatPage() {
                       aria-hidden="true"
                     >
                       {selectedChatIds.size === conversations.length ? (
-                        <Check size={11} strokeWidth={3} />
+                        <CheckIcon size={11} strokeWidth={3} />
                       ) : selectedChatIds.size > 0 ? (
                         <Minus size={11} strokeWidth={3} />
                       ) : null}
@@ -1914,7 +1879,7 @@ function KojoChatPage() {
                   {selectedChatIds.size > 0 ? (
                     <Button
                       variant="danger-outline"
-                      icon={<Trash2 size={14} />}
+                      icon={<TrashIcon size={14} />}
                       className="file-manager-bulk-delete"
                       onClick={() => setConfirmBulkDelete(true)}
                     >
@@ -1977,7 +1942,7 @@ function KojoChatPage() {
                         onClick={() => setDeletingConvId(conv.id)}
                         title="Delete chat"
                       >
-                        <Trash2 size={15} />
+                        <TrashIcon size={15} />
                       </button>
                     )}
                   </div>
@@ -2012,7 +1977,7 @@ function KojoChatPage() {
                 so the way back lives here in its own header rather than as a
                 floating overlay, which would land on the menu button below. */}
             <Link className="chat-mode-back-btn" to="/dashboard" aria-label="Back to dashboard" title="Back to dashboard">
-              <ArrowLeft size={20} />
+              <ArrowLeftIcon size={20} />
             </Link>
             <button
               type="button"
@@ -2021,7 +1986,7 @@ function KojoChatPage() {
               onClick={() => setSidebarOpen(true)}
               aria-label="Open chats and folders"
             >
-              <Menu size={26} />
+              <MenuIcon size={26} />
             </button>
             <button
               type="button"
@@ -2065,7 +2030,7 @@ function KojoChatPage() {
               )}
               {view === "chat" && !isGeneralMode && (
                 <span className="chat-mode-folder-pill" title={selectedFolder?.name}>
-                  <FolderOpen size={11} aria-hidden="true" />
+                  <FolderIcon size={11} aria-hidden="true" />
                   <span className="chat-mode-folder-pill-name">{selectedFolder?.name ?? "-"}</span>
                 </span>
               )}
@@ -2096,7 +2061,7 @@ function KojoChatPage() {
                   title="Clear chat"
                   aria-label="Clear chat history"
                 >
-                  <Trash2 size={17} />
+                  <TrashIcon size={17} />
                 </button>
               )}
             </div>
@@ -2238,7 +2203,7 @@ function KojoChatPage() {
                                   disabled={ansIdx === 0}
                                   aria-label="Previous answer"
                                 >
-                                  <ChevronLeft size={13} />
+                                  <ChevronLeftIcon size={13} />
                                 </button>
                                 <span>{ansIdx + 1}/{ansVersions!.length}</span>
                                 <button
@@ -2247,7 +2212,7 @@ function KojoChatPage() {
                                   disabled={ansIdx === ansVersions!.length - 1}
                                   aria-label="Next answer"
                                 >
-                                  <ChevronRight size={13} />
+                                  <ChevronRightIcon size={13} />
                                 </button>
                               </div>
                             )}
@@ -2259,7 +2224,7 @@ function KojoChatPage() {
                                 aria-label={copiedId === msg.id ? "Copied" : "Copy response"}
                                 title="Copy"
                               >
-                                {copiedId === msg.id ? <Check size={13} /> : <Copy size={13} />}
+                                {copiedId === msg.id ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
                               </button>
                               {msg.id === lastAssistantId && !msg.stopped && (
                                 <button
@@ -2270,7 +2235,7 @@ function KojoChatPage() {
                                   title="Regenerate"
                                   disabled={isLoading}
                                 >
-                                  <RotateCcw size={13} />
+                                  <RetryIcon size={13} />
                                 </button>
                               )}
                             </div>
@@ -2332,7 +2297,7 @@ function KojoChatPage() {
                     <div className="kojo-user-col">
                       <div className={`kojo-user-bubble${msg.failed ? " kojo-user-bubble--failed" : ""}`}>
                         {msg.display ? (
-                          <span className="kojo-command-pill"><Sparkles size={11} />{msg.display}</span>
+                          <span className="kojo-command-pill"><SparklesIcon size={11} />{msg.display}</span>
                         ) : (
                           <p>{bubbleText}</p>
                         )}
@@ -2340,7 +2305,7 @@ function KojoChatPage() {
 
                       {msg.failed ? (
                         <div className="kojo-user-failed" role="alert">
-                          <AlertCircle size={12} />
+                          <AlertIcon size={12} />
                           <span>Couldn't send.</span>
                           <button
                             type="button"
@@ -2348,7 +2313,7 @@ function KojoChatPage() {
                             onClick={() => handleRetry(msg)}
                             disabled={isLoading}
                           >
-                            <RotateCcw size={12} />
+                            <RetryIcon size={12} />
                             Retry
                           </button>
                         </div>
@@ -2362,7 +2327,7 @@ function KojoChatPage() {
                                 disabled={viewIdx === 0}
                                 aria-label="Previous version"
                               >
-                                <ChevronLeft size={13} />
+                                <ChevronLeftIcon size={13} />
                               </button>
                               <span>{viewIdx + 1}/{versions!.length}</span>
                               <button
@@ -2371,7 +2336,7 @@ function KojoChatPage() {
                                 disabled={viewIdx === versions!.length - 1}
                                 aria-label="Next version"
                               >
-                                <ChevronRight size={13} />
+                                <ChevronRightIcon size={13} />
                               </button>
                             </div>
                           )}
@@ -2383,7 +2348,7 @@ function KojoChatPage() {
                               aria-label={copiedId === msg.id ? "Copied" : "Copy prompt"}
                               title="Copy"
                             >
-                              {copiedId === msg.id ? <Check size={13} /> : <Copy size={13} />}
+                              {copiedId === msg.id ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
                             </button>
                             {canEdit && (
                               <button
@@ -2394,7 +2359,7 @@ function KojoChatPage() {
                                 title="Edit"
                                 disabled={isLoading}
                               >
-                                <Pencil size={13} />
+                                <PencilIcon size={13} />
                               </button>
                             )}
                           </div>
@@ -2440,7 +2405,7 @@ function KojoChatPage() {
             aria-label="Scroll to latest message"
             title="Scroll to latest message"
           >
-            <ArrowDown size={16} />
+            <ArrowDownIcon size={16} />
           </button>
 
           <div className="chat-mode-input-shell">
@@ -2481,7 +2446,7 @@ function KojoChatPage() {
                     disabled={isLoading || !canCompose}
                     aria-label="Attach files and actions"
                   >
-                    {isUploading ? <span className="loader loader--sm" /> : <Plus size={16} />}
+                    {isUploading ? <span className="loader loader--sm" /> : <PlusIcon size={16} />}
                   </button>
                   {showAttachMenu && (
                     <div className="kojo-attach-menu">
@@ -2519,7 +2484,7 @@ function KojoChatPage() {
 
                       {!isGeneralMode && (
                         <div className="kojo-attach-menu-item kojo-attach-menu-item--info">
-                          <CheckCircle2 size={13} className="kojo-attach-menu-check" />
+                          <CheckCircleIcon size={13} className="kojo-attach-menu-check" />
                           <span>Folder notes included</span>
                         </div>
                       )}
@@ -2560,7 +2525,7 @@ function KojoChatPage() {
                     type="button"
                     aria-label="Send"
                   >
-                    <ArrowUp size={16} />
+                    <ArrowUpIcon size={16} />
                   </button>
                 )}
               </div>
@@ -2585,7 +2550,7 @@ function KojoChatPage() {
                 onClick={() => setDocsOpen(false)}
                 aria-label="Close documents"
               >
-                <X size={14} />
+                <CloseIcon size={14} />
               </button>
             </div>
             <div className="chat-mode-docs-body">
@@ -2608,7 +2573,7 @@ function KojoChatPage() {
                             : "matching";
                     const row = (
                       <>
-                        <FolderOpen size={13} className="chat-mode-doc-icon chat-mode-doc-icon--test" />
+                        <FolderIcon size={13} className="chat-mode-doc-icon chat-mode-doc-icon--test" />
                         <span className="chat-mode-doc-info">
                           <span className={`chat-mode-doc-name${c.entity_deleted ? " kojo-action-deleted-name" : ""}`}>{title}</span>
                           <span className="chat-mode-doc-meta">
@@ -2657,7 +2622,7 @@ function KojoChatPage() {
                         onClick={() => void handleDeleteFile(f.id)}
                         aria-label={`Remove ${f.file_name}`}
                       >
-                        <X size={12} />
+                        <CloseIcon size={12} />
                       </button>
                     </div>
                   ))}

@@ -1,4 +1,5 @@
-import { ArrowLeft, ArrowLeftRight, X } from "lucide-react";
+import { ArrowLeftRight } from "lucide-react";
+import { ArrowLeftIcon, CloseIcon } from "../icons";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Button } from "./Button";
 import { Dropdown, type DropdownOption } from "./Dropdown";
@@ -314,7 +315,7 @@ export function QuizletImportModal({ folderId, newFolderName, onClose, onImporte
             </p>
           </div>
           <button className="qz-close" type="button" aria-label="Close" onClick={onClose} disabled={busy}>
-            <X size={18} />
+            <CloseIcon size={18} />
           </button>
         </div>
 
@@ -457,7 +458,7 @@ export function QuizletImportModal({ folderId, newFolderName, onClose, onImporte
                           onClick={() => setDrafts((current) => current.filter((row) => row.id !== draft.id))}
                           disabled={busy}
                         >
-                          <X size={15} />
+                          <CloseIcon size={15} />
                         </button>
                       </li>
                     );
@@ -509,7 +510,7 @@ export function QuizletImportModal({ folderId, newFolderName, onClose, onImporte
               <div className="button-row">
                 <Button
                   variant="secondary"
-                  icon={<ArrowLeft size={16} />}
+                  icon={<ArrowLeftIcon size={16} />}
                   onClick={() => {
                     setStep("paste");
                     setError(null);

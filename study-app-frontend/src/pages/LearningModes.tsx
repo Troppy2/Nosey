@@ -1,4 +1,6 @@
-import { ArrowLeft, FolderOpen, BookCopy, Puzzle } from "lucide-react";
+import { BookCopy, Puzzle } from "lucide-react";
+import { FolderIcon } from "../icons";
+import { ArrowLeftIcon } from "../icons";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Card } from "../components/Card";
@@ -48,7 +50,7 @@ export default function LearningModes() {
           <SkeletonFolderGrid count={4} label="Loading your class folders" />
         ) : folders.length === 0 ? (
           <EmptyState
-            icon={<FolderOpen />}
+            icon={<FolderIcon />}
             title="No class folders yet"
             body="Create a class folder first, then generate or add flashcards in that folder."
             action={
@@ -63,7 +65,7 @@ export default function LearningModes() {
               <Card key={folder.id} interactive className="folder-card flash-folder-card">
                 <Link className="folder-card-main" to={`/flashcards/${folder.id}`}>
                   <div>
-                    <FolderOpen size={34} style={{ color: folder.color ?? "var(--green-dark)" }} />
+                    <FolderIcon size={34} style={{ color: folder.color ?? "var(--green-dark)" }} />
                     <h2>{folder.name}</h2>
                     <p className="muted">{folder.subject ?? "Class folder"}</p>
                   </div>
@@ -93,7 +95,7 @@ export default function LearningModes() {
     <div className="page page-narrow">
       <header className="page-header mode-header">
         <Link className="flash-back-btn" to="/flashcards" aria-label="Back to class folders" title="Back to class folders">
-          <ArrowLeft size={18} />
+          <ArrowLeftIcon size={18} />
         </Link>
         {loading ? (
           <div className="mode-header-loading" role="status" aria-label="Loading this class">

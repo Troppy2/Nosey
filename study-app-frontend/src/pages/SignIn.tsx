@@ -1,4 +1,6 @@
-import { ArrowLeft, LogIn, ShieldCheck } from "lucide-react";
+import { LogIn } from "lucide-react";
+import { ShieldIcon } from "../icons";
+import { ArrowLeftIcon } from "../icons";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { PrivacyTermsModal } from "../components/PrivacyTermsModal";
@@ -114,7 +116,7 @@ export default function SignIn() {
     <main className="landing signin-page">
       <section className="landing-card">
         <button className="signin-back" onClick={() => navigate("/")}>
-          <ArrowLeft size={16} />
+          <ArrowLeftIcon size={16} />
           <span>Back</span>
         </button>
 
@@ -166,7 +168,7 @@ export default function SignIn() {
             .
           </p>
           <div className="trust-note">
-            <ShieldCheck size={17} />
+            <ShieldIcon size={17} />
             <span>Your notes stay tied to your account and are never sold.</span>
           </div>
         </Card>

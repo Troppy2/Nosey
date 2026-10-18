@@ -1,4 +1,5 @@
-import { CornerDownLeft, Sparkles } from "lucide-react";
+import { CornerDownLeft } from "lucide-react";
+import { SparklesIcon } from "../icons";
 
 export type CommandOption = {
   slash: string;
@@ -29,7 +30,7 @@ export function SlashCommandMenu({ commands, activeIndex = 0, onSelect }: Props)
           onClick={() => onSelect(command)}
         >
           <span className="slash-menu-icon" aria-hidden="true">
-            <Sparkles size={15} />
+            <SparklesIcon size={15} />
           </span>
           <span className="slash-menu-copy">
             <span className="slash-menu-item-top">

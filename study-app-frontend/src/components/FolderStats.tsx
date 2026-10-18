@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { PlusIcon } from "../icons";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createDailyQuiz, fetchFolderStats } from "../lib/api";
@@ -71,7 +71,7 @@ export function FolderStats({ folderId }: { folderId: number }) {
         body={message.body}
         action={
           <Link to={`/create-test?folderId=${folderId}`}>
-            <Button icon={<Plus size={16} />}>Take your first test</Button>
+            <Button icon={<PlusIcon size={16} />}>Take your first test</Button>
           </Link>
         }
       />

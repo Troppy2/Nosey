@@ -1,4 +1,5 @@
-import { Check, Edit3, Pin, Plus, Search, Trash2, X } from "lucide-react";
+import { Pin } from "lucide-react";
+import { CheckIcon, CloseIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from "../icons";
 import type { FormEvent } from "react";
 import { useMemo, useState } from "react";
 import { Button } from "./Button";
@@ -187,18 +188,18 @@ export default function SlashCommandManager({ commands, loading = false, onChang
             {form.is_pinned ? "Pinned" : "Pin"}
           </Button>
           {editingId ? (
-            <Button type="button" variant="primary" icon={<X size={15} className="icon-cancel" />} onClick={resetForm}>
+            <Button type="button" variant="primary" icon={<CloseIcon size={15} className="icon-cancel" />} onClick={resetForm}>
               Cancel
             </Button>
           ) : null}
-          <Button type="submit" icon={saving ? <Check size={15} className="icon-check" /> : <Plus size={15} className="icon-plus" />} disabled={saving}>
+          <Button type="submit" icon={saving ? <CheckIcon size={15} className="icon-check" /> : <PlusIcon size={15} className="icon-plus" />} disabled={saving}>
             {saving ? <InlineLoading label="Saving" /> : editingId ? "Update" : "Create"}
           </Button>
         </div>
       </form>
 
       <div className="slash-manager-search">
-        <Search size={15} className="icon-search" />
+        <SearchIcon size={15} className="icon-search" />
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search commands" />
       </div>
 
@@ -231,10 +232,10 @@ export default function SlashCommandManager({ commands, loading = false, onChang
                   <Pin size={16} />
                 </button>
                 <button type="button" className="slash-action-btn action-edit" onClick={() => editCommand(command)} aria-label="Edit command" title="Edit">
-                  <Edit3 size={16} />
+                  <PencilIcon size={16} />
                 </button>
                 <button type="button" className="slash-action-btn action-delete" onClick={() => setConfirmDelete(command)} aria-label="Delete command" title="Delete">
-                  <Trash2 size={16} />
+                  <TrashIcon size={16} />
                 </button>
               </div>
             </article>

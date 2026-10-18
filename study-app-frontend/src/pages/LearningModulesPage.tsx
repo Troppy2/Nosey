@@ -1,21 +1,5 @@
-import {
-  AlertCircle,
-  Archive,
-  ArchiveRestore,
-  ArrowLeft,
-  BookOpenCheck,
-  CheckCircle2,
-  ChevronRight,
-  GraduationCap,
-  Loader2,
-  Lock,
-  Mic2,
-  Presentation,
-  RefreshCcw,
-  Trash2,
-  Upload,
-  X,
-} from "lucide-react";
+import { Archive, ArchiveRestore, BookOpenCheck, GraduationCap, Loader2, Lock, Mic2, Presentation, RefreshCcw } from "lucide-react";
+import { AlertIcon, ArrowLeftIcon, CheckCircleIcon, ChevronRightIcon, CloseIcon, TrashIcon, UploadIcon } from "../icons";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -319,7 +303,7 @@ export default function LearningModulesPage() {
         >
           <Archive size={15} />
           Archived tracks ({archivedTracks.length})
-          <ChevronRight size={16} className={showArchived ? "lm-chevron-open" : ""} />
+          <ChevronRightIcon size={16} className={showArchived ? "lm-chevron-open" : ""} />
         </button>
         {showArchived ? (
           <div className="lm-archived-tracks">
@@ -338,7 +322,7 @@ export default function LearningModulesPage() {
                       onClick={() => setOpenArchivedId(open ? null : at.id)}
                       aria-expanded={open}
                     >
-                      <ChevronRight size={16} className={open ? "lm-chevron-open" : ""} />
+                      <ChevronRightIcon size={16} className={open ? "lm-chevron-open" : ""} />
                       <span className="lm-archived-track-title">
                         {at.modules.length} module{at.modules.length === 1 ? "" : "s"}
                         {dateLabel ? ` · ${dateLabel}` : ""}
@@ -364,7 +348,7 @@ export default function LearningModulesPage() {
                         disabled={archiveBusy}
                         onClick={() => setDeleteArchivedId(at.id)}
                       >
-                        <Trash2 size={16} />
+                        <TrashIcon size={16} />
                       </button>
                     </div>
                   </div>
@@ -385,7 +369,7 @@ export default function LearningModulesPage() {
                                 ) : null}
                               </span>
                               <span className="lm-module-state">
-                                {module.passed ? <CheckCircle2 size={20} /> : <ChevronRight size={20} />}
+                                {module.passed ? <CheckCircleIcon size={20} /> : <ChevronRightIcon size={20} />}
                               </span>
                             </Link>
                           ) : (
@@ -533,7 +517,7 @@ export default function LearningModulesPage() {
             <span className="form-error small">{episode.error ?? "Generation failed. Try again."}</span>
           ) : done ? (
             <span className="lm-format-completed">
-              <CheckCircle2 size={16} /> Completed by listening
+              <CheckCircleIcon size={16} /> Completed by listening
             </span>
           ) : (
             <span className="muted small">Not passed yet</span>
@@ -552,7 +536,7 @@ export default function LearningModulesPage() {
               disabled={busy}
               onClick={() => void deleteEpisodeTrack(episode)}
             >
-              <Trash2 size={16} />
+              <TrashIcon size={16} />
             </button>
           </div>
         ) : null}
@@ -577,7 +561,7 @@ export default function LearningModulesPage() {
       <div className="page page-narrow">
         <header className="page-header mode-header">
           <Link className="flash-back-btn" to={`/flashcards/${numericFolderId}`} aria-label="Back to modes" title="Back to modes">
-            <ArrowLeft size={18} />
+            <ArrowLeftIcon size={18} />
           </Link>
           <div>
             <span className="eyebrow">Learning Modules</span>
@@ -593,7 +577,7 @@ export default function LearningModulesPage() {
           {renderFormatPicker()}
           {speechNotice ? (
             <div className="lm-speech-notice lm-speech-notice--inline">
-              <AlertCircle size={16} />
+              <AlertIcon size={16} />
               <p className="small">
                 Audio playback is not available in this browser. You can still read the transcript
                 and answer the checkpoint questions.
@@ -623,7 +607,7 @@ export default function LearningModulesPage() {
               </p>
               {moduleCount > 10 ? (
                 <div className="lm-count-warning">
-                  <AlertCircle size={16} />
+                  <AlertIcon size={16} />
                   <p className="small">
                     Big tracks take a while. Each module is written one at a time, so {moduleCount}{" "}
                     modules can take several minutes to finish. You can start module 1 as soon as
@@ -662,7 +646,7 @@ export default function LearningModulesPage() {
           <div className="button-row">
             <Button
               variant="secondary"
-              icon={<Upload size={16} />}
+              icon={<UploadIcon size={16} />}
               onClick={() => fileInputRef.current?.click()}
               disabled={busy}
             >
@@ -761,7 +745,7 @@ export default function LearningModulesPage() {
     <div className="page page-narrow">
       <header className="page-header mode-header">
         <Link className="flash-back-btn" to={`/flashcards/${numericFolderId}`} aria-label="Back to modes" title="Back to modes">
-          <ArrowLeft size={18} />
+          <ArrowLeftIcon size={18} />
         </Link>
         <div className="lm-header-main">
           <span className="eyebrow">Learning Modules</span>
@@ -809,7 +793,7 @@ export default function LearningModulesPage() {
               title="Delete track"
               disabled={busy}
             >
-              <Trash2 size={17} />
+              <TrashIcon size={17} />
             </button>
           </div>
         ) : null}
@@ -819,7 +803,7 @@ export default function LearningModulesPage() {
 
       {track.status === "failed" ? (
         <Card className="lm-failed">
-          <AlertCircle size={22} />
+          <AlertIcon size={22} />
           <div>
             <strong>Generation failed.</strong>
             <p className="muted small">{track.error ?? "Something went wrong while building the track."}</p>
@@ -832,7 +816,7 @@ export default function LearningModulesPage() {
 
       {track.notes_stale ? (
         <Card className="lm-stale">
-          <AlertCircle size={18} />
+          <AlertIcon size={18} />
           <p>
             This folder's notes have changed since the track was built. Rebuild it to match the new
             material.
@@ -866,7 +850,7 @@ export default function LearningModulesPage() {
               })();
             }}
           >
-            <X size={14} /> Cancel
+            <CloseIcon size={14} /> Cancel
           </button>
         </div>
       ) : null}
@@ -890,11 +874,11 @@ export default function LearningModulesPage() {
               </span>
               <span className="lm-module-state">
                 {module.passed ? (
-                  <CheckCircle2 size={20} />
+                  <CheckCircleIcon size={20} />
                 ) : !module.ready ? (
                   <Loader2 size={18} className="lm-spin" />
                 ) : openable ? (
-                  <ChevronRight size={20} />
+                  <ChevronRightIcon size={20} />
                 ) : (
                   <Lock size={17} />
                 )}

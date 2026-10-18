@@ -1,6 +1,6 @@
 import katex from "katex";
 import "katex/dist/katex.min.css";
-import { Check, Copy } from "lucide-react";
+import { CheckIcon, CopyIcon } from "../icons";
 import React, { useState } from "react";
 
 import { repairMathDelimiters } from "../lib/repairMathDelimiters";
@@ -414,7 +414,7 @@ function CodeBlock({ lang, src, enableCopy }: { lang: string; src: string; enabl
           {lang && <span className="kojo-code-lang">{lang}</span>}
           {enableCopy && (
             <button type="button" className="kojo-code-copy" onClick={copy} aria-label={copied ? "Copied" : "Copy code"}>
-              {copied ? <Check size={13} /> : <Copy size={13} />}
+              {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
               {copied ? "Copied" : "Copy"}
             </button>
           )}

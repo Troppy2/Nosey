@@ -1,4 +1,5 @@
-import { ArrowLeft, Check, ListChecks, Puzzle, RotateCcw, Sparkles, Target, Trophy } from "lucide-react";
+import { ListChecks, Puzzle, Target, Trophy } from "lucide-react";
+import { ArrowLeftIcon, CheckIcon, RetryIcon, SparklesIcon } from "../icons";
 import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
@@ -161,7 +162,7 @@ export default function Matching() {
         id: "unseen" as DeckId,
         title: "Cards you have not tried",
         blurb: "Never attempted in any mode.",
-        icon: Sparkles,
+        icon: SparklesIcon,
         count: unseen.length,
       },
       {
@@ -458,7 +459,7 @@ export default function Matching() {
               aria-label="Back to modes"
               title="Back to modes"
             >
-              <ArrowLeft size={18} />
+              <ArrowLeftIcon size={18} />
             </Link>
             <p className="match-setup-folder">{folder?.name ?? "Matching"}</p>
           </div>
@@ -528,7 +529,7 @@ export default function Matching() {
                         }
                         aria-pressed={on}
                       >
-                        <span className="match-picker-check">{on ? <Check size={13} /> : null}</span>
+                        <span className="match-picker-check">{on ? <CheckIcon size={13} /> : null}</span>
                         <span className="match-picker-text">{preview(card.front)}</span>
                         {isStruggling(card) ? <span className="match-picker-flag">missed</span> : null}
                       </button>
@@ -616,7 +617,7 @@ export default function Matching() {
                 Drill the {missedCards.length} you missed
               </Button>
             ) : (
-              <Button icon={<RotateCcw size={18} />} onClick={() => startRun(buildDeck(deckId))}>
+              <Button icon={<RetryIcon size={18} />} onClick={() => startRun(buildDeck(deckId))}>
                 Play again
               </Button>
             )}
@@ -646,7 +647,7 @@ export default function Matching() {
           aria-label="Back to modes"
           title="Back to modes"
         >
-          <ArrowLeft size={17} />
+          <ArrowLeftIcon size={17} />
         </Link>
         <span className="match-rail-deck">{activeDeck?.title ?? "Matching"}</span>
         <span className="match-rail-round">

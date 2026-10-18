@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { CloseIcon } from "../icons";
 import { useEffect } from "react";
 
 // The privacy policy and terms of service, opened from the landing footer and
@@ -19,7 +19,7 @@ export function PrivacyTermsModal({ onClose }: { onClose: () => void }) {
         <div className="privacy-modal-header">
           <h2>Privacy Policy &amp; Terms of Service</h2>
           <button className="privacy-modal-close" onClick={() => onClose()} aria-label="Close">
-            <X size={18} />
+            <CloseIcon size={18} />
           </button>
         </div>
         <div className="privacy-modal-body">

@@ -1,4 +1,5 @@
-import { BookOpen, Brain, FileText, LogIn, ShieldCheck } from "lucide-react";
+import { FileText, LogIn } from "lucide-react";
+import { BookIcon, BrainIcon, ShieldIcon } from "../icons";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -14,12 +15,12 @@ const features = [
     body: "Use PDF, TXT, or Markdown notes as the grounded source for practice.",
   },
   {
-    icon: BookOpen,
+    icon: BookIcon,
     title: "Generate tests",
     body: "Practice with multiple choice, written, or mixed question sets.",
   },
   {
-    icon: Brain,
+    icon: BrainIcon,
     title: "Review weak spots",
     body: "Turn missed concepts into flashcards you can revisit.",
   },
@@ -64,7 +65,7 @@ export default function Landing() {
             </Button>
           </div>
           <div className="trust-note">
-            <ShieldCheck size={17} />
+            <ShieldIcon size={17} />
             <span>Sign in to save your notes, tests, and progress across devices.</span>
           </div>
           <div className="guest-skip">

@@ -1,4 +1,5 @@
-import { ChevronRight, Clock } from "lucide-react";
+import { Clock } from "lucide-react";
+import { ChevronRightIcon } from "../icons";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type { MockInterviewSession, Stage1GradeResponse, Stage1QuestionResult } from "../lib/types";
 import type { MockProgress } from "../lib/mockInterview";
@@ -141,7 +142,7 @@ function Stage1ResultsView({ stored }: { stored: MockProgress | null }) {
           onClick={() => navigate(nextRoute(), { state: { session: state?.session, selectedStages } })}
         >
           {hasLaterStage ? "Continue to Next Stage" : "View Final Summary"}
-          <ChevronRight size={15} />
+          <ChevronRightIcon size={15} />
         </button>
       </div>
     </div>

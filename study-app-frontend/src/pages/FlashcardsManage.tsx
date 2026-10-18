@@ -1,4 +1,5 @@
-import { ArrowLeft, Edit3, FileDown, FileUp, Plus, Trash2, Upload } from "lucide-react";
+import { FileDown, FileUp } from "lucide-react";
+import { ArrowLeftIcon, PencilIcon, PlusIcon, TrashIcon, UploadIcon } from "../icons";
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -255,7 +256,7 @@ export default function FlashcardsManage() {
       <header className="page-header">
         <div>
           <Link className="back-link" to={`/folders/${id}`}>
-            <ArrowLeft size={16} />
+            <ArrowLeftIcon size={16} />
             Back to folder
           </Link>
           <h1>Manage Flashcards</h1>
@@ -277,7 +278,7 @@ export default function FlashcardsManage() {
             Export to Quizlet
           </Button>
           <Button
-            icon={<Trash2 size={18} />}
+            icon={<TrashIcon size={18} />}
             onClick={() => setShowDeleteAllModal(true)}
             variant="danger"
             disabled={cards.length === 0}
@@ -309,7 +310,7 @@ export default function FlashcardsManage() {
           />
           <Button
             data-tour="manage-from-file"
-            icon={<Upload size={18} />}
+            icon={<UploadIcon size={18} />}
             onClick={() => fileRef.current?.click()}
             variant="secondary"
             disabled={generating}
@@ -318,7 +319,7 @@ export default function FlashcardsManage() {
           </Button>
           <Button
             data-tour="manage-more"
-            icon={<Plus size={18} />}
+            icon={<PlusIcon size={18} />}
             onClick={handleGenerateMore}
             variant="secondary"
             disabled={generatingMore}
@@ -371,7 +372,7 @@ export default function FlashcardsManage() {
         />
         <Button
           disabled={!newFront.trim() || !newBack.trim()}
-          icon={<Plus size={18} />}
+          icon={<PlusIcon size={18} />}
           onClick={handleAdd}
         >
           Add Card
@@ -420,10 +421,10 @@ export default function FlashcardsManage() {
                   </div>
                   <div className="row-actions">
                     <button aria-label="Edit card" onClick={() => startEdit(card)} type="button">
-                      <Edit3 size={17} />
+                      <PencilIcon size={17} />
                     </button>
                     <button aria-label="Delete card" onClick={() => setConfirmDeleteCard(card)} type="button">
-                      <Trash2 size={17} />
+                      <TrashIcon size={17} />
                     </button>
                   </div>
                 </Card>
