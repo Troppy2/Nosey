@@ -50,6 +50,9 @@ class Question(Base):
     answer_input: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
     # Language of a "code" question; None falls back to tests.coding_language.
     code_language: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    # Short topic name written by the LLM at generation (migration 071); folder
+    # stats group answers by it. None for older and untagged questions.
+    topic: Mapped[Optional[str]] = mapped_column(String(80), nullable=True, index=True)
 
     test: Mapped[Test] = relationship("Test", back_populates="questions")
     mcq_options: Mapped[list[MCQOption]] = relationship(

@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from fastapi import UploadFile
 
+from src.utils.topics import normalize_topic
 from src.repositories.flashcard_repository import FlashcardRepository
 from src.repositories.folder_repository import FolderRepository
 from src.repositories.test_repository import TestRepository
@@ -52,6 +53,7 @@ class FlashcardService:
             front=data.front,
             back=data.back,
             source=data.source,
+            topic=normalize_topic(data.topic),
         )
         await session.commit()
         await session.refresh(card)
@@ -118,10 +120,11 @@ class FlashcardService:
             existing_flashcards=existing_flashcards,
             provider=provider,
             enable_fallback=enable_fallback,
+            known_topics=await FlashcardRepository(session).list_topics(folder_id),
         )
         repo = FlashcardRepository(session)
         cards = [
-            await repo.create(folder_id, item.front, item.back, "generated_from_test")
+            await repo.create(folder_id, item.front, item.back, "generated_from_test", topic=item.topic)
             for item in generated
         ]
         await session.commit()
@@ -149,10 +152,11 @@ class FlashcardService:
             existing_flashcards=existing_flashcards,
             provider=provider,
             enable_fallback=enable_fallback,
+            known_topics=await FlashcardRepository(session).list_topics(folder_id),
         )
         repo = FlashcardRepository(session)
         cards = [
-            await repo.create(folder_id, item.front, item.back, "generated_from_prompt")
+            await repo.create(folder_id, item.front, item.back, "generated_from_prompt", topic=item.topic)
             for item in generated
         ]
         await session.commit()
@@ -272,10 +276,11 @@ class FlashcardService:
             existing_flashcards=existing_flashcards,
             provider=provider,
             enable_fallback=enable_fallback,
+            known_topics=await FlashcardRepository(session).list_topics(folder_id),
         )
         repo = FlashcardRepository(session)
         cards = [
-            await repo.create(folder_id, item.front, item.back, "generated_from_file")
+            await repo.create(folder_id, item.front, item.back, "generated_from_file", topic=item.topic)
             for item in generated
         ]
         await session.commit()

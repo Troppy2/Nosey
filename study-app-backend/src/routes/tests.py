@@ -634,11 +634,13 @@ async def _generate_questions_background(
                                 for index, option_text in enumerate(item.options)
                             ]
                             await q_repo.add_mcq_question(
-                                test_id, item.question_text, display_order, q_options
+                                test_id, item.question_text, display_order, q_options,
+                                topic=item.topic,
                             )
                         else:
                             await q_repo.add_frq_question(
-                                test_id, item.question_text, display_order, item.expected_answer
+                                test_id, item.question_text, display_order, item.expected_answer,
+                                topic=item.topic,
                             )
                         await q_session.commit()
                     display_order += 1
@@ -687,17 +689,17 @@ async def _generate_questions_background(
                 async with async_session_maker() as session:
                     repo = TestRepository(session)
                     for tf_item in tf_questions:
-                        await repo.add_tf_question(test_id, tf_item.question_text, display_order, tf_item.correct_answer)
+                        await repo.add_tf_question(test_id, tf_item.question_text, display_order, tf_item.correct_answer, topic=tf_item.topic)
                         display_order += 1
                     for ms_item in ms_questions:
                         ms_options = [
                             (option_text, index in ms_item.correct_indices)
                             for index, option_text in enumerate(ms_item.options)
                         ]
-                        await repo.add_ms_question(test_id, ms_item.question_text, display_order, ms_options)
+                        await repo.add_ms_question(test_id, ms_item.question_text, display_order, ms_options, topic=ms_item.topic)
                         display_order += 1
                     for rank_item in rank_questions:
-                        await repo.add_rank_question(test_id, rank_item.question_text, display_order, rank_item.items_in_correct_order)
+                        await repo.add_rank_question(test_id, rank_item.question_text, display_order, rank_item.items_in_correct_order, topic=rank_item.topic)
                         display_order += 1
                     await session.commit()
                 logger.info(
