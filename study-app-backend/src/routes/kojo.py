@@ -15,6 +15,8 @@ from src.repositories.usage_event_repository import UsageEventRepository
 from src.utils.provider_policy import resolve_request_provider
 from src.utils.usage_context import bind_usage
 from src.schemas.kojo_schema import (
+    BulkDeleteConversationsRequest,
+    BulkDeleteConversationsResponse,
     ConversationFileDTO,
     KojoActionCardDTO,
     ProposeActionRequest,
@@ -749,6 +751,18 @@ async def rename_conversation(
         )
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/conversations/bulk-delete", response_model=BulkDeleteConversationsResponse)
+async def bulk_delete_conversations(
+    body: BulkDeleteConversationsRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> BulkDeleteConversationsResponse:
+    deleted = await KojoService().bulk_delete_conversations(
+        user_id=user.id, conversation_ids=body.ids, session=session
+    )
+    return BulkDeleteConversationsResponse(deleted=deleted)
 
 
 @router.delete("/conversations/{conversation_id}", status_code=204)
