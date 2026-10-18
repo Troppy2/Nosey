@@ -59,7 +59,6 @@
 }
 
 .brand-link:hover .brand-mark {
-  transform: translateY(-1px);
   box-shadow: var(--shadow-lg);
 }
 
@@ -125,8 +124,6 @@
 
 .sidebar-collapse-btn:hover {
   color: var(--green-dark);
-  transform: translateY(-1px);
-  transform: translateY(-1px) scale(1.04);
 }
 
 .sidebar-collapse-btn:active {
@@ -349,10 +346,6 @@
     border-color var(--transition-normal);
 }
 
-.button:hover:not(:disabled) {
-  transform: translateY(-2px);
-}
-
 .button:active:not(:disabled) {
   transform: scale(0.96);
 }
@@ -373,7 +366,6 @@
 
 .button-primary:hover:not(:disabled) {
   background: var(--green-dark-mid);
-  box-shadow: 0 4px 14px rgba(113, 131, 85, 0.35);
 }
 
 .button-secondary {
@@ -385,7 +377,6 @@
 .button-secondary:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.96);
   border-color: var(--green-dark);
-  box-shadow: 0 2px 8px rgba(113, 131, 85, 0.2);
 }
 
 .button-ghost {
@@ -422,7 +413,6 @@
 
 .button-danger:hover:not(:disabled) {
   background: var(--accent-danger-strong);
-  box-shadow: 0 4px 14px rgba(157, 59, 49, 0.3);
 }
 
 /* Surface levels.
@@ -485,7 +475,6 @@
 .card-interactive:hover {
   border-color: var(--green-mid);
   box-shadow: var(--shadow-lg);
-  transform: translateY(-2px) scale(1.01);
 }
 
 .form-error {
@@ -528,25 +517,33 @@
   font-weight: 500;
 }
 
-.input {
+.input,
+.field-input {
   width: 100%;
   min-height: 48px;
   padding: 12px 16px;
-  color: var(--ink);
+  color: #000;
   background: rgba(255, 255, 255, 0.66);
   border: 1px solid var(--green-light-mid);
   border-radius: var(--radius-md);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
 }
 
-.input:hover {
+.input:hover,
+.field-input:hover {
   border-color: var(--green-mid);
 }
 
-.input:focus {
+.input:focus,
+.field-input:focus {
   border-color: var(--green-dark);
   box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.18);
   outline: none;
+}
+
+.input::placeholder,
+.field-input::placeholder {
+  color: var(--green-mid);
 }
 
 .textarea {
@@ -2247,7 +2244,6 @@
   background: var(--c);
   border-color: var(--c);
   color: #fff;
-  transform: translateY(-3px);
   box-shadow: 0 10px 22px color-mix(in srgb, var(--c) 34%, transparent);
 }
 
@@ -2262,7 +2258,7 @@
 }
 
 .confidence:active {
-  transform: translateY(-1px);
+  transform: none;
   box-shadow: 0 4px 12px color-mix(in srgb, var(--c) 28%, transparent);
 }
 
@@ -4296,7 +4292,6 @@ pre.kojo-code-block code {
 .flashcard-preview-card:hover {
   border-color: var(--green-mid);
   box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
 }
 
 .flashcard-preview-card p {
@@ -5467,7 +5462,6 @@ select[class*="lc-"]:focus-visible {
 .lc-row-link:hover,
 .lc-problem-source a:hover,
 .lc-toolbar-btn:hover, .lc-toolbar-timer:hover {
-  transform: translateY(-1px);
   border-color: var(--green-dark);
   background: var(--green-lightest);
 }
@@ -5544,7 +5538,6 @@ select[class*="lc-"]:focus-visible {
 }
 
 .lc-timer-preset:hover {
-  transform: translateY(-1px);
   background: var(--green-lightest);
   color: var(--ink);
 }
@@ -5653,7 +5646,6 @@ select[class*="lc-"]:focus-visible {
 }
 
 .lc-coding-tab:hover {
-  transform: translateY(-1px);
   border-color: var(--green-dark);
   background: var(--green-lightest);
 }
@@ -5842,7 +5834,6 @@ select[class*="lc-"]:focus-visible {
 }
 
 .lc-node:hover {
-  transform: translateY(-2px);
   border-color: var(--lc-accent);
   box-shadow: var(--shadow-md);
 }
@@ -5989,7 +5980,6 @@ select[class*="lc-"]:focus-visible {
 
 .lc-problem-row:hover {
   box-shadow: 0 6px 18px rgba(38, 48, 31, 0.1);
-  transform: translateY(-1px);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -6557,7 +6547,6 @@ select[class*="lc-"]:focus-visible {
 }
 
 .lc-timer-modal-preset:hover {
-  transform: translateY(-1px);
   border-color: var(--green-dark);
   background: var(--green-lightest);
   box-shadow: 0 6px 16px rgba(113, 131, 85, 0.13);
@@ -6828,7 +6817,6 @@ select[class*="lc-"]:focus-visible {
 
   .lc-node:hover,
   .lc-node[data-side="right"]:hover {
-    transform: translateY(-2px);
   }
 
   .lc-node::after {
@@ -7432,7 +7420,6 @@ select[class*="lc-"]:focus-visible {
 }
 
 .lc-inline-icon-btn:hover {
-  transform: translateY(-1px);
   border-color: var(--green-dark);
   background: var(--green-lightest);
   color: var(--green-dark);
@@ -9587,13 +9574,11 @@ select[class*="lc-"]:focus-visible {
 .mock-company-btn:hover {
   border-color: var(--green-mid);
   box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
 }
 .mock-company-btn.selected {
   border-color: var(--green-dark);
   background: var(--green-lightest);
   box-shadow: 0 0 0 3px rgba(113,131,85,0.2), var(--shadow-md);
-  transform: translateY(-1px);
 }
 
 .mock-company-avatar {
@@ -11520,7 +11505,6 @@ select[class*="lc-"]:focus-visible {
 .flash-nav-btn:hover:not(:disabled) {
   background: var(--white);
   border-color: var(--green-mid);
-  transform: translateY(-1px);
 }
 
 .flash-nav-btn:disabled {
@@ -12057,7 +12041,6 @@ select[class*="lc-"]:focus-visible {
 }
 
 .tf-button:hover {
-  transform: translateY(-2px);
   border-color: var(--green-mid);
 }
 
@@ -12521,7 +12504,7 @@ select[class*="lc-"]:focus-visible {
     var(--green-lightest);
   transition: border-color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
 }
-.ats-drop:hover { border-color: var(--green-dark); background-color: #dfeecb; transform: translateY(-1px); }
+.ats-drop:hover { border-color: var(--green-dark); background-color: #dfeecb; }
 .ats-drop.dragging {
   border-color: var(--green-dark);
   background-color: #dfeecb;
@@ -12651,7 +12634,7 @@ select[class*="lc-"]:focus-visible {
   box-shadow: 0 10px 20px -8px rgba(113, 131, 85, 0.7);
   transition: transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
 }
-.ats-run:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 16px 26px -10px rgba(113, 131, 85, 0.82); }
+.ats-run:hover:not(:disabled) { box-shadow: 0 16px 26px -10px rgba(113, 131, 85, 0.82); }
 .ats-run:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* Scan overlay */
@@ -12961,7 +12944,6 @@ select[class*="lc-"]:focus-visible {
 }
 
 .lc-custom-add-btn:hover {
-  transform: translateY(-1px);
   filter: brightness(1.04);
   box-shadow: 0 10px 20px rgba(180, 83, 9, 0.28);
 }
@@ -13139,7 +13121,6 @@ select[class*="lc-"]:focus-visible {
 }
 
 .lc-custom-ai-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
   filter: brightness(1.05);
 }
 
@@ -13547,7 +13528,6 @@ select.lc-custom-input {
 
 .lc-rescue-action:hover:not(:disabled) {
   background: var(--lc-rescue-deep);
-  transform: translateY(-1px);
 }
 
 .lc-rescue-action:disabled {
@@ -13859,7 +13839,6 @@ select.lc-custom-input {
 
 .lc-empty-reset:hover {
   background: var(--green-dark-mid);
-  transform: translateY(-1px);
 }
 
 /* Section-level empty: a lighter, calmer counterpart to .lc-empty for empties
@@ -14152,7 +14131,7 @@ select.lc-custom-input {
 }
 
 .survey-star:hover {
-  transform: scale(1.14) translateY(-1px);
+  transform: scale(1.14);
 }
 
 .survey-star:active {
@@ -14419,7 +14398,6 @@ select.lc-custom-input {
 }
 
 .mode-card:hover {
-  transform: translateY(-3px);
   box-shadow: var(--shadow-lg);
   border-color: var(--mode-accent);
 }
@@ -14657,7 +14635,6 @@ select.lc-custom-input {
 }
 
 .match-tile:hover:not(:disabled) {
-  transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
 
@@ -14669,7 +14646,6 @@ select.lc-custom-input {
 .match-tile.is-selected {
   border-color: var(--green-dark);
   box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.3);
-  transform: translateY(-2px);
 }
 
 .match-tile.is-mismatch {
@@ -15097,7 +15073,6 @@ select.lc-custom-input {
 }
 
 a.lm-module-row:hover {
-  transform: translateY(-2px);
   box-shadow: var(--shadow-md);
   border-color: var(--green-dark);
 }
@@ -16317,7 +16292,6 @@ a.lm-module-row:focus-visible {
   .kojo-scroll-bottom:hover {
     background: var(--green-dark);
     color: var(--white);
-    transform: translateY(-1px);
   }
 }
 
@@ -17789,7 +17763,6 @@ button.kojo-blueprint-head:hover {
 .kojo-browse-card:hover {
   border-color: var(--green-light-mid);
   box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
 }
 
 .kojo-browse-card-name {
@@ -18992,7 +18965,6 @@ button.kojo-blueprint-head:hover {
 .lc-cadence-resume:hover {
   border-color: var(--green-dark);
   box-shadow: var(--shadow-sm);
-  transform: translateY(-1px);
 }
 
 .lc-cadence-resume-copy {
@@ -20247,7 +20219,6 @@ button.lc-reminder-feature-cta:disabled {
 .lc-add-link-btn:hover {
   background: var(--green-lightest);
   border-color: var(--green-dark-mid);
-  transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
 
@@ -20882,7 +20853,6 @@ button.lc-reminder-feature-cta:disabled {
 .lc-preset-chip:hover:not(:disabled) {
   background: var(--green-lightest);
   border-color: var(--green-dark-mid);
-  transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
 
@@ -20939,7 +20909,6 @@ button.lc-reminder-feature-cta:disabled {
 
 /* Adopt the app's global float: cards lift on hover. */
 .lc-bank-tile:hover {
-  transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
 }
 
@@ -21039,7 +21008,6 @@ button.lc-reminder-feature-cta:disabled {
 .lc-bank-tile-actions button:not(.lc-bank-delete):hover {
   border-color: var(--green-dark-mid);
   background: var(--green-lightest);
-  transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
 
@@ -21330,7 +21298,6 @@ button.lc-reminder-feature-cta:disabled {
 
 .lc-bank-match-btn:hover:not(:disabled) {
   background: var(--green-dark-mid);
-  transform: translateY(-2px);
   box-shadow: 0 4px 14px rgba(113, 131, 85, 0.35);
 }
 
@@ -21596,7 +21563,6 @@ button.lc-reminder-feature-cta:disabled {
 }
 
 .lc-cog-btn:hover {
-  transform: translateY(-1px);
   border-color: var(--green-dark);
   background: var(--green-lightest);
 }
@@ -21838,7 +21804,6 @@ button.lc-reminder-feature-cta:disabled {
 }
 
 .lc-difficulty-btn:hover {
-  transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
 
@@ -22010,7 +21975,6 @@ button.lc-reminder-feature-cta:disabled {
 }
 
 .lc-complexity-submit:hover:not(:disabled) {
-  transform: translateY(-2px);
 }
 
 .lc-complexity-submit:disabled {
@@ -22238,13 +22202,11 @@ button.lc-reminder-feature-cta:disabled {
 .mock-level-btn:hover {
   border-color: var(--green-mid);
   box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
 }
 .mock-level-btn.selected {
   border-color: var(--green-dark);
   background: var(--green-lightest);
   box-shadow: 0 0 0 3px rgba(113,131,85,0.2), var(--shadow-md);
-  transform: translateY(-1px);
 }
 .mock-level-label {
   font-weight: 600;
@@ -22604,7 +22566,6 @@ button.lc-reminder-feature-cta:disabled {
 }
 
 .lc-random-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
   border-color: var(--green-dark);
   background: var(--green-lightest);
 }
@@ -22660,7 +22621,6 @@ button.lc-official-link:disabled:hover {
 }
 
 .mock-history-card:hover {
-  transform: translateY(-1px);
   border-color: var(--green-dark);
 }
 
@@ -23580,7 +23540,6 @@ button.lc-official-link:disabled:hover {
   text-align: left;
 }
 .lm-format-slot-create:hover .lm-format-slot-icon {
-  transform: translateY(-2px);
 }
 .lm-format-slot-create:focus-visible {
   outline: 2px solid var(--green-dark);
@@ -24575,7 +24534,6 @@ button.lc-official-link:disabled:hover {
 
 .match-deck:hover:not(:disabled) {
   border-color: var(--green-mid);
-  transform: translateY(-1px);
 }
 
 .match-deck:disabled {
@@ -25038,7 +24996,6 @@ button.lc-official-link:disabled:hover {
 }
 
 .sd-card:hover {
-  transform: translateY(-2px);
   box-shadow: 0 6px 18px rgba(38, 48, 31, 0.12);
 }
 
@@ -28737,6 +28694,13 @@ a.sd-chip.is-done:hover {
   }
 }
 
+
+/* Page rules like `.review-detail span` or `.test-progress span` recolor every
+   span under them. A button label always takes the button's own color. */
+.button span,
+.button svg {
+  color: inherit;
+}
 
 .review-detail .needs-input-error {
   padding: 0;
