@@ -24464,6 +24464,16 @@ button.lc-official-link:disabled:hover {
   .scratchpad-header {
     flex-direction: column;
   }
+  /* flex: 1 in a column collapses the question to zero height; size to content
+     and put the window controls on their own row above it. */
+  .scratchpad-header-main {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+  .scratchpad-header-actions {
+    order: -1;
+    align-self: flex-end;
+  }
 }
 
 /* Kojo chat's mobile-only back control. Hidden by default; the mobile shell
@@ -27370,31 +27380,44 @@ a.sd-chip.is-done:hover {
 
 .needs-input-banner {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 14px;
   margin-bottom: 20px;
-  border: 1px solid rgba(245, 158, 11, 0.45);
-  background: rgba(245, 158, 11, 0.1);
+  padding: 14px 16px 14px 18px;
+  border: 1px solid var(--green-light-mid);
+  border-left: 4px solid var(--accent-caution-strong);
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .needs-input-banner > svg {
   flex-shrink: 0;
-  margin-top: 2px;
   color: var(--accent-caution-strong);
 }
 
-.needs-input-banner > div {
+.needs-input-banner-text {
   flex: 1;
   min-width: 0;
 }
 
 .needs-input-banner h2 {
-  margin: 0 0 4px;
+  margin: 0 0 2px;
   font-size: 1.05rem;
 }
 
 .needs-input-banner p {
   margin: 0;
+}
+
+.needs-input-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.needs-input-banner-actions .button {
+  min-height: 44px;
+  white-space: nowrap;
 }
 
 .review-item.needs-input {
@@ -27452,9 +27475,12 @@ a.sd-chip.is-done:hover {
 @media (max-width: 640px) {
   .needs-input-banner {
     flex-wrap: wrap;
+    align-items: flex-start;
   }
 
-  .needs-input-banner > .button {
+  .needs-input-banner-actions {
+    flex-direction: column;
+    align-items: stretch;
     width: 100%;
   }
 }
@@ -28667,4 +28693,52 @@ a.sd-chip.is-done:hover {
   border-radius: 10px;
   background: var(--green-lightest);
   color: var(--ink);
+}
+
+/* Needs-input card actions: primary + quiet skip, inline, not stacked full-width. */
+.review-detail .needs-input-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.review-detail .needs-input-actions .button {
+  width: auto;
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+
+
+@media (max-width: 640px) {
+  .review-detail .needs-input-actions .button-primary {
+    flex: 1 1 100%;
+  }
+
+  .review-detail .needs-input-actions .button-secondary {
+    flex: 1 1 100%;
+  }
+}
+
+/* Disabled Grade: a flat muted surface with readable text, not a faded
+   dark-green button (opacity made the light label illegible). */
+.review-detail .needs-input-actions .button-primary:disabled {
+  opacity: 1;
+  color: var(--green-mid);
+  background: rgba(113, 131, 85, 0.14);
+  box-shadow: none;
+}
+
+@media (max-width: 640px) {
+  /* Stacked phone header: controls row + label + ~2 question lines before it shrinks. */
+  .scratchpad-header {
+    min-height: 140px;
+  }
+}
+
+
+.review-detail .needs-input-error {
+  padding: 0;
+  background: none;
 }

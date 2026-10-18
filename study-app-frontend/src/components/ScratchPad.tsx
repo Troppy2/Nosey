@@ -22,6 +22,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
+import { createPortal } from "react-dom";
 import {
   useCallback,
   useEffect,
@@ -2641,16 +2642,20 @@ export function ScratchPadTrigger({ questionText, data, onChange, paperStyle, on
         <PenLine size={14} />
         {hasWork ? "Continue your scratch work" : "Show your work"}
       </button>
-      {open ? (
-        <ScratchPadModal
-          questionText={questionText}
-          data={data}
-          onChange={onChange}
-          paperStyle={paperStyle}
-          onPaperStyleChange={onPaperStyleChange}
-          onClose={() => setOpen(false)}
-        />
-      ) : null}
+      {/* Portaled so host page rules (e.g. .review-detail div on Results) cannot restyle the modal. */}
+      {open
+        ? createPortal(
+            <ScratchPadModal
+              questionText={questionText}
+              data={data}
+              onChange={onChange}
+              paperStyle={paperStyle}
+              onPaperStyleChange={onPaperStyleChange}
+              onClose={() => setOpen(false)}
+            />,
+            document.body,
+          )
+        : null}
     </>
   );
 }

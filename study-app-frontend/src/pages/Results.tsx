@@ -242,19 +242,25 @@ export default function Results() {
       {held.length > 0 ? (
         <Card className="needs-input-banner">
           <PenLine size={20} />
-          <div>
+          <div className="needs-input-banner-text">
             <h2>
               {held.length === 1 ? "1 answer needs" : `${held.length} answers need`} your input
             </h2>
-            <p className="muted small">
-              Kojo couldn't read some of your handwriting. Fix the drawing or type the answer below, once
-              per question, and it gets graded. Your score updates when you do.
-            </p>
+            <p className="muted small">Kojo couldn't read your handwriting. Fix each one to get it graded.</p>
             {skipAllError ? <p className="needs-input-error small">{skipAllError}</p> : null}
           </div>
-          <Button variant="secondary" onClick={() => void handleSkipAll()} disabled={skippingAll}>
-            {skippingAll ? "Grading..." : "Skip all"}
-          </Button>
+          <div className="needs-input-banner-actions">
+            <Button
+              onClick={() =>
+                document.querySelector(".review-item.needs-input")?.scrollIntoView({ behavior: "smooth", block: "start" })
+              }
+            >
+              Fix them
+            </Button>
+            <Button variant="ghost" onClick={() => void handleSkipAll()} disabled={skippingAll}>
+              {skippingAll ? "Skipping..." : "Skip all (counts as wrong)"}
+            </Button>
+          </div>
         </Card>
       ) : null}
 
@@ -848,9 +854,9 @@ function NeedsInputItem({
           <Info size={15} />
           <span>
             {transcript
-              ? "Kojo wasn't confident reading your handwriting. Check what it read, then fix your drawing or type the answer."
-              : "Kojo couldn't read your handwriting. Fix your drawing or type the answer."}{" "}
-            You get one redo, and the answer stays hidden until then.
+              ? "Kojo wasn't sure what it read. Check it, then redraw or type your answer."
+              : "Kojo couldn't read this one. Redraw it or type your answer."}{" "}
+            One redo, answer stays hidden until then.
           </span>
         </div>
         {transcript ? (
@@ -886,12 +892,12 @@ function NeedsInputItem({
           </label>
         </div>
         {error ? <p className="needs-input-error small">{error}</p> : null}
-        <div className="button-row">
+        <div className="needs-input-actions">
           <Button onClick={() => void submitRedo()} disabled={!canSubmit || busy !== null}>
             {busy === "redo" ? "Grading..." : "Grade this answer"}
           </Button>
           <Button variant="secondary" onClick={() => void skip()} disabled={busy !== null}>
-            {busy === "skip" ? "Grading..." : "Skip"}
+            {busy === "skip" ? "Skipping..." : "Skip (counts as wrong)"}
           </Button>
         </div>
       </div>
