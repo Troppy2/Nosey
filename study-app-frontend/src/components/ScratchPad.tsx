@@ -15,6 +15,7 @@ import {
 } from "react";
 import { scopeKey } from "../lib/api";
 import { traceInk } from "../lib/inkTrace";
+import { recognizeShape, type ShapeKind } from "../lib/shapeRecognize";
 import {
   PASTE_TEXT_MAX_CHARS,
   PASTE_TEXT_MAX_WORDS,
@@ -42,6 +43,7 @@ export type Stroke = {
   c?: string; // CSS color
   w?: number; // line width in CSS pixels
   h?: 1; // a highlighter stroke: wide, translucent, drawn under the ink
+  p?: 1; // straight segments, not a spline: a snapped shape with sharp corners
 };
 
 export type ScratchPadData = {
@@ -232,7 +234,7 @@ export function exportScratchPadPng(data: ScratchPadData, options: { faithful?: 
     for (const stroke of drawn.filter((st) => st.h)) drawStroke(ctx, stroke, scale, scale, scale);
     for (const stroke of drawn.filter((st) => !st.h)) drawStroke(ctx, stroke, scale, scale, scale);
   } else {
-    for (const stroke of drawn) drawSmoothPath(ctx, stroke.points, scale, scale);
+    for (const stroke of drawn) drawSmoothPath(ctx, stroke.points, scale, scale, stroke.p === 1);
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
@@ -279,7 +281,8 @@ const SIMPLIFY_EPSILON = 0.4;
 // stroke, not after every one: re-rendering it per stroke is what stalled
 // writing. The pad flushes on close and when the page is hidden.
 const NOTIFY_DELAY_MS = 400;
-const SELECT_COLOR = "#2b6fd6";
+// Nosey green (--green-dark in base.css); canvas cannot read CSS variables.
+const SELECT_COLOR = "#718355";
 const SELECT_PAD_PX = 6;
 const HANDLE_PX = 5;
 const HANDLE_HIT_PX = 16;
@@ -347,7 +350,7 @@ function ctxOf(canvas: HTMLCanvasElement | null): CanvasRenderingContext2D | nul
   return canvas ? canvas.getContext("2d") : null;
 }
 
-type StrokeLook = Pick<Stroke, "c" | "w" | "h">;
+type StrokeLook = Pick<Stroke, "c" | "w" | "h" | "p">;
 
 function styleStroke(ctx: CanvasRenderingContext2D, look: StrokeLook) {
   ctx.lineCap = "round";
@@ -368,14 +371,14 @@ function styleStroke(ctx: CanvasRenderingContext2D, look: StrokeLook) {
 function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke, scaleX: number, scaleY: number, widthScale = 1) {
   styleStroke(ctx, stroke);
   if (widthScale !== 1) ctx.lineWidth *= widthScale;
-  drawSmoothPath(ctx, stroke.points, scaleX, scaleY);
+  drawSmoothPath(ctx, stroke.points, scaleX, scaleY, stroke.p === 1);
   ctx.globalAlpha = 1;
 }
 
 // Highlighter strokes go first so ink always stays on top of them.
-function drawAllStrokes(ctx: CanvasRenderingContext2D, list: Stroke[], scale: number) {
-  for (const stroke of list) if (stroke.h) drawStroke(ctx, stroke, scale, scale);
-  for (const stroke of list) if (!stroke.h) drawStroke(ctx, stroke, scale, scale);
+function drawAllStrokes(ctx: CanvasRenderingContext2D, list: Stroke[], scale: number, widthScale = 1) {
+  for (const stroke of list) if (stroke.h) drawStroke(ctx, stroke, scale, scale, widthScale);
+  for (const stroke of list) if (!stroke.h) drawStroke(ctx, stroke, scale, scale, widthScale);
 }
 
 // How many backing pixels per CSS pixel a canvas was sized at.
@@ -410,8 +413,15 @@ function eraseFromStroke(stroke: Stroke, x: number, y: number, r: number): Strok
   }
   const out: Stroke[] = [];
   let run: number[] = [];
+  // A leftover shorter than the eraser's radius is a crumb the eraser just
+  // missed, not ink the student meant to keep.
+  const runLength = () => {
+    let len = 0;
+    for (let i = 2; i < run.length; i += 2) len += Math.hypot(run[i] - run[i - 2], run[i + 1] - run[i - 1]);
+    return len;
+  };
   const flush = () => {
-    if (run.length >= 4) out.push({ ...stroke, points: roundPoints(simplifyStroke(run, SIMPLIFY_EPSILON)) });
+    if (run.length >= 4 && runLength() >= r) out.push({ ...stroke, points: roundPoints(simplifyStroke(run, SIMPLIFY_EPSILON)) });
     run = [];
   };
   for (let i = 0; i < dense.length; i += 2) {
@@ -484,32 +494,98 @@ function strokesInShape(strokes: Stroke[], mode: SelectMode, shape: number[]): S
   });
 }
 
+// Transforms keep the stroke's look (color, width, highlighter flag): dropping
+// it is what turned moved or resized highlights and colored ink black.
 function translateStroke(stroke: Stroke, dx: number, dy: number): Stroke {
-  return { points: stroke.points.map((v, i) => round1(v + (i % 2 === 0 ? dx : dy))) };
+  return { ...stroke, points: stroke.points.map((v, i) => round1(v + (i % 2 === 0 ? dx : dy))) };
 }
 
 function scaleStroke(stroke: Stroke, ax: number, ay: number, factor: number): Stroke {
-  return { points: stroke.points.map((v, i) => round1(i % 2 === 0 ? ax + (v - ax) * factor : ay + (v - ay) * factor)) };
+  return { ...stroke, points: stroke.points.map((v, i) => round1(i % 2 === 0 ? ax + (v - ax) * factor : ay + (v - ay) * factor)) };
 }
 
-// Draws a polyline as quadratic curves through the midpoints of consecutive
-// samples. Straight lineTo hops between raw pointer samples are what made
-// handwriting look faceted and stiff, most visibly at speed, when the samples
-// are furthest apart.
-function drawSmoothPath(ctx: CanvasRenderingContext2D, points: number[], scaleX: number, scaleY: number) {
+function rotateStroke(stroke: Stroke, cx: number, cy: number, angle: number): Stroke {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const points: number[] = [];
+  for (let i = 0; i < stroke.points.length; i += 2) {
+    const dx = stroke.points[i] - cx;
+    const dy = stroke.points[i + 1] - cy;
+    points.push(round1(cx + dx * cos - dy * sin), round1(cy + dx * sin + dy * cos));
+  }
+  return { ...stroke, points };
+}
+
+// Holding the pen still this long at the end of a stroke snaps it to a shape.
+const SHAPE_HOLD_MS = 500;
+// Pen movement under this (CSS px) still counts as holding still.
+const SHAPE_HOLD_SLOP_PX = 4;
+const PEN_SHAPES: ShapeKind[] = ["line", "ellipse", "rect", "triangle", "star"];
+// The highlighter only straightens, for underlining.
+const HIGHLIGHT_SHAPES: ShapeKind[] = ["line"];
+
+// Distance above the selection box of its rotate handle, in CSS pixels.
+const ROTATE_HANDLE_GAP_PX = 26;
+// A rotation within this of a right angle (or level) snaps to it.
+const ROTATE_SNAP_RAD = (4 * Math.PI) / 180;
+
+// Where a selection's rotate handle sits, in logical units: above the box,
+// or below it when the box touches the top of the page and the handle would
+// be off the canvas, out of reach.
+function rotateHandleAt(b: { minX: number; minY: number; maxX: number; maxY: number }, scale: number): [number, number] {
+  const pad = SELECT_PAD_PX / scale;
+  const gap = ROTATE_HANDLE_GAP_PX / scale;
+  const above = b.minY - pad - gap;
+  const x = (b.minX + b.maxX) / 2;
+  return above * scale >= HANDLE_HIT_PX ? [x, above] : [x, b.maxY + pad + gap];
+}
+
+type TransformGesture =
+  | { kind: "move"; base: Stroke[]; dx: number; dy: number }
+  | { kind: "scale"; base: Stroke[]; ax: number; ay: number; factor: number }
+  | { kind: "rotate"; base: Stroke[]; cx: number; cy: number; angle: number };
+
+function transformSelection(g: TransformGesture): Stroke[] {
+  if (g.kind === "move") return g.base.map((s) => translateStroke(s, g.dx, g.dy));
+  if (g.kind === "scale") return g.base.map((s) => scaleStroke(s, g.ax, g.ay, g.factor));
+  return g.base.map((s) => rotateStroke(s, g.cx, g.cy, g.angle));
+}
+
+// Draws a polyline as a spline that passes THROUGH every sample. The old
+// midpoint-quadratic curve only touched the midpoints, so it cut inside every
+// sample: on dense live input that was invisible, but on the sparser
+// simplified stroke it bent straight lines and reshaped the stroke on lift,
+// and zooming in magnified the bends into waves. Tangents are weighted by the
+// neighbouring segment lengths (chordal Catmull-Rom), which keeps uneven
+// spacing from overshooting. Straight hops between raw samples are what made
+// handwriting look faceted, so a plain polyline is not an option either.
+function drawSmoothPath(ctx: CanvasRenderingContext2D, points: number[], scaleX: number, scaleY: number, straight = false) {
   const n = points.length / 2;
   if (n < 2) return;
-  const px = (i: number) => points[i * 2] * scaleX;
-  const py = (i: number) => points[i * 2 + 1] * scaleY;
+  const px = (i: number) => points[Math.max(0, Math.min(n - 1, i)) * 2] * scaleX;
+  const py = (i: number) => points[Math.max(0, Math.min(n - 1, i)) * 2 + 1] * scaleY;
+  const len = (i: number, j: number) => Math.hypot(px(j) - px(i), py(j) - py(i));
   ctx.beginPath();
   ctx.moveTo(px(0), py(0));
-  if (n === 2) {
-    ctx.lineTo(px(1), py(1));
+  if (n === 2 || straight) {
+    for (let i = 1; i < n; i++) ctx.lineTo(px(i), py(i));
   } else {
-    for (let i = 1; i < n - 1; i++) {
-      ctx.quadraticCurveTo(px(i), py(i), (px(i) + px(i + 1)) / 2, (py(i) + py(i + 1)) / 2);
+    for (let i = 0; i < n - 1; i++) {
+      const d12 = len(i, i + 1);
+      if (d12 === 0) continue;
+      const d01 = i > 0 ? len(i - 1, i) : 0;
+      const d23 = i + 2 < n ? len(i + 1, i + 2) : 0;
+      const k1 = d12 / 3 / (d01 + d12);
+      const k2 = d12 / 3 / (d12 + d23);
+      ctx.bezierCurveTo(
+        px(i) + (px(i + 1) - px(i - 1)) * k1,
+        py(i) + (py(i + 1) - py(i - 1)) * k1,
+        px(i + 1) - (px(i + 2) - px(i)) * k2,
+        py(i + 1) - (py(i + 2) - py(i)) * k2,
+        px(i + 1),
+        py(i + 1),
+      );
     }
-    ctx.lineTo(px(n - 1), py(n - 1));
   }
   ctx.stroke();
 }
@@ -520,12 +596,26 @@ function drawSmoothPath(ctx: CanvasRenderingContext2D, points: number[], scaleX:
 // drawing and a palm or finger resting on the glass are two live pointers at
 // once and must not interfere with each other.
 type Gesture =
-  | { kind: "draw"; pointerId: number; points: number[]; predicted: number[]; look: StrokeLook }
-  | { kind: "erase"; pointerId: number; snapshot: Stroke[]; remaining: Stroke[] }
+  | {
+      kind: "draw";
+      pointerId: number;
+      points: number[];
+      predicted: number[];
+      look: StrokeLook;
+      // Where the pen last settled (client px) and the timer that snaps the
+      // stroke to a shape if it stays there.
+      hold?: { x: number; y: number; timer: number };
+      // Set once snapped: the shape as recognised, the point it turns and
+      // scales around, and where the pen was when it snapped. Moving the pen
+      // after that resizes and rotates the shape until the pen lifts.
+      shape?: { kind: ShapeKind; base: number[]; cx: number; cy: number; ax: number; ay: number };
+    }
+  | { kind: "erase"; pointerId: number; snapshot: Stroke[]; remaining: Stroke[]; last?: [number, number] }
   | { kind: "scroll"; pointerId: number; startX: number; startY: number; startLeft: number; startTop: number }
   | { kind: "select"; pointerId: number; mode: SelectMode; points: number[] }
   | { kind: "move"; pointerId: number; startX: number; startY: number; base: Stroke[]; rest: Stroke[]; dx: number; dy: number }
-  | { kind: "scale"; pointerId: number; ax: number; ay: number; startDist: number; base: Stroke[]; rest: Stroke[]; factor: number };
+  | { kind: "scale"; pointerId: number; ax: number; ay: number; startDist: number; base: Stroke[]; rest: Stroke[]; factor: number }
+  | { kind: "rotate"; pointerId: number; cx: number; cy: number; startAngle: number; base: Stroke[]; rest: Stroke[]; angle: number };
 
 // Ink copied in a scratch pad, shared by every pad in the session so a part's
 // work can be pasted into the next part. Never saved or sent anywhere.
@@ -580,6 +670,8 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
   // Where the eraser is, in logical units, for its on-canvas size circle.
   const hoverRef = useRef<[number, number] | null>(null);
   const toolRef = useRef<Tool>("pen");
+  // A stylus hovering with its eraser end, whatever tool is picked.
+  const stylusEraserHoverRef = useRef(false);
   toolRef.current = tool;
   const [zoom, setZoom] = useState(1);
   const zoomRef = useRef(1);
@@ -726,11 +818,11 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
       !list[list.length - 1].h &&
       prev.strokes.every((stroke, i) => stroke === list[i])
     ) {
-      drawStroke(ctx, list[list.length - 1], scale, scale);
+      drawStroke(ctx, list[list.length - 1], scale, scale, zoomRef.current);
     } else {
       // A new highlight repaints everything: it has to go under the ink.
       ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
-      drawAllStrokes(ctx, list, scale);
+      drawAllStrokes(ctx, list, scale, zoomRef.current);
     }
     paintedRef.current = override ? null : { strokes: list, key };
   }, []);
@@ -752,7 +844,8 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
     for (const gesture of gesturesRef.current.values()) {
       if (gesture.kind !== "draw") continue;
       styleStroke(ctx, gesture.look);
-      drawSmoothPath(ctx, gesture.predicted.length ? gesture.points.concat(gesture.predicted) : gesture.points, scale, scale);
+      ctx.lineWidth *= zoomRef.current;
+      drawSmoothPath(ctx, gesture.predicted.length ? gesture.points.concat(gesture.predicted) : gesture.points, scale, scale, gesture.look.p === 1);
       ctx.globalAlpha = 1;
     }
   }
@@ -763,23 +856,23 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
     if (!canvas || !ctx) return;
     clearCanvas(canvas);
     const { scale } = dimsRef.current;
-    let active: Gesture | undefined;
+    let active: Extract<Gesture, { kind: "move" | "scale" | "rotate" | "select" }> | undefined;
     for (const gesture of gesturesRef.current.values()) {
-      if (gesture.kind === "move" || gesture.kind === "scale" || gesture.kind === "select") active = gesture;
+      if (gesture.kind === "move" || gesture.kind === "scale" || gesture.kind === "rotate" || gesture.kind === "select") active = gesture;
     }
     let shown = selectedRef.current;
-    if (active?.kind === "move") shown = active.base.map((s) => translateStroke(s, active.dx, active.dy));
-    else if (active?.kind === "scale") shown = active.base.map((s) => scaleStroke(s, active.ax, active.ay, active.factor));
+    const transforming = !!active && active.kind !== "select";
+    if (active && active.kind !== "select") shown = transformSelection(active);
 
     if (shown.length) {
+      // While dragging, the selection is drawn here in its own look (the
+      // static layer has it lifted out). At rest it stays on the static layer
+      // untouched: no blue recolor, only the box and handles mark it.
+      if (transforming) drawAllStrokes(ctx, shown, scale, zoomRef.current);
       ctx.strokeStyle = SELECT_COLOR;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.setLineDash([]);
-      for (const stroke of shown) {
-        ctx.lineWidth = stroke.h ? 2 : stroke.w ?? DEFAULT_WIDTH;
-        drawSmoothPath(ctx, stroke.points, scale, scale);
-      }
       const b = strokeBounds(shown);
       if (b) {
         const pad = SELECT_PAD_PX / scale;
@@ -799,11 +892,27 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
           ctx.fill();
           ctx.stroke();
         }
+        if (active?.kind !== "rotate") {
+          const [hx, hy] = rotateHandleAt(b, scale);
+          const rx = hx * scale;
+          const ry = hy * scale;
+          const below = ry > y + h;
+          ctx.beginPath();
+          ctx.moveTo(rx, below ? y + h : y);
+          ctx.lineTo(rx, below ? ry - HANDLE_PX - 1 : ry + HANDLE_PX + 1);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(rx, ry, HANDLE_PX + 1, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
       }
     }
     // The eraser's size, drawn where it will act.
     const hover = hoverRef.current;
-    if (hover && toolRef.current === "erase") {
+    let erasing = toolRef.current === "erase" || stylusEraserHoverRef.current;
+    for (const gesture of gesturesRef.current.values()) if (gesture.kind === "erase") erasing = true;
+    if (hover && erasing) {
       const radius = prefsRef.current.eraserPx / 2;
       ctx.setLineDash([]);
       ctx.beginPath();
@@ -815,10 +924,11 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
       ctx.stroke();
     }
     if (active?.kind === "select" && active.points.length >= 4) {
+      // Just a thin dashed trail of where the pen went, like Samsung Notes;
+      // the strokes it catches are picked when the pen lifts.
       ctx.strokeStyle = SELECT_COLOR;
-      ctx.fillStyle = "rgba(43, 111, 214, 0.08)";
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([6, 4]);
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([4, 4]);
       const p = active.points;
       ctx.beginPath();
       if (active.mode === "box") {
@@ -828,9 +938,7 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
       } else {
         ctx.moveTo(p[0] * scale, p[1] * scale);
         for (let i = 2; i < p.length; i += 2) ctx.lineTo(p[i] * scale, p[i + 1] * scale);
-        ctx.closePath();
       }
-      ctx.fill();
       ctx.stroke();
       ctx.setLineDash([]);
     }
@@ -866,8 +974,9 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
       Math.max(SCRATCH_PAD_LOGICAL_WIDTH, needW, Math.ceil(cssWidth / INK_SCALE / 50) * 50),
     );
     // Zoom scales the page, not the stored coordinates: the logical page and
-    // the stroke data are the same at every zoom. Ink line widths stay in CSS
-    // pixels, so zooming in gives finer control without fattening the pen.
+    // the stroke data are the same at every zoom. Line widths scale with the
+    // zoom too, so a stroke keeps its proportions (and matches the GPU-scaled
+    // pinch preview) instead of thinning or fattening against its own shape.
     // Skip the rebuild when nothing that sizes the canvases has changed. A
     // mode switch or a scrollbar appearing fires several resize callbacks in a
     // row, and each rebuild clears and repaints every layer: that is the
@@ -967,6 +1076,20 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
     const [x, y] = toLogical(clientX, clientY);
     hoverRef.current = [x, y];
     const { scale } = dimsRef.current;
+    // Sweep from the previous eraser position, so a fast drag erases a
+    // continuous path instead of a row of dots.
+    const from = gesture.last ?? [x, y];
+    gesture.last = [x, y];
+    const stepR = prefsRef.current.eraserPx / 4 / scale;
+    const hops = Math.max(1, Math.ceil(Math.hypot(x - from[0], y - from[1]) / Math.max(0.01, stepR)));
+    for (let k = 1; k <= hops; k++) {
+      eraseAtPoint(gesture, from[0] + ((x - from[0]) * k) / hops, from[1] + ((y - from[1]) * k) / hops);
+    }
+    scheduleFrame();
+  }
+
+  function eraseAtPoint(gesture: Extract<Gesture, { kind: "erase" }>, x: number, y: number) {
+    const { scale } = dimsRef.current;
     // The size control is a diameter in CSS pixels, so it feels the same at
     // any zoom; the radius here is in logical units.
     const r = prefsRef.current.eraserPx / 2 / scale;
@@ -976,7 +1099,11 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
     if (mode === "precise") {
       next = [];
       for (const stroke of gesture.remaining) {
-        const pieces = eraseFromStroke(stroke, x, y, r);
+        // Widened by half the stroke's drawn width: the round caps of the
+        // pieces left behind reach that far back into the gap, so an eraser
+        // no wider than a highlighter used to cut a gap that closed itself.
+        const half = ((stroke.w ?? (stroke.h ? HIGHLIGHT_WIDTH : DEFAULT_WIDTH)) * zoomRef.current) / 2 / scale;
+        const pieces = eraseFromStroke(stroke, x, y, r + half);
         if (pieces === null) next.push(stroke);
         else {
           changed = true;
@@ -994,7 +1121,6 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
       gesture.remaining = next;
       paintStatic(next);
     }
-    scheduleFrame();
   }
 
   // ── Selection actions ───────────────────────────────────────────────────
@@ -1141,7 +1267,9 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
     if (gesture.kind === "scroll") return;
 
     if (gesture.kind === "erase") {
-      if (gesture.remaining.length !== gesture.snapshot.length) {
+      // By identity, not count: a precise erase that trims a stroke's end
+      // leaves the count unchanged, and comparing lengths threw that away.
+      if (gesture.remaining !== gesture.snapshot) {
         pushHistory(gesture.snapshot);
         commitStrokes(gesture.remaining);
         setSelection([]);
@@ -1149,24 +1277,28 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
       return;
     }
 
-    if (gesture.kind === "move" || gesture.kind === "scale") {
+    if (gesture.kind === "move" || gesture.kind === "scale" || gesture.kind === "rotate") {
       const moved =
         gesture.kind === "move"
           ? Math.abs(gesture.dx) + Math.abs(gesture.dy) >= 1
-          : Math.abs(gesture.factor - 1) > 0.005;
+          : gesture.kind === "scale"
+            ? Math.abs(gesture.factor - 1) > 0.005
+            : Math.abs(gesture.angle) > 0.002;
       if (!moved) {
         paintStatic();
         drawOverlay();
         return;
       }
-      const clampX = (v: number) => Math.max(0, Math.min(w, v));
-      const transformed = gesture.base.map((s) => {
-        const t =
-          gesture.kind === "move"
-            ? translateStroke(s, gesture.dx, gesture.dy)
-            : scaleStroke(s, gesture.ax, gesture.ay, gesture.factor);
-        return { points: t.points.map((v, i) => (i % 2 === 0 ? clampX(v) : Math.max(0, v))) };
-      });
+      // Kept on the page by shifting the whole selection, never by clamping
+      // points one by one: that flattened whatever a rotation or resize
+      // pushed past an edge, changing the drawing's shape.
+      let transformed = transformSelection(gesture);
+      const tb = strokeBounds(transformed);
+      if (tb) {
+        const sx = tb.minX < 0 ? -tb.minX : tb.maxX > w ? Math.max(-tb.minX, w - tb.maxX) : 0;
+        const sy = tb.minY < 0 ? -tb.minY : 0;
+        if (sx || sy) transformed = transformed.map((t) => translateStroke(t, sx, sy));
+      }
       const b = strokeBounds(transformed);
       if (b) ensureHeight(b.maxY);
       pushHistory(prev);
@@ -1201,11 +1333,12 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
       return;
     }
 
+    if (gesture.hold) window.clearTimeout(gesture.hold.timer);
     if (gesture.points.length < 4) {
       clearLive();
       return; // a tap, not a stroke
     }
-    const simplified = roundPoints(simplifyStroke(gesture.points, SIMPLIFY_EPSILON));
+    const simplified = gesture.shape ? roundPoints(gesture.points) : roundPoints(simplifyStroke(gesture.points, SIMPLIFY_EPSILON));
     const next = [...prev, { points: simplified, ...gesture.look }].slice(-MAX_STROKES_PER_QUESTION);
     pushHistory(prev);
     // The static layer picks this stroke up on the very next paint, which
@@ -1303,6 +1436,17 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
         ];
         const hit = corners.findIndex(([cx, cy]) => Math.hypot(cx - x, cy - y) <= HANDLE_HIT_PX / scale);
         const rest = list.filter((s) => !sel.includes(s));
+        const [rotX, rotY] = rotateHandleAt(b, scale);
+        if (Math.hypot(rotX - x, rotY - y) <= HANDLE_HIT_PX / scale) {
+          const cx = (b.minX + b.maxX) / 2;
+          const cy = (b.minY + b.maxY) / 2;
+          gesturesRef.current.set(e.pointerId, {
+            kind: "rotate", pointerId: e.pointerId, cx, cy, startAngle: Math.atan2(y - cy, x - cx), base: sel, rest, angle: 0,
+          });
+          paintStatic(rest);
+          drawOverlay();
+          return;
+        }
         if (hit >= 0) {
           const [ax, ay] = corners[(hit + 2) % 4];
           const startDist = Math.hypot(corners[hit][0] - ax, corners[hit][1] - ay) || 1;
@@ -1342,6 +1486,47 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
     gesturesRef.current.set(e.pointerId, { kind: "draw", pointerId: e.pointerId, points: [x, y], predicted: [], look });
   }
 
+  // The pen has held still at the end of a stroke: replace the stroke with
+  // the shape it looks like, if any. Leaves the stroke alone otherwise.
+  function snapShape(pointerId: number) {
+    const gesture = gesturesRef.current.get(pointerId);
+    if (!gesture || gesture.kind !== "draw" || gesture.shape) return;
+    const shape = recognizeShape(gesture.points, gesture.look.h ? HIGHLIGHT_SHAPES : PEN_SHAPES);
+    if (!shape) return;
+    const p = gesture.points;
+    gesture.shape = { kind: shape.kind, base: shape.points, cx: shape.cx, cy: shape.cy, ax: p[p.length - 2], ay: p[p.length - 1] };
+    gesture.points = shape.points;
+    gesture.predicted = [];
+    gesture.look = shape.straight ? { ...gesture.look, p: 1 } : gesture.look;
+    scheduleFrame();
+  }
+
+  // After a snap the pen keeps steering the shape: a line's far end follows
+  // the pen, any other shape scales and turns around its centre.
+  function adjustShape(gesture: Extract<Gesture, { kind: "draw" }>, x: number, y: number) {
+    const shape = gesture.shape;
+    if (!shape) return;
+    if (shape.kind === "line") {
+      gesture.points = [shape.base[0], shape.base[1], round1(x), round1(y)];
+      return;
+    }
+    const { cx, cy, ax, ay, base } = shape;
+    const startDist = Math.hypot(ax - cx, ay - cy);
+    if (startDist < 1) return;
+    const factor = Math.max(0.05, Math.hypot(x - cx, y - cy) / startDist);
+    let angle = Math.atan2(y - cy, x - cx) - Math.atan2(ay - cy, ax - cx);
+    if (Math.abs(angle) < ROTATE_SNAP_RAD) angle = 0;
+    const cos = Math.cos(angle) * factor;
+    const sin = Math.sin(angle) * factor;
+    const out: number[] = [];
+    for (let i = 0; i < base.length; i += 2) {
+      const dx = base[i] - cx;
+      const dy = base[i + 1] - cy;
+      out.push(round1(cx + dx * cos - dy * sin), round1(cy + dx * sin + dy * cos));
+    }
+    gesture.points = out;
+  }
+
   function handlePointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
     if (touchesRef.current.has(e.pointerId)) {
       touchesRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1358,7 +1543,11 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
     const gesture = gesturesRef.current.get(e.pointerId);
     if (!gesture) {
       // Hovering with the eraser: show where it will act and how big it is.
-      if (toolRef.current === "erase" && e.pointerType !== "touch") {
+      // A stylus eraser end reports the eraser bit while hovering. It can be
+      // stale after use (see handlePointerDown), but here it only shows the
+      // size circle, never erases.
+      stylusEraserHoverRef.current = e.pointerType === "pen" && (e.buttons & 32) !== 0;
+      if ((toolRef.current === "erase" || stylusEraserHoverRef.current) && e.pointerType !== "touch") {
         hoverRef.current = toLogical(e.clientX, e.clientY);
         scheduleFrame();
       }
@@ -1399,6 +1588,17 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
       return;
     }
 
+    if (gesture.kind === "rotate") {
+      const [x, y] = toLogicalIn(rect, e.clientX, e.clientY);
+      let angle = Math.atan2(y - gesture.cy, x - gesture.cx) - gesture.startAngle;
+      const quarter = Math.PI / 2;
+      const snapped = Math.round(angle / quarter) * quarter;
+      if (Math.abs(angle - snapped) < ROTATE_SNAP_RAD) angle = snapped;
+      gesture.angle = angle;
+      scheduleFrame();
+      return;
+    }
+
     if (gesture.kind === "scale") {
       const [x, y] = toLogicalIn(rect, e.clientX, e.clientY);
       gesture.factor = Math.max(0.1, Math.min(10, Math.hypot(x - gesture.ax, y - gesture.ay) / gesture.startDist));
@@ -1426,18 +1626,46 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
       return;
     }
 
+    // Samples closer than a fraction of a pixel to the last kept one add no
+    // shape, only jitter and length. A stroke that reaches the point cap is
+    // committed and continued as a new stroke from the same spot. It used to
+    // stop taking samples, so a long highlight froze and only the predicted
+    // tip moved, drawing a straight line to the pen.
+    if (gesture.shape) {
+      adjustShape(gesture, ...toLogicalIn(rect, e.clientX, e.clientY));
+      scheduleFrame();
+      return;
+    }
+    const minStep = 0.35 / Math.max(0.01, dimsRef.current.scale);
+    let draw: Extract<Gesture, { kind: "draw" }> = gesture;
     for (const evt of events.length ? events : [native]) {
-      if (gesture.points.length >= MAX_POINTS_PER_STROKE * 2) break;
       const [x, y] = toLogicalIn(rect, evt.clientX, evt.clientY);
-      gesture.points.push(x, y);
+      const p: number[] = draw.points;
+      if (Math.hypot(x - p[p.length - 2], y - p[p.length - 1]) < minStep) continue;
+      if (p.length >= MAX_POINTS_PER_STROKE * 2) {
+        const lx = p[p.length - 2];
+        const ly = p[p.length - 1];
+        const look = draw.look;
+        finalizeGesture(e.pointerId);
+        draw = { kind: "draw", pointerId: e.pointerId, points: [lx, ly], predicted: [], look };
+        gesturesRef.current.set(e.pointerId, draw);
+      }
+      draw.points.push(x, y);
+    }
+    // Any real movement restarts the hold-to-snap clock.
+    const hold = draw.hold;
+    if (!hold || Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > SHAPE_HOLD_SLOP_PX) {
+      if (hold) window.clearTimeout(hold.timer);
+      const id = e.pointerId;
+      draw.hold = { x: e.clientX, y: e.clientY, timer: window.setTimeout(() => snapShape(id), SHAPE_HOLD_MS) };
     }
     // Where the pen is about to be, as predicted by the browser. Drawn for this
     // frame only and never stored, so a wrong guess costs nothing.
-    gesture.predicted = [];
+    draw.predicted = [];
     if (typeof native.getPredictedEvents === "function") {
       for (const evt of native.getPredictedEvents().slice(0, 2)) {
         const [x, y] = toLogicalIn(rect, evt.clientX, evt.clientY);
-        gesture.predicted.push(x, y);
+        draw.predicted.push(x, y);
       }
     }
     scheduleFrame();
@@ -1470,8 +1698,11 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
     gesturesRef.current.delete(pointerId);
     // An abandoned erase, move or resize has been previewing its result on the
     // static layer without committing it, so the real strokes are put back.
-    if (gesture.kind === "erase" || gesture.kind === "move" || gesture.kind === "scale") paintStatic();
-    else if (gesture.kind === "draw") clearLive();
+    if (gesture.kind === "erase" || gesture.kind === "move" || gesture.kind === "scale" || gesture.kind === "rotate") paintStatic();
+    else if (gesture.kind === "draw") {
+      if (gesture.hold) window.clearTimeout(gesture.hold.timer);
+      clearLive();
+    }
     drawOverlay();
   }
 
