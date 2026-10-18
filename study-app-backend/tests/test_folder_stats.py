@@ -223,3 +223,43 @@ async def test_weak_spots_across_folders_skip_archived(db_session_maker):
         spots = await FolderStatsService().weak_spots(user.id, session)
         assert [(s.topic, s.folder_name) for s in spots] == [("Bonds", "Chem"), ("Meiosis", "Bio")]
         assert spots[0].accuracy == 0.0 and spots[1].accuracy == 0.25
+
+
+# ---- folder test instructions + default view (chunks 4 and 7)
+
+@pytest.mark.asyncio
+async def test_update_folder_test_instructions_and_default_view(db_session_maker):
+    from src.schemas.folder_schema import FolderUpdate
+    from src.services.folder_service import FolderService
+
+    async with db_session_maker() as session:
+        user = User(email="u@example.com", google_id="g1")
+        session.add(user)
+        await session.flush()
+        folder = Folder(user_id=user.id, name="Bio")
+        session.add(folder)
+        await session.commit()
+
+        out = await FolderService().update_folder(
+            folder.id, user.id, FolderUpdate(test_instructions="  Exam wording only.  ", default_view="flashcards"), session
+        )
+        assert out.test_instructions == "Exam wording only." and out.default_view == "flashcards"
+        out = await FolderService().update_folder(folder.id, user.id, FolderUpdate(test_instructions=""), session)
+        assert out.test_instructions is None and out.default_view == "flashcards"
+        with pytest.raises(Exception):
+            FolderUpdate(default_view="grid")
+
+
+# ---- every MCQ/FRQ generation prompt asks for a topic (e2e found math/coding missing)
+
+def test_generation_prompts_ask_for_topic():
+    from src.services.llm_service import _TOPIC_TAG_RULE, LLMService
+
+    llm = LLMService()
+    prompts = {
+        "math": llm._build_math_generation_prompt("notes", 2, 1, "mixed"),
+        "coding": llm._build_coding_generation_prompt("notes", 2, 1, "mixed", "Python"),
+    }
+    for name, prompt in prompts.items():
+        assert _TOPIC_TAG_RULE in prompt, name
+        assert "correct_index: 0-3, topic" in prompt and "expected_answer, topic" in prompt, name

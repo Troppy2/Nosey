@@ -29468,3 +29468,25 @@ a.sd-chip.is-done:hover {
 .weak-spots-empty p {
   margin: 0;
 }
+
+/* Folder Settings: "How Kojo makes tests" (folder stats chunk 7) */
+.folder-test-instructions-row {
+  display: grid;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(113, 131, 85, 0.1);
+}
+
+.folder-test-instructions-row textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.folder-test-instructions-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}

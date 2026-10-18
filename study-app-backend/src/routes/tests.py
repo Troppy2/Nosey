@@ -1334,6 +1334,18 @@ async def create_daily_quiz(
         if not folder_file_count:
             raise StudyAppException("Add notes to this folder so Kojo has something to build your quiz from.")
 
+        # Same mode as the folder's latest test, so a math folder gets a STEM
+        # quiz and a coding folder a coding one.
+        last_test = await session.scalar(
+            select(Test)
+            .where(Test.folder_id == folder_id, Test.kind.is_(None), Test.generation_status == "ready")
+            .order_by(Test.created_at.desc())
+            .limit(1)
+        )
+        is_math_mode = bool(last_test and last_test.is_math_mode)
+        is_coding_mode = bool(last_test and last_test.is_coding_mode)
+        coding_language = (last_test.coding_language if last_test else None) or "Python"
+
         instructions = plan.instructions()
         if folder.test_instructions:
             instructions = f"{folder.test_instructions.strip()}\n\n{instructions}"
@@ -1348,6 +1360,9 @@ async def create_daily_quiz(
             f"Daily Quiz, {local_day.strftime('%b')} {local_day.day}",
             "mixed",
             "Your daily weak-spot practice: " + ", ".join(plan.focus),
+            is_math_mode=is_math_mode,
+            is_coding_mode=is_coding_mode,
+            coding_language=coding_language,
             kind=DAILY_QUIZ_KIND,
         )
         test.generation_status = "generating"
@@ -1366,11 +1381,11 @@ async def create_daily_quiz(
                 test_type="mixed",
                 count_mcq=DAILY_MCQ,
                 count_frq=DAILY_FRQ,
-                is_math_mode=False,
+                is_math_mode=is_math_mode,
                 difficulty="mixed",
                 topic_focus=None,
-                is_coding_mode=False,
-                coding_language="Python",
+                is_coding_mode=is_coding_mode,
+                coding_language=coding_language,
                 custom_instructions=instructions[:_CUSTOM_INSTRUCTIONS_MAX],
                 provider=provider,
                 enable_fallback=True,
