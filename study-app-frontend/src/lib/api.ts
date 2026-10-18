@@ -1,5 +1,6 @@
 import type {
   DailyQuizResponse,
+  WeakSpot,
   FolderStats,
   AdminStats,
   FlagQueueResponse,
@@ -506,6 +507,10 @@ function tzOffsetMinutes(): number {
 
 export async function fetchFolderStats(folderId: number): Promise<FolderStats> {
   return request<FolderStats>(`/folders/${folderId}/stats?tz_offset_minutes=${tzOffsetMinutes()}`);
+}
+
+export async function fetchWeakSpots(): Promise<WeakSpot[]> {
+  return request<WeakSpot[]>("/folders/weak-spots");
 }
 
 // Makes today's weak-spot quiz, or returns it when it already exists.

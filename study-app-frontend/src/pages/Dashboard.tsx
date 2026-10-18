@@ -1,6 +1,7 @@
 import { BookOpen, Brain, Edit3, FolderOpen, Plus, Trash2, TrendingUp, Undo2, X, FileCheck, Folder as FolderIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { WeakSpots } from "../components/WeakSpots";
 import { Button } from "../components/Button";
 import { FormError } from "../components/FormError";
 import { Card } from "../components/Card";
@@ -592,6 +593,7 @@ export default function Dashboard() {
                     ))
                   )}
                 </div>
+                <WeakSpots />
               </aside>
             </div>
           </>

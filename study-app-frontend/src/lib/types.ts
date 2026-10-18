@@ -271,6 +271,12 @@ export type FolderStats = {
   today_quiz?: TodayQuiz | null;
 };
 
+// Dashboard: a weak topic and the folder it belongs to (GET /folders/weak-spots).
+export type WeakSpot = TopicStat & {
+  folder_id: ID;
+  folder_name: string;
+};
+
 export type TodayQuiz = {
   test_id: ID;
   generation_status: string;

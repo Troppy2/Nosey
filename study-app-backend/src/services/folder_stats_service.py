@@ -17,6 +17,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.flashcard import Flashcard, FlashcardAttempt
+from src.models.folder import Folder
 from src.models.question import Question
 from src.models.test import Test
 from src.models.user_answer import UserAnswer
@@ -31,6 +32,7 @@ from src.schemas.folder_stats_schema import (
     ScorePoint,
     TodayQuiz,
     TopicStat,
+    WeakSpot,
     TopicStatus,
 )
 from src.utils.exceptions import ResourceNotFoundException
@@ -205,7 +207,62 @@ async def todays_quiz(
     return TodayQuiz(test_id=test.id, generation_status=test.generation_status, completed=completed is not None)
 
 
+async def _load_marks(
+    session: AsyncSession, user_id: int, folder_ids: list[int]
+) -> list[tuple[int, _Mark]]:
+    """(folder_id, mark) for every tagged test answer and flashcard review in these folders."""
+    if not folder_ids:
+        return []
+    answer_rows = (await session.execute(
+        select(Test.folder_id, Question.topic, UserAnswer.is_correct, UserAttempt.created_at)
+        .join(UserAnswer, UserAnswer.question_id == Question.id)
+        .join(UserAttempt, UserAttempt.id == UserAnswer.attempt_id)
+        .join(Test, Test.id == Question.test_id)
+        .where(
+            Test.folder_id.in_(folder_ids),
+            UserAttempt.user_id == user_id,
+            UserAttempt.status == "submitted",
+            Question.topic.is_not(None),
+            or_(UserAnswer.ocr_status.is_(None), UserAnswer.ocr_status != OCR_STATUS_NEEDS_INPUT),
+        )
+    )).all()
+    card_rows = (await session.execute(
+        select(Flashcard.folder_id, Flashcard.topic, FlashcardAttempt.correct, FlashcardAttempt.created_at)
+        .join(FlashcardAttempt, FlashcardAttempt.flashcard_id == Flashcard.id)
+        .where(
+            Flashcard.folder_id.in_(folder_ids),
+            FlashcardAttempt.user_id == user_id,
+            Flashcard.topic.is_not(None),
+        )
+    )).all()
+    out = [(r.folder_id, _Mark(r.topic, bool(r.is_correct), r.created_at, True)) for r in answer_rows]
+    out += [(r.folder_id, _Mark(r.topic, bool(r.correct), r.created_at, False)) for r in card_rows]
+    return out
+
+
+# Dashboard Weak Spots: how many topics to show across all folders.
+WEAK_SPOTS_LIMIT = 5
+
+
 class FolderStatsService:
+    async def weak_spots(self, user_id: int, session: AsyncSession) -> list[WeakSpot]:
+        """Weakest topics across the user's active folders, weakest first (Dashboard)."""
+        folders = (await session.execute(
+            select(Folder.id, Folder.name).where(Folder.user_id == user_id, Folder.is_archived.is_(False))
+        )).all()
+        names = {row.id: row.name for row in folders}
+        by_folder: dict[int, list[_Mark]] = defaultdict(list)
+        for folder_id, mark in await _load_marks(session, user_id, list(names)):
+            by_folder[folder_id].append(mark)
+        spots = [
+            WeakSpot(folder_id=folder_id, folder_name=names[folder_id], **topic.model_dump())
+            for folder_id, marks in by_folder.items()
+            for topic in summarize_topics(marks)
+            if topic.status == "weak"
+        ]
+        spots.sort(key=lambda s: (s.accuracy, -s.answers))
+        return spots[:WEAK_SPOTS_LIMIT]
+
     async def get_stats(
         self, folder_id: int, user_id: int, session: AsyncSession, tz_offset_minutes: int = 0
     ) -> FolderStatsResponse:
@@ -231,30 +288,7 @@ class FolderStatsService:
         ]
         scores = [p.score for p in progression]
 
-        answer_rows = (await session.execute(
-            select(Question.topic, UserAnswer.is_correct, UserAttempt.created_at)
-            .join(UserAnswer, UserAnswer.question_id == Question.id)
-            .join(UserAttempt, UserAttempt.id == UserAnswer.attempt_id)
-            .join(Test, Test.id == Question.test_id)
-            .where(
-                Test.folder_id == folder_id,
-                UserAttempt.user_id == user_id,
-                UserAttempt.status == "submitted",
-                Question.topic.is_not(None),
-                or_(UserAnswer.ocr_status.is_(None), UserAnswer.ocr_status != OCR_STATUS_NEEDS_INPUT),
-            )
-        )).all()
-        card_rows = (await session.execute(
-            select(Flashcard.topic, FlashcardAttempt.correct, FlashcardAttempt.created_at)
-            .join(FlashcardAttempt, FlashcardAttempt.flashcard_id == Flashcard.id)
-            .where(
-                Flashcard.folder_id == folder_id,
-                FlashcardAttempt.user_id == user_id,
-                Flashcard.topic.is_not(None),
-            )
-        )).all()
-        marks = [_Mark(r.topic, bool(r.is_correct), r.created_at, True) for r in answer_rows]
-        marks += [_Mark(r.topic, bool(r.correct), r.created_at, False) for r in card_rows]
+        marks = [mark for _, mark in await _load_marks(session, user_id, [folder_id])]
 
         return FolderStatsResponse(
             folder_id=folder_id,
