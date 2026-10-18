@@ -104,10 +104,10 @@ class QuestionIn(ToolArgs):
     code_language: Optional[str] = Field(
         default=None, max_length=50, description="For input=code, e.g. Python, Java. Defaults to the test's language."
     )
-    topic: Optional[str] = Field(
-        default=None, max_length=80,
-        description="The concept this question tests, 2 to 4 words. Reuse the same name across questions "
-        "on one concept; Nosey groups results by it to find weak topics.",
+    topic: str = Field(
+        min_length=1, max_length=80,
+        description="Required. The concept this question tests, 2 to 4 words. Reuse the same name across "
+        "questions on one concept; Nosey groups results by it to find weak topics.",
     )
 
     @model_validator(mode="after")
@@ -325,6 +325,7 @@ class EditQuestionArgs(ToolArgs):
         default=None, description="FRQ only. Send null explicitly to go back to the test's mode."
     )
     code_language: Optional[str] = Field(default=None, max_length=50)
+    topic: Optional[str] = Field(default=None, min_length=1, max_length=80, description="The concept, 2 to 4 words.")
 
 
 async def edit_question(ctx: McpContext, args: EditQuestionArgs) -> dict[str, Any]:
@@ -357,6 +358,8 @@ async def edit_question(ctx: McpContext, args: EditQuestionArgs) -> dict[str, An
             ctx.session.add(FRQAnswer(question_id=question.id, expected_answer=args.expected_answer))
         else:
             question.frq_answer.expected_answer = args.expected_answer
+    if args.topic is not None:
+        question.topic = normalize_topic(args.topic)
     fields = args.model_fields_set
     if "input" in fields or "code_language" in fields:
         answer_input = args.input if "input" in fields else question.answer_input
@@ -420,7 +423,7 @@ async def delete_test(ctx: McpContext, args: DeleteTestArgs) -> dict[str, Any]:
 class CardIn(ToolArgs):
     front: str = Field(min_length=1, max_length=IMPORT_MAX_SIDE_CHARS)
     back: str = Field(min_length=1, max_length=IMPORT_MAX_SIDE_CHARS)
-    topic: Optional[str] = Field(default=None, max_length=80, description="The concept this card covers, 2 to 4 words.")
+    topic: str = Field(min_length=1, max_length=80, description="Required. The concept this card covers, 2 to 4 words.")
 
 
 class CreateFlashcardsArgs(ToolArgs):
@@ -455,12 +458,15 @@ class EditFlashcardArgs(ToolArgs):
     flashcard_id: int
     front: Optional[str] = Field(default=None, min_length=1, max_length=IMPORT_MAX_SIDE_CHARS)
     back: Optional[str] = Field(default=None, min_length=1, max_length=IMPORT_MAX_SIDE_CHARS)
+    topic: Optional[str] = Field(default=None, min_length=1, max_length=80, description="The concept, 2 to 4 words.")
 
 
 async def edit_flashcard(ctx: McpContext, args: EditFlashcardArgs) -> dict[str, Any]:
     card = await _owned_card(ctx, args.flashcard_id)
     await screen(ctx, args.front, args.back)
     await FlashcardRepository(ctx.session).update(card, args.front or card.front, args.back or card.back)
+    if args.topic is not None:
+        card.topic = normalize_topic(args.topic)
     await ctx.session.commit()
     return {"flashcard_id": card.id, "front": card.front, "back": card.back}
 

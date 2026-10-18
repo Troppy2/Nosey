@@ -34,11 +34,11 @@ async def call(client):  # noqa: F811
 
 
 def _frq(text: str, answer: str = "x", **kw) -> dict:
-    return {"type": "FRQ", "text": text, "expected_answer": answer, **kw}
+    return {"type": "FRQ", "text": text, "expected_answer": answer, "topic": "Basics", **kw}
 
 
 def _mcq(text: str) -> dict:
-    return {"type": "MCQ", "text": text, "options": [{"text": "a", "correct": True}, {"text": "b"}]}
+    return {"type": "MCQ", "text": text, "options": [{"text": "a", "correct": True}, {"text": "b"}], "topic": "Basics"}
 
 
 async def test_folders_can_be_created_and_renamed_never_deleted(client, call, db_session_maker) -> None:  # noqa: F811
@@ -88,13 +88,13 @@ async def test_create_test_any_order_multipart_and_custom_inputs(call, seeded, d
 
 
 async def test_invalid_questions_come_back_as_fixable_errors(call, seeded) -> None:  # noqa: F811
-    two_correct = {"type": "MCQ", "text": "Pick", "options": [{"text": "a", "correct": True}, {"text": "b", "correct": True}]}
+    two_correct = {"type": "MCQ", "text": "Pick", "options": [{"text": "a", "correct": True}, {"text": "b", "correct": True}], "topic": "Basics"}
     err = await call("create_test", {"folder_id": seeded["folder_id"], "title": "Bad", "items": [two_correct]}, expect_error=True)
     assert "exactly one correct" in err["error"]
 
     err = await call(
         "create_test",
-        {"folder_id": seeded["folder_id"], "title": "Bad", "items": [{"type": "TF", "text": "Sky is blue", "input": "math", "correct_answer": True}]},
+        {"folder_id": seeded["folder_id"], "title": "Bad", "items": [{"type": "TF", "text": "Sky is blue", "input": "math", "correct_answer": True, "topic": "Basics"}]},
         expect_error=True,
     )
     assert "only for FRQ" in err["error"]
@@ -105,7 +105,7 @@ async def test_invalid_questions_come_back_as_fixable_errors(call, seeded) -> No
 
 async def test_add_and_edit_questions(call, seeded, db_session_maker) -> None:  # noqa: F811
     made = await call("create_test", {"folder_id": seeded["folder_id"], "title": "T", "items": [_frq("Q1")]})
-    added = await call("add_questions", {"test_id": made["test_id"], "items": [{"type": "TF", "text": "2 > 1", "correct_answer": True}]})
+    added = await call("add_questions", {"test_id": made["test_id"], "items": [{"type": "TF", "text": "2 > 1", "correct_answer": True, "topic": "Basics"}]})
     assert added["question_count"] == 2
     tf_id = added["items"][0]["question_id"]
     frq_id = made["items"][0]["question_id"]
@@ -143,7 +143,7 @@ async def test_flashcards_crud_scoped_to_owner(call, seeded, db_session_maker) -
         await session.commit()
         foreign_id = foreign_card.id
 
-    made = await call("create_flashcards", {"folder_id": seeded["folder_id"], "cards": [{"front": "H", "back": "Hydrogen"}, {"front": "He", "back": "Helium"}]})
+    made = await call("create_flashcards", {"folder_id": seeded["folder_id"], "cards": [{"front": "H", "back": "Hydrogen", "topic": "Elements"}, {"front": "He", "back": "Helium", "topic": "Elements"}]})
     first, second = made["flashcard_ids"]
     await call("edit_flashcard", {"flashcard_id": first, "back": "Hydrogen (1)"})
     err = await call("edit_flashcard", {"flashcard_id": foreign_id, "back": "pwned"}, expect_error=True)

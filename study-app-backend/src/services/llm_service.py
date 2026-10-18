@@ -5574,6 +5574,51 @@ Example shape: {{"results": [{{"slug": "custom-abc", "topic": "graph", "subtopic
 
 Return only the JSON object."""
 
+    # Topic backfill batch size: items tagged per LLM call. One _complete_json call
+    # per batch (its own provider fallback), batches run sequentially.
+    _TOPIC_BATCH_SIZE = 25
+
+    async def tag_topics(self, context: str, items: list[tuple[int, str]]) -> dict[int, str]:
+        """Label untagged questions or flashcards with a short topic (2 to 4 words).
+
+        `context` is the test or folder title; `items` are (id, text) pairs from that
+        one test or folder, so names are reused across a batch. Returns {id: topic};
+        ids the model skipped are left out.
+        """
+        from src.utils.topics import normalize_topic
+
+        result: dict[int, str] = {}
+        known: list[str] = []
+        for start in range(0, len(items), self._TOPIC_BATCH_SIZE):
+            batch = items[start : start + self._TOPIC_BATCH_SIZE]
+            blocks = "\n\n".join(f"ID: {item_id}\n{text.strip()[:1200]}" for item_id, text in batch)
+            reuse = f"Topics already used for this set (reuse them when they fit): {', '.join(known)}\n\n" if known else ""
+            prompt = f"""Label each study item below with the concept it tests.
+
+Set: {context[:200]}
+
+Rules:
+- A topic is 2 to 4 words, Title Case, e.g. "Cell Respiration", "Chain Rule".
+- Items on the same concept MUST share the exact same topic name.
+- Aim for a handful of topics across the set, not one per item.
+
+{reuse}ITEMS:
+{blocks}
+
+Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a number>, "topic": "<topic>"}}, one per item."""
+            data = await self._complete_json(prompt)
+            for entry in self._extract_classify_items(data):
+                try:
+                    item_id = int(entry.get("id"))
+                except (TypeError, ValueError):
+                    continue
+                topic = normalize_topic(entry.get("topic"))
+                if topic:
+                    result[item_id] = topic
+                    if topic not in known:
+                        known.append(topic)
+        return result
+
     async def _with_retry(self, fn, label: str):
         """Retry a cloud LLM call on a transient status with exponential backoff (max 3 attempts).
 
