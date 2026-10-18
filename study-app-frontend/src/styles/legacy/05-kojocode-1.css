@@ -1,0 +1,1329 @@
+/* Chat-mode empty state + suggestion grid overrides */
+.chat-mode-main .kojo-empty {
+  padding: 72px 28px 40px;
+}
+
+.chat-mode-main .kojo-empty-icon {
+  width: 68px;
+  height: 68px;
+  margin-bottom: 16px;
+}
+
+.chat-mode-main .kojo-empty-title {
+  font-size: 1.55rem;
+}
+
+.chat-mode-main .kojo-empty-sub {
+  max-width: 420px;
+  font-size: 0.9rem;
+}
+
+.chat-mode-main .kojo-suggestions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  max-width: 540px;
+  margin: 14px auto 0;
+}
+
+.chat-mode-main .kojo-suggestion {
+  padding: 14px 16px;
+  border-radius: var(--radius-xl);
+  font-size: 0.875rem;
+  border-color: rgba(113, 131, 85, 0.22);
+}
+
+/* Chat-mode message row spacing */
+.chat-mode-main .kojo-message {
+  padding: 14px 0;
+}
+
+/* LeetCode mode */
+
+.lc-page {
+  --lc-border: rgba(113, 131, 85, 0.26);
+  --lc-surface: rgba(255, 255, 255, 0.72);
+}
+
+/* KojoCode: one keyboard focus ring for every interactive surface. Any element
+   carrying an lc- class gets a single consistent ring, so buttons, tabs, chips,
+   links, toggles, and options that previously showed no keyboard state now do.
+   Text fields keep their own border-glow focus and opt out just below.
+   Element-specific :focus-visible rules defined later in the file still win on
+   source order, so intentional per-component treatments are preserved. */
+[class*="lc-"]:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+input[class*="lc-"]:focus-visible,
+textarea[class*="lc-"]:focus-visible,
+select[class*="lc-"]:focus-visible {
+  outline: none;
+}
+
+.lc-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px 20px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+/* The title column absorbs the reflow (its text wraps) so the action group never
+   splits into a 2x2. When space runs out, the whole group drops to its own line
+   below the title as one row, instead of the buttons jumping around. */
+.lc-hero > div:first-child {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.lc-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+
+.lc-hero p {
+  max-width: 680px;
+  margin-top: 8px;
+}
+
+.lc-official-link,
+.lc-row-link,
+.lc-problem-source a,
+.lc-toolbar-btn,
+.lc-coding-tab, .lc-toolbar-timer {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.lc-official-link:hover,
+.lc-row-link:hover,
+.lc-problem-source a:hover,
+.lc-toolbar-btn:hover, .lc-toolbar-timer:hover {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+}
+
+.lc-toolbar-timer--urgent {
+  border-color: rgba(220, 38, 38, 0.38);
+  background: rgba(254, 242, 242, 0.92);
+  color: var(--accent-danger-strong);
+}
+
+.lc-toolbar-timer--urgent:hover {
+  border-color: rgba(220, 38, 38, 0.54);
+  background: rgba(254, 226, 226, 0.96);
+  color: #7f1d1d;
+}
+
+.lc-tb-label {
+  display: inline;
+}
+
+/* Problem | Code switcher: desktop shows both panes, so the toggle is hidden. */
+.lc-mobile-pane-toggle {
+  display: none;
+}
+
+.lc-mobile-pane-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex: 1;
+  min-height: 40px;
+  border: 0;
+  background: transparent;
+  color: #596949;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.lc-mobile-pane-btn--active {
+  background: var(--white);
+  color: var(--green-dark);
+  box-shadow: var(--shadow-sm);
+}
+
+.lc-timer-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lc-timer-presets {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.lc-timer-preset {
+  min-height: 30px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: #516142;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+
+.lc-timer-preset:hover {
+  background: var(--green-lightest);
+  color: var(--ink);
+}
+
+.lc-timer-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.lc-timer-input span {
+  color: #5e6f4c;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.lc-timer-input input {
+  width: 58px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 700;
+  outline: none;
+}
+
+.lc-toolbar-btn--timer {
+  min-width: 104px;
+  min-height: 36px;
+  gap: 7px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-toolbar-btn--timer .lc-tb-label--timer {
+  display: inline;
+}
+
+.lc-timer-ring {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.lc-timer-ring-track {
+  stroke: rgba(113, 131, 85, 0.18);
+}
+
+.lc-timer-ring-progress {
+  stroke: var(--green-dark);
+  transition: stroke-dashoffset 0.8s linear, stroke 160ms ease;
+}
+
+.lc-timer-ring--idle .lc-timer-ring-track {
+  stroke: rgba(113, 131, 85, 0.42);
+  stroke-dasharray: 2 3;
+}
+
+.lc-toolbar-btn--timer-idle {
+  color: #526442;
+}
+
+.lc-toolbar-btn--timer-calm {
+  border-color: rgba(113, 131, 85, 0.45);
+  background: rgba(233, 245, 219, 0.58);
+}
+
+.lc-toolbar-btn--timer-warn {
+  border-color: rgba(202, 138, 4, 0.44);
+  background: #fff9e8;
+  color: #8a5a06;
+}
+
+.lc-timer-ring--warn .lc-timer-ring-track {
+  stroke: rgba(202, 138, 4, 0.18);
+}
+
+.lc-timer-ring--warn .lc-timer-ring-progress {
+  stroke: #ca8a04;
+}
+
+.lc-toolbar-btn--timer-alert {
+  border-color: rgba(220, 38, 38, 0.48);
+  background: #fff3f3;
+  color: #a32020;
+  animation: lc-timer-alert-pulse 1.4s ease-in-out infinite;
+}
+
+.lc-timer-ring--alert .lc-timer-ring-track {
+  stroke: rgba(220, 38, 38, 0.17);
+}
+
+.lc-timer-ring--alert .lc-timer-ring-progress {
+  stroke: var(--accent-danger);
+}
+
+@keyframes lc-timer-alert-pulse {
+  50% { box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1); }
+}
+
+.lc-coding-tab:hover {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+}
+
+.lc-dashboard {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) repeat(3, minmax(150px, 190px));
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.lc-dashboard-main,
+.lc-stat-tile {
+  min-height: 112px;
+  padding: 16px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--shadow-sm);
+}
+
+.lc-dashboard-main strong {
+  display: block;
+  margin: 4px 0 12px;
+  color: var(--ink);
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.lc-stat-label,
+.lc-stat-tile small {
+  color: #596949;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.lc-master-bar,
+.lc-node-progress {
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: rgba(113, 131, 85, 0.16);
+}
+
+.lc-master-bar span,
+.lc-node-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--green-dark);
+}
+
+.lc-stat-tile {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 5px;
+}
+
+.lc-stat-tile svg {
+  color: var(--green-dark);
+}
+
+.lc-stat-tile span {
+  color: var(--ink);
+  font-size: 1.65rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.lc-stat-tile--split {
+  grid-template-columns: 1fr auto;
+  align-content: center;
+  column-gap: 14px;
+}
+
+.lc-stat-tile--split span {
+  font-size: 1rem;
+}
+
+/* Difficulty split: tint each count with the shared difficulty palette so the
+   Easy/Medium/Hard breakdown is scannable at a glance. Reuses the exact colors
+   from .lc-difficulty--* (used on problem rows and filter chips). */
+.lc-stat-tile--split .lc-split-val--easy {
+  color: var(--accent-positive-strong);
+}
+
+.lc-stat-tile--split .lc-split-val--medium {
+  color: var(--accent-caution-strong);
+}
+
+.lc-stat-tile--split .lc-split-val--hard {
+  color: var(--accent-danger-strong);
+}
+
+.lc-stat-tile--streak {
+  position: relative;
+  cursor: default;
+}
+
+.lc-stat-tile--streak::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: #fff;
+  font-size: 0.73rem;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 10;
+}
+
+.lc-stat-tile--streak:hover::after {
+  opacity: 1;
+}
+
+.lc-roadmap {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 26px 92px;
+  padding: 12px 0 32px;
+}
+
+.lc-roadmap::before {
+  content: "";
+  position: absolute;
+  top: 24px;
+  bottom: 36px;
+  left: 50%;
+  width: 3px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(#87986a, #97a97c, #718355);
+  transform: translateX(-50%);
+}
+
+.lc-node {
+  --lc-accent: var(--green-dark);
+  position: relative;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 14px;
+  min-height: 104px;
+  padding: 20px;
+  border: 1px solid color-mix(in srgb, var(--lc-accent) 34%, white);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.lc-node[data-side="left"] {
+  grid-column: 1;
+}
+
+.lc-node[data-side="right"] {
+  grid-column: 2;
+  transform: translateY(34px);
+}
+
+.lc-node::after {
+  content: "";
+  position: absolute;
+  top: 42px;
+  width: 46px;
+  height: 2px;
+  background: color-mix(in srgb, var(--lc-accent) 42%, white);
+}
+
+.lc-node[data-side="left"]::after {
+  right: -46px;
+}
+
+.lc-node[data-side="right"]::after {
+  left: -46px;
+}
+
+.lc-node:hover {
+  border-color: var(--lc-accent);
+  box-shadow: var(--shadow-md);
+}
+
+.lc-node[data-side="right"]:hover {
+  transform: translateY(32px);
+}
+
+.lc-node-icon {
+  display: inline-grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--lc-accent) 12%, white);
+  color: var(--lc-accent);
+}
+
+.lc-node-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lc-node-copy strong {
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.lc-node-copy small {
+  color: #596949;
+  font-weight: 650;
+}
+
+.lc-node-progress {
+  grid-column: 1 / -1;
+  height: 7px;
+}
+
+.lc-node-progress span {
+  background: var(--lc-accent);
+}
+
+.lc-category-header {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.lc-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  padding: 0;
+  background: none;
+  color: #596949;
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.lc-back-btn:hover {
+  color: var(--ink);
+}
+
+.lc-category-title-row {
+  --lc-accent: var(--green-dark);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.lc-category-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* The search grows to fill the row so the action buttons group together right
+   after it, instead of space-between flinging them to opposite edges. */
+.lc-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 180px;
+  max-width: 460px;
+  padding: 0 12px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  color: #596949;
+}
+
+.lc-search input {
+  width: 100%;
+  min-height: 42px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+/* Comfortable card grid instead of a dense bordered list: each problem is its own
+   card, arranged in a responsive grid rather than stacked rows. */
+.lc-problem-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  overflow: visible;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.lc-problem-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto auto;
+  /* Top-align so the check and difficulty sit on the title's first line rather
+     than floating at mid-card on multi-line rows (title + topic + subtopic tags).
+     The check then reads as belonging to the title it toggles. */
+  align-items: start;
+  gap: 12px;
+  min-height: 58px;
+  padding: 14px 16px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-xl);
+  background: var(--white);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.13s ease, transform 0.13s ease;
+}
+
+/* Nudge the taller check icon and difficulty pill down a hair so their optical
+   centers sit on the title's first-line text. */
+.lc-problem-row > .lc-problem-check {
+  margin-top: 1px;
+}
+
+.lc-problem-row > .lc-difficulty {
+  margin-top: 1px;
+}
+
+.lc-problem-row:hover {
+  box-shadow: 0 6px 18px rgba(38, 48, 31, 0.1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-problem-row {
+    transition: none;
+  }
+  .lc-problem-row:hover {
+    transform: none;
+  }
+}
+
+/* Archived rows drop the completion checkbox, so the grid loses its first column. */
+.lc-problem-row--archived {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+/* Keep Edit / Archive / Delete (and Restore / Delete) together as one tight cluster. */
+.lc-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lc-problem-row:last-child {
+  border-bottom: 0;
+}
+
+/* Done cards keep the same white card background as unsolved ones (a full-tint wash
+   made them nearly disappear against the page's own green background); "done" reads
+   instead through a clear green left accent plus the filled checkmark. */
+.lc-problem-row--done {
+  background: var(--white);
+  border-color: color-mix(in srgb, var(--green-dark) 40%, var(--lc-border));
+  border-left: 4px solid var(--green-dark);
+  padding-left: 13px;
+}
+
+.lc-problem-check {
+  display: inline-flex;
+  padding: 0;
+  background: none;
+  color: var(--green-dark);
+  cursor: pointer;
+}
+
+.lc-check-done {
+  color: var(--green-dark);
+}
+
+.lc-check-empty {
+  color: #9ca78d;
+}
+
+.lc-problem-title-btn {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 0;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Title only (first span). Scoped with > :first-of-type so the truncation does
+   NOT leak onto the subtopic-tag spans that share this button (the element-inside-
+   container gotcha). Clamps to two lines so long problem names stay readable
+   instead of being cut to "Longest Substri...". */
+.lc-problem-title-btn > span:first-of-type {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-size: 0.92rem;
+  font-weight: 750;
+  line-height: 1.3;
+}
+
+.lc-problem-title-btn small {
+  color: #596949;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.lc-problem-title-btn:hover span {
+  color: var(--green-dark);
+}
+
+.lc-difficulty,
+.lc-extra-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border-radius: var(--radius-pill);
+  font-size: 0.72rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.lc-difficulty--easy {
+  background: var(--accent-positive-tint);
+  color: var(--accent-positive-strong);
+}
+
+.lc-difficulty--medium {
+  background: var(--accent-caution-tint);
+  color: var(--accent-caution-strong);
+}
+
+.lc-difficulty--hard {
+  background: var(--accent-danger-tint);
+  color: var(--accent-danger-strong);
+}
+
+.lc-difficulty--reference {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.lc-extra-pill {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+.lc-row-link {
+  width: 34px;
+  min-height: 34px;
+  padding: 0;
+}
+
+.lc-editor-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+  background: #f7faf2;
+}
+
+.lc-editor-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding: 9px 16px;
+  border-bottom: 1px solid rgba(113, 131, 85, 0.24);
+  background: rgba(255, 255, 255, 0.94);
+  flex-wrap: wrap;
+}
+
+.lc-editor-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 180px;
+  flex: 1;
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.lc-editor-title>span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Toolbar clusters: grouped labeled sections (Run/Submit, Timer, Notes, Ask Kojo)
+   instead of one bare row of icon buttons. */
+.lc-toolbar-cluster {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+  background: rgba(233, 245, 219, 0.5);
+}
+
+.lc-toolbar-cluster-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted, #596949);
+  margin-right: 2px;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .lc-toolbar-cluster-label {
+    display: none;
+  }
+}
+
+.lc-toolbar-btn {
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 0.82rem;
+}
+
+.lc-toolbar-btn--kojo {
+  border-color: var(--green-dark-mid);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+}
+
+.lc-toolbar-btn--done {
+  border-color: var(--green-dark);
+  background: var(--green-light);
+  color: var(--green-dark);
+}
+
+.lc-code-tabs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 54px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(113, 131, 85, 0.18);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.lc-code-tabs__list {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.lc-coding-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.lc-coding-tab--active {
+  border-color: var(--green-dark);
+  background: var(--green-light);
+  color: var(--green-dark);
+  box-shadow: var(--shadow-sm);
+}
+
+.lc-coding-tab--add {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* A tab locked while a 3-Pass Drill is open: preserved but not viewable/deletable. */
+.lc-coding-tab--locked {
+  opacity: 0.6;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.55);
+  cursor: not-allowed;
+}
+
+.lc-coding-tab--locked:hover {
+  transform: none;
+  border-color: var(--lc-border);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.lc-coding-tab-lock {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.closeTab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 2px;
+  border-radius: var(--radius-pill);
+  color: var(--green-dark);
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.closeTab:hover {
+  background: rgba(113, 131, 85, 0.22);
+}
+
+.lc-editor-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+
+.lc-problem-pane {
+  width: min(420px, 40vw);
+  min-width: 320px;
+  overflow-y: auto;
+  padding: 22px;
+  border-right: 1px solid rgba(113, 131, 85, 0.22);
+  background: var(--white);
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.lc-problem-source {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  color: #596949;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.lc-problem-source a {
+  min-height: 32px;
+  padding: 6px 9px;
+  text-transform: none;
+}
+
+.lc-problem-heading {
+  margin-bottom: 12px;
+  font-family: var(--font-sans);
+  font-size: 1.35rem;
+  line-height: 1.2;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.lc-problem-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.lc-problem-meta>span:not(.lc-difficulty) {
+  min-height: 24px;
+  padding: 4px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.lc-source-note {
+  padding: 14px;
+  border: 1px solid rgba(113, 131, 85, 0.24);
+  border-radius: var(--radius-md);
+  background: rgba(233, 245, 219, 0.44);
+}
+
+.lc-source-note p {
+  color: #3d4a32;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.lc-editor-progress-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 13px;
+  border: 1px solid rgba(113, 131, 85, 0.24);
+  border-radius: var(--radius-md);
+  background: var(--white);
+}
+
+.lc-editor-progress-card span {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.lc-editor-progress-card button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  background: var(--green-dark);
+  color: var(--white);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.lc-editor-pane {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #1e1e1e;
+}
+
+.lc-editor-surface {
+  min-height: 0;
+  flex: 1;
+  /* Monaco's wrapper <section> uses height:100%, which resolves to auto (content
+     height, ~5px) whenever the shell is height:auto (<=1100px), collapsing the
+     editor to a sliver. Grid stretches the item geometrically, with no dependence
+     on percentage resolution, so the editor fills the surface at every width. */
+  display: grid;
+}
+
+.lc-kojo-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(38, 48, 31, 0.34);
+  z-index: 400;
+}
+
+.lc-kojo-modal {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 401;
+  display: flex;
+  width: 440px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 48px);
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(113, 131, 85, 0.28);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  box-shadow: var(--shadow-lg);
+}
+
+.lc-timeout-modal {
+  width: 460px;
+}
+
+/* Ask-Kojo drawer variant: a real slide-in side panel, not a floating card over a
+   dimming full-screen backdrop, so the editor stays visible and usable while it's
+   open (per the KojoCode redesign: "never crushes the editor"). */
+.lc-kojo-backdrop--drawer {
+  background: transparent;
+}
+
+.lc-kojo-modal--drawer {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 380px;
+  max-width: min(380px, 100vw);
+  max-height: none;
+  border-radius: 0;
+  border-top: none;
+  border-bottom: none;
+  border-left: 1px solid var(--lc-border);
+  box-shadow: -8px 0 24px rgba(38, 48, 31, 0.12);
+  animation: lc-kojo-drawer-in 0.18s ease-out;
+}
+
+@keyframes lc-kojo-drawer-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-kojo-modal--drawer {
+    animation: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .lc-kojo-modal--drawer {
+    width: 100%;
+    max-width: 100vw;
+  }
+}
+
+.lc-timer-modal {
+  width: min(438px, calc(100vw - 32px));
+  overflow: hidden;
+  border-color: rgba(113, 131, 85, 0.32);
+  box-shadow: 0 24px 64px rgba(38, 48, 31, 0.2);
+}
+
+.lc-timer-modal-header {
+  position: relative;
+  display: block;
+  padding: 25px 58px 22px 24px;
+  background: linear-gradient(135deg, #eff7e4, #dcebc9);
+  border-bottom: 1px solid rgba(113, 131, 85, 0.2);
+}
+
+.lc-timer-modal-header h2 {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-family: "Lora", Georgia, serif;
+  font-size: 1.45rem;
+  line-height: 1.22;
+}
+
+.lc-timer-modal-header .lc-kojo-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+}
+
+.lc-timer-modal-eyebrow {
+  display: block;
+  color: #5c7045;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.lc-timer-modal-body {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+}
+
+.lc-timer-modal-presets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.lc-timer-modal-preset {
+  display: flex;
+  min-height: 86px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 12px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-xl);
+  background: #fbfdf8;
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.lc-timer-modal-preset:hover {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+  box-shadow: 0 6px 16px rgba(113, 131, 85, 0.13);
+}
+
+.lc-timer-modal-preset:focus-visible,
+.lc-timer-modal-input:focus-within {
+  outline: 3px solid rgba(113, 131, 85, 0.25);
+  outline-offset: 2px;
+}
+
+.lc-timer-modal-preset-value {
+  font-family: "Lora", Georgia, serif;
+  font-size: 1.65rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.lc-timer-modal-preset-value::after {
+  content: " min";
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.lc-timer-modal-preset-caption {
+  color: #657653;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.lc-timer-modal-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 54px;
+  padding: 0 16px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--radius-xl);
+  background: #fbfdf8;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.lc-timer-modal-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #77866a;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lc-timer-modal-divider::before,
+.lc-timer-modal-divider::after {
+  height: 1px;
+  flex: 1;
+  background: var(--lc-border);
+  content: "";
+}
+
+.lc-timer-modal-input input {
+  width: 100%;
+  min-height: 50px;
+  padding: 0 42px 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 1.05rem;
+  font-weight: 700;
+  outline: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-timer-modal-unit {
+  position: absolute;
+  right: 16px;
+  color: #5e6f4c;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.lc-timer-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0 24px 24px;
+}
+
+.lc-timeout-modal-header {
+  background: rgba(254, 242, 242, 0.82);
+  border-bottom-color: rgba(220, 38, 38, 0.16);
+}
+
+.lc-timeout-avatar {
+  color: var(--accent-danger-tint);
+  background: var(--accent-danger);
+}
+
+.lc-timeout-copy {
+  gap: 10px;
+}
+
+.lc-timeout-copy p + p {
+  color: #516142;
+}
+
+.lc-timeout-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 14px 14px;
+}
+
+.lc-timeout-action {
+  min-height: 40px;
+}
+
+.lc-timeout-action--ghost {
+  background: var(--white);
+}
+

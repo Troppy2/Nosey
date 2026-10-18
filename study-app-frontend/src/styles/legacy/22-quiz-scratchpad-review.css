@@ -1,0 +1,1244 @@
+/* Scratch pad: pen options, eraser options, zoom. */
+.scratchpad-style-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.6);
+}
+.scratchpad-swatches,
+.scratchpad-widths,
+.scratchpad-segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.scratchpad-swatch {
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 2px solid var(--white);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--green-light-mid);
+  cursor: pointer;
+}
+.scratchpad-swatch--highlight {
+  border-radius: var(--radius-sm);
+}
+.scratchpad-swatch.is-active {
+  box-shadow: 0 0 0 2px var(--green-dark);
+}
+.scratchpad-widths button {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 1.7rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  cursor: pointer;
+}
+.scratchpad-widths button span {
+  display: block;
+  width: 1.1rem;
+  border-radius: 999px;
+  background: var(--ink);
+}
+.scratchpad-widths button.is-active,
+.scratchpad-segmented button.is-active {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+}
+.scratchpad-segmented button {
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.scratchpad-eraser-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+/* The eraser slider is Learning Modules' .lm-dock-seek; this only sizes it. */
+.scratchpad-eraser-range {
+  flex: none;
+  width: 9rem;
+}
+.scratchpad-eraser-preview {
+  display: grid;
+  place-items: center;
+  width: 4.2rem;
+  height: 4.2rem;
+}
+.scratchpad-eraser-preview span {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  border: 1.5px solid #6b7a5c;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+}
+.scratchpad-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+.scratchpad-zoom-label {
+  min-width: 3.2rem;
+  height: 2rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.scratchpad-zoom + .scratchpad-finger-toggle {
+  margin-left: 0;
+}
+
+/* Pinch anywhere over the scratch pad must never zoom the browser page; the
+   pad handles two-finger zoom itself. Single-finger panning still scrolls. */
+.scratchpad-backdrop {
+  touch-action: pan-x pan-y;
+}
+
+/* ─── Results: answer text, read handwriting, OCR redo (GH #149) ───────── */
+
+/* Grid children default to min-width: auto, so one display equation that
+   cannot wrap stretched the whole review card past the screen and clipped
+   the answer above it. With min-width 0 the equation scrolls in its own box. */
+.review-detail > *,
+.review-detail div {
+  min-width: 0;
+}
+
+.review-detail .math-block {
+  max-width: 100%;
+}
+
+/* A typed answer is prose more often than code: sans, one box, wrapping. */
+.review-answer-text,
+.review-work-transcript {
+  background: var(--green-lightest);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-family: var(--font-sans);
+  white-space: normal;
+}
+
+.review-detail .review-answer-text p,
+.review-detail .review-work-transcript p {
+  padding: 0;
+  background: none;
+  border-radius: 0;
+}
+
+/* Read handwriting: one step per line, maths inline, no callout chrome. */
+.review-work-transcript .kojo-markdown {
+  display: grid;
+  gap: 6px;
+}
+
+/* GH #157: a whole scratch pad read back no longer pushes the feedback off
+   screen. Tall boxes are capped with a fade and a "Show more" toggle. */
+.review-detail .review-clamp {
+  max-height: 320px;
+  overflow: hidden;
+  position: relative;
+}
+.review-detail .review-clamp.expanded {
+  max-height: none;
+}
+.review-detail .review-clamp.clipped {
+  -webkit-mask-image: linear-gradient(to bottom, #000 75%, transparent);
+  mask-image: linear-gradient(to bottom, #000 75%, transparent);
+}
+.review-clamp-toggle,
+.review-full-read-toggle {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  background: none;
+  cursor: pointer;
+}
+.review-clamp-toggle:hover,
+.review-full-read-toggle:hover {
+  text-decoration: underline;
+}
+.review-full-read-toggle .rotated {
+  transform: rotate(180deg);
+}
+.review-detail .review-full-read {
+  opacity: 0.85;
+}
+
+/* Any wide equation scrolls inside its own box instead of widening the card.
+   Paragraphs are grid items too: "**Final answer:** $$...$$" put a display
+   equation inside a <p>, whose min-width: auto stretched the card. */
+.review-detail p,
+.review-detail li {
+  min-width: 0;
+  max-width: 100%;
+}
+.review-detail .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.review-work-transcript .math-block {
+  margin: 0;
+  padding: 0;
+  background: none;
+  border-left: none;
+  border-radius: 0;
+  text-align: left;
+}
+
+.score-provisional-pill {
+  margin-left: 8px;
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  font-size: 0.72rem;
+  vertical-align: middle;
+}
+
+.needs-input-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+  padding: 14px 16px 14px 18px;
+  border: 1px solid var(--green-light-mid);
+  border-left: 4px solid var(--accent-caution-strong);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.needs-input-banner > svg {
+  flex-shrink: 0;
+  color: var(--accent-caution-strong);
+}
+
+.needs-input-banner-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.needs-input-banner h2 {
+  margin: 0 0 2px;
+  font-size: 1.05rem;
+}
+
+.needs-input-banner p {
+  margin: 0;
+}
+
+.needs-input-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.needs-input-banner-actions .button {
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+.review-item.needs-input {
+  border: 1px solid rgba(245, 158, 11, 0.45);
+}
+
+.review-item.needs-input .needs-input-head {
+  cursor: default;
+}
+
+.review-item.needs-input .needs-input-head > svg {
+  color: var(--accent-caution-strong);
+}
+
+.review-detail .needs-input-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--accent-caution-strong);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.review-detail .needs-input-notice span {
+  color: inherit;
+  font-size: inherit;
+  font-weight: 600;
+}
+
+.review-detail .needs-input-notice svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.needs-input-fields {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.needs-input-typed {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+
+.needs-input-error {
+  margin: 0;
+  color: var(--red, #e53e3e);
+}
+
+@media (max-width: 640px) {
+  .needs-input-banner {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .needs-input-banner-actions {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+}
+
+.attempt-provisional-pill {
+  margin-left: 8px;
+  padding: 1px 8px;
+  font-size: 0.7rem;
+  background: rgba(245, 158, 11, 0.14);
+  color: var(--accent-caution-strong);
+}
+
+/* ─── Multi-part problems (GH #151) ─────────────────────────────────────── */
+
+/* Test page: the setup once, then each part with its own answer box. */
+.question-card--problem {
+  gap: 22px;
+}
+
+.question-problem-setup {
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--green-light-mid);
+}
+
+.question-part {
+  display: grid;
+  /* minmax(0, 1fr), not the implicit auto track: a long unbroken math
+     preview would otherwise widen the track past the card. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  min-width: 0;
+  padding: 18px 20px;
+  border-radius: var(--radius-md);
+  background: var(--green-lightest);
+  border-left: 3px solid var(--green-mid);
+}
+
+.question-part-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.question-part-head strong {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  color: var(--green-dark);
+}
+
+.question-part-text {
+  min-width: 0;
+}
+
+/* Same rule as .question-card > *: wide children scroll inside the part. */
+.question-part > * {
+  min-width: 0;
+}
+
+.test-nav-chip-parts {
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent-caution-strong);
+}
+
+/* Results: one block per problem, its parts inside. */
+.review-problem {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--green-light-mid);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.review-problem-head {
+  display: grid;
+  gap: 6px;
+  padding: 4px 6px 6px;
+  min-width: 0;
+}
+
+/* Create Test review step: the setup above a problem's parts. */
+.pp-setup {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: var(--green-lightest);
+}
+
+/* Question editor: a problem's setup card. */
+.editor-group-setup {
+  display: grid;
+  gap: 10px;
+  border-left: 3px solid var(--green-mid);
+}
+
+@media (max-width: 640px) {
+  .question-part {
+    padding: 14px;
+  }
+
+  .review-problem {
+    padding: 10px;
+  }
+}
+
+/* Question editor: Prettier review (beta). Before/after is one rendered
+   "after" view; the card below still shows the current text. */
+.prettier-review {
+  display: grid;
+  gap: 14px;
+}
+.prettier-review-head,
+.prettier-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.prettier-review-head p {
+  margin: 2px 0 0;
+}
+.prettier-item {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(113, 131, 85, 0.18);
+  min-width: 0;
+}
+.prettier-after {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 14px;
+  background: var(--green-lightest);
+  border-radius: var(--radius-md);
+}
+.prettier-after ol {
+  margin: 0;
+  padding-left: 22px;
+}
+.prettier-answer {
+  display: grid;
+  gap: 4px;
+}
+
+/* Scratch pad edge grips: drag the drawing area taller from its top or bottom. */
+.scratchpad-edge-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 14px;
+  margin: -0.45rem 0;
+  cursor: ns-resize;
+  touch-action: none;
+  flex-shrink: 0;
+}
+.scratchpad-edge-grip span {
+  width: 44px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--green-light-mid);
+  transition: background 0.15s ease, width 0.15s ease;
+}
+.scratchpad-edge-grip:hover span,
+.scratchpad-edge-grip:active span {
+  width: 64px;
+  background: var(--green-dark);
+}
+
+/* Scratch pad question annotations (session only). The question is held at a
+   fixed width and scaled so text never re-wraps under the ink. */
+.scratchpad-annotate-outer {
+  position: relative;
+  overflow: hidden;
+}
+.scratchpad-annotate-inner {
+  position: relative;
+  transform-origin: top left;
+}
+.scratchpad-annotate-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.scratchpad-annotate-canvas.is-active {
+  pointer-events: auto;
+  touch-action: none;
+  cursor: crosshair;
+}
+.scratchpad-annotate-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.3rem;
+}
+.scratchpad-annotate-bar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  background: transparent;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.scratchpad-annotate-bar button.is-active {
+  color: var(--white);
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+}
+.scratchpad-modal--focus .scratchpad-annotate-bar {
+  display: none;
+}
+
+/* A dragged or custom-sized scratch pad always stays on screen. Full screen
+   is excluded: it must keep its edge-to-edge 100vw x 100vh. */
+.scratchpad-modal:not(.scratchpad-modal--full) {
+  max-width: 96vw;
+  max-height: 96vh;
+}
+
+/* Inside the modal's height, the question header is what gives way: it
+   shrinks and its text scrolls, the tools and canvas keep their size. */
+.scratchpad-header {
+  flex: 0 1 auto;
+  min-height: 72px;
+  overflow: hidden;
+}
+.scratchpad-header-main {
+  align-self: stretch;
+  min-height: 0;
+}
+.scratchpad-header-main .scratchpad-question-text {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+.scratchpad-annotate-bar,
+.scratchpad-paper-picker {
+  flex-shrink: 0;
+}
+
+/* Beta multi-part problems toggle (Create Test extras, targeted practice modal). */
+.multipart-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  cursor: pointer;
+  user-select: none;
+}
+.multipart-toggle input {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: var(--green-dark);
+  cursor: pointer;
+}
+
+/* Math answer mode buttons: Edit as LaTeX / Plain text. */
+.math-input-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* Targeted practice modal: a compact one-column sheet. */
+.tp-card {
+  width: min(460px, 100%);
+  gap: 16px;
+  padding: 22px;
+}
+.tp-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.tp-head h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--green-dark);
+}
+.tp-head p {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  color: var(--green-dark-mid);
+}
+.tp-close {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  color: var(--green-dark);
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.tp-close:hover {
+  background: var(--green-light);
+}
+.tp-grid {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 14px 16px;
+}
+.tp-label {
+  /* Same column width in the main grid and in More options. */
+  min-width: 68px;
+  padding-top: 9px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--green-dark);
+}
+.tp-field {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+/* The app's .choice buttons (Create Test), compact for the modal. */
+.tp-choices {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  /* Each button at least fits its label; spare width is shared. */
+  grid-auto-columns: minmax(max-content, 1fr);
+  gap: 6px;
+}
+.tp-choices .choice {
+  min-height: 38px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.tp-choices .choice:focus-visible,
+.tp-close:focus-visible,
+.tp-more summary:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.tp-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+.tp-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+.tp-count input {
+  width: 58px;
+  height: 34px;
+  padding: 0 8px;
+  font: inherit;
+  font-weight: 600;
+  text-align: center;
+  color: var(--ink);
+  background: var(--white);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-sm);
+}
+.tp-more {
+  border-top: 1px solid var(--green-light-mid);
+  padding-top: 12px;
+}
+.tp-more summary {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.tp-more-body {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+.tp-more-body .field-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--green-dark);
+}
+.tp-more-body .input {
+  min-height: 38px;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.tp-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+.tp-multipart {
+  margin-top: 0;
+}
+.tp-multipart small {
+  display: block;
+  margin-top: 2px;
+  color: var(--green-dark-mid);
+}
+.tp-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+@media (max-width: 520px) {
+  .tp-card {
+    padding: 18px;
+  }
+  .tp-grid,
+  .tp-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+  .tp-label {
+    min-width: 0;
+    padding-top: 6px;
+  }
+  .tp-actions > * {
+    flex: 1;
+  }
+}
+
+/* While annotating, the whole question shows: the ink layer takes touch for
+   drawing, so a clipped question could not be scrolled on a tablet. The pad
+   scrolls instead if the question is long. */
+.scratchpad-question-text.is-annotating {
+  max-height: none;
+  overflow: visible;
+}
+.scratchpad-header:has(.is-annotating) {
+  flex-shrink: 0;
+  overflow: visible;
+}
+.scratchpad-modal:has(.scratchpad-question-text.is-annotating) {
+  overflow-y: auto;
+}
+
+
+/* Create Test: the practice test's answer sheet / mark scheme, asked for once
+   the test is read (recreate mode). */
+.answer-sheet {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: var(--green-lightest);
+}
+
+.answer-sheet-title {
+  margin: 0 0 4px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.answer-sheet-copy {
+  margin: 0;
+}
+
+.answer-sheet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.answer-sheet-upload {
+  cursor: pointer;
+  gap: 6px;
+}
+
+.answer-sheet-none {
+  margin: 0;
+}
+
+.answer-sheet-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--green-dark);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.answer-sheet-ready {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+}
+
+.answer-sheet-ready-icon {
+  flex-shrink: 0;
+  color: var(--green-dark);
+}
+
+.answer-sheet-ready-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.answer-sheet-ready-name {
+  overflow: hidden;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.answer-sheet-ready-text .small {
+  margin: 0;
+}
+
+/* Remove a picked file (practice test, answer sheet): a small outlined pill
+   instead of bare bold text. Beats `.selected-file button`. */
+.selected-file .file-remove-button,
+.file-remove-button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--green-dark);
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.selected-file .file-remove-button:hover,
+.file-remove-button:hover {
+  border-color: var(--error);
+  background: rgba(220, 38, 38, 0.06);
+  color: var(--error);
+}
+
+.file-remove-button:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .answer-sheet-actions > * {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}
+
+/* Picker review: the answer sheet's working for one question. */
+.pp-solution {
+  margin-top: 6px;
+}
+
+/* Quizlet import/export: modals (QuizletImportModal, QuizletExportModal) and
+   the Create Folder link. */
+.modal-card.qz-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 100%);
+  max-height: 88vh;
+  gap: 12px;
+  padding: 20px;
+}
+
+.modal-card.qz-modal--export {
+  width: min(640px, 100%);
+}
+
+.qz-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.qz-header h2 {
+  margin: 0 0 4px;
+  font-size: 1.15rem;
+}
+
+.qz-header p {
+  margin: 0;
+}
+
+.qz-close,
+.qz-remove {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 6px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--green-dark);
+  cursor: pointer;
+}
+
+.qz-close:hover:not(:disabled),
+.qz-remove:hover:not(:disabled) {
+  background: var(--green-light);
+}
+
+.qz-close:focus-visible,
+.qz-remove:focus-visible,
+.qz-link:focus-visible,
+.qz-create-link:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.qz-body {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.qz-body > p {
+  margin: 0;
+}
+
+.qz-steps {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 20px;
+  color: var(--ink);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.qz-paste {
+  min-height: 180px;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  tab-size: 4;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+}
+
+.qz-export-text {
+  min-height: 220px;
+}
+
+.qz-seps {
+  padding: 8px 12px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.52);
+  font-size: 0.88rem;
+}
+
+.qz-seps summary {
+  color: var(--green-dark);
+  cursor: pointer;
+}
+
+.qz-seps-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.qz-link {
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--green-dark);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.qz-found {
+  margin: 0;
+  color: var(--accent-positive-strong);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.qz-found--warn {
+  color: var(--accent-caution-strong);
+}
+
+.qz-tidy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--accent-caution-tint);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent-caution-tint) 60%, white);
+}
+
+.qz-tidy p {
+  margin: 2px 0 0;
+}
+
+.qz-review-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.qz-check-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.qz-check-all input,
+.qz-row > input {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  accent-color: var(--green-dark);
+}
+
+.qz-rows {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qz-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.qz-row > input {
+  margin-top: 11px;
+}
+
+.qz-row.is-on {
+  border-color: var(--green-dark);
+  background: var(--white);
+}
+
+.qz-row-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 6px 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.qz-field {
+  min-height: 38px;
+  max-height: 9em;
+  padding: 8px 10px;
+  resize: vertical;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  field-sizing: content;
+}
+
+.qz-issue {
+  grid-column: 1 / -1;
+  justify-self: start;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.qz-issue--missing,
+.qz-issue--too-long {
+  background: var(--accent-danger-tint);
+  color: var(--accent-danger-strong);
+}
+
+.qz-issue--duplicate {
+  background: var(--accent-info-tint);
+  color: var(--accent-info-strong);
+}
+
+.qz-issue--reworded {
+  background: var(--accent-caution-tint);
+  color: var(--accent-caution-strong);
+}
+
+.qz-remove {
+  margin-top: 4px;
+}
+
+.qz-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding-top: 10px;
+  border-top: 1px solid var(--green-light-mid);
+}
+
+.qz-footer .button-row {
+  margin-left: auto;
+}
+
+.qz-destination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.qz-destination .field {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+
+.qz-create-link {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--green-dark);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.qz-create-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .modal-backdrop:has(.qz-modal) {
+    padding: 0;
+  }
+
+  .modal-card.qz-modal {
+    height: 100%;
+    max-height: 100vh;
+    /* iOS Safari: 100vh runs under the toolbar and would hide the footer. */
+    max-height: 100dvh;
+    border-radius: 0;
+    padding: 16px;
+  }
+
+  .qz-seps-grid,
+  .qz-row-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .qz-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .qz-footer .button-row {
+    margin-left: 0;
+  }
+
+  /* Column layout: the row's 320px basis would become a height here. */
+  .qz-destination {
+    flex: 0 0 auto;
+  }
+
+  .qz-footer .button-row > * {
+    flex: 1 1 auto;
+  }
+}
+

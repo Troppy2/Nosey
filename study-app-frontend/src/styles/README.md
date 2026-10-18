@@ -8,8 +8,14 @@ Use the smallest stylesheet that owns a rule:
 - `components/`: styles tied to one reusable component. The component imports
   its stylesheet directly.
 - `pages/`: styles used only by one route. The route imports its stylesheet.
-- `styles.css`: legacy rules that have not yet been moved. Do not add new
-  component- or page-specific rules here.
+- `styles.css`: now only an ordered list of `@import`s for `legacy/`.
+- `legacy/NN-*.css`: the old 29.5k-line `styles.css`, split (2026-10-18) into
+  23 partials of about 1,200 lines, cut at section comments with no content
+  changes (built CSS was byte-identical before and after). File names say what
+  each part mostly styles (`kojocode` = LeetCode mode `lc-*`, `learning-modules`
+  = `lm-*`, `system-design` = `sd-*`). Order is the cascade: never reorder the
+  imports. To find a selector, search `legacy/`. Do not add new component- or
+  page-specific rules here.
 
 ## Migration rule
 

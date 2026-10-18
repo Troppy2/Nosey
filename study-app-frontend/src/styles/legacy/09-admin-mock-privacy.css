@@ -1,0 +1,1223 @@
+/* Shared chat bubble styles for both Stage 2 and Stage 3 */
+.mock-chat-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: 88%;
+}
+
+.mock-chat-msg--interviewer { align-self: flex-start; }
+.mock-chat-msg--user        { align-self: flex-end; }
+
+.mock-chat-msg-role {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  padding: 0 4px;
+}
+.mock-chat-msg--interviewer .mock-chat-msg-role { color: var(--green-dark); }
+
+.mock-chat-msg-bubble {
+  font-size: 0.875rem;
+  line-height: 1.65;
+  padding: 10px 14px;
+  border-radius: var(--radius-xl);
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.mock-chat-msg--interviewer .mock-chat-msg-bubble {
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light);
+  border-radius: 3px 14px 14px 14px;
+  color: var(--ink);
+}
+.mock-chat-msg--user .mock-chat-msg-bubble {
+  background: var(--green-dark);
+  border-radius: 14px 3px 14px 14px;
+  color: #fff;
+}
+
+.mock-chat-typing {
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+/* ── Stage 3 (legacy) ── */
+.mock-stage3-opening {
+  margin-bottom: 16px;
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-left: 3px solid var(--green-light-mid);
+}
+.mock-stage3-question-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 26px;
+}
+.mock-stage3-q-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.mock-stage3-question-text {
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1.65;
+  margin: 0;
+  color: var(--ink);
+  padding: 16px 18px;
+  background: var(--green-lightest);
+  border-left: 3px solid var(--green-dark);
+  border-radius: 0 8px 8px 0;
+}
+.mock-stage3-followup {
+  padding: 12px 16px;
+  background: var(--accent-caution-tint);
+  border: 1px solid #fde68a;
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.mock-stage3-followup .eyebrow { color: var(--accent-caution-strong); }
+.mock-stage3-followup-btn { align-self: flex-start; font-size: 0.82rem; }
+.mock-star-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.mock-star-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.mock-star-chip-s { background: #dbeafe; color: #1e40af; }
+.mock-star-chip-t { background: #fce7f3; color: #9d174d; }
+.mock-star-chip-a { background: var(--accent-caution-tint); color: var(--accent-caution-strong); }
+.mock-star-chip-r { background: #d1fae5; color: var(--accent-positive-strong); }
+.mock-star-hint-label { font-size: 0.75rem; color: var(--muted); font-weight: 500; }
+.mock-stage3-tip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  background: var(--green-lightest);
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+}
+.mock-stage3-input-area {
+  padding: 0;
+  border-top: none;
+  background: transparent;
+}
+.mock-stage3-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid var(--green-light);
+}
+.mock-stage3-feedback-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px;
+}
+
+/* ── Summary ── */
+.mock-rec-card {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 28px 32px;
+  margin-bottom: 24px;
+  border-radius: var(--radius-xl);
+}
+.mock-rec-icon { flex-shrink: 0; }
+.mock-rec-label { font-size: 1.5rem; font-weight: 800; margin-bottom: 5px; }
+
+.rec-strong-hire { border-left: 5px solid var(--accent-positive); background: linear-gradient(90deg, #ecfdf5 0%, #fff 100%); }
+.rec-hire        { border-left: 5px solid var(--accent-info); background: linear-gradient(90deg, var(--accent-info-tint) 0%, #fff 100%); }
+.rec-borderline  { border-left: 5px solid var(--accent-caution); background: linear-gradient(90deg, var(--accent-caution-tint) 0%, #fff 100%); }
+.rec-no-hire     { border-left: 5px solid var(--accent-danger); background: linear-gradient(90deg, var(--accent-danger-tint) 0%, #fff 100%); }
+
+/* Per-stage verdicts moved onto the loop spine (.loop-spine--verdicts) so the
+   debrief reads back in the same shape the loop was configured in. */
+
+.mock-summary-feedback {
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.mock-summary-feedback p {
+  line-height: 1.7;
+}
+
+/* ── Animations ── */
+.spin { animation: spin 1s linear infinite; }
+.pulse { animation: pulse 1.2s ease-in-out infinite; }
+@keyframes spin  { to { transform: rotate(360deg); } }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .mock-stage1-body { flex-direction: column; }
+  .mock-stage1-problem-panel { width: 100%; max-width: none; border-right: none; border-bottom: 1px solid var(--green-light-mid); max-height: 260px; }
+  .mock-stage2-script-card { padding: 20px 22px; }
+}
+
+@media (max-width: 760px) {
+  .mock-stage1-layout { height: calc(100vh - 56px); }
+}
+@media (max-width: 600px) {
+  .mock-rec-card { padding: 20px; gap: 16px; }
+}
+
+/* ═══════════════════════════════════════════════════
+   MOBILE RESPONSIVENESS ADDITIONS
+   Fills gaps in the existing breakpoints.
+   ═══════════════════════════════════════════════════ */
+
+@media (max-width: 760px) {
+  /* Kojo side-panel: expand to full viewport width so it doesn't overflow on phones */
+  .kojo-panel {
+    width: 100vw;
+    border-left: none;
+  }
+
+  /* KojoMode full-page. This used to subtract 61px for the mobile topbar, but the
+     mobile shell redesign (2026-09-04) removed that bar: Sidebar.tsx returns the
+     dock shell early and never renders .mobile-topbar, and below 760px the shell
+     is ALWAYS the mobile one, so the bar can never be present here. The reserved
+     61px was showing as a band of page green under the composer. */
+  .chat-mode-shell {
+    height: 100dvh;
+  }
+
+  /* Flashcard manage: row-actions must stay auto-width inside the flex row */
+  .flashcard-manage-item .row-actions {
+    width: auto;
+    flex-shrink: 0;
+  }
+
+  /* Folder grid: single column on phones */
+  .folder-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  /* Folder card: 300px min-height is far too tall on a phone screen, compact it */
+  .folder-card {
+    min-height: 165px;
+    padding: 16px 18px;
+  }
+
+  .folder-card h2 {
+    margin-top: 8px;
+    font-size: 1.1rem;
+  }
+
+  .folder-card p {
+    margin-top: 4px;
+  }
+
+  /* Page-header description: shrink font so it takes less vertical space */
+  .page-header > div > p.muted {
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+
+  /* Folder list: tighter gap on phones */
+  .folder-list {
+    gap: 8px;
+  }
+
+  /* CreateTest upload zone: reduce padding on phones */
+  .upload-zone {
+    padding: 28px 16px;
+  }
+
+  /* math-mode-toggle: ensure text wraps cleanly on narrow screens */
+  .math-mode-toggle {
+    align-items: flex-start;
+  }
+
+  .math-mode-toggle-sub {
+    font-size: 0.78rem;
+  }
+
+  /* Segmented control: always auto-width, never stretches in stacked toolbar */
+  .page-header .toolbar .segmented {
+    align-self: flex-start;
+    width: fit-content;
+  }
+
+  /* Question wrap: reduce top/side padding on phones */
+  .question-wrap {
+    padding: 24px 14px;
+  }
+
+  /* Review detail: 56px left indent is too wide on narrow screens - reduce to match body padding */
+  .review-detail {
+    padding: 0 16px 16px 16px;
+  }
+
+  /* Score hero: scale down the large percentage number */
+  .score-hero strong {
+    font-size: 3rem;
+  }
+
+  .score-hero {
+    padding: 32px 20px;
+  }
+
+  /* Test progress header: reduce horizontal padding on phones */
+  .test-progress header {
+    padding: 12px 16px;
+  }
+
+  /* Landing/sign-in: reduce card padding on phones */
+  .signin-card {
+    padding: 24px 20px;
+  }
+
+  /* Stat card number: slightly smaller on phones */
+  .stat-card strong {
+    font-size: 1.75rem;
+  }
+
+  /* Toolbar wraps cleanly when stacked */
+  .toolbar {
+    flex-wrap: wrap;
+  }
+
+  /* Option button: reduce min-height on phones for denser layout */
+  .option-button {
+    min-height: 54px;
+  }
+
+  /* Kojo model select: full width when header wraps */
+  .kojo-model-select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  /* Results: focus-card-header - hide icon and wrap Study notes button to its own row */
+  .focus-card-header {
+    flex-wrap: wrap;
+  }
+  .focus-card-header > svg {
+    display: none;
+  }
+  .focus-card-header > button {
+    flex: 0 0 100%;
+  }
+
+  /* Results / shared: section-title stacks vertically so long action buttons don't crowd the heading */
+  .section-title {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  /* FlashcardsManage: prevent danger button from spanning full width in the 2-col toolbar grid */
+  .page-header .toolbar > .button-danger {
+    grid-column: auto;
+    align-self: start;
+    width: fit-content;
+  }
+}
+
+@media (max-width: 560px) {
+  /* Score hero: cap the number at 2.5rem on tiny screens */
+  .score-hero strong {
+    font-size: 2.5rem;
+  }
+
+  /* Result stats number: smaller on very small phones */
+  .result-stats strong {
+    font-size: 1.6rem;
+  }
+
+  /* Confidence buttons: tighter stacked layout on small phones */
+  .confidence {
+    min-height: 74px;
+    padding: 11px 6px;
+    gap: 4px;
+  }
+
+  .confidence-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .confidence-label {
+    font-size: 0.9rem;
+  }
+
+  .confidence-sub {
+    font-size: 0.62rem;
+  }
+
+  /* Button: allow wrapping so text doesn't overflow */
+  .button {
+    white-space: normal;
+    text-align: center;
+  }
+
+  /* Question card: minimal padding on tiny screens */
+  .question-card {
+    padding: 16px;
+  }
+
+  /* Modal card: tighter padding */
+  .modal-card {
+    padding: 18px;
+    gap: 14px;
+  }
+
+  /* Kojo panel fullscreen fixes */
+  .kojo-panel--fullscreen .kojo-header {
+    padding: 10px 14px;
+  }
+
+  .kojo-panel--fullscreen .kojo-messages-inner {
+    padding: 16px 14px 12px;
+  }
+
+  .kojo-panel--fullscreen .kojo-input-area {
+    padding: 10px 14px 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* KojoMode sidebar is an off-canvas drawer on phones (see 760px block) , do not hide it */
+
+  /* Mock interview stage 1 topbar: wrap and make question tabs scrollable */
+  .mock-stage1-topbar {
+    height: auto;
+    min-height: 52px;
+    padding: 8px 12px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .mock-stage1-question-tabs {
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+    justify-content: flex-start;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mock-stage1-question-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Mock results: stack icon-and-text cards on narrow screens */
+  .mock-overall-card,
+  .mock-rec-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 18px 16px;
+  }
+
+  /* Mock setup hero: reduce title size */
+  .mock-setup-hero {
+    padding: 18px 16px 16px;
+  }
+
+  .mock-setup-hero-title {
+    font-size: 1.35rem;
+  }
+
+  .mock-setup-hero-top {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* Mock stage 2 header: stack on narrow screens */
+  .mock-stage2-header-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  /* LC timer controls: stack preset and input */
+  .lc-timer-controls {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* ── Landing footer ── */
+
+.landing-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.landing-footer-version {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-xs);
+  padding: 1px 6px;
+  letter-spacing: 0.03em;
+}
+
+.landing-footer-link {
+  font-size: 0.78rem;
+  color: var(--green-dark-mid);
+  text-decoration: none;
+}
+
+.landing-footer-link:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.landing-footer-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* ── Privacy modal ── */
+
+.privacy-modal {
+  width: min(620px, 100%);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.privacy-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.privacy-modal-header h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.privacy-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--green-dark-mid);
+}
+
+.privacy-modal-close:hover {
+  background: var(--green-lightest);
+  color: var(--ink);
+}
+
+.privacy-modal-body {
+  padding: 20px 24px 24px;
+  overflow-y: auto;
+  display: grid;
+  gap: 14px;
+}
+
+.privacy-modal-body h3 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 4px;
+}
+
+.privacy-modal-body p,
+.privacy-modal-body li {
+  font-size: 0.85rem;
+  color: var(--ink);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.privacy-modal-body ul {
+  padding-left: 18px;
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.privacy-modal-body a {
+  color: var(--green-dark);
+  text-decoration: underline;
+}
+
+
+/* ============================================================
+   Admin panel
+   ============================================================ */
+
+/* Auth / re-auth screen */
+.admin-auth-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 48px 24px;
+  text-align: center;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.admin-auth-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--green-lightest);
+  color: var(--green-dark);
+}
+
+.admin-auth-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--accent-danger-tint);
+  color: var(--accent-danger);
+  font-size: 0.85rem;
+  width: 100%;
+  text-align: left;
+}
+
+.admin-auth-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.admin-auth-note {
+  max-width: 320px;
+}
+
+/* Stats grid */
+.admin-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.admin-stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.admin-stat-icon {
+  color: var(--green-dark);
+  margin-bottom: 4px;
+}
+
+.admin-stat-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+  line-height: 1;
+}
+
+.admin-stat-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0;
+}
+
+/* Sections */
+.admin-section {
+  margin-bottom: 32px;
+}
+
+.admin-section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 12px;
+}
+
+/* Tables */
+.admin-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.admin-table th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--green-lightest);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.admin-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink);
+  vertical-align: middle;
+}
+
+.admin-table tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-table tbody tr:hover {
+  background: var(--green-lightest);
+}
+
+.admin-users-table {
+  min-width: 640px;
+}
+
+.admin-cell-id {
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.admin-cell-email {
+  font-family: monospace;
+  font-size: 0.82rem;
+  word-break: break-all;
+}
+
+.admin-cell-date {
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* Badges */
+.admin-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.admin-badge--green {
+  background: var(--accent-positive-tint);
+  color: var(--accent-positive);
+}
+
+.admin-badge--muted {
+  background: var(--green-lightest);
+  color: var(--muted);
+}
+
+.admin-badge--blue {
+  background: #dbeafe;
+  color: var(--accent-info-strong);
+}
+
+/* Dropdown used to set per-user beta access in the admin roster. */
+.admin-beta-select {
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--green-lightest);
+  background: var(--green-lightest);
+  color: var(--muted);
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.admin-beta-select--on {
+  background: var(--accent-positive-tint);
+  border-color: var(--accent-positive-tint);
+  color: var(--accent-positive);
+}
+
+.admin-beta-select:hover:not(:disabled) {
+  filter: brightness(0.97);
+}
+
+.admin-beta-select:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.admin-error {
+  color: var(--accent-danger);
+  margin-bottom: 12px;
+}
+
+/* Error banner */
+.admin-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: var(--accent-danger-tint);
+  color: var(--accent-danger);
+  font-size: 0.85rem;
+  margin-bottom: 24px;
+}
+
+/* Session countdown timer */
+.admin-session-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--green-lightest);
+}
+
+.admin-session-timer--warn {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+/* Admin badge extended colors */
+.admin-badge--yellow {
+  background: #fef9c3;
+  color: #a16207;
+}
+
+.admin-badge--red {
+  background: var(--accent-danger-tint);
+  color: var(--accent-danger);
+}
+
+/* Feature health indicators */
+.admin-health {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.admin-health--ok {
+  color: var(--accent-positive);
+}
+
+.admin-health--warn {
+  color: var(--accent-caution);
+}
+
+.admin-health--error {
+  color: var(--accent-danger);
+}
+
+/* Colored table cells */
+.admin-cell-green {
+  color: var(--accent-positive);
+  font-weight: 500;
+}
+
+.admin-cell-red {
+  color: var(--accent-danger);
+  font-weight: 500;
+}
+
+.admin-cell-count {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+/* Daily activity bar chart */
+.admin-activity-table {
+  min-width: 360px;
+}
+
+.admin-activity-bar-wrap {
+  height: 10px;
+  background: var(--green-lightest);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  min-width: 80px;
+}
+
+.admin-activity-bar {
+  height: 100%;
+  background: var(--green-dark);
+  border-radius: var(--radius-pill);
+  transition: width 0.3s ease;
+}
+
+/* LC Notes modal */
+.lc-notes-modal {
+  width: 480px;
+}
+
+.lc-notes-modal-header {
+  background: rgba(233, 245, 219, 0.58);
+  cursor: move;
+  user-select: none;
+}
+
+.lc-notes-body {
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lc-notes-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 240px;
+  padding: 10px 12px;
+  border: 1.5px solid #d1e8b0;
+  border-radius: var(--radius-md);
+  background: var(--green-lightest);
+  font-size: 0.88rem;
+  font-family: inherit;
+  line-height: 1.55;
+  color: var(--ink);
+  outline: none;
+}
+
+.lc-notes-textarea:focus {
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.15);
+}
+
+.lc-notes-textarea::placeholder {
+  color: #9ab87a;
+}
+
+/* ── Learning Mode (beta test mode) ───────────────────────────────────────── */
+.learning-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--green-light);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.learning-mode-toggle:hover {
+  border-color: var(--green-dark-mid, var(--green-dark));
+}
+
+.learning-mode-toggle--on {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+  color: #fff;
+}
+
+.learning-mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border-radius: var(--radius-xl);
+  border: 1px dashed var(--green-light);
+  background: var(--green-lightest);
+}
+
+.learning-mode-bar-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--green-dark);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.learning-mode-ask-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: var(--green-dark);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.learning-mode-ask-btn:hover {
+  filter: brightness(1.08);
+}
+
+@media (max-width: 760px) {
+  .learning-mode-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .learning-mode-ask-btn {
+    justify-content: center;
+  }
+}
+
+
+/* ============================================================
+   FLASHCARD UI REVAMP (study + manage pages)
+   ============================================================ */
+
+/* ── Study screen: nav controls below the flip card ── */
+.flash-controls {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 12px;
+  width: min(620px, 100%);
+  margin-top: 18px;
+}
+
+.flash-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--green-dark);
+  background: rgba(255, 255, 255, 0.7);
+  border: 1.5px solid var(--green-light-mid);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.flash-nav-btn:hover:not(:disabled) {
+  background: var(--white);
+  border-color: var(--green-mid);
+}
+
+.flash-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.flash-hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Reserved space so showing the confidence row does not shift the layout */
+.flash-confidence-zone {
+  display: grid;
+  width: min(520px, 100%);
+  min-height: 60px;
+  margin-top: 14px;
+}
+
+.flash-kbd-hint {
+  margin-top: 18px;
+  color: var(--gray-500);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  /* Keyboard hint is meaningless on touch devices */
+  .flash-kbd-hint {
+    display: none;
+  }
+
+  .flash-confidence-zone {
+    min-height: 52px;
+  }
+}
+
+/* ── Manage page: AI generation panel ── */
+.flashcard-gen-panel {
+  display: grid;
+  gap: 14px;
+  padding: 20px 24px;
+  margin-bottom: 18px;
+}
+
+.flashcard-gen-head {
+  display: grid;
+  gap: 4px;
+}
+
+.flashcard-gen-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.flashcard-gen-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.flashcard-gen-count .input {
+  width: 86px;
+  min-height: 42px;
+  padding: 8px 10px;
+}
+
+@media (max-width: 760px) {
+  .flashcard-gen-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .flashcard-gen-controls .button {
+    width: 100%;
+  }
+
+  .flashcard-gen-count {
+    justify-content: space-between;
+  }
+
+  /* Manage list: stack front/back with a divider, keep actions top-aligned */
+  .flashcard-manage-item {
+    align-items: flex-start;
+  }
+
+  .flashcard-manage-content > div + div {
+    padding-top: 10px;
+    border-top: 1px dashed var(--green-light-mid);
+  }
+}
+
+/* ─── Take Test tools (beta) ─────────────────────────────────────────────────
+   Question navigator, cross-out, highlighter, scratch notes, stuck bookmark.
+   Gated behind beta mode. Consistent layout across desktop and mobile. */
+
+::highlight(nosey-test-highlight) {
+  background-color: #fff1a8;
+  color: inherit;
+}
+
+.test-tools-wrap {
+  position: relative;
+  padding: 0 32px 12px;
+}
+
+.test-tools-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.test-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1.5px solid var(--green-mid);
+  border-radius: var(--radius-pill);
+  color: var(--green-dark);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.test-tool-btn:hover:not(:disabled) {
+  background: rgba(207, 225, 185, 0.5);
+  border-color: var(--green-dark);
+}
+
+.test-tool-btn:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.test-tool-btn--active {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+  color: var(--green-lightest);
+}
+
+.test-tool-btn--active:hover:not(:disabled) {
+  background: #5a6944;
+  border-color: #5a6944;
+}
+

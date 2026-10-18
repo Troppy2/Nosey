@@ -1,0 +1,1222 @@
+/* Legacy styles still to be migrated. Global tokens and defaults live in base.css. */
+
+
+/* ── Global scrollbar styling ── */
+
+
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width, clamp(236px, 22vw, 280px)) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.shell-main {
+  min-width: 0;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  min-width: 0;
+  height: 100vh;
+  padding: 24px 18px;
+  overflow-y: auto;
+  background: rgba(207, 225, 185, 0.58);
+  border-right: 1px solid var(--green-light-mid);
+  backdrop-filter: blur(14px);
+  transition: width var(--transition-normal), padding var(--transition-normal), transform var(--transition-normal), opacity var(--transition-normal);
+}
+
+.sidebar[data-hidden="true"] {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (min-width: 1101px) {
+  .sidebar[data-hidden="true"] {
+    transform: none;
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 8px;
+  min-width: 0;
+}
+
+.brand-link {
+  cursor: pointer;
+}
+
+.brand-link:hover .brand-mark {
+  box-shadow: var(--shadow-lg);
+}
+
+.brand-link:hover strong {
+  color: var(--green-dark);
+}
+
+.brand-mark {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  color: var(--green-lightest);
+  background: var(--green-dark);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+/* The icon artwork carries its own tile, so drop the green plate behind it.
+   Painted as a background rather than an <img> so it can't be dragged out or
+   saved via the right-click menu. */
+.brand-mark--art {
+  padding: 0;
+  background: url("/favicon.svg") center / contain no-repeat;
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.brand-lockup strong {
+  display: block;
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.brand-lockup span {
+  color: #627350;
+  font-size: 0.84rem;
+}
+
+.brand-copy {
+  min-width: 0;
+}
+
+/* Desktop-only sidebar collapse button */
+.sidebar-collapse-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.46);
+  border: 1px solid rgba(113, 131, 85, 0.16);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast), color var(--transition-fast);
+}
+
+.sidebar-collapse-btn:hover {
+  color: var(--green-dark);
+}
+
+.sidebar-collapse-btn:active {
+  transform: scale(0.96);
+}
+
+.sidebar-nav {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  justify-items: stretch;
+  align-content: start;
+}
+
+/* Desktop-only Spotify connect button */
+.sidebar-spotify {
+  display: none;
+  margin-top: auto;
+  padding: 8px 12px;
+}
+
+.spotify-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-spotify .button {
+  width: 100%;
+  min-height: 52px;
+  padding: 14px 16px;
+  font-weight: 700;
+  font-size: 1rem;
+  border-radius: var(--radius-lg);
+}
+
+.spotify-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  color: var(--ink);
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  box-shadow: var(--shadow-sm);
+  white-space: nowrap;
+}
+
+.spotify-wrap:hover .spotify-tooltip {
+  display: block;
+}
+
+@media (min-width: 1101px) {
+  .sidebar-spotify {
+    display: flex;
+  }
+
+  .shell {
+    --sidebar-width: clamp(236px, 22vw, 280px);
+  }
+
+  .shell[data-sidebar-collapsed="true"] {
+    --sidebar-width: 76px;
+  }
+
+  /* Collapsed sidebar styles */
+  .sidebar-header {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .sidebar-header .brand-lockup {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+  }
+
+  .sidebar-collapse-btn {
+    display: inline-flex;
+  }
+
+  .sidebar[data-collapsed="true"] {
+    width: 76px;
+    padding-inline: 12px;
+    padding-top: 16px;
+    gap: 16px;
+    overflow-x: hidden;
+    align-items: center;
+  }
+
+  .sidebar[data-collapsed="true"] .brand-lockup {
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    width: 100%;
+  }
+
+  .sidebar[data-collapsed="true"] .brand-copy,
+  .sidebar[data-collapsed="true"] .nav-label,
+  .sidebar[data-collapsed="true"] .sidebar-actions,
+  .sidebar[data-collapsed="true"] .sidebar-spotify {
+    display: none;
+  }
+
+  .sidebar[data-collapsed="true"] .sidebar-header {
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .sidebar[data-collapsed="true"] .sidebar-header .brand-lockup {
+    width: auto;
+  }
+
+  .sidebar[data-collapsed="true"] .sidebar-nav {
+    align-items: center;
+  }
+
+  .sidebar[data-collapsed="true"] .nav-link {
+    justify-content: center;
+    width: 52px;
+    min-height: 52px;
+    padding: 0;
+    gap: 0;
+  }
+
+  .sidebar[data-collapsed="true"] .sidebar-collapse-btn {
+    color: var(--green-dark);
+    background: rgba(255, 255, 255, 0.72);
+  }
+}
+
+/* Mobile drawer elements , hidden on desktop/tablet, shown via mobile breakpoint */
+.mobile-topbar {
+  display: none;
+}
+
+.hamburger-btn {
+  display: none;
+}
+
+.drawer-close-btn {
+  display: none;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+/* Sidebar header stays flexible on desktop and drawer layouts */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+}
+
+.sidebar-header .brand-lockup {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 12px 16px;
+  color: #536342;
+  border-radius: var(--radius-md);
+  white-space: nowrap;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+
+.nav-label {
+  min-width: 0;
+}
+
+.nav-link:hover,
+.nav-link.active {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.nav-link:active {
+  transform: scale(0.98);
+}
+
+.signout {
+  width: 100%;
+  background: transparent;
+  text-align: left;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 48px;
+  padding: 12px 18px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 700;
+  transition:
+    transform var(--transition-normal),
+    box-shadow var(--transition-normal),
+    background var(--transition-normal),
+    color var(--transition-normal),
+    border-color var(--transition-normal);
+}
+
+.button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.button-full {
+  width: 100%;
+}
+
+.button-primary {
+  color: var(--green-lightest);
+  background: var(--green-dark);
+}
+
+.button-primary:hover:not(:disabled) {
+  background: var(--green-dark-mid);
+}
+
+.button-secondary {
+  color: var(--green-dark);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1.5px solid var(--green-mid);
+}
+
+.button-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: var(--green-dark);
+}
+
+.button-ghost {
+  color: var(--green-dark);
+  background: transparent;
+}
+
+.button-ghost:hover:not(:disabled) {
+  /* Ghost buttons (Manage, Swap term and definition) only tint on hover, app-wide
+     by request; the base .button lift reads as a jump on a borderless button. */
+  transform: none;
+  background: rgba(113, 131, 85, 0.1);
+}
+
+.button-danger {
+  color: #fff;
+  background: var(--error);
+}
+
+/* Same meaning as .button-danger, a fraction of the weight. A filled red bar is
+   the loudest thing the app can draw, so it belongs to the one action that
+   cannot be undone (delete account), not to routine ones like signing out. */
+.button-danger-outline {
+  color: var(--accent-danger);
+  background: transparent;
+  border: 1.5px solid var(--accent-danger);
+}
+
+.button-danger-outline:hover:not(:disabled) {
+  color: var(--accent-danger-strong);
+  background: var(--accent-danger-tint);
+  border-color: var(--accent-danger-strong);
+}
+
+.button-danger:hover:not(:disabled) {
+  background: var(--accent-danger-strong);
+}
+
+/* Surface levels.
+   Every surface in the app used to resolve to this one treatment and differ
+   only in padding, so a stat readout, a container, and a tappable card all
+   carried the same weight and nothing said which was which. Three levels now,
+   separated at rest rather than only on hover (hover does not exist on a
+   phone, which is where the flatness was most obvious):
+
+     1 flat        a readout that groups numbers. Tinted, borderless, no
+                   shadow: part of the page rather than an object on it.
+     2 raised      the default. A container holding content.
+     3 interactive something you tap. Opaque white against the page's tint,
+                   a larger radius, and a real shadow. */
+
+/* Level 2, the default. */
+.card {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+/* A tinted level 2. Still a container, still an object on the page; the tint
+   marks it as set apart (a form, a sign-in panel) rather than as lower in the
+   hierarchy. Level 1 lives on .stat-card. */
+.card-soft {
+  background: rgba(207, 225, 185, 0.64);
+}
+
+.card-dark {
+  color: var(--green-lightest);
+  background: linear-gradient(135deg, var(--green-dark), #536342);
+  border-color: transparent;
+}
+
+/* Level 3. Everything here applies at any tone. */
+.card-interactive {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition:
+    transform var(--transition-normal),
+    box-shadow var(--transition-normal),
+    border-color var(--transition-normal),
+    background var(--transition-normal);
+}
+
+/* The level-3 fill, scoped to the default tone only.
+   Unscoped, this sat after .card-dark with the same specificity and quietly
+   won the background from it, leaving .card-dark's light text on white: the
+   "Review These" cards rendered as near-invisible pale green on white. A tone
+   has already made the fill decision, so the level only sets it when no tone
+   has. Opacity is the readable difference: a solid white card reads as sitting
+   above a green page in a way a 72%-translucent one does not. */
+.card-plain.card-interactive {
+  background: var(--white);
+}
+
+.card-interactive:hover {
+  border-color: var(--green-mid);
+  box-shadow: var(--shadow-lg);
+}
+
+.form-error {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  color: var(--error);
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.18);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+}
+
+.grid {
+  display: grid;
+  gap: 24px;
+}
+
+.grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.field-label {
+  font-size: 0.95rem;
+}
+
+.field-hint {
+  color: #627350;
+  font-size: 0.86rem;
+  font-weight: 500;
+}
+
+.input,
+.field-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 16px;
+  color: #000;
+  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+}
+
+.input:hover,
+.field-input:hover {
+  border-color: var(--green-mid);
+}
+
+.input:focus,
+.field-input:focus {
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.18);
+  outline: none;
+}
+
+.input::placeholder,
+.field-input::placeholder {
+  color: var(--green-mid);
+}
+
+.textarea {
+  min-height: 210px;
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 5px 10px;
+  color: var(--green-dark);
+  background: rgba(207, 225, 185, 0.72);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-pill);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.progress-track {
+  height: 8px;
+  overflow: hidden;
+  background: var(--green-light);
+  border-radius: var(--radius-pill);
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--green-dark);
+  border-radius: inherit;
+  transition: width 500ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.empty-state {
+  display: grid;
+  gap: 14px;
+  place-items: center;
+  padding: 56px 24px;
+  margin: 5px;
+  color: #596949;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.46);
+  border: 1px dashed var(--green-light-mid);
+  border-radius: var(--radius-md);
+}
+
+.empty-icon {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  color: var(--green-dark);
+  background: var(--green-light);
+  border-radius: var(--radius-md);
+}
+
+.loader {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--green-light);
+  border-top-color: var(--green-dark);
+  border-radius: var(--radius-pill);
+  animation: spin 800ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.landing {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 100vh;
+  place-items: center;
+  padding: 40px 16px;
+}
+
+.landing-card {
+  display: grid;
+  width: min(480px, 100%);
+  gap: 28px;
+}
+
+.landing-brand {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.landing-brand .brand-mark {
+  width: 56px;
+  height: 56px;
+}
+
+.signin-card {
+  display: grid;
+  gap: 24px;
+  padding: 32px;
+}
+
+.signin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.signin-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.trust-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: #596949;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.feature-list {
+  display: grid;
+  gap: 16px;
+}
+
+.feature-item {
+  display: flex;
+  gap: 16px;
+  padding: 20px;
+}
+
+.feature-item svg {
+  flex: 0 0 auto;
+  color: var(--green-dark);
+}
+
+.feature-item p {
+  margin-top: 4px;
+  color: #596949;
+  font-size: 0.9rem;
+}
+
+.centered-block {
+  display: grid;
+  min-height: 260px;
+  place-items: center;
+}
+
+.stat-grid {
+  margin-bottom: 42px;
+}
+
+/* Level 1: a readout, not an object.
+   Tint plus a defining border. The border is what the fill alone could not do,
+   which is give the tile an edge against a page of the same hue. Hierarchy is
+   then carried by the shadow: level 2 and 3 cast one, this does not, so the
+   strip still sits under the cards below it despite the heavier fill. */
+.stat-card {
+  display: grid;
+  gap: 22px;
+  padding: 24px;
+  background: rgba(181, 201, 154, 0.3);
+  border: 1px solid var(--green-light-mid);
+  box-shadow: none;
+}
+
+.stat-card div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #596949;
+}
+
+.stat-card svg {
+  color: var(--green-dark);
+}
+
+.stat-card strong {
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: 2.15rem;
+}
+
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: clamp(20px, 2.5vw, 32px);
+}
+
+.icon-pin, .icon-check, .icon-plus, .icon-search, .icon-cancel { flex: 0 0 auto; vertical-align: middle; }
+
+/* icon colors inherit from button , no override needed */
+.icon-search { color: #7f8b6f; }
+
+.slash-manager-actions .button svg, .slash-manager-composer svg, .slash-manager-search svg { width: 1em; height: 1em; display: inline-block; }
+
+.dashboard-main {
+  display: grid;
+  align-content: start;
+  gap: 44px;
+}
+
+/* Grid items default to min-width: auto, so one unbreakable test title
+   ("CSCI2033_Midterm1_Targeted_Worksheet") made the main column wider than
+   its track and it slid under Review These whenever the open sidebar left
+   less room. Both columns now shrink to their tracks. */
+.dashboard-layout > .dashboard-main,
+.dashboard-layout > aside {
+  min-width: 0;
+}
+
+.text-link {
+  color: var(--green-dark);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.folder-mini {
+  display: flex;
+  gap: 16px;
+  min-height: 132px;
+  padding: 22px;
+}
+
+.test-row,
+.folder-card-main,
+.folder-list-main,
+.test-row-main {
+  color: inherit;
+}
+
+.folder-card-main {
+  position: relative;
+  display: grid;
+  gap: 0;
+  flex: 1;
+}
+
+.folder-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
+.folder-card-actions {
+  justify-content: flex-end;
+}
+
+.folder-list-main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+  flex: 1;
+}
+
+.test-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+}
+
+.test-row-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  flex: 1;
+}
+
+/* The title block shrinks and long file-name titles wrap instead of pushing
+   the row (and the page column) wider. */
+.test-row-main > div:first-child {
+  min-width: 0;
+}
+
+.test-row-main h3 {
+  overflow-wrap: anywhere;
+}
+
+/* The "Resume" affordance on a Continue Test row. Was an inline style object in
+   Dashboard.tsx. */
+.test-row-resume {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+  color: var(--green-dark);
+  font-size: 0.875rem;
+  font-weight: 500;
+  /* The title beside it is the part that may shrink; this label is either fully
+     readable or it is noise. */
+  white-space: nowrap;
+}
+
+.mini-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+  color: #596949;
+  font-size: 0.86rem;
+}
+
+.folder-list-row > .mini-meta {
+  margin-top: 0;
+  align-self: center;
+}
+
+.test-list,
+.weak-stack,
+.review-list {
+  display: grid;
+  gap: 14px;
+}
+
+.score-badge {
+  flex: 0 0 auto;
+  min-width: 88px;
+  padding: 8px 12px;
+  color: var(--green-lightest);
+  background: var(--green-dark);
+  border-radius: var(--radius-md);
+  font-weight: 800;
+  text-align: center;
+}
+
+/* Each weak card links straight to that flashcard in review */
+.weak-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius-xl);
+}
+
+.weak-card-link:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.weak-card {
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+}
+
+.weak-card h3,
+.weak-card p {
+  color: inherit;
+}
+
+/* Stands in for the h3 that used to be here. Card fronts render as markdown
+   so math shows as math, and markdown emits blocks a heading cannot hold.
+   These values mirror what the h3 computed to, so the card is unchanged. */
+.weak-card-front {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: inherit;
+}
+
+/* MarkdownContent wraps its output in .kojo-markdown, which sets its own size
+   and dark ink. Without resetting the wrapper too, `inherit` on the paragraph
+   just picks that up again and the title renders small and near-invisible on
+   this card's dark green. */
+.weak-card-front .kojo-markdown,
+.weak-card-front p,
+.weak-card-front .math-inline,
+.weak-card-front .math-block {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+
+/* A formula-only front arrives as display math. Strip the callout panel so it
+   reads as the card's title, the way a text front does. */
+.weak-card-front .math-block {
+  padding: 0;
+  background: none;
+  border-left: none;
+  border-radius: 0;
+  text-align: left;
+}
+
+.dark-pill {
+  justify-self: start;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.toolbar,
+.button-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.segmented {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.56);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+}
+
+.segmented button,
+.icon-actions button {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  color: var(--green-dark);
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+
+.segmented button:hover,
+.segmented button.active,
+.icon-actions button:hover {
+  color: var(--green-lightest);
+  background: var(--green-dark);
+}
+
+.folder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: clamp(14px, 2vw, 24px);
+}
+
+.folder-list {
+  display: grid;
+  gap: 10px;
+}
+
+.folder-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 300px;
+  padding: 24px;
+  overflow: hidden;
+}
+
+.folder-card h2 {
+  margin-top: 22px;
+}
+
+.folder-card p {
+  margin-top: 8px;
+}
+
+.folder-card-footer {
+  display: flex;
+  gap: 12px;
+  color: #596949;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.folder-detail-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.folder-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 18px;
+  min-height: 82px;
+  padding: 18px 22px;
+}
+
+.icon-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.row-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.test-row .row-actions {
+  padding-left: 14px;
+  border-left: 1px solid var(--green-light-mid);
+}
+
+.row-actions button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  color: var(--green-dark);
+  background: transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.row-actions button:hover {
+  color: var(--green-lightest);
+  background: var(--green-dark);
+}
+
+.row-actions button:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  animation: fade-in 0.15s ease;
+}
+
+.modal-card {
+  display: grid;
+  width: min(460px, 100%);
+  gap: 18px;
+  padding: 26px;
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.settings-card {
+  display: grid;
+  gap: 24px;
+  padding: 28px;
+}
+
+.settings-summary {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.settings-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: #596949;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* Keep the entire Settings menu on one typeface (the sans face). The global h1/h2
+   rule sets serif (Lora), which left the page title, the session name, and the group
+   headings in serif while every control and label rendered in sans. Unify on sans for
+   a cohesive control-surface feel; size and weight still carry the hierarchy. */
+.settings-page h1,
+.settings-page h2,
+.settings-page .settings-group-title {
+  font-family: var(--font-sans);
+}
+
+.settings-page h1 {
+  letter-spacing: -0.02em;
+}
+
+.settings-page .settings-summary h2 {
+  letter-spacing: -0.01em;
+}
+
+.settings-group-title {
+  margin: 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--green-light-mid);
+  font-size: 0.84rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: var(--green-dark);
+}
+
+.settings-card > .settings-group-title:first-of-type {
+  padding-top: 0;
+  border-top: none;
+}
+
+.settings-group-title--danger {
+  color: #b3261e;
+  border-top-color: rgba(179, 38, 30, 0.28);
+}
+
+.settings-restore-list {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-restore-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.settings-restore-folder {
+  margin: 0;
+  font-weight: 700;
+}
+
+.settings-feedback {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.settings-feedback--success {
+  background: #edf7ed;
+  color: #2e6b2e;
+}
+
+.settings-feedback--error {
+  background: #fdecea;
+  color: #b71c1c;
+}
+

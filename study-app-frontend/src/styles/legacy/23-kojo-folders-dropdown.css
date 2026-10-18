@@ -1,0 +1,1135 @@
+/* Dropdown (components/Dropdown.tsx): custom single-select. The trigger reuses
+   .input so it lines up with text fields; the panel is portalled to <body>
+   and positioned fixed, above modals (.modal-backdrop is z-index 1000). */
+.dropdown-trigger {
+  /* Inline like the native select it replaces; the context class (or .input)
+     sets width, padding and font size, so no font override here. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dropdown-trigger.is-placeholder .dropdown-value {
+  color: var(--muted);
+}
+
+.dropdown-trigger[aria-expanded="true"] {
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.14);
+}
+
+.dropdown-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.dropdown-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropdown-chevron {
+  flex-shrink: 0;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.dropdown-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.dropdown-panel {
+  position: fixed;
+  z-index: 1100;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 264px;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--white);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  outline: none;
+}
+
+.dropdown-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+
+.dropdown-option.is-active {
+  background: var(--green-lightest);
+}
+
+.dropdown-option[aria-selected="true"] {
+  color: var(--green-dark);
+  font-weight: 600;
+}
+
+.dropdown-check {
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-chevron {
+    transition: none;
+  }
+}
+
+.lm-reformat-note {
+  margin: 0 0 0.75rem;
+}
+
+/* ── Safety modal (GH #173) ── */
+.safety-modal-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+  color: var(--ink);
+}
+
+/* ── Admin moderation (GH #173) ── */
+.admin-moderation-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-moderation-head .admin-section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-flag-list {
+  display: grid;
+  gap: 12px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-flag {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: var(--green-lightest);
+}
+
+.admin-flag-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-flag-excerpt {
+  max-height: 180px;
+  margin: 0;
+  padding: 10px 12px;
+  overflow-y: auto;
+  border-left: 3px solid var(--green-light-mid);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.88rem;
+  color: var(--ink);
+}
+
+.admin-ban-reason {
+  min-height: 90px;
+  padding: 10px 12px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-sm, 8px);
+  font: inherit;
+  resize: vertical;
+}
+
+.admin-ban-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Sign-in terms notice ── */
+.signin-terms {
+  margin: 0;
+  text-align: center;
+}
+
+.signin-terms-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--green-dark);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* MCP connector consent page (ConnectAuthorize.tsx), reuses the sign-in shell */
+.connect-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.connect-scopes {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.connect-scopes li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.45;
+}
+
+.connect-scopes svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--green-dark);
+}
+
+.connect-actions {
+  justify-content: flex-end;
+}
+
+.connect-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  border-radius: var(--radius-lg);
+  background: rgba(217, 119, 6, 0.08);
+  line-height: 1.45;
+}
+
+.connect-warning svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--warning);
+}
+
+.connect-warning p {
+  margin: 0;
+}
+
+.connect-error {
+  display: grid;
+  gap: 14px;
+  justify-items: start;
+}
+
+/* Custom mode badge (TakeTest header): a test whose questions each pick their
+   own input. Same shape as .math-mode-badge, in the info accent so it reads
+   apart from STEM green. */
+.custom-mode-badge {
+  background: var(--accent-info-tint);
+  color: var(--accent-info-strong);
+}
+
+/* Settings > Connected apps (ConnectedApps.tsx): the connector link to copy */
+.connected-apps-url {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 14px;
+}
+
+.connected-apps-url code {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 8px 10px;
+  overflow-wrap: anywhere;
+  border-radius: var(--radius-lg);
+  background: var(--green-lightest);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+/* Learning modules: "Unlocked" pill on MCP-built tracks */
+.lm-unlocked-pill {
+  margin-left: 10px;
+  vertical-align: middle;
+  font-size: 0.75rem;
+}
+
+/* Usage meters: hand-off tip shown near a limit */
+.usage-handoff-tip {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--green-lightest);
+  color: var(--ink);
+}
+
+/* Needs-input card actions: primary + quiet skip, inline, not stacked full-width. */
+.review-detail .needs-input-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.review-detail .needs-input-actions .button {
+  width: auto;
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+
+
+@media (max-width: 640px) {
+  .review-detail .needs-input-actions .button-primary {
+    flex: 1 1 100%;
+  }
+
+  .review-detail .needs-input-actions .button-secondary {
+    flex: 1 1 100%;
+  }
+}
+
+/* Disabled Grade: a flat muted surface with readable text, not a faded
+   dark-green button (opacity made the light label illegible). */
+.review-detail .needs-input-actions .button-primary:disabled {
+  opacity: 1;
+  color: var(--green-mid);
+  background: rgba(113, 131, 85, 0.14);
+  box-shadow: none;
+}
+
+@media (max-width: 640px) {
+  /* Stacked phone header: controls row + label + ~2 question lines before it shrinks. */
+  .scratchpad-header {
+    min-height: 140px;
+  }
+}
+
+
+/* Page rules like `.review-detail span` or `.test-progress span` recolor every
+   span under them. A button label always takes the button's own color. */
+.button span,
+.button svg {
+  color: inherit;
+}
+
+.review-detail .needs-input-error {
+  padding: 0;
+  background: none;
+}
+
+/* Phone page-header toolbars: the 2-col grid leaves ~170px per button and the
+   labels wrap into uneven shapes. Stack one full-width button per row. */
+@media (max-width: 480px) {
+  .page-header .toolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .page-header .toolbar .button {
+    white-space: nowrap;
+  }
+}
+
+/* Kojo chat on touch screens: icon controls were 26-32px. Give them a 40px
+   hit area; desktop (fine pointer) keeps the dense sizes. */
+@media (pointer: coarse) {
+  .kojo-user-action,
+  .kojo-chat-item-delete,
+  .chat-mode-sidebar-close,
+  .kojo-attach-btn,
+  .kojo-send,
+  .tt-btn {
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
+
+/* ── Ask Kojo side panel (KojoHelpChat: test mode, KojoCode, System Design) ──
+   Same visual language as the full Kojo chat page (.chat-mode-shell): flat
+   canvas, dark user bubbles, small pill suggestions, soft rounded composer. */
+.kojo-panel--help {
+  --k-canvas: #f6f9f1;
+  --k-field: var(--white);
+  --k-ink: var(--ink);
+  --k-muted: var(--muted);
+  --k-faint: #8fa07a;
+  --k-line: rgba(113, 131, 85, 0.16);
+  --k-hover: rgba(113, 131, 85, 0.1);
+  --k-accent: var(--green-dark);
+  --k-accent-tint: rgba(113, 131, 85, 0.13);
+  background: var(--k-canvas);
+}
+
+.kojo-panel--help .kojo-header {
+  border-bottom: 1px solid var(--k-line);
+  background: var(--k-canvas);
+}
+
+.kojo-panel--help .kojo-avatar {
+  background: var(--white);
+  border: 1px solid var(--k-line);
+}
+
+.kojo-panel--help .kojo-header-btn {
+  border: none;
+  background: transparent;
+  color: var(--k-muted);
+}
+
+.kojo-panel--help .kojo-header-btn:hover {
+  background: var(--k-hover);
+  color: var(--k-ink);
+}
+
+.kojo-panel--help .lc-kojo-contract {
+  margin: 0;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--k-line);
+  background: transparent;
+}
+
+.kojo-panel--help .lc-kojo-contract p {
+  margin: 0;
+  color: var(--k-faint);
+  font-size: 0.75rem;
+}
+
+.kojo-panel--help .kojo-messages {
+  background: var(--k-canvas);
+}
+
+.kojo-panel--help .kojo-empty {
+  padding: 40px 20px 24px;
+}
+
+.kojo-panel--help .kojo-empty-title {
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  color: var(--k-ink);
+}
+
+.kojo-panel--help .kojo-empty-sub {
+  max-width: 340px;
+  color: var(--k-muted);
+}
+
+.kojo-panel--help .kojo-suggestions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 16px auto 0;
+}
+
+.kojo-panel--help .kojo-suggestion {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid var(--k-line);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  box-shadow: none;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--k-muted);
+  text-align: left;
+}
+
+.kojo-panel--help .kojo-suggestion:hover:not(:disabled) {
+  border-color: var(--k-accent);
+  background: var(--k-accent-tint);
+  color: var(--k-accent);
+}
+
+.kojo-panel--help .kojo-msg-avatar {
+  background: var(--white);
+  border: 1px solid var(--k-line);
+}
+
+.kojo-panel--help .kojo-user-bubble {
+  padding: 10px 14px;
+  border-radius: var(--radius-xl);
+  background: var(--k-ink);
+  color: var(--k-canvas);
+  font-size: 0.9rem;
+  box-shadow: 0 2px 8px rgba(38, 48, 31, 0.18);
+}
+
+.kojo-panel--help .kojo-user-bubble p,
+.kojo-panel--help .kojo-message-time--user {
+  color: var(--k-canvas);
+}
+
+.kojo-panel--help .kojo-input-area {
+  padding: 8px 16px 12px;
+  border-top: none;
+  background: var(--k-canvas);
+}
+
+.kojo-panel--help .kojo-input-wrap {
+  padding: 6px 6px 6px 14px;
+  border: 1px solid var(--k-line);
+  border-radius: var(--radius-xl);
+  background: var(--k-field);
+  box-shadow: none;
+}
+
+.kojo-panel--help .kojo-input-wrap:focus-within {
+  border-color: var(--green-mid);
+  box-shadow: 0 2px 12px var(--k-hover);
+}
+
+.kojo-panel--help .kojo-input {
+  padding: 6px 0;
+  border: none;
+  background: transparent;
+  color: var(--k-ink);
+  font-size: 0.9rem;
+}
+
+.kojo-panel--help .kojo-input::placeholder {
+  color: var(--k-faint);
+}
+
+.kojo-panel--help .kojo-send {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--k-ink);
+  color: var(--k-canvas);
+}
+
+.kojo-panel--help .kojo-send:not(:disabled):hover {
+  background: var(--k-accent);
+}
+
+.kojo-panel--help .kojo-send:disabled {
+  background: transparent;
+  color: rgba(89, 105, 73, 0.45);
+}
+
+.kojo-panel--help .kojo-input-hint {
+  color: rgba(89, 105, 73, 0.5);
+  font-size: 0.7rem;
+}
+
+/* Kojo chat: bulk delete (Select in the Recent header). Bar, toggle,
+   checkbox and delete button are the shared file-manager / .checkbox-input
+   pieces; only sidebar placement lives here. */
+.kojo-recent-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 10px;
+}
+
+.kojo-recent-head {
+  margin: 8px 0 4px;
+}
+
+.kojo-recent-head .chat-mode-section-label {
+  margin: 0 14px;
+}
+
+.kojo-recent-link {
+  min-height: 32px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--k-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.kojo-recent-link:hover {
+  background: var(--k-hover);
+  color: var(--k-ink);
+}
+
+.kojo-select-bar {
+  gap: 6px;
+  margin: 0 12px 6px;
+}
+
+/* The sidebar is ~250px: keep both controls on one line. */
+.kojo-select-bar .file-manager-select-toggle,
+.kojo-select-bar .file-manager-bulk-delete {
+  min-height: 32px;
+  padding: 5px 10px 5px 8px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.kojo-chat-item-check {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.kojo-chat-item-check .checkbox-input {
+  grid-row: span 2;
+}
+
+.kojo-chat-item--selected {
+  background: var(--green-lightest);
+}
+
+@media (pointer: coarse) {
+  .kojo-recent-link {
+    min-height: 40px;
+  }
+}
+
+/* Sidebar brand row only carries the phone close button now; hide it on desktop. */
+@media (min-width: 761px) {
+  .chat-mode-brand {
+    display: none;
+  }
+}
+
+/* "Recent" in sentence case, Kojo chat's sans, not the mono all-caps label. */
+.kojo-recent-head .kojo-recent-label {
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--k-muted);
+}
+
+/* Chat names in the sidebar use the serif display face. */
+.chat-mode-shell .kojo-chat-item-name {
+  font-family: var(--font-serif);
+}
+
+/* Kojo folder FILES card: remove control, quiet until hovered (always visible on touch). */
+.kojo-file-remove {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--k-faint);
+  cursor: pointer;
+}
+
+.kojo-file-remove:hover,
+.kojo-file-remove:focus-visible {
+  background: var(--k-danger-tint);
+  color: var(--red, #c53030);
+}
+
+@media (pointer: coarse) {
+  .kojo-file-remove {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* Results: missed topic chips (folder stats chunk 3) */
+.missed-topic-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.missed-topic-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  max-width: 100%;
+  padding: 7px 12px;
+  background: rgba(220, 38, 38, 0.04);
+  border: 1px solid rgba(220, 38, 38, 0.14);
+  border-radius: 999px;
+}
+
+.missed-topic-name {
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.missed-topic-count {
+  font-size: 0.8rem;
+  color: var(--error);
+  white-space: nowrap;
+}
+
+.missed-questions-details {
+  margin-top: 12px;
+}
+
+.missed-questions-details > summary {
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--green-dark);
+  padding: 6px 0;
+}
+
+/* Folder page: Stats | Flashcards panel (folder stats chunk 4) */
+.segmented--text button {
+  width: auto;
+  height: 36px;
+  padding: 0 16px;
+  font-weight: 600;
+}
+
+.folder-panel-title {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* Matches the practice test rows below: 20px side padding, 14px gaps. */
+.folder-stats {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.folder-stats-message {
+  display: grid;
+  gap: 4px;
+  padding: 16px 20px;
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+}
+
+.folder-stats-message strong {
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+}
+
+.folder-stats-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.folder-stats-tile {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 18px 20px;
+  background: rgba(181, 201, 154, 0.3);
+  border: 1px solid var(--green-light-mid);
+  box-shadow: none;
+}
+
+.folder-stats-tile-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #596949;
+  font-size: 0.875rem;
+}
+
+.folder-stats-tile-label svg {
+  color: var(--green-dark);
+}
+
+.folder-stats-tile strong {
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: 1.9rem;
+  line-height: 1.1;
+}
+
+.folder-stats-chart-card,
+.folder-stats-topic-card {
+  padding: 18px 20px;
+}
+
+.folder-stats-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 1rem;
+  color: var(--ink);
+}
+
+.folder-stats-chart {
+  position: relative;
+  width: 100%;
+  height: 200px;
+}
+
+.folder-stats-chart svg {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: visible;
+}
+
+.folder-stats > *,
+.folder-stats-chart-card {
+  min-width: 0;
+}
+
+.folder-stats-grid {
+  stroke: var(--green-light-mid);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.folder-stats-axis {
+  fill: #7f8b6f;
+  font-size: 11px;
+}
+
+.folder-stats-line {
+  fill: none;
+  stroke: var(--green-dark);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.folder-stats-hit {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.folder-stats-dot {
+  fill: var(--green-dark);
+  stroke: var(--white);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.folder-stats-chart g:focus {
+  outline: none;
+}
+
+.folder-stats-tooltip {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  gap: 2px;
+  min-width: 160px;
+  max-width: 220px;
+  padding: 8px 10px;
+  font-size: 0.8rem;
+  color: var(--ink);
+  background: var(--white);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  transform: translate(-50%, calc(-100% - 12px));
+  pointer-events: none;
+}
+
+.folder-stats-tooltip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-stats-topics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+/* Weak = still growing: amber, not error red. */
+.folder-stats-topic-card--weak .folder-stats-heading svg {
+  color: var(--warning);
+}
+
+.folder-stats-topic-card--strong .folder-stats-heading svg {
+  color: var(--green-dark);
+}
+
+.folder-stats-topic-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.folder-stats-topic-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.folder-stats-topic-name {
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.folder-stats-topic-pct {
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.folder-stats-bar {
+  height: 6px;
+  margin: 6px 0 4px;
+  background: var(--green-lightest);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.folder-stats-bar span {
+  display: block;
+  height: 100%;
+  background: var(--green-dark);
+  border-radius: 999px;
+}
+
+.folder-stats-topic-card--weak .folder-stats-bar span {
+  background: var(--warning);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 640px) {
+  .folder-stats-tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .folder-stats-tile {
+    padding: 12px;
+  }
+
+  .folder-stats-tile strong {
+    font-size: 1.4rem;
+  }
+
+  .folder-stats-tile-label {
+    font-size: 0.75rem;
+  }
+
+  .folder-stats-topics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Folder Stats: daily quiz in the encouragement banner (chunk 5) */
+.folder-stats-message--quiz {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+}
+
+.folder-stats-message-text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 280px;
+}
+
+.folder-stats-quiz {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.folder-stats-quiz-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--green-dark);
+}
+
+.folder-stats-quiz-hint {
+  max-width: 240px;
+}
+
+.folder-stats-quiz-error {
+  margin: -6px 0 0;
+  color: var(--error);
+}
+
+@media (max-width: 640px) {
+  .folder-stats-quiz,
+  .folder-stats-quiz .button {
+    width: 100%;
+  }
+
+  .folder-stats-quiz .button {
+    justify-content: center;
+  }
+}
+
+/* Folder Stats loading: same shells as the loaded panel. Bars use a
+   translucent ink wash so they sit naturally on the tinted tiles, the banner
+   and the white cards alike, instead of one flat grey-green. */
+.folder-stats--loading .skel {
+  display: block;
+  background: linear-gradient(90deg, rgba(113, 131, 85, 0.14) 30%, rgba(113, 131, 85, 0.06) 50%, rgba(113, 131, 85, 0.14) 70%);
+  background-size: 300% 100%;
+}
+
+.folder-stats--loading .folder-stats-message,
+.folder-stats--loading .folder-stats-tile,
+.folder-stats--loading .folder-stats-topic-card {
+  gap: 12px;
+}
+
+.folder-stats--loading .folder-stats-topic-card {
+  display: grid;
+}
+
+.folder-stats--loading .folder-stats-tile {
+  min-height: 118px;
+}
+
+/* The chart's three gridlines (100 / 50 / 0%), at the chart's own height. */
+.folder-stats-skel-chart {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 200px;
+  margin-top: 12px;
+  padding: 12px 12px 12px 40px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .folder-stats--loading .skel { animation: none; }
+}
+
+/* Dashboard Weak Spots (folder stats chunk 6): under Review These */
+.weak-spots {
+  margin-top: 28px;
+}
+
+.weak-spots-card {
+  padding: 18px 20px;
+}
+
+.weak-spots-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.weak-spots-item {
+  display: block;
+  margin: 0 -10px;
+  padding: 10px;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+
+.weak-spots-item:hover,
+.weak-spots-item:focus-visible {
+  background: var(--green-lightest);
+}
+
+.weak-spots-bar span {
+  background: var(--warning);
+}
+
+.weak-spots-skel {
+  display: grid;
+  gap: 8px;
+  padding: 10px 0;
+}
+
+.weak-spots-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: var(--green-dark);
+}
+
+.weak-spots-empty p {
+  margin: 0;
+}
+
+/* Folder Settings: "How Kojo makes tests" (folder stats chunk 7) */
+.folder-test-instructions-row {
+  display: grid;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(113, 131, 85, 0.1);
+}
+
+.folder-test-instructions-row textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.folder-test-instructions-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* Custom icon set: empty-state icons were rendering at the 24px default inside a large tile. */
+.empty-icon svg.icon {
+  width: 34px;
+  height: 34px;
+}

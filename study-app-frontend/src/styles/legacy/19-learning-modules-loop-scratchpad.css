@@ -1,0 +1,1351 @@
+/* Time, set in mono and zero-padded so the column reads like a schedule. */
+.loop-station-time {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+/* The two-part time cluster: a mono figure and its uppercase unit. Used on the
+   spine and restated in the setup footer, so it is one pair of classes. */
+.loop-num {
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--green-mid);
+  transition: color var(--transition-normal);
+}
+
+.loop-unit {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gray-500);
+}
+
+.loop-station.is-on .loop-num {
+  color: var(--loop-ink);
+}
+
+.loop-station-time--total .loop-num {
+  font-size: 1.05rem;
+  color: var(--green-dark);
+}
+
+.loop-station-desc {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--gray-500);
+  max-width: 62ch;
+  transition: color var(--transition-normal);
+}
+
+.loop-station.is-on .loop-station-desc {
+  color: var(--muted);
+}
+
+/* The debrief always happens, so it reads as a destination, not an option. */
+.loop-station--terminal .loop-node {
+  background: var(--green-lightest);
+  border-color: var(--green-dark);
+  border-style: dashed;
+  color: var(--green-dark);
+}
+
+.loop-station--terminal .loop-station-label {
+  color: var(--loop-ink);
+}
+
+.loop-station--terminal .loop-station-body {
+  padding-bottom: 2px;
+}
+
+.loop-station-body:hover .loop-station-label {
+  color: var(--loop-ink);
+}
+
+/* Only the offset differs from the global :focus-visible. */
+.loop-station-body:focus-visible {
+  outline-offset: 4px;
+}
+
+/* ── Setup footer tally: the same mono time, restated as the commitment ── */
+.mock-setup-tally {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  flex-wrap: wrap;
+}
+
+.mock-setup-tally .loop-num {
+  font-size: 1rem;
+  color: var(--loop-ink);
+}
+
+.mock-setup-tally .loop-unit {
+  font-size: 0.72rem;
+}
+
+.mock-tally-sep {
+  width: 1px;
+  height: 13px;
+  align-self: center;
+  background: var(--green-light-mid);
+}
+
+/* ── The spine, replayed as verdicts on the debrief page ── */
+.loop-spine--verdicts {
+  margin-bottom: 24px;
+}
+
+.loop-spine--verdicts .loop-station-body {
+  padding-bottom: 18px;
+}
+
+.loop-spine--verdicts .loop-segment {
+  min-height: 18px;
+}
+
+/* Namespaced: the bare .verdict-* classes are badge fills and would flood the row.
+   strong and pass keep the default ink node from `.loop-station.is-on`, so only the
+   two that need flagging are listed. */
+.loop-spine--verdicts .loop-station.loop-verdict-borderline .loop-node {
+  background: var(--accent-caution-tint);
+  border-color: var(--accent-caution);
+  color: var(--accent-caution-strong);
+}
+
+.loop-spine--verdicts .loop-station.loop-verdict-needs-work .loop-node {
+  background: var(--accent-danger-tint);
+  border-color: var(--accent-danger);
+  color: var(--accent-danger-strong);
+}
+
+.loop-spine--verdicts .mock-verdict-badge {
+  margin-left: auto;
+}
+
+/* ── The spine laid flat: stage headers, results, history rows ── */
+.loop-track {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 14px 0 0;
+  padding: 0;
+}
+
+.loop-track-station {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* Enough padding that the connector reads as a rail between stations rather
+     than as a hyphen attached to the label. */
+  padding-right: 18px;
+  margin-right: 6px;
+  position: relative;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--gray-500);
+}
+
+/* The connector between stations: the rail, flattened. */
+.loop-track-station:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  right: 4px;
+  width: 10px;
+  height: 1.5px;
+  background: var(--loop-rail-off);
+}
+
+.loop-track-node {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--green-light-mid);
+  background: var(--white);
+}
+
+.loop-track-station.is-done .loop-track-node {
+  background: var(--loop-ink);
+  border-color: var(--loop-ink);
+}
+
+.loop-track-station.is-done {
+  color: var(--muted);
+}
+
+.loop-track-station.is-current .loop-track-node {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.22);
+}
+
+.loop-track-station.is-current {
+  color: var(--loop-ink);
+}
+
+.loop-track-station.is-done:not(:last-child)::after {
+  background: var(--green-mid);
+}
+
+/* The results header is centred, so the track under it has to be too. */
+.mock-results-page-header .loop-track {
+  justify-content: center;
+}
+
+.loop-track--compact {
+  margin-top: 6px;
+}
+
+.loop-track--compact .loop-track-station {
+  font-size: 0.68rem;
+  padding-right: 14px;
+  margin-right: 4px;
+}
+
+.loop-track--compact .loop-track-station:not(:last-child)::after {
+  right: 3px;
+  width: 8px;
+}
+
+.loop-track--compact .loop-track-node {
+  width: 6px;
+  height: 6px;
+}
+
+/* ── The one orchestrated moment: the rail draws itself on arrival ──
+   Scoped off the debrief spine on purpose. There the reader has just waited on an
+   LLM call, and staggering the verdicts holds the last one back another ~0.6s. */
+.loop-spine:not(.loop-spine--verdicts) .loop-station {
+  animation: loop-station-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--station-i, 0) * 70ms);
+}
+
+@keyframes loop-station-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loop-spine .loop-station {
+    animation: none;
+  }
+  .loop-segment,
+  .loop-node,
+  .loop-station-label,
+  .loop-num,
+  .loop-station-desc {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .loop-station {
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 0 12px;
+  }
+  .loop-station-time {
+    margin-left: 0;
+  }
+  .mock-loop-section {
+    padding: 18px 16px 20px;
+  }
+}
+
+
+/* ============================================================
+   Privacy policy and terms of service modal
+   ============================================================ */
+
+.privacy-modal-body .policy-divider {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 10px 0 4px;
+}
+
+.privacy-modal-body .policy-section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.privacy-modal-body strong {
+  font-weight: 600;
+}
+
+/* ============================================================
+   Server waiting screen (backend down / booting)
+   ============================================================ */
+
+.waiting-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  padding: 32px 16px;
+  background: linear-gradient(180deg, var(--green-lightest) 0%, #f2f7ea 100%);
+  color: var(--ink);
+}
+
+.waiting-card {
+  width: min(100%, 700px);
+  padding: 32px 32px 28px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-card-mobile);
+  box-shadow: var(--shadow-lg);
+}
+
+.waiting-eyebrow {
+  margin: 0 0 10px;
+  color: var(--green-dark);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.waiting-title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: clamp(1.85rem, 4.5vw, 2.5rem);
+  line-height: 1.15;
+}
+
+.waiting-body {
+  margin: 14px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.waiting-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px 28px;
+  margin: 22px 0 0;
+}
+
+.waiting-timer-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.waiting-meta-label {
+  color: var(--green-dark);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.waiting-timer {
+  font-family: var(--font-mono);
+  font-size: 1.9rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.waiting-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 14px 8px 10px;
+  color: var(--ink);
+  font-size: 0.9rem;
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-pill);
+}
+
+.waiting-status-dot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  background: var(--warning);
+  border-radius: 50%;
+  animation: waiting-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes waiting-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+.waiting-game-stage {
+  margin-top: 22px;
+  overflow: hidden;
+  background: #fbfdf7;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+}
+
+.waiting-game-stage[data-dimmed] canvas {
+  opacity: 0.25;
+  filter: saturate(0.4);
+  transition: opacity 0.35s ease, filter 0.35s ease;
+}
+
+.waiting-game canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 960 / 300;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  /* The runner is drawn as pixel art on a 5px cell grid. Nearest-neighbour
+     upscaling keeps the cells square instead of blurring them. */
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+}
+
+.waiting-game-hint {
+  margin: 10px 0 0;
+  color: var(--ink);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.waiting-game-hint kbd {
+  display: inline-block;
+  padding: 0 6px;
+  color: var(--green-dark);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: var(--green-lightest);
+  border: 1px solid var(--green-light-mid);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-xs);
+}
+
+.waiting-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+@media (max-width: 640px) {
+  .waiting-card {
+    padding: 26px 20px 22px;
+  }
+  .waiting-meta {
+    gap: 16px 18px;
+  }
+  .waiting-timer {
+    font-size: 1.7rem;
+  }
+  .waiting-status {
+    font-size: 0.84rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .waiting-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .waiting-status {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .waiting-status-dot {
+    animation: none;
+  }
+  .waiting-game-stage[data-dimmed] canvas {
+    transition: none;
+  }
+  .lm-spin {
+    animation: none;
+  }
+  .lm-audio-toggle,
+  .lm-audio-seek,
+  .lm-checkpoint-option {
+    transition: none;
+  }
+  .lm-checkpoint-dots button {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* ── Learning module episode formats (podcast, video lecture) --------------- */
+/* This block must never redefine a selector the article lesson player already
+   owns (.lm-audio-toggle, .lm-audio-body, .lm-audio-titles, .lm-audio-seek,
+   .lm-audio-rates, .lm-audio-rate, .lm-audio-restart, .lm-failed, .lm-spin).
+   The episode player reuses those classes and their existing rules as-is;
+   anything it needs beyond that goes on a modifier class instead. */
+
+.lm-format-picker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.65rem;
+  margin-bottom: 1.15rem;
+}
+.lm-format-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  padding: 0.9rem 0.75rem;
+  border: 1.5px solid var(--green-lightest);
+  border-radius: var(--radius-xl);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+}
+.lm-format-card:hover {
+  border-color: var(--green-mid);
+}
+.lm-format-card:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.lm-format-card.is-selected {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+  box-shadow: inset 0 0 0 1px var(--green-dark);
+}
+.lm-format-card-icon {
+  color: var(--green-dark);
+}
+.lm-format-card-name {
+  font-weight: 700;
+  font-size: 1rem;
+}
+.lm-format-card-blurb {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.lm-episode-note {
+  margin: 0 0 0.9rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-lg);
+  background: var(--green-lightest);
+}
+/* Reuses .lm-stale's advisory-strip shape (an inline notice on this same page
+   family) with the warning token instead of a new hardcoded amber. */
+.lm-speech-notice {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  margin: 0 0 0.9rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--warning) 14%, var(--white));
+  color: var(--warning);
+  font-size: 0.9rem;
+}
+.lm-speech-notice svg { flex: none; }
+.lm-speech-notice p { margin: 0; color: var(--ink); }
+.lm-speech-notice--inline { margin-bottom: 0; }
+
+/* One shell for both slot states (empty = create, filled = ready/generating/
+   failed): same padding, same icon position, same title size, same vertical
+   order, so a slot reads as one object in two states rather than two
+   different components. */
+.lm-format-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.lm-format-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.9rem 0.75rem;
+}
+.lm-format-slot--empty {
+  padding: 0;
+  border-style: dashed;
+}
+.lm-format-slot-create {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  width: 100%;
+  height: 100%;
+  padding: 0.9rem 0.75rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+  text-align: left;
+}
+.lm-format-slot-create:hover .lm-format-slot-icon {
+}
+.lm-format-slot-create:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.lm-format-slot-icon {
+  color: var(--green-dark);
+  transition: transform var(--transition-fast);
+}
+.lm-format-slot-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.lm-format-slot-title {
+  font-weight: 700;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.lm-format-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--green-dark);
+  background: var(--green-lightest);
+  border-radius: var(--radius-pill);
+  padding: 0.1rem 0.5rem;
+}
+.lm-format-slot-state {
+  min-height: 1.4rem;
+  display: flex;
+  align-items: center;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+.lm-format-completed {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--green-dark);
+  font-weight: 600;
+}
+.lm-format-slot.is-failed .form-error { margin: 0; }
+.lm-format-slot-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: auto;
+}
+.lm-format-slot-actions .button { padding: 0.4rem 0.75rem; }
+
+/* Episode player */
+/* .card supplies background, border, and shadow only, never padding, so every
+   Card consumer must set its own. These four never got any: content was
+   sitting flush against the card border with nothing else to blame for the
+   cramped, uneven feel across both the podcast and lecture screens. */
+.lm-episode .lm-header-main h1 { margin: 0 0 0.15rem; }
+.lm-episode-stage {
+  min-height: 10rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 1.25rem;
+}
+.lm-slide {
+  padding: 0.4rem 0.15rem;
+}
+.lm-slide-title {
+  font-size: 1.6rem;
+  line-height: 1.2;
+  margin: 0 0 0.9rem;
+  color: var(--ink);
+}
+.lm-slide-bullets {
+  margin: 0 0 0.75rem;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+/* No global list reset exists in this stylesheet, so the browser's own li
+   margin was stacking on top of the flex gap above, doubling the space
+   between bullets. Zero it explicitly rather than relying on the UA default. */
+.lm-slide-bullets li {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.4;
+  color: var(--ink);
+}
+.lm-slide-example {
+  margin: 0.25rem 0 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--radius-lg);
+  background: var(--green-lightest);
+  border-left: 3px solid var(--green-dark);
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
+.lm-slide-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+}
+.lm-slide-dots {
+  display: flex;
+  gap: 0.1rem;
+}
+/* The visible dot stays small; the button's own box is the real (>=32px) tap
+   target, via padding rather than width/height, so touch does not shrink to
+   the dot's 10px footprint. */
+.lm-slide-dots button,
+.lm-checkpoint-dots button {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  display: grid;
+  place-items: center;
+}
+/* Always carries its own border, so an unfilled dot stays visible whether it
+   sits on the plain page background, the green-lightest player, or a white
+   card. A flat green-lightest fill with no border was invisible on the page
+   itself, since that is the page's own background color. */
+.lm-slide-dots button::before,
+.lm-checkpoint-dots button::before {
+  content: "";
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  border: 1.5px solid var(--green-mid);
+}
+.lm-slide-dots button:focus-visible,
+.lm-checkpoint-dots button:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 1px;
+}
+.lm-slide-dots button.is-active::before {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+}
+.lm-episode-transcript {
+  padding: 1.25rem;
+}
+.lm-episode-transcript .lm-transcript-toggle {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  color: var(--green-dark);
+  padding: 0.3rem 0;
+}
+.lm-episode-transcript .lm-transcript-toggle:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.lm-transcript-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  margin-top: 0.6rem;
+}
+.lm-turn {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  padding: 0.25rem 0.4rem;
+  border-radius: var(--radius-lg);
+  scroll-margin-top: 1.25rem;
+}
+.lm-turn.is-active {
+  background: var(--green-lightest);
+}
+.lm-turn p {
+  margin: 0.1rem 0 0;
+  line-height: 1.55;
+}
+/* Host: filled. Expert: outlined. Same green, no second hue, so the two
+   speakers stay distinguishable in greyscale and for a colorblind reader
+   (the app's existing filled/outline pairing for primary vs. secondary). */
+.lm-speaker-chip {
+  flex: none;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--white);
+  background: var(--green-dark);
+  border: 1px solid var(--green-dark);
+  border-radius: var(--radius-pill);
+  padding: 0.15rem 0.55rem;
+  margin-top: 0.1rem;
+}
+.lm-speaker-chip.is-expert {
+  background: var(--white);
+  color: var(--green-dark);
+}
+/* Matches the article player's own background/border combo (line ~14800)
+   rather than white: the active rate pill is white, so on a white player it
+   was invisible. green-lightest is what makes that pill readable. */
+.lm-episode-player {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem;
+  border: 1px solid var(--green-light);
+  border-radius: var(--radius-xl);
+  margin: 0.9rem 0;
+  background: var(--green-lightest);
+}
+.lm-audio-format {
+  display: inline-flex;
+  color: var(--green-dark);
+}
+/* The article's .lm-audio-titles is justify-content: space-between, built for
+   a title on the left and a byline on the right. The episode player only has
+   one icon and one status word, so space-between flings them to opposite
+   ends of the row and reads as the icon floating loose. Keep them together. */
+.lm-episode-player .lm-audio-titles {
+  justify-content: flex-start;
+  gap: 0.4rem;
+}
+.lm-checkpoint-marks {
+  position: relative;
+  height: 0.5rem;
+}
+.lm-checkpoint-marks span {
+  position: absolute;
+  top: 0;
+  width: 3px;
+  height: 0.5rem;
+  border-radius: var(--radius-xs);
+  background: var(--green-mid);
+  transform: translateX(-50%);
+}
+.lm-checkpoint-marks span.is-correct { background: var(--green-dark); }
+.lm-checkpoint-marks span.is-missed { background: var(--error); }
+.lm-checkpoint-dots {
+  display: flex;
+  gap: 0.25rem;
+  justify-content: center;
+  margin: 0.4rem 0 0.9rem;
+}
+/* Correct / missed / unreached must not be color-only: filled vs. a ring vs.
+   empty, backed by an aria-label naming the state (set in EpisodePlayer.tsx). */
+.lm-checkpoint-dots button.is-correct::before {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+}
+.lm-checkpoint-dots button.is-missed::before {
+  background: var(--white);
+  border: 2px solid var(--error);
+}
+/* Unreached uses the shared base rule (transparent fill, green-mid ring); no
+   override needed, kept only as an explicit no-op for clarity at the callsite. */
+.lm-checkpoint-dots button.is-unreached::before { background: transparent; }
+.lm-checkpoint {
+  margin: 0.9rem 0;
+  padding: 1.25rem;
+}
+.lm-checkpoint-q {
+  font-size: 1.25rem;
+  line-height: 1.3;
+  margin: 0.4rem 0 1.1rem;
+  color: var(--ink);
+}
+.lm-checkpoint-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.lm-checkpoint-option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  border: 1.5px solid var(--green-lightest);
+  border-radius: var(--radius-xl);
+  background: var(--white);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+}
+.lm-checkpoint-option:hover:not(:disabled) {
+  border-color: var(--green-dark);
+}
+.lm-checkpoint-option:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.lm-checkpoint-option:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+.lm-checkpoint-option-letter {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-pill);
+  display: grid;
+  place-items: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: var(--green-lightest);
+  color: var(--green-dark);
+}
+.lm-checkpoint-option.is-correct {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+}
+.lm-checkpoint-option.is-wrong {
+  border-color: var(--error);
+  background: color-mix(in srgb, var(--error) 8%, var(--white));
+}
+.lm-checkpoint-explain {
+  margin: 0.75rem 0 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-lg);
+  background: var(--green-lightest);
+  font-size: 0.9rem;
+}
+.lm-checkpoint-explain p { margin: 0; }
+.lm-checkpoint-skip {
+  display: block;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  margin-top: 1rem;
+  padding: 0;
+  font-size: 0.85rem;
+}
+.lm-checkpoint-skip:hover:not(:disabled) {
+  color: var(--green-dark);
+}
+.lm-checkpoint-skip:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.lm-summary-entry {
+  justify-content: center;
+  margin: 0.5rem 0;
+}
+.lm-episode-summary {
+  padding: 1.25rem;
+}
+.lm-episode-summary h2 { margin-top: 0; }
+.lm-checkpoint-review {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.lm-review-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+.lm-review-status {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.1rem;
+}
+.lm-review-status .is-correct { color: var(--green-dark); }
+.lm-review-status .is-wrong { color: var(--error); }
+.lm-review-empty {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-pill);
+  background: var(--green-lightest);
+}
+.lm-review-body p { margin: 0 0 0.25rem; }
+.lm-review-q { font-weight: 600; }
+.lm-passed {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--green-lightest);
+  border-color: var(--green-dark);
+  margin: 0.9rem 0;
+}
+.lm-passed svg { color: var(--green-dark); flex: none; }
+.lm-passed p { margin: 0; }
+.lm-missed-list {
+  margin-top: 0.6rem;
+}
+.lm-missed-list h3 { margin: 0 0 0.25rem; }
+.lm-missed-card {
+  margin: 0.6rem 0;
+  padding: 0.9rem 1rem;
+}
+.lm-missed-q {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.lm-missed-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.6rem;
+}
+.lm-jump-link {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--green-dark);
+  text-decoration: underline;
+  font-size: 0.85rem;
+}
+.lm-jump-link:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lm-format-card,
+  .lm-format-slot-icon,
+  .lm-checkpoint-option {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .lm-format-picker {
+    grid-template-columns: 1fr;
+  }
+  .lm-episode-player {
+    flex-wrap: wrap;
+  }
+  .lm-audio-rates {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ── STEM Scratch Pad (handwritten scratch work, beta) ---------------------- */
+
+.scratchpad-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-lg);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+.scratchpad-open-btn:hover {
+  border-color: var(--green-dark);
+}
+.scratchpad-open-btn:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.scratchpad-backdrop {
+  z-index: 1100;
+  /* No backdrop blur under this particular modal. The canvas above it
+     repaints continuously while a stroke is being drawn, and a full-screen
+     blur has to recomposite on every one of those frames, which on a tablet
+     is enough on its own to make ink trail behind the stylus. */
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.scratchpad-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: min(720px, 92vw);
+  height: min(560px, 85vh);
+  padding: 1rem 1.15rem 1.25rem;
+  position: relative;
+  resize: none;
+}
+.scratchpad-modal--comfortable {
+  width: min(720px, 92vw);
+  height: min(560px, 85vh);
+}
+.scratchpad-modal--large {
+  width: min(1040px, 96vw);
+  height: min(760px, 92vh);
+}
+/* Doubled class: beats the phone-width .scratchpad-modal size rule and the
+   mobile shell's card radius, which used to shrink full screen to 96vw x 88vh. */
+.scratchpad-modal.scratchpad-modal--full {
+  width: 100vw;
+  height: 100vh;
+  /* Fills the visible area on phones and in a shrunk window, where 100vh
+     runs past the browser bars. */
+  height: 100dvh;
+  max-height: 100dvh;
+  max-width: none;
+  border-radius: 0;
+}
+.scratchpad-backdrop:has(.scratchpad-modal--full) {
+  padding: 0;
+}
+
+/* Focus: the question and paper rows are hidden so the canvas fills the screen. */
+.scratchpad-modal--focus {
+  gap: 0.35rem;
+  padding: 0.5rem 0.75rem 0.5rem;
+}
+.scratchpad-modal--focus .scratchpad-question-text,
+.scratchpad-modal--focus .scratchpad-paper-picker {
+  display: none;
+}
+.scratchpad-modal--focus .scratchpad-header {
+  align-items: center;
+}
+
+.scratchpad-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.scratchpad-header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1;
+}
+.scratchpad-header-main .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.scratchpad-question-text {
+  margin: 0;
+  /* A long question scrolls instead of pushing the drawing area away. */
+  max-height: 40vh;
+  overflow-y: auto;
+  color: var(--ink);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+.scratchpad-question-text .kojo-md-p {
+  margin: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.scratchpad-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+}
+.scratchpad-size-buttons {
+  display: inline-flex;
+  gap: 0.2rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  padding: 0.15rem;
+}
+.scratchpad-size-buttons button {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.scratchpad-size-buttons button.is-active {
+  background: var(--green-dark);
+  color: var(--white);
+}
+.scratchpad-size-buttons button:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 1px;
+}
+.scratchpad-minimize {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  color: var(--ink);
+  cursor: pointer;
+}
+.scratchpad-minimize:hover {
+  border-color: var(--green-dark);
+}
+.scratchpad-minimize:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.scratchpad-paper-picker {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+.scratchpad-paper-picker button {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.scratchpad-paper-picker button.is-active {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-weight: 600;
+}
+.scratchpad-paper-picker button:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.scratchpad-canvas-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+  /* Never shorter than its tools + the canvas floor: the question header
+     shrinks and scrolls instead, so nothing spills out of the modal. */
+  min-height: auto;
+}
+.scratchpad-canvas-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.scratchpad-tool-btn {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  color: var(--ink);
+  cursor: pointer;
+}
+.scratchpad-tool-btn:hover:not(:disabled) {
+  border-color: var(--green-dark);
+}
+.scratchpad-tool-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.scratchpad-tool-btn.is-active {
+  background: var(--green-lightest);
+  border-color: var(--green-dark);
+  color: var(--green-dark);
+}
+.scratchpad-tool-btn:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.scratchpad-finger-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+  height: 2rem;
+  padding: 0 0.7rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--green-light-mid);
+  background: var(--white);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.scratchpad-finger-toggle:hover {
+  border-color: var(--green-dark);
+  color: var(--ink);
+}
+.scratchpad-finger-toggle:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+.scratchpad-finger-toggle.is-active {
+  background: var(--green-lightest);
+  border-color: var(--green-dark);
+  color: var(--green-dark);
+}
+
+.scratchpad-canvas-container {
+  position: relative;
+  flex: 1;
+  /* Never squeezed to nothing by a long question or a small pad. */
+  min-height: 180px;
+  /* Its size never comes from the page inside: the page height is set in JS
+     from this box's height, so content-sizing here grows without end. */
+  contain: size;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-lg);
+  background: var(--white);
+  /* The page can stand taller than the modal, and wider when zoomed in. */
+  overflow-x: auto;
+  overflow-y: auto;
+  /* Reserve the scrollbar's space so it appearing never resizes the canvas. */
+  scrollbar-gutter: stable;
+}
