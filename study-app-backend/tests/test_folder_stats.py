@@ -122,3 +122,72 @@ async def test_get_stats_end_to_end(db_session_maker):
 
         with pytest.raises(ResourceNotFoundException):
             await FolderStatsService().get_stats(folder.id, other.id, session)
+
+
+# ---- daily quiz (chunk 5)
+
+from src.schemas.folder_stats_schema import TopicStat  # noqa: E402
+from src.services.folder_stats_service import local_day_window, plan_daily_quiz, todays_quiz  # noqa: E402
+
+
+def _topic(name, accuracy, status, answers=5):
+    return TopicStat(topic=name, accuracy=accuracy, answers=answers, test_answers=answers,
+                     flashcard_answers=0, status=status, last_seen=T0)
+
+
+def test_plan_daily_quiz_prefers_weak_then_reviews_strong():
+    plan = plan_daily_quiz([
+        _topic("Strong A", 0.95, "strong"), _topic("Weak B", 0.3, "weak"),
+        _topic("Weak A", 0.2, "weak"), _topic("Mid", 0.7, "neutral"), _topic("Strong B", 0.85, "strong"),
+    ])
+    assert plan.focus == ["Weak A", "Weak B", "Mid"]
+    assert plan.review == ["Strong B", "Strong A"]
+    text = plan.instructions()
+    assert "About 7 of the 10" in text and "other 3" in text
+
+
+def test_plan_daily_quiz_all_strong_and_empty():
+    assert plan_daily_quiz([]) is None
+    plan = plan_daily_quiz([_topic("A", 0.9, "strong"), _topic("B", 0.82, "strong")])
+    assert plan.focus == ["B", "A"] and plan.review == []
+    assert "About 10 of the 10" in plan.instructions()
+
+
+def test_local_day_window_uses_the_users_day():
+    # 03:00 UTC on Oct 18 is still Oct 17 in Chicago (UTC-5 => offset +300).
+    start, end = local_day_window(300, now=datetime(2026, 10, 18, 3, 0))
+    assert start == datetime(2026, 10, 17, 5, 0) and end == datetime(2026, 10, 18, 5, 0)
+    start, _ = local_day_window(0, now=datetime(2026, 10, 18, 3, 0))
+    assert start == datetime(2026, 10, 18, 0, 0)
+
+
+@pytest.mark.asyncio
+async def test_todays_quiz_finds_only_todays_non_failed_daily(db_session_maker, monkeypatch):
+    from src.services import folder_stats_service
+
+    monkeypatch.setattr(folder_stats_service, "utcnow_naive", lambda: datetime(2026, 10, 17, 15, 0))
+    async with db_session_maker() as session:
+        user = User(email="u@example.com", google_id="g1")
+        session.add(user)
+        await session.flush()
+        folder = Folder(user_id=user.id, name="Bio")
+        session.add(folder)
+        await session.flush()
+        yesterday = TestRow(folder_id=folder.id, title="old", test_type="mixed", kind="daily",
+                            created_at=datetime(2026, 10, 16, 15, 0))
+        failed = TestRow(folder_id=folder.id, title="f", test_type="mixed", kind="daily",
+                         generation_status="failed", created_at=datetime(2026, 10, 17, 9, 0))
+        normal = TestRow(folder_id=folder.id, title="n", test_type="mixed", created_at=datetime(2026, 10, 17, 10, 0))
+        session.add_all([yesterday, failed, normal])
+        await session.commit()
+        assert await todays_quiz(session, folder.id, user.id, 0) is None
+
+        today = TestRow(folder_id=folder.id, title="t", test_type="mixed", kind="daily",
+                        created_at=datetime(2026, 10, 17, 11, 0))
+        session.add(today)
+        await session.flush()
+        found = await todays_quiz(session, folder.id, user.id, 0)
+        assert found.test_id == today.id and found.completed is False
+        session.add(UserAttempt(user_id=user.id, test_id=today.id, attempt_number=1, status="submitted", total_score=80))
+        await session.commit()
+        assert (await todays_quiz(session, folder.id, user.id, 0)).completed is True

@@ -1,4 +1,5 @@
 import type {
+  DailyQuizResponse,
   FolderStats,
   AdminStats,
   FlagQueueResponse,
@@ -498,8 +499,21 @@ export async function fetchFolder(folderId: number): Promise<Folder> {
   return request<Folder>(`/folders/${folderId}`);
 }
 
+// The user's timezone decides what "today" means for the daily quiz.
+function tzOffsetMinutes(): number {
+  return new Date().getTimezoneOffset();
+}
+
 export async function fetchFolderStats(folderId: number): Promise<FolderStats> {
-  return request<FolderStats>(`/folders/${folderId}/stats`);
+  return request<FolderStats>(`/folders/${folderId}/stats?tz_offset_minutes=${tzOffsetMinutes()}`);
+}
+
+// Makes today's weak-spot quiz, or returns it when it already exists.
+export async function createDailyQuiz(folderId: number): Promise<DailyQuizResponse> {
+  return request<DailyQuizResponse>(`/folders/${folderId}/daily-quiz`, {
+    method: "POST",
+    body: JSON.stringify({ tz_offset_minutes: tzOffsetMinutes() }),
+  });
 }
 
 export async function createFolder(input: Pick<Folder, "name" | "subject" | "description">): Promise<Folder> {

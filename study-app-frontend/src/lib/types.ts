@@ -34,6 +34,8 @@ export type TestSummary = {
   created_at: string;
   generation_status?: string;
   generation_error?: string | null;
+  // "daily" for the folder's daily weak-spot quiz.
+  kind?: string | null;
 };
 
 export type TestUpdate = {
@@ -265,6 +267,20 @@ export type FolderStats = {
   score_progression: ScorePoint[];
   topics: TopicStat[];
   encouragement: "empty" | "first" | "improving" | "dipping" | "steady";
+  // Today's daily quiz in the user's local day, null until it is made.
+  today_quiz?: TodayQuiz | null;
+};
+
+export type TodayQuiz = {
+  test_id: ID;
+  generation_status: string;
+  completed: boolean;
+};
+
+export type DailyQuizResponse = {
+  test_id: ID;
+  generation_status: string;
+  created: boolean;
 };
 
 export type DraftAttemptAnswer = {

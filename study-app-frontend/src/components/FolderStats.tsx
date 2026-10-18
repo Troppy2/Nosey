@@ -1,7 +1,7 @@
 import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import { fetchFolderStats } from "../lib/api";
+import { Link, useNavigate } from "react-router-dom";
+import { createDailyQuiz, fetchFolderStats } from "../lib/api";
 import { formatDate } from "../lib/format";
 import type { FolderStats as FolderStatsData, ScorePoint, TopicStat } from "../lib/types";
 import { Button } from "./Button";
@@ -27,8 +27,23 @@ function pct(value: number | null): string {
 }
 
 export function FolderStats({ folderId }: { folderId: number }) {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<FolderStatsData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [quizBusy, setQuizBusy] = useState(false);
+  const [quizError, setQuizError] = useState<string | null>(null);
+
+  async function openDailyQuiz() {
+    setQuizBusy(true);
+    setQuizError(null);
+    try {
+      const quiz = await createDailyQuiz(folderId);
+      navigate(`/test/${quiz.test_id}`);
+    } catch (err) {
+      setQuizError(err instanceof Error ? err.message : "Could not make your quiz. Try again in a moment.");
+      setQuizBusy(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -69,10 +84,19 @@ export function FolderStats({ folderId }: { folderId: number }) {
 
   return (
     <div className="folder-stats">
-      <div className="folder-stats-message">
-        <strong>{message.title}</strong>
-        <span className="muted">{message.body}</span>
+      <div className="folder-stats-message folder-stats-message--quiz">
+        <div className="folder-stats-message-text">
+          <strong>{message.title}</strong>
+          <span className="muted">{message.body}</span>
+        </div>
+        <DailyQuizAction
+          quiz={stats.today_quiz ?? null}
+          hasTopics={stats.topics.length > 0}
+          busy={quizBusy}
+          onOpen={() => void openDailyQuiz()}
+        />
       </div>
+      {quizError ? <p className="folder-stats-quiz-error small">{quizError}</p> : null}
 
       <div className="folder-stats-tiles">
         <Card tone="soft" className="folder-stats-tile icon-hover">
@@ -115,6 +139,44 @@ export function FolderStats({ folderId }: { folderId: number }) {
           empty="Get a topic to 80% to see it here."
         />
       </div>
+    </div>
+  );
+}
+
+// One quiz per folder per day: make it, open it while it builds, then retake it.
+function DailyQuizAction({
+  quiz,
+  hasTopics,
+  busy,
+  onOpen,
+}: {
+  quiz: FolderStatsData["today_quiz"];
+  hasTopics: boolean;
+  busy: boolean;
+  onOpen: () => void;
+}) {
+  if (!hasTopics && !quiz) {
+    return <span className="muted small folder-stats-quiz-hint">Daily quiz unlocks after your first tagged test.</span>;
+  }
+  const label = busy
+    ? "Opening..."
+    : !quiz
+      ? "Start today's quiz"
+      : quiz.generation_status === "generating"
+        ? "Open today's quiz"
+        : quiz.completed
+          ? "Retake today's quiz"
+          : "Take today's quiz";
+  return (
+    <div className="folder-stats-quiz" data-tour="folder-daily-quiz">
+      {quiz?.completed ? (
+        <span className="folder-stats-quiz-done icon-hover">
+          <TestsTakenIcon size={18} active /> Done today
+        </span>
+      ) : null}
+      <Button variant={quiz?.completed ? "secondary" : "primary"} onClick={onOpen} disabled={busy}>
+        {label}
+      </Button>
     </div>
   );
 }

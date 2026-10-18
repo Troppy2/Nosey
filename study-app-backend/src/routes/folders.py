@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_session
@@ -58,11 +58,12 @@ async def get_folder(
 @router.get("/{folder_id}/stats", response_model=FolderStatsResponse)
 async def get_folder_stats(
     folder_id: int,
+    tz_offset_minutes: int = Query(default=0, ge=-840, le=840),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> FolderStatsResponse:
     try:
-        return await FolderStatsService().get_stats(folder_id, user.id, session)
+        return await FolderStatsService().get_stats(folder_id, user.id, session, tz_offset_minutes)
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

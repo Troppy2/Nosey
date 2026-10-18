@@ -29326,6 +29326,58 @@ a.sd-chip.is-done:hover {
   }
 }
 
+/* Folder Stats: daily quiz in the encouragement banner (chunk 5) */
+.folder-stats-message--quiz {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+}
+
+.folder-stats-message-text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 280px;
+}
+
+.folder-stats-quiz {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.folder-stats-quiz-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--green-dark);
+}
+
+.folder-stats-quiz-hint {
+  max-width: 240px;
+}
+
+.folder-stats-quiz-error {
+  margin: -6px 0 0;
+  color: var(--error);
+}
+
+@media (max-width: 640px) {
+  .folder-stats-quiz,
+  .folder-stats-quiz .button {
+    width: 100%;
+  }
+
+  .folder-stats-quiz .button {
+    justify-content: center;
+  }
+}
+
 /* Folder Stats loading: same shells as the loaded panel. Bars use a
    translucent ink wash so they sit naturally on the tinted tiles, the banner
    and the white cards alike, instead of one flat grey-green. */
