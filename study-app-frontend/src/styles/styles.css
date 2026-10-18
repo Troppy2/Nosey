@@ -28732,3 +28732,175 @@ a.sd-chip.is-done:hover {
     min-height: 40px;
   }
 }
+
+/* ── Ask Kojo side panel (KojoHelpChat: test mode, KojoCode, System Design) ──
+   Same visual language as the full Kojo chat page (.chat-mode-shell): flat
+   canvas, dark user bubbles, small pill suggestions, soft rounded composer. */
+.kojo-panel--help {
+  --k-canvas: #f6f9f1;
+  --k-field: var(--white);
+  --k-ink: var(--ink);
+  --k-muted: var(--muted);
+  --k-faint: #8fa07a;
+  --k-line: rgba(113, 131, 85, 0.16);
+  --k-hover: rgba(113, 131, 85, 0.1);
+  --k-accent: var(--green-dark);
+  --k-accent-tint: rgba(113, 131, 85, 0.13);
+  background: var(--k-canvas);
+}
+
+.kojo-panel--help .kojo-header {
+  border-bottom: 1px solid var(--k-line);
+  background: var(--k-canvas);
+}
+
+.kojo-panel--help .kojo-avatar {
+  background: var(--white);
+  border: 1px solid var(--k-line);
+}
+
+.kojo-panel--help .kojo-header-btn {
+  border: none;
+  background: transparent;
+  color: var(--k-muted);
+}
+
+.kojo-panel--help .kojo-header-btn:hover {
+  background: var(--k-hover);
+  color: var(--k-ink);
+}
+
+.kojo-panel--help .lc-kojo-contract {
+  margin: 0;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--k-line);
+  background: transparent;
+}
+
+.kojo-panel--help .lc-kojo-contract p {
+  margin: 0;
+  color: var(--k-faint);
+  font-size: 0.75rem;
+}
+
+.kojo-panel--help .kojo-messages {
+  background: var(--k-canvas);
+}
+
+.kojo-panel--help .kojo-empty {
+  padding: 40px 20px 24px;
+}
+
+.kojo-panel--help .kojo-empty-title {
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  color: var(--k-ink);
+}
+
+.kojo-panel--help .kojo-empty-sub {
+  max-width: 340px;
+  color: var(--k-muted);
+}
+
+.kojo-panel--help .kojo-suggestions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 16px auto 0;
+}
+
+.kojo-panel--help .kojo-suggestion {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid var(--k-line);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  box-shadow: none;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--k-muted);
+  text-align: left;
+}
+
+.kojo-panel--help .kojo-suggestion:hover:not(:disabled) {
+  border-color: var(--k-accent);
+  background: var(--k-accent-tint);
+  color: var(--k-accent);
+}
+
+.kojo-panel--help .kojo-msg-avatar {
+  background: var(--white);
+  border: 1px solid var(--k-line);
+}
+
+.kojo-panel--help .kojo-user-bubble {
+  padding: 10px 14px;
+  border-radius: var(--radius-xl);
+  background: var(--k-ink);
+  color: var(--k-canvas);
+  font-size: 0.9rem;
+  box-shadow: 0 2px 8px rgba(38, 48, 31, 0.18);
+}
+
+.kojo-panel--help .kojo-user-bubble p,
+.kojo-panel--help .kojo-message-time--user {
+  color: var(--k-canvas);
+}
+
+.kojo-panel--help .kojo-input-area {
+  padding: 8px 16px 12px;
+  border-top: none;
+  background: var(--k-canvas);
+}
+
+.kojo-panel--help .kojo-input-wrap {
+  padding: 6px 6px 6px 14px;
+  border: 1px solid var(--k-line);
+  border-radius: var(--radius-xl);
+  background: var(--k-field);
+  box-shadow: none;
+}
+
+.kojo-panel--help .kojo-input-wrap:focus-within {
+  border-color: var(--green-mid);
+  box-shadow: 0 2px 12px var(--k-hover);
+}
+
+.kojo-panel--help .kojo-input {
+  padding: 6px 0;
+  border: none;
+  background: transparent;
+  color: var(--k-ink);
+  font-size: 0.9rem;
+}
+
+.kojo-panel--help .kojo-input::placeholder {
+  color: var(--k-faint);
+}
+
+.kojo-panel--help .kojo-send {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--k-ink);
+  color: var(--k-canvas);
+}
+
+.kojo-panel--help .kojo-send:not(:disabled):hover {
+  background: var(--k-accent);
+}
+
+.kojo-panel--help .kojo-send:disabled {
+  background: transparent;
+  color: rgba(89, 105, 73, 0.45);
+}
+
+.kojo-panel--help .kojo-input-hint {
+  color: rgba(89, 105, 73, 0.5);
+  font-size: 0.7rem;
+}
