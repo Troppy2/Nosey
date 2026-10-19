@@ -42,6 +42,8 @@ class UserAnswer(Base):
     # None (no drawing), ok, needs_input, resolved, skipped. See OCR_STATUS_*
     # in schemas/attempt_schema.py.
     ocr_status: Mapped[Optional[str]] = mapped_column(String(20))
+    # None = Nosey's grader, "agent" = regraded by an MCP agent (migration 073).
+    graded_by: Mapped[Optional[str]] = mapped_column(String(16))
 
     attempt: Mapped[UserAttempt] = relationship("UserAttempt", back_populates="answers")
     question: Mapped[Question] = relationship("Question", back_populates="user_answers")

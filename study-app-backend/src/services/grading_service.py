@@ -24,6 +24,7 @@ from src.schemas.attempt_schema import (
     DraftAttemptResponse,
     FRQGrade,
     OCR_LOW_CONFIDENCE_THRESHOLD,
+    GRADED_BY_AGENT,
     OCR_STATUS_NEEDS_INPUT,
     OCR_STATUS_OK,
     OCR_STATUS_RESOLVED,
@@ -527,6 +528,36 @@ class GradingService:
         provisional = any(a.ocr_status == OCR_STATUS_NEEDS_INPUT for a in answers)
         return score, correct, total, provisional
 
+    async def apply_agent_grades(
+        self, attempt_id: int, user_id: int, grades: list[dict], session: AsyncSession
+    ) -> tuple[float, int, int]:
+        """Overwrite answer grades with ones an MCP agent wrote, then rescore.
+
+        No LLM call: the agent did the grading. Each grade is
+        {question_id, is_correct, feedback, reasoning?}. Weakness stats read
+        user_answers live and best scores read total_score, so rescoring here
+        is all the stats recompute needed.
+        """
+        attempt, _test = await self._load_held_answer(attempt_id, user_id, session)
+        rows = {a.question_id: a for a in await AttemptRepository(session).list_answers(attempt.id)}
+        missing = [g["question_id"] for g in grades if g["question_id"] not in rows]
+        if missing:
+            raise ValidationException(f"These question_ids have no answer in attempt {attempt_id}: {missing}")
+        held = [g["question_id"] for g in grades if rows[g["question_id"]].ocr_status == OCR_STATUS_NEEDS_INPUT]
+        if held:
+            raise ValidationException(f"These answers are waiting on the student to redo a drawing: {held}")
+        for grade in grades:
+            row = rows[grade["question_id"]]
+            row.is_correct = grade["is_correct"]
+            row.ai_feedback = grade["feedback"]
+            row.ai_reasoning = grade.get("reasoning")
+            row.confidence_score = None
+            row.flagged_uncertain = False
+            row.graded_by = GRADED_BY_AGENT
+        score, correct, total, _provisional = await self._rescore(attempt, session)
+        await session.commit()
+        return score, correct, total
+
     async def redo_answer(
         self,
         attempt_id: int,
@@ -582,6 +613,7 @@ class GradingService:
         row.user_answer = body.answer or _drawn_answer(work)
         row.is_correct = grade.is_correct
         row.ai_feedback = grade.feedback
+        row.graded_by = None
         row.ai_reasoning = grade.reasoning
         row.confidence_score = grade.confidence
         row.flagged_uncertain = grade.flagged_uncertain
@@ -668,6 +700,7 @@ class GradingService:
                 verdicts[question.id] = grade.is_correct
                 row.is_correct = grade.is_correct
                 row.ai_feedback = grade.feedback
+                row.graded_by = None
                 row.ai_reasoning = grade.reasoning
                 row.confidence_score = grade.confidence
                 row.flagged_uncertain = grade.flagged_uncertain
@@ -730,6 +763,7 @@ class GradingService:
         for row, grade in zip(rows, grades):
             row.is_correct = grade.is_correct
             row.ai_feedback = grade.feedback
+            row.graded_by = None
             row.ai_reasoning = grade.reasoning
             row.confidence_score = grade.confidence
             row.flagged_uncertain = grade.flagged_uncertain
@@ -1092,8 +1126,10 @@ class GradingService:
             is_provisional=held,
         )
         topics = {a.question_id: a.question.topic if a.question else None for a in attempt.answers}
+        graded_by = {a.question_id: a.graded_by for a in attempt.answers}
         for result in detail.answers:
             result.topic = topics.get(result.question_id)
+            result.graded_by = graded_by.get(result.question_id)
         detail.missed_topics = missed_topics(
             (r.topic, r.is_correct) for r in detail.answers if r.ocr_status != OCR_STATUS_NEEDS_INPUT
         )

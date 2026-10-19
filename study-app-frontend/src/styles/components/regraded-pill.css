@@ -1,0 +1,8 @@
+/* "Regraded" tag on a Results answer an MCP agent regraded. */
+.pill.review-regraded-pill {
+  min-height: 0;
+  margin-left: 8px;
+  padding: 1px 8px;
+  font-size: 0.72rem;
+  vertical-align: middle;
+}

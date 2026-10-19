@@ -36,6 +36,7 @@ from src.schemas.folder_schema import FolderCreate, FolderUpdate
 from src.schemas.test_schema import TestUpdate
 from src.services.account_safety_service import screen_user_input
 from src.services.folder_service import FolderService
+from src.services.grading_service import GradingService
 from src.services.kojo_context_cache import invalidate_folder
 from src.services.mcp_tool_base import McpContext, McpTool, ToolArgs, ToolInputError, owned_folder
 from src.services.test_service import TestService, validate_answer_input
@@ -597,6 +598,36 @@ async def rename_folder(ctx: McpContext, args: RenameFolderArgs) -> dict[str, An
     return {"folder_id": folder.id, "name": folder.name, "subject": folder.subject}
 
 
+# ---------------------------------------------------------------- grading
+
+class GradeIn(ToolArgs):
+    question_id: int = Field(description="question_id from get_attempt_result.")
+    is_correct: bool
+    feedback: str = Field(min_length=1, max_length=MAX_TEXT_CHARS, description="Feedback shown to the user.")
+    reasoning: Optional[str] = Field(default=None, max_length=MAX_TEXT_CHARS)
+
+
+class RegradeAttemptArgs(ToolArgs):
+    attempt_id: int = Field(description="Attempt id from list_test_attempts.")
+    grades: list[GradeIn] = Field(min_length=1, max_length=MAX_QUESTIONS_PER_CALL)
+
+    @model_validator(mode="after")
+    def _unique_questions(self) -> "RegradeAttemptArgs":
+        ids = [g.question_id for g in self.grades]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Each question_id can appear only once in grades.")
+        return self
+
+
+async def regrade_attempt(ctx: McpContext, args: RegradeAttemptArgs) -> dict[str, Any]:
+    await screen(ctx, *(t for g in args.grades for t in (g.feedback, g.reasoning)))
+    score, correct, total = await GradingService().apply_agent_grades(
+        args.attempt_id, ctx.user.id, [g.model_dump() for g in args.grades], ctx.session
+    )
+    return {"attempt_id": args.attempt_id, "score": score, "correct_count": correct, "total": total,
+            "regraded": len(args.grades)}
+
+
 # ---------------------------------------------------------------- registry
 
 def _write(name: str, title: str, description: str, args, handler, destructive: bool = False) -> McpTool:
@@ -651,6 +682,16 @@ WRITE_TOOLS: tuple[McpTool, ...] = (
            DeleteQuestionArgs, delete_question, destructive=True),
     _write("delete_test", "Delete a test", "Delete a whole test and its results. Needs confirm=true.",
            DeleteTestArgs, delete_test, destructive=True),
+    _write(
+        "regrade_attempt",
+        "Regrade a test attempt",
+        "Overwrite Nosey's grade and feedback on answers in a submitted attempt with your own, e.g. "
+        "to grade by the user's rubric. Read the answers with get_attempt_result(wrong_only=false) "
+        "first. Only listed questions change; the attempt score and the user's stats are recomputed "
+        "and Results marks those answers as regraded.",
+        RegradeAttemptArgs,
+        regrade_attempt,
+    ),
     _write("create_flashcards", "Create flashcards", "Add up to 500 flashcards to a folder.",
            CreateFlashcardsArgs, create_flashcards),
     _write("edit_flashcard", "Edit a flashcard", "Change a flashcard's front or back.",
