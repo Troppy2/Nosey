@@ -974,59 +974,48 @@ select.lc-custom-input {
 }
 
 /* ── MathLive visual math field (math mode answers) ────────────────────── */
+/* Matches .field-input so the answer box reads like every other input. */
 .math-field-input {
   display: block;
   width: 100%;
   max-width: 100%;
   min-width: 0;
+  min-height: 48px;
   overflow-x: auto;
   font-size: 1.15rem;
-  padding: 10px 12px;
-  background: var(--white);
-  border: 1.5px solid var(--green-light);
+  padding: 10px 16px;
+  color: #000;
+  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid var(--green-light-mid);
   border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
   --caret-color: var(--green-dark);
   --selection-background-color: var(--green-lightest);
   --contains-highlight-background-color: var(--green-lightest);
   --smart-fence-color: var(--green-dark-mid);
+  --placeholder-color: var(--green-mid);
+}
+
+.math-field-input:hover {
+  border-color: var(--green-mid);
 }
 
 .math-field-input:focus-within {
   outline: none;
   border-color: var(--green-dark);
-  box-shadow: 0 0 0 3px var(--green-lightest);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.18);
 }
 
-.math-field-hint {
-  margin: 0;
-  font-size: 0.78rem;
-  color: var(--green-dark-mid);
+/* The app's own keypad (MathKeyboard.tsx) replaces MathLive's toggle and menu. */
+.math-field-input::part(virtual-keyboard-toggle),
+.math-field-input::part(menu-toggle) {
+  display: none;
 }
 
 .math-field-loading {
   display: flex;
   justify-content: center;
   padding: 18px 0;
-}
-
-/* MathLive virtual keyboard renders into <body>, so theme vars go on :root.
-   Var names come from the MathLive virtual keyboard API. */
-:root {
-  --keyboard-zindex: 1200;
-  --keyboard-background: var(--green-lightest);
-  --keyboard-border: var(--green-light);
-  --keycap-background: var(--white);
-  --keycap-background-hover: var(--green-lightest);
-  --keycap-border: var(--green-light);
-  --keycap-text: var(--ink);
-  --keycap-secondary-background: var(--green-lightest);
-  --keycap-secondary-background-hover: var(--green-light);
-  --keycap-secondary-text: var(--green-dark);
-  --keycap-primary-background: var(--green-dark);
-  --keycap-primary-text: var(--white);
-  --keyboard-toolbar-text: var(--green-dark);
-  --keyboard-toolbar-text-active: var(--green-dark);
-  --keyboard-toolbar-background-hover: var(--green-light);
 }
 
 /* Dedicated sign-in page (issue #41) */

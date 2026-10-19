@@ -3,13 +3,16 @@ import "katex/dist/katex.min.css";
 import type { MathfieldElement } from "mathlive";
 import type { DetailedHTMLProps, HTMLAttributes } from "react";
 import { useEffect, useRef, useState } from "react";
-import { MathKeyboard } from "./MathKeyboard";
+import { useMobileShell } from "../lib/useMobileShell";
+import { MathKeyboard, type MathKeyAction } from "./MathKeyboard";
 
 // The <math-field> web component is registered by the lazy mathlive import below.
 declare global {
   namespace JSX {
     interface IntrinsicElements {
-      "math-field": DetailedHTMLProps<HTMLAttributes<MathfieldElement>, MathfieldElement>;
+      // React 18 passes className to custom elements as a literal "classname"
+      // attribute, so the field is styled through a plain class attribute.
+      "math-field": DetailedHTMLProps<HTMLAttributes<MathfieldElement>, MathfieldElement> & { class?: string };
     }
   }
 }
@@ -71,6 +74,11 @@ export function MathInput({ value, onChange, placeholder, preferText = false }: 
   const [loadFailed, setLoadFailed] = useState(false);
   const [latexMode, setLatexMode] = useState(false);
   const [textMode, setTextMode] = useState(preferText);
+  // On phones the keypad docks to the bottom while the field has focus, like
+  // Desmos. The field never opens the OS keyboard (MathLive's input sink is
+  // inputmode=none), so the keypad is the only way to type there.
+  const isMobile = useMobileShell();
+  const [keypadOpen, setKeypadOpen] = useState(false);
 
   // Keep the latest onChange reachable from the input listener without
   // re-binding the listener on every TakeTest render (it passes an inline arrow).
@@ -112,26 +120,91 @@ export function MathInput({ value, onChange, placeholder, preferText = false }: 
   useEffect(() => {
     const mf = mathFieldRef.current;
     if (!visual || !mf) return;
+    // Our keypad replaces MathLive's built-in one.
+    mf.mathVirtualKeyboardPolicy = "manual";
     const handleInput = () => onChangeRef.current(mf.value);
+    const handleFocus = () => setKeypadOpen(true);
+    const handleBlur = () => setKeypadOpen(false);
     mf.addEventListener("input", handleInput);
-    return () => mf.removeEventListener("input", handleInput);
+    mf.addEventListener("focusin", handleFocus);
+    mf.addEventListener("focusout", handleBlur);
+    return () => {
+      mf.removeEventListener("input", handleInput);
+      mf.removeEventListener("focusin", handleFocus);
+      mf.removeEventListener("focusout", handleBlur);
+    };
   }, [visual]);
 
-  function insertSymbol(symbol: string) {
+  const docked = visual && isMobile && keypadOpen;
+
+  // Reserve room under the page so the docked keypad never covers the field.
+  useEffect(() => {
+    if (!docked) return;
+    document.body.classList.add("mkb-docked-open");
+    const id = window.setTimeout(() => {
+      mathFieldRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 50);
+    return () => {
+      window.clearTimeout(id);
+      document.body.classList.remove("mkb-docked-open");
+    };
+  }, [docked]);
+
+  // The LaTeX textarea gets the template with its slot markers stripped, and
+  // the caret lands where the first slot was.
+  function applyToTextarea(action: MathKeyAction) {
     const el = textareaRef.current;
-    if (!el) {
-      onChange(value + symbol);
-      return;
+    const start = el?.selectionStart ?? value.length;
+    const end = el?.selectionEnd ?? value.length;
+    let next = value;
+    let cursor = start;
+    if (action.type === "cmd") {
+      if (action.cmd === "enter") {
+        el?.blur();
+        return;
+      }
+      if (action.cmd === "left") cursor = Math.max(0, start - 1);
+      else if (action.cmd === "right") cursor = Math.min(value.length, end + 1);
+      else if (start !== end) {
+        next = value.slice(0, start) + value.slice(end);
+      } else if (start > 0) {
+        next = value.slice(0, start - 1) + value.slice(start);
+        cursor = start - 1;
+      }
+    } else {
+      const raw = action.type === "type" ? action.text : action.latex.replace(/#@/g, "");
+      const slot = raw.search(/#[0?]/);
+      const text = raw.replace(/#[0?]/g, "");
+      const padded = action.type === "insert" && /^\[a-zA-Z]+$/.test(text) ? `${text} ` : text;
+      next = value.slice(0, start) + padded + value.slice(end);
+      cursor = start + (slot >= 0 ? slot : padded.length);
     }
-    const start = el.selectionStart ?? value.length;
-    const end = el.selectionEnd ?? value.length;
-    const next = value.slice(0, start) + symbol + value.slice(end);
-    onChange(next);
+    if (next !== value) onChange(next);
     requestAnimationFrame(() => {
+      if (!el) return;
       el.focus();
-      const cursor = start + symbol.length;
       el.setSelectionRange(cursor, cursor);
     });
+  }
+
+  function applyToField(action: MathKeyAction) {
+    const mf = mathFieldRef.current;
+    if (!mf) return;
+    if (action.type === "insert") {
+      mf.insert(action.latex, { focus: true, selectionMode: "placeholder", format: "latex" });
+    } else if (action.type === "type") {
+      mf.executeCommand(["typedText", action.text]);
+    } else if (action.cmd === "enter") {
+      mf.blur();
+      setKeypadOpen(false);
+      return;
+    } else {
+      mf.executeCommand(
+        action.cmd === "left" ? "moveToPreviousChar" : action.cmd === "right" ? "moveToNextChar" : "deleteBackward",
+      );
+    }
+    mf.focus();
+    onChangeRef.current(mf.value);
   }
 
   const showLatexEditor = latexMode || loadFailed;
@@ -192,16 +265,21 @@ export function MathInput({ value, onChange, placeholder, preferText = false }: 
               })()}
             </div>
           )}
-          <MathKeyboard onInsert={insertSymbol} />
+          <MathKeyboard onKey={applyToTextarea} />
         </>
       ) : fieldReady ? (
         <>
-          <math-field ref={mathFieldRef} className="math-field-input" />
-          <p className="math-field-hint">
-            Type your answer directly, it renders as real math. Tap the keyboard
-            icon in the box for fractions, roots and symbols; empty slots can be
-            clicked or reached with the arrow keys.
-          </p>
+          <math-field ref={mathFieldRef} class="math-field-input" />
+          {(!isMobile || docked) && (
+            <MathKeyboard
+              onKey={applyToField}
+              docked={docked}
+              onHide={() => {
+                mathFieldRef.current?.blur();
+                setKeypadOpen(false);
+              }}
+            />
+          )}
         </>
       ) : (
         <div className="math-field-loading">

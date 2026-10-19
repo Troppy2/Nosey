@@ -1,0 +1,196 @@
+/* Math keypad (MathKeyboard.tsx). One flat panel, borderless keys separated
+   by gaps. Key tone carries meaning: digits are brightest, operators tinted,
+   cursor and delete keys muted, Done is the one solid key. Inline under the
+   answer field on desktop; docked to the bottom of the screen on phones. */
+
+.mkb {
+  --mkb-gap: 6px;
+  --mkb-key-h: 44px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: var(--green-lightest);
+  border-radius: var(--radius-md);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.mkb-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mkb-pages {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: var(--radius-sm);
+}
+
+.mkb-page {
+  min-width: 52px;
+  height: 32px;
+  padding: 0 12px;
+  font: 600 0.85rem var(--font-sans);
+  color: var(--green-dark-mid);
+  background: none;
+  border: none;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.mkb-page:hover {
+  color: var(--green-dark);
+}
+
+.mkb-page.is-active {
+  color: var(--green-dark);
+  background: var(--white);
+  box-shadow: 0 1px 2px rgba(58, 74, 42, 0.12);
+}
+
+.mkb-hide {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 32px;
+  color: var(--green-dark-mid);
+  background: none;
+  border: none;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+.mkb-grid {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: var(--mkb-gap);
+}
+
+.mkb-key {
+  min-width: 0;
+  height: var(--mkb-key-h);
+  padding: 0 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font: 500 1.05rem var(--font-sans);
+  color: var(--ink);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgba(58, 74, 42, 0.14);
+  transition: background var(--transition-fast), transform 60ms ease;
+}
+
+.mkb-key:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.mkb-key:focus-visible,
+.mkb-page:focus-visible,
+.mkb-hide:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 1px;
+}
+
+.mkb-key--num {
+  background: var(--white);
+  font-size: 1.15rem;
+}
+
+.mkb-key--fn {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.mkb-key--op {
+  background: var(--green-light);
+  color: var(--green-dark);
+  font-size: 1.2rem;
+}
+
+.mkb-key--util {
+  background: var(--green-light-mid);
+  color: var(--green-dark);
+}
+
+.mkb-key--util.is-on {
+  background: var(--green-dark);
+  color: var(--white);
+}
+
+.mkb-key--primary {
+  background: var(--green-dark);
+  color: var(--white);
+  font-size: 1.25rem;
+}
+
+.mkb-key--num:hover,
+.mkb-key--fn:hover {
+  background: var(--white);
+  box-shadow: 0 0 0 1px var(--green-light-mid);
+}
+
+.mkb-key--op:hover,
+.mkb-key--util:hover {
+  filter: brightness(0.96);
+}
+
+.mkb-key--primary:hover {
+  filter: brightness(1.08);
+}
+
+.mkb-tex .katex {
+  font-size: 0.95rem;
+}
+
+/* Docked on phones: full width, above the mobile dock, clear of the home bar. */
+.mkb--docked {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1200;
+  --mkb-gap: 5px;
+  --mkb-key-h: 46px;
+  gap: 6px;
+  padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+  border-radius: 0;
+  box-shadow: 0 -4px 16px rgba(58, 74, 42, 0.12);
+  animation: mkb-rise 160ms ease-out;
+}
+
+.mkb--docked .mkb-key {
+  font-size: 1rem;
+}
+
+.mkb--docked .mkb-key--num {
+  font-size: 1.1rem;
+}
+
+body.mkb-docked-open {
+  padding-bottom: 260px;
+}
+
+@keyframes mkb-rise {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mkb--docked {
+    animation: none;
+  }
+}

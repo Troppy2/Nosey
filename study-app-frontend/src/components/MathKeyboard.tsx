@@ -1,196 +1,178 @@
 import katex from "katex";
 import "katex/dist/katex.min.css";
+import type { ReactNode } from "react";
 import { useState } from "react";
+import { CloseIcon } from "../icons";
+import "../styles/components/math-keyboard.css";
 
-type Symbol = { display: string; insert: string; label?: string };
-type SymbolGroup = { label: string; symbols: Symbol[] };
+// What a key does. The keyboard only reports actions; MathInput decides how to
+// apply them to the visual math field or to the LaTeX textarea.
+//  - insert: a MathLive template. #@ takes the previous term, #0 the selection,
+//    #? is an empty slot the caret jumps into.
+//  - type: characters typed as if from a physical keyboard.
+export type MathKeyAction =
+  | { type: "insert"; latex: string }
+  | { type: "type"; text: string }
+  | { type: "cmd"; cmd: "left" | "right" | "backspace" | "enter" };
 
-const SYMBOL_GROUPS: SymbolGroup[] = [
+type Tone = "num" | "op" | "fn" | "util" | "primary";
+type Key = { label: ReactNode; aria: string; action?: MathKeyAction; span?: number; tone?: Tone; shift?: true };
+type Page = { id: string; label: string; rows: Key[][] };
+
+const katexCache = new Map<string, string>();
+
+function Tex({ src }: { src: string }) {
+  let html = katexCache.get(src);
+  if (html === undefined) {
+    html = katex.renderToString(src, { throwOnError: false, output: "html" });
+    katexCache.set(src, html);
+  }
+  return <span className="mkb-tex" dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+const t = (text: string, tone: Tone = "fn", aria = text): Key => ({ label: text, aria, tone, action: { type: "type", text } });
+const ins = (label: ReactNode, latex: string, aria: string, tone: Tone = "fn"): Key => ({ label, aria, tone, action: { type: "insert", latex } });
+const num = (d: string) => t(d, "num");
+const op = (label: string, latex: string, aria: string) => ins(label, latex, aria, "op");
+
+const LEFT: Key = { label: "←", aria: "Move left", tone: "util", action: { type: "cmd", cmd: "left" } };
+const RIGHT: Key = { label: "→", aria: "Move right", tone: "util", action: { type: "cmd", cmd: "right" } };
+const BACK: Key = { label: "⌫", aria: "Delete", tone: "util", span: 2, action: { type: "cmd", cmd: "backspace" } };
+const ENTER: Key = { label: "↵", aria: "Done", tone: "primary", span: 2, action: { type: "cmd", cmd: "enter" } };
+
+const SLOT = "\\square";
+
+const PAGES: Page[] = [
   {
-    label: "Fractions",
-    symbols: [
-      { display: "\\frac{a}{b}", insert: "\\frac{}{}", label: "Fraction" },
-      { display: "\\frac{1}{2}", insert: "\\frac{1}{2}", label: "1/2" },
-      { display: "\\frac{1}{3}", insert: "\\frac{1}{3}", label: "1/3" },
-      { display: "\\frac{d}{dx}", insert: "\\frac{d}{dx}", label: "d/dx" },
-      { display: "\\frac{\\partial}{\\partial x}", insert: "\\frac{\\partial}{\\partial x}", label: "∂/∂x" },
-      { display: "\\frac{dy}{dx}", insert: "\\frac{dy}{dx}", label: "dy/dx" },
+    id: "main",
+    label: "123",
+    rows: [
+      [t("x"), t("y"), ins(<Tex src={`a^2`} />, "#@^{2}", "Squared"), ins(<Tex src={`a^b`} />, "#@^{#?}", "Power"),
+        num("7"), num("8"), num("9"), op("÷", "\\div", "Divide"), LEFT, RIGHT],
+      [t("("), t(")"), t("<"), t(">"), num("4"), num("5"), num("6"), op("×", "\\times", "Times"), BACK],
+      [ins(<Tex src={`|a|`} />, "\\left|#0\\right|", "Absolute value"), t(","), ins("≤", "\\le", "Less or equal"), ins("≥", "\\ge", "Greater or equal"),
+        num("1"), num("2"), num("3"), op("−", "-", "Minus"), ins("±", "\\pm", "Plus or minus"), ins("°", "^{\\circ}", "Degrees")],
+      [ins(<Tex src={`\\frac{${SLOT}}{${SLOT}}`} />, "\\frac{#0}{#?}", "Fraction"), ins(<Tex src={`\\sqrt{${SLOT}}`} />, "\\sqrt{#0}", "Square root"),
+        ins(<Tex src={`\\sqrt[n]{${SLOT}}`} />, "\\sqrt[#?]{#0}", "Nth root"), ins("π", "\\pi", "Pi"),
+        num("0"), num("."), op("=", "=", "Equals"), op("+", "+", "Plus"), ENTER],
     ],
   },
   {
-    label: "Powers",
-    symbols: [
-      { display: "x^{2}", insert: "^{2}", label: "x²" },
-      { display: "x^{3}", insert: "^{3}", label: "x³" },
-      { display: "x^{n}", insert: "^{n}", label: "xⁿ" },
-      { display: "x^{-1}", insert: "^{-1}", label: "x⁻¹" },
-      { display: "\\sqrt{x}", insert: "\\sqrt{}", label: "√x" },
-      { display: "\\sqrt[n]{x}", insert: "\\sqrt[n]{}", label: "ⁿ√x" },
-      { display: "e^{x}", insert: "e^{}", label: "eˣ" },
-      { display: "10^{n}", insert: "\\times 10^{}", label: "×10ⁿ" },
-      { display: "x^{1/2}", insert: "^{1/2}", label: "x^½" },
-      { display: "|x|", insert: "|x|", label: "|x|" },
-      { display: "x_{n}", insert: "_{n}", label: "subscript" },
-      { display: "x_{0}", insert: "_{0}", label: "x₀" },
+    id: "func",
+    label: "f(x)",
+    rows: [
+      [ins("sin", "\\sin(#0)", "sine"), ins("cos", "\\cos(#0)", "cosine"), ins("tan", "\\tan(#0)", "tangent"), ins("ln", "\\ln(#0)", "natural log"),
+        ins("log", "\\log(#0)", "log"), ins(<Tex src={`\\log_{n}`} />, "\\log_{#?}(#0)", "log base n"), ins(<Tex src={`e^{x}`} />, "e^{#?}", "e to the power"),
+        ins(<Tex src={`a_{n}`} />, "#@_{#?}", "Subscript"), LEFT, RIGHT],
+      [ins(<Tex src={`\\sin^{-1}`} />, "\\sin^{-1}(#0)", "arcsine"), ins(<Tex src={`\\cos^{-1}`} />, "\\cos^{-1}(#0)", "arccosine"),
+        ins(<Tex src={`\\tan^{-1}`} />, "\\tan^{-1}(#0)", "arctangent"), ins(<Tex src={`\\frac{d}{dx}`} />, "\\frac{d}{dx}", "Derivative"),
+        ins(<Tex src={`\\frac{\\partial}{\\partial x}`} />, "\\frac{\\partial}{\\partial #?}", "Partial derivative"), ins("f′", "#@'", "Prime"),
+        ins("!", "!", "Factorial"), ins("∞", "\\infty", "Infinity"), BACK],
+      [ins("∫", "\\int #0\\,d#?", "Integral"), ins(<Tex src={`\\int_{a}^{b}`} />, "\\int_{#?}^{#?} #0\\,d#?", "Definite integral"),
+        ins(<Tex src={`\\sum`} />, "\\sum_{#?}^{#?} #0", "Sum"), ins(<Tex src={`\\prod`} />, "\\prod_{#?}^{#?} #0", "Product"),
+        ins("lim", "\\lim_{#? \\to #?} #0", "Limit"), ins("∇", "\\nabla", "Nabla"), ins(<Tex src={`\\vec{v}`} />, "\\vec{#0}", "Vector"),
+        ins(<Tex src={`\\hat{n}`} />, "\\hat{#0}", "Unit vector"), ins("×10ⁿ", "\\times 10^{#?}", "Scientific notation"), ins("%", "\\%", "Percent")],
+      [ins("≠", "\\ne", "Not equal"), ins("≈", "\\approx", "Approximately"), ins("∝", "\\propto", "Proportional to"), ins("·", "\\cdot", "Dot"),
+        ins("→", "\\to", "Approaches"), ins("∠", "\\angle", "Angle"), ins("⊥", "\\perp", "Perpendicular"), ins("∥", "\\parallel", "Parallel"), ENTER],
     ],
   },
   {
-    label: "Ops",
-    symbols: [
-      { display: "+", insert: " + " },
-      { display: "-", insert: " - " },
-      { display: "\\times", insert: " \\times " },
-      { display: "\\div", insert: " \\div " },
-      { display: "=", insert: " = " },
-      { display: "\\neq", insert: " \\neq " },
-      { display: "\\approx", insert: " \\approx " },
-      { display: "\\pm", insert: " \\pm " },
-      { display: "\\leq", insert: " \\leq " },
-      { display: "\\geq", insert: " \\geq " },
-      { display: "<", insert: " < " },
-      { display: ">", insert: " > " },
-      { display: "\\infty", insert: "\\infty" },
-      { display: "\\%", insert: "\\%" },
+    id: "abc",
+    label: "abc",
+    rows: [
+      "qwertyuiop".split("").map((c) => t(c)),
+      [..."asdfghjkl".split("").map((c) => t(c)), { ...BACK, span: 1 }],
+      [{ label: "⇧", aria: "Shift", tone: "util", shift: true }, ..."zxcvbnm".split("").map((c) => t(c)), LEFT, RIGHT],
+      [t("'"), t(":"), { label: "space", aria: "Space", tone: "fn", span: 6, action: { type: "insert", latex: "\\ " } }, ENTER],
     ],
   },
   {
-    label: "Calculus",
-    symbols: [
-      { display: "\\int", insert: "\\int ", label: "∫" },
-      { display: "\\int_{a}^{b}", insert: "\\int_{a}^{b} ", label: "∫ᵃᵇ" },
-      { display: "\\oint", insert: "\\oint ", label: "∮" },
-      { display: "\\sum", insert: "\\sum ", label: "∑" },
-      { display: "\\sum_{i=0}^{n}", insert: "\\sum_{i=0}^{n} ", label: "∑ᵢ" },
-      { display: "\\prod", insert: "\\prod ", label: "∏" },
-      { display: "\\lim", insert: "\\lim_{x \\to } ", label: "lim" },
-      { display: "\\lim_{x\\to\\infty}", insert: "\\lim_{x \\to \\infty} ", label: "lim∞" },
-      { display: "\\partial", insert: "\\partial ", label: "∂" },
-      { display: "\\nabla", insert: "\\nabla ", label: "∇" },
-      { display: "f'(x)", insert: "f'(x)", label: "f'(x)" },
-      { display: "f''(x)", insert: "f''(x)", label: "f''(x)" },
-    ],
-  },
-  {
-    label: "Greek",
-    symbols: [
-      { display: "\\alpha", insert: "\\alpha ", label: "α" },
-      { display: "\\beta", insert: "\\beta ", label: "β" },
-      { display: "\\gamma", insert: "\\gamma ", label: "γ" },
-      { display: "\\delta", insert: "\\delta ", label: "δ" },
-      { display: "\\epsilon", insert: "\\epsilon ", label: "ε" },
-      { display: "\\theta", insert: "\\theta ", label: "θ" },
-      { display: "\\lambda", insert: "\\lambda ", label: "λ" },
-      { display: "\\mu", insert: "\\mu ", label: "μ" },
-      { display: "\\pi", insert: "\\pi ", label: "π" },
-      { display: "\\sigma", insert: "\\sigma ", label: "σ" },
-      { display: "\\phi", insert: "\\phi ", label: "φ" },
-      { display: "\\omega", insert: "\\omega ", label: "ω" },
-      { display: "\\Sigma", insert: "\\Sigma ", label: "Σ" },
-      { display: "\\Delta", insert: "\\Delta ", label: "Δ" },
-      { display: "\\Omega", insert: "\\Omega ", label: "Ω" },
-      { display: "\\Phi", insert: "\\Phi ", label: "Φ" },
-    ],
-  },
-  {
-    label: "Trig",
-    symbols: [
-      { display: "\\sin", insert: "\\sin()", label: "sin" },
-      { display: "\\cos", insert: "\\cos()", label: "cos" },
-      { display: "\\tan", insert: "\\tan()", label: "tan" },
-      { display: "\\csc", insert: "\\csc()", label: "csc" },
-      { display: "\\sec", insert: "\\sec()", label: "sec" },
-      { display: "\\cot", insert: "\\cot()", label: "cot" },
-      { display: "\\sin^{-1}", insert: "\\sin^{-1}()", label: "sin⁻¹" },
-      { display: "\\cos^{-1}", insert: "\\cos^{-1}()", label: "cos⁻¹" },
-      { display: "\\tan^{-1}", insert: "\\tan^{-1}()", label: "tan⁻¹" },
-      { display: "\\ln", insert: "\\ln()", label: "ln" },
-      { display: "\\log", insert: "\\log()", label: "log" },
-      { display: "\\log_{b}", insert: "\\log_{b}()", label: "logᵦ" },
-    ],
-  },
-  {
-    label: "Physics",
-    symbols: [
-      { display: "\\vec{v}", insert: "\\vec{}", label: "vector" },
-      { display: "\\hat{n}", insert: "\\hat{}", label: "unit vector" },
-      { display: "\\Delta x", insert: "\\Delta ", label: "delta (change)" },
-      { display: "\\dot{x}", insert: "\\dot{}", label: "time derivative" },
-      { display: "\\ddot{x}", insert: "\\ddot{}", label: "2nd time derivative" },
-      { display: "\\vec{a} \\cdot \\vec{b}", insert: " \\cdot ", label: "dot product" },
-      { display: "\\vec{a} \\times \\vec{b}", insert: " \\times ", label: "cross product" },
-      { display: "\\propto", insert: " \\propto ", label: "proportional to" },
-      { display: "^{\\circ}", insert: "^{\\circ}", label: "degrees" },
-      { display: "\\angle", insert: "\\angle ", label: "angle" },
-      { display: "\\perp", insert: " \\perp ", label: "perpendicular" },
-      { display: "\\parallel", insert: " \\parallel ", label: "parallel" },
-      { display: "\\rightarrow", insert: " \\rightarrow ", label: "yields / to" },
-      { display: "\\hbar", insert: "\\hbar ", label: "reduced Planck" },
-      { display: "\\Omega", insert: "\\Omega ", label: "ohms" },
-      { display: "\\times 10^{n}", insert: "\\times 10^{}", label: "scientific notation" },
-    ],
-  },
-  {
-    label: "Logic",
-    symbols: [
-      { display: "\\forall", insert: "\\forall ", label: "∀" },
-      { display: "\\exists", insert: "\\exists ", label: "∃" },
-      { display: "\\in", insert: " \\in ", label: "∈" },
-      { display: "\\notin", insert: " \\notin ", label: "∉" },
-      { display: "\\subset", insert: " \\subset ", label: "⊂" },
-      { display: "\\cup", insert: " \\cup ", label: "∪" },
-      { display: "\\cap", insert: " \\cap ", label: "∩" },
-      { display: "\\land", insert: " \\land ", label: "∧" },
-      { display: "\\lor", insert: " \\lor ", label: "∨" },
-      { display: "\\neg", insert: "\\neg ", label: "¬" },
-      { display: "\\Rightarrow", insert: " \\Rightarrow ", label: "⇒" },
-      { display: "\\Leftrightarrow", insert: " \\Leftrightarrow ", label: "⟺" },
+    id: "greek",
+    label: "αβγ",
+    rows: [
+      [..."αβγδεθλμ".split("").map((c) => t(c)), LEFT, RIGHT],
+      [..."πρστφω".split("").map((c) => t(c)), t("Δ"), t("Ω"), BACK],
+      [ins("∀", "\\forall", "For all"), ins("∃", "\\exists", "Exists"), ins("∈", "\\in", "In"), ins("∉", "\\notin", "Not in"),
+        ins("⊂", "\\subset", "Subset"), ins("∪", "\\cup", "Union"), ins("∩", "\\cap", "Intersection"), ins("∅", "\\emptyset", "Empty set"),
+        t("Σ"), t("Φ")],
+      [ins("∧", "\\land", "And"), ins("∨", "\\lor", "Or"), ins("¬", "\\neg", "Not"), ins("⇒", "\\Rightarrow", "Implies"),
+        ins("⇔", "\\Leftrightarrow", "If and only if"), ins("ℝ", "\\mathbb{R}", "Reals"), ins("ℏ", "\\hbar", "h bar"), ins("ℓ", "\\ell", "ell"), ENTER],
     ],
   },
 ];
 
-function KatexSpan({ src }: { src: string }) {
-  try {
-    const html = katex.renderToString(src, { throwOnError: false, output: "html" });
-    return <span dangerouslySetInnerHTML={{ __html: html }} />;
-  } catch {
-    return <span>{src}</span>;
-  }
-}
-
 type MathKeyboardProps = {
-  onInsert: (symbol: string) => void;
+  onKey: (action: MathKeyAction) => void;
+  docked?: boolean;
+  onHide?: () => void;
 };
 
-export function MathKeyboard({ onInsert }: MathKeyboardProps) {
-  const [activeTab, setActiveTab] = useState(0);
-  const group = SYMBOL_GROUPS[activeTab];
+export function MathKeyboard({ onKey, docked = false, onHide }: MathKeyboardProps) {
+  const [pageId, setPageId] = useState("main");
+  const [shift, setShift] = useState(false);
+  const page = PAGES.find((p) => p.id === pageId) ?? PAGES[0];
+
+  function press(key: Key) {
+    if (key.shift) {
+      setShift((s) => !s);
+      return;
+    }
+    if (!key.action) return;
+    const action = key.action;
+    if (shift && action.type === "type") {
+      onKey({ type: "type", text: action.text.toUpperCase() });
+      setShift(false);
+      return;
+    }
+    onKey(action);
+  }
 
   return (
-    <div className="math-keyboard">
-      <div className="math-keyboard-tabs">
-        {SYMBOL_GROUPS.map((g, i) => (
-          <button
-            key={g.label}
-            type="button"
-            className={`math-tab ${activeTab === i ? "active" : ""}`}
-            onClick={() => setActiveTab(i)}
-          >
-            {g.label}
+    <div
+      className={`mkb${docked ? " mkb--docked" : ""}`}
+      role="group"
+      aria-label="Math keyboard"
+      // Keys must not take focus from the answer field, or the caret is lost.
+      onPointerDown={(e) => e.preventDefault()}
+    >
+      <div className="mkb-bar">
+        <div className="mkb-pages" role="tablist" aria-label="Key sets">
+          {PAGES.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              role="tab"
+              aria-selected={p.id === pageId}
+              className={`mkb-page${p.id === pageId ? " is-active" : ""}`}
+              onClick={() => setPageId(p.id)}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        {docked && onHide && (
+          <button type="button" className="mkb-hide" aria-label="Hide keyboard" onClick={onHide}>
+            <CloseIcon size={18} />
           </button>
-        ))}
+        )}
       </div>
-      <div className="math-keyboard-symbols">
-        {group.symbols.map((s) => (
-          <button
-            key={s.insert}
-            type="button"
-            className="math-sym-btn"
-            onClick={() => onInsert(s.insert)}
-            title={s.label ?? s.insert}
-          >
-            <KatexSpan src={s.display} />
-          </button>
-        ))}
+      <div className="mkb-grid">
+        {page.rows.flat().map((key, i) => {
+          const upper = shift && key.action?.type === "type";
+          return (
+            <button
+              key={`${page.id}-${i}`}
+              type="button"
+              className={`mkb-key mkb-key--${key.tone ?? "fn"}${key.shift && shift ? " is-on" : ""}`}
+              style={key.span ? { gridColumn: `span ${key.span}` } : undefined}
+              aria-label={key.aria}
+              aria-pressed={key.shift ? shift : undefined}
+              onClick={() => press(key)}
+            >
+              {upper && typeof key.label === "string" ? key.label.toUpperCase() : key.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
