@@ -113,6 +113,8 @@ class AnswerResult(BaseModel):
     group_label: Optional[str] = None
     group_stem: Optional[str] = None
     part_label: Optional[str] = None
+    # "agent" when a connected MCP agent regraded this answer, else None.
+    graded_by: Optional[str] = None
 
 
 class AttemptResult(BaseModel):
@@ -234,6 +236,8 @@ class ReviewSummaryResponse(BaseModel):
 # OCR redo states on UserAnswer.ocr_status (GH #149). None means no drawing.
 OCR_STATUS_OK = "ok"
 OCR_STATUS_NEEDS_INPUT = "needs_input"
+# UserAnswer.graded_by value for grades written by an MCP agent (migration 073).
+GRADED_BY_AGENT = "agent"
 OCR_STATUS_RESOLVED = "resolved"
 OCR_STATUS_SKIPPED = "skipped"
 

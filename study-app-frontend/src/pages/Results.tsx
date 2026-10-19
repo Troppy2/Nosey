@@ -37,6 +37,7 @@ import { isReadFromDrawing } from "../lib/drawnAnswer";
 import { scoreTone } from "../lib/format";
 import { useSettings } from "../lib/useSettings";
 import type { AnswerResult, AttemptDetail, RedoAnswerResponse } from "../lib/types";
+import "../styles/components/regraded-pill.css";
 
 type MissedTopicCount = { topic: string; missed: number; total: number };
 
@@ -742,7 +743,10 @@ function ReviewItem({ answer, label }: { answer: AnswerResult; label: string }) 
       <button className="review-trigger" onClick={() => setOpen(!open)} type="button">
         <Icon size={22} />
         <div>
-          <span className="small muted">{label}</span>
+          <span className="small muted">
+            {label}
+            {answer.graded_by === "agent" ? <span className="pill review-regraded-pill">Regraded</span> : null}
+          </span>
           <div className="review-question-markdown">
             {/* Lays out a run-on coding problem; anything else is unchanged. */}
             <MarkdownContent content={formatCodingProblem(answer.question_text ?? `Question ${answer.question_id}`)} />

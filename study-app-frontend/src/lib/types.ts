@@ -186,6 +186,8 @@ export type AnswerResult = {
   group_label?: string | null;
   group_stem?: string | null;
   part_label?: string | null;
+  // "agent" when a connected MCP agent regraded this answer.
+  graded_by?: string | null;
 };
 
 export type OcrStatus = "ok" | "needs_input" | "resolved" | "skipped";

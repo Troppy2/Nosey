@@ -189,3 +189,39 @@ async def test_moderation_refusal_is_a_tool_error_and_saves_nothing(call, seeded
     async with db_session_maker() as session:
         names = (await session.scalars(select(Folder.name))).all()
         assert "Bad" not in names
+
+
+async def test_regrade_attempt_overwrites_grades_and_rescores(call, seeded, db_session_maker) -> None:  # noqa: F811
+    from src.models.user_answer import UserAnswer
+    from src.models.user_attempt import UserAttempt
+    from src.services.grading_service import GradingService
+
+    made = await call("create_test", {"folder_id": seeded["folder_id"], "title": "Rubric",
+                                      "items": [_frq("Define entropy"), _frq("Define enthalpy")]})
+    qids = [item.get("question_id") or item["question_ids"][0] for item in made["items"]]
+    async with db_session_maker() as session:
+        attempt = UserAttempt(user_id=seeded["beta"].id, test_id=made["test_id"], attempt_number=1,
+                              status="submitted", total_questions=2, correct_count=0, total_score=0)
+        session.add(attempt)
+        await session.flush()
+        for qid in qids:
+            session.add(UserAnswer(attempt_id=attempt.id, question_id=qid, user_answer="?",
+                                   is_correct=False, ai_feedback="Nosey says no"))
+        await session.commit()
+        attempt_id = attempt.id
+
+    out = await call("regrade_attempt", {"attempt_id": attempt_id, "grades": [
+        {"question_id": qids[0], "is_correct": True, "feedback": "Meets my rubric"}]})
+    assert out == {"attempt_id": attempt_id, "score": 50.0, "correct_count": 1, "total": 2, "regraded": 1}
+
+    async with db_session_maker() as session:
+        detail = await GradingService().get_attempt_detail(attempt_id, seeded["beta"].id, session)
+        by_q = {a.question_id: a for a in detail.answers}
+        assert by_q[qids[0]].feedback == "Meets my rubric" and by_q[qids[0]].graded_by == "agent"
+        assert by_q[qids[1]].graded_by is None and detail.score == 50.0
+
+    await call("regrade_attempt", {"attempt_id": attempt_id, "grades": [
+        {"question_id": 999999, "is_correct": True, "feedback": "x"}]}, expect_error=True)
+    await call("regrade_attempt", {"attempt_id": attempt_id, "grades": [
+        {"question_id": qids[0], "is_correct": True, "feedback": "x"},
+        {"question_id": qids[0], "is_correct": False, "feedback": "y"}]}, expect_error=True)
