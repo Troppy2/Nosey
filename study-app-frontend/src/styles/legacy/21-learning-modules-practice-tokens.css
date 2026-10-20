@@ -421,6 +421,13 @@
   transition: transform var(--transition-normal), opacity var(--transition-normal);
 }
 
+/* Fixed to the viewport, so on desktop it would centre under the sidebar too.
+   Start it where the sidebar ends (same width the shell grid uses, collapsed
+   or open) so it centres on the content column. */
+.shell:not(.shell--mobile) .lm-audio-player {
+  left: var(--sidebar-width, clamp(236px, 22vw, 280px));
+}
+
 /* ── Speed: a chip that opens a slider ──────────────────────────────────────
    One control at every width. Presets could not offer 1.7x, and five inline
    buttons never fit a one-row dock on a phone. */

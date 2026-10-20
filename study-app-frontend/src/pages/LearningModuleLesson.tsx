@@ -414,9 +414,9 @@ export default function LearningModuleLesson() {
   const [chunkPos, setChunkPos] = useState(0);
   const [speedOpen, setSpeedOpen] = useState(false);
   const speedRef = useRef<HTMLDivElement | null>(null);
-  // True while the quiz is on screen: the pill hides so it never sits on top of
-  // the questions. Narration deliberately keeps playing.
-  const [quizInView, setQuizInView] = useState(false);
+  // True once the reader has scrolled to the quiz: the pill hides so it never
+  // sits on top of the questions. Narration deliberately keeps playing.
+  const [answeringQuiz, setAnsweringQuiz] = useState(false);
   // State, not a ref: the effect below has to re-run when the section mounts or
   // unmounts (edit mode removes it), and a ref assignment does not re-render.
   const [quizNode, setQuizNode] = useState<HTMLElement | null>(null);
@@ -788,29 +788,37 @@ export default function LearningModuleLesson() {
     };
   }, [speedOpen]);
 
-  // Hide the pill while the quiz is on screen so it never sits on top of the
-  // questions. The bottom rootMargin gives it a head start, so the pill is
-  // already gone by the time the first question would slide under it rather
-  // than overlapping for a frame.
-  //
-  // Narration is NOT paused here: the pill hiding is a layout decision, not a
-  // playback one. Scrolling back up brings it back exactly where it was.
+  // The dock stays up while reading and tucks away once question one has
+  // scrolled into the upper part of the screen, so it never covers the quiz.
+  // It never hides while the page is still at the top: on a short article the
+  // quiz is on screen from the start, and hiding then would leave no way to
+  // reach the seek bar. Scrolling back up brings it back.
   useEffect(() => {
-    if (!quizNode || typeof IntersectionObserver === "undefined") {
-      setQuizInView(false);
+    if (!quizNode) {
+      setAnsweringQuiz(false);
       return;
     }
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setQuizInView(entry.isIntersecting);
-        // A popover left open behind a hidden dock would reappear open when
-        // the reader scrolls back up.
-        if (entry.isIntersecting) setSpeedOpen(false);
-      },
-      { rootMargin: "0px 0px 60px 0px" },
-    );
-    observer.observe(quizNode);
-    return () => observer.disconnect();
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const first = quizNode.querySelector(".lm-quiz-question");
+      const scrolled = window.scrollY > 8;
+      const reached = !!first && first.getBoundingClientRect().top < window.innerHeight * 0.6;
+      const hide = scrolled && reached;
+      setAnsweringQuiz(hide);
+      if (hide) setSpeedOpen(false);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
   }, [quizNode]);
 
   // Keep the paragraph being read in view while the narration plays.
@@ -1259,7 +1267,7 @@ export default function LearningModuleLesson() {
            MobileDock (a full-width positioner that ignores pointer events, a
            centred rail that takes them) so the page stays clickable either
            side of the pill on a wide screen. */
-        <div className="lm-audio-player" data-hidden={quizInView}>
+        <div className="lm-audio-player" data-hidden={answeringQuiz}>
           <div className="lm-dock-rail" role="group" aria-label="Listen to this lesson">
             <button
               className="lm-dock-toggle"
