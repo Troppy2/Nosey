@@ -1,5 +1,5 @@
 import { AlertTriangle, Atom, Calculator, Loader2, Target } from "lucide-react";
-import { BrainIcon } from "../icons";
+import { ArrowLeftIcon, BrainIcon } from "../icons";
 import { CheckCircleIcon, ChevronDownIcon, CloseIcon, CrossCircleIcon, InfoIcon, PencilIcon, RetryIcon, SparklesIcon } from "../icons";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -252,7 +252,14 @@ export default function Results() {
   }
 
   const content = (
+
     <div className="page page-narrow">
+      <div className="return_home">
+        <Link className="back-link" to={attempt.folder_id ? `/folders/${attempt.folder_id}` : "/folders"}>
+          <ArrowLeftIcon size={16} />
+          Folder
+        </Link>
+      </div>
       <Card className={`score-hero score-${tone}`}>
         <span className="eyebrow">
           Attempt {attempt.attempt_number}
@@ -263,6 +270,7 @@ export default function Results() {
           {attempt.correct_count} of {attempt.total} correct
           {held.length > 0 ? `, ${held.length} waiting on you` : ""}
         </p>
+
       </Card>
 
       {held.length > 0 ? (
@@ -419,24 +427,24 @@ export default function Results() {
                 </details>
               </>
             ) : (
-            <div className="targeted-topics-list">
-              {missed.slice(0, 6).map((a, i) => (
-                <div key={a.question_id} className="targeted-topic-item">
-                  <CrossCircleIcon size={15} className="targeted-topic-icon" />
-                  <span className="targeted-topic-text">
-                    {/* Rendered, not sliced: a hard character cut lands in the
+              <div className="targeted-topics-list">
+                {missed.slice(0, 6).map((a, i) => (
+                  <div key={a.question_id} className="targeted-topic-item">
+                    <CrossCircleIcon size={15} className="targeted-topic-icon" />
+                    <span className="targeted-topic-text">
+                      {/* Rendered, not sliced: a hard character cut lands in the
                         middle of a $...$ pair on math questions and leaves raw
                         LaTeX on screen. CSS line-clamps the overflow instead. */}
-                    <MarkdownContent content={a.question_text ?? `Question ${i + 1}`} />
-                  </span>
-                </div>
-              ))}
-              {missed.length > 6 && (
-                <p className="muted small" style={{ margin: "4px 0 0" }}>
-                  +{missed.length - 6} more weak areas will be included
-                </p>
-              )}
-            </div>
+                      <MarkdownContent content={a.question_text ?? `Question ${i + 1}`} />
+                    </span>
+                  </div>
+                ))}
+                {missed.length > 6 && (
+                  <p className="muted small" style={{ margin: "4px 0 0" }}>
+                    +{missed.length - 6} more weak areas will be included
+                  </p>
+                )}
+              </div>
             )}
           </div>
 
