@@ -135,3 +135,32 @@ class SDQuizAttempt(Base, TimestampMixin):
 
 
 Index("ix_sd_quiz_attempts_user_concept", SDQuizAttempt.user_id, SDQuizAttempt.concept_id)
+
+
+
+CUSTOM_CONCEPT_PREFIX = "custom-"
+
+
+class SDCustomTopic(Base, TimestampMixin):
+    """A System Design topic written by an AI app through the MCP connector.
+
+    The built-in curriculum is static frontend content; these rows are the only
+    topics in the database. Full parity: content_json holds the frontend Concept
+    shape (notes, video, visualizer, project, quiz) minus id and order, so the
+    concept page and the Pyodide workspace render it unchanged. Progress and
+    submissions reuse the built-in tables under the concept id "custom-<id>".
+    """
+
+    __tablename__ = "sd_custom_topics"
+
+    id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        BIGINT_ID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    content_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}", server_default="{}")
+    created_via: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+
+    @property
+    def concept_id(self) -> str:
+        return f"{CUSTOM_CONCEPT_PREFIX}{self.id}"

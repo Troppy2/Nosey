@@ -1,7 +1,8 @@
 /**
- * The shape of one System Design concept. Content is static and bundled with
- * the frontend: never in the database, never generated at runtime. The backend
- * stores user state only, keyed by the ids declared here.
+ * The shape of one System Design concept. Built-in content is static and bundled
+ * with the frontend. Custom topics (ids "custom-<n>", written by an AI app through
+ * the MCP connector) arrive from GET /system-design/custom-topics in this same
+ * shape. The backend stores user state keyed by these ids.
  */
 
 export type ConceptFile = {
@@ -43,7 +44,13 @@ export type QuizFrq = {
   rubric: string;
 };
 
-export type ConceptVideo = { title: string; youtubeId: string };
+export type ConceptVideo = {
+  title: string;
+  /** null for a non-YouTube link on a custom topic: shown as a link, not embedded. */
+  youtubeId: string | null;
+  /** The original link. Custom topics only. */
+  url?: string;
+};
 
 export type Concept = {
   /** Matches the backend concept_id: lowercase, digits and hyphens only. */

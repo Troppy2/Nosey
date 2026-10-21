@@ -14,10 +14,12 @@ vi.mock("../lib/useSettings", () => ({
 
 vi.mock("../lib/api", () => ({
   getSystemDesignProgress: vi.fn(),
+  listSystemDesignCustomTopics: vi.fn(() => Promise.resolve([])),
 }));
 
-const { getSystemDesignProgress } = await import("../lib/api");
+const { getSystemDesignProgress, listSystemDesignCustomTopics } = await import("../lib/api");
 const mockedProgress = vi.mocked(getSystemDesignProgress);
+const mockedCustom = vi.mocked(listSystemDesignCustomTopics);
 
 function renderTrack() {
   return render(
@@ -43,6 +45,20 @@ afterEach(() => {
 });
 
 describe("SystemDesign track page", () => {
+  it("lists custom topics under Your topics", async () => {
+    mockedCustom.mockResolvedValueOnce([{ ...SD_CONCEPTS[0], id: "custom-1", title: "Rate limiting" }]);
+    renderTrack();
+    expect(await screen.findByText("Your topics")).toBeTruthy();
+    const link = (await screen.findByText("Rate limiting")).closest("a");
+    expect(link?.getAttribute("href")).toBe("/system-design/custom-1");
+  });
+
+  it("hides Your topics when there are none", async () => {
+    renderTrack();
+    await screen.findByText(SD_CONCEPTS[0].title);
+    expect(screen.queryByText("Your topics")).toBeNull();
+  });
+
   it("renders a card per concept in order", async () => {
     renderTrack();
     for (const concept of SD_CONCEPTS) {

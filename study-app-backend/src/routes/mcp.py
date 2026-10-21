@@ -41,7 +41,9 @@ SERVER_INSTRUCTIONS = (
     "the user uploaded, and get_attempt_result to see what they got wrong. You write the "
     "content; create_test, create_flashcards and add_note save it. Folders can be created "
     "and renamed but never deleted. Only delete anything (confirm=true) when the user asked "
-    "for it. Share the url create_test returns."
+    "for it. Share the url create_test returns. Interview prep (beta accounts): KojoCode coding "
+    "problems, prep banks, 3-Pass drills, mock interviews and System Design topics have their own "
+    "list_/create_ tools; call list_leetcode_problems for real slugs before building a bank."
 )
 
 # JSON-RPC error codes.

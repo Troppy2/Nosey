@@ -93,7 +93,7 @@ export function validateConcept(concept: Concept): string[] {
   const ids = [...concept.quiz.mcq, ...concept.quiz.frq].map((question) => question.id);
   if (new Set(ids).size !== ids.length) problems.push("quiz question ids are not unique");
 
-  if (concept.video && !concept.video.youtubeId.trim()) {
+  if (concept.video && !(concept.video.youtubeId ?? "").trim()) {
     problems.push("video is set but has no youtubeId");
   }
 

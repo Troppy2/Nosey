@@ -1,0 +1,31 @@
+/* Past interviews: a delete button beside each card (MockInterviewHistory.tsx). */
+.mock-history-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.mock-history-row .mock-history-card {
+  flex: 1;
+  min-width: 0;
+}
+
+.mock-history-delete {
+  flex-shrink: 0;
+  width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  border-radius: 12px;
+  background: transparent;
+  color: var(--muted, inherit);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.mock-history-delete:hover,
+.mock-history-delete:focus-visible {
+  color: var(--error);
+  border-color: var(--error);
+}

@@ -78,6 +78,7 @@ import type {
   McpConnection,
   McpConsentRequest,
 } from "./types";
+import type { Concept } from "../data/systemDesign/types";
 import { reportBackendHttpFailure, reportBackendNetworkFailure } from "./backendStatus";
 import { getDeviceId } from "./deviceId";
 import { reportSafety, SAFETY_HEADER } from "./safetyEvents";
@@ -2412,6 +2413,10 @@ export async function listMockInterviewSessions(): Promise<MockInterviewSession[
   return request<MockInterviewSession[]>("/mock-interview");
 }
 
+export async function deleteMockInterviewSession(sessionId: number): Promise<void> {
+  await request(`/mock-interview/${sessionId}`, { method: "DELETE" });
+}
+
 // Push the client's whole run snapshot. Called debounced from mockInterview.ts, so a
 // refresh, a cleared cache, or a different device can pick the run back up.
 export async function syncMockProgress(sessionId: number, progressJson: string): Promise<void> {
@@ -2649,6 +2654,11 @@ export async function submitSurvey(payload: {
 }
 
 // ── System Design mode ────────────────────────────────────────────────────────
+
+/** Custom topics written through the MCP connector, already in the bundled Concept shape. */
+export async function listSystemDesignCustomTopics(): Promise<Concept[]> {
+  return request<Concept[]>("/system-design/custom-topics");
+}
 
 export async function getSystemDesignProgress(): Promise<SystemDesignProgress> {
   return request<SystemDesignProgress>("/system-design/progress");

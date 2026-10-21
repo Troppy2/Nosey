@@ -8,7 +8,8 @@ import { KojoHelpChat } from "../components/KojoHelpChat";
 import { SkeletonText } from "../components/Skeletons";
 import { MarkdownContent } from "../components/MarkdownContent";
 import SimTimelinePanel from "../components/SimTimelinePanel";
-import { exerciseId as buildExerciseId, getConcept, resolveMockPackages } from "../data/systemDesign";
+import { exerciseId as buildExerciseId, resolveMockPackages } from "../data/systemDesign";
+import { useConcept } from "../data/systemDesign/useConcept";
 import type { ExerciseKind } from "../data/systemDesign/types";
 import { getSystemDesignSubmission, putSystemDesignSubmission } from "../lib/api";
 import { runPythonMultiFile, type MultiFileTestResult } from "../lib/pyodideRunner";
@@ -22,7 +23,7 @@ type Pane = "brief" | "code" | "results";
 export default function SystemDesignWorkspace() {
   const { conceptId, exerciseKind } = useParams<{ conceptId: string; exerciseKind: string }>();
   const { betaMode } = useSettings();
-  const concept = getConcept(conceptId);
+  const { concept, loading: conceptLoading } = useConcept(conceptId);
   const kind = EXERCISE_KINDS.find((candidate) => candidate === exerciseKind) ?? null;
   const exercise = concept && kind ? concept[kind] : null;
 
@@ -147,6 +148,13 @@ export default function SystemDesignWorkspace() {
   );
 
   if (!betaMode) return <Navigate to="/leetcode" replace />;
+  if (conceptLoading) {
+    return (
+      <div className="page page-narrow sd-page">
+        <div className="sd-skeleton">Loading this topic...</div>
+      </div>
+    );
+  }
   if (!concept) return <Navigate to="/system-design" replace />;
   if (!kind || !exercise) return <Navigate to={`/system-design/${concept.id}`} replace />;
 

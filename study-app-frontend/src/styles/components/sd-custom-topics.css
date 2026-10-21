@@ -1,0 +1,9 @@
+/* System Design: the "Your topics" section under the built-in track (SystemDesign.tsx). */
+.sd-custom-topics {
+  margin-top: var(--space-5);
+}
+
+.sd-section-title {
+  font-size: 1.05rem;
+  margin: 0 0 var(--space-3);
+}
