@@ -1,6 +1,5 @@
-import { AlertTriangle, Atom, Calculator, Loader2, Target } from "lucide-react";
-import { ArrowLeftIcon, BrainIcon } from "../icons";
-import { CheckCircleIcon, ChevronDownIcon, CloseIcon, CrossCircleIcon, InfoIcon, PencilIcon, RetryIcon, SparklesIcon } from "../icons";
+import { AlertTriangle, Atom, Loader2, Target } from "lucide-react";
+import { ArrowLeftIcon, BrainIcon, CheckCircleIcon, ChevronDownIcon, CloseIcon, CrossCircleIcon, InfoIcon, PencilIcon, RetryIcon, SparklesIcon } from "../icons";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
@@ -252,14 +251,11 @@ export default function Results() {
   }
 
   const content = (
-
     <div className="page page-narrow">
-      <div className="return_home">
-        <Link className="back-link" to={attempt.folder_id ? `/folders/${attempt.folder_id}` : "/folders"}>
-          <ArrowLeftIcon size={16} />
-          Folder
-        </Link>
-      </div>
+      <Link className="back-link" to={attempt.folder_id ? `/folders/${attempt.folder_id}` : "/folders"}>
+        <ArrowLeftIcon size={16} />
+        Folder
+      </Link>
       <Card className={`score-hero score-${tone}`}>
         <span className="eyebrow">
           Attempt {attempt.attempt_number}
@@ -270,7 +266,6 @@ export default function Results() {
           {attempt.correct_count} of {attempt.total} correct
           {held.length > 0 ? `, ${held.length} waiting on you` : ""}
         </p>
-
       </Card>
 
       {held.length > 0 ? (
@@ -406,45 +401,11 @@ export default function Results() {
                 </div>
                 <details className="missed-questions-details">
                   <summary>Questions you missed ({missed.length})</summary>
-                  <div className="targeted-topics-list">
-                    {missed.slice(0, 6).map((a, i) => (
-                      <div key={a.question_id} className="targeted-topic-item">
-                        <CrossCircleIcon size={15} className="targeted-topic-icon" />
-                        <span className="targeted-topic-text">
-                          {/* Rendered, not sliced: a hard character cut lands in the
-                              middle of a $...$ pair on math questions and leaves raw
-                              LaTeX on screen. CSS line-clamps the overflow instead. */}
-                          <MarkdownContent content={a.question_text ?? `Question ${i + 1}`} />
-                        </span>
-                      </div>
-                    ))}
-                    {missed.length > 6 && (
-                      <p className="muted small" style={{ margin: "4px 0 0" }}>
-                        +{missed.length - 6} more weak areas will be included
-                      </p>
-                    )}
-                  </div>
+                  <MissedQuestionList missed={missed} />
                 </details>
               </>
             ) : (
-              <div className="targeted-topics-list">
-                {missed.slice(0, 6).map((a, i) => (
-                  <div key={a.question_id} className="targeted-topic-item">
-                    <CrossCircleIcon size={15} className="targeted-topic-icon" />
-                    <span className="targeted-topic-text">
-                      {/* Rendered, not sliced: a hard character cut lands in the
-                        middle of a $...$ pair on math questions and leaves raw
-                        LaTeX on screen. CSS line-clamps the overflow instead. */}
-                      <MarkdownContent content={a.question_text ?? `Question ${i + 1}`} />
-                    </span>
-                  </div>
-                ))}
-                {missed.length > 6 && (
-                  <p className="muted small" style={{ margin: "4px 0 0" }}>
-                    +{missed.length - 6} more weak areas will be included
-                  </p>
-                )}
-              </div>
+              <MissedQuestionList missed={missed} />
             )}
           </div>
 
@@ -700,6 +661,31 @@ function reviewBlocks(answers: AnswerResult[]): { groupId: AnswerResult["group_i
     }
   }
   return blocks;
+}
+
+// The first six missed questions. Shared by both branches of the Missed
+// Topics panel: with topic chips above, or on its own when there are no tags.
+function MissedQuestionList({ missed }: { missed: AnswerResult[] }) {
+  return (
+    <div className="targeted-topics-list">
+      {missed.slice(0, 6).map((answer, index) => (
+        <div key={answer.question_id} className="targeted-topic-item">
+          <CrossCircleIcon size={15} className="targeted-topic-icon" />
+          <span className="targeted-topic-text">
+            {/* Rendered, not sliced: a hard character cut lands in the middle
+                of a $...$ pair on math questions and leaves raw LaTeX on
+                screen. CSS line-clamps the overflow instead. */}
+            <MarkdownContent content={answer.question_text ?? `Question ${index + 1}`} />
+          </span>
+        </div>
+      ))}
+      {missed.length > 6 && (
+        <p className="muted small" style={{ margin: "4px 0 0" }}>
+          +{missed.length - 6} more weak areas will be included
+        </p>
+      )}
+    </div>
+  );
 }
 
 // A long answer (a whole scratch pad read back) is capped so the feedback
