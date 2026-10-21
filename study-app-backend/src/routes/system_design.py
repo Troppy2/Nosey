@@ -15,6 +15,7 @@ from src.schemas.system_design_schema import (
     SDSubmissionSaveRequest,
     SDSubModuleRequest,
 )
+from src.services.sd_custom_topic_service import SDCustomTopicService
 from src.services.system_design_quiz_service import SystemDesignQuizService
 from src.services.system_design_service import SystemDesignService
 from src.utils.exceptions import LLMException, ResourceNotFoundException, StudyAppException
@@ -55,6 +56,19 @@ async def get_sd_progress(
     except Exception as exc:
         raise _http_error(exc, "Could not load your System Design progress.") from exc
     return SDProgressResponse(concepts=concepts)
+
+
+@router.get("/custom-topics")
+async def list_sd_custom_topics(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[dict]:
+    """Topics an AI app wrote through the MCP connector, in the frontend Concept
+    shape (ids "custom-<n>"), so the pages render them like bundled concepts."""
+    try:
+        return await SDCustomTopicService().concepts(user.id, session)
+    except Exception as exc:
+        raise _http_error(exc, "Could not load your topics.") from exc
 
 
 @router.put(

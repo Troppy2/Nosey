@@ -1182,6 +1182,19 @@ async def finish_interview(
 
 # ── List sessions ─────────────────────────────────────────────────────────────
 
+@router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def delete_session(
+    session_id: int,
+    db: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> Response:
+    """Delete one past (or unfinished) interview and everything saved on it."""
+    row = await _load_session(session_id, user, db)
+    await db.delete(row)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("", response_model=list[MockInterviewSessionResponse])
 async def list_sessions(
     db: AsyncSession = Depends(get_session),

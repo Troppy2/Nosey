@@ -1,13 +1,15 @@
 import { Briefcase, Clock } from "lucide-react";
-import { AlertIcon, ArrowLeftIcon, ChevronRightIcon } from "../icons";
+import { AlertIcon, ArrowLeftIcon, ChevronRightIcon, TrashIcon } from "../icons";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { SkeletonList } from "../components/Skeletons";
-import { listMockInterviewSessions } from "../lib/api";
+import { ConfirmModal } from "../components/ConfirmModal";
+import { deleteMockInterviewSession, listMockInterviewSessions } from "../lib/api";
 import type { MockInterviewSession } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
 import { MockLoopTrack } from "../components/MockLoopRail";
 import { RECOMMENDATIONS, recommendationMeta } from "../data/mockInterviewLoop";
+import "../styles/components/mock-history-delete.css";
 
 const LEVEL_LABELS: Record<string, string> = {
   intern: "Internship",
@@ -54,6 +56,25 @@ export default function MockInterviewHistory() {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<MockInterviewSession[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<MockInterviewSession | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteMockInterviewSession(pendingDelete.id);
+      setSessions((rows) => (rows ?? []).filter((row) => row.id !== pendingDelete.id));
+      setPendingDelete(null);
+    } catch (e: unknown) {
+      setDeleteError(e instanceof Error ? e.message : "Could not delete that interview.");
+      setPendingDelete(null);
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -86,6 +107,26 @@ export default function MockInterviewHistory() {
         <Briefcase size={26} style={{ color: "var(--green-dark)", flexShrink: 0, marginTop: 4 }} />
       </div>
 
+      {deleteError ? (
+        <div className="card mock-error-card" role="status">
+          <AlertIcon size={20} style={{ color: "var(--error)" }} />
+          <p>{deleteError}</p>
+        </div>
+      ) : null}
+
+      {pendingDelete ? (
+        <ConfirmModal
+          title="Delete this interview?"
+          message={`${companyLabelOf(pendingDelete)}, ${formatDate(pendingDelete.created_at) || "undated"}. Its results and debrief are deleted for good.`}
+          confirmLabel="Delete"
+          danger
+          busy={deleting}
+          busyLabel="Deleting"
+          onConfirm={() => void confirmDelete()}
+          onCancel={() => setPendingDelete(null)}
+        />
+      ) : null}
+
       {error ? (
         <div className="card mock-error-card">
           <AlertIcon size={20} style={{ color: "var(--error)" }} />
@@ -109,8 +150,8 @@ export default function MockInterviewHistory() {
             const complete = session.status === "complete";
             const stages = stagesOf(session);
             return (
+              <div key={session.id} className="mock-history-row">
               <button
-                key={session.id}
                 type="button"
                 className="card mock-history-card"
                 onClick={() =>
@@ -144,6 +185,16 @@ export default function MockInterviewHistory() {
                 </div>
                 <ChevronRightIcon size={16} className="mock-history-chevron" />
               </button>
+              <button
+                type="button"
+                className="mock-history-delete"
+                aria-label={`Delete ${companyLabelOf(session)} interview`}
+                title="Delete interview"
+                onClick={() => setPendingDelete(session)}
+              >
+                <TrashIcon size={16} />
+              </button>
+              </div>
             );
           })}
         </div>

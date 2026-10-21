@@ -4,8 +4,9 @@ import { ArrowLeftIcon, CheckIcon } from "../icons";
 import { useEffect, useState, type ComponentType } from "react";
 import { Link, Navigate } from "react-router-dom";
 
-import { SD_CONCEPTS } from "../data/systemDesign";
-import { getSystemDesignProgress } from "../lib/api";
+import "../styles/components/sd-custom-topics.css";
+import { SD_CONCEPTS, type Concept } from "../data/systemDesign";
+import { getSystemDesignProgress, listSystemDesignCustomTopics } from "../lib/api";
 import { useSettings } from "../lib/useSettings";
 import type { SystemDesignProgressEntry, SystemDesignSubModule } from "../lib/types";
 
@@ -65,6 +66,21 @@ export default function SystemDesign() {
   const [progress, setProgress] = useState<Record<string, SystemDesignProgressEntry>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [customTopics, setCustomTopics] = useState<Concept[]>([]);
+
+  useEffect(() => {
+    if (!betaMode) return;
+    let cancelled = false;
+    // Optional extras: when this fails the bundled track still renders.
+    listSystemDesignCustomTopics()
+      .then((topics) => {
+        if (!cancelled) setCustomTopics(topics ?? []);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [betaMode]);
 
   useEffect(() => {
     if (!betaMode) return;
@@ -116,60 +132,76 @@ export default function SystemDesign() {
       ) : null}
 
       <ol className="sd-track">
-        {SD_CONCEPTS.map((concept) => {
-          const entry = progress[concept.id] ?? SD_EMPTY_PROGRESS;
-          const done = doneCount(entry);
-          const next = nextSubModule(entry);
-          return (
-            <li key={concept.id} className="sd-track-item">
-              <Link to={`/system-design/${concept.id}`} className="sd-card">
-                <div className="sd-card-head">
-                  <h2 className="sd-card-title" data-testid="sd-concept-title">
-                    {concept.title}
-                  </h2>
-                  <span className={`sd-card-count${done === SD_SUB_MODULES.length ? " is-complete" : ""}`}>
-                    {done === SD_SUB_MODULES.length ? (
-                      <>
-                        <CheckIcon size={14} />
-                        Complete
-                      </>
-                    ) : (
-                      `${done} of ${SD_SUB_MODULES.length} done`
-                    )}
-                  </span>
-                </div>
-                <p className="sd-card-blurb">{concept.blurb}</p>
-                <ul className="sd-chips">
-                  {SD_SUB_MODULES.map((subModule) => {
-                    const Icon = subModule.icon;
-                    const isDone = isSubModuleDone(entry, subModule.key);
-                    return (
-                      <li
-                        key={subModule.key}
-                        className={`sd-chip${isDone ? " is-done" : ""}`}
-                        data-testid={`sd-chip-${concept.id}`}
-                        data-sub-module={subModule.key}
-                        data-done={isDone ? "true" : "false"}
-                      >
-                        {isDone ? <CheckIcon size={14} /> : <Icon size={14} />}
-                        {subModule.label}
-                      </li>
-                    );
-                  })}
-                </ul>
-                <span className="sd-card-cta">
-                  {next ? `Continue with ${next.label.toLowerCase()}` : "Review this concept"}
-                </span>
-              </Link>
-            </li>
-          );
-        })}
+        {SD_CONCEPTS.map((concept) => (
+          <ConceptCard key={concept.id} concept={concept} entry={progress[concept.id] ?? SD_EMPTY_PROGRESS} />
+        ))}
       </ol>
+
+      {customTopics.length ? (
+        <section className="sd-custom-topics" aria-labelledby="sd-custom-heading">
+          <h2 id="sd-custom-heading" className="sd-section-title">
+            Your topics
+          </h2>
+          <ol className="sd-track">
+            {customTopics.map((concept) => (
+              <ConceptCard key={concept.id} concept={concept} entry={progress[concept.id] ?? SD_EMPTY_PROGRESS} />
+            ))}
+          </ol>
+        </section>
+      ) : null}
 
       <p className="muted small sd-track-note">
         More concepts are being written. Each one lands with its notes, both exercises and its quiz
         at the same time.
       </p>
     </div>
+  );
+}
+
+function ConceptCard({ concept, entry }: { concept: Concept; entry: SystemDesignProgressEntry }) {
+  const done = doneCount(entry);
+  const next = nextSubModule(entry);
+  return (
+    <li className="sd-track-item">
+      <Link to={`/system-design/${concept.id}`} className="sd-card">
+        <div className="sd-card-head">
+          <h2 className="sd-card-title" data-testid="sd-concept-title">
+            {concept.title}
+          </h2>
+          <span className={`sd-card-count${done === SD_SUB_MODULES.length ? " is-complete" : ""}`}>
+            {done === SD_SUB_MODULES.length ? (
+              <>
+                <CheckIcon size={14} />
+                Complete
+              </>
+            ) : (
+              `${done} of ${SD_SUB_MODULES.length} done`
+            )}
+          </span>
+        </div>
+        <p className="sd-card-blurb">{concept.blurb}</p>
+        <ul className="sd-chips">
+          {SD_SUB_MODULES.map((subModule) => {
+            const Icon = subModule.icon;
+            const isDone = isSubModuleDone(entry, subModule.key);
+            return (
+              <li
+                key={subModule.key}
+                className={`sd-chip${isDone ? " is-done" : ""}`}
+                data-testid={`sd-chip-${concept.id}`}
+                data-sub-module={subModule.key}
+                data-done={isDone ? "true" : "false"}
+              >
+                {isDone ? <CheckIcon size={14} /> : <Icon size={14} />}
+                {subModule.label}
+              </li>
+            );
+          })}
+        </ul>
+        <span className="sd-card-cta">
+          {next ? `Continue with ${next.label.toLowerCase()}` : "Review this concept"}
+        </span>
+      </Link>
+    </li>
   );
 }

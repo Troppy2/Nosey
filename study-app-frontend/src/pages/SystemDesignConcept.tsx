@@ -5,7 +5,7 @@ import { Link, Navigate, useParams } from "react-router-dom";
 
 import { MarkdownContent } from "../components/MarkdownContent";
 import { markdownToSpeech, speechCapability, splitForSpeech } from "../components/episodeSpeech";
-import { getConcept } from "../data/systemDesign";
+import { useConcept } from "../data/systemDesign/useConcept";
 import {
   getSystemDesignProgress,
   gradeSystemDesignQuiz,
@@ -107,7 +107,7 @@ function useReadAloud(markdown: string) {
 export default function SystemDesignConcept() {
   const { conceptId } = useParams<{ conceptId: string }>();
   const { betaMode } = useSettings();
-  const concept = getConcept(conceptId);
+  const { concept, loading: conceptLoading } = useConcept(conceptId);
 
   const [entry, setEntry] = useState<SystemDesignProgressEntry>(SD_EMPTY_PROGRESS);
   const [error, setError] = useState<string | null>(null);
@@ -217,6 +217,13 @@ export default function SystemDesignConcept() {
   }, [concept, frqAnswers, mcqAnswers, refreshProgress]);
 
   if (!betaMode) return <Navigate to="/leetcode" replace />;
+  if (conceptLoading) {
+    return (
+      <div className="page page-narrow sd-page">
+        <div className="sd-skeleton">Loading this topic...</div>
+      </div>
+    );
+  }
   if (!concept) return <Navigate to="/system-design" replace />;
 
   const complete = doneCount(entry) === SD_SUB_MODULES.length;
@@ -346,7 +353,13 @@ export default function SystemDesignConcept() {
         <header className="sd-panel-head">
           <h2>Video</h2>
         </header>
-        {concept.video ? (
+        {concept.video && !concept.video.youtubeId && concept.video.url ? (
+          <p>
+            <a href={concept.video.url} target="_blank" rel="noopener noreferrer">
+              {concept.video.title}
+            </a>
+          </p>
+        ) : concept.video?.youtubeId ? (
           <div className="sd-video">
             <iframe
               src={`https://www.youtube-nocookie.com/embed/${concept.video.youtubeId}`}
