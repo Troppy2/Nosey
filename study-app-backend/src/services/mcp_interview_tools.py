@@ -986,7 +986,7 @@ INTERVIEW_TOOLS: tuple[McpTool, ...] = (
            "Write a complete System Design topic, shown under Your topics with the same five sub-modules as the "
            "built-in ones: notes, a video (YouTube embeds; other links open in a new tab), a visualizer and a "
            "project (Python exercises with hidden tests that run in the browser), and a quiz (3 to 10 multiple "
-           "choice plus exactly 5 written answers graded against the notes).",
+           "choice plus 3 to 10 written answers graded against the notes).",
            CreateSdTopicArgs, create_sd_topic),
     _write("edit_sd_topic", "Edit a System Design topic",
            "Change parts of a custom topic. Each exercise or the quiz is replaced whole. Progress is kept.",

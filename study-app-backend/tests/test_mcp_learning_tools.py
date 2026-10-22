@@ -120,3 +120,42 @@ async def test_add_edit_delete(call, seeded, db_session_maker) -> None:  # noqa:
         assert await session.get(LearningTrack, made["track_id"]) is None
         left = (await session.scalars(select(LearningModule).where(LearningModule.track_id == made["track_id"]))).all()
         assert left == []
+
+
+async def test_edit_one_quiz_question_keeps_the_rest(client, call, seeded) -> None:  # noqa: F811
+    made = await call("create_learning_track", {"folder_id": seeded["folder_id"], "modules": [_module("Cells")]})
+    module_id = made["modules"][0]["module_id"]
+
+    edited = await call("edit_quiz_question", {"module_id": module_id, "question_index": 1,
+                                               "explanation": "Cells divide by mitosis."})
+    assert edited["question"]["explanation"] == "Cells divide by mitosis."
+    assert edited["question"]["question"] == "Q1" and edited["question"]["correct_index"] == 0
+
+    await call("edit_quiz_question", {"module_id": module_id, "question_index": 2,
+                                      "question": "Which is right?", "options": ["x", "y", "z"], "correct_index": 2})
+    quiz = (await call("get_learning_module", {"module_id": module_id}))["quiz"]
+    assert [q["question"] for q in quiz] == ["Q0", "Q1", "Which is right?"]
+    assert quiz[2]["options"] == ["x", "y", "z"] and quiz[2]["correct_index"] == 2
+    assert quiz[2]["explanation"] == "Because."  # untouched fields kept
+
+    graded = (await client.post(f"/learning-modules/{module_id}/quiz-attempt", json={"answers": [0, 0, 2]})).json()
+    assert graded["score"] == 3
+
+
+async def test_edit_quiz_question_rejects_bad_input(call, seeded) -> None:  # noqa: F811
+    made = await call("create_learning_track", {"folder_id": seeded["folder_id"], "modules": [_module("Cells")]})
+    module_id = made["modules"][0]["module_id"]
+    await call("edit_quiz_question", {"module_id": module_id, "question_index": 3, "explanation": "x"},
+               expect_error=True)
+    await call("edit_quiz_question", {"module_id": module_id, "question_index": 0, "options": ["a", "b"]},
+               expect_error=True)
+    await call("edit_quiz_question", {"module_id": module_id, "question_index": 0, "correct_index": 5},
+               expect_error=True)
+
+
+async def test_mcp_quiz_with_more_than_five_questions_submits(client, call, seeded) -> None:  # noqa: F811
+    made = await call("create_learning_track",
+                      {"folder_id": seeded["folder_id"], "modules": [_module("Cells", quiz=_quiz(8))]})
+    module_id = made["modules"][0]["module_id"]
+    graded = (await client.post(f"/learning-modules/{module_id}/quiz-attempt", json={"answers": [0] * 8})).json()
+    assert graded["score"] == 8 and graded["passed"] is True

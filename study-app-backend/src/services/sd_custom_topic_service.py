@@ -19,13 +19,16 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.system_design import SDCustomTopic
+from src.models.system_design import CUSTOM_CONCEPT_PREFIX, SDCustomTopic
 from src.utils.exceptions import ResourceNotFoundException
 
 MODULE_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\.py$")
 RESERVED_MODULES = frozenset({"_sd_tests.py", "sim.py"})
-# The grader scores exactly five written answers (system_design_quiz_service).
-FRQ_COUNT = 5
+# Built-in topics ship exactly five written questions; a custom topic may carry
+# MIN_FRQ to MAX_FRQ, and the grader checks a submission against its stored count.
+# Each written answer is one grading LLM call, hence the cap.
+MIN_FRQ = 3
+MAX_FRQ = 10
 YOUTUBE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{11}$")
 
 
@@ -92,7 +95,9 @@ class FrqIn(_In):
 
 class QuizIn(_In):
     mcq: list[McqIn] = Field(min_length=3, max_length=10)
-    frq: list[FrqIn] = Field(min_length=FRQ_COUNT, max_length=FRQ_COUNT, description="Exactly five written questions.")
+    frq: list[FrqIn] = Field(
+        min_length=MIN_FRQ, max_length=MAX_FRQ, description="3 to 10 written questions, each graded against the notes."
+    )
 
 
 class VideoIn(_In):
@@ -211,6 +216,16 @@ class SDCustomTopicService:
         if row is None:
             raise ResourceNotFoundException("System Design topic")
         return row
+
+    async def frq_count(self, user_id: int, concept_id: str, session: AsyncSession) -> Optional[int]:
+        """Written questions on the user's custom topic, or None for a built-in concept id."""
+        if not concept_id.startswith(CUSTOM_CONCEPT_PREFIX):
+            return None
+        raw_id = concept_id[len(CUSTOM_CONCEPT_PREFIX):]
+        if not raw_id.isdigit():
+            raise ResourceNotFoundException("System Design topic")
+        row = await self.get_owned(user_id, int(raw_id), session)
+        return len((stored_content(row).get("quiz") or {}).get("frq") or [])
 
     async def concepts(self, user_id: int, session: AsyncSession) -> list[dict[str, Any]]:
         return [to_concept(row, index + 1) for index, row in enumerate(await self.list(user_id, session))]
