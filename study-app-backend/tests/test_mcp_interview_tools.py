@@ -224,3 +224,33 @@ async def test_custom_topic_quiz_grades_more_than_five_written_answers(client, c
     # Built-in concepts still need exactly five.
     builtin = await client.post("/system-design/quiz/caching/grade", json=body(7))
     assert builtin.status_code == 400
+
+
+async def test_bank_completion_is_separate_from_global_done(client, call, seeded, db_session_maker) -> None:  # noqa: F811
+    async with db_session_maker() as session:
+        session.add(LCProgress(user_id=seeded["beta"].id, problem_slug="two-sum", done=True))
+        await session.commit()
+    bank = await call("create_prep_bank", {"name": "NVIDIA OA", "problem_slugs": ["two-sum", "maximum-subarray"]})
+    assert bank["done_count"] == 0  # solved before it was added: still cold here
+    other = (await client.post("/leetcode/banks", json={"name": "Second"})).json()
+    await client.post(f"/leetcode/banks/{other['id']}/problems", json={"problem_slug": "two-sum"})
+
+    marked = (await client.put("/leetcode/banks/completion/two-sum", json={"done": True})).json()
+    assert sorted(b["id"] for b in marked["banks"]) == sorted([bank["bank_id"], other["id"]])
+    assert all(b["completed_slugs"] == ["two-sum"] for b in marked["banks"])
+    assert set(marked["banks"][0]["added_at"]) >= {"two-sum"}
+    again = (await client.put("/leetcode/banks/completion/two-sum", json={"done": True})).json()
+    assert again["banks"] == []  # already done: nothing changes, timestamp kept
+
+    listed = await call("list_prep_banks", {})
+    nvidia = next(b for b in listed["banks"] if b["bank_id"] == bank["bank_id"])
+    assert nvidia["completed_in_bank"] == ["two-sum"] and nvidia["done_count"] == 1
+
+    cleared = (await client.put("/leetcode/banks/completion/two-sum", json={"done": False})).json()
+    assert all(b["completed_slugs"] == [] for b in cleared["banks"])
+
+    # Removing and re-adding starts a fresh cold run.
+    await client.put("/leetcode/banks/completion/two-sum", json={"done": True})
+    await call("remove_bank_problems", {"bank_id": bank["bank_id"], "problem_slugs": ["two-sum"]})
+    readded = await call("add_bank_problems", {"bank_id": bank["bank_id"], "problem_slugs": ["two-sum"]})
+    assert readded["completed_in_bank"] == []

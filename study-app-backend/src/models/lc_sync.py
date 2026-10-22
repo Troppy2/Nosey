@@ -241,6 +241,10 @@ class LCBankProblem(Base):
     added_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    # When the user solved it IN this bank. Banks are cold interview practice, so
+    # a problem solved before it was added still starts not done here; the global
+    # lc_progress.done flag is separate and untouched. Null = not done in this bank.
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     bank: Mapped[LCPrepBank] = relationship("LCPrepBank", back_populates="problems")
 
