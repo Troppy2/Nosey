@@ -918,6 +918,10 @@ export type LCPrepBank = {
   target: string;
   is_active: boolean;
   problem_slugs: string[];
+  /** Solved inside this bank (cold practice), not the global done flag. */
+  completed_slugs: string[];
+  /** slug -> ISO time added. Keys the fresh "Bank" code tab, so a re-add starts a new run. */
+  added_at: Record<string, string>;
   created_at: string;
 };
 

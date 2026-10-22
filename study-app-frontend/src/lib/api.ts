@@ -2268,6 +2268,17 @@ export async function createLCPrepBank(name: string, target = ""): Promise<impor
   });
 }
 
+/** Mark or clear a problem as solved in every bank that holds it. Returns the banks that changed. */
+export async function setLCBankCompletion(
+  slug: string,
+  done: boolean,
+): Promise<{ banks: import("./types").LCPrepBank[] }> {
+  return request<{ banks: import("./types").LCPrepBank[] }>(
+    `/leetcode/banks/completion/${encodeURIComponent(slug)}`,
+    { method: "PUT", body: JSON.stringify({ done }) },
+  );
+}
+
 export async function deleteLCPrepBank(bankId: number): Promise<void> {
   await request(`/leetcode/banks/${bankId}`, { method: "DELETE" });
 }

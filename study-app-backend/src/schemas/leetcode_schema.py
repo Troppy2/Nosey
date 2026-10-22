@@ -388,11 +388,26 @@ class LCPrepBankResponse(BaseModel):
     target: str
     is_active: bool
     problem_slugs: list[str] = Field(default_factory=list)
+    # Solved inside this bank (not the global done flag). Subset of problem_slugs.
+    completed_slugs: list[str] = Field(default_factory=list)
+    # slug -> ISO time it was added. A fresh cold-run tab is keyed on this, so
+    # removing and re-adding a problem starts a new run instead of reusing the old tab.
+    added_at: dict[str, str] = Field(default_factory=dict)
     created_at: str
 
 
 class LCBankAddProblemRequest(BaseModel):
     problem_slug: str = Field(..., min_length=1, max_length=200)
+
+
+class LCBankCompletionRequest(BaseModel):
+    done: bool
+
+
+class LCBankCompletionResponse(BaseModel):
+    """The banks whose completion changed, re-serialized."""
+
+    banks: list["LCPrepBankResponse"] = Field(default_factory=list)
 
 
 class LCBankBulkAddRequest(BaseModel):

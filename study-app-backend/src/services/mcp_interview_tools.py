@@ -386,11 +386,20 @@ async def _known_slugs(ctx: McpContext, slugs: list[str]) -> list[str]:
 
 
 async def _bank_out(ctx: McpContext, bank: LCPrepBank) -> dict[str, Any]:
-    progress = await _progress(ctx)
-    slugs = await _bank_slugs(ctx, bank.id)
+    rows = (
+        await ctx.session.execute(
+            select(LCBankProblem)
+            .where(LCBankProblem.bank_id == bank.id)
+            .order_by(LCBankProblem.added_at.asc(), LCBankProblem.id.asc())
+        )
+    ).scalars().all()
+    # Banks are cold practice: done here means solved after being added to this
+    # bank (lc_bank_problems.completed_at), not the global done flag.
+    completed = [r.problem_slug for r in rows if r.completed_at is not None]
     return {
         "bank_id": bank.id, "name": bank.name, "target": bank.target, "is_active": bank.is_active,
-        "problem_slugs": slugs, "done_count": sum(1 for s in slugs if s in progress and progress[s].done),
+        "problem_slugs": [r.problem_slug for r in rows], "completed_in_bank": completed,
+        "done_count": len(completed),
     }
 
 
@@ -946,7 +955,9 @@ INTERVIEW_TOOLS: tuple[McpTool, ...] = (
     _write("delete_leetcode_problem", "Delete a KojoCode problem", "Delete a custom problem. Needs confirm=true.",
            DeleteProblemArgs, delete_leetcode_problem, destructive=True),
     _read("list_prep_banks", "List prep banks",
-          "The user's prep banks (problem sets for a target interview), with their problems and how many are done.",
+          "The user's prep banks (problem sets for a target interview), with their problems and which were "
+          "solved in that bank. A bank is cold practice: problems solved before they were added still count "
+          "as not done there.",
           ListBanksArgs, list_prep_banks),
     _write("create_prep_bank", "Create a prep bank",
            "Create a prep bank from built-in or custom problem slugs, optionally making it the active one.",

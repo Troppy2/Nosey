@@ -49,6 +49,7 @@ import {
   createLCPrepBank,
   deleteLCPrepBank,
   activateLCPrepBank,
+  setLCBankCompletion,
   addLCBankProblem,
   bulkAddLCBankProblems,
   removeLCBankProblem,
@@ -131,6 +132,10 @@ type CodeTab = {
   // While that drill is open, every OTHER tab is locked (not viewable/deletable) so the
   // user can't peek at their previous solution. Rides along in workspace_json.
   drillPass?: number;
+  // When set, this tab is the cold attempt for a prep bank run: the problem is in a bank
+  // and not yet solved there, so every other tab is locked until it is. The value is the
+  // bank's added_at for the problem, so removing and re-adding it starts a fresh tab.
+  bankRun?: string;
 };
 
 type CodeWorkspace = {
@@ -1949,7 +1954,8 @@ function RemindersCard({
   // so the same handful don't keep resurfacing once you're partway through the bank.
   function handleOpenRandomBankProblem() {
     if (!activeBank || !activeBank.problem_slugs.length) return;
-    const unsolved = activeBank.problem_slugs.filter((slug) => !progress[slug]);
+    const completed = new Set(activeBank.completed_slugs ?? []);
+    const unsolved = activeBank.problem_slugs.filter((slug) => !completed.has(slug));
     const pool = unsolved.length ? unsolved : activeBank.problem_slugs;
     onOpenProblem(randomFrom(pool));
   }
@@ -2798,6 +2804,31 @@ export default function LeetCodeMode() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, drills, betaMode, currentProblemData]);
 
+  // Prep bank cold-run tab: while the open problem is in a bank it hasn't been solved in
+  // (and has no open drill, which wins), it is solved in a FRESH "Bank" tab and every older
+  // tab is locked (isTabLockedForDrill), so a previous solution can't be peeked at. Same
+  // shape as the drill effect above; the tab is keyed on the bank run so a re-add is fresh.
+  useEffect(() => {
+    if (!betaMode || view.type !== "problem") return;
+    const slug = view.problemSlug;
+    if (drills.some((d) => d.problem_slug === slug && !d.completed_at)) return;
+    const run = pendingBankRun(slug);
+    if (!run) return;
+    const starter = interviewRealism ? "" : currentProblemData?.python_snippet?.trimEnd() ?? "";
+    setCodeWorkspaces((prev) => {
+      const workspace = prev[slug] ?? loadCodeWorkspace(slug);
+      const existing = workspace.tabs.find((tab) => tab.bankRun === run);
+      if (existing && workspace.activeTabId === existing.id) return prev;
+      const bankTab = existing ?? { id: makeTabId(), name: "Bank", code: starter, bankRun: run };
+      const tabs = existing ? workspace.tabs : [...workspace.tabs, bankTab];
+      const next = { tabs, activeTabId: bankTab.id };
+      saveCodeWorkspace(slug, next);
+      schedulePushWorkspaceToDb(slug, next);
+      return { ...prev, [slug]: next };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, drills, prepBanks, betaMode, currentProblemData]);
+
   // Tick the Weak-Area Practice elapsed clock once a second while a session is running.
   useEffect(() => {
     if (!practiceSession || practiceEnded) return;
@@ -2922,7 +2953,9 @@ export default function LeetCodeMode() {
 
   // Per-topic solved/total breakdown across a bank's problems: the bank's own weak-area
   // map, mirroring the dashboard Focus card but scoped to the bank. Weakest topic first.
-  function bankTopicStats(slugs: string[]): TopicStat[] {
+  function bankTopicStats(bank: LCPrepBank): TopicStat[] {
+    const slugs = bank.problem_slugs;
+    const completed = new Set(bank.completed_slugs ?? []);
     const byTopic = new Map<string, { label: string; done: number; total: number }>();
     for (const slug of slugs) {
       const problem = findProblem(slug);
@@ -2933,7 +2966,7 @@ export default function LeetCodeMode() {
           : CATEGORY_META[problem.categoryId]?.label ?? problem.categoryLabel;
       const row = byTopic.get(id) ?? { label, done: 0, total: 0 };
       row.total += 1;
-      if (progress[slug]) row.done += 1;
+      if (completed.has(slug)) row.done += 1;
       byTopic.set(id, row);
     }
     return Array.from(byTopic.entries())
@@ -3004,7 +3037,7 @@ export default function LeetCodeMode() {
       targetSubtopic = weakTopic?.subtopic ?? null;
       const chosenTopicId = weakTopic
         ? resolveTopic(weakTopic.topic).id
-        : bankTopicStats(activeBank.problem_slugs)[0]?.id;
+        : bankTopicStats(activeBank)[0]?.id;
       const topicPool = chosenTopicId
         ? bankProblems.filter((problem) => problem.categoryId === chosenTopicId)
         : [];
@@ -3862,10 +3895,14 @@ export default function LeetCodeMode() {
     const isNewSolve = nextDone && !solvedAt[problem.slug];
     const nextCounts = isNewSolve ? bumpTodayCount() : solvedDayCounts;
     pushProgressToDb(next, nextDates, nextCounts).then(refreshServerCounts);
+    applyBankCompletion(problem.slug, nextDone);
     if (nextDone) onProblemCompleted(problem);
   }
 
   function markProblemDone(problem: Problem) {
+    // A pass inside a pending bank run counts for the bank even when the problem was
+    // already done globally (it was solved before it was added).
+    if (pendingBankRun(problem.slug)) applyBankCompletion(problem.slug, true);
     if (progress[problem.slug]) return;
     const next = { ...progress, [problem.slug]: true };
     setProgress(next);
@@ -4440,13 +4477,52 @@ export default function LeetCodeMode() {
   }
 
   // A tab is locked when its problem has an open drill and the tab is not the current pass's
-  // fresh attempt tab. Locked tabs can't be viewed (selected) or deleted, so the user can't
-  // reach a previous solution while drilling. Non-beta / no open drill => never locked.
+  // fresh attempt tab, or (no open drill) when the problem is in a prep bank it has not been
+  // solved in yet and the tab is not that bank run's tab. Locked tabs can't be viewed
+  // (selected) or deleted, so the user can't reach a previous solution. A drill wins over a
+  // bank. Non-beta => never locked.
   function isTabLockedForDrill(slug: string, tab: CodeTab): boolean {
     if (!betaMode) return false;
     const drill = drills.find((d) => d.problem_slug === slug && !d.completed_at);
-    if (!drill) return false;
-    return tab.drillPass !== drill.current_pass;
+    if (drill) return tab.drillPass !== drill.current_pass;
+    const run = pendingBankRun(slug);
+    return run !== null && tab.bankRun !== run;
+  }
+
+  // Prep banks are cold interview practice: a problem is "pending" while some bank holds it
+  // unsolved, even if it was solved before it was added. Returns that run's key (the latest
+  // added_at among those banks), or null when nothing is pending.
+  function pendingBankRun(slug: string): string | null {
+    if (!betaMode) return null;
+    let run: string | null = null;
+    for (const bank of prepBanks) {
+      if (!bank.problem_slugs.includes(slug) || (bank.completed_slugs ?? []).includes(slug)) continue;
+      const added = bank.added_at?.[slug] ?? bank.created_at;
+      if (run === null || added > run) run = added;
+    }
+    return run;
+  }
+
+  // Mark (or clear) the problem as solved in every bank that holds it. Optimistic; the
+  // server echoes the banks that changed, and a failure refetches so the UI can't drift.
+  function applyBankCompletion(slug: string, done: boolean) {
+    if (!betaMode || !prepBanks.some((bank) => bank.problem_slugs.includes(slug))) return;
+    setPrepBanks((prev) =>
+      prev.map((bank) => {
+        if (!bank.problem_slugs.includes(slug)) return bank;
+        const rest = (bank.completed_slugs ?? []).filter((s) => s !== slug);
+        return { ...bank, completed_slugs: done ? [...rest, slug] : rest };
+      }),
+    );
+    setLCBankCompletion(slug, done)
+      .then(({ banks }) => {
+        if (!banks.length) return;
+        const byId = new Map(banks.map((bank) => [bank.id, bank]));
+        setPrepBanks((prev) => prev.map((bank) => byId.get(bank.id) ?? bank));
+      })
+      .catch(() => {
+        fetchLCPrepBanks().then(setPrepBanks).catch(() => {});
+      });
   }
 
   function handleDeleteCodeTab(tabId: string) {
@@ -5890,7 +5966,7 @@ export default function LeetCodeMode() {
             <div className="lc-bank-gallery">
               {prepBanks.map((bank) => {
                 const total = bank.problem_slugs.length;
-                const done = bank.problem_slugs.filter((slug) => progress[slug]).length;
+                const done = (bank.completed_slugs ?? []).length;
                 const isSelected = bank.id === selectedBankId;
                 return (
                   <article key={bank.id} className={`lc-bank-tile${bank.is_active ? " is-active" : ""}${isSelected ? " is-open" : ""}`}>
@@ -5928,7 +6004,7 @@ export default function LeetCodeMode() {
           {selectedBank ? (
             (() => {
               const total = selectedBank.problem_slugs.length;
-              const done = selectedBank.problem_slugs.filter((slug) => progress[slug]).length;
+              const done = (selectedBank.completed_slugs ?? []).length;
               // Show ALL of the bank's topics (not just the top few). Order by
               // bank-scoped struggle when signals exist, else by completion.
               // Category heat is topic-level: take the strongest signal per topic id
@@ -5938,7 +6014,7 @@ export default function LeetCodeMode() {
                 const id = resolveTopic(topic.topic).id;
                 bankLevelByTopic.set(id, Math.max(bankLevelByTopic.get(id) ?? 0, topic.level));
               }
-              const weakMap = [...bankTopicStats(selectedBank.problem_slugs)].sort((a, b) => {
+              const weakMap = [...bankTopicStats(selectedBank)].sort((a, b) => {
                 const la = bankLevelByTopic.get(a.id) ?? 0;
                 const lb = bankLevelByTopic.get(b.id) ?? 0;
                 if (la !== lb) return lb - la;
@@ -5999,7 +6075,8 @@ export default function LeetCodeMode() {
                     <ul className="lc-bank-problem-list">
                       {selectedBank.problem_slugs.map((slug) => {
                         const problem = findProblem(slug);
-                        const solved = Boolean(progress[slug]);
+                        // Solved in THIS bank, not ever: a bank is cold interview practice.
+                        const solved = (selectedBank.completed_slugs ?? []).includes(slug);
                         const difficulty = problem?.difficulty ?? "Unknown";
                         return (
                           <li key={slug} className="lc-bank-problem-row">
@@ -6739,10 +6816,18 @@ export default function LeetCodeMode() {
               {runnerLoading ? <Loader2 size={16} className="spin" /> : <Play size={16} />}
               <span className="lc-tb-label">Run code</span>
             </button>
-            <button type="button" className={progress[currentProblem.slug] ? "lc-toolbar-btn lc-toolbar-btn--done" : "lc-toolbar-btn"} onClick={() => toggleProgress(currentProblem)} aria-label={progress[currentProblem.slug] ? "Mark incomplete" : "Mark done"}>
-              {progress[currentProblem.slug] ? <CheckCircleIcon size={16} /> : <Circle size={16} />}
-              <span className="lc-tb-label">{progress[currentProblem.slug] ? "Done" : "Mark done"}</span>
-            </button>
+            {progress[currentProblem.slug] && pendingBankRun(currentProblem.slug) ? (
+              // Solved before it joined a bank: done globally, still cold in the bank.
+              <button type="button" className="lc-toolbar-btn" onClick={() => applyBankCompletion(currentProblem.slug, true)} aria-label="Mark done in bank">
+                <Circle size={16} />
+                <span className="lc-tb-label">Done in bank</span>
+              </button>
+            ) : (
+              <button type="button" className={progress[currentProblem.slug] ? "lc-toolbar-btn lc-toolbar-btn--done" : "lc-toolbar-btn"} onClick={() => toggleProgress(currentProblem)} aria-label={progress[currentProblem.slug] ? "Mark incomplete" : "Mark done"}>
+                {progress[currentProblem.slug] ? <CheckCircleIcon size={16} /> : <Circle size={16} />}
+                <span className="lc-tb-label">{progress[currentProblem.slug] ? "Done" : "Mark done"}</span>
+              </button>
+            )}
           </div>
 
           <div className="lc-toolbar-cluster" data-cluster="timer" aria-label="Timer">

@@ -34,6 +34,8 @@ from src.schemas.leetcode_schema import (
     LCCustomProblemResponse,
     LCBankAddProblemRequest,
     LCBankBulkAddRequest,
+    LCBankCompletionRequest,
+    LCBankCompletionResponse,
     LCCustomProblemSyncRequest,
     LCCustomTestCase,
     LCDailyProblemRequest,
@@ -1197,13 +1199,28 @@ async def _bank_problem_slugs(session: AsyncSession, bank_id: int) -> list[str]:
     return list(rows)
 
 
-def _serialize_bank(row: LCPrepBank, problem_slugs: list[str]) -> LCPrepBankResponse:
+async def _bank_problem_rows(session: AsyncSession, bank_id: int) -> list[LCBankProblem]:
+    return list(
+        (
+            await session.execute(
+                select(LCBankProblem)
+                .where(LCBankProblem.bank_id == bank_id)
+                .order_by(LCBankProblem.added_at.asc(), LCBankProblem.id.asc())
+            )
+        ).scalars().all()
+    )
+
+
+async def _serialize_bank(session: AsyncSession, row: LCPrepBank) -> LCPrepBankResponse:
+    problems = await _bank_problem_rows(session, row.id)
     return LCPrepBankResponse(
         id=row.id,
         name=row.name,
         target=row.target,
         is_active=row.is_active,
-        problem_slugs=problem_slugs,
+        problem_slugs=[p.problem_slug for p in problems],
+        completed_slugs=[p.problem_slug for p in problems if p.completed_at is not None],
+        added_at={p.problem_slug: p.added_at.isoformat() for p in problems if p.added_at is not None},
         created_at=row.created_at.isoformat(),
     )
 
@@ -1229,7 +1246,7 @@ async def list_prep_banks(
             select(LCPrepBank).where(LCPrepBank.user_id == user.id).order_by(LCPrepBank.created_at.asc())
         )
     ).scalars().all()
-    return [_serialize_bank(row, await _bank_problem_slugs(session, row.id)) for row in rows]
+    return [await _serialize_bank(session, row) for row in rows]
 
 
 @router.post("/banks", response_model=LCPrepBankResponse, status_code=status.HTTP_201_CREATED)
@@ -1242,7 +1259,7 @@ async def create_prep_bank(
     session.add(row)
     await session.commit()
     await session.refresh(row)
-    return _serialize_bank(row, [])
+    return await _serialize_bank(session, row)
 
 
 @router.delete("/banks/{bank_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
@@ -1280,7 +1297,7 @@ async def activate_prep_bank(
     row.is_active = True
     await session.commit()
     await session.refresh(row)
-    return _serialize_bank(row, await _bank_problem_slugs(session, row.id))
+    return await _serialize_bank(session, row)
 
 
 @router.post("/banks/{bank_id}/problems", response_model=LCPrepBankResponse, status_code=status.HTTP_201_CREATED)
@@ -1303,7 +1320,7 @@ async def add_bank_problem(
     if not existing and slug:
         session.add(LCBankProblem(bank_id=bank_id, problem_slug=slug))
         await session.commit()
-    return _serialize_bank(row, await _bank_problem_slugs(session, bank_id))
+    return await _serialize_bank(session, row)
 
 
 @router.post(
@@ -1326,7 +1343,7 @@ async def bulk_add_bank_problems(
             session.add(LCBankProblem(bank_id=bank_id, problem_slug=slug))
             existing_slugs.add(slug)
     await session.commit()
-    return _serialize_bank(row, await _bank_problem_slugs(session, bank_id))
+    return await _serialize_bank(session, row)
 
 
 @router.delete(
@@ -1351,6 +1368,39 @@ async def remove_bank_problem(
         await session.delete(existing)
         await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.put("/banks/completion/{slug}", response_model=LCBankCompletionResponse)
+async def set_bank_completion(
+    slug: str,
+    body: LCBankCompletionRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LCBankCompletionResponse:
+    """Mark (or clear) a problem as solved in EVERY one of the user's banks that
+    holds it. Called when the user marks a problem done or passes it, and when
+    they undo that. Banks already in the requested state keep their timestamp."""
+    rows = (
+        await session.execute(
+            select(LCBankProblem)
+            .join(LCPrepBank, LCPrepBank.id == LCBankProblem.bank_id)
+            .where(LCPrepBank.user_id == user.id, LCBankProblem.problem_slug == slug)
+        )
+    ).scalars().all()
+    now = datetime.now(timezone.utc)
+    changed_bank_ids: list[int] = []
+    for row in rows:
+        if body.done and row.completed_at is None:
+            row.completed_at = now
+            changed_bank_ids.append(row.bank_id)
+        elif not body.done and row.completed_at is not None:
+            row.completed_at = None
+            changed_bank_ids.append(row.bank_id)
+    await session.commit()
+    banks = (
+        await session.execute(select(LCPrepBank).where(LCPrepBank.id.in_(changed_bank_ids)))
+    ).scalars().all() if changed_bank_ids else []
+    return LCBankCompletionResponse(banks=[await _serialize_bank(session, bank) for bank in banks])
 
 
 # ── 3-Pass Drill schedule (beta-only) ─────────────────────────────────────────
