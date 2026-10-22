@@ -12,14 +12,16 @@ from src.schemas.system_design_schema import (
     SDQuizGradeResponse,
 )
 from src.services.llm_service import LLMService
+from src.services.sd_custom_topic_service import SDCustomTopicService
 from src.services.system_design_service import SystemDesignService, validate_concept_id
 from src.utils.exceptions import LLMException, ValidationException
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Every concept ships exactly five written questions, so a request with any
-# other number is a client bug, not something to score partially.
+# Every built-in concept ships exactly five written questions, so a request with
+# any other number is a client bug, not something to score partially. Custom
+# (MCP-written) topics carry their own count, checked against the stored topic.
 REQUIRED_FRQ_COUNT = 5
 # Both gates have to clear. The weights frontload the written answers, which are
 # the part that actually shows understanding.
@@ -46,10 +48,10 @@ class SystemDesignQuizService:
         session: AsyncSession,
     ) -> SDQuizGradeResponse:
         validate_concept_id(concept_id)
-        if len(payload.frq) != REQUIRED_FRQ_COUNT:
-            raise ValidationException(
-                f"Expected {REQUIRED_FRQ_COUNT} written answers, got {len(payload.frq)}"
-            )
+        custom_count = await SDCustomTopicService().frq_count(user_id, concept_id, session)
+        required = REQUIRED_FRQ_COUNT if custom_count is None else custom_count
+        if len(payload.frq) != required:
+            raise ValidationException(f"Expected {required} written answers, got {len(payload.frq)}")
 
         mcq_score = self._percentage(
             sum(1 for item in payload.mcq if item.chosen_index == item.correct_index),
@@ -88,7 +90,7 @@ class SystemDesignQuizService:
             raise LLMException("Grading is temporarily unavailable, try again shortly.")
 
         frq_score = self._percentage(
-            sum(1 for grade in grades if grade.is_correct), REQUIRED_FRQ_COUNT
+            sum(1 for grade in grades if grade.is_correct), required
         )
         total_score = round(MCQ_WEIGHT * mcq_score + FRQ_WEIGHT * frq_score)
 

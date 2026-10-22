@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { runPythonMultiFile } from "../../../lib/pyodideRunner";
+import { __setSdExecutorForTests, runPythonMultiFile } from "../../../lib/pyodideRunner";
 import { resolveMockPackages } from "../index";
 import { normalizeSource } from "../raw";
 import { consistentHashing } from "./meta";
@@ -37,8 +37,7 @@ describe.skipIf(!ENABLED)("consistent hashing content (integration)", () => {
     const packageName = "pyodide";
     const pyodideModule = await import(/* @vite-ignore */ packageName);
     const pyodide = await pyodideModule.loadPyodide();
-    (window as unknown as { __noseyPyodide?: Promise<unknown> }).__noseyPyodide =
-      Promise.resolve(pyodide);
+    __setSdExecutorForTests(async (driver) => String(await pyodide.runPythonAsync(driver)));
   }, 120_000);
 
   it("fails the visualizer starter", async () => {

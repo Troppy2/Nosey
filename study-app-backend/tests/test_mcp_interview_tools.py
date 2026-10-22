@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlalchemy import select
@@ -9,6 +10,7 @@ from sqlalchemy import select
 from src.models.lc_sync import LCProgress
 from src.models.mock_interview import MockInterviewSession
 from src.models.system_design import SDConceptProgress
+from src.schemas.attempt_schema import FRQGrade
 from tests.test_mcp_connector import _connect, _rpc, client, seeded  # noqa: F401  (fixtures)
 
 pytestmark = pytest.mark.asyncio
@@ -172,7 +174,9 @@ async def test_sd_topic_renders_and_completes_like_a_builtin(client, call, seede
 
 async def test_sd_topic_validation(call) -> None:
     quiz = _topic()["quiz"]
-    await call("create_sd_topic", _topic(quiz={**quiz, "frq": quiz["frq"][:4]}), expect_error=True)
+    await call("create_sd_topic", _topic(quiz={**quiz, "frq": quiz["frq"][:2]}), expect_error=True)
+    too_many = [{"prompt": f"W{i}", "rubric": "r"} for i in range(11)]
+    await call("create_sd_topic", _topic(quiz={**quiz, "frq": too_many}), expect_error=True)
     bad_exercise = {**_exercise("x"), "test_module": "def tests(): pass"}
     await call("create_sd_topic", _topic(project=bad_exercise), expect_error=True)
     reserved = {**_exercise("x"), "files": [{"name": "sim.py", "contents": ""}]}
@@ -190,3 +194,33 @@ async def test_non_beta_user_is_refused(client, call, seeded, db_session_maker) 
     seeded["beta"].is_beta = False
     message = await call("list_prep_banks", {}, expect_error=True)
     assert "beta" in message
+
+
+async def test_custom_topic_quiz_grades_more_than_five_written_answers(client, call) -> None:  # noqa: F811
+    quiz = _topic()["quiz"]
+    seven = [{"prompt": f"W{i}", "rubric": "Mentions bursts."} for i in range(7)]
+    made = await call("create_sd_topic", _topic(quiz={**quiz, "frq": seven}))
+    concept = (await client.get("/system-design/custom-topics")).json()[0]
+    assert len(concept["quiz"]["frq"]) == 7
+
+    def body(count: int) -> dict:
+        return {
+            "notes": concept["notes"],
+            "mcq": [{"id": q["id"], "chosenIndex": q["correctIndex"], "correctIndex": q["correctIndex"]}
+                    for q in concept["quiz"]["mcq"]],
+            "frq": [{"id": q["id"], "prompt": q["prompt"], "rubric": q["rubric"], "answer": "bursts " * 10}
+                    for q in concept["quiz"]["frq"][:count]],
+        }
+
+    grader = AsyncMock(return_value=FRQGrade(is_correct=True, feedback="Good.", confidence=0.9))
+    with patch("src.services.llm_service.LLMService.grade_frq_answer", new=grader):
+        graded = await client.post(f"/system-design/quiz/{made['concept_id']}/grade", json=body(7))
+        assert graded.status_code == 200, graded.text
+        assert graded.json()["frqScore"] == 100 and graded.json()["passed"] is True
+        assert grader.await_count == 7
+        # The count is checked against the stored topic, not the request.
+        short = await client.post(f"/system-design/quiz/{made['concept_id']}/grade", json=body(5))
+        assert short.status_code == 400 and "Expected 7" in short.json()["detail"]
+    # Built-in concepts still need exactly five.
+    builtin = await client.post("/system-design/quiz/caching/grade", json=body(7))
+    assert builtin.status_code == 400

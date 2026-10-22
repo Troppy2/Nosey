@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { runPythonMultiFile } from "./pyodideRunner";
+import { __setSdExecutorForTests, runPythonMultiFile } from "./pyodideRunner";
 
 /**
  * The one integration test of the System Design runner. It boots a real Python
@@ -8,8 +8,8 @@ import { runPythonMultiFile } from "./pyodideRunner";
  * `npm run test:pyodide` runs this.
  *
  * It drives runPythonMultiFile through the same entry point the app uses; only
- * the Pyodide instance is supplied directly (the app loads it from a CDN script
- * tag, which jsdom will not execute).
+ * the executor is swapped for a Pyodide loaded here (the app runs the driver in a
+ * Web Worker, which jsdom does not have).
  */
 const ENABLED = Boolean(
   (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
@@ -47,8 +47,7 @@ describe.skipIf(!ENABLED)("runPythonMultiFile (integration)", () => {
     const packageName = "pyodide";
     const pyodideModule = await import(/* @vite-ignore */ packageName);
     const pyodide = await pyodideModule.loadPyodide();
-    (window as unknown as { __noseyPyodide?: Promise<unknown> }).__noseyPyodide =
-      Promise.resolve(pyodide);
+    __setSdExecutorForTests(async (driver) => String(await pyodide.runPythonAsync(driver)));
   }, 120_000);
 
   it("passes a two-file fixture end to end", async () => {

@@ -18,7 +18,7 @@ import json
 from typing import Any, Optional
 from urllib.parse import urlsplit
 
-from pydantic import Field, model_validator
+from pydantic import Field, ValidationError, model_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
@@ -213,14 +213,7 @@ class EditModuleArgs(ToolArgs):
 
 
 async def edit_module(ctx: McpContext, args: EditModuleArgs) -> dict[str, Any]:
-    module = await ctx.session.scalar(
-        select(LearningModule)
-        .join(LearningTrack, LearningTrack.id == LearningModule.track_id)
-        .join(Folder, Folder.id == LearningTrack.folder_id)
-        .where(LearningModule.id == args.module_id, Folder.user_id == ctx.user.id)
-    )
-    if module is None:
-        raise ResourceNotFoundException("Learning module")
+    module = await _owned_module(ctx, args.module_id)
     fields = args.model_fields_set
     lesson = args.lesson_markdown if args.lesson_markdown is not None else (module.lesson_content or "")
     try:
@@ -256,6 +249,68 @@ async def edit_module(ctx: McpContext, args: EditModuleArgs) -> dict[str, Any]:
         module.video_url = args.video_url.strip() or None
     await ctx.session.commit()
     return {"module_id": module.id, "updated": sorted(fields - {"module_id"})}
+
+
+class EditQuizQuestionArgs(ToolArgs):
+    module_id: int
+    question_index: int = Field(ge=0, description="0-based position in the quiz list get_learning_module returns.")
+    question: Optional[str] = Field(default=None, min_length=1, max_length=2000)
+    options: Optional[list[str]] = Field(
+        default=None, min_length=2, max_length=6, description="Replaces all options; send correct_index with it."
+    )
+    correct_index: Optional[int] = Field(default=None, ge=0, description="0-based index into options.")
+    explanation: Optional[str] = Field(
+        default=None, min_length=1, max_length=4000,
+        description="The feedback shown when the student misses this question.",
+    )
+
+
+async def _owned_module(ctx: McpContext, module_id: int) -> LearningModule:
+    module = await ctx.session.scalar(
+        select(LearningModule)
+        .join(LearningTrack, LearningTrack.id == LearningModule.track_id)
+        .join(Folder, Folder.id == LearningTrack.folder_id)
+        .where(LearningModule.id == module_id, Folder.user_id == ctx.user.id)
+    )
+    if module is None:
+        raise ResourceNotFoundException("Learning module")
+    return module
+
+
+async def edit_quiz_question(ctx: McpContext, args: EditQuizQuestionArgs) -> dict[str, Any]:
+    module = await _owned_module(ctx, args.module_id)
+    try:
+        quiz = json.loads(module.quiz_json or "[]")
+    except ValueError:
+        quiz = []
+    if not isinstance(quiz, list) or not quiz:
+        raise ToolInputError("This module has no quiz yet. Use edit_module to write one.")
+    if args.question_index >= len(quiz):
+        raise ToolInputError(f"question_index must be 0 to {len(quiz) - 1}: the quiz has {len(quiz)} questions.")
+    if args.options is not None and args.correct_index is None:
+        raise ToolInputError("Send correct_index together with new options.")
+
+    current = quiz[args.question_index]
+    merged = {
+        "question": args.question if args.question is not None else current.get("question", ""),
+        "options": args.options if args.options is not None else current.get("options", []),
+        "correct_index": args.correct_index if args.correct_index is not None else current.get("correct_index", 0),
+        "explanation": args.explanation if args.explanation is not None else current.get("explanation") or "",
+    }
+    if not merged["explanation"]:
+        # A missing explanation is backfilled by Nosey's LLM on submit, which the connector must not cause.
+        raise ToolInputError("This question has no explanation yet; send one.")
+    try:
+        checked = QuizQuestionIn.model_validate(merged)
+    except ValidationError as exc:
+        raise ToolInputError(str(exc)) from exc
+    await screen(ctx, args.question, args.explanation, *(args.options or []))
+
+    quiz[args.question_index] = {**current, **checked.model_dump()}
+    module.quiz_json = json.dumps(quiz, ensure_ascii=False)
+    await ctx.session.commit()
+    # Progress (best_score, passed) is kept, as with edit_module.
+    return {"module_id": module.id, "question_index": args.question_index, "question": quiz[args.question_index]}
 
 
 class ArchiveTrackArgs(ToolArgs):
@@ -319,6 +374,15 @@ LEARNING_TOOLS: tuple[McpTool, ...] = (
         "new narration makes the reader read the new lesson text. The student's progress is kept.",
         EditModuleArgs,
         edit_module,
+    ),
+    _write(
+        "edit_quiz_question",
+        "Edit one quiz question",
+        "Change one question of a module's quiz in place: its text, options and answer, or just the "
+        "explanation (the feedback shown when the student misses it). The rest of the quiz and the "
+        "student's progress are kept. Read the quiz with get_learning_module first.",
+        EditQuizQuestionArgs,
+        edit_quiz_question,
     ),
     _write("archive_track", "Archive a learning track",
            "Archive a track, or restore one with archived=false.", ArchiveTrackArgs, archive_track),

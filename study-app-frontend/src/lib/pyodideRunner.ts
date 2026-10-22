@@ -571,9 +571,64 @@ export type MultiFileTestResult = {
   error?: string;
 };
 
+type SdExecutor = (driver: string) => Promise<string>;
+
+// Covers a first-run Pyodide download plus the driver's own 10s in-Python limit.
+// Past this the worker is terminated, which also stops a loop the tracer missed.
+const SD_WORKER_TIMEOUT_MS = 90_000;
+
+let sdWorker: Worker | null = null;
+let sdRunId = 0;
+
+function runInSdWorker(driver: string): Promise<string> {
+  if (!sdWorker) {
+    sdWorker = new Worker(new URL("./sdPython.worker.ts", import.meta.url), { type: "module" });
+  }
+  const worker = sdWorker;
+  const id = ++sdRunId;
+  return new Promise((resolve, reject) => {
+    const reset = () => {
+      worker.removeEventListener("message", onMessage);
+      worker.removeEventListener("error", onError);
+      clearTimeout(timer);
+    };
+    const kill = (message: string) => {
+      reset();
+      worker.terminate();
+      if (sdWorker === worker) sdWorker = null;
+      reject(new Error(message));
+    };
+    const onMessage = (event: MessageEvent<{ id: number; output?: string; error?: string }>) => {
+      if (event.data?.id !== id) return;
+      reset();
+      if (typeof event.data.output === "string") resolve(event.data.output);
+      else reject(new Error(event.data.error || "The Python runner failed."));
+    };
+    const onError = () => kill("The Python runner failed to start.");
+    const timer = setTimeout(
+      () => kill("Time limit exceeded. Check for an infinite loop, then run again."),
+      SD_WORKER_TIMEOUT_MS,
+    );
+    worker.addEventListener("message", onMessage);
+    worker.addEventListener("error", onError);
+    worker.postMessage({ id, driver });
+  });
+}
+
+let sdExecutor: SdExecutor = runInSdWorker;
+
+/** Tests only: jsdom has no Worker, so integration tests run the driver on a Pyodide they load. */
+export function __setSdExecutorForTests(executor: SdExecutor | null): void {
+  sdExecutor = executor ?? runInSdWorker;
+}
+
 /**
  * Run a System Design exercise: the learner's files plus a hidden test module,
  * all inside the browser. Nothing here executes on the backend.
+ *
+ * SECURITY: the hidden test module can be untrusted (custom topics are written
+ * through the MCP connector), so it runs in sdPython.worker.ts, never on the
+ * page's own Pyodide where `import js` reaches localStorage and the auth token.
  *
  * Thin on purpose. Every decision (what to write, in what order, how to read the
  * results back) lives in sdHarness.ts where it is unit tested without Pyodide.
@@ -597,7 +652,6 @@ export async function runPythonMultiFile(args: {
     };
   }
 
-  const pyodide = await loadPyodideInstance();
   const entryTest = args.entryTest || "run_tests";
 
   const driver = `
@@ -615,7 +669,7 @@ WORK_DIR = ${JSON.stringify(SD_WORK_DIR)}
 ENTRY = ${JSON.stringify(entryTest)}
 FILES = json.loads(${JSON.stringify(JSON.stringify(harnessFiles))})
 
-# The Pyodide instance is shared across the whole app and across runs, so the
+# The worker's Pyodide instance is shared across runs, so the
 # workspace is rebuilt from scratch every time. Without the sys.modules purge a
 # second run would silently reuse the first run's module objects and the learner
 # would see stale results from code they had already changed.
@@ -682,7 +736,7 @@ json.dumps(RESULT, default=repr)
 
   let raw: { cases?: unknown; stdout?: unknown; events?: unknown; error?: unknown };
   try {
-    raw = JSON.parse(String(await pyodide.runPythonAsync(driver)));
+    raw = JSON.parse(await sdExecutor(driver));
   } catch (error) {
     return {
       ok: false,
