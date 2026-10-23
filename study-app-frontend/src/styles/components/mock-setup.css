@@ -1,0 +1,65 @@
+/* Mock interview setup: flat sections, pill choices, checkbox rows, sticky start bar. */
+.setup2 { max-width: 880px; margin: 0 auto; padding: 40px 24px 64px; display: flex; flex-direction: column; gap: 40px; color: #26301f; }
+.setup2-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.setup2-head-left { display: flex; flex-direction: column; gap: 6px; }
+.setup2-head h1 { margin: 0; font-family: Lora, serif; font-size: 40px; font-weight: 600; letter-spacing: -0.01em; }
+.setup2-history { min-height: 44px; padding: 0 16px; border-radius: 8px; background: transparent; border: 1px solid #26301f; font-size: 15px; font-weight: 600; color: #26301f; cursor: pointer; }
+.setup2-resume { display: flex; align-items: center; gap: 16px; padding: 16px 20px; background: #26301f; color: #f6f9f1; border-radius: 8px; }
+.setup2-resume-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.setup2-resume-info span:first-child { font-weight: 600; font-size: 15px; }
+.setup2-resume-info span:last-child { font-size: 14px; color: #cfe1b9; }
+.setup2-resume-go { min-height: 44px; padding: 0 16px; border-radius: 6px; border: 0; background: #f6f9f1; color: #26301f; font-weight: 600; font-size: 15px; cursor: pointer; }
+.setup2-resume-drop { width: 44px; height: 44px; border-radius: 6px; border: 0; background: transparent; color: #cfe1b9; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.setup2-section { display: flex; flex-direction: column; gap: 14px; }
+.setup2-section h2 { margin: 0; font-size: 18px; font-weight: 600; }
+.setup2-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.setup2-pill { min-height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid #b5c99a; background: #fff; color: #26301f; font-size: 15px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.setup2-pill.is-on { border: 2px solid #26301f; background: #26301f; color: #fff; font-weight: 600; }
+.setup2-pill-dashed { border: 1px dashed #718355; background: transparent; color: #4f6339; font-weight: 600; }
+.setup2-segment { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: #e9f0de; border-radius: 8px; padding: 4px; gap: 4px; }
+.setup2-segment button { min-height: 44px; border: 0; border-radius: 6px; background: transparent; color: #4f6339; font-size: 15px; cursor: pointer; }
+.setup2-segment button.is-on { background: #fff; color: #26301f; font-weight: 600; box-shadow: 0 1px 2px rgba(38, 48, 31, .18); }
+.setup2-hint { margin: 0; font-size: 14px; color: #596949; }
+.setup2-rounds-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.setup2-rounds-head span { font-size: 14px; color: #596949; }
+.setup2-rounds { display: flex; flex-direction: column; border-top: 1px solid #cfe1b9; }
+.setup2-round { display: flex; align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid #cfe1b9; cursor: pointer; }
+.setup2-round .toggle-switch { flex: none; }
+.setup2-round-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.setup2-round-name { font-weight: 600; font-size: 16px; }
+.setup2-round-desc { font-size: 14px; color: #596949; }
+.setup2-round-meta { font-size: 14px; color: #596949; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.setup2-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 18px 20px 18px 24px; background: #fff; border: 1px solid #cfe1b9; border-radius: 8px; font-size: 15px; }
+.setup2-start { min-height: 48px; padding: 0 24px; border-radius: 8px; border: 0; background: #26301f; color: #fff; font-weight: 600; font-size: 16px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+.setup2-start:disabled { opacity: .45; cursor: not-allowed; }
+.setup2 button:focus-visible, .setup2 input:focus-visible { outline: 2px solid #4f6339; outline-offset: 3px; }
+@media (max-width: 640px) {
+  .setup2 { padding: 24px 16px calc(var(--dock-height, 0px) + 32px); gap: 32px; }
+  .setup2-head h1 { font-size: 30px; }
+  .setup2-segment { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .setup2-round { align-items: flex-start; flex-wrap: wrap; }
+  .setup2-round-meta { width: 100%; padding-left: 36px; }
+  .setup2-start { width: 100%; justify-content: center; }
+}
+
+/* The loop rail, restyled for the redesign: a white card, larger nodes, sentence-case times. */
+.setup2-loop { background: #fff; border: 1px solid #cfe1b9; border-radius: 8px; padding: 22px 24px 14px; }
+.setup2-loop .setup2-rounds-head { margin-bottom: 8px; }
+.setup2 .loop-station { grid-template-columns: 34px minmax(0, 1fr); gap: 0 14px; }
+.setup2 .loop-node { width: 34px; height: 34px; border: 1.5px solid #b5c99a; background: #f6f9f1; color: #87986a; }
+.setup2 .loop-station.is-on .loop-node { background: #26301f; border-color: #26301f; color: #f6f9f1; }
+.setup2 .loop-station.is-on .loop-segment { background: linear-gradient(180deg, #26301f, #718355); }
+.setup2 .loop-station--terminal .loop-node { background: #e9f0de; border: 1.5px dashed #718355; color: #4f6339; }
+.setup2 .loop-station-body { align-self: start; padding: 4px 12px 10px; margin: 0 0 8px -6px; border-radius: 8px; transition: background-color 160ms cubic-bezier(.3,0,0,1); }
+.setup2 .loop-station-body:not(.loop-station-body--static):hover { background: #f3f8ec; }
+.setup2 .loop-station-body:not(.loop-station-body--static):active { background: #e9f0de; }
+.setup2 .loop-station-index { font-family: inherit; font-size: 13px; color: #87986a; }
+.setup2 .loop-station-label { font-size: 16px; color: #87986a; }
+.setup2 .loop-station.is-on .loop-station-label, .setup2 .loop-station--terminal .loop-station-label { color: #26301f; }
+.setup2 .loop-station-desc { font-size: 14px; color: #87986a; }
+.setup2 .loop-station.is-on .loop-station-desc { color: #596949; }
+.setup2 .loop-num { font-family: inherit; font-size: 14px; color: #87986a; }
+.setup2 .loop-station.is-on .loop-num, .setup2 .loop-station-time--total .loop-num { color: #26301f; }
+.setup2 .loop-station-time--total .loop-num { font-size: 16px; }
+.setup2 .loop-unit { font-size: 14px; font-weight: 400; letter-spacing: 0; text-transform: none; color: #596949; }
+.setup2-start { gap: 6px; }

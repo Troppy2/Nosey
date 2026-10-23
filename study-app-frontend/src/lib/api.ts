@@ -2468,7 +2468,22 @@ export type Stage1SubmissionItem = {
   all_passed: boolean;
   tests_passed: number;
   tests_total: number;
+  hidden_passed: number;
+  hidden_total: number;
+  hidden_failures: { input: string; expected: string; actual: string }[];
 };
+
+// Hidden OA tests: the model returns edge/large inputs plus a reference solution;
+// the browser runs the reference to compute the expected outputs.
+export async function fetchStage1HiddenTests(
+  sessionId: number,
+  body: { title: string; statement: string; examples: { input_text: string; output_text: string }[] },
+): Promise<{ reference_code: string; inputs: string[] }> {
+  return request(`/mock-interview/${sessionId}/stage1/hidden-tests`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
 
 // Resume deep dive: the interviewer grills the candidate on their own resume after the
 // ATS scan. Same call shape as the Stage 2/3 chats, the client carries the transcript.
@@ -2535,12 +2550,38 @@ export async function sendStage3Message(
   message: string | null,
   history: InterviewChatMessage[],
   coveredGoals: string[] = [],
+  followupsOnCurrent = 0,
   provider?: string,
 ): Promise<Stage3MessageResponse> {
   return request<Stage3MessageResponse>(`/mock-interview/${sessionId}/stage3/message`, {
     method: "POST",
-    body: JSON.stringify({ message, history, covered_goals: coveredGoals, provider }),
+    body: JSON.stringify({
+      message,
+      history,
+      covered_goals: coveredGoals,
+      followups_on_current: followupsOnCurrent,
+      provider,
+    }),
   });
+}
+
+// Interviewer voice (mp3) and the transcription fallback for browsers without speech recognition.
+export async function speakInterviewer(text: string): Promise<Blob> {
+  const token = localStorage.getItem(TOKEN_KEY);
+  const res = await guardedFetch(`${API_BASE_URL}/mock-interview/speak`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ text }),
+  });
+  if (!res.ok) throw new Error(`Voice unavailable (${res.status})`);
+  return res.blob();
+}
+
+export async function transcribeAnswer(audio: Blob): Promise<string> {
+  const form = new FormData();
+  form.append("audio", audio, "answer.webm");
+  const out = await request<{ text: string }>("/mock-interview/transcribe", { method: "POST", body: form });
+  return out.text;
 }
 
 export async function finishMockInterview(

@@ -1,4 +1,3 @@
-import { Briefcase, Clock } from "lucide-react";
 import { AlertIcon, ArrowLeftIcon, ChevronRightIcon, TrashIcon } from "../icons";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -8,9 +7,9 @@ import { deleteMockInterviewSession, listMockInterviewSessions } from "../lib/ap
 import { hydrateMockProgress, resumeRouteFor } from "../lib/mockInterview";
 import type { MockInterviewSession } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
-import { MockLoopTrack } from "../components/MockLoopRail";
 import { RECOMMENDATIONS, recommendationMeta } from "../data/mockInterviewLoop";
-import "../styles/components/mock-history-delete.css";
+import "../styles/components/mock-debrief.css";
+import "../styles/components/mock-history.css";
 
 const LEVEL_LABELS: Record<string, string> = {
   intern: "Internship",
@@ -20,6 +19,14 @@ const LEVEL_LABELS: Record<string, string> = {
 };
 
 function recommendationOf(session: MockInterviewSession): string | null {
+  if (session.skill_ratings) {
+    try {
+      const call = (JSON.parse(session.skill_ratings) as { call?: string }).call;
+      if (call) return call;
+    } catch {
+      /* fall through to the text scan for older rows */
+    }
+  }
   const feedback = session.overall_feedback;
   if (!feedback) return null;
   const upper = feedback.toUpperCase();
@@ -114,27 +121,21 @@ export default function MockInterviewHistory() {
     };
   }, []);
 
-  return (
-    <div className="page page-narrow">
-      <button className="mock-back-link" onClick={() => navigate("/mock-interview")}>
-        <ArrowLeftIcon size={16} /> Mock Interview
-      </button>
+  const open = (sessions ?? []).filter((x) => x.status !== "complete");
+  const finished = (sessions ?? []).filter((x) => x.status === "complete");
 
-      <div className="page-header">
-        <div>
-          <span className="eyebrow">Mock Interview Mode</span>
-          <h1 style={{ marginTop: 6 }}>Past interviews</h1>
-          <p className="muted small" style={{ marginTop: 6 }}>
-            Every loop you have run, saved to your account. Open one to reread the debrief.
-          </p>
-        </div>
-        <Briefcase size={26} style={{ color: "var(--green-dark)", flexShrink: 0, marginTop: 4 }} />
-      </div>
+  return (
+    <div className="history2">
+      <header className="history2-head">
+        <button type="button" className="debrief-back" onClick={() => navigate("/mock-interview")}>
+          <ArrowLeftIcon size={16} /> Run an interview loop
+        </button>
+        <h1>Past interviews</h1>
+      </header>
 
       {deleteError ? (
-        <div className="card mock-error-card" role="status">
-          <AlertIcon size={20} style={{ color: "var(--error)" }} />
-          <p>{deleteError}</p>
+        <div className="history2-error" role="status">
+          <AlertIcon size={18} /> {deleteError}
         </div>
       ) : null}
 
@@ -152,72 +153,96 @@ export default function MockInterviewHistory() {
       ) : null}
 
       {error ? (
-        <div className="card mock-error-card">
-          <AlertIcon size={20} style={{ color: "var(--error)" }} />
-          <p>{error}</p>
+        <div className="history2-error">
+          <AlertIcon size={18} /> {error}
         </div>
       ) : !sessions ? (
         <SkeletonList rows={4} label="Loading your interviews" />
       ) : sessions.length === 0 ? (
-        <div className="card mock-history-empty">
-          <p className="muted">You have not finished a mock interview yet.</p>
-          <button className="button button-primary" onClick={() => navigate("/mock-interview")}>
-            Start one <ChevronRightIcon size={14} />
+        <div className="history2-empty">
+          <p>You have not run a mock interview yet.</p>
+          <button type="button" className="debrief-btn debrief-btn-primary" onClick={() => navigate("/mock-interview")}>
+            Run your first loop
           </button>
         </div>
       ) : (
-        <div className="mock-history-list">
-          {sessions.map((session) => {
-            const rec = recommendationOf(session);
-            const meta = rec ? recommendationMeta(rec) : null;
-            const RecIcon = meta?.icon;
-            const complete = session.status === "complete";
-            const stages = stagesOf(session);
-            return (
-              <div key={session.id} className="mock-history-row">
-              <button
-                type="button"
-                className="card mock-history-card"
-                onClick={() => void openSession(session)}
-                disabled={openingId === session.id}
-                aria-busy={openingId === session.id}
-              >
-                <div className="mock-history-main">
-                  <div className="mock-history-title-row">
-                    <span className="mock-history-company">{companyLabelOf(session)}</span>
-                    {meta && RecIcon ? (
-                      <span className={`mock-history-rec ${meta.className}`}>
-                        <RecIcon size={13} />
-                        {meta.label}
-                      </span>
-                    ) : (
-                      <span className="mock-history-rec mock-history-rec--open">
-                        <Clock size={13} />
-                        In progress
-                      </span>
-                    )}
-                  </div>
-                  <div className="mock-history-meta muted small">
-                    <span>{LEVEL_LABELS[session.level ?? "intern"] ?? session.level}</span>
-                    {formatDate(session.created_at) ? <span>{formatDate(session.created_at)}</span> : null}
-                  </div>
-                  <MockLoopTrack stages={stages} current={complete ? "done" : "unknown"} compact />
-                </div>
-                <ChevronRightIcon size={16} className="mock-history-chevron" />
-              </button>
-              <button
-                type="button"
-                className="mock-history-delete"
-                aria-label={`Delete ${companyLabelOf(session)} interview`}
-                title="Delete interview"
-                onClick={() => setPendingDelete(session)}
-              >
-                <TrashIcon size={16} />
-              </button>
+        <>
+          {open.length > 0 && (
+            <section className="history2-section">
+              <h2>In progress</h2>
+              <div className="history2-list">
+                {open.map((session) => {
+                  const started = session.status !== "pending";
+                  return (
+                    <div key={session.id} className="history2-row">
+                      <div className="history2-row-main">
+                        <span className="history2-company">{companyLabelOf(session)}</span>
+                        <span className="history2-sub">
+                          {LEVEL_LABELS[session.level ?? "intern"] ?? session.level}
+                          {formatDate(session.created_at) ? `, ${started ? "started" : "set up"} ${formatDate(session.created_at)}` : ""}
+                          {started ? "" : ". Not started"}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className={started ? "debrief-btn debrief-btn-primary" : "debrief-btn"}
+                        onClick={() => void openSession(session)}
+                        disabled={openingId === session.id}
+                        aria-busy={openingId === session.id}
+                      >
+                        {started ? "Resume" : "Start"}
+                      </button>
+                      <button
+                        type="button"
+                        className="history2-delete"
+                        aria-label={`Delete ${companyLabelOf(session)} interview`}
+                        onClick={() => setPendingDelete(session)}
+                      >
+                        <TrashIcon size={18} />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
+            </section>
+          )}
+
+          {finished.length > 0 && (
+            <section className="history2-section">
+              <h2>Finished</h2>
+              <div className="history2-list">
+                {finished.map((session) => {
+                  const rec = recommendationOf(session);
+                  const meta = rec ? recommendationMeta(rec) : null;
+                  const tone = rec === "STRONG HIRE" || rec === "HIRE" || rec === "LEAN HIRE" ? "debrief-tone-good" : rec === "NO HIRE" || rec === "STRONG NO HIRE" ? "debrief-tone-bad" : "debrief-tone-mid";
+                  return (
+                    <div key={session.id} className="history2-row">
+                      <button type="button" className="history2-row-link" onClick={() => void openSession(session)}>
+                        <span className="history2-row-main">
+                          <span className="history2-company">{companyLabelOf(session)}</span>
+                          <span className="history2-sub">
+                            {LEVEL_LABELS[session.level ?? "intern"] ?? session.level}
+                            {formatDate(session.created_at) ? `, ${formatDate(session.created_at)}` : ""}
+                          </span>
+                        </span>
+                        {meta && <span className={`history2-rec ${tone}`}>{meta.label}</span>}
+                        <ChevronRightIcon size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        className="history2-delete"
+                        aria-label={`Delete ${companyLabelOf(session)} interview`}
+                        onClick={() => setPendingDelete(session)}
+                      >
+                        <TrashIcon size={18} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+        </>
       )}
     </div>
   );

@@ -1,5 +1,5 @@
-import { Building2, FileText, History, Loader2, Play, Save, Shuffle } from "lucide-react";
-import { ArrowLeftIcon, ChevronRightIcon, CloseIcon, SparklesIcon } from "../icons";
+import { Loader2 } from "lucide-react";
+import { ArrowLeftIcon, BookIcon, CheckIcon, ChevronRightIcon, CloseIcon, PlusIcon, SparklesIcon } from "../icons";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -35,6 +35,9 @@ import {
 } from "../lib/mockInterview";
 import { MockLoopRail } from "../components/MockLoopRail";
 import { formatLoopDuration, totalLoopMinutes, type LoopStageKey } from "../data/mockInterviewLoop";
+import "../styles/components/mock-debrief.css";
+import "../styles/components/mock-setup.css";
+
 
 const DIFFICULTY_OPTIONS: TaxonomyDifficulty[] = ["Easy", "Medium", "Hard"];
 
@@ -46,16 +49,6 @@ const LEVEL_OPTIONS: { key: InterviewLevel; label: string; description: string }
   { key: "mid", label: "Mid-Level", description: "Probing follow-ups, near-optimal expected" },
   { key: "senior", label: "Senior", description: "Hard problems, deep and rigorous" },
 ];
-
-const COMPANY_BRAND: Record<CompanyKey, { color: string; initial: string }> = {
-  google: { color: "#4285F4", initial: "G" },
-  meta: { color: "#7B68EE", initial: "M" },
-  amazon: { color: "#FF9900", initial: "A" },
-  apple: { color: "#1d1d1f", initial: "" },
-  microsoft: { color: "#0078D4", initial: "M" },
-  netflix: { color: "#E50914", initial: "N" },
-  random: { color: "#276749", initial: "" },
-};
 
 export default function MockInterviewSetup() {
   const navigate = useNavigate();
@@ -359,95 +352,57 @@ export default function MockInterviewSetup() {
   const totalTime = totalLoopMinutes(selectedStages);
 
   return (
-    <div className="page page-narrow">
-      <button className="mock-back-link" onClick={() => navigate("/leetcode")}>
-        <ArrowLeftIcon size={16} /> KojoCode
-      </button>
-      <div className="mock-setup-hero">
-        <div className="mock-setup-hero-top">
-          <div>
-            <span className="eyebrow">Mock Interview Mode</span>
-            <h1 className="mock-setup-hero-title" style={{ marginTop: 6 }}>
-              Interview Loop Simulator
-            </h1>
-            <p className="muted small" style={{ marginTop: 6 }}>
-              Run a real SWE loop end to end, on the clock, with no hints.
-            </p>
-          </div>
-          <div className="mock-setup-hero-actions">
-            <button
-              type="button"
-              className="button button-ghost mock-history-link"
-              onClick={() => navigate("/mock-interview/history")}
-            >
-              <History size={15} /> Past interviews
-            </button>
-          </div>
+    <div className="setup2">
+      <header className="setup2-head">
+        <div className="setup2-head-left">
+          <button type="button" className="debrief-back" onClick={() => navigate("/leetcode")}>
+            <ArrowLeftIcon size={16} /> KojoCode
+          </button>
+          <h1>Run an interview loop</h1>
         </div>
-      </div>
+        <button type="button" className="setup2-history" onClick={() => navigate("/mock-interview/history")}>
+          Past interviews
+        </button>
+      </header>
 
       {/* Resume banner */}
       {active && (
-        <div className="card mock-resume-banner">
-          <div className="mock-resume-banner-info">
-            <Play size={16} style={{ color: "var(--green-dark)", flexShrink: 0 }} />
-            <div>
-              <div className="mock-resume-banner-title">Resume your {activeCompanyLabel} interview</div>
-              <div className="muted small">You have an interview in progress. Pick up where you left off.</div>
-            </div>
+        <div className="setup2-resume">
+          <div className="setup2-resume-info">
+            <span>{activeCompanyLabel} interview in progress</span>
+            <span>Pick up where you left off.</span>
           </div>
-          <div className="mock-resume-banner-actions">
-            <button className="button button-primary" onClick={handleResume}>
-              Resume <ChevronRightIcon size={14} />
-            </button>
-            <button
-              className="button button-ghost mock-resume-discard"
-              onClick={handleDiscard}
-              title="Discard saved progress"
-            >
-              <CloseIcon size={14} /> Discard
-            </button>
-          </div>
+          <button type="button" className="setup2-resume-go" onClick={handleResume}>
+            Resume
+          </button>
+          <button type="button" className="setup2-resume-drop" onClick={handleDiscard} title="Discard saved progress" aria-label="Discard saved progress">
+            <CloseIcon size={16} />
+          </button>
         </div>
       )}
 
       {/* Company selector */}
-      <section className="card mock-setup-section">
-        <h2 className="eyebrow">Choose Company</h2>
-        <div className="mock-company-grid">
-          {COMPANY_OPTIONS.map((opt) => {
-            const brand = COMPANY_BRAND[opt.key] ?? { color: "#888", initial: "?" };
-            const isRandom = opt.key === "random";
-            const isApple = opt.key === "apple";
-            return (
-              <button
-                key={opt.key}
-                className={`mock-company-btn${selectedCompany === opt.key ? " selected" : ""}`}
-                onClick={() => setSelectedCompany(opt.key)}
-              >
-                <div className="mock-company-avatar" style={{ background: brand.color }}>
-                  {isRandom ? (
-                    <Shuffle size={18} color="#fff" />
-                  ) : isApple ? (
-                    <svg width="18" height="22" viewBox="0 0 814 1000" fill="#fff">
-                      <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-57.8-155.5-127.4C46 790.1 0 665.8 0 546.5c0-211.9 138.5-323.9 275.1-323.9 70.6 0 129.5 46.4 173.5 46.4 42.2 0 108.5-49.5 188.5-49.5 30.6 0 108.2 2.6 168.7 80.5zM552.5 85.3c29.2-35.1 50.2-83.4 50.2-131.7 0-6.5-.6-13-1.9-19.5-47.6 1.9-104 32.5-138.2 73.8-26.6 30.8-50.7 79.1-50.7 128.7 0 7.1 1.3 14.2 1.9 16.5 3.2.6 8.4 1.3 13.7 1.3 42.8 0 96.9-29.1 125-69.1z" />
-                    </svg>
-                  ) : (
-                    <span className="mock-company-initial">{brand.initial}</span>
-                  )}
-                </div>
-                <span className="mock-company-label">{opt.label}</span>
-              </button>
-            );
-          })}
+      <section className="setup2-section">
+        <h2>Company</h2>
+        <div className="setup2-pills">
+          {COMPANY_OPTIONS.map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              className={`setup2-pill${selectedCompany === opt.key ? " is-on" : ""}`}
+              aria-pressed={selectedCompany === opt.key}
+              onClick={() => setSelectedCompany(opt.key)}
+            >
+              {opt.key === "random" ? "Surprise me" : opt.label}
+            </button>
+          ))}
           <button
-            className={`mock-company-btn${selectedCompany === "custom" ? " selected" : ""}`}
+            type="button"
+            className={`setup2-pill setup2-pill-dashed${selectedCompany === "custom" ? " is-on" : ""}`}
+            aria-pressed={selectedCompany === "custom"}
             onClick={() => setSelectedCompany("custom")}
           >
-            <div className="mock-company-avatar" style={{ background: "#4b5563" }}>
-              <Building2 size={18} color="#fff" />
-            </div>
-            <span className="mock-company-label">Custom (JD)</span>
+            <PlusIcon size={16} /> Paste a job description
           </button>
         </div>
 
@@ -475,7 +430,7 @@ export default function MockInterviewSetup() {
                         onClick={() => applySavedJd(jd)}
                         title={jd.company_name ? `Load ${jd.name} (${jd.company_name})` : `Load ${jd.name}`}
                       >
-                        <FileText size={13} />
+                        <BookIcon size={13} />
                         {jd.name}
                       </button>
                       <button
@@ -532,7 +487,7 @@ export default function MockInterviewSetup() {
                     : "Save this job description to reuse later"
                 }
               >
-                {savingJd ? <Loader2 size={14} className="spin" /> : <Save size={14} />}
+                {savingJd ? <Loader2 size={14} className="spin" /> : <CheckIcon size={14} />}
                 {loadedJdId ? "Update saved JD" : "Save this JD"}
               </button>
               {customRoleFocus && !analyzing && (
@@ -620,59 +575,49 @@ export default function MockInterviewSetup() {
       </section>
 
       {/* Level selector */}
-      <section className="card mock-setup-section">
-        <h2 className="eyebrow">Choose Level</h2>
-        <p className="muted small" style={{ marginTop: 4, marginBottom: 12 }}>
-          Sets the difficulty of Stage 1 problems and how strict the interviewer is. Defaults to internship.
-        </p>
-        <div className="mock-level-grid">
+      <section className="setup2-section">
+        <h2>Level</h2>
+        <div className="setup2-segment" role="radiogroup" aria-label="Level">
           {LEVEL_OPTIONS.map((opt) => (
             <button
               key={opt.key}
-              className={`mock-level-btn${selectedLevel === opt.key ? " selected" : ""}`}
+              type="button"
+              role="radio"
+              aria-checked={selectedLevel === opt.key}
+              className={selectedLevel === opt.key ? "is-on" : ""}
               onClick={() => setSelectedLevel(opt.key)}
             >
-              <span className="mock-level-label">{opt.label}</span>
-              <span className="mock-level-desc">{opt.description}</span>
+              {opt.label}
             </button>
           ))}
         </div>
+        <p className="setup2-hint">{LEVEL_OPTIONS.find((o) => o.key === selectedLevel)?.description}</p>
       </section>
 
-      {/* Stage selector: the loop spine. Rail length tracks the time each stage costs. */}
-      <section className="card mock-setup-section mock-loop-section">
-        <div className="mock-loop-section-head">
-          <h2 className="eyebrow">Your loop</h2>
-          <p className="muted small">
-            Switch off any stage you do not want to sit today. The rail shows what each one costs you.
-          </p>
+      {/* Rounds: the loop rail. Tap a station to switch that round on or off. */}
+      <section className="setup2-section setup2-loop">
+        <div className="setup2-rounds-head">
+          <h2>Rounds</h2>
+          <span>Tap a round to skip it. The rail shows how long each one takes.</span>
         </div>
         <MockLoopRail selected={selectedStages} onToggle={toggleStage} />
       </section>
 
-      {/* Footer */}
-      <div className="mock-setup-footer">
-        <div className="mock-setup-footer-meta">
+      <div className="setup2-footer">
+        <div className="setup2-footer-meta">
           {selectedStages.length > 0 ? (
-            <p className="mock-setup-tally">
-              <span className="loop-num">{selectedStages.length}</span>
-              <span className="loop-unit">stage{selectedStages.length > 1 ? "s" : ""}</span>
-              <span className="mock-tally-sep" aria-hidden="true" />
-              <span className="loop-num">{formatLoopDuration(totalTime)}</span>
-              <span className="loop-unit">on the clock</span>
-            </p>
+            <span>
+              <strong>
+                {selectedStages.length} round{selectedStages.length > 1 ? "s" : ""}
+              </strong>
+              , about {formatLoopDuration(totalTime)}
+            </span>
           ) : (
-            <p className="muted small" style={{ margin: 0 }}>
-              Pick at least one stage to run.
-            </p>
+            <span>Pick at least one round to run.</span>
           )}
           {error && <p className="mock-setup-error">{error}</p>}
         </div>
-        <button
-          className="button button-primary mock-start-btn"
-          onClick={handleStart}
-          disabled={starting || selectedStages.length === 0}
-        >
+        <button type="button" className="setup2-start" onClick={handleStart} disabled={starting || selectedStages.length === 0}>
           {starting ? (
             <>
               <Loader2 size={15} className="spin" /> Starting the loop

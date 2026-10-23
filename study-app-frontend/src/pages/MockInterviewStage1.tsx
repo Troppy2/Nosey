@@ -1,13 +1,19 @@
 import Editor from "@monaco-editor/react";
-import { Clock, ExternalLink, Flag, Loader2, LogOut, Play } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { CodeIcon } from "../icons";
-import { AlertIcon, CheckCircleIcon, ChevronLeftIcon, ChevronRightIcon, CrossCircleIcon, PencilIcon } from "../icons";
+import { AlertIcon, ArrowLeftIcon, PlayIcon, TimerIcon, CheckCircleIcon, ChevronLeftIcon, ChevronRightIcon, CrossCircleIcon, PencilIcon } from "../icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { LoadingNotice } from "../components/Loaders";
 import type { ProgressStage } from "../components/Progress";
 import { ProgressOverlay, useStagedProgress } from "../components/Progress";
-import { fetchLCCustomProblems, fetchLeetCodeProblem, gradeStage1, type Stage1SubmissionItem } from "../lib/api";
+import {
+  fetchLCCustomProblems,
+  fetchLeetCodeProblem,
+  fetchStage1HiddenTests,
+  gradeStage1,
+  type Stage1SubmissionItem,
+} from "../lib/api";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { useSettings } from "../lib/useSettings";
 import { runPythonLeetCode, type RunnerResult } from "../lib/pyodideRunner";
@@ -17,6 +23,8 @@ import {
   saveMockProgress,
   type MockProgress,
   type MockCompany,
+  type HiddenFailure,
+  type HiddenTestState,
   type Stage1QuestionProgress,
 } from "../lib/mockInterview";
 import { MockProgressGate } from "../components/MockProgressGate";
@@ -61,6 +69,36 @@ function questionTimeLimitMs(difficulty: string): number {
   if (difficulty === "Hard") return 40 * 60 * 1000;
   if (difficulty === "Easy") return 15 * 60 * 1000;
   return 25 * 60 * 1000;
+}
+
+// Plain text for the hidden-test prompt; LeetCode statements arrive as HTML.
+function statementText(data: LoadedProblem): string {
+  if (data.markdown !== undefined) return data.markdown;
+  const doc = new DOMParser().parseFromString(sanitizeLeetCodeHtml(data.content_html), "text/html");
+  return (doc.body.textContent ?? "").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+// Hidden cases run one at a time: the runner aborts the whole batch on the first
+// exception, and one crashing or timed-out case must not sink the others.
+async function runHiddenCases(
+  code: string,
+  cases: { input: string; expected: string }[],
+): Promise<{ passed: number; total: number; failures: HiddenFailure[] }> {
+  let passed = 0;
+  const failures: HiddenFailure[] = [];
+  for (let i = 0; i < cases.length; i++) {
+    const c = cases[i];
+    const res = await runPythonLeetCode(code, [{ label: `Hidden ${i + 1}`, inputText: c.input, expectedOutput: c.expected }]);
+    const one = res.cases?.[0];
+    if (one?.passed) passed += 1;
+    else
+      failures.push({
+        input: c.input,
+        expected: c.expected,
+        actual: one ? one.actual : (res.error ?? "Error").split("\n").filter(Boolean).slice(-1)[0] ?? "Error",
+      });
+  }
+  return { passed, total: cases.length, failures };
 }
 
 function formatMs(ms: number): string {
@@ -167,6 +205,8 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
   const [problemError, setProblemError] = useState<string | null>(null);
   const [runnerResults, setRunnerResults] = useState<Record<string, RunnerResult>>({});
   const [running, setRunning] = useState(false);
+  const [submittingOne, setSubmittingOne] = useState(false);
+  const hiddenInFlight = useRef<Set<string>>(new Set());
 
   const [now, setNow] = useState(Date.now());
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -185,7 +225,7 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
   useEffect(() => {
     setQuestions((prev) => {
       const cur = prev[currentIdx];
-      if (!cur || cur.startedAt > 0 || cur.isExpired) return prev;
+      if (!cur || cur.startedAt > 0) return prev;
       const next = [...prev];
       next[currentIdx] = { ...cur, startedAt: Date.now() };
       return next;
@@ -272,27 +312,123 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
   const current = questions[currentIdx];
   const curData = current ? problemData[current.slug] : undefined;
   const curRunnable = isLeetCodeRunnable(curData);
-  const limitMs = current ? questionTimeLimitMs(current.difficulty) : 0;
-  const elapsedMs = current
-    ? current.startedAt > 0
-      ? current.timeUsedMs + (now - current.startedAt)
-      : current.timeUsedMs
-    : 0;
+  // One clock for the whole assessment, sized by the problems in it. Each problem
+  // still tracks its own time for the results, but only the total can run out.
+  const limitMs = questions.reduce((sum, q) => sum + questionTimeLimitMs(q.difficulty), 0);
+  const elapsedMs = questions.reduce(
+    (sum, q) => sum + q.timeUsedMs + (q.startedAt > 0 ? now - q.startedAt : 0),
+    0,
+  );
   const remainingMs = Math.max(0, limitMs - elapsedMs);
   const timePct = limitMs > 0 ? Math.max(0, Math.min(100, (remainingMs / limitMs) * 100)) : 0;
   const isWarning = remainingMs < 5 * 60 * 1000 && remainingMs > 0;
-  const isExpiredNow = remainingMs === 0;
+  const isExpiredNow = limitMs > 0 && remainingMs === 0;
   const barColor = timePct > 40 ? "var(--green-dark)" : timePct > 20 ? "#f59e0b" : "#ef4444";
 
+  // Time's up: submit everything, like a real OA closing the window.
+  const autoSubmitted = useRef(false);
   useEffect(() => {
-    if (isExpiredNow && current && !current.isExpired) {
-      setQuestions((prev) => {
-        const next = [...prev];
-        next[currentIdx] = { ...next[currentIdx], isExpired: true, startedAt: 0, timeUsedMs: limitMs };
-        return next;
-      });
+    if (!isExpiredNow || autoSubmitted.current || submitting || finished) return;
+    autoSubmitted.current = true;
+    void handleSubmitAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isExpiredNow]);
+
+  function setHidden(slug: string, patch: Partial<Stage1QuestionProgress>) {
+    setQuestions((prev) => prev.map((q) => (q.slug === slug ? { ...q, ...patch } : q)));
+  }
+
+  // Generate hidden tests for a problem once: the model writes inputs and a reference
+  // solution, the reference runs here to produce the expected outputs.
+  async function prepareHidden(slug: string, data: LoadedProblem): Promise<HiddenTestState> {
+    const existing = questions.find((q) => q.slug === slug)?.hidden;
+    if (existing) return existing;
+    if (!isLeetCodeRunnable(data) || data.examples.length === 0) {
+      const state: HiddenTestState = { status: "unavailable" };
+      setHidden(slug, { hidden: state });
+      return state;
     }
-  }, [isExpiredNow, current, currentIdx, limitMs]);
+    try {
+      const gen = await fetchStage1HiddenTests(numericSessionId, {
+        title: data.title,
+        statement: statementText(data).slice(0, 15000) || data.title,
+        examples: data.examples.slice(0, 10).map((ex) => ({ input_text: ex.input_text, output_text: ex.output_text })),
+      });
+      // The reference must agree with the official examples, or its outputs can't be trusted.
+      const check = await runPythonLeetCode(
+        gen.reference_code,
+        data.examples.map((ex) => ({ label: `Example ${ex.index}`, inputText: ex.input_text, expectedOutput: ex.output_text })),
+      );
+      if (!check.ok) throw new Error("Reference solution disagrees with the examples.");
+      const cases: { input: string; expected: string }[] = [];
+      for (const input of gen.inputs) {
+        const res = await runPythonLeetCode(gen.reference_code, [{ label: "ref", inputText: input, expectedOutput: "" }]);
+        const one = res.cases?.[0];
+        if (one && !res.error) cases.push({ input, expected: one.actual });
+      }
+      const state: HiddenTestState = cases.length >= 3 ? { status: "ready", cases } : { status: "unavailable" };
+      setHidden(slug, { hidden: state });
+      return state;
+    } catch {
+      const state: HiddenTestState = { status: "unavailable" };
+      setHidden(slug, { hidden: state });
+      return state;
+    }
+  }
+
+  useEffect(() => {
+    if (!current || !curData || current.hidden || hiddenInFlight.current.has(current.slug)) return;
+    hiddenInFlight.current.add(current.slug);
+    void prepareHidden(current.slug, curData).finally(() => hiddenInFlight.current.delete(current.slug));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.slug, curData]);
+
+  async function ensureData(slug: string): Promise<LoadedProblem | null> {
+    if (problemData[slug]) return problemData[slug];
+    try {
+      const data = await loadProblem(slug);
+      setProblemData((prev) => ({ ...prev, [slug]: data }));
+      return data;
+    } catch {
+      return null;
+    }
+  }
+
+  // Run one problem's hidden tests against its current code.
+  async function runHiddenFor(q: Stage1QuestionProgress): Promise<Pick<Stage1QuestionProgress, "hiddenPassed" | "hiddenTotal" | "hiddenFailures" | "hiddenCode"> | null> {
+    let state = q.hidden;
+    if (!state) {
+      const data = await ensureData(q.slug);
+      if (!data) return null;
+      state = await prepareHidden(q.slug, data);
+    }
+    if (state.status !== "ready") return null;
+    if (q.hiddenCode === q.code && q.hiddenTotal) {
+      return { hiddenPassed: q.hiddenPassed, hiddenTotal: q.hiddenTotal, hiddenFailures: q.hiddenFailures, hiddenCode: q.hiddenCode };
+    }
+    if (!q.code.trim()) {
+      return {
+        hiddenPassed: 0,
+        hiddenTotal: state.cases.length,
+        hiddenFailures: state.cases.map((c) => ({ ...c, actual: "No code submitted" })),
+        hiddenCode: q.code,
+      };
+    }
+    const out = await runHiddenCases(q.code, state.cases);
+    const patch = { hiddenPassed: out.passed, hiddenTotal: out.total, hiddenFailures: out.failures, hiddenCode: q.code };
+    setHidden(q.slug, patch);
+    return patch;
+  }
+
+  async function handleSubmitOne() {
+    if (!current || submittingOne) return;
+    setSubmittingOne(true);
+    try {
+      await runHiddenFor(current);
+    } finally {
+      setSubmittingOne(false);
+    }
+  }
 
   function saveCurrentTime() {
     setQuestions((prev) => {
@@ -312,7 +448,7 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
     setQuestions((prev) => {
       const next = [...prev];
       const q = next[idx];
-      if (q && !q.isExpired && q.startedAt === 0) next[idx] = { ...q, startedAt: Date.now() };
+      if (q && q.startedAt === 0) next[idx] = { ...q, startedAt: Date.now() };
       return next;
     });
   }
@@ -376,7 +512,10 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
     setSubmitting(true);
     setSubmitError(null);
     try {
+      const hiddenBySlug: Record<string, Awaited<ReturnType<typeof runHiddenFor>>> = {};
+      for (const q of questions) hiddenBySlug[q.slug] = await runHiddenFor(q);
       const subs: Stage1SubmissionItem[] = questions.map((qs) => {
+        const hidden = hiddenBySlug[qs.slug];
         const result = runnerResults[qs.slug];
         const testResults = result?.cases?.length
           ? JSON.stringify(
@@ -398,6 +537,9 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
           all_passed: qs.lastAllPassed,
           tests_passed: qs.lastTestsPassed,
           tests_total: qs.lastTestsTotal,
+          hidden_passed: hidden?.hiddenPassed ?? 0,
+          hidden_total: hidden?.hiddenTotal ?? 0,
+          hidden_failures: (hidden?.hiddenFailures ?? []).slice(0, 10),
         };
       });
       const response = await gradeStage1(numericSessionId, subs);
@@ -522,7 +664,7 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
         <div
           className={`mock-stage1-timer${isWarning ? " warning" : ""}${isExpiredNow ? " expired" : ""}`}
         >
-          <Clock size={13} />
+          <TimerIcon size={13} />
           {isExpiredNow ? "Time's up" : formatMs(remainingMs)}
         </div>
       </div>
@@ -551,11 +693,11 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
             </div>
           </div>
 
-          {current.isExpired && (
+          {isExpiredNow && (
             <div className="mock-stage1-panel-section" style={{ paddingBottom: 10 }}>
               <div className="mock-stage1-expired-banner">
                 <AlertIcon size={14} />
-                Time expired. Submit what you have or move on.
+                Time's up. Your assessment is being submitted.
               </div>
             </div>
           )}
@@ -571,7 +713,7 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
                   rel="noopener noreferrer"
                   className="mock-stage1-lc-link"
                 >
-                  LeetCode <ExternalLink size={10} />
+                  LeetCode
                 </a>
               )}
             </div>
@@ -600,7 +742,7 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
           {/* Time budget */}
           <div className="mock-stage1-panel-section">
             <span className="mock-stage1-section-label">
-              <Clock size={11} /> Time Budget
+              <TimerIcon size={11} /> Time Budget
             </span>
             <div className="mock-stage1-time-budget">
               <div className="mock-stage1-time-budget-row">
@@ -611,7 +753,7 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
                 >
                   {isExpiredNow ? "Expired" : formatMs(remainingMs)}
                 </span>
-                <span className="mock-stage1-time-budget-limit">of {formatMsCompact(limitMs)}</span>
+                <span className="mock-stage1-time-budget-limit">left of {formatMsCompact(limitMs)} for the whole assessment</span>
               </div>
               <div className="mock-stage1-time-bar-track">
                 <div
@@ -620,8 +762,8 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
                 />
               </div>
               <div className="mock-stage1-benchmark-row">
-                <Clock size={10} />
-                Target: {benchmarkLabel(current.difficulty)}
+                <TimerIcon size={10} />
+                Aim for {benchmarkLabel(current.difficulty)} on this one
               </div>
             </div>
           </div>
@@ -654,8 +796,21 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
               disabled={running || !curRunnable || !current.code.trim()}
               title={curRunnable ? "Run against the sample cases" : "This problem cannot be run in-app"}
             >
-              {running ? <Loader2 size={13} className="spin" /> : <Play size={13} />}
+              {running ? <Loader2 size={13} className="spin" /> : <PlayIcon size={13} />}
               {running ? "Running…" : "Run"}
+            </button>
+            <button
+              className="mock-stage1-run-btn mock-stage1-submit-one"
+              onClick={() => void handleSubmitOne()}
+              disabled={submittingOne || running || !current.code.trim() || current.hidden?.status === "unavailable"}
+              title={
+                current.hidden?.status === "unavailable"
+                  ? "Hidden tests are unavailable for this problem; it is graded on the samples"
+                  : "Run the hidden tests"
+              }
+            >
+              {submittingOne ? <Loader2 size={13} className="spin" /> : null}
+              {submittingOne ? "Submitting…" : !current.hidden ? "Preparing tests…" : "Submit"}
             </button>
           </div>
           <div className="mock-stage1-editor-wrap">
@@ -687,6 +842,15 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
               reviewed without sample execution.
             </div>
           )}
+          {current.hiddenTotal ? (
+            <div className="mock-stage1-console mock-stage1-console--hidden">
+              <span className={current.hiddenPassed === current.hiddenTotal ? "mock-stage1-console-pass" : "mock-stage1-console-fail"}>
+                {current.hiddenPassed === current.hiddenTotal ? <CheckCircleIcon size={14} /> : <CrossCircleIcon size={14} />}
+                {current.hiddenPassed} of {current.hiddenTotal} hidden tests passed
+                {current.hiddenCode !== current.code ? " (code changed since)" : ""}
+              </span>
+            </div>
+          ) : null}
           {curResult && (
             <div className="mock-stage1-console">
               {curResult.error ? (
@@ -795,7 +959,7 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
           disabled={submitting}
           title="Quit (your progress is saved)"
         >
-          <LogOut size={13} /> Quit
+          <ArrowLeftIcon size={13} /> Leave
         </button>
         <button
           className="button button-primary"
@@ -809,7 +973,7 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
             </>
           ) : (
             <>
-              <Flag size={13} /> Submit All
+              Submit all
             </>
           )}
         </button>

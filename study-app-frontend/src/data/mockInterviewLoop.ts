@@ -1,5 +1,5 @@
-import { FileText, MessageSquare, Minus, ScrollText, Users, type LucideIcon } from "lucide-react";
-import { CodeIcon } from "../icons";
+import { Minus, type LucideIcon } from "lucide-react";
+import { BookIcon, ChatIcon, CodeIcon, MicIcon, PencilIcon } from "../icons";
 import { CheckCircleIcon, CrossCircleIcon } from "../icons";
 
 /**
@@ -34,7 +34,7 @@ export const LOOP_STAGES: LoopStage[] = [
     short: "Resume",
     minutes: 2,
     verdictKey: "resume_verdict",
-    icon: FileText,
+    icon: BookIcon,
     description: "An ATS pass on your resume. It tells you whether you would earn the OA, and never blocks you.",
   },
   {
@@ -52,7 +52,7 @@ export const LOOP_STAGES: LoopStage[] = [
     short: "Technical",
     minutes: 45,
     verdictKey: "stage2_verdict",
-    icon: Users,
+    icon: ChatIcon,
     description: "A live conversation: your background, CS questions, then one coding challenge.",
   },
   {
@@ -61,7 +61,7 @@ export const LOOP_STAGES: LoopStage[] = [
     short: "Behavioral",
     minutes: 45,
     verdictKey: "stage3_verdict",
-    icon: MessageSquare,
+    icon: MicIcon,
     description: "STAR questions written for this company. Say the answer out loud, then type it.",
   },
 ];
@@ -73,7 +73,7 @@ export const ALL_STAGE_KEYS: LoopStageKey[] = LOOP_STAGES.map((s) => s.key);
 export const DEBRIEF_STATION = {
   label: "Debrief",
   short: "Debrief",
-  icon: ScrollText,
+  icon: PencilIcon,
   description: "A recruiter-style writeup: a verdict on every stage you ran, and one hiring call.",
 };
 
@@ -114,7 +114,15 @@ export function verdictMeta(verdict?: string | null) {
  * `_extract_recommendation` in `routes/mock_interview.py`; there is no codegen step,
  * so if the backend ladder changes, change it here too.
  */
-export const RECOMMENDATIONS = ["STRONG HIRE", "NO HIRE", "BORDERLINE", "HIRE"] as const;
+export const RECOMMENDATIONS = [
+  "STRONG NO HIRE",
+  "STRONG HIRE",
+  "LEAN NO HIRE",
+  "LEAN HIRE",
+  "NO HIRE",
+  "BORDERLINE",
+  "HIRE",
+] as const;
 
 export const RECOMMENDATION_META: Record<
   string,
@@ -137,6 +145,24 @@ export const RECOMMENDATION_META: Record<
     className: "rec-borderline",
     icon: Minus,
     description: "Mixed performance. More practice needed.",
+  },
+  "STRONG NO HIRE": {
+    label: "Strong No Hire",
+    className: "rec-no-hire",
+    icon: CrossCircleIcon,
+    description: "Far below the bar for this level right now. Rebuild the fundamentals.",
+  },
+  "LEAN HIRE": {
+    label: "Lean Hire",
+    className: "rec-hire",
+    icon: CheckCircleIcon,
+    description: "Close to the bar, with a few gaps a committee would discuss.",
+  },
+  "LEAN NO HIRE": {
+    label: "Lean No Hire",
+    className: "rec-borderline",
+    icon: Minus,
+    description: "Some good signal, but not enough to clear the bar yet.",
   },
   "NO HIRE": {
     label: "No Hire",

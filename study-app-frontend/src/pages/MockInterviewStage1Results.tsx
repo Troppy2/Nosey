@@ -1,4 +1,3 @@
-import { Clock } from "lucide-react";
 import { ChevronRightIcon } from "../icons";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type { MockInterviewSession, Stage1GradeResponse, Stage1QuestionResult } from "../lib/types";
@@ -6,23 +5,14 @@ import type { MockProgress } from "../lib/mockInterview";
 import { MockProgressGate } from "../components/MockProgressGate";
 import { MockLoopTrack } from "../components/MockLoopRail";
 import { verdictMeta } from "../data/mockInterviewLoop";
+import { MarkdownContent } from "../components/MarkdownContent";
+import "../styles/components/mock-debrief.css";
 
 function formatMs(ms: number): string {
   const totalSec = Math.round(ms / 1000);
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
   return `${m}m ${s}s`;
-}
-
-function VerdictBadge({ verdict }: { verdict: string }) {
-  const meta = verdictMeta(verdict);
-  const Icon = meta.icon;
-  return (
-    <span className={`mock-verdict-badge ${meta.className}`}>
-      <Icon size={12} />
-      {meta.label}
-    </span>
-  );
 }
 
 function overallVerdict(results: Stage1QuestionResult[]): string {
@@ -68,7 +58,6 @@ function Stage1ResultsView({ stored }: { stored: MockProgress | null }) {
 
   const overall = overallVerdict(results);
   const overallMeta = verdictMeta(overall);
-  const OverallIcon = overallMeta.icon;
   const passedCount = results.filter((r) => r.verdict === "strong" || r.verdict === "pass").length;
 
   const hasLaterStage = selectedStages.includes("stage2") || selectedStages.includes("stage3");
@@ -80,71 +69,75 @@ function Stage1ResultsView({ stored }: { stored: MockProgress | null }) {
   }
 
   return (
-    <div className="page page-narrow">
-      <div className="mock-results-page-header">
-        <span className="eyebrow">Stage 1 Complete</span>
-        <h1 style={{ marginTop: 6 }}>Online Assessment Results</h1>
-        <p className="muted small" style={{ marginTop: 6 }}>
-          Here is how you performed on each problem.
-        </p>
+    <div className="debrief">
+      <header className="debrief-head">
+        <span className="debrief-kicker">
+          Online assessment, {passedCount} of {results.length} problems passed
+        </span>
+        <h1 className="debrief-word">{overallMeta.label}</h1>
         <MockLoopTrack stages={selectedStages} current="stage1" />
-      </div>
+      </header>
 
-      <div className={`card mock-overall-card mock-overall-${overall}`}>
-        <OverallIcon size={36} className="mock-overall-icon" style={{ color: overallMeta.color }} />
-        <div style={{ flex: 1 }}>
-          <div className="mock-overall-label">{overallMeta.label}</div>
-          <div className="muted small" style={{ marginTop: 2 }}>
-            {passedCount} of {results.length} problems passed
-          </div>
-        </div>
-        <div style={{ textAlign: "right", flexShrink: 0 }}>
-          <div className="mock-score-fraction" style={{ color: overallMeta.color }}>
-            {passedCount}
-            <span style={{ fontSize: "1.1rem", color: "var(--muted)" }}>/{results.length}</span>
-          </div>
-          <div className="mock-score-label">problems</div>
-        </div>
-      </div>
-
-      <div className="mock-results-list">
-        {results.map((result, i) => (
-          <div key={result.slug} className={`card mock-result-card ${result.verdict}`}>
-            <div className="mock-result-header">
-              <span className="mock-result-num">Q{i + 1}</span>
-              <span className="mock-result-title">{result.title}</span>
-              <span className={`pill mock-diff-${result.difficulty.toLowerCase()}`}>
-                {result.difficulty}
-              </span>
-              <VerdictBadge verdict={result.verdict} />
-              <span className="muted small mock-result-time">
-                <Clock size={11} />
-                {formatMs(result.time_used_ms)}
-              </span>
+      <section className="debrief-rows" aria-label="Results by problem">
+        {results.map((result) => {
+          const meta = verdictMeta(result.verdict);
+          return (
+            <div key={result.slug} className="debrief-row">
+              <div className="debrief-row-side">
+                <h2>{result.title.startsWith("custom-") ? "Custom problem" : result.title}</h2>
+                <span className={`debrief-verdict ${toneOf(result.verdict)}`}>{meta.label}</span>
+                <span className="debrief-meta">
+                  {result.difficulty}, {formatMs(result.time_used_ms)}
+                </span>
+                <span className="debrief-meta">
+                  {result.hidden_total
+                    ? `${result.hidden_passed ?? 0} of ${result.hidden_total} hidden tests`
+                    : "Graded on samples"}
+                </span>
+              </div>
+              <div className="debrief-body">
+                <MarkdownContent content={result.feedback} />
+                {result.hidden_failures && result.hidden_failures.length > 0 && (
+                  <details className="debrief-code">
+                    <summary>Failed hidden tests ({result.hidden_failures.length})</summary>
+                    {result.hidden_failures.map((f, i) => (
+                      <pre key={i}>{`Input: ${f.input}
+Expected: ${f.expected}
+Got: ${f.actual}`}</pre>
+                    ))}
+                  </details>
+                )}
+                {result.code.trim().length > 0 && (
+                  <details className="debrief-code">
+                    <summary>View your code</summary>
+                    <pre>{result.code}</pre>
+                  </details>
+                )}
+              </div>
             </div>
-            <p className="mock-result-feedback">{result.feedback}</p>
-            {result.code.trim().length > 0 && (
-              <details className="mock-result-code-toggle">
-                <summary>View your code</summary>
-                <pre className="mock-result-code">{result.code}</pre>
-              </details>
-            )}
-          </div>
-        ))}
-      </div>
+          );
+        })}
+      </section>
 
-      <div className="button-row" style={{ marginTop: 28 }}>
-        <button className="button button-ghost" onClick={() => navigate("/mock-interview")}>
-          Exit Interview
-        </button>
+      <div className="debrief-actions">
         <button
-          className="button button-primary"
+          type="button"
+          className="debrief-btn debrief-btn-primary"
           onClick={() => navigate(nextRoute(), { state: { session: state?.session, selectedStages } })}
         >
-          {hasLaterStage ? "Continue to Next Stage" : "View Final Summary"}
+          {hasLaterStage ? "Continue to next round" : "View the debrief"}
           <ChevronRightIcon size={15} />
+        </button>
+        <button type="button" className="debrief-btn" onClick={() => navigate("/mock-interview")}>
+          Exit interview
         </button>
       </div>
     </div>
   );
+}
+
+function toneOf(verdict?: string | null): string {
+  if (verdict === "strong" || verdict === "pass") return "debrief-tone-good";
+  if (verdict === "needs_work") return "debrief-tone-bad";
+  return "debrief-tone-mid";
 }

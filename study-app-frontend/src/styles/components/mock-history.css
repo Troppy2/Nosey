@@ -1,0 +1,23 @@
+/* Past interviews: flat list, sectioned by state. */
+.history2 { max-width: 880px; margin: 0 auto; padding: 40px 24px 64px; display: flex; flex-direction: column; gap: 28px; color: #26301f; }
+.history2-head { display: flex; flex-direction: column; gap: 6px; }
+.history2-head h1 { margin: 0; font-family: Lora, serif; font-size: 40px; font-weight: 600; }
+.history2-section { display: flex; flex-direction: column; gap: 10px; }
+.history2-section h2 { margin: 0; font-size: 14px; font-weight: 600; color: #596949; }
+.history2-list { display: flex; flex-direction: column; gap: 10px; }
+.history2-row { display: flex; align-items: center; gap: 16px; padding: 14px 16px 14px 20px; background: #fff; border: 1px solid #cfe1b9; border-radius: 8px; flex-wrap: wrap; }
+.history2-row:hover { border-color: #b5c99a; }
+.history2-row-main { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 220px; text-align: left; }
+.history2-company { font-weight: 600; font-size: 16px; }
+.history2-sub { font-size: 14px; color: #596949; }
+.history2-row-link { flex: 1; min-width: 0; display: flex; align-items: center; gap: 16px; background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; text-align: left; }
+.history2-rec { font-size: 14px; font-weight: 700; padding: 6px 12px; border-radius: 6px; background: #e9f0de; min-width: 96px; text-align: center; }
+.history2-row-link { padding: 4px 8px; margin: -4px -8px; border-radius: 8px; }
+.history2-row-link:hover { background: transparent; }
+.history2-delete { width: 44px; height: 44px; border-radius: 8px; border: 0; background: transparent; color: #596949; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.history2-delete:hover { color: #9b2c1a; }
+.history2-error { display: flex; align-items: center; gap: 8px; color: #9b2c1a; font-size: 15px; }
+.history2-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.history2-empty p { margin: 0; color: #596949; }
+.history2 button:focus-visible { outline: 2px solid #4f6339; outline-offset: 3px; }
+@media (max-width: 640px) { .history2 { padding: 24px 16px 48px; } .history2-head h1 { font-size: 30px; } }

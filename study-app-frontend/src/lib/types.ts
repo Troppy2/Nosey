@@ -995,6 +995,7 @@ export type MockInterviewSession = {
   progress_updated_at?: string | null;
   resume_file_name?: string | null;
   resume_grill?: string | null;
+  skill_ratings?: string | null;
   created_at?: string | null;
 };
 
@@ -1038,6 +1039,9 @@ export type Stage1QuestionResult = {
   time_used_ms: number;
   verdict: "strong" | "pass" | "borderline" | "needs_work";
   feedback: string;
+  hidden_passed?: number;
+  hidden_total?: number;
+  hidden_failures?: { input: string; expected: string; actual: string }[];
 };
 
 export type Stage1GradeResponse = {
@@ -1068,6 +1072,7 @@ export type Stage3MessageResponse = {
   reply: string;
   is_done: boolean;
   covered_goals?: string[];
+  is_followup?: boolean;
 };
 
 export type MockInterviewFinishResponse = {
@@ -1077,6 +1082,7 @@ export type MockInterviewFinishResponse = {
   stage2_verdict?: string | null;
   stage3_verdict?: string | null;
   hiring_recommendation: string;
+  skill_ratings?: Record<string, string> | null;
 };
 
 // Post-feature satisfaction surveys
