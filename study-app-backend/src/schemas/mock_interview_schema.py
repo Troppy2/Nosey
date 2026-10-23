@@ -159,10 +159,19 @@ class Stage2SubmitRequest(BaseModel):
     problem_title: str = Field(default="the coding problem", max_length=200)
     problem_slug: str = Field(default="", max_length=200)
     provider: Optional[str] = Field(default=None)
+    # The whole technical round, so grading sees the approach talk, the hints and
+    # the closing questions, not just the final code.
+    problem: Optional[CodingProblemInfo] = None
+    history: list[InterviewChatMessage] = Field(default_factory=list, max_length=200)
+    hints_used: int = Field(default=0, ge=0, le=50)
+    time_up: bool = False
+    samples_passed: int = Field(default=0, ge=0, le=50)
+    samples_total: int = Field(default=0, ge=0, le=50)
 
 
 class Stage2SubmitResponse(BaseModel):
     feedback: str
+    verdict: Optional[str] = None
 
 
 # ── Conversational interview (Stage 2 + Stage 3) ──────────────────────────────
@@ -172,11 +181,27 @@ class InterviewChatMessage(BaseModel):
     content: str
 
 
+class CodingProblemExample(BaseModel):
+    input_text: str = Field(default="", max_length=4000)
+    output_text: str = Field(default="", max_length=4000)
+    explanation_text: Optional[str] = Field(default=None, max_length=4000)
+
+
 class CodingProblemInfo(BaseModel):
-    title: str
-    slug: str
-    difficulty: str
-    prompt: str
+    title: str = Field(..., max_length=300)
+    slug: str = Field(..., max_length=200)
+    difficulty: str = Field(..., max_length=20)
+    # Plain text or markdown; always filled so Kojo can answer clarifying questions.
+    prompt: str = Field(default="", max_length=20000)
+    # LeetCode's statement HTML for catalog problems (rendered instead of prompt).
+    prompt_html: str = Field(default="", max_length=60000)
+    examples: list[CodingProblemExample] = Field(default_factory=list, max_length=10)
+    starter_code: str = Field(default="", max_length=20000)
+    source: str = Field(default="novel", max_length=20)  # "novel" | "catalog" | "custom"
+
+
+class Stage2ProblemRequest(BaseModel):
+    provider: Optional[str] = Field(default=None)
 
 
 class Stage2MessageRequest(BaseModel):
@@ -186,6 +211,15 @@ class Stage2MessageRequest(BaseModel):
     # Running set of interview goals already covered, echoed back by the client
     # each turn so the server can track coverage without server-side state.
     covered_goals: list[str] = Field(default_factory=list)
+    # The problem prepared by /stage2/problem, held by the client until Kojo presents it.
+    problem: Optional[CodingProblemInfo] = None
+    # The live editor, sent every turn so Kojo reads it like a shared doc.
+    code: str = Field(default="", max_length=20000)
+    hints_used: int = Field(default=0, ge=0, le=50)
+    minutes_left: Optional[int] = Field(default=None, ge=0, le=120)
+    # A turn the candidate did not type: "hint" (hint button), "nudge" (long stall)
+    # or "time_up" (the 45 minute clock hit zero).
+    event: Optional[str] = Field(default=None, pattern="^(hint|nudge|time_up)$")
 
 
 class Stage2MessageResponse(BaseModel):
@@ -193,6 +227,7 @@ class Stage2MessageResponse(BaseModel):
     coding_problem: Optional[CodingProblemInfo] = None
     is_done: bool = False
     covered_goals: list[str] = Field(default_factory=list)
+    hint_given: bool = False
 
 
 # Resume deep dive (the grill that follows the ATS scan). Same contract as the

@@ -1,7 +1,7 @@
 import { AlertIcon, ArrowLeftIcon, RetryIcon } from "../icons";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { LoadingNotice } from "../components/Loaders";
+import { MockLoader } from "../components/MockLoader";
 import { finishMockInterview } from "../lib/api";
 import type { MockInterviewFinishResponse, MockInterviewSession } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
@@ -65,14 +65,13 @@ function SummaryView({ stored }: { stored: MockProgress | null }) {
 
   if (loading) {
     return (
-      <div className="page page-narrow mock-loading">
-                <LoadingNotice
-          title="Writing your interview debrief"
-          estimate="Pulling together every stage you completed. Around 20 seconds."
-          slowNote="Still writing. A full three-stage debrief takes the longest. Keep this page open."
-          slowAfterMs={25000}
-        />
-      </div>
+      <MockLoader
+        tone="page"
+        title="Writing your debrief"
+        note="Pulling together every round you finished. Around 20 seconds."
+        slowNote="Still writing. A full loop takes the longest, keep this page open."
+        slowAfterMs={25000}
+      />
     );
   }
 

@@ -149,3 +149,52 @@
 }
 /* Compact bar beside the editor has a 12px gap, so its ring stays smaller still. */
 .voice-transcript-answer .voice-btn-mic.is-on { box-shadow: 0 0 0 calc(2px + var(--level, 0) * 6px) rgba(143,200,96,.45); transform: scale(calc(1 + var(--level, 0) * 0.02)); }
+
+/* Technical round: clock, End round, editor actions, sample run, hint count. */
+.voice-clock { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--v-text); white-space: nowrap; }
+.voice-clock.is-low { color: #9a3412; }
+.voice-end { min-height: 40px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--v-edge); background: transparent; color: var(--v-text); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background-color 160ms cubic-bezier(.3,0,0,1), border-color 160ms cubic-bezier(.3,0,0,1); }
+.voice-end:hover:not(:disabled) { background: #fff; border-color: var(--v-ink); }
+.voice-end:active:not(:disabled) { transform: scale(.97); }
+.voice-end:disabled { opacity: .55; cursor: not-allowed; }
+.voice-editor-head { align-items: center; }
+.voice-editor-actions { display: flex; gap: 8px; }
+.voice-editor-btn { min-height: 36px; padding: 0 14px; border-radius: 6px; border: 1px solid #5a6b47; background: transparent; color: #eef4e4; font: inherit; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; transition: background-color 160ms cubic-bezier(.3,0,0,1), border-color 160ms cubic-bezier(.3,0,0,1); }
+.voice-editor-btn:hover:not(:disabled) { background: #2a3622; border-color: #a9bb92; }
+.voice-editor-btn:active:not(:disabled) { transform: scale(.97); }
+.voice-editor-btn:disabled { opacity: .45; cursor: not-allowed; }
+.voice-editor-btn:focus-visible, .voice-end:focus-visible { outline: 2px solid #b5e48c; outline-offset: 2px; }
+.voice-run { flex-wrap: wrap; gap: 8px 20px; font-size: 14px; color: #cfe1b9; }
+.voice-run-pass, .voice-run-fail { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.voice-run-pass { color: #b5e48c; }
+.voice-run-fail { color: #f2b3a0; }
+.voice-run-case { font-family: "JetBrains Mono", monospace; font-size: 13px; overflow-wrap: anywhere; }
+.voice-example h2 { margin: 4px 0 6px; font-size: 15px; font-weight: 600; }
+.voice-example pre { margin: 0; font-family: "JetBrains Mono", monospace; font-size: 13px; line-height: 1.6; background: #f6f9f1; border: 1px solid #e0ebd2; border-radius: 8px; padding: 12px 14px; white-space: pre-wrap; }
+.voice-problem-text pre { font-family: "JetBrains Mono", monospace; font-size: 13px; background: #f6f9f1; border: 1px solid #e0ebd2; border-radius: 8px; padding: 12px 14px; white-space: pre-wrap; }
+.voice-problem-meta { margin: auto 0 0; font-size: 13px; color: var(--v-mute); }
+.voice-verdict { margin: 0 0 8px; font-weight: 700; color: var(--v-ink); }
+.voice-banner { position: fixed; top: 76px; left: 50%; transform: translateX(-50%); z-index: 1001; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 32px); padding: 10px 14px; border-radius: 8px; background: #fff; border: 1px solid #f2b3a0; color: #7c2d12; font-size: 14px; box-shadow: 0 4px 16px rgba(38,48,31,.12); }
+.voice-banner button { min-height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--v-edge, #9db783); background: transparent; font: inherit; font-weight: 600; cursor: pointer; }
+@media (max-width: 900px) {
+  .voice-clock { font-size: 14px; }
+  .voice-end { min-height: 36px; padding: 0 12px; font-size: 13px; }
+}
+.voice-transcript-toggle { white-space: nowrap; }
+.voice-steps-label { white-space: nowrap; }
+/* Work mode with the transcript closed: Kojo's latest line sits above the controls. */
+.voice-work-prompt { flex: 1; min-height: 0; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 8px; }
+.voice-work-prompt p { margin: 0; font-family: Lora, serif; font-size: 18px; line-height: 1.5; color: var(--v-text); }
+/* Phones: the technical header wraps to a third row for the phase, clock and End round,
+   and the work area grows with its content so the room scrolls instead of overlapping. */
+@media (max-width: 900px) {
+  .voice-room--work .voice-body { flex: none; }
+  .voice-room--work .voice-problem { max-height: 45vh; }
+  .voice-work-prompt { padding: 16px; }
+  .voice-work-prompt p { font-size: 17px; }
+}
+@media (max-width: 600px) {
+  .voice-head-right { grid-column: 1 / -1; grid-row: 3; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
+  .voice-steps-label { display: none; }
+  .voice-room--work .voice-head-right .voice-transcript-toggle { margin-left: auto; }
+}

@@ -81,11 +81,21 @@ export type Stage1Progress = {
 
 export type Stage2Progress = {
   messages: InterviewChatMessage[];
+  /** The problem on screen, set once Kojo presents it. */
   codingProblem: CodingProblemInfo | null;
   code: string;
   codeFeedback: string | null;
   submitted: boolean;
   coveredGoals?: string[];
+  /** Picked by /stage2/problem at the start, held until Kojo presents it. */
+  preparedProblem?: CodingProblemInfo | null;
+  hintsUsed?: number;
+  /** Epoch ms when the 45 minute clock started. */
+  startedAt?: number;
+  timeUp?: boolean;
+  samplesPassed?: number;
+  samplesTotal?: number;
+  verdict?: string | null;
 };
 
 export type Stage3Progress = {

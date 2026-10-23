@@ -1054,11 +1054,23 @@ export type InterviewChatMessage = {
   content: string;
 };
 
+export type CodingProblemExample = {
+  input_text: string;
+  output_text: string;
+  explanation_text?: string | null;
+};
+
 export type CodingProblemInfo = {
   title: string;
   slug: string;
   difficulty: string;
+  /** Markdown or plain text. */
   prompt: string;
+  /** LeetCode statement HTML for catalog problems; rendered instead of prompt. */
+  prompt_html?: string;
+  examples?: CodingProblemExample[];
+  starter_code?: string;
+  source?: "novel" | "catalog" | "custom";
 };
 
 export type Stage2MessageResponse = {
@@ -1066,7 +1078,10 @@ export type Stage2MessageResponse = {
   coding_problem?: CodingProblemInfo | null;
   is_done: boolean;
   covered_goals?: string[];
+  hint_given?: boolean;
 };
+
+export type Stage2TurnEvent = "hint" | "nudge" | "time_up";
 
 export type Stage3MessageResponse = {
   reply: string;
