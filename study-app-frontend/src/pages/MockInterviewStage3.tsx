@@ -1,6 +1,5 @@
-import { Loader2, LogOut, MessageSquare, Send } from "lucide-react";
-import { AlertIcon, ChevronRightIcon } from "../icons";
-import { useEffect, useRef, useState } from "react";
+import { AlertIcon, ChatIcon } from "../icons";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { LoadingNotice } from "../components/Loaders";
 import { sendStage3Message } from "../lib/api";
@@ -8,7 +7,8 @@ import type { InterviewChatMessage, MockInterviewSession } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
 import { loadMockProgress, saveMockProgress, type MockProgress, type MockCompany } from "../lib/mockInterview";
 import { MockProgressGate } from "../components/MockProgressGate";
-import { MockLoopTrack } from "../components/MockLoopRail";
+import { VoiceRoom } from "../components/VoiceRoom";
+import { useInterviewerVoice } from "../lib/voice";
 
 export default function MockInterviewStage3() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -37,24 +37,18 @@ function Stage3Runner({ stored }: { stored: MockProgress | null }) {
   const selectedStages = state?.selectedStages ?? stored?.selectedStages ?? ["stage3"];
 
   const [messages, setMessages] = useState<InterviewChatMessage[]>(() => stored?.stage3?.messages ?? []);
-  const [input, setInput] = useState("");
   const [initializing, setInitializing] = useState(() => (stored?.stage3?.messages?.length ?? 0) === 0);
   const [sending, setSending] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [isDone, setIsDone] = useState(() => stored?.stage3?.isDone ?? false);
   const [coveredGoals, setCoveredGoals] = useState<string[]>(() => stored?.stage3?.coveredGoals ?? []);
+  // Probes Kojo has asked on the current story; the server caps it at 2.
+  const [followups, setFollowups] = useState(0);
 
   // Stage 3 covers 5 behavioral questions; this drives a small progress indicator.
   const totalGoals = 5;
 
-  const threadRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  function scrollToBottom() {
-    setTimeout(() => {
-      threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: "smooth" });
-    }, 50);
-  }
+  const voice = useInterviewerVoice();
 
   useEffect(() => {
     if (!Number.isFinite(numericSessionId)) return;
@@ -72,10 +66,7 @@ function Stage3Runner({ stored }: { stored: MockProgress | null }) {
   }, [messages, isDone, coveredGoals]);
 
   useEffect(() => {
-    if (!initializing) {
-      scrollToBottom();
-      return;
-    }
+    if (!initializing) return;
     let cancelled = false;
     (async () => {
       try {
@@ -87,10 +78,7 @@ function Stage3Runner({ stored }: { stored: MockProgress | null }) {
       } catch (e: unknown) {
         if (!cancelled) setInitError(e instanceof Error ? e.message : "Failed to start interview.");
       } finally {
-        if (!cancelled) {
-          setInitializing(false);
-          scrollToBottom();
-        }
+        if (!cancelled) setInitializing(false);
       }
     })();
     return () => {
@@ -99,20 +87,20 @@ function Stage3Runner({ stored }: { stored: MockProgress | null }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [numericSessionId]);
 
-  async function handleSend() {
-    const text = input.trim();
+  async function handleSend(text: string) {
     if (!text || sending || isDone) return;
+    voice.stop();
 
     const userMsg: InterviewChatMessage = { role: "user", content: text };
     const nextHistory = [...messages, userMsg];
     setMessages(nextHistory);
-    setInput("");
     setSending(true);
-    scrollToBottom();
 
     try {
-      const res = await sendStage3Message(numericSessionId, text, messages, coveredGoals);
+      const res = await sendStage3Message(numericSessionId, text, messages, coveredGoals, followups);
+      setFollowups(res.is_followup ? followups + 1 : 0);
       setMessages([...nextHistory, { role: "interviewer", content: res.reply }]);
+      void voice.speak(res.reply);
       if (res.covered_goals) setCoveredGoals(res.covered_goals);
       if (res.is_done) setIsDone(true);
     } catch {
@@ -122,15 +110,6 @@ function Stage3Runner({ stored }: { stored: MockProgress | null }) {
       ]);
     } finally {
       setSending(false);
-      scrollToBottom();
-      inputRef.current?.focus();
-    }
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
     }
   }
 
@@ -141,7 +120,7 @@ function Stage3Runner({ stored }: { stored: MockProgress | null }) {
           className="mock-interviewer-avatar"
           style={{ width: 52, height: 52, fontSize: "0.9rem" }}
         >
-          <MessageSquare size={18} />
+          <ChatIcon size={18} />
         </div>
         <LoadingNotice
           title="Preparing your behavioral interview"
@@ -179,118 +158,37 @@ function Stage3Runner({ stored }: { stored: MockProgress | null }) {
   }
 
   return (
-    <div className="page page-narrow">
-      <div className="page-header" style={{ marginBottom: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div className="mock-interviewer-avatar">BQ</div>
-          <div>
-            <div className="mock-interviewer-name">{companyLabel} Interviewer</div>
-            <div className="mock-stage-breadcrumb">
-              Stage 3: Behavioral Interview
-              <span className="mock-goal-progress" title="Questions covered">
-                {Math.min(coveredGoals.length, totalGoals)} of {totalGoals} covered
-              </span>
-            </div>
-            <MockLoopTrack stages={selectedStages} current="stage3" compact />
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <button
-            className="button button-ghost"
-            onClick={() => navigate("/mock-interview")}
-            title="Quit (your progress is saved)"
-          >
-            <LogOut size={14} /> Quit
-          </button>
-          {isDone && (
-            <button
-              className="button button-primary"
-              onClick={() =>
-                navigate(`/mock-interview/${sessionId}/summary`, {
-                  state: { session: state?.session, selectedStages },
-                })
-              }
-            >
-              View Summary <ChevronRightIcon size={14} />
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="mock-stage3-chat-wrap">
-        <div className="mock-stage3-chat-thread" ref={threadRef}>
-          {messages.map((msg, i) => (
-            <div
-              key={i}
-              className={`mock-chat-msg ${
-                msg.role === "interviewer" ? "mock-chat-msg--interviewer" : "mock-chat-msg--user"
-              }`}
-            >
-              <span className="mock-chat-msg-role">
-                {msg.role === "interviewer" ? `${companyLabel} Interviewer` : "You"}
-              </span>
-              <p className="mock-chat-msg-bubble">{msg.content}</p>
-            </div>
-          ))}
-
-          {sending && (
-            <div className="mock-chat-msg mock-chat-msg--interviewer">
-              <span className="mock-chat-msg-role">{companyLabel} Interviewer</span>
-              <p className="mock-chat-msg-bubble mock-chat-typing">
-                <Loader2 size={13} className="spin" /> Typing…
-              </p>
-            </div>
-          )}
-
-          {isDone && (
-            <div style={{ textAlign: "center", padding: "16px 0 4px" }}>
-              <span className="eyebrow">Interview Complete</span>
-              <p className="muted small" style={{ marginTop: 4 }}>
-                All questions answered. Click "View Summary" to see your debrief.
-              </p>
-            </div>
-          )}
-        </div>
-
-        {!isDone && (
-          <div className="mock-stage3-chat-input-row">
-            <textarea
-              ref={inputRef}
-              className="kojo-input"
-              placeholder="Type your answer (Enter to send, Shift+Enter for newline)"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={sending}
-              rows={3}
-              style={{ flex: 1, minHeight: 56, maxHeight: 160, resize: "none" }}
-            />
-            <button
-              className="kojo-send"
-              onClick={handleSend}
-              disabled={!input.trim() || sending}
-              title="Send answer"
-            >
-              {sending ? <Loader2 size={15} className="spin" /> : <Send size={15} />}
-            </button>
-          </div>
-        )}
-      </div>
-
-      {!isDone && (
-        <div
-          style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
+    <VoiceRoom
+      title="Behavioral interview"
+      subtitle={`${companyLabel}, ${MockLoopLabel(selectedStages, "stage3")}`}
+      interviewerName="Kojo"
+      messages={messages}
+      covered={Math.min(coveredGoals.length, totalGoals)}
+      total={totalGoals}
+      waiting={sending}
+      done={isDone}
+      onSend={handleSend}
+      onLeave={() => navigate("/mock-interview")}
+      voice={voice}
+      nextLabel="your debrief"
+      onAdvance={() =>
+        navigate(`/mock-interview/${sessionId}/summary`, { state: { session: state?.session, selectedStages } })
+      }
+      doneAction={
+        <button
+          className="voice-send"
+          onClick={() =>
+            navigate(`/mock-interview/${sessionId}/summary`, { state: { session: state?.session, selectedStages } })
+          }
         >
-          <span className="mock-star-hint-label">STAR:</span>
-          <span className="mock-star-chip mock-star-chip-s">Situation</span>
-          <span className="mock-star-chip mock-star-chip-t">Task</span>
-          <span className="mock-star-chip mock-star-chip-a">Action</span>
-          <span className="mock-star-chip mock-star-chip-r">Result</span>
-          <span className="mock-star-hint-label" style={{ marginLeft: 4 }}>
-            Speak it out loud first, then type.
-          </span>
-        </div>
-      )}
-    </div>
+          View debrief
+        </button>
+      }
+    />
   );
+}
+
+function MockLoopLabel(stages: string[], current: string) {
+  const idx = stages.indexOf(current);
+  return idx < 0 ? "behavioral round" : `round ${idx + 1} of ${stages.length}`;
 }
