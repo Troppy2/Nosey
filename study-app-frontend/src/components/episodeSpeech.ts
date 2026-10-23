@@ -1,3 +1,5 @@
+import { EXPERT_VOICE, NARRATION_CHUNK_CHARS, NARRATION_VOICE, narrationSupported } from "../lib/narration";
+
 // Speech helpers shared by the article lesson player and the episode player
 // (podcast / video-lecture). Extracted from LearningModuleLesson.tsx so the
 // math normalizer has exactly one home: two copies would drift and the voice
@@ -76,9 +78,9 @@ export function markdownToSpeech(markdown: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
-// Chrome silently stops long utterances, so a block of speech is split into
-// short chunks that are queued one after another.
-export function splitForSpeech(text: string, maxLen = 220): string[] {
+// A block of speech is split into short chunks that are queued one after
+// another (each chunk is one narration clip).
+export function splitForSpeech(text: string, maxLen = NARRATION_CHUNK_CHARS): string[] {
   const sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [text];
   const chunks: string[] = [];
   let current = "";
@@ -94,80 +96,27 @@ export function splitForSpeech(text: string, maxLen = 220): string[] {
   return chunks;
 }
 
-// A speechCapability() result. speechSynthesis exists in every modern browser
-// but is unusable in some (notably older mobile Safari, and any browser with
-// no installed voices). Both conditions have to be checked: an empty voice
-// list plays silence.
+// Narration runs on the server voice, so it only needs audio playback.
 export type SpeechCapability = { usable: boolean; reason?: string };
 
 export function speechCapability(): SpeechCapability {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-    return { usable: false, reason: "This browser cannot play synthesized speech." };
-  }
-  const voices = window.speechSynthesis.getVoices();
-  // getVoices() is async-populated: an empty list here is inconclusive until
-  // voiceschanged fires, so callers must re-check after that event.
-  return { usable: true };
+  return narrationSupported()
+    ? { usable: true }
+    : { usable: false, reason: "This browser cannot play audio." };
 }
 
 // Voice assignment for the episode player. The two podcast speakers MUST be
-// two different TTS voices. A listener with no visual cue has only the voice
-// to tell them who is talking, so this is a correctness requirement, not a
-// nicety.
-//
-// Accent is the strongest, most instantly recognizable difference the Web
-// Speech API gives us, so the cast is assigned by locale:
-//   expert -> en-GB (British)
-//   host   -> en-US (American)
-// Degradation, in order, when the device does not have both:
-//   1. Both accents present: use them. This is the target.
-//   2. Only one accent present: two different English voices from what exists.
-//   3. Only one usable English voice: same voice, pitch and rate offset on the
-//      expert. Weakest option, but still two audibly distinct speakers.
-// A lecture is single-voice and just takes the best available.
-export type CastVoices = Record<
-  string,
-  { voice: SpeechSynthesisVoice | null; pitch: number; rate: number }
->;
+// two different voices: a listener with no visual cue has only the voice to
+// tell them who is talking, so this is a correctness requirement.
+//   host -> af_heart (the voice every lesson uses)
+//   expert -> bm_george (a British male voice, clearly different)
+// A lecture (slide deck) is single-voice and uses the lesson voice.
+export type CastVoices = Record<string, { voice: string; rate: number }>;
 
-export function castFor(format: "podcast" | "lecture", voices: SpeechSynthesisVoice[]): CastVoices {
-  // Google voices first where present (Chrome), for quality.
-  const rank = (v: SpeechSynthesisVoice) => (v.name.includes("Google") ? 0 : 1);
-  const byQuality = (a: SpeechSynthesisVoice, b: SpeechSynthesisVoice) =>
-    rank(a) - rank(b) || a.name.localeCompare(b.name);
-
-  const english = voices.filter((v) => v.lang.toLowerCase().startsWith("en"));
-  const pool = [...(english.length ? english : voices)].sort(byQuality);
-  const withLang = (prefix: string) =>
-    pool.filter((v) => v.lang.toLowerCase().replace("_", "-").startsWith(prefix));
-
-  if (format === "lecture") {
-    // A single clear narrator. Prefer en-US, fall back to anything usable.
-    return { lecturer: { voice: withLang("en-us")[0] ?? pool[0] ?? null, pitch: 1, rate: 1 } };
-  }
-
-  const british = withLang("en-gb");
-  const american = withLang("en-us");
-  let expert: SpeechSynthesisVoice | null = british[0] ?? null;
-  let host: SpeechSynthesisVoice | null = american[0] ?? null;
-
-  // Fill whichever side the device could not satisfy, never with the voice
-  // already taken by the other speaker.
-  const distinctFrom = (taken: SpeechSynthesisVoice | null) =>
-    pool.find((v) => v.voiceURI !== taken?.voiceURI) ?? null;
-  if (!expert) expert = distinctFrom(host);
-  if (!host) host = distinctFrom(expert);
-
-  if (host && expert && host.voiceURI !== expert.voiceURI) {
-    return {
-      host: { voice: host, pitch: 1, rate: 1 },
-      expert: { voice: expert, pitch: 1, rate: 1 },
-    };
-  }
-  // Last resort: one voice, differentiated by pitch and rate.
-  const only = host ?? expert ?? null;
+export function castFor(format: "podcast" | "lecture"): CastVoices {
+  if (format === "lecture") return { lecturer: { voice: NARRATION_VOICE, rate: 1 } };
   return {
-    host: { voice: only, pitch: 1.08, rate: 1 },
-    expert: { voice: only, pitch: 0.82, rate: 0.95 },
+    host: { voice: NARRATION_VOICE, rate: 1 },
+    expert: { voice: EXPERT_VOICE, rate: 1 },
   };
 }

@@ -14,6 +14,7 @@ import {
   speechCapability,
   splitForSpeech,
 } from "../components/episodeSpeech";
+import { cancelNarration, narrationSupported, prefetchNarration, speakNarration } from "../lib/narration";
 import { answerCheckpoint, fetchModuleEpisode, fetchTrackForModule, scopeKey } from "../lib/api";
 import type { CheckpointAnswerResult, EpisodeCheckpoint, ModuleEpisode } from "../lib/types";
 
@@ -26,9 +27,8 @@ const SPEAKER_LABELS: Record<string, string> = {
 };
 
 // One shared playback core for both episode formats, copied from the article
-// lesson player: flat chunk queue, session-bumped callbacks (Chrome fires
-// onend/onerror for cancelled utterances), hard-cancel pause, per-utterance
-// voice settings. Each chunk knows its turn and speaker, the voice comes from
+// lesson player: flat chunk queue, session-bumped callbacks, stop-style pause,
+// per-clip voice. Each chunk knows its turn and speaker, the voice comes from
 // the cast for that speaker, and the rate multiplies the user rate by the
 // cast rate.
 function useEpisodeSpeech(
@@ -37,7 +37,7 @@ function useEpisodeSpeech(
   userRate: number,
   onQueueEnd: () => void,
 ) {
-  const ttsSupported = typeof window !== "undefined" && "speechSynthesis" in window;
+  const ttsSupported = narrationSupported();
   const [speech, setSpeech] = useState<SpeechState>("idle");
   const [chunkPos, setChunkPos] = useState(0);
   const chunkIndexRef = useRef(0);
@@ -47,8 +47,7 @@ function useEpisodeSpeech(
   const castRef = useRef<CastVoices>({});
   const onQueueEndRef = useRef(onQueueEnd);
   onQueueEndRef.current = onQueueEnd;
-  // Every (re)start bumps the session; callbacks from older sessions no-op,
-  // because Chrome keeps firing onend/onerror for cancelled utterances.
+  // Every (re)start bumps the session; callbacks from older sessions no-op.
   const playSessionRef = useRef(0);
 
   const chunks = useMemo<{ text: string; turnIndex: number; speaker: string }[]>(() => {
@@ -90,31 +89,33 @@ function useEpisodeSpeech(
       onQueueEndRef.current();
       return;
     }
-    const utterance = new SpeechSynthesisUtterance(chunk.text);
-    const cfg = castRef.current[chunk.speaker] ?? { voice: null, pitch: 1, rate: 1 };
-    utterance.rate = userRateRef.current * (cfg.rate ?? 1);
-    utterance.pitch = cfg.pitch ?? 1;
-    if (cfg.voice) utterance.voice = cfg.voice;
-    utterance.onstart = () => {
-      if (playSessionRef.current === session) setChunkPos(index);
-    };
-    utterance.onend = () => {
-      if (playSessionRef.current !== session || stoppedRef.current) return;
-      chunkIndexRef.current += 1;
-      speakChunk();
-    };
-    utterance.onerror = () => {
-      // Cancels surface here as errors too; only a live session goes idle.
-      if (playSessionRef.current === session && !stoppedRef.current) setSpeech("idle");
-    };
-    window.speechSynthesis.speak(utterance);
+    const cfg = castRef.current[chunk.speaker];
+    const voice = cfg?.voice ?? "af_heart";
+    const next = chunksRef.current[index + 1];
+    if (next) prefetchNarration(next.text, castRef.current[next.speaker]?.voice ?? "af_heart");
+    speakNarration({
+      text: chunk.text,
+      voice,
+      rate: userRateRef.current * (cfg?.rate ?? 1),
+      onStart: () => {
+        if (playSessionRef.current === session) setChunkPos(index);
+      },
+      onEnd: () => {
+        if (playSessionRef.current !== session || stoppedRef.current) return;
+        chunkIndexRef.current += 1;
+        speakChunk();
+      },
+      onError: () => {
+        if (playSessionRef.current === session && !stoppedRef.current) setSpeech("idle");
+      },
+    });
   }, []);
 
   const startSpeechFrom = useCallback(
     (fromChunk: number) => {
       if (!ttsSupported || chunksRef.current.length === 0) return;
       playSessionRef.current += 1;
-      window.speechSynthesis.cancel();
+      cancelNarration();
       stoppedRef.current = false;
       chunkIndexRef.current = Math.min(Math.max(fromChunk, 0), chunksRef.current.length - 1);
       setSpeech("playing");
@@ -123,14 +124,12 @@ function useEpisodeSpeech(
     [ttsSupported, speakChunk],
   );
 
-  // Pause is deliberately NOT speechSynthesis.pause(): Chrome's pause is
-  // unreliable (the queue can keep playing right through it). Pausing
-  // hard-cancels instead, and resume replays from the start of the current
-  // chunk, which costs at most a sentence or two of repetition.
+  // Pausing stops the clip, and resume replays from the start of the current
+  // chunk, which costs at most a few sentences.
   const pause = useCallback(() => {
     playSessionRef.current += 1;
     stoppedRef.current = true;
-    if (ttsSupported) window.speechSynthesis.cancel();
+    if (ttsSupported) cancelNarration();
     setSpeech("paused");
   }, [ttsSupported]);
 
@@ -149,7 +148,7 @@ function useEpisodeSpeech(
   const restart = useCallback(() => {
     playSessionRef.current += 1;
     stoppedRef.current = true;
-    if (ttsSupported) window.speechSynthesis.cancel();
+    if (ttsSupported) cancelNarration();
     setSpeech("idle");
     setChunkPos(0);
     chunkIndexRef.current = 0;
@@ -173,7 +172,7 @@ function useEpisodeSpeech(
       if (ttsSupported) {
         playSessionRef.current += 1;
         stoppedRef.current = true;
-        window.speechSynthesis.cancel();
+        cancelNarration();
         setSpeech("idle");
       }
     };
@@ -212,34 +211,9 @@ function EpisodePlayerInner({
   onModulePassed?: () => void;
 }) {
   // ── Voices ───────────────────────────────────────────────────────────────
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const voicesReadyRef = useRef(false);
-
-  // getVoices() is async-populated: it returns an empty array on first call in
-  // most browsers. The cast is computed from the voiceschanged-filled state so
-  // the first episode of a session gets the accent split, not the default
-  // system voice.
-  useEffect(() => {
-    if (!("speechSynthesis" in window)) return;
-    const load = () => {
-      const list = window.speechSynthesis.getVoices();
-      voicesReadyRef.current = list.length > 0;
-      setVoices(list);
-    };
-    load();
-    window.speechSynthesis.addEventListener("voiceschanged", load);
-    return () => window.speechSynthesis.removeEventListener("voiceschanged", load);
-  }, []);
-
-  const cast = useMemo<CastVoices>(() => castFor(episode.format, voices), [episode.format, voices]);
-
-  // Capability is checked at mount, then re-checked once voices land (an empty
-  // getVoices() on first call is inconclusive).
-  const [speechUsable, setSpeechUsable] = useState<boolean>(speechCapability().usable);
-  useEffect(() => {
-    if (!speechUsable || !voicesReadyRef.current) return;
-    setSpeechUsable(window.speechSynthesis.getVoices().length > 0);
-  }, [voices.length, speechUsable]);
+  // Server voices: host and expert are two different voices, a lecture uses the lesson voice.
+  const cast = useMemo<CastVoices>(() => castFor(episode.format), [episode.format]);
+  const speechUsable = speechCapability().usable;
 
   // ── Player rate ──────────────────────────────────────────────────────────
   const [userRate, setUserRate] = useState(1);

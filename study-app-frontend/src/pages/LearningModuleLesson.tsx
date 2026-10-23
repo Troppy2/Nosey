@@ -1,4 +1,4 @@
-import { Pause, Play, Video, Volume2 } from "lucide-react";
+import { Pause, Play, Video } from "lucide-react";
 import { ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, CrossCircleIcon, PencilIcon, RetryIcon } from "../icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
@@ -6,7 +6,6 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { FormError } from "../components/FormError";
 import { Card } from "../components/Card";
-import { Dropdown } from "../components/Dropdown";
 import { useConfetti } from "../components/Confetti";
 import { InlineLoading, LoadingNotice } from "../components/Loaders";
 import { MarkdownContent } from "../components/MarkdownContent";
@@ -19,6 +18,14 @@ import {
   updateModuleVideo,
 } from "../lib/api";
 import { markdownToSpeech, splitForSpeech } from "../components/episodeSpeech";
+import {
+  cancelNarration,
+  NARRATION_CHUNK_CHARS,
+  NARRATION_VOICE,
+  narrationSupported,
+  prefetchNarration,
+  speakNarration,
+} from "../lib/narration";
 import { looksMangled, repairLessonForDisplay, repairLessonFully } from "../lib/repairLessonMarkdown";
 import { isPermutationOf, shuffled, shuffledOptionOrder } from "../lib/shuffle";
 import { useMobileShell } from "../lib/useMobileShell";
@@ -248,8 +255,8 @@ function formatClock(seconds: number): string {
 }
 
 // Playback speed is continuous, not a set of presets: 0.05 steps so someone who
-// wants 1.7x can actually have it. The ceiling is 3x because Web Speech voices
-// turn to mush above it on most platforms, and the floor is 0.5x because slower
+// wants 1.7x can actually have it. The ceiling is 3x because speech turns to
+// mush above it, and the floor is 0.5x because slower
 // than that stops sounding like speech.
 // Keys that move a range input. Any other key-up (Tab leaving the slider)
 // must not commit a seek, or the rounded fractional position could skip ahead.
@@ -270,18 +277,6 @@ export function easeChunkProgress(ratio: number): number {
 const RATE_MIN = 0.5;
 const RATE_MAX = 3;
 const RATE_STEP = 0.05;
-// Chrome's Google voices stream from Google's servers and stop speeding up
-// near 2x: any higher rate is clamped silently, so the chip would say 3x while
-// the audio plays at 2x. Voices installed on the device (localService, e.g.
-// Microsoft David on Windows or Samantha on macOS) honour the full range.
-const NETWORK_VOICE_RATE_MAX = 2;
-
-// The speed ceiling for the voice that will actually speak: the picked one,
-// else the browser default. Unknown until the voice list loads.
-function maxRateFor(voice: SpeechSynthesisVoice | null): number {
-  return voice && !voice.localService ? NETWORK_VOICE_RATE_MAX : RATE_MAX;
-}
-
 // Trailing zeros dropped, so 1.7 reads "1.7x" and 1 reads "1x".
 function formatRate(rate: number): string {
   return `${Number(rate.toFixed(2))}x`;
@@ -400,7 +395,7 @@ export default function LearningModuleLesson() {
   // The narration is a spoken rewrite of the article (notation in words), not
   // a word-for-word read, so it plays as a podcast-style audio player at the
   // top of the page rather than pretending to follow the text line by line.
-  const ttsSupported = typeof window !== "undefined" && "speechSynthesis" in window;
+  const ttsSupported = narrationSupported();
   const [speech, setSpeech] = useState<SpeechState>("idle");
   // Persisted device-wide like the voice is: a continuous speed is a real
   // preference, and re-dialling 1.7x on every module would be tedious.
@@ -431,61 +426,9 @@ export default function LearningModuleLesson() {
 
   const audioPosKey = numericModuleId != null ? scopeKey(`nosey_lm_audio_${numericModuleId}`) : "";
 
-  // ── Narration voice ─────────────────────────────────────────────────────────
-  // Voices come from the browser's speechSynthesis (Chrome ships Google
-  // voices). The pick is device-wide, not per module.
   const [menuOpen, setMenuOpen] = useState(false);
-  const [voiceFormOpen, setVoiceFormOpen] = useState(false);
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [voiceURI, setVoiceURI] = useState<string>(
-    () => (typeof window !== "undefined" ? localStorage.getItem(scopeKey("nosey_lm_voice")) ?? "" : ""),
-  );
-  const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
-
-  // getVoices() is empty until the browser loads its list; voiceschanged fires
-  // when it is ready (and again if the list updates).
-  useEffect(() => {
-    if (!ttsSupported) return;
-    const load = () => setVoices(window.speechSynthesis.getVoices());
-    load();
-    window.speechSynthesis.addEventListener("voiceschanged", load);
-    return () => window.speechSynthesis.removeEventListener("voiceschanged", load);
-  }, [ttsSupported]);
-
-  useEffect(() => {
-    voiceRef.current = voices.find((v) => v.voiceURI === voiceURI) ?? null;
-  }, [voices, voiceURI]);
-
-  const rateMax = maxRateFor(
-    voices.find((v) => v.voiceURI === voiceURI) ?? voices.find((v) => v.default) ?? null,
-  );
-
-  // A saved 3x carried onto a voice that tops out at 2x would show a speed
-  // nobody hears. Clamp and persist so the chip always tells the truth.
-  useEffect(() => {
-    if (rate <= rateMax) return;
-    setRate(rateMax);
-    rateRef.current = rateMax;
-    try {
-      localStorage.setItem(scopeKey("nosey_lm_rate"), String(rateMax));
-    } catch {
-      // Private mode or a full quota.
-    }
-  }, [rate, rateMax]);
-
-  // English voices first (lessons are English), Google voices first within
-  // that, so Chrome users see the good options at the top.
-  const voiceOptions = useMemo(() => {
-    return [...voices].sort((a, b) => {
-      const aEn = a.lang.toLowerCase().startsWith("en") ? 0 : 1;
-      const bEn = b.lang.toLowerCase().startsWith("en") ? 0 : 1;
-      if (aEn !== bEn) return aEn - bEn;
-      const aGoogle = a.name.includes("Google") ? 0 : 1;
-      const bGoogle = b.name.includes("Google") ? 0 : 1;
-      if (aGoogle !== bGoogle) return aGoogle - bGoogle;
-      return a.name.localeCompare(b.name);
-    });
-  }, [voices]);
+  // One server voice for every lesson, so the speed ceiling is the same everywhere.
+  const rateMax = RATE_MAX;
 
   useEffect(() => {
     if (numericModuleId == null) return;
@@ -540,12 +483,12 @@ export default function LearningModuleLesson() {
   const speechChunks = useMemo(() => {
     if (module?.tts_script) {
       return mapScriptToBlocks(module.tts_script, module.lesson_content ?? "", lessonBlocks).flatMap(
-        ({ text: paragraph, blockIndex }) => splitForSpeech(paragraph).map((text) => ({ text, blockIndex })),
+        ({ text: paragraph, blockIndex }) => splitForSpeech(paragraph, NARRATION_CHUNK_CHARS).map((text) => ({ text, blockIndex })),
       );
     }
     return lessonBlocks.flatMap((block, blockIndex) => {
       const text = markdownToSpeech(block);
-      return text ? splitForSpeech(text).map((t) => ({ text: t, blockIndex })) : [];
+      return text ? splitForSpeech(text, NARRATION_CHUNK_CHARS).map((t) => ({ text: t, blockIndex })) : [];
     });
   }, [module?.tts_script, module?.lesson_content, lessonBlocks]);
 
@@ -674,32 +617,32 @@ export default function LearningModuleLesson() {
       updateChunkPos(0);
       return;
     }
-    const utterance = new SpeechSynthesisUtterance(chunk.text);
-    utterance.rate = rateRef.current;
-    if (voiceRef.current) utterance.voice = voiceRef.current;
-    utterance.onstart = () => {
-      if (playSessionRef.current === session) updateChunkPos(index);
-    };
-    utterance.onend = () => {
-      if (playSessionRef.current !== session || stoppedRef.current) return;
-      chunkIndexRef.current += 1;
-      // Advance here too, not only in onstart: Chrome's network voices can
-      // skip onstart, which froze the bar and highlight on the old chunk.
-      if (chunkIndexRef.current < chunksRef.current.length) updateChunkPos(chunkIndexRef.current);
-      speakChunk();
-    };
-    utterance.onerror = () => {
-      // Cancels surface here as errors too; only a live session goes idle.
-      if (playSessionRef.current === session && !stoppedRef.current) setSpeech("idle");
-    };
-    window.speechSynthesis.speak(utterance);
+    prefetchNarration(chunksRef.current[index + 1]?.text, NARRATION_VOICE);
+    speakNarration({
+      text: chunk.text,
+      voice: NARRATION_VOICE,
+      rate: rateRef.current,
+      onStart: () => {
+        if (playSessionRef.current === session) updateChunkPos(index);
+      },
+      onEnd: () => {
+        if (playSessionRef.current !== session || stoppedRef.current) return;
+        chunkIndexRef.current += 1;
+        if (chunkIndexRef.current < chunksRef.current.length) updateChunkPos(chunkIndexRef.current);
+        speakChunk();
+      },
+      onError: () => {
+        // Only a live session goes idle; cancels are not errors.
+        if (playSessionRef.current === session && !stoppedRef.current) setSpeech("idle");
+      },
+    });
   }, [updateChunkPos]);
 
   const startSpeechFrom = useCallback(
     (fromChunk: number) => {
       if (!ttsSupported || speechChunks.length === 0) return;
       playSessionRef.current += 1;
-      window.speechSynthesis.cancel();
+      cancelNarration();
       stoppedRef.current = false;
       chunksRef.current = speechChunks;
       chunkIndexRef.current = Math.min(Math.max(fromChunk, 0), speechChunks.length - 1);
@@ -709,16 +652,13 @@ export default function LearningModuleLesson() {
     [ttsSupported, speechChunks, speakChunk],
   );
 
-  // One button, podcast semantics. Pause is deliberately NOT
-  // speechSynthesis.pause(): Chrome's pause is unreliable (the queue can keep
-  // playing right through it). Pausing hard-cancels instead, and resume
-  // replays from the start of the current chunk, which costs at most a
-  // sentence or two of repetition.
+  // One button, podcast semantics. Pausing stops the clip, and resume replays
+  // from the start of the current chunk, which costs at most a few sentences.
   function togglePlayback() {
     if (speech === "playing") {
       playSessionRef.current += 1;
       stoppedRef.current = true;
-      window.speechSynthesis.cancel();
+      cancelNarration();
       setSpeech("paused");
     } else {
       startSpeechFrom(chunkPos);
@@ -728,7 +668,7 @@ export default function LearningModuleLesson() {
   const stopSpeech = useCallback(() => {
     playSessionRef.current += 1;
     stoppedRef.current = true;
-    window.speechSynthesis.cancel();
+    cancelNarration();
     setSpeech("idle");
   }, []);
 
@@ -753,21 +693,6 @@ export default function LearningModuleLesson() {
     // Session-safe restart of the current chunk so the change is heard
     // immediately (a raw cancel + speak races stale onend callbacks).
     if (commit && speech === "playing") {
-      startSpeechFrom(chunkIndexRef.current);
-    }
-  }
-
-  function selectVoice(uri: string) {
-    setVoiceURI(uri);
-    voiceRef.current = voices.find((v) => v.voiceURI === uri) ?? null;
-    const key = scopeKey("nosey_lm_voice");
-    if (uri) {
-      localStorage.setItem(key, uri);
-    } else {
-      localStorage.removeItem(key);
-    }
-    // Like a rate change: session-safe restart so the new voice is heard now.
-    if (speech === "playing") {
       startSpeechFrom(chunkIndexRef.current);
     }
   }
@@ -843,19 +768,6 @@ export default function LearningModuleLesson() {
   // current playback state, not the one from when the drag began.
   commitDragRef.current = (index) => seekTo(index, true);
 
-  function previewVoice() {
-    if (!ttsSupported) return;
-    // Halt the lesson queue (session bump makes its callbacks inert), then
-    // speak a one-off sample outside the queue.
-    stopSpeech();
-    const sample = new SpeechSynthesisUtterance(
-      "This is how your lessons will sound. Binary search runs in O of log n time.",
-    );
-    sample.rate = rateRef.current;
-    if (voiceRef.current) sample.voice = voiceRef.current;
-    window.speechSynthesis.speak(sample);
-  }
-
   // Stop reading when leaving the page OR switching to another module (the
   // component stays mounted when only the :moduleId param changes). The restore
   // effect above re-derives the new module's saved position.
@@ -864,7 +776,7 @@ export default function LearningModuleLesson() {
       if (ttsSupported) {
         playSessionRef.current += 1;
         stoppedRef.current = true;
-        window.speechSynthesis.cancel();
+        cancelNarration();
         setSpeech("idle");
       }
     };
@@ -1189,7 +1101,6 @@ export default function LearningModuleLesson() {
                     type="button"
                     onClick={() => {
                       setMenuOpen(false);
-                      setVoiceFormOpen(false);
                       startEditing();
                     }}
                   >
@@ -1200,21 +1111,10 @@ export default function LearningModuleLesson() {
                     type="button"
                     onClick={() => {
                       setMenuOpen(false);
-                      setVoiceFormOpen(false);
                       void runReformat();
                     }}
                   >
                     <RetryIcon size={15} /> Reformat article
-                  </button>
-                  <button
-                    role="menuitem"
-                    type="button"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      setVoiceFormOpen((open) => !open);
-                    }}
-                  >
-                    <Volume2 size={15} /> Change voice
                   </button>
                 </div>
               ) : null}
@@ -1227,38 +1127,6 @@ export default function LearningModuleLesson() {
         <p className="muted small lm-reformat-note" role="status">
           {reformatting ? "Reformatting the article…" : reformatNote}
         </p>
-      ) : null}
-
-      {!editing && voiceFormOpen ? (
-        <Card className="lm-voice-form">
-          <label className="lm-setup-label" htmlFor="lm-voice-select">
-            Narration voice
-          </label>
-          <p className="muted small">
-            Voices come from your browser: Chrome includes Google voices, other browsers offer
-            their own. Your pick applies to every lesson on this device.
-          </p>
-          <Dropdown
-            bare
-            id="lm-voice-select"
-            label="Narration voice"
-            className="lm-voice-select"
-            value={voiceURI}
-            options={[
-              { value: "", label: "Browser default" },
-              ...voiceOptions.map((voice) => ({ value: voice.voiceURI, label: `${voice.name} (${voice.lang})` })),
-            ]}
-            onChange={selectVoice}
-          />
-          <div className="button-row">
-            <Button variant="secondary" onClick={previewVoice}>
-              Preview voice
-            </Button>
-            <Button variant="secondary" onClick={() => setVoiceFormOpen(false)}>
-              Done
-            </Button>
-          </div>
-        </Card>
       ) : null}
 
       {playerVisible ? (
@@ -1375,11 +1243,6 @@ export default function LearningModuleLesson() {
                     <strong>{formatRate(rate)}</strong>
                     <span>{formatRate(rateMax)}</span>
                   </div>
-                  {rateMax < RATE_MAX ? (
-                    <p className="muted small lm-dock-speed-note">
-                      This voice tops out at {formatRate(rateMax)}. Pick a device voice for up to {formatRate(RATE_MAX)}.
-                    </p>
-                  ) : null}
                 </div>
               ) : null}
             </div>

@@ -5,6 +5,7 @@ import { Link, Navigate, useParams } from "react-router-dom";
 
 import { MarkdownContent } from "../components/MarkdownContent";
 import { markdownToSpeech, speechCapability, splitForSpeech } from "../components/episodeSpeech";
+import { cancelNarration, NARRATION_VOICE, prefetchNarration, speakNarration } from "../lib/narration";
 import { useConcept } from "../data/systemDesign/useConcept";
 import {
   getSystemDesignProgress,
@@ -31,17 +32,21 @@ export function stripLeadingHeading(markdown: string): string {
   return markdown.replace(/^\s*#\s+[^\n]*\n+/, "");
 }
 
-/** Play/pause/stop over the Web Speech API, one chunk at a time.
- *  Chrome silently drops long utterances, hence splitForSpeech. */
+/** Play/pause/stop over the narration voice, one chunk at a time. */
 function useReadAloud(markdown: string) {
   const capability = useMemo(() => speechCapability(), []);
   const chunks = useMemo(() => splitForSpeech(markdownToSpeech(markdown)), [markdown]);
   const [speaking, setSpeaking] = useState(false);
   const [paused, setPaused] = useState(false);
   const indexRef = useRef(0);
+  const chunksRef = useRef(chunks);
+  chunksRef.current = chunks;
+  // Each play bumps this so a clip that ends after a stop or skip does nothing.
+  const sessionRef = useRef(0);
 
   const stop = useCallback(() => {
-    if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel();
+    sessionRef.current += 1;
+    cancelNarration();
     indexRef.current = 0;
     setSpeaking(false);
     setPaused(false);
@@ -49,46 +54,54 @@ function useReadAloud(markdown: string) {
 
   useEffect(() => stop, [stop]);
 
-  const speakFrom = useCallback(
-    (start: number) => {
-      const synth = window.speechSynthesis;
-      if (!synth) return;
-      synth.cancel();
-      indexRef.current = start;
-      for (let i = start; i < chunks.length; i += 1) {
-        const utterance = new SpeechSynthesisUtterance(chunks[i]);
-        utterance.onstart = () => {
-          indexRef.current = i;
-        };
-        if (i === chunks.length - 1) {
-          // Deliberately does NOT mark the notes read. Completion is the
-          // learner's explicit claim, never something audio playback asserts.
-          utterance.onend = () => {
+  const speakFrom = useCallback((start: number) => {
+    sessionRef.current += 1;
+    const session = sessionRef.current;
+    indexRef.current = start;
+    setSpeaking(true);
+    setPaused(false);
+    const next = () => {
+      if (sessionRef.current !== session) return;
+      const text = chunksRef.current[indexRef.current];
+      if (text === undefined) {
+        // Deliberately does NOT mark the notes read. Completion is the
+        // learner's explicit claim, never something audio playback asserts.
+        setSpeaking(false);
+        setPaused(false);
+        indexRef.current = 0;
+        return;
+      }
+      prefetchNarration(chunksRef.current[indexRef.current + 1], NARRATION_VOICE);
+      speakNarration({
+        text,
+        voice: NARRATION_VOICE,
+        rate: 1,
+        onEnd: () => {
+          indexRef.current += 1;
+          next();
+        },
+        onError: () => {
+          if (sessionRef.current === session) {
             setSpeaking(false);
             setPaused(false);
-            indexRef.current = 0;
-          };
-        }
-        synth.speak(utterance);
-      }
-      setSpeaking(true);
-      setPaused(false);
-    },
-    [chunks],
-  );
+          }
+        },
+      });
+    };
+    next();
+  }, []);
 
+  // Pause stops the clip; resume replays the current chunk.
   const toggle = useCallback(() => {
-    const synth = window.speechSynthesis;
-    if (!synth) return;
     if (!speaking) {
       speakFrom(0);
       return;
     }
     if (paused) {
-      synth.resume();
-      setPaused(false);
+      speakFrom(indexRef.current);
     } else {
-      synth.pause();
+      sessionRef.current += 1;
+      cancelNarration();
       setPaused(true);
     }
   }, [paused, speakFrom, speaking]);

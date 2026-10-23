@@ -1,4 +1,4 @@
-"""Mock interview voice: text to speech and speech to text through OpenRouter.
+"""Interviewer and lesson voice: text to speech and speech to text through OpenRouter.
 
 Stateless. TTS tries the free model first and falls back to a cheap one; the
 browser's own speech recognition is the primary transcript source, so
@@ -24,7 +24,8 @@ def _headers() -> dict[str, str]:
 
 
 class SpeechService:
-    async def synthesize(self, text: str) -> bytes:
+    async def synthesize(self, text: str, voice_override: str | None = None) -> bytes:
+        """`voice_override` replaces the primary (Kokoro) voice; the fallback model keeps its own."""
         text = (text or "").strip()
         if not text:
             raise ValidationException("Nothing to speak.")
@@ -32,7 +33,7 @@ class SpeechService:
         last: Exception | None = None
         async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
             for model, voice in (
-                (settings.openrouter_tts_model, settings.openrouter_tts_voice),
+                (settings.openrouter_tts_model, voice_override or settings.openrouter_tts_voice),
                 (settings.openrouter_tts_fallback_model, settings.openrouter_tts_fallback_voice),
             ):
                 try:

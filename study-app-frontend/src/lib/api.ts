@@ -2604,6 +2604,18 @@ export async function sendStage3Message(
 }
 
 // Interviewer voice (mp3) and the transcription fallback for browsers without speech recognition.
+// Narration for lessons, episodes and notes (any signed-in user, unlike the beta-only interviewer voice).
+export async function narrateText(text: string, voice: string): Promise<Blob> {
+  const token = localStorage.getItem(TOKEN_KEY);
+  const res = await guardedFetch(`${API_BASE_URL}/speech/tts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ text, voice }),
+  });
+  if (!res.ok) throw new Error(`Voice unavailable (${res.status})`);
+  return res.blob();
+}
+
 export async function speakInterviewer(text: string): Promise<Blob> {
   const token = localStorage.getItem(TOKEN_KEY);
   const res = await guardedFetch(`${API_BASE_URL}/mock-interview/speak`, {

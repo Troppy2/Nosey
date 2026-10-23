@@ -1,6 +1,16 @@
 import { useEffect, useState } from "react";
 import "../styles/components/mock-loader.css";
 
+/** True once `ms` have passed since mount, so a fast load still shows the loader long enough to read. */
+export function useMinElapsed(ms: number): boolean {
+  const [elapsed, setElapsed] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setElapsed(true), ms);
+    return () => window.clearTimeout(t);
+  }, [ms]);
+  return elapsed;
+}
+
 /**
  * Full-screen wait for the Mock Interview rounds. Drawn like the room it opens into
  * (same ground, same orb), so the round fades in instead of jumping out of a card.

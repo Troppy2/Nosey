@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { MockLoader } from "./MockLoader";
+import { MockLoader, useMinElapsed } from "./MockLoader";
 import { getMockInterviewSession } from "../lib/api";
 import type { MockProgress } from "../lib/mockInterview";
 import type { MockInterviewSession } from "../lib/types";
@@ -51,6 +51,8 @@ export function MockProgressGate({
   const hasSession = Boolean((location.state as GateState)?.session);
   const needsSession = ready && !progress && !hasSession;
   const [fetchFailed, setFetchFailed] = useState(false);
+  // Restoring is usually instant; hold the loader a beat so it reads as a screen, not a flicker.
+  const shownLongEnough = useMinElapsed(1800);
 
   useEffect(() => {
     if (!needsSession || fetchFailed) return;
@@ -72,9 +74,9 @@ export function MockProgressGate({
     };
   }, [needsSession, fetchFailed, sessionId, location.pathname, location.search, navigate]);
 
-  if (!ready || (needsSession && !fetchFailed)) {
+  if (!shownLongEnough || !ready || (needsSession && !fetchFailed)) {
     return (
-      <MockLoader title={label} note="Restoring where you left off." tone={tone} />
+      <MockLoader title={label} note="Getting your interview ready." tone={tone} />
     );
   }
   return <>{render(progress)}</>;
