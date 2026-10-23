@@ -11,11 +11,20 @@ export const NARRATION_CHUNK_CHARS = 600;
  * How long a chunk may wait for its saved clip before the browser voice reads it instead. Saved
  * clips come back in milliseconds, so this only triggers while the server is still generating one.
  */
-const WAIT_FOR_CLIP_MS = 1200;
+const WAIT_FOR_CLIP_MS = 2500;
 
 export const narrationSupported = () => typeof window !== "undefined" && typeof Audio !== "undefined";
 
-type Clip = { text: string; voice: string; rate: number; onStart?: () => void; onEnd?: () => void; onError?: () => void };
+type Clip = {
+  text: string;
+  voice: string;
+  rate: number;
+  /** A voice from the device's own text to speech (not AI). When set, nothing is fetched. */
+  deviceVoice?: SpeechSynthesisVoice | null;
+  onStart?: () => void;
+  onEnd?: () => void;
+  onError?: () => void;
+};
 
 // ── On-device cache ───────────────────────────────────────────────────────────
 // A heard clip is kept in the browser's Cache Storage, so replays, seeking back and returning
@@ -85,9 +94,13 @@ function fetchClip(text: string, voice: string): Promise<Blob> {
   return hit;
 }
 
-/** Warms the next clip so playback does not stall between chunks. */
+/** Warms clips ahead of playback so they are ready (or at least generating) before they are needed. */
 export function prefetchNarration(text: string | undefined, voice: string) {
   if (text) void fetchClip(text, voice).catch(() => undefined);
+}
+
+export function prefetchMany(texts: (string | undefined)[], voice: string) {
+  for (const text of texts) prefetchNarration(text, voice);
 }
 
 export function cancelNarration() {
@@ -104,7 +117,7 @@ export function cancelNarration() {
  * server is still generating it) the browser voice reads this chunk so there is never a dead wait,
  * and the clip keeps loading so the next chunk can use it. Starting a new chunk cancels the last.
  */
-export function speakNarration({ text, voice, rate, onStart, onEnd, onError }: Clip) {
+export function speakNarration({ text, voice, rate, deviceVoice, onStart, onEnd, onError }: Clip) {
   cancelNarration();
   const mine = run;
   let usedBrowser = false;
@@ -115,11 +128,15 @@ export function speakNarration({ text, voice, rate, onStart, onEnd, onError }: C
     usedBrowser = true;
     const u = new SpeechSynthesisUtterance(text);
     u.rate = rate;
+    if (deviceVoice) u.voice = deviceVoice;
     u.onstart = () => mine === run && onStart?.();
     u.onend = () => mine === run && onEnd?.();
     u.onerror = () => mine === run && onError?.();
     synth.speak(u);
   };
+
+  // A chosen device voice is instant and needs no clip.
+  if (deviceVoice) return startBrowser();
 
   const timer = window.setTimeout(() => {
     if (mine === run) startBrowser();

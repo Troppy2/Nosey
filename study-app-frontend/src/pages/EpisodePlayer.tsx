@@ -15,7 +15,7 @@ import {
   splitForSpeech,
 } from "../components/episodeSpeech";
 import { cancelNarration, narrationSupported, prefetchNarration, speakNarration } from "../lib/narration";
-import { answerCheckpoint, fetchModuleEpisode, fetchTrackForModule, scopeKey } from "../lib/api";
+import { answerCheckpoint, fetchModuleEpisode, fetchTrackForModule, scopeKey, warmModuleNarration } from "../lib/api";
 import type { CheckpointAnswerResult, EpisodeCheckpoint, ModuleEpisode } from "../lib/types";
 
 type SpeechState = "idle" | "playing" | "paused";
@@ -76,6 +76,17 @@ function useEpisodeSpeech(
     castRef.current = cast;
   }, [userRate, cast]);
 
+  // Get the audio ready as soon as the episode opens, not when Play is pressed: ask the server to
+  // finish generating the clips (it skips ones it has) and pull the first few into this browser.
+  useEffect(() => {
+    if (!episode || !ttsSupported) return;
+    void warmModuleNarration(episode.module_id).catch(() => undefined);
+  }, [episode, ttsSupported]);
+  useEffect(() => {
+    if (!ttsSupported) return;
+    for (const chunk of chunks.slice(0, 3)) prefetchNarration(chunk.text, cast[chunk.speaker]?.voice ?? "af_heart");
+  }, [chunks, cast, ttsSupported]);
+
   const speakChunk = useCallback(() => {
     if (stoppedRef.current) return;
     const session = playSessionRef.current;
@@ -91,8 +102,9 @@ function useEpisodeSpeech(
     }
     const cfg = castRef.current[chunk.speaker];
     const voice = cfg?.voice ?? "af_heart";
-    const next = chunksRef.current[index + 1];
-    if (next) prefetchNarration(next.text, castRef.current[next.speaker]?.voice ?? "af_heart");
+    for (const ahead of chunksRef.current.slice(index + 1, index + 3)) {
+      prefetchNarration(ahead.text, castRef.current[ahead.speaker]?.voice ?? "af_heart");
+    }
     speakNarration({
       text: chunk.text,
       voice,

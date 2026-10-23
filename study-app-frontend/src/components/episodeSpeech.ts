@@ -10,6 +10,137 @@ import { EXPERT_VOICE, NARRATION_CHUNK_CHARS, NARRATION_VOICE, narrationSupporte
 // function calls. Runs on every speech block as a safety net; the LLM-written
 // narration script should already be plain prose, but raw notation must never
 // reach the voice as symbols it silently drops.
+// Greek letters and math symbols, spoken as words. A voice model skips them otherwise (a raw alpha or
+// a leftover backslash command is read as silence), which made math lessons unlistenable.
+const GREEK_NAMES: Record<string, string> = {
+  alpha: "alpha",
+  beta: "beta",
+  gamma: "gamma",
+  delta: "delta",
+  epsilon: "epsilon",
+  zeta: "zeta",
+  eta: "eta",
+  theta: "theta",
+  iota: "iota",
+  kappa: "kappa",
+  lambda: "lambda",
+  mu: "mu",
+  nu: "nu",
+  xi: "xi",
+  omicron: "omicron",
+  pi: "pi",
+  rho: "rho",
+  sigma: "sigma",
+  tau: "tau",
+  upsilon: "upsilon",
+  phi: "phi",
+  chi: "chi",
+  psi: "psi",
+  omega: "omega",
+  varepsilon: "epsilon",
+  vartheta: "theta",
+  varphi: "phi",
+  varrho: "rho",
+  varsigma: "sigma",
+  Gamma: "capital gamma",
+  Delta: "capital delta",
+  Theta: "capital theta",
+  Lambda: "capital lambda",
+  Xi: "capital xi",
+  Pi: "capital pi",
+  Sigma: "capital sigma",
+  Upsilon: "capital upsilon",
+  Phi: "capital phi",
+  Psi: "capital psi",
+  Omega: "capital omega",
+};
+const GREEK_UNICODE: Record<string, string> = {
+  α: "alpha",
+  β: "beta",
+  γ: "gamma",
+  δ: "delta",
+  ε: "epsilon",
+  ζ: "zeta",
+  η: "eta",
+  θ: "theta",
+  ι: "iota",
+  κ: "kappa",
+  λ: "lambda",
+  μ: "mu",
+  ν: "nu",
+  ξ: "xi",
+  π: "pi",
+  ρ: "rho",
+  σ: "sigma",
+  ς: "sigma",
+  τ: "tau",
+  υ: "upsilon",
+  φ: "phi",
+  χ: "chi",
+  ψ: "psi",
+  ω: "omega",
+  ϕ: "phi",
+  ϵ: "epsilon",
+  ϑ: "theta",
+  Γ: "capital gamma",
+  Δ: "capital delta",
+  Λ: "capital lambda",
+  Ξ: "capital xi",
+  Π: "capital pi",
+  Σ: "capital sigma",
+  Φ: "capital phi",
+  Ψ: "capital psi",
+};
+const MATH_SYMBOLS: Record<string, string> = {
+  "≤": " less than or equal to ",
+  "≥": " greater than or equal to ",
+  "≠": " not equal to ",
+  "≈": " approximately equal to ",
+  "±": " plus or minus ",
+  "÷": " divided by ",
+  "√": " the square root of ",
+  "∑": " the sum of ",
+  "∫": " the integral of ",
+  "∞": " infinity ",
+  "∈": " is in ",
+  "∉": " is not in ",
+  "⊂": " is a subset of ",
+  "⊆": " is a subset of or equal to ",
+  "∪": " union ",
+  "∩": " intersection ",
+  "∀": " for all ",
+  "∃": " there exists ",
+  "∂": " partial ",
+  "∇": " nabla ",
+  "°": " degrees ",
+  "∝": " is proportional to ",
+  "≡": " is congruent to ",
+  "⇒": " implies ",
+  "⇔": " if and only if ",
+};
+const LATEX_SYMBOLS: Record<string, string> = {
+  pm: " plus or minus ",
+  div: " divided by ",
+  approx: " approximately equal to ",
+  in: " is in ",
+  notin: " is not in ",
+  subset: " is a subset of ",
+  subseteq: " is a subset of or equal to ",
+  cup: " union ",
+  cap: " intersection ",
+  forall: " for all ",
+  exists: " there exists ",
+  partial: " partial ",
+  nabla: " nabla ",
+  propto: " is proportional to ",
+  equiv: " is congruent to ",
+  Rightarrow: " implies ",
+  Leftrightarrow: " if and only if ",
+  to: " to ",
+  rightarrow: " to ",
+  leftarrow: " from ",
+};
+
 export function notationToSpeech(text: string): string {
   let out = text;
   // Complexity classes first, before the generic call rule: O(n log n) -> "O of n log n".
@@ -25,6 +156,12 @@ export function notationToSpeech(text: string): string {
   out = out.replace(/\\int\b/g, " the integral of ");
   out = out.replace(/\\infty\b/g, " infinity ");
   out = out.replace(/\\pi\b/g, " pi ");
+  // LaTeX Greek letters and symbol commands, then the same characters typed directly.
+  out = out.replace(/\\([a-zA-Z]+)(?![a-zA-Z])/g, (m, name: string) =>
+    GREEK_NAMES[name] !== undefined ? ` ${GREEK_NAMES[name]} ` : (LATEX_SYMBOLS[name] ?? m),
+  );
+  out = out.replace(/[\u0370-\u03ff\u1f00-\u1fff]/g, (ch) => (GREEK_UNICODE[ch] !== undefined ? ` ${GREEK_UNICODE[ch]} ` : ch));
+  out = out.replace(/[≤≥≠≈±÷√∑∫∞∈∉⊂⊆∪∩∀∃∂∇°∝≡⇒⇔]/g, (ch) => MATH_SYMBOLS[ch]);
   out = out.replace(/\\cdot\b|\\times\b|×|·/g, " times ");
   out = out.replace(/\\le(q)?\b/g, " less than or equal to ");
   out = out.replace(/\\ge(q)?\b/g, " greater than or equal to ");

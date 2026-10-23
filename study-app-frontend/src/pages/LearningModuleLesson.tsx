@@ -1,9 +1,10 @@
 import { Pause, Play, Video } from "lucide-react";
-import { ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, CrossCircleIcon, PencilIcon, RetryIcon } from "../icons";
+import { ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, CrossCircleIcon, PencilIcon, RetryIcon, SpeakerIcon } from "../icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { Button } from "../components/Button";
+import { Dropdown } from "../components/Dropdown";
 import { FormError } from "../components/FormError";
 import { Card } from "../components/Card";
 import { useConfetti } from "../components/Confetti";
@@ -16,6 +17,7 @@ import {
   submitModuleQuiz,
   updateModuleLesson,
   updateModuleVideo,
+  warmModuleNarration,
 } from "../lib/api";
 import { markdownToSpeech, splitForSpeech } from "../components/episodeSpeech";
 import {
@@ -23,7 +25,7 @@ import {
   NARRATION_CHUNK_CHARS,
   NARRATION_VOICE,
   narrationSupported,
-  prefetchNarration,
+  prefetchMany,
   speakNarration,
 } from "../lib/narration";
 import { looksMangled, repairLessonForDisplay, repairLessonFully } from "../lib/repairLessonMarkdown";
@@ -276,6 +278,15 @@ export function easeChunkProgress(ratio: number): number {
 
 const RATE_MIN = 0.5;
 const RATE_MAX = 3;
+// Chrome's Google voices stream from Google's servers and stop speeding up near 2x: any higher
+// rate is clamped silently, so the chip would say 3x while the audio plays at 2x.
+const NETWORK_VOICE_RATE_MAX = 2;
+
+// The speed ceiling for the voice that will actually speak. No device voice picked means the
+// Nosey voice, which plays as audio and honours the full range.
+function maxRateFor(voice: SpeechSynthesisVoice | null): number {
+  return voice && !voice.localService ? NETWORK_VOICE_RATE_MAX : RATE_MAX;
+}
 const RATE_STEP = 0.05;
 // Trailing zeros dropped, so 1.7 reads "1.7x" and 1 reads "1x".
 function formatRate(rate: number): string {
@@ -426,9 +437,68 @@ export default function LearningModuleLesson() {
 
   const audioPosKey = numericModuleId != null ? scopeKey(`nosey_lm_audio_${numericModuleId}`) : "";
 
+  // ── Narration voice ─────────────────────────────────────────────────────────
+  // Default is the Nosey voice (an AI voice, played from saved audio). The listener can switch to
+  // one of their device's own voices (not AI) from the lesson menu. The pick is device-wide, and an
+  // empty value means the Nosey voice. (_v2: the old key held a device voice picked back when that was the
+  // only voice, which would now silently override the Nosey default.)
   const [menuOpen, setMenuOpen] = useState(false);
-  // One server voice for every lesson, so the speed ceiling is the same everywhere.
-  const rateMax = RATE_MAX;
+  const [voiceFormOpen, setVoiceFormOpen] = useState(false);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [voiceURI, setVoiceURI] = useState<string>(
+    () => (typeof window !== "undefined" ? localStorage.getItem(scopeKey("nosey_lm_voice_v2")) ?? "" : ""),
+  );
+  const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
+  const deviceVoicesSupported = typeof window !== "undefined" && "speechSynthesis" in window;
+
+  // getVoices() is empty until the browser loads its list; voiceschanged fires when it is ready.
+  useEffect(() => {
+    if (!deviceVoicesSupported) return;
+    const load = () => setVoices(window.speechSynthesis.getVoices());
+    load();
+    window.speechSynthesis.addEventListener("voiceschanged", load);
+    return () => window.speechSynthesis.removeEventListener("voiceschanged", load);
+  }, [deviceVoicesSupported]);
+
+  useEffect(() => {
+    voiceRef.current = voices.find((v) => v.voiceURI === voiceURI) ?? null;
+  }, [voices, voiceURI]);
+
+  const rateMax = maxRateFor(voices.find((v) => v.voiceURI === voiceURI) ?? null);
+
+  // A saved 3x carried onto a voice that tops out at 2x would show a speed nobody hears.
+  useEffect(() => {
+    if (rate <= rateMax) return;
+    setRate(rateMax);
+    rateRef.current = rateMax;
+    try {
+      localStorage.setItem(scopeKey("nosey_lm_rate"), String(rateMax));
+    } catch {
+      // Private mode or a full quota.
+    }
+  }, [rate, rateMax]);
+
+  // Get the audio ready as soon as the lesson opens, not when Play is pressed: ask the server to
+  // finish generating this module's clips (it skips ones it has) and pull the first few into this
+  // browser. Otherwise the first chunk would always be read by the device voice while the Nosey
+  // voice is still being made.
+  useEffect(() => {
+    if (numericModuleId == null || !ttsSupported || voiceURI) return;
+    void warmModuleNarration(numericModuleId).catch(() => undefined);
+  }, [numericModuleId, ttsSupported, voiceURI]);
+
+  // English voices first (lessons are English), Google voices first within that.
+  const voiceOptions = useMemo(() => {
+    return [...voices].sort((a, b) => {
+      const aEn = a.lang.toLowerCase().startsWith("en") ? 0 : 1;
+      const bEn = b.lang.toLowerCase().startsWith("en") ? 0 : 1;
+      if (aEn !== bEn) return aEn - bEn;
+      const aGoogle = a.name.includes("Google") ? 0 : 1;
+      const bGoogle = b.name.includes("Google") ? 0 : 1;
+      if (aGoogle !== bGoogle) return aGoogle - bGoogle;
+      return a.name.localeCompare(b.name);
+    });
+  }, [voices]);
 
   useEffect(() => {
     if (numericModuleId == null) return;
@@ -494,6 +564,12 @@ export default function LearningModuleLesson() {
 
   // The paragraph the player is on, for the article highlight.
   const currentBlock = speechChunks[chunkPos]?.blockIndex ?? 0;
+
+  // Pull the first few clips into this browser before Play is pressed (see the warm effect above).
+  useEffect(() => {
+    if (!ttsSupported || voiceURI || speechChunks.length === 0) return;
+    prefetchMany(speechChunks.slice(0, 3).map((c) => c.text), NARRATION_VOICE);
+  }, [ttsSupported, voiceURI, speechChunks]);
 
   // Words spoken by the time each chunk STARTS, plus a final total. Drives the
   // player's elapsed/total readout at ~170 spoken words a minute.
@@ -617,10 +693,12 @@ export default function LearningModuleLesson() {
       updateChunkPos(0);
       return;
     }
-    prefetchNarration(chunksRef.current[index + 1]?.text, NARRATION_VOICE);
+    const deviceVoice = voiceRef.current;
+    if (!deviceVoice) prefetchMany([chunksRef.current[index + 1]?.text, chunksRef.current[index + 2]?.text], NARRATION_VOICE);
     speakNarration({
       text: chunk.text,
       voice: NARRATION_VOICE,
+      deviceVoice,
       rate: rateRef.current,
       onStart: () => {
         if (playSessionRef.current === session) updateChunkPos(index);
@@ -695,6 +773,32 @@ export default function LearningModuleLesson() {
     if (commit && speech === "playing") {
       startSpeechFrom(chunkIndexRef.current);
     }
+  }
+
+  function selectVoice(uri: string) {
+    setVoiceURI(uri);
+    voiceRef.current = voices.find((v) => v.voiceURI === uri) ?? null;
+    const key = scopeKey("nosey_lm_voice_v2");
+    try {
+      if (uri) localStorage.setItem(key, uri);
+      else localStorage.removeItem(key);
+    } catch {
+      // Private mode or a full quota: the choice just is not remembered.
+    }
+    // Like a speed change: restart the current chunk so the new voice is heard now.
+    if (speech === "playing") startSpeechFrom(chunkIndexRef.current);
+  }
+
+  function previewVoice() {
+    if (!ttsSupported) return;
+    // Halt the lesson queue (the session bump makes its callbacks inert), then speak a one-off sample.
+    stopSpeech();
+    speakNarration({
+      text: "This is how your lessons will sound. Binary search runs in O of log n time.",
+      voice: NARRATION_VOICE,
+      deviceVoice: voiceRef.current,
+      rate: rateRef.current,
+    });
   }
 
   useEffect(() => {
@@ -1116,6 +1220,18 @@ export default function LearningModuleLesson() {
                   >
                     <RetryIcon size={15} /> Reformat article
                   </button>
+                  {ttsSupported ? (
+                    <button
+                      role="menuitem"
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setVoiceFormOpen((open) => !open);
+                      }}
+                    >
+                      <SpeakerIcon size={15} /> Change voice
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -1127,6 +1243,38 @@ export default function LearningModuleLesson() {
         <p className="muted small lm-reformat-note" role="status">
           {reformatting ? "Reformatting the article…" : reformatNote}
         </p>
+      ) : null}
+
+      {!editing && voiceFormOpen ? (
+        <Card className="lm-voice-form">
+          <label className="lm-setup-label" htmlFor="lm-voice-select">
+            Narration voice
+          </label>
+          <p className="muted small">
+            The Nosey voice is AI generated. The others are your device's built-in text to speech, which is
+            not AI. Your pick applies to every lesson on this device.
+          </p>
+          <Dropdown
+            bare
+            id="lm-voice-select"
+            label="Narration voice"
+            className="lm-voice-select"
+            value={voiceURI}
+            options={[
+              { value: "", label: "Nosey voice (AI)" },
+              ...voiceOptions.map((voice) => ({ value: voice.voiceURI, label: `${voice.name} (${voice.lang})` })),
+            ]}
+            onChange={selectVoice}
+          />
+          <div className="button-row">
+            <Button variant="secondary" onClick={previewVoice}>
+              Preview voice
+            </Button>
+            <Button variant="secondary" onClick={() => setVoiceFormOpen(false)}>
+              Done
+            </Button>
+          </div>
+        </Card>
       ) : null}
 
       {playerVisible ? (
@@ -1243,6 +1391,11 @@ export default function LearningModuleLesson() {
                     <strong>{formatRate(rate)}</strong>
                     <span>{formatRate(rateMax)}</span>
                   </div>
+                  {rateMax < RATE_MAX ? (
+                    <p className="muted small lm-dock-speed-note">
+                      This voice tops out at {formatRate(rateMax)}. Pick a voice installed on your device, or the Nosey voice, for up to {formatRate(RATE_MAX)}.
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
             </div>

@@ -412,6 +412,33 @@ async def _get_owned_module(module_id: int, user_id: int, session: AsyncSession)
     return module
 
 
+@router.post("/{module_id}/narration/warm", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit("30/minute")
+async def warm_module_narration(
+    module_id: int,
+    request: Request,
+    response: Response,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> dict[str, bool]:
+    """Start generating this module's narration in the background (idempotent: clips that already
+    exist are skipped). The lesson and episode players call it when a module opens, so the audio is
+    ready by the time the listener presses Play, including for modules written before narration was
+    pre-generated."""
+    try:
+        module = await _get_owned_module(module_id, user.id, session)
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if module.episode_script:
+        track = await session.get(LearningTrack, module.track_id)
+        schedule_episode_narration(module.id, track.format if track is not None else "podcast")
+        return {"started": True}
+    if module.tts_script:
+        schedule_lesson_narration(module.id)
+        return {"started": True}
+    return {"started": False}
+
+
 def _checkpoint_progress(module: LearningModule, total: int) -> list[dict[str, object]]:
     """The listener's per-checkpoint record, normalized to length `total`.
 

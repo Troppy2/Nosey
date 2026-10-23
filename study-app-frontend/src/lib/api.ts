@@ -2604,6 +2604,11 @@ export async function sendStage3Message(
 }
 
 // Interviewer voice (mp3) and the transcription fallback for browsers without speech recognition.
+// Starts pre-generating a module's narration so it is ready when Play is pressed (fire and forget).
+export async function warmModuleNarration(moduleId: number): Promise<void> {
+  await request<unknown>(`/learning-modules/${moduleId}/narration/warm`, { method: "POST" });
+}
+
 // Narration for lessons, episodes and notes (any signed-in user, unlike the beta-only interviewer voice).
 export async function narrateText(text: string, voice: string): Promise<Blob> {
   const token = localStorage.getItem(TOKEN_KEY);
