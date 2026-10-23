@@ -731,10 +731,18 @@ async def create_mock_interview(ctx: McpContext, args: CreateMockArgs) -> dict[s
         custom_company = company
         jd_text = args.job_description or None
         problems = []
+        customs = {row.slug: row for row in await _custom_rows(ctx)}
         for slug in await _known_slugs(ctx, args.problem_slugs):
             builtin = lc_catalog.get(slug)
-            problems.append(CustomProblemRef(slug=slug, title=builtin.title if builtin else slug,
-                                             difficulty=builtin.difficulty if builtin else "Medium"))
+            custom = customs.get(slug)
+            if builtin is not None:
+                title, difficulty = builtin.title, builtin.difficulty
+            else:
+                # A custom problem: its real title (never the slug), so the OA heading,
+                # grading and the interviewer prompt all name it properly.
+                title = custom.title if custom else slug
+                difficulty = custom.difficulty if custom and custom.difficulty in DIFFICULTIES else "Medium"
+            problems.append(CustomProblemRef(slug=slug, title=title[:200], difficulty=difficulty))
         custom_config = MockCustomConfig(
             role_focus=args.role_focus, culture=args.culture, topics=args.topics, problems=problems
         ).model_dump_json()

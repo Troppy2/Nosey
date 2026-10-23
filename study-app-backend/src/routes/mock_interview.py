@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_session
 from src.dependencies import get_beta_user, get_current_user
+from src.models.lc_sync import LCCustomProblem
 from src.models.mock_interview import MockInterviewSession
 from src.models.user import User
 from src.schemas.mock_interview_schema import (
@@ -145,6 +146,18 @@ def _merge_covered_goals(prior: list[str], reported, valid_goals: list[str]) -> 
     if isinstance(reported, list):
         covered.update(g for g in reported if isinstance(g, str) and g in valid_goals)
     return [g for g in valid_goals if g in covered]
+
+
+async def _custom_problem_statements(db: AsyncSession, user_id: int, slugs: list[str]) -> str:
+    """Title + statement (trimmed) of the user's custom problems, for the interviewer prompt."""
+    if not slugs:
+        return ""
+    rows = (
+        await db.execute(
+            select(LCCustomProblem).where(LCCustomProblem.user_id == user_id, LCCustomProblem.slug.in_(slugs))
+        )
+    ).scalars().all()
+    return "\n".join(f"- {r.title} ({r.slug}): {(r.description or '').strip()[:1200]}" for r in rows)
 
 
 def _custom_config(row: MockInterviewSession) -> Optional[MockCustomConfig]:
@@ -843,6 +856,16 @@ async def stage2_message(
                 f"\nWhen you present the coding problem, choose ONE from the candidate's target "
                 f"problem set: {picks}. Use its real title and slug.\n"
             )
+            # custom-* problems exist only in the user's account, not on LeetCode, so the
+            # model cannot know them by title: give it their statements to present from.
+            custom_statements = await _custom_problem_statements(
+                db, user.id, [p.slug for p in cfg.problems[:6] if p.slug.startswith("custom-")]
+            )
+            if custom_statements:
+                custom_focus += (
+                    "These are the candidate's own problems, not on LeetCode. If you pick one, present "
+                    "it from this statement, keeping its slug:\n" + custom_statements + "\n"
+                )
         elif cfg.topics:
             custom_focus = (
                 f"\nFocus the technical and coding questions on these topics this company tests: "

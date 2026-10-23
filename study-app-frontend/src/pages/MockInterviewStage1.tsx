@@ -7,7 +7,8 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { LoadingNotice } from "../components/Loaders";
 import type { ProgressStage } from "../components/Progress";
 import { ProgressOverlay, useStagedProgress } from "../components/Progress";
-import { fetchLeetCodeProblem, gradeStage1, type Stage1SubmissionItem } from "../lib/api";
+import { fetchLCCustomProblems, fetchLeetCodeProblem, gradeStage1, type Stage1SubmissionItem } from "../lib/api";
+import { MarkdownContent } from "../components/MarkdownContent";
 import { useSettings } from "../lib/useSettings";
 import { runPythonLeetCode, type RunnerResult } from "../lib/pyodideRunner";
 import { isLeetCodeRunnable, sanitizeLeetCodeHtml } from "../lib/leetcodeHtml";
@@ -27,7 +28,34 @@ import {
   type InterviewLevel,
   type InterviewProblem,
 } from "../data/mockInterviewProblems";
-import type { LeetCodeProblemData, MockInterviewSession } from "../lib/types";
+import type { LCCustomProblem, LeetCodeProblemData, MockInterviewSession } from "../lib/types";
+
+type LoadedProblem = LeetCodeProblemData & { markdown?: string };
+
+// A custom-* slug (written by the user or an AI app) lives only in the user's custom
+// problems, never on LeetCode, so it is loaded from there: the statement is markdown
+// and the user's test cases become the runnable examples, as in KojoCode.
+async function loadProblem(slug: string): Promise<LoadedProblem> {
+  if (!slug.startsWith("custom-")) return fetchLeetCodeProblem(slug);
+  const custom: LCCustomProblem | undefined = (await fetchLCCustomProblems()).find((p) => p.slug === slug);
+  if (!custom) throw new Error("This custom problem was deleted, so its statement is gone.");
+  return {
+    title: custom.title,
+    title_slug: custom.slug,
+    difficulty: custom.difficulty === "unknown" ? "" : custom.difficulty,
+    content_html: "",
+    markdown: custom.description,
+    examples: custom.test_cases.map((tc, index) => ({
+      index: index + 1,
+      input_text: tc.input_text,
+      output_text: tc.output_text,
+      explanation_text: tc.explanation_text ?? null,
+    })),
+    example_testcases: [],
+    python_snippet: custom.starter_code,
+    topic_tags: custom.topic ? [{ name: custom.topic, slug: custom.topic }] : [],
+  };
+}
 
 function questionTimeLimitMs(difficulty: string): number {
   if (difficulty === "Hard") return 40 * 60 * 1000;
@@ -134,7 +162,7 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
   const [currentIdx, setCurrentIdx] = useState(() => stored?.stage1?.currentIdx ?? 0);
 
   // Fetched LeetCode problem statements + runner results, keyed by slug.
-  const [problemData, setProblemData] = useState<Record<string, LeetCodeProblemData>>({});
+  const [problemData, setProblemData] = useState<Record<string, LoadedProblem>>({});
   const [problemLoading, setProblemLoading] = useState(false);
   const [problemError, setProblemError] = useState<string | null>(null);
   const [runnerResults, setRunnerResults] = useState<Record<string, RunnerResult>>({});
@@ -210,7 +238,7 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
     let cancelled = false;
     setProblemLoading(true);
     setProblemError(null);
-    fetchLeetCodeProblem(currentSlug)
+    loadProblem(currentSlug)
       .then((data) => {
         if (cancelled) return;
         setProblemData((prev) => ({ ...prev, [currentSlug]: data }));
@@ -362,7 +390,7 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
           : "[]";
         return {
           slug: qs.slug,
-          title: qs.title,
+          title: problemData[qs.slug]?.title || qs.title,
           difficulty: qs.difficulty,
           code: qs.code,
           time_used_ms: qs.timeUsedMs + (qs.startedAt > 0 ? Date.now() - qs.startedAt : 0),
@@ -507,7 +535,8 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
             <span className="mock-stage1-prob-num">
               Problem {currentIdx + 1} of {questions.length}
             </span>
-            <h2 className="mock-stage1-problem-title">{current.title}</h2>
+            {/* Older sessions stored a custom problem's slug as its title; the loaded data has the real one. */}
+            <h2 className="mock-stage1-problem-title">{curData?.title || current.title}</h2>
             <div className="mock-stage1-problem-meta">
               <span className={`pill mock-diff-${current.difficulty.toLowerCase()}`}>
                 {current.difficulty}
@@ -535,14 +564,16 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
           <div className="mock-stage1-panel-section">
             <div className="mock-stage1-section-label-row">
               <span className="mock-stage1-section-label">Problem</span>
-              <a
-                href={`https://leetcode.com/problems/${current.slug}/`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mock-stage1-lc-link"
-              >
-                LeetCode <ExternalLink size={10} />
-              </a>
+              {current.slug.startsWith("custom-") ? null : (
+                <a
+                  href={`https://leetcode.com/problems/${current.slug}/`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mock-stage1-lc-link"
+                >
+                  LeetCode <ExternalLink size={10} />
+                </a>
+              )}
             </div>
             {problemLoading && (
               <div className="mock-stage1-statement-loading">
@@ -554,12 +585,16 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
                 <AlertIcon size={14} /> {problemError}
               </div>
             )}
-            {curData && (
+            {curData && curData.markdown !== undefined ? (
+              <div className="mock-stage1-statement">
+                <MarkdownContent content={curData.markdown} />
+              </div>
+            ) : curData ? (
               <div
                 className="mock-stage1-statement"
                 dangerouslySetInnerHTML={{ __html: sanitizeLeetCodeHtml(curData.content_html) }}
               />
-            )}
+            ) : null}
           </div>
 
           {/* Time budget */}

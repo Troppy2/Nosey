@@ -256,3 +256,11 @@ async def test_bank_completion_is_separate_from_global_done(client, call, seeded
     await call("remove_bank_problems", {"bank_id": bank["bank_id"], "problem_slugs": ["two-sum"]})
     readded = await call("add_bank_problems", {"bank_id": bank["bank_id"], "problem_slugs": ["two-sum"]})
     assert readded["completed_in_bank"] == []
+
+
+async def test_mock_interview_uses_custom_problem_titles(client, call) -> None:  # noqa: F811
+    made_problem = await call("create_leetcode_problem", _problem(title="Rotate the warehouse grid", difficulty="Hard"))
+    made = await call("create_mock_interview", {"company": "NVIDIA", "problem_slugs": [made_problem["slug"], "two-sum"]})
+    problems = (await client.get(f"/mock-interview/{made['session_id']}")).json()["custom_config"]["problems"]
+    assert problems[0] == {"slug": made_problem["slug"], "title": "Rotate the warehouse grid", "difficulty": "Hard"}
+    assert problems[1]["title"] == "Two Sum"
