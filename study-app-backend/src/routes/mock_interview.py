@@ -36,12 +36,18 @@ from src.schemas.mock_interview_schema import (
     Stage3MessageRequest,
     Stage3MessageResponse,
 )
-from src.schemas.mock_interview_schema import _normalize_level
+from src.schemas.mock_interview_schema import (
+    SpeakRequest,
+    Stage1HiddenTestsRequest,
+    Stage1HiddenTestsResponse,
+    _normalize_level,
+)
 from src.services import lc_taxonomy
 from src.limiter import limiter
 from src.services.file_service import FileService
 from src.services.leetcode_service import LeetCodeService
 from src.services.llm_service import LLMService
+from src.services.speech_service import SpeechService
 from src.utils.exceptions import LLMException, ValidationException
 from src.utils.provider_policy import resolve_request_provider
 from src.services.account_safety_service import screen_user_input
@@ -134,7 +140,7 @@ _RESUME_GOALS = ["project_deep_dive", "impact_metrics", "tech_choice", "ownershi
 # Hard turn caps (counted by user turns) so the stage always terminates even if the
 # model never reports full goal coverage.
 _STAGE2_TURN_CAP = 10
-_STAGE3_TURN_CAP = 7
+_STAGE3_TURN_CAP = 17  # 5 stories, up to 2 probes each, plus closing questions
 _RESUME_TURN_CAP = 7
 
 
@@ -321,6 +327,33 @@ async def sync_progress(
 
 
 # ── Parse a job description into a prefilled custom-company config ─────────────
+
+@router.post("/speak")
+@limiter.limit("40/minute")
+async def speak(request: Request, payload: SpeakRequest):
+    """Interviewer voice: text in, mp3 out."""
+    try:
+        audio = await SpeechService().synthesize(payload.text)
+    except ValidationException as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except LLMException as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    return Response(content=audio, media_type="audio/mpeg", headers={"Cache-Control": "no-store"})
+
+
+@router.post("/transcribe")
+@limiter.limit("20/minute")
+async def transcribe(request: Request, audio: UploadFile = File(...)):
+    """Fallback for browsers without speech recognition."""
+    data = await audio.read()
+    try:
+        text = await SpeechService().transcribe(data, audio.filename or "answer.webm", audio.content_type or "audio/webm")
+    except ValidationException as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except LLMException as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    return {"text": text}
+
 
 @router.post("/parse-jd", response_model=JDParseResponse)
 @limiter.limit("5/minute")
@@ -568,7 +601,7 @@ async def resume_grill_message(
     question_number = len(covered) + 1
 
     system_prompt = (
-        f"You are a hiring manager at {company_label} running a 20-minute resume deep dive with "
+        f"You are Kojo, a hiring manager at {company_label}, running a 20-minute resume deep dive with "
         f"{candidate} for a {level_cfg['label']} role, right after the resume passed the screen.\n"
         f"This company weighs: {role_focus}\n"
         f"Calibrate depth to a {level_cfg['label']} candidate: {level_cfg['rigor']}\n\n"
@@ -678,6 +711,57 @@ async def _save_resume_grill_feedback(
     await db.commit()
 
 
+# ── Stage 1: hidden tests ─────────────────────────────────────────────────────
+# Real OAs score on hidden cases. The model writes edge and large inputs plus a
+# reference solution; the browser runs the reference to compute expected outputs,
+# so the answers are executed, never guessed by the model.
+
+_HIDDEN_MAX_INPUT_CHARS = 3000
+
+
+@router.post("/{session_id}/stage1/hidden-tests", response_model=Stage1HiddenTestsResponse)
+@limiter.limit("15/minute")
+async def stage1_hidden_tests(
+    request: Request,
+    session_id: int,
+    body: Stage1HiddenTestsRequest,
+    db: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> Stage1HiddenTestsResponse:
+    await _load_session(session_id, user, db)
+    examples = "\n\n".join(f"Input: {ex.input_text}\nOutput: {ex.output_text}" for ex in body.examples)
+    prompt = (
+        "You write hidden test cases for a coding assessment, like HackerRank or CodeSignal.\n\n"
+        f"PROBLEM: {body.title}\n{body.statement[:12000]}\n\n"
+        f"EXAMPLES (reuse this exact input format):\n{examples}\n\n"
+        'Return ONLY JSON: {"reference_code": "...", "inputs": ["..."]}\n'
+        "- reference_code: a correct, efficient Python 3 `class Solution` with the same method "
+        "signature the examples imply. Standard library only.\n"
+        "- inputs: 8 to 12 inputs written EXACTLY in the example input format (same variable "
+        "names, same order). Cover edge cases (empty or single element, duplicates, negatives, "
+        "boundaries from the constraints) and 2 larger inputs that would time out an O(n^2) "
+        f"solution. Keep every input under {_HIDDEN_MAX_INPUT_CHARS} characters.\n"
+        "- Do NOT include outputs; they are computed by running reference_code.\n"
+        "- Do NOT repeat the examples."
+    )
+    try:
+        data = await LLMService().complete_json_strongest(prompt)
+    except LLMException as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    reference = str(data.get("reference_code") or "").strip()
+    raw_inputs = data.get("inputs") if isinstance(data.get("inputs"), list) else []
+    seen = {ex.input_text.strip() for ex in body.examples}
+    inputs: list[str] = []
+    for item in raw_inputs:
+        text = str(item).strip()
+        if text and len(text) <= _HIDDEN_MAX_INPUT_CHARS and text not in seen:
+            seen.add(text)
+            inputs.append(text)
+    if not reference or "class Solution" not in reference or len(inputs) < 3:
+        raise HTTPException(status_code=503, detail="Hidden tests could not be generated for this problem.")
+    return Stage1HiddenTestsResponse(reference_code=reference[:20000], inputs=inputs[:12])
+
+
 # ── Stage 1: grade submissions ────────────────────────────────────────────────
 
 @router.post("/{session_id}/stage1/grade", response_model=Stage1GradeResponse)
@@ -698,24 +782,40 @@ async def grade_stage1(
         # Verdict comes first from the real in-app execution counts so it is
         # deterministic; the LLM only writes prose feedback and can never flip
         # a passing run to a fail (or vice versa).
-        verdict = _derive_verdict(
-            all_passed=sub.all_passed,
-            tests_passed=sub.tests_passed,
-            tests_total=sub.tests_total,
-            code=sub.code,
-        )
+        if sub.hidden_total > 0:
+            verdict = _hidden_verdict(sub.hidden_passed, sub.hidden_total)
+        else:
+            verdict = _derive_verdict(
+                all_passed=sub.all_passed,
+                tests_passed=sub.tests_passed,
+                tests_total=sub.tests_total,
+                code=sub.code,
+            )
+        test_results = sub.test_results
+        if sub.hidden_total > 0:
+            # Give the reviewer the hidden outcome so the prose matches the verdict.
+            test_results = json.dumps(
+                {
+                    "samples": test_results,
+                    "hidden": f"{sub.hidden_passed} of {sub.hidden_total} hidden tests passed",
+                    "hidden_failures": sub.hidden_failures[:5],
+                }
+            )[:20000]
         try:
             result = await svc.grade(
                 title_slug=sub.slug,
                 title=sub.title,
                 user_code=sub.code,
-                test_results=sub.test_results,
-                all_passed=sub.all_passed,
+                test_results=test_results,
+                all_passed=sub.all_passed if sub.hidden_total == 0 else sub.hidden_passed >= sub.hidden_total,
                 provider=resolve_request_provider(user, body.provider),
             )
             feedback = result.feedback
         except Exception:
-            feedback = _fallback_feedback(verdict, sub.tests_passed, sub.tests_total)
+            if sub.hidden_total > 0:
+                feedback = _fallback_feedback(verdict, sub.hidden_passed, sub.hidden_total, hidden=True)
+            else:
+                feedback = _fallback_feedback(verdict, sub.tests_passed, sub.tests_total)
 
         return Stage1QuestionResult(
             slug=sub.slug,
@@ -725,6 +825,9 @@ async def grade_stage1(
             time_used_ms=sub.time_used_ms,
             verdict=verdict,
             feedback=feedback,
+            hidden_passed=sub.hidden_passed,
+            hidden_total=sub.hidden_total,
+            hidden_failures=sub.hidden_failures[:10],
         )
 
     results = await asyncio.gather(*[_grade_one(s) for s in body.submissions])
@@ -734,6 +837,18 @@ async def grade_stage1(
     await db.commit()
 
     return Stage1GradeResponse(results=list(results))
+
+
+def _hidden_verdict(passed: int, total: int) -> str:
+    """OA verdict from hidden tests: all = strong, 80%+ = pass, 40%+ = borderline."""
+    ratio = passed / total if total else 0.0
+    if passed >= total:
+        return "strong"
+    if ratio >= 0.8:
+        return "pass"
+    if ratio >= 0.4:
+        return "borderline"
+    return "needs_work"
 
 
 def _derive_verdict(all_passed: bool, tests_passed: int, tests_total: int, code: str) -> str:
@@ -758,9 +873,10 @@ def _derive_verdict(all_passed: bool, tests_passed: int, tests_total: int, code:
     return "borderline" if len(code.strip()) > 50 else "needs_work"
 
 
-def _fallback_feedback(verdict: str, tests_passed: int, tests_total: int) -> str:
+def _fallback_feedback(verdict: str, tests_passed: int, tests_total: int, hidden: bool = False) -> str:
     if tests_total > 0:
-        ran = f"You passed {tests_passed} of {tests_total} sample test cases. "
+        kind = "hidden" if hidden else "sample"
+        ran = f"You passed {tests_passed} of {tests_total} {kind} test cases. "
     else:
         ran = ""
     tail = {
@@ -897,7 +1013,7 @@ async def stage2_message(
         current_goal = "coding_problem"
 
     system_prompt = (
-        f"You are a {level_cfg['role']} at {company_label} conducting a 45-minute technical phone "
+        f"You are Kojo, a {level_cfg['role']} at {company_label}, conducting a 45-minute technical phone "
         f"screen with {candidate} for a {level_cfg['label']} role.\n"
         f"Calibrate difficulty and expectations to a {level_cfg['label']} candidate: {level_cfg['rigor']}\n"
         f"{custom_focus}"
@@ -1016,27 +1132,34 @@ async def stage3_message(
     # goals covered so far; the server enforces advancement and a hard turn cap.
     covered = _merge_covered_goals(body.covered_goals, [], _STAGE3_GOALS)
     remaining = [g for g in _STAGE3_GOALS if g not in covered]
+    followups_left = max(0, 2 - body.followups_on_current)
     question_number = len(covered) + 1  # the behavioral question to ask this turn
 
     system_prompt = (
-        f"You are a hiring manager at {company_label} conducting a 30-minute behavioral interview with "
+        f"You are Kojo, a hiring manager at {company_label}, conducting a 30-minute behavioral interview with "
         f"{candidate} for a {level_cfg['label']} role.\n"
         f"Company culture: {culture_hint}\n"
         f"Calibrate depth to a {level_cfg['label']} candidate: {level_cfg['rigor']}\n\n"
         "RESPOND WITH ONLY RAW JSON, no markdown, no extra text:\n"
-        '{"reply": "...", "covered_goals": ["..."], "is_done": false}\n\n'
+        '{"reply": "...", "covered_goals": ["..."], "is_followup": false, "is_done": false}\n\n'
         f"YOUR GOALS: ask exactly 5 behavioral STAR questions, one per turn, tracked as "
         f"{_STAGE3_GOALS}.\n"
         f"GOALS ALREADY COVERED: {covered or ['(none yet)']}\n"
         f"THIS TURN: ask behavioral question number {question_number} of 5, tailored to "
         f"{company_label}'s culture above (or wrap up if all 5 are already covered).\n\n"
         "RULES:\n"
-        "- Give a 1 sentence acknowledgment of the previous answer, then ask the NEXT uncovered "
-        "question. Ask ONE question per turn. Do NOT re-ask a question already covered.\n"
-        "- Ask a follow-up ONLY to clarify an unclear answer. If the candidate asks YOU a question, "
-        "answer briefly, then continue with the current question. Never add questions beyond the 5.\n"
+        "- Probe like a real interviewer: if the last story is vague about the candidate's OWN role, "
+        "the result, or the numbers, ask ONE follow-up about that (\"what did you specifically do?\", "
+        "\"what was the measurable result?\", \"what would you change?\") and set is_followup true. "
+        f"At most 2 follow-ups per story; {followups_left} left for the current story.\n"
+        "- When the story is complete, give a 1 sentence acknowledgment and ask the NEXT uncovered "
+        "question with is_followup false. Do NOT re-ask a question already covered.\n"
+        "- After all 5 questions are covered, ask \"Do you have any questions for me?\" and answer the "
+        "candidate's questions in character as an engineer at the company, briefly and honestly. "
+        "Set is_done true once you have answered their questions (or they have none).\n"
+        "- Never add questions beyond the 5.\n"
         "- covered_goals: list every behavioral question slot answered so far (from the list above).\n"
-        "- After all 5 answers are given and acknowledged: wrap up warmly and set is_done: true.\n"
+
         "- reply: 2 to 3 sentences max. Ask ONE question per turn.\n"
         f"- Use {candidate}'s name occasionally. Be warm but professional.\n"
         "- Return ONLY raw JSON.\n"
@@ -1065,15 +1188,17 @@ async def stage3_message(
     # Merge coverage. A user answer this turn advances one behavioral goal even if the
     # model forgets to report it, so coverage cannot stall.
     updated_covered = _merge_covered_goals(covered, parsed.get("covered_goals"), _STAGE3_GOALS)
-    if body.message is not None and len(updated_covered) <= len(covered):
+    is_followup = bool(parsed.get("is_followup")) and followups_left > 0
+    if body.message is not None and len(updated_covered) <= len(covered) and not is_followup:
         next_goal = next((g for g in _STAGE3_GOALS if g not in updated_covered), None)
         if next_goal:
             updated_covered = _merge_covered_goals(updated_covered, [next_goal], _STAGE3_GOALS)
 
     # The stage ends when the model says so, when all 5 questions are covered, or when
     # the hard turn cap is hit, so the interviewer can never ramble past the budget.
-    is_done = bool(parsed.get("is_done", False))
-    if len(updated_covered) >= len(_STAGE3_GOALS) or turn_count + 1 >= _STAGE3_TURN_CAP:
+    # Done once Kojo has answered the candidate's closing questions, or at the hard cap.
+    is_done = bool(parsed.get("is_done", False)) and len(updated_covered) >= len(_STAGE3_GOALS)
+    if turn_count + 1 >= _STAGE3_TURN_CAP:
         is_done = True
 
     if is_done and body.message is not None:
@@ -1094,6 +1219,7 @@ async def stage3_message(
         reply=parsed.get("reply", ""),
         is_done=is_done,
         covered_goals=updated_covered,
+        is_followup=is_followup,
     )
 
 
@@ -1151,13 +1277,15 @@ async def finish_interview(
     # The summary page calls this on every mount. Once a debrief exists, return
     # the cached copy instead of paying for another LLM generation.
     if row.status == STATUS_COMPLETE and row.overall_feedback:
+        rubric = _load_rubric(row.skill_ratings)
         return FinishResponse(
             overall_feedback=row.overall_feedback,
             resume_verdict=resume_verdict,
             stage1_verdict=stage1_verdict,
             stage2_verdict=stage2_verdict,
             stage3_verdict=stage3_verdict,
-            hiring_recommendation=_extract_recommendation(row.overall_feedback),
+            hiring_recommendation=rubric["call"] if rubric else _extract_recommendation(row.overall_feedback),
+            skill_ratings=rubric["skills"] if rubric else None,
         )
 
     resume_summary = _summarize_resume(row.resume_screen)
@@ -1166,30 +1294,47 @@ async def finish_interview(
     stage2_summary = _summarize_stage2(row.stage2_submission)
     stage3_summary = _summarize_stage3(row.stage3_answers)
 
+    scale = " / ".join(HIRE_SCALE)
     prompt = (
-        f"You are a senior recruiter at {company_label} writing a debrief after a full mock interview "
-        f"loop for a {level_cfg['label']} candidate.\n"
+        f"You are a hiring committee at {company_label} writing the debrief after a full mock interview "
+        f"loop for a {level_cfg['label']} candidate. The interviewer was Kojo.\n"
         f"Judge against the {level_cfg['label']} bar: {level_cfg['rigor']}\n\n"
         f"Resume Screen (ATS):\n{resume_summary}\n\n"
         f"Resume Deep Dive:\n{resume_grill_summary}\n\n"
         f"Stage 1 (Online Assessment):\n{stage1_summary}\n\n"
         f"Stage 2 (Technical Interview):\n{stage2_summary}\n\n"
         f"Stage 3 (Behavioral):\n{stage3_summary}\n\n"
-        "Write a concise debrief (3-4 sentences): overall strengths, areas to improve, "
-        "and end with a hiring recommendation from: STRONG HIRE / HIRE / BORDERLINE / NO HIRE. "
-        f"Base the recommendation on the interview performance (Stages 1 to 3) against the "
-        f"{level_cfg['label']} bar; mention the resume screen only as context. Be direct and professional."
+        "Return ONLY JSON:\n"
+        '{"call": "...", "skills": {"coding": "...", "problem_solving": "...", "communication": "...", '
+        '"testing": "..."}, "writeup": "..."}\n'
+        f"- call and every skill use exactly one of: {scale}.\n"
+        "- coding: correctness and code quality (OA hidden tests, technical solution).\n"
+        "- problem_solving: approach, optimisation, and how many hints were needed (hints lower it).\n"
+        "- communication: clarifying questions, explaining the approach, STAR clarity, questions asked "
+        "at the end.\n"
+        "- testing: edge cases, dry runs, hidden test results.\n"
+        "- Skip a skill (null) only when no stage produced evidence for it.\n"
+        "- writeup: 3 to 5 sentences of markdown: strengths, what to improve, and a closing line that "
+        "agrees with call. Do not add a separate recommendation line.\n"
+        "- Base the call on Stages 1 to 3; the resume is context only. Be direct and professional."
     )
 
     try:
-        llm = LLMService()
-        overall_feedback = await llm.call_kojo(prompt, provider=resolve_request_provider(user, body.provider))
+        data = await LLMService().complete_json_strongest(prompt)
     except LLMException as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    hiring_recommendation = _extract_recommendation(overall_feedback)
+    call = _normalize_hire(data.get("call")) or "LEAN NO HIRE"
+    raw_skills = data.get("skills") if isinstance(data.get("skills"), dict) else {}
+    skills = {
+        key: rating
+        for key in SKILL_KEYS
+        if (rating := _normalize_hire(raw_skills.get(key))) is not None
+    }
+    overall_feedback = _strip_recommendation_line(str(data.get("writeup") or "").strip()) or "Debrief unavailable."
 
     row.overall_feedback = overall_feedback
+    row.skill_ratings = json.dumps({"call": call, "skills": skills})
     row.status = STATUS_COMPLETE
     await db.commit()
 
@@ -1199,8 +1344,41 @@ async def finish_interview(
         stage1_verdict=stage1_verdict,
         stage2_verdict=stage2_verdict,
         stage3_verdict=stage3_verdict,
-        hiring_recommendation=hiring_recommendation,
+        hiring_recommendation=call,
+        skill_ratings=skills,
     )
+
+
+# Six-step hiring-committee scale, used for every new debrief (old runs keep the
+# four-step STRONG HIRE / HIRE / BORDERLINE / NO HIRE ladder read from their text).
+HIRE_SCALE = ("STRONG NO HIRE", "NO HIRE", "LEAN NO HIRE", "LEAN HIRE", "HIRE", "STRONG HIRE")
+SKILL_KEYS = ("coding", "problem_solving", "communication", "testing")
+
+
+def _normalize_hire(value: object) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    text = " ".join(value.upper().replace("_", " ").split())
+    return text if text in HIRE_SCALE else None
+
+
+def _strip_recommendation_line(text: str) -> str:
+    lines = [ln for ln in text.splitlines() if not ln.strip().lower().lstrip("*_ ").startswith("recommendation")]
+    return "\n".join(lines).strip()
+
+
+def _load_rubric(raw: Optional[str]) -> Optional[dict]:
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return None
+    call = _normalize_hire(data.get("call"))
+    if not call:
+        return None
+    skills = data.get("skills") if isinstance(data.get("skills"), dict) else {}
+    return {"call": call, "skills": {k: v for k, v in skills.items() if _normalize_hire(v)}}
 
 
 # ── List sessions ─────────────────────────────────────────────────────────────
@@ -1256,6 +1434,7 @@ def _to_response(row: MockInterviewSession) -> MockInterviewSessionResponse:
         progress_updated_at=row.progress_updated_at.isoformat() if row.progress_updated_at else None,
         resume_file_name=row.resume_file_name,
         resume_grill=row.resume_grill,
+        skill_ratings=row.skill_ratings,
         created_at=row.created_at.isoformat() if row.created_at else None,
     )
 

@@ -71,6 +71,7 @@ class MockInterviewSessionResponse(BaseModel):
     progress_updated_at: Optional[str] = None
     resume_file_name: Optional[str] = None
     resume_grill: Optional[str] = None
+    skill_ratings: Optional[str] = None
     created_at: Optional[str] = None
 
 
@@ -107,6 +108,27 @@ class Stage1Submission(BaseModel):
     # means the problem could not be executed (verdict falls back to heuristics).
     tests_passed: int = Field(default=0, ge=0)
     tests_total: int = Field(default=0, ge=0)
+    # Hidden test results, run in the browser on submit. hidden_total == 0 means hidden
+    # tests were unavailable for this problem and grading falls back to the samples.
+    hidden_passed: int = Field(default=0, ge=0)
+    hidden_total: int = Field(default=0, ge=0)
+    hidden_failures: list[dict] = Field(default_factory=list, max_length=20)
+
+
+class Stage1HiddenTestsExample(BaseModel):
+    input_text: str = Field(..., max_length=4000)
+    output_text: str = Field(default="", max_length=4000)
+
+
+class Stage1HiddenTestsRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    statement: str = Field(..., min_length=1, max_length=16000)
+    examples: list[Stage1HiddenTestsExample] = Field(..., min_length=1, max_length=10)
+
+
+class Stage1HiddenTestsResponse(BaseModel):
+    reference_code: str
+    inputs: list[str]
 
 
 class Stage1GradeRequest(BaseModel):
@@ -122,6 +144,9 @@ class Stage1QuestionResult(BaseModel):
     time_used_ms: int
     verdict: str          # "strong" | "pass" | "borderline" | "needs_work"
     feedback: str
+    hidden_passed: int = 0
+    hidden_total: int = 0
+    hidden_failures: list[dict] = Field(default_factory=list)
 
 
 class Stage1GradeResponse(BaseModel):
@@ -190,12 +215,15 @@ class Stage3MessageRequest(BaseModel):
     history: list[InterviewChatMessage] = Field(default=[])
     provider: Optional[str] = Field(default=None)
     covered_goals: list[str] = Field(default_factory=list)
+    # Follow-up probes Kojo has already asked on the current story (max 2).
+    followups_on_current: int = Field(default=0, ge=0, le=5)
 
 
 class Stage3MessageResponse(BaseModel):
     reply: str
     is_done: bool = False
     covered_goals: list[str] = Field(default_factory=list)
+    is_followup: bool = False
 
 
 # Final summary
@@ -210,10 +238,16 @@ class FinishResponse(BaseModel):
     stage2_verdict: Optional[str] = None
     stage3_verdict: Optional[str] = None
     hiring_recommendation: str
+    # Per-skill ratings on the six-step scale; None for runs finished before the rubric.
+    skill_ratings: Optional[dict[str, str]] = None
 
 
 # Job-description parsing (custom company). Single LLM call turns a pasted JD into a
 # prefilled interview config the user can then edit before starting.
+class SpeakRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=1500)
+
+
 class JDParseRequest(BaseModel):
     jd_text: str = Field(..., min_length=20, max_length=20000)
     # The topic ids available in the frontend taxonomy, so the model maps suggestions

@@ -72,5 +72,8 @@ class MockInterviewSession(Base, TimestampMixin):
 
     # Final LLM-generated overall feedback
     overall_feedback: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # New-scale debrief: {"call": "LEAN HIRE", "skills": {"coding": "HIRE", ...}}. NULL on
+    # runs finished before the rubric existed (migration 076).
+    skill_ratings: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     user: Mapped[User] = relationship("User", back_populates="mock_interview_sessions")
