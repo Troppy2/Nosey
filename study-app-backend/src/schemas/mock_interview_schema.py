@@ -124,6 +124,9 @@ class Stage1HiddenTestsRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     statement: str = Field(..., min_length=1, max_length=16000)
     examples: list[Stage1HiddenTestsExample] = Field(..., min_length=1, max_length=10)
+    # LeetCode's Python starter. The runner builds TreeNode/ListNode inputs from the
+    # method's type hints, so the reference must keep this exact signature.
+    starter_code: str = Field(default="", max_length=8000)
 
 
 class Stage1HiddenTestsResponse(BaseModel):

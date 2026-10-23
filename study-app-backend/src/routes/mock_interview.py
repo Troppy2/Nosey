@@ -348,7 +348,7 @@ async def speak(request: Request, payload: SpeakRequest):
 
 @router.post("/transcribe")
 @limiter.limit("20/minute")
-async def transcribe(request: Request, audio: UploadFile = File(...)):
+async def transcribe(request: Request, response: Response, audio: UploadFile = File(...)):
     """Fallback for browsers without speech recognition."""
     data = await audio.read()
     try:
@@ -728,6 +728,7 @@ _HIDDEN_MAX_INPUT_CHARS = 3000
 @limiter.limit("15/minute")
 async def stage1_hidden_tests(
     request: Request,
+    response: Response,
     session_id: int,
     body: Stage1HiddenTestsRequest,
     db: AsyncSession = Depends(get_session),
@@ -735,13 +736,21 @@ async def stage1_hidden_tests(
 ) -> Stage1HiddenTestsResponse:
     await _load_session(session_id, user, db)
     examples = "\n\n".join(f"Input: {ex.input_text}\nOutput: {ex.output_text}" for ex in body.examples)
+    # The in-browser runner builds TreeNode/ListNode inputs from the type hints, so a
+    # reference without them gets raw lists and fails the example check.
+    starter = body.starter_code.strip()
+    signature_rule = (
+        f"Keep EXACTLY this method signature, type hints included:\n{starter}\n"
+        if starter
+        else "Use the method signature the examples imply, with full type hints.\n"
+    )
     prompt = (
         "You write hidden test cases for a coding assessment, like HackerRank or CodeSignal.\n\n"
         f"PROBLEM: {body.title}\n{body.statement[:12000]}\n\n"
         f"EXAMPLES (reuse this exact input format):\n{examples}\n\n"
         'Return ONLY JSON: {"reference_code": "...", "inputs": ["..."]}\n'
-        "- reference_code: a correct, efficient Python 3 `class Solution` with the same method "
-        "signature the examples imply. Standard library only.\n"
+        "- reference_code: a correct, efficient Python 3 `class Solution`. Standard library only. "
+        f"{signature_rule}"
         "- inputs: 8 to 12 inputs written EXACTLY in the example input format (same variable "
         "names, same order). Cover edge cases (empty or single element, duplicates, negatives, "
         "boundaries from the constraints) and 2 larger inputs that would time out an O(n^2) "

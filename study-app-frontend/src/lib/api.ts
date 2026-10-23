@@ -2479,7 +2479,7 @@ export type Stage1SubmissionItem = {
 // the browser runs the reference to compute the expected outputs.
 export async function fetchStage1HiddenTests(
   sessionId: number,
-  body: { title: string; statement: string; examples: { input_text: string; output_text: string }[] },
+  body: { title: string; statement: string; examples: { input_text: string; output_text: string }[]; starter_code?: string },
 ): Promise<{ reference_code: string; inputs: string[] }> {
   return request(`/mock-interview/${sessionId}/stage1/hidden-tests`, {
     method: "POST",

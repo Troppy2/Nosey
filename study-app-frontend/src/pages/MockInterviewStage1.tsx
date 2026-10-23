@@ -1,7 +1,7 @@
 import Editor from "@monaco-editor/react";
 import { Loader2 } from "lucide-react";
-import { CodeIcon } from "../icons";
-import { AlertIcon, ArrowLeftIcon, PlayIcon, TimerIcon, CheckCircleIcon, ChevronLeftIcon, ChevronRightIcon, CrossCircleIcon, PencilIcon } from "../icons";
+import { AlertIcon, ArrowLeftIcon, PlayIcon, CheckCircleIcon, CrossCircleIcon } from "../icons";
+import "../styles/components/mock-oa.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { MockLoader } from "../components/MockLoader";
@@ -114,11 +114,7 @@ function formatMsCompact(ms: number): string {
   return `${totalMin} min`;
 }
 
-function benchmarkLabel(difficulty: string): string {
-  if (difficulty === "Hard") return "35 to 40 min";
-  if (difficulty === "Easy") return "10 to 15 min";
-  return "20 to 25 min";
-}
+const LEVEL_LABELS: Record<string, string> = { intern: "internship", junior: "new grad", mid: "mid-level", senior: "senior" };
 
 function freshQuestion(p: InterviewProblem): Stage1QuestionProgress {
   return {
@@ -320,10 +316,8 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
     0,
   );
   const remainingMs = Math.max(0, limitMs - elapsedMs);
-  const timePct = limitMs > 0 ? Math.max(0, Math.min(100, (remainingMs / limitMs) * 100)) : 0;
   const isWarning = remainingMs < 5 * 60 * 1000 && remainingMs > 0;
   const isExpiredNow = limitMs > 0 && remainingMs === 0;
-  const barColor = timePct > 40 ? "var(--green-dark)" : timePct > 20 ? "#f59e0b" : "#ef4444";
 
   // Time's up: submit everything, like a real OA closing the window.
   const autoSubmitted = useRef(false);
@@ -353,6 +347,7 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
         title: data.title,
         statement: statementText(data).slice(0, 15000) || data.title,
         examples: data.examples.slice(0, 10).map((ex) => ({ input_text: ex.input_text, output_text: ex.output_text })),
+        starter_code: (data.python_snippet ?? "").slice(0, 8000),
       });
       // The reference must agree with the official examples, or its outputs can't be trusted.
       const check = await runPythonLeetCode(
@@ -579,9 +574,6 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
     }
   }
 
-  const attemptedCount = questions.filter(
-    (qs) => qs.ranOnce || qs.code.trim().length > 60 || qs.isExpired,
-  ).length;
 
   // Every solution goes to the model for review, so the wait scales with how
   // many problems were in the assessment.
@@ -619,200 +611,144 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
   const curTotal = curResult?.cases?.length ?? 0;
 
   return (
-    <div className="mock-stage1-layout">
-      {/* Topbar */}
-      <div className="mock-stage1-topbar">
-        <div className="mock-stage1-topbar-left">
-          <div className="mock-stage1-company-badge">
-            <CodeIcon size={11} />
-            {companyLabel}
-          </div>
-          <span className="mock-stage1-stage-label">Stage 1: Online Assessment</span>
+    <div className="oa">
+      <header className="oa-head">
+        <button
+          type="button"
+          className="oa-leave"
+          onClick={() => navigate("/mock-interview")}
+          disabled={submitting}
+          aria-label="Pause and leave, your progress is saved"
+          title="Pause and leave, your progress is saved"
+        >
+          <ArrowLeftIcon size={18} />
+        </button>
+        <div className="oa-head-title">
+          <span>Online assessment</span>
+          <small>
+            {companyLabel}, {LEVEL_LABELS[level] ?? level}
+          </small>
         </div>
-
-        <div className="mock-stage1-question-tabs">
+        <nav className="oa-tabs" aria-label="Problems">
           {questions.map((qs, i) => {
             const attempted = qs.ranOnce || qs.code.trim().length > 60;
+            const solved = qs.hiddenTotal ? qs.hiddenPassed === qs.hiddenTotal : false;
             return (
               <button
                 key={qs.slug}
-                className={[
-                  "mock-q-tab",
-                  i === currentIdx ? "active" : "",
-                  qs.isExpired ? "expired" : "",
-                  attempted ? "attempted" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
+                type="button"
+                className={`oa-tab${i === currentIdx ? " is-on" : ""}`}
+                aria-current={i === currentIdx ? "true" : undefined}
                 onClick={() => goToQuestion(i)}
                 title={qs.title}
               >
-                <span className="mock-q-tab-dot" />
-                Q{i + 1}
-                <span
-                  className={`pill mock-diff-${qs.difficulty.toLowerCase()}`}
-                  style={{ fontSize: "0.68rem", padding: "1px 5px" }}
-                >
-                  {qs.difficulty[0]}
+                <span className="oa-tab-name">
+                  {i + 1}. {problemData[qs.slug]?.title || qs.title}
                 </span>
+                {solved ? (
+                  <CheckCircleIcon size={14} aria-label="All hidden tests passed" />
+                ) : attempted ? (
+                  <span className="oa-tab-dot" aria-label="Attempted" />
+                ) : null}
               </button>
             );
           })}
-        </div>
-
-        <div
-          className={`mock-stage1-timer${isWarning ? " warning" : ""}${isExpiredNow ? " expired" : ""}`}
-        >
-          <TimerIcon size={13} />
-          {isExpiredNow ? "Time's up" : formatMs(remainingMs)}
-        </div>
-      </div>
-
-      {/* Main split */}
-      <div className="mock-stage1-body">
-        {/* Left: problem panel */}
-        <div className="mock-stage1-problem-panel">
-          <div className="mock-stage1-problem-header">
-            <span className="mock-stage1-prob-num">
-              Problem {currentIdx + 1} of {questions.length}
+        </nav>
+        <div className="oa-head-right">
+          {submitError && (
+            <span className="oa-submit-error" role="alert">
+              <AlertIcon size={13} /> {submitError}
             </span>
-            {/* Older sessions stored a custom problem's slug as its title; the loaded data has the real one. */}
-            <h2 className="mock-stage1-problem-title">{curData?.title || current.title}</h2>
-            <div className="mock-stage1-problem-meta">
-              <span className={`pill mock-diff-${current.difficulty.toLowerCase()}`}>
-                {current.difficulty}
-              </span>
-              {interviewRealism
-                ? null
-                : current.topics.map((t) => (
-                    <span key={t} className="pill">
-                      {t}
-                    </span>
-                  ))}
-            </div>
-          </div>
+          )}
+          <span className={`oa-clock${isWarning ? " is-low" : ""}${isExpiredNow ? " is-out" : ""}`}>
+            {isExpiredNow ? "Time's up" : formatMs(remainingMs)}
+          </span>
+          <span className="oa-clock-of">of {formatMsCompact(limitMs)}</span>
+          <button type="button" className="oa-submit-all" onClick={handleSubmitAll} disabled={submitting || finished}>
+            {submitting ? "Grading..." : "Submit assessment"}
+          </button>
+        </div>
+      </header>
 
-          {isExpiredNow && (
-            <div className="mock-stage1-panel-section" style={{ paddingBottom: 10 }}>
-              <div className="mock-stage1-expired-banner">
-                <AlertIcon size={14} />
-                Time's up. Your assessment is being submitted.
-              </div>
+      <div className="oa-body">
+        <article className="oa-problem">
+          <div className="oa-problem-head">
+            {/* Older sessions stored a custom problem's slug as its title; the loaded data has the real one. */}
+            <h1>{curData?.title || current.title}</h1>
+            <span className={`oa-diff oa-diff-${current.difficulty.toLowerCase()}`}>{current.difficulty}</span>
+          </div>
+          {!interviewRealism && current.topics.length > 0 && (
+            <div className="oa-topics">
+              {current.topics.map((t) => (
+                <span key={t}>{t}</span>
+              ))}
             </div>
           )}
-
-          {/* Problem statement, rendered in-app */}
-          <div className="mock-stage1-panel-section">
-            <div className="mock-stage1-section-label-row">
-              <span className="mock-stage1-section-label">Problem</span>
-              {current.slug.startsWith("custom-") ? null : (
-                <a
-                  href={`https://leetcode.com/problems/${current.slug}/`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mock-stage1-lc-link"
-                >
-                  LeetCode
-                </a>
-              )}
+          {isExpiredNow && (
+            <div className="oa-expired" role="status">
+              <AlertIcon size={14} /> Time's up. Your assessment is being submitted.
             </div>
-            {problemLoading && (
-              <div className="mock-stage1-statement-loading">
-                <Loader2 size={15} className="spin" /> Loading problem…
-              </div>
-            )}
-            {problemError && (
-              <div className="mock-stage1-statement-error">
-                <AlertIcon size={14} /> {problemError}
-              </div>
-            )}
-            {curData && curData.markdown !== undefined ? (
-              <div className="mock-stage1-statement">
-                <MarkdownContent content={curData.markdown} />
-              </div>
-            ) : curData ? (
-              <div
-                className="mock-stage1-statement"
-                dangerouslySetInnerHTML={{ __html: sanitizeLeetCodeHtml(curData.content_html) }}
-              />
-            ) : null}
-          </div>
+          )}
+          {problemLoading && (
+            <div className="oa-note">
+              <Loader2 size={15} className="spin" /> Loading problem...
+            </div>
+          )}
+          {problemError && (
+            <div className="oa-note oa-note-error">
+              <AlertIcon size={14} /> {problemError}
+            </div>
+          )}
+          {curData && curData.markdown !== undefined ? (
+            <div className="oa-statement">
+              <MarkdownContent content={curData.markdown} />
+            </div>
+          ) : curData ? (
+            <div className="oa-statement" dangerouslySetInnerHTML={{ __html: sanitizeLeetCodeHtml(curData.content_html) }} />
+          ) : null}
+          <label htmlFor="oa-scratch" className="oa-scratch-label">
+            Scratch notes
+          </label>
+          <textarea
+            id="oa-scratch"
+            className="oa-scratch"
+            rows={5}
+            placeholder="Approach, edge cases, complexity"
+            value={current.notes}
+            onChange={(e) => handleNotesChange(e.target.value)}
+            spellCheck={false}
+          />
+        </article>
 
-          {/* Time budget */}
-          <div className="mock-stage1-panel-section">
-            <span className="mock-stage1-section-label">
-              <TimerIcon size={11} /> Time Budget
-            </span>
-            <div className="mock-stage1-time-budget">
-              <div className="mock-stage1-time-budget-row">
-                <span
-                  className={`mock-stage1-time-budget-remaining${isWarning ? " warning" : ""}${
-                    isExpiredNow ? " expired" : ""
-                  }`}
-                >
-                  {isExpiredNow ? "Expired" : formatMs(remainingMs)}
-                </span>
-                <span className="mock-stage1-time-budget-limit">left of {formatMsCompact(limitMs)} for the whole assessment</span>
-              </div>
-              <div className="mock-stage1-time-bar-track">
-                <div
-                  className="mock-stage1-time-bar-fill"
-                  style={{ width: `${timePct}%`, backgroundColor: barColor }}
-                />
-              </div>
-              <div className="mock-stage1-benchmark-row">
-                <TimerIcon size={10} />
-                Aim for {benchmarkLabel(current.difficulty)} on this one
-              </div>
+        <section className="oa-editor" aria-label="Code">
+          <div className="oa-editor-head">
+            <span>solution.py</span>
+            <div className="oa-editor-actions">
+              <button
+                type="button"
+                className="oa-editor-btn"
+                onClick={handleRun}
+                disabled={running || !curRunnable || !current.code.trim()}
+                title={curRunnable ? "Run against the sample cases" : "This problem cannot be run in-app"}
+              >
+                <PlayIcon size={14} /> {running ? "Running..." : "Run tests"}
+              </button>
+              <button
+                type="button"
+                className="oa-editor-btn oa-editor-btn--primary"
+                onClick={() => void handleSubmitOne()}
+                disabled={submittingOne || running || !current.code.trim() || current.hidden?.status === "unavailable"}
+                title={
+                  current.hidden?.status === "unavailable"
+                    ? "Hidden tests are unavailable for this problem; it is graded on the samples"
+                    : "Run the hidden tests"
+                }
+              >
+                {submittingOne ? "Submitting..." : !current.hidden ? "Preparing tests..." : "Submit"}
+              </button>
             </div>
           </div>
-
-          {/* Scratch pad */}
-          <div className="mock-stage1-scratch-section">
-            <span className="mock-stage1-section-label">
-              <PencilIcon size={11} /> Scratch Pad
-            </span>
-            <textarea
-              className="mock-stage1-scratch-input"
-              placeholder="Jot down your approach, edge cases, pseudocode…"
-              value={current.notes}
-              onChange={(e) => handleNotesChange(e.target.value)}
-              spellCheck={false}
-            />
-          </div>
-        </div>
-
-        {/* Right: editor + run console */}
-        <div className="mock-stage1-editor-panel">
-          <div className="mock-stage1-editor-header">
-            <span className="mock-stage1-editor-lang">
-              <span className="mock-stage1-editor-lang-dot" />
-              Python 3
-            </span>
-            <button
-              className="mock-stage1-run-btn"
-              onClick={handleRun}
-              disabled={running || !curRunnable || !current.code.trim()}
-              title={curRunnable ? "Run against the sample cases" : "This problem cannot be run in-app"}
-            >
-              {running ? <Loader2 size={13} className="spin" /> : <PlayIcon size={13} />}
-              {running ? "Running…" : "Run"}
-            </button>
-            <button
-              className="mock-stage1-run-btn mock-stage1-submit-one"
-              onClick={() => void handleSubmitOne()}
-              disabled={submittingOne || running || !current.code.trim() || current.hidden?.status === "unavailable"}
-              title={
-                current.hidden?.status === "unavailable"
-                  ? "Hidden tests are unavailable for this problem; it is graded on the samples"
-                  : "Run the hidden tests"
-              }
-            >
-              {submittingOne ? <Loader2 size={13} className="spin" /> : null}
-              {submittingOne ? "Submitting…" : !current.hidden ? "Preparing tests…" : "Submit"}
-            </button>
-          </div>
-          <div className="mock-stage1-editor-wrap">
+          <div className="oa-editor-body">
             <Editor
               height="100%"
               language="python"
@@ -834,148 +770,48 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
             />
           </div>
 
-          {/* Run console */}
-          {!curRunnable && curData && (
-            <div className="mock-stage1-console mock-stage1-console--note">
-              This problem has no auto-runnable harness. Write your solution and submit; it will be
-              reviewed without sample execution.
-            </div>
-          )}
-          {current.hiddenTotal ? (
-            <div className="mock-stage1-console mock-stage1-console--hidden">
-              <span className={current.hiddenPassed === current.hiddenTotal ? "mock-stage1-console-pass" : "mock-stage1-console-fail"}>
-                {current.hiddenPassed === current.hiddenTotal ? <CheckCircleIcon size={14} /> : <CrossCircleIcon size={14} />}
-                {current.hiddenPassed} of {current.hiddenTotal} hidden tests passed
-                {current.hiddenCode !== current.code ? " (code changed since)" : ""}
-              </span>
-            </div>
-          ) : null}
-          {curResult && (
-            <div className="mock-stage1-console">
-              {curResult.error ? (
-                <div className="mock-stage1-console-error">
-                  <AlertIcon size={13} /> {curResult.error}
-                </div>
-              ) : (
+          {(curResult || current.hiddenTotal || (!curRunnable && curData)) && (
+            <div className="oa-console" role="status">
+              {!curRunnable && curData && (
+                <span className="oa-console-note">
+                  No runnable harness for this problem. Submit it and it will be reviewed without sample runs.
+                </span>
+              )}
+              {current.hiddenTotal ? (
+                <span className={current.hiddenPassed === current.hiddenTotal ? "oa-pass" : "oa-fail"}>
+                  {current.hiddenPassed === current.hiddenTotal ? <CheckCircleIcon size={14} /> : <CrossCircleIcon size={14} />}
+                  {current.hiddenPassed} of {current.hiddenTotal} hidden tests passed
+                  {current.hiddenCode !== current.code ? " (code changed since)" : ""}
+                </span>
+              ) : null}
+              {curResult?.error ? (
+                <span className="oa-fail">
+                  <AlertIcon size={13} /> {curResult.error.split("\n").filter(Boolean).slice(-1)[0]}
+                </span>
+              ) : curResult ? (
                 <>
-                  <div className="mock-stage1-console-summary">
-                    {curResult.ok ? (
-                      <span className="mock-stage1-console-pass">
-                        <CheckCircleIcon size={14} /> Passed {curPassed}/{curTotal} sample cases
-                      </span>
-                    ) : (
-                      <span className="mock-stage1-console-fail">
-                        <CrossCircleIcon size={14} /> Passed {curPassed}/{curTotal} sample cases
-                      </span>
-                    )}
-                  </div>
-                  {curResult.cases?.some((c) => !c.passed) && (
-                    <details className="mock-stage1-console-details">
-                      <summary>View failing cases</summary>
-                      {curResult.cases
-                        .filter((c) => !c.passed)
-                        .map((c, i) => (
-                          <div key={i} className="mock-stage1-console-case">
-                            <span className="mock-stage1-console-case-label">{c.label}</span>
-                            <div>
-                              <span className="muted small">Expected:</span> <code>{c.expected}</code>
-                            </div>
-                            <div>
-                              <span className="muted small">Got:</span> <code>{c.actual}</code>
-                            </div>
-                          </div>
-                        ))}
-                    </details>
+                  {curResult.cases?.map((c) => (
+                    <span key={c.label}>
+                      {c.label}{" "}
+                      {c.passed ? (
+                        <strong className="oa-pass">passed</strong>
+                      ) : (
+                        <>
+                          <strong className="oa-fail">failed</strong>: expected <code>{c.expected}</code>, got <code>{c.actual}</code>
+                        </>
+                      )}
+                    </span>
+                  ))}
+                  {curTotal > 0 && (
+                    <span className="oa-console-sum">
+                      {curPassed} of {curTotal} sample cases passed
+                    </span>
                   )}
                 </>
-              )}
+              ) : null}
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Bottom bar */}
-      <div className="mock-stage1-bottombar">
-        <button
-          className="button button-ghost"
-          style={{ padding: "6px 10px" }}
-          onClick={() => goToQuestion(currentIdx - 1)}
-          disabled={currentIdx === 0}
-          title="Previous problem"
-        >
-          <ChevronLeftIcon size={15} />
-        </button>
-        <button
-          className="button button-ghost"
-          style={{ padding: "6px 10px" }}
-          onClick={() => goToQuestion(currentIdx + 1)}
-          disabled={currentIdx === questions.length - 1}
-          title="Next problem"
-        >
-          <ChevronRightIcon size={15} />
-        </button>
-
-        <div className="mock-stage1-q-status-row">
-          {questions.map((qs, i) => {
-            const attempted = qs.ranOnce || qs.code.trim().length > 60;
-            return (
-              <button
-                key={qs.slug}
-                className={[
-                  "mock-stage1-q-chip",
-                  i === currentIdx ? "active" : "",
-                  qs.isExpired ? "expired" : "",
-                  attempted && !qs.isExpired ? "attempted" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                onClick={() => goToQuestion(i)}
-                title={qs.title}
-              >
-                <span className="mock-stage1-q-chip-dot" />
-                Q{i + 1}
-              </button>
-            );
-          })}
-        </div>
-
-        <span className="mock-stage1-q-progress">
-          {attemptedCount}/{questions.length} attempted
-        </span>
-
-        <div style={{ flex: 1 }} />
-
-        {submitError && (
-          <span className="mock-stage1-submit-error">
-            <AlertIcon size={13} /> {submitError}
-          </span>
-        )}
-
-        <button
-          className="button button-ghost"
-          style={{ padding: "8px 14px" }}
-          onClick={() => navigate("/mock-interview")}
-          disabled={submitting}
-          title="Quit (your progress is saved)"
-        >
-          <ArrowLeftIcon size={13} /> Leave
-        </button>
-        <button
-          className="button button-primary"
-          style={{ padding: "8px 20px" }}
-          onClick={handleSubmitAll}
-          disabled={submitting || finished}
-        >
-          {submitting ? (
-            <>
-              <Loader2 size={14} className="spin" /> Grading…
-            </>
-          ) : (
-            <>
-              Submit all
-            </>
-          )}
-        </button>
+        </section>
       </div>
 
       {submitting ? (
