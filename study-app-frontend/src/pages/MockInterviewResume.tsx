@@ -1,5 +1,5 @@
-import { FileText, Loader2, LogOut, MessagesSquare, ScanLine, Send, Type } from "lucide-react";
-import { AlertIcon, CheckCircleIcon, ChevronRightIcon, CloseIcon, CrossCircleIcon, UploadIcon } from "../icons";
+import { Loader2 } from "lucide-react";
+import { AlertIcon, ArrowLeftIcon, BookIcon, ChatIcon, CheckCircleIcon, ChevronRightIcon, CloseIcon, CrossCircleIcon, PencilIcon, SearchIcon, UploadIcon } from "../icons";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { screenResume, sendResumeGrillMessage } from "../lib/api";
@@ -7,6 +7,8 @@ import type { InterviewChatMessage, MockInterviewSession, ResumeScreenResult } f
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
 import { loadMockProgress, saveMockProgress, type MockProgress, type MockCompany } from "../lib/mockInterview";
 import { MockProgressGate } from "../components/MockProgressGate";
+import { VoiceAnswerBar } from "../components/VoiceAnswerBar";
+import { useInterviewerVoice } from "../lib/voice";
 
 const ACCEPT = ".pdf,.docx,.doc,.txt,.md,.tex";
 
@@ -77,11 +79,11 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
     () => stored?.resume?.grillCoveredGoals ?? [],
   );
   const [grillDone, setGrillDone] = useState(() => stored?.resume?.grillDone ?? false);
-  const [grillInput, setGrillInput] = useState("");
+  const voice = useInterviewerVoice();
+  const grillFinishedLive = useRef(false);
   const [grillSending, setGrillSending] = useState(false);
   const [grillError, setGrillError] = useState<string | null>(null);
   const grillThreadRef = useRef<HTMLDivElement>(null);
-  const grillInputRef = useRef<HTMLTextAreaElement>(null);
 
   const GRILL_TOTAL_GOALS = 5;
 
@@ -127,37 +129,30 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
       message === null ? [] : [...grillMessages, { role: "user", content: message } as InterviewChatMessage];
     if (message !== null) {
       setGrillMessages(nextHistory);
-      setGrillInput("");
+      voice.stop();
       scrollGrillToBottom();
     }
     try {
       const res = await sendResumeGrillMessage(numericSessionId, message, history, grillCoveredGoals);
       const withReply = [...nextHistory, { role: "interviewer", content: res.reply } as InterviewChatMessage];
       setGrillMessages(withReply);
+      void voice.speak(res.reply);
       const covered = res.covered_goals ?? grillCoveredGoals;
       setGrillCoveredGoals(covered);
       setGrillDone(res.is_done);
+      if (res.is_done) grillFinishedLive.current = true;
       persist({ grillMessages: withReply, grillCoveredGoals: covered, grillDone: res.is_done });
     } catch (e: unknown) {
       setGrillError(e instanceof Error ? e.message : "Could not reach the interviewer. Try again.");
     } finally {
       setGrillSending(false);
       scrollGrillToBottom();
-      grillInputRef.current?.focus();
     }
   }
 
   function startGrill() {
     setGrillOpen(true);
     if (grillMessages.length === 0) void sendGrillTurn(null);
-  }
-
-  function handleGrillKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      const text = grillInput.trim();
-      if (text && !grillSending && !grillDone) void sendGrillTurn(text);
-    }
   }
 
   function nextRoute() {
@@ -217,6 +212,23 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
     }
   }
 
+  // Self-advance once the deep dive wraps up live: let the last line play, then move on.
+  const [advanceIn, setAdvanceIn] = useState<number | null>(null);
+  useEffect(() => {
+    if (!grillDone || !grillFinishedLive.current || voice.speaking || voice.blocked || advanceIn !== null) return;
+    setAdvanceIn(4);
+  }, [grillDone, voice.speaking, voice.blocked, advanceIn]);
+  useEffect(() => {
+    if (advanceIn === null || advanceIn < 0) return;
+    if (advanceIn === 0) {
+      handleContinue();
+      return;
+    }
+    const t = window.setTimeout(() => setAdvanceIn((n) => (n === null ? null : n - 1)), 1000);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [advanceIn]);
+
   function handleContinue() {
     persist({ inputText: text, fileName, result }, true);
     navigate(nextRoute(), { state: { session: state?.session, selectedStages } });
@@ -237,7 +249,7 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
       <header className="ats-head">
         <div className="ats-head-text">
           <span className="ats-eyebrow">
-            <ScanLine size={13} /> Resume Screen
+            <SearchIcon size={13} /> Resume Screen
           </span>
           <h1 className="ats-title">ATS Resume Check</h1>
           <p className="ats-sub">
@@ -250,7 +262,7 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
           onClick={() => navigate("/mock-interview")}
           title="Quit (your progress is saved)"
         >
-          <LogOut size={15} /> Quit
+          <ArrowLeftIcon size={15} /> Leave
         </button>
       </header>
 
@@ -281,7 +293,7 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
               className={`ats-mode${mode === "paste" ? " active" : ""}`}
               onClick={() => setMode("paste")}
             >
-              <Type size={14} /> Paste text
+              <PencilIcon size={14} /> Paste text
             </button>
             <span className={`ats-mode-slider ${mode}`} aria-hidden />
           </div>
@@ -291,7 +303,7 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
             (fileName ? (
               <div className="ats-file">
                 <div className="ats-file-icon">
-                  <FileText size={18} />
+                  <BookIcon size={18} />
                 </div>
                 <div className="ats-file-meta">
                   <span className="ats-file-name">{fileName}</span>
@@ -361,7 +373,7 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
                 : "Plain text or LaTeX both work."}
             </span>
             <button className="ats-run" onClick={handleScreen} disabled={loading || !canRun}>
-              {loading ? <Loader2 size={16} className="spin" /> : <ScanLine size={16} />}
+              {loading ? <Loader2 size={16} className="spin" /> : <SearchIcon size={16} />}
               {loading ? "Scanning resume" : result ? "Re-scan" : "Run ATS Screen"}
             </button>
           </div>
@@ -483,7 +495,7 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
           <div className="ats-grill-head">
             <div>
               <span className="eyebrow">
-                <MessagesSquare size={13} /> Resume Deep Dive
+                <ChatIcon size={13} /> Resume Deep Dive
               </span>
               <p className="muted small" style={{ marginTop: 4 }}>
                 {grillOpen
@@ -493,7 +505,7 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
             </div>
             {!grillOpen && (
               <button className="button button-primary" onClick={startGrill} disabled={grillSending}>
-                {grillSending ? <Loader2 size={15} className="spin" /> : <MessagesSquare size={15} />}
+                {grillSending ? <Loader2 size={15} className="spin" /> : <ChatIcon size={15} />}
                 Start the deep dive
               </button>
             )}
@@ -526,9 +538,18 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
                 {grillDone && (
                   <div style={{ textAlign: "center", padding: "14px 0 2px" }}>
                     <span className="eyebrow">Deep dive complete</span>
-                    <p className="muted small" style={{ marginTop: 4 }}>
-                      Your answers feed the final debrief. Continue when you are ready.
-                    </p>
+                    {advanceIn !== null && advanceIn >= 0 ? (
+                      <p className="muted small" style={{ marginTop: 4 }} role="status">
+                        Moving to the next round in {advanceIn}s.{" "}
+                        <button type="button" className="voice-stay" onClick={() => setAdvanceIn(-1)}>
+                          Stay here
+                        </button>
+                      </p>
+                    ) : (
+                      <p className="muted small" style={{ marginTop: 4 }}>
+                        Your answers feed the final debrief. Continue when you are ready.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -540,26 +561,15 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
               )}
 
               {!grillDone && (
-                <div className="mock-stage3-chat-input-row">
-                  <textarea
-                    ref={grillInputRef}
-                    className="kojo-input"
-                    placeholder="Type your answer (Enter to send, Shift+Enter for newline)"
-                    value={grillInput}
-                    onChange={(e) => setGrillInput(e.target.value)}
-                    onKeyDown={handleGrillKeyDown}
+                <div className="voice-dock">
+                  <VoiceAnswerBar
+                    onSend={(text) => void sendGrillTurn(text)}
                     disabled={grillSending}
-                    rows={3}
-                    style={{ flex: 1, minHeight: 56, maxHeight: 160, resize: "none" }}
+                    muted={voice.muted}
+                    onToggleMute={() => voice.setMuted(!voice.muted)}
+                    onStartTalking={voice.stop}
+                    speaking={voice.speaking}
                   />
-                  <button
-                    className="kojo-send"
-                    onClick={() => void sendGrillTurn(grillInput.trim())}
-                    disabled={!grillInput.trim() || grillSending}
-                    title="Send answer"
-                  >
-                    {grillSending ? <Loader2 size={15} className="spin" /> : <Send size={15} />}
-                  </button>
                 </div>
               )}
             </>
