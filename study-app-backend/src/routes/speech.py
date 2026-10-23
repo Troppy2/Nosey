@@ -2,9 +2,10 @@
 
 Open to every signed-in, non-guest user (the mock interview /speak route stays
 beta-only). Cost is bounded three ways: a fixed voice list, a per-account rate
-limit, and a daily per-account character cap.
+limit, and a daily per-account character cap (both keyed on the verified user).
 """
-import hashlib
+import time
+from collections import deque
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -31,12 +32,20 @@ DAILY_CHAR_CAP = 150_000
 _used: dict[int, tuple[date, int]] = {}
 
 
-def _account_key(request: Request) -> str:
-    """Rate-limit per account (from the bearer token), not per IP; falls back to the IP."""
-    auth = request.headers.get("authorization", "")
-    if auth.lower().startswith("bearer ") and len(auth) > 20:
-        return "tts:" + hashlib.sha256(auth.encode()).hexdigest()[:24]
-    return "tts-ip:" + (request.client.host if request.client else "unknown")
+# user id -> recent request times. Keyed on the verified user (after get_current_user), not
+# on anything the client sends, so it cannot be dodged by varying headers.
+_recent: dict[int, deque[float]] = {}
+PER_MINUTE = 90
+
+
+def _throttle(user: User) -> None:
+    now = time.monotonic()
+    hits = _recent.setdefault(user.id, deque())
+    while hits and now - hits[0] > 60:
+        hits.popleft()
+    if len(hits) >= PER_MINUTE:
+        raise HTTPException(status_code=429, detail="Too many narration requests. Try again in a moment.")
+    hits.append(now)
 
 
 def _charge(user: User, chars: int) -> None:
@@ -55,7 +64,7 @@ class NarrationRequest(BaseModel):
 
 
 @router.post("/tts")
-@limiter.limit("90/minute", key_func=_account_key)
+@limiter.limit("300/minute")  # coarse per-IP backstop; the real limit is per verified account
 async def narrate(
     request: Request,
     payload: NarrationRequest,
@@ -66,6 +75,7 @@ async def narrate(
     if payload.voice not in NARRATION_VOICES:
         raise HTTPException(status_code=400, detail="Unknown voice.")
     if not is_exempt(user):
+        _throttle(user)
         _charge(user, len(payload.text))
     try:
         audio = await SpeechService().synthesize(payload.text, payload.voice)
