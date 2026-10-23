@@ -10,8 +10,8 @@ Agreed rules (2026-10-21):
   /system-design routers (dependencies.get_beta_user).
 - Built-in catalog problems are read-only; only custom ones can be written.
 - Drills can be added and removed, never advanced: a pass is the user's.
-- A mock interview is set up here and run by the user in Nosey. Creating
-  one while an unfinished run exists is refused.
+- A mock interview is set up here and run by the user in Nosey. Several can
+  be unfinished at once; each stays resumable from Past interviews.
 - Every delete needs confirm=true.
 """
 from __future__ import annotations
@@ -719,20 +719,6 @@ class CreateMockArgs(ToolArgs):
 
 async def create_mock_interview(ctx: McpContext, args: CreateMockArgs) -> dict[str, Any]:
     _require_beta(ctx)
-    unfinished = (
-        await ctx.session.execute(
-            select(MockInterviewSession.id).where(
-                MockInterviewSession.user_id == ctx.user.id,
-                MockInterviewSession.status != MOCK_STATUS_COMPLETE,
-                MockInterviewSession.progress_json.is_not(None),
-            ).limit(1)
-        )
-    ).scalar_one_or_none()
-    if unfinished is not None:
-        raise ToolInputError(
-            f"The user has an unfinished mock interview (session_id {unfinished}). Ask them to finish it in "
-            "Nosey, or delete it with delete_mock_interview if they say so, then try again."
-        )
     company = args.company.strip()
     key = company.lower()
     await screen(ctx, company, args.job_description, args.role_focus, args.culture)
@@ -985,7 +971,7 @@ INTERVIEW_TOOLS: tuple[McpTool, ...] = (
           "overall debrief.", GetMockArgs, get_mock_interview),
     _write("create_mock_interview", "Set up a mock interview",
            "Set up a mock interview loop for the user to run in Nosey: a built-in company, or any other company "
-           "with a job description, focus, topics and exact problems. Refused while an unfinished run exists. "
+           "with a job description, focus, topics and exact problems. Other unfinished runs are kept and stay resumable. "
            "Returns the URL to start it.", CreateMockArgs, create_mock_interview),
     _write("delete_mock_interview", "Delete a mock interview",
            "Delete a past or unfinished mock interview and its results. Needs confirm=true.",

@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { SkeletonList } from "../components/Skeletons";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { deleteMockInterviewSession, listMockInterviewSessions } from "../lib/api";
+import { hydrateMockProgress, resumeRouteFor } from "../lib/mockInterview";
 import type { MockInterviewSession } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
 import { MockLoopTrack } from "../components/MockLoopRail";
@@ -59,6 +60,29 @@ export default function MockInterviewHistory() {
   const [pendingDelete, setPendingDelete] = useState<MockInterviewSession | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [openingId, setOpeningId] = useState<number | null>(null);
+
+  // The stage pages need either the session in router state (what setup passes) or a
+  // saved run snapshot; with neither they bounce to setup. So an unfinished run resumes
+  // from its snapshot at the stage it stopped on, and a run that was never started (or
+  // was set up by an AI app) opens its first stage with the session in hand.
+  async function openSession(session: MockInterviewSession) {
+    if (session.status === "complete") {
+      navigate(`/mock-interview/${session.id}/summary`);
+      return;
+    }
+    setOpeningId(session.id);
+    const progress = await hydrateMockProgress(session.id).catch(() => null);
+    setOpeningId(null);
+    if (progress) {
+      navigate(resumeRouteFor(progress));
+      return;
+    }
+    const selectedStages = stagesOf(session);
+    navigate(`/mock-interview/${session.id}/${selectedStages[0] ?? "stage1"}`, {
+      state: { session, selectedStages },
+    });
+  }
 
   async function confirmDelete() {
     if (!pendingDelete) return;
@@ -154,13 +178,9 @@ export default function MockInterviewHistory() {
               <button
                 type="button"
                 className="card mock-history-card"
-                onClick={() =>
-                  navigate(
-                    complete
-                      ? `/mock-interview/${session.id}/summary`
-                      : `/mock-interview/${session.id}/${stages[0] ?? "stage1"}`,
-                  )
-                }
+                onClick={() => void openSession(session)}
+                disabled={openingId === session.id}
+                aria-busy={openingId === session.id}
               >
                 <div className="mock-history-main">
                   <div className="mock-history-title-row">

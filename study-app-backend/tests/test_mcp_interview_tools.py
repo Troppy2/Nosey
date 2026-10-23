@@ -113,7 +113,7 @@ async def test_completed_problems(call, seeded, db_session_maker) -> None:  # no
     assert done["total_completed"] == 1 and done["problems"][0]["title"] == "Two Sum"
 
 
-async def test_mock_interview_create_refuses_while_unfinished_and_delete(client, call, db_session_maker) -> None:  # noqa: F811
+async def test_mock_interview_create_alongside_unfinished_and_delete(client, call, db_session_maker) -> None:  # noqa: F811
     made = await call("create_mock_interview", {
         "company": "Stripe", "level": "junior", "stages": ["stage1", "stage3"],
         "job_description": "Payments.", "topics": ["arrays"], "problem_slugs": ["two-sum"],
@@ -123,13 +123,15 @@ async def test_mock_interview_create_refuses_while_unfinished_and_delete(client,
     assert session_row["company"] == "custom" and session_row["custom_company"] == "Stripe"
     assert session_row["custom_config"]["problems"][0]["title"] == "Two Sum"
 
-    # Once the user starts it (progress synced), a second one is refused.
+    # An unfinished run (progress synced) no longer blocks a new one; both stay listed.
     async with db_session_maker() as session:
         row = await session.get(MockInterviewSession, made["session_id"])
         row.progress_json = "{}"
         await session.commit()
-    refused = await call("create_mock_interview", {"company": "google"}, expect_error=True)
-    assert str(made["session_id"]) in refused
+    second = await call("create_mock_interview", {"company": "google"})
+    listed = {m["session_id"] for m in (await call("list_mock_interviews", {}))["interviews"]}
+    assert listed == {made["session_id"], second["session_id"]}
+    await call("delete_mock_interview", {"session_id": second["session_id"], "confirm": True})
 
     full = await call("get_mock_interview", {"session_id": made["session_id"]})
     assert full["stages"] == ["stage1", "stage3"]
