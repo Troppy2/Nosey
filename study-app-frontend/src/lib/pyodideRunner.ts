@@ -94,7 +94,17 @@ async function loadPyodideInstance() {
   return window.__noseyPyodide;
 }
 
-export async function runPythonLeetCode(code: string, testCases: TestCase[]): Promise<RunnerResult> {
+// One interpreter is shared, so overlapping runs (a user Run while hidden tests are
+// being prepared) would clobber each other's globals. Calls queue up instead.
+let leetCodeQueue: Promise<unknown> = Promise.resolve();
+
+export function runPythonLeetCode(code: string, testCases: TestCase[]): Promise<RunnerResult> {
+  const next = leetCodeQueue.then(() => runPythonLeetCodeNow(code, testCases));
+  leetCodeQueue = next.catch(() => undefined);
+  return next;
+}
+
+async function runPythonLeetCodeNow(code: string, testCases: TestCase[]): Promise<RunnerResult> {
   const pyodide = await loadPyodideInstance();
   const payload = JSON.stringify(testCases);
   const runner = `

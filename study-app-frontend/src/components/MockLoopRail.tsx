@@ -83,7 +83,7 @@ export function LoopStation({
     >
       <div className="loop-gutter" aria-hidden="true">
         <span className="loop-node">
-          <Icon size={13} />
+          <Icon size={17} />
         </span>
         {!terminal && <span className="loop-segment" />}
       </div>

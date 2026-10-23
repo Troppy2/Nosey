@@ -1,0 +1,60 @@
+/* Debrief-style result screens: big verdict word, carded sections, formatted markdown. */
+.shell-main:has(.setup2, .history2, .debrief) { background: #f6f9f1; }
+.debrief { max-width: 760px; margin: 0 auto; padding: 40px 24px 64px; display: flex; flex-direction: column; gap: 36px; color: #26301f; }
+.debrief-head { display: flex; flex-direction: column; gap: 14px; }
+.debrief-back { align-self: flex-start; font-size: 14px; color: #4f6339; background: none; border: 0; padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+.debrief-back:hover { color: #26301f; }
+.debrief-kicker { font-size: 15px; color: #596949; }
+.debrief-word { margin: 0; font-family: Lora, serif; font-size: 64px; font-weight: 600; line-height: 1; }
+.debrief-lede { margin: 0; font-size: 18px; line-height: 1.6; max-width: 640px; }
+.debrief-rows { display: flex; flex-direction: column; background: #fff; border: 1px solid #cfe1b9; border-radius: 8px; padding: 0 24px; }
+.debrief-row { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 24px; padding: 22px 0; border-bottom: 1px solid #e0ebd2; }
+.debrief-row:last-child { border-bottom: 0; }
+.debrief-row--solo { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.debrief-row--solo .debrief-row-side { flex-direction: row; align-items: baseline; justify-content: space-between; grid-column: 1 / -1; }
+.debrief-row h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.debrief-row-side { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.debrief-verdict { font-size: 14px; font-weight: 700; }
+.debrief-tone-good { color: #2f5b1f; }
+.debrief-tone-mid { color: #7a4a00; }
+.debrief-tone-bad { color: #9b2c1a; }
+.debrief-meta { font-size: 14px; color: #596949; }
+.debrief-body { font-size: 15px; line-height: 1.6; min-width: 0; overflow-wrap: anywhere; }
+.debrief-body > :first-child { margin-top: 0; }
+.debrief-body > :last-child { margin-bottom: 0; }
+.debrief-section { display: flex; flex-direction: column; gap: 12px; background: #fff; border: 1px solid #cfe1b9; border-radius: 8px; padding: 24px; }
+.debrief-section h2 { margin: 0; font-size: 18px; font-weight: 600; }
+.debrief-code summary { cursor: pointer; font-size: 14px; color: #4f6339; min-height: 32px; display: flex; align-items: center; }
+.debrief-code pre { margin: 8px 0 0; padding: 12px 14px; border-radius: 8px; background: #1f2819; color: #eef4e4; font-family: "JetBrains Mono", monospace; font-size: 13px; line-height: 1.6; overflow-x: auto; }
+.debrief-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.debrief-btn { min-height: 44px; padding: 0 18px; border-radius: 8px; border: 1px solid #26301f; background: transparent; color: #26301f; font-weight: 600; font-size: 15px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+.debrief-btn-primary { background: #26301f; color: #fff; }
+.debrief-btn:focus-visible { outline: 2px solid #4f6339; outline-offset: 3px; }
+@media (max-width: 640px) {
+  .debrief { padding: 24px 16px 48px; gap: 28px; }
+  .debrief-word { font-size: 44px; }
+  .debrief-row { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+}
+
+/* Shared press feedback for the mock interview pages: hover lifts the tone, press sinks, focus rings. */
+.setup2-pill, .setup2-segment button, .setup2-history, .setup2-resume-go, .setup2-resume-drop, .setup2-start,
+.debrief-btn, .debrief-back, .history2-delete, .history2-row-link {
+  transition: background-color 160ms cubic-bezier(.3,0,0,1), border-color 160ms cubic-bezier(.3,0,0,1), color 160ms cubic-bezier(.3,0,0,1), transform 120ms cubic-bezier(.3,0,0,1), box-shadow 160ms cubic-bezier(.3,0,0,1);
+}
+.setup2-pill:hover:not(.is-on) { border-color: #718355; background: #f3f8ec; }
+.setup2-pill.is-on:hover { background: #3a4a2f; border-color: #3a4a2f; }
+.setup2-segment button:hover:not(.is-on) { background: rgba(255,255,255,.6); color: #26301f; }
+.setup2-history:hover, .debrief-btn:not(.debrief-btn-primary):hover { background: #26301f; color: #fff; }
+.setup2-start:hover:not(:disabled), .debrief-btn-primary:hover { background: #3a4a2f; box-shadow: 0 4px 12px rgba(38,48,31,.18); }
+.setup2-resume-go:hover { background: #fff; }
+.setup2-resume-drop:hover { background: rgba(255,255,255,.12); color: #fff; }
+.history2-delete:hover { background: #f7e4e0; }
+.setup2-pill:active, .setup2-segment button:active, .setup2-history:active, .setup2-resume-go:active, .setup2-resume-drop:active,
+.setup2-start:active:not(:disabled), .debrief-btn:active, .history2-delete:active { transform: scale(.97); }
+.setup2 :is(button, [role="switch"]):focus-visible, .history2 button:focus-visible, .debrief button:focus-visible { outline: 2px solid #4f6339; outline-offset: 3px; }
+.setup2-round { border-radius: 8px; transition: background-color 160ms cubic-bezier(.3,0,0,1); }
+.setup2-round:hover { background: rgba(207,225,185,.35); }
+@media (prefers-reduced-motion: reduce) {
+  .setup2-pill, .setup2-segment button, .setup2-history, .setup2-resume-go, .setup2-start, .debrief-btn, .history2-delete { transition: none; }
+  .setup2-pill:active, .setup2-start:active, .debrief-btn:active, .history2-delete:active { transform: none; }
+}

@@ -58,7 +58,18 @@ export type Stage1QuestionProgress = {
   lastTestsPassed: number;
   lastTestsTotal: number;
   lastAllPassed: boolean;
+  /** Hidden tests: inputs from the model, expected outputs computed by running its reference. */
+  hidden?: HiddenTestState;
+  /** Latest hidden run, and the code it ran against (a stale run is redone on submit). */
+  hiddenPassed?: number;
+  hiddenTotal?: number;
+  hiddenFailures?: HiddenFailure[];
+  hiddenCode?: string;
 };
+
+export type HiddenTestCase = { input: string; expected: string };
+export type HiddenFailure = { input: string; expected: string; actual: string };
+export type HiddenTestState = { status: "ready"; cases: HiddenTestCase[] } | { status: "unavailable" };
 
 export type Stage1Progress = {
   problems: InterviewProblem[];
