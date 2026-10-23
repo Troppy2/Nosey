@@ -23,9 +23,10 @@ def test_compress_makes_audio_much_smaller_but_still_playable():
     source = _speech_like_mp3()
     small, content_type = ns.compress(source)
     assert content_type == "audio/mpeg"
-    assert len(small) < len(source) / 3
+    assert len(small) < len(source) / 2
     data, rate = sf.read(io.BytesIO(small))
-    assert rate == ns.STORED_SAMPLE_RATE
+    assert rate == 24000  # the sample rate is kept: down-sampling made the voice tinny
+    assert data.ndim == 1
     assert abs(len(data) / rate - 3.0) < 0.2
 
 

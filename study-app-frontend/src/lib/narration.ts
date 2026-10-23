@@ -21,7 +21,8 @@ type Clip = { text: string; voice: string; rate: number; onStart?: () => void; o
 // A heard clip is kept in the browser's Cache Storage, so replays, seeking back and returning
 // tomorrow are instant and offline. (localStorage holds about 5 MB, a few lessons of audio;
 // Cache Storage is the same idea with room for hundreds.)
-const DEVICE_CACHE = "nosey-narration-v1";
+// Bump the version when stored audio quality changes, so old clips are not kept.
+const DEVICE_CACHE = "nosey-narration-v2";
 const DEVICE_CACHE_MAX = 400;
 
 async function deviceKey(voice: string, text: string): Promise<string | null> {

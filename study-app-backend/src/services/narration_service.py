@@ -13,7 +13,6 @@ import json
 import re
 from typing import Optional
 
-import numpy as np
 import soundfile as sf
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -31,9 +30,10 @@ logger = get_logger(__name__)
 
 LESSON_VOICE = "af_heart"
 EXPERT_VOICE = "bm_george"
-# Speech only needs 16 kHz mono; this gives about 21 kbps (about 1 MB for a typical lesson).
-STORED_SAMPLE_RATE = 16000
-STORED_COMPRESSION = 0.99
+# Mono at the provider's own sample rate, about 44 kbps (roughly 2 MB for a typical lesson, a third
+# of the provider's 128 kbps). Down-sampling to 16 kHz was smaller but cut the high frequencies
+# and made the voice sound tinny, so the rate is never changed.
+STORED_COMPRESSION = 0.9
 CHUNK_CHARS = 600
 # Two clips at a time keeps a long lesson quick without hammering the provider.
 PREGEN_CONCURRENCY = 2
@@ -44,17 +44,15 @@ def clip_hash(text: str) -> str:
 
 
 def compress(audio: bytes) -> tuple[bytes, str]:
-    """Re-encode provider mp3 as 16 kHz mono ~21 kbps mp3. Falls back to the original bytes."""
+    """Re-encode provider mp3 as mono ~44 kbps mp3 at the same sample rate. Falls back to the original bytes."""
     try:
         data, rate = sf.read(io.BytesIO(audio), dtype="float32")
         if data.ndim > 1:
             data = data.mean(axis=1)
-        n = int(len(data) * STORED_SAMPLE_RATE / rate)
-        if n <= 0:
+        if len(data) == 0:
             return audio, "audio/mpeg"
-        resampled = np.interp(np.linspace(0, len(data) - 1, n), np.arange(len(data)), data).astype("float32")
         out = io.BytesIO()
-        sf.write(out, resampled, STORED_SAMPLE_RATE, format="MP3", subtype="MPEG_LAYER_III", compression_level=STORED_COMPRESSION)
+        sf.write(out, data, rate, format="MP3", subtype="MPEG_LAYER_III", compression_level=STORED_COMPRESSION)
         small = out.getvalue()
         return (small, "audio/mpeg") if small and len(small) < len(audio) else (audio, "audio/mpeg")
     except Exception as exc:  # never lose a clip over re-encoding
