@@ -675,7 +675,6 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
           <div className="oa-problem-head">
             {/* Older sessions stored a custom problem's slug as its title; the loaded data has the real one. */}
             <h1>{curData?.title || current.title}</h1>
-            <span className={`oa-diff oa-diff-${current.difficulty.toLowerCase()}`}>{current.difficulty}</span>
           </div>
           {!interviewRealism && current.topics.length > 0 && (
             <div className="oa-topics">

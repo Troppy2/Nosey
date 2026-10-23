@@ -87,7 +87,7 @@ function Stage1ResultsView({ stored }: { stored: MockProgress | null }) {
                 <h2>{result.title.startsWith("custom-") ? "Custom problem" : result.title}</h2>
                 <span className={`debrief-verdict ${toneOf(result.verdict)}`}>{meta.label}</span>
                 <span className="debrief-meta">
-                  {result.difficulty}, {formatMs(result.time_used_ms)}
+                  {formatMs(result.time_used_ms)}
                 </span>
                 <span className="debrief-meta">
                   {result.hidden_total

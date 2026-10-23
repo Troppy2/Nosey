@@ -341,7 +341,6 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
       <article className="voice-problem">
         <div className="voice-problem-head">
           <h1>{codingProblem.title}</h1>
-          <span className={`voice-diff voice-diff-${codingProblem.difficulty.toLowerCase()}`}>{codingProblem.difficulty}</span>
         </div>
         {codingProblem.prompt_html ? (
           <div

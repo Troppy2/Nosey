@@ -1252,6 +1252,7 @@ async def stage2_message(
         + f"Hints given so far: {body.hints_used}.\n\n"
         "RULES:\n"
         "- No concept trivia. Everything is about this one problem.\n"
+        "- Never say how hard the problem is or call it easy, medium or hard: real interviewers do not.\n"
         "- When the current goal is done this turn, end your reply by starting the next goal (for example, "
         "once the code is complete ask for the complexity). Never end on a bare acknowledgment.\n"
         "- Never write the solution or large chunks of code for them. If they ask for a hint out loud, give "
