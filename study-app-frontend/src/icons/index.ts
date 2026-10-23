@@ -37,3 +37,8 @@ export { MenuIcon } from "./MenuIcon";
 export { BookIcon } from "./BookIcon";
 export { BrainIcon } from "./BrainIcon";
 export { UndoIcon } from "./UndoIcon";
+export { MicIcon } from "./MicIcon";
+export { SpeakerIcon } from "./SpeakerIcon";
+export { KeyboardIcon } from "./KeyboardIcon";
+export { PlayIcon } from "./PlayIcon";
+export { TimerIcon } from "./TimerIcon";
