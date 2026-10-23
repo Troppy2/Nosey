@@ -1,5 +1,8 @@
 import asyncio
+import html
 import json
+import random
+import re
 from datetime import datetime
 from typing import Optional
 
@@ -13,6 +16,7 @@ from src.models.lc_sync import LCCustomProblem
 from src.models.mock_interview import MockInterviewSession
 from src.models.user import User
 from src.schemas.mock_interview_schema import (
+    CodingProblemExample,
     CodingProblemInfo,
     FinishRequest,
     FinishResponse,
@@ -31,6 +35,7 @@ from src.schemas.mock_interview_schema import (
     Stage1QuestionResult,
     Stage2MessageRequest,
     Stage2MessageResponse,
+    Stage2ProblemRequest,
     Stage2SubmitRequest,
     Stage2SubmitResponse,
     Stage3MessageRequest,
@@ -42,7 +47,7 @@ from src.schemas.mock_interview_schema import (
     Stage1HiddenTestsResponse,
     _normalize_level,
 )
-from src.services import lc_taxonomy
+from src.services import lc_catalog, lc_taxonomy
 from src.limiter import limiter
 from src.services.file_service import FileService
 from src.services.leetcode_service import LeetCodeService
@@ -131,7 +136,7 @@ def _level_config(row: MockInterviewSession) -> dict:
 # Ordered interview goals for the conversational stages. The LLM is told to cover
 # these one at a time and report which it has covered; the server enforces
 # advancement and a hard turn cap so the interviewer cannot ramble indefinitely.
-_STAGE2_GOALS = ["background", "concept_q1", "concept_q2", "coding_problem", "coding_discussion"]
+_STAGE2_GOALS = ["background", "coding_problem", "approach", "complexity", "optimize", "dry_run", "questions"]
 _STAGE3_GOALS = ["behavioral_q1", "behavioral_q2", "behavioral_q3", "behavioral_q4", "behavioral_q5"]
 # Resume deep dive: the recruiter/HM grill that follows the ATS scan. Each goal is one
 # probe into what the candidate actually claims on their resume.
@@ -139,7 +144,7 @@ _RESUME_GOALS = ["project_deep_dive", "impact_metrics", "tech_choice", "ownershi
 
 # Hard turn caps (counted by user turns) so the stage always terminates even if the
 # model never reports full goal coverage.
-_STAGE2_TURN_CAP = 10
+_STAGE2_TURN_CAP = 40  # a full 45 minutes of back and forth while coding
 _STAGE3_TURN_CAP = 17  # 5 stories, up to 2 probes each, plus closing questions
 _RESUME_TURN_CAP = 7
 
@@ -888,7 +893,166 @@ def _fallback_feedback(verdict: str, tests_passed: int, tests_total: int, hidden
     return ran + tail
 
 
-# ── Stage 2: submit coding answer ─────────────────────────────────────────────
+# ── Stage 2: prepare the coding problem ──────────────────────────────────────
+
+# Share of technical rounds that use a real catalog problem; the rest get a novel
+# problem Kojo writes (a reskin of a catalog seed, so difficulty stays honest).
+_STAGE2_CATALOG_SHARE = 0.3
+_STAGE2_CATALOG_FETCH_TIMEOUT = 8
+
+
+def _html_to_plain(markup: str) -> str:
+    text = re.sub(r"<(br|/p|/li|/pre|/div)[^>]*>", "\n", markup or "", flags=re.I)
+    text = html.unescape(re.sub(r"<[^>]+>", "", text))
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
+def _stage2_seed(row: MockInterviewSession, rng: random.Random) -> tuple[lc_catalog.CatalogProblem, str]:
+    """A catalog problem at the level's (or custom config's) difficulty and topics,
+    plus the single difficulty the round targets."""
+    cfg = _custom_config(row)
+    difficulties = (cfg.difficulties if cfg and cfg.difficulties else _level_config(row)["coding_difficulty"].split("/"))
+    difficulty = rng.choice([d for d in difficulties if d in ("Easy", "Medium", "Hard")] or ["Medium"])
+    pool = [p for p in lc_catalog.catalog() if p.difficulty == difficulty]
+    if cfg and (cfg.topics or cfg.subtopics):
+        wanted = {lc_catalog.to_topic_id(t) for t in cfg.topics + cfg.subtopics}
+        focused = [
+            p for p in pool
+            if p.topic in wanted or any(lc_catalog.to_topic_id(s) in wanted for s in p.subtopics)
+        ]
+        pool = focused or pool
+    return rng.choice(pool or list(lc_catalog.catalog())), difficulty
+
+
+async def _stage2_catalog_problem(slug: str, fallback_title: str) -> Optional[CodingProblemInfo]:
+    """The real LeetCode statement, or None when LeetCode is unreachable (it blocks
+    datacenter IPs often, see GH #75)."""
+    try:
+        data = await asyncio.wait_for(LeetCodeService().get_problem(slug), _STAGE2_CATALOG_FETCH_TIMEOUT)
+    except Exception:
+        return None
+    if not data.content_html:
+        return None
+    return CodingProblemInfo(
+        title=data.title or fallback_title,
+        slug=data.title_slug or slug,
+        difficulty=data.difficulty or "Medium",
+        prompt=_html_to_plain(data.content_html)[:20000],
+        prompt_html=data.content_html[:60000],
+        examples=[
+            CodingProblemExample(
+                input_text=ex.input_text[:4000],
+                output_text=ex.output_text[:4000],
+                explanation_text=(ex.explanation_text or None) and ex.explanation_text[:4000],
+            )
+            for ex in data.examples[:10]
+        ],
+        starter_code=(data.python_snippet or "")[:20000],
+        source="catalog",
+    )
+
+
+@router.post("/{session_id}/stage2/problem", response_model=CodingProblemInfo)
+@limiter.limit("10/minute")
+async def stage2_problem(
+    request: Request,
+    response: Response,
+    session_id: int,
+    body: Stage2ProblemRequest,
+    db: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> CodingProblemInfo:
+    """Pick the technical round's problem before Kojo presents it. About 70% are novel
+    problems Kojo writes; about 30% are real catalog problems chosen here, so titles
+    and slugs are never invented. Seeded by session so a retry lands on the same pick."""
+    row = await _load_session(session_id, user, db)
+    rng = random.Random(f"stage2-{row.id}")
+    cfg = _custom_config(row)
+
+    # A custom company with chosen problems keeps using them, as before.
+    if cfg and cfg.problems:
+        pick = rng.choice(cfg.problems[:6])
+        if pick.slug.startswith("custom-"):
+            custom = (
+                await db.execute(
+                    select(LCCustomProblem).where(LCCustomProblem.user_id == user.id, LCCustomProblem.slug == pick.slug)
+                )
+            ).scalar_one_or_none()
+            if custom is not None:
+                try:
+                    cases = json.loads(custom.test_cases_json or "[]")
+                except ValueError:
+                    cases = []
+                cases = cases if isinstance(cases, list) else []
+                return CodingProblemInfo(
+                    title=custom.title[:300],
+                    slug=custom.slug,
+                    difficulty=custom.difficulty if custom.difficulty in ("Easy", "Medium", "Hard") else "Medium",
+                    prompt=(custom.description or "")[:20000],
+                    examples=[
+                        CodingProblemExample(
+                            input_text=str(c.get("input_text", ""))[:4000],
+                            output_text=str(c.get("output_text", ""))[:4000],
+                        )
+                        for c in cases[:10]
+                        if isinstance(c, dict) and c.get("input_text")
+                    ],
+                    starter_code=(custom.starter_code or "")[:20000],
+                    source="custom",
+                )
+        else:
+            real = await _stage2_catalog_problem(pick.slug, pick.title or pick.slug)
+            if real is not None:
+                return real
+
+    seed, difficulty = _stage2_seed(row, rng)
+    if rng.random() < _STAGE2_CATALOG_SHARE:
+        real = await _stage2_catalog_problem(seed.slug, seed.title)
+        if real is not None:
+            return real
+        # LeetCode unreachable: reskin the same seed instead of inventing a title.
+
+    try:
+        generated = await LeetCodeService().generate_daily_problem(
+            topic=seed.topic_label,
+            target_difficulty=difficulty,
+            seed_title=seed.title,
+            provider=resolve_request_provider(user, body.provider),
+        )
+    except LLMException as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if not generated.title or not generated.description:
+        raise HTTPException(status_code=503, detail="Kojo couldn't write a problem. Try again.")
+    return CodingProblemInfo(
+        title=generated.title[:300],
+        slug=f"mock-{row.id}",
+        difficulty=generated.difficulty if generated.difficulty in ("Easy", "Medium", "Hard") else difficulty,
+        prompt=generated.description[:20000],
+        examples=[
+            CodingProblemExample(
+                input_text=tc.input_text, output_text=tc.output_text, explanation_text=tc.explanation_text
+            )
+            for tc in generated.test_cases[:10]
+        ],
+        starter_code=generated.starter_code[:20000],
+        source="novel",
+    )
+
+
+# ── Stage 2: grade the technical round ───────────────────────────────────────
+
+_STAGE2_VERDICTS = ("strong", "pass", "borderline", "needs_work")
+
+
+def _transcript_text(history: list[InterviewChatMessage], candidate: str, limit: int = 14000) -> str:
+    lines = [
+        f"{'Kojo' if m.role == 'interviewer' else candidate}: {m.content.strip()[:1500]}"
+        for m in history
+    ]
+    text = "\n".join(lines)
+    # Keep the end of a long round: that is where the code, complexity and questions are.
+    return text if len(text) <= limit else "...\n" + text[-limit:]
+
 
 @router.post("/{session_id}/stage2/submit", response_model=Stage2SubmitResponse)
 @limiter.limit("5/minute")
@@ -902,40 +1066,74 @@ async def submit_stage2(
 ) -> Stage2SubmitResponse:
     row = await _load_session(session_id, user, db)
 
-    coding_slug = body.problem_slug or "unknown"
-    coding_title = body.problem_title or "the coding problem"
+    problem = body.problem
+    coding_title = problem.title if problem else (body.problem_title or "the coding problem")
     company_label = _company_label(row)
     candidate = _candidate_name(user)
     level_cfg = _level_config(row)
+    samples = (
+        f"{body.samples_passed} of {body.samples_total} sample cases passed on their last run"
+        if body.samples_total
+        else "they never ran the sample cases"
+    )
 
     prompt = (
-        f"You are a {level_cfg['role']} interviewer at {company_label} reviewing {candidate}'s solution "
-        f"for a {level_cfg['label']} candidate.\n"
-        f"Problem: {coding_title} ({coding_slug})\n\n"
-        f"{candidate}'s code:\n```python\n{body.code}\n```\n\n"
-        f"Calibrate your expectations to a {level_cfg['label']} candidate: {level_cfg['rigor']}\n"
-        f"Provide brief interview-style feedback (3-4 sentences) addressed directly to {candidate}: "
-        "correctness, approach quality, time/space complexity, and one improvement suggestion. "
-        "Be professional and constructive."
+        f"You are Kojo, a senior software engineer at {company_label}, grading a 45 minute technical phone screen "
+        f"you just ran with {candidate} for a {level_cfg['label']} role.\n"
+        f"Calibrate to a {level_cfg['label']} candidate: {level_cfg['rigor']}\n\n"
+        f"PROBLEM: {coding_title}\n{(problem.prompt if problem else '')[:4000]}\n\n"
+        f"FINAL CODE:\n```python\n{body.code[:12000] or '(no code written)'}\n```\n\n"
+        f"FACTS: hints used: {body.hints_used}. Clock ran out: {'yes' if body.time_up else 'no'}. "
+        f"Samples: {samples}.\n\n"
+        f"TRANSCRIPT:\n{_transcript_text(body.history, candidate) or '(none)'}\n\n"
+        'Return ONLY JSON: {"verdict": "...", "feedback": "..."}\n'
+        f"- verdict: one of {', '.join(_STAGE2_VERDICTS)}.\n"
+        "- Judge the whole round: clarifying questions and approach before coding, correctness of the "
+        "final code, the complexity answer, the optimize follow-up, the dry run, and how they talked.\n"
+        "- Every hint lowers problem solving: 3 or more hints cannot be strong. Grade the code that "
+        "exists if the clock ran out; unfinished code cannot be strong.\n"
+        f"- feedback: 4 to 6 sentences of markdown addressed to {candidate}: what went well, what to "
+        "fix, one concrete next step. End with one sentence on the questions they asked at the end "
+        "(or that they asked none). Questions are not graded."
     )
 
     try:
-        llm = LLMService()
-        feedback = await llm.call_kojo(prompt, provider=resolve_request_provider(user, body.provider))
+        data = await LLMService().complete_json_strongest(prompt)
     except LLMException as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    row.stage2_submission = json.dumps({"code": body.code, "feedback": feedback})
+    verdict = str(data.get("verdict") or "").strip().lower().replace(" ", "_")
+    if verdict not in _STAGE2_VERDICTS:
+        verdict = "borderline" if body.code.strip() else "needs_work"
+    feedback = str(data.get("feedback") or "").strip() or _fallback_feedback(verdict, 0, 0)
+
+    row.stage2_submission = json.dumps(
+        {
+            "code": body.code,
+            "feedback": feedback,
+            "verdict": verdict,
+            "hints_used": body.hints_used,
+            "time_up": body.time_up,
+            "samples_passed": body.samples_passed,
+            "samples_total": body.samples_total,
+            "problem": {
+                "title": coding_title,
+                "slug": problem.slug if problem else body.problem_slug,
+                "difficulty": problem.difficulty if problem else "",
+                "source": problem.source if problem else "",
+            },
+        }
+    )
     row.status = STATUS_STAGE2_COMPLETE
     await db.commit()
 
-    return Stage2SubmitResponse(feedback=feedback)
+    return Stage2SubmitResponse(feedback=feedback, verdict=verdict)
 
 
 # ── Stage 2: conversational interview ────────────────────────────────────────
 
 @router.post("/{session_id}/stage2/message", response_model=Stage2MessageResponse)
-@limiter.limit("5/minute")
+@limiter.limit("10/minute")
 async def stage2_message(
     request: Request,
     response: Response,
@@ -951,143 +1149,158 @@ async def stage2_message(
     level_cfg = _level_config(row)
 
     turn_count = sum(1 for m in body.history if m.role == "user")
-
     history_text = "\n".join(
-        f"{'You (Interviewer)' if m.role == 'interviewer' else candidate}: {m.content}"
-        for m in body.history
+        f"{'You (Kojo)' if m.role == 'interviewer' else candidate}: {m.content}" for m in body.history
     )
 
-    # For a custom company the candidate chose the difficulties (and maybe specific
-    # problems / focus topics); those override the level-derived difficulty for the
-    # coding problem the interviewer presents.
-    cfg = _custom_config(row)
-    coding_difficulty = level_cfg["coding_difficulty"]
-    custom_focus = ""
-    if cfg:
-        if cfg.difficulties:
-            coding_difficulty = "/".join(cfg.difficulties)
-        if cfg.problems:
-            picks = ", ".join(f"{p.title or p.slug} ({p.slug})" for p in cfg.problems[:6])
-            custom_focus = (
-                f"\nWhen you present the coding problem, choose ONE from the candidate's target "
-                f"problem set: {picks}. Use its real title and slug.\n"
-            )
-            # custom-* problems exist only in the user's account, not on LeetCode, so the
-            # model cannot know them by title: give it their statements to present from.
-            custom_statements = await _custom_problem_statements(
-                db, user.id, [p.slug for p in cfg.problems[:6] if p.slug.startswith("custom-")]
-            )
-            if custom_statements:
-                custom_focus += (
-                    "These are the candidate's own problems, not on LeetCode. If you pick one, present "
-                    "it from this statement, keeping its slug:\n" + custom_statements + "\n"
-                )
-        elif cfg.topics:
-            custom_focus = (
-                f"\nFocus the technical and coding questions on these topics this company tests: "
-                f"{', '.join(cfg.topics)}.\n"
-            )
-        if cfg.subtopics:
-            custom_focus += (
-                f"Emphasize these specific techniques where they fit naturally: "
-                f"{', '.join(cfg.subtopics)}.\n"
-            )
-
-    # Goal tracking: the client echoes back the goals covered so far. We tell the
-    # model which goal to focus on next so it does not loop or wander.
     covered = _merge_covered_goals(body.covered_goals, [], _STAGE2_GOALS)
+    presented = "coding_problem" in covered
+    problem = body.problem
+    time_up = body.event == "time_up" or body.minutes_left == 0
+    starting = body.message is None and body.event is None
+    # The first thing the candidate says answers the background question, so the
+    # problem goes up on that turn. Deterministic: no waiting on the model to decide.
+    present_now = not presented and not starting and problem is not None and not time_up
+
     remaining = [g for g in _STAGE2_GOALS if g not in covered]
-    current_goal = remaining[0] if remaining else "coding_discussion"
-    # Once the candidate has been talking for a while without reaching the coding
-    # problem, force it so the interviewer stops chatting and gets to the code.
-    force_coding = "coding_problem" not in covered and turn_count >= 4
+    if starting:
+        current_goal = "background"
+    elif present_now:
+        current_goal = "coding_problem"
+    elif time_up:
+        current_goal = "questions"
+    else:
+        current_goal = remaining[0] if remaining else "questions"
 
     goal_descriptions = {
-        "background": f"greet warmly and ask about {candidate}'s background (role, relevant experience, why {company_label})",
-        "concept_q1": "ask ONE technical conceptual question (time complexity, data structure tradeoffs, or algorithm design)",
-        "concept_q2": "ask a SECOND, different technical conceptual question",
-        "coding_problem": f"present ONE {coding_difficulty} LeetCode problem by filling the coding_problem field",
-        "coding_discussion": "discuss the coding problem and answer clarifying questions without giving away the full solution",
+        "background": f"introduce yourself in one sentence and ask {candidate} ONE quick background question "
+        "(what they are working on now, or a recent project). No other questions",
+        "coding_problem": "thank them in a few words, then present the problem: it is now on their screen, so "
+        "summarise it in 1 or 2 sentences and invite clarifying questions before they code",
+        "approach": "answer clarifying questions and hear their approach BEFORE code. If they start coding "
+        "without explaining, ask them to talk you through the plan first. Once the plan is reasonable, let "
+        "them code: stay brief and react to what is in the editor",
+        "complexity": "once the code looks complete, ask for the time and space complexity and push back if "
+        "the answer is wrong",
+        "optimize": "ask ONE optimize follow-up: a faster or leaner approach, or a twist on the constraints",
+        "dry_run": "ask them to dry run their code on a small example or an edge case, and point at the line "
+        "if a bug shows up",
+        "questions": 'ask "Do you have any questions for me?" and answer in character as an engineer at the '
+        "company, briefly and honestly. Set is_done true once you have answered (or they have none)",
     }
-    if force_coding:
-        current_goal = "coding_problem"
 
-    system_prompt = (
-        f"You are Kojo, a {level_cfg['role']} at {company_label}, conducting a 45-minute technical phone "
-        f"screen with {candidate} for a {level_cfg['label']} role.\n"
-        f"Calibrate difficulty and expectations to a {level_cfg['label']} candidate: {level_cfg['rigor']}\n"
-        f"{custom_focus}"
-        "RESPOND WITH ONLY RAW JSON, no markdown fences, no extra text:\n"
-        '{"reply": "...", "coding_problem": null, "covered_goals": ["..."], "is_done": false}\n\n'
-        "YOUR INTERVIEW GOALS, IN ORDER (cover each ONE at a time):\n"
-        + "".join(f"- {g}: {goal_descriptions[g]}\n" for g in _STAGE2_GOALS)
-        + "\n"
-        f"GOALS ALREADY COVERED: {covered or ['(none yet)']}\n"
-        f"YOUR SINGLE GOAL FOR THIS TURN: {current_goal} ({goal_descriptions[current_goal]})\n\n"
-        "RULES:\n"
-        "- Address ONLY the current goal this turn. Once the candidate has answered it, add it to "
-        "covered_goals and move to the next goal. Do NOT re-ask a goal that is already covered.\n"
-        "- Ask a follow-up ONLY to clarify an incomplete or unclear answer. If the candidate asks YOU "
-        "a question, answer it briefly, then return to the current goal. Never invent new goals.\n"
-        "- When the current goal is coding_problem, fill the coding_problem field like:\n"
-        f'  {{"title":"Two Sum","slug":"two-sum","difficulty":"{coding_difficulty.split("/")[0]}","prompt":"Given an array..."}}\n'
-        "  and include \"coding_problem\" in covered_goals. In all other turns coding_problem MUST be null.\n"
-        "- covered_goals: list every goal covered so far (including ones from earlier turns).\n"
-        "- reply: 2 to 4 sentences max. Be direct and conversational.\n"
-        f"- Use {candidate}'s name occasionally (not every message).\n"
-        "- The candidate submits their code with a separate button, so always keep is_done false.\n"
-        "- Return ONLY raw JSON.\n"
-    )
-    if force_coding:
-        system_prompt += (
-            "\nIMPORTANT: The background and concept questions have taken long enough. Present the "
-            "coding problem THIS turn regardless of what else is pending.\n"
+    if problem is not None:
+        origin = (
+            f"This is LeetCode's {problem.title}."
+            if problem.source == "catalog"
+            else "You wrote this problem yourself. It is not a LeetCode problem: never name or link one."
+        )
+        problem_block = (
+            f"THE PROBLEM{' (on the candidate screen)' if presented or present_now else ' (not shown yet)'}: "
+            f"{problem.title} ({problem.difficulty}). {origin}\n{problem.prompt[:5000]}\n\n"
+        )
+    else:
+        problem_block = ""
+    if presented:
+        code = body.code.strip()
+        code_block = (
+            "THE CANDIDATE'S EDITOR RIGHT NOW (a shared doc; they may still be typing):\n"
+            f"```python\n{code[:6000]}\n```\n\n"
+            if code
+            else "THE CANDIDATE'S EDITOR RIGHT NOW: empty.\n\n"
+        )
+    else:
+        code_block = ""
+
+    event_line = {
+        "hint": f"{candidate} pressed the hint button. Give ONE small hint that moves them one step, based on "
+        "their code and approach. Never the full solution. Set hint_given true.",
+        "nudge": f"{candidate} has been quiet for a few minutes. Check in and give ONE small nudge based on their "
+        "editor. Never the full solution. Set hint_given true.",
+        "time_up": "The 45 minutes are up. In one sentence say you are at time and thank them, then ask "
+        '"Do you have any questions for me?". Do not start new topics.',
+    }.get(body.event or "", "")
+    if not event_line and body.minutes_left is not None and 0 < body.minutes_left <= 5:
+        event_line = (
+            f"Only {body.minutes_left} minutes left: skip ahead (a quick dry run at most) and move to "
+            '"Do you have any questions for me?" soon.'
         )
 
-    if body.message is None:
+    system_prompt = (
+        f"You are Kojo, a senior software engineer at {company_label}, running a 45 minute technical phone screen "
+        f"with {candidate} for a {level_cfg['label']} role. It is a voice call with a shared code editor.\n"
+        f"Calibrate to a {level_cfg['label']} candidate: {level_cfg['rigor']}\n\n"
+        "RESPOND WITH ONLY RAW JSON, no markdown fences, no extra text:\n"
+        '{"reply": "...", "covered_goals": ["..."], "hint_given": false, "is_done": false}\n\n'
+        "THE ROUND, IN ORDER:\n"
+        + "".join(f"- {g}: {goal_descriptions[g]}\n" for g in _STAGE2_GOALS)
+        + "\n"
+        + problem_block
+        + code_block
+        + f"GOALS ALREADY COVERED: {covered or ['(none yet)']}\n"
+        f"THIS TURN: {current_goal} ({goal_descriptions[current_goal]})\n"
+        + (f"RIGHT NOW: {event_line}\n" if event_line else "")
+        + f"Hints given so far: {body.hints_used}.\n\n"
+        "RULES:\n"
+        "- No concept trivia. Everything is about this one problem.\n"
+        "- When the current goal is done this turn, end your reply by starting the next goal (for example, "
+        "once the code is complete ask for the complexity). Never end on a bare acknowledgment.\n"
+        "- Never write the solution or large chunks of code for them. If they ask for a hint out loud, give "
+        "one small hint and set hint_given true.\n"
+        "- If they ask YOU something, answer briefly, then return to the current goal.\n"
+        "- covered_goals: every goal covered so far, from the list above. Add a goal only once it has "
+        "actually happened.\n"
+        "- reply: 1 to 3 sentences, spoken out loud, so no markdown, bullet points or code blocks.\n"
+        f"- Use {candidate}'s name occasionally, not every message.\n"
+        "- is_done stays false until you have answered their closing questions.\n"
+        "- Return ONLY raw JSON.\n"
+    )
+
+    if starting:
         full_prompt = system_prompt + "\nConversation so far:\n(none)\n\nBegin the interview now."
+    elif body.message is None:
+        full_prompt = system_prompt + f"\nConversation so far:\n{history_text or '(none)'}\n\nYour JSON response:"
     else:
         full_prompt = (
             system_prompt
-            + f"\nConversation so far:\n{history_text}\n\n"
+            + f"\nConversation so far:\n{history_text or '(none)'}\n\n"
             + f"{candidate}: {body.message}\n\nYour JSON response:"
         )
 
+    raw = ""
     try:
-        llm = LLMService()
-        raw = await llm.call_kojo(full_prompt, provider=resolve_request_provider(user, body.provider))
-        raw = raw.strip()
+        raw = (await LLMService().call_kojo(full_prompt, provider=resolve_request_provider(user, body.provider))).strip()
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
         parsed = json.loads(raw)
     except Exception:
-        fallback = raw if isinstance(raw, str) and raw else "I see, thanks for sharing that. Let's continue."
-        return Stage2MessageResponse(reply=fallback[:600], covered_goals=covered)
+        parsed = {"reply": raw[:600] if raw and not raw.startswith("{") else "Sorry, could you say that again?"}
 
-    coding_problem = None
-    if parsed.get("coding_problem"):
-        cp = parsed["coding_problem"]
-        coding_problem = CodingProblemInfo(
-            title=cp.get("title", "Coding Problem"),
-            slug=cp.get("slug", "problem"),
-            difficulty=cp.get("difficulty", coding_difficulty.split("/")[0]),
-            prompt=cp.get("prompt", ""),
-        )
-
-    # Merge the model's report with what was already covered. If a coding problem
-    # was presented this turn, count that goal as covered regardless of the report.
     updated_covered = _merge_covered_goals(covered, parsed.get("covered_goals"), _STAGE2_GOALS)
-    if coding_problem is not None and "coding_problem" not in updated_covered:
-        updated_covered = _merge_covered_goals(updated_covered, ["coding_problem"], _STAGE2_GOALS)
+    if present_now:
+        updated_covered = _merge_covered_goals(updated_covered, ["background", "coding_problem"], _STAGE2_GOALS)
+    elif not presented:
+        # The problem goes up only through present_now, never on the model's word.
+        updated_covered = [] if starting else [g for g in updated_covered if g == "background"]
+    if body.event == "time_up":
+        updated_covered = _merge_covered_goals(updated_covered, ["questions"], _STAGE2_GOALS)
+
+    # Done once Kojo has answered the closing questions: "questions" must have been
+    # asked on an earlier turn (or at the time-up turn), then the model says so.
+    asked_before = "questions" in covered or (time_up and body.event is None)
+    is_done = bool(parsed.get("is_done")) and asked_before and body.message is not None
+    if turn_count + 1 >= _STAGE2_TURN_CAP:
+        is_done = True
 
     row.status = STATUS_STAGE2
     await db.commit()
 
     return Stage2MessageResponse(
-        reply=parsed.get("reply", ""),
-        coding_problem=coding_problem,
-        is_done=False,
+        reply=str(parsed.get("reply") or "").strip() or "Go on, I'm listening.",
+        coding_problem=problem if present_now else None,
+        is_done=is_done,
         covered_goals=updated_covered,
+        hint_given=body.event in ("hint", "nudge") or bool(parsed.get("hint_given")),
     )
 
 
@@ -1496,7 +1709,18 @@ def _summarize_stage2(stage2_submission_json: Optional[str]) -> str:
         return "Stage 2 was skipped or not completed."
     try:
         data = json.loads(stage2_submission_json)
-        return data.get("feedback", "No feedback recorded.")
+        feedback = data.get("feedback", "No feedback recorded.")
+        if "hints_used" not in data:
+            return feedback
+        problem = data.get("problem") or {}
+        facts = (
+            f"Problem: {problem.get('title', 'unknown')} ({problem.get('difficulty') or 'unknown'}). "
+            f"Verdict: {str(data.get('verdict', '')).upper()}. Hints used: {data.get('hints_used', 0)}. "
+            f"Clock ran out: {'yes' if data.get('time_up') else 'no'}. "
+        )
+        if data.get("samples_total"):
+            facts += f"Sample cases: {data.get('samples_passed', 0)} of {data['samples_total']} passed. "
+        return facts + feedback
     except Exception:
         return "Stage 2 feedback unavailable."
 
@@ -1531,6 +1755,9 @@ def _stage2_overall_verdict(stage2_submission_json: Optional[str]) -> Optional[s
         return None
     try:
         data = json.loads(stage2_submission_json)
+        if data.get("verdict") in _STAGE2_VERDICTS:
+            return data["verdict"]
+        # Older runs stored prose only.
         fb = data.get("feedback", "").lower()
         if any(w in fb for w in ("excellent", "strong", "optimal", "great")):
             return "strong"

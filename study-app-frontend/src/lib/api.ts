@@ -51,6 +51,8 @@ import type {
   ResumeScreenResult,
   Stage1GradeResponse,
   Stage2MessageResponse,
+  Stage2TurnEvent,
+  CodingProblemInfo,
   Stage3MessageResponse,
   ProviderStatus,
   QuestionCreate,
@@ -2514,19 +2516,38 @@ export async function gradeStage1(
   });
 }
 
+export async function fetchStage2Problem(sessionId: number, provider?: string): Promise<CodingProblemInfo> {
+  return request<CodingProblemInfo>(`/mock-interview/${sessionId}/stage2/problem`, {
+    method: "POST",
+    body: JSON.stringify({ provider }),
+  });
+}
+
 export async function submitStage2(
   sessionId: number,
-  code: string,
-  problemTitle: string,
-  problemSlug: string,
+  round: {
+    code: string;
+    problem: CodingProblemInfo;
+    history: InterviewChatMessage[];
+    hintsUsed: number;
+    timeUp: boolean;
+    samplesPassed: number;
+    samplesTotal: number;
+  },
   provider?: string,
-): Promise<{ feedback: string }> {
-  return request<{ feedback: string }>(`/mock-interview/${sessionId}/stage2/submit`, {
+): Promise<{ feedback: string; verdict?: string | null }> {
+  return request<{ feedback: string; verdict?: string | null }>(`/mock-interview/${sessionId}/stage2/submit`, {
     method: "POST",
     body: JSON.stringify({
-      code,
-      problem_title: problemTitle,
-      problem_slug: problemSlug,
+      code: round.code,
+      problem_title: round.problem.title.slice(0, 200),
+      problem_slug: round.problem.slug,
+      problem: round.problem,
+      history: round.history.slice(-200),
+      hints_used: round.hintsUsed,
+      time_up: round.timeUp,
+      samples_passed: round.samplesPassed,
+      samples_total: round.samplesTotal,
       provider,
     }),
   });
@@ -2537,11 +2558,28 @@ export async function sendStage2Message(
   message: string | null,
   history: InterviewChatMessage[],
   coveredGoals: string[] = [],
+  turn: {
+    problem?: CodingProblemInfo | null;
+    code?: string;
+    hintsUsed?: number;
+    minutesLeft?: number | null;
+    event?: Stage2TurnEvent | null;
+  } = {},
   provider?: string,
 ): Promise<Stage2MessageResponse> {
   return request<Stage2MessageResponse>(`/mock-interview/${sessionId}/stage2/message`, {
     method: "POST",
-    body: JSON.stringify({ message, history, covered_goals: coveredGoals, provider }),
+    body: JSON.stringify({
+      message,
+      history,
+      covered_goals: coveredGoals,
+      problem: turn.problem ?? null,
+      code: (turn.code ?? "").slice(0, 20000),
+      hints_used: turn.hintsUsed ?? 0,
+      minutes_left: turn.minutesLeft ?? null,
+      event: turn.event ?? null,
+      provider,
+    }),
   });
 }
 

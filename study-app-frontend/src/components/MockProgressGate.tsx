@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { LoadingNotice } from "./Loaders";
+import { MockLoader } from "./MockLoader";
 import { getMockInterviewSession } from "../lib/api";
 import type { MockProgress } from "../lib/mockInterview";
 import type { MockInterviewSession } from "../lib/types";
@@ -36,11 +36,14 @@ export function MockProgressGate({
   sessionId,
   label,
   render,
+  tone = "page",
 }: {
   sessionId: number;
   /** Active phrase for the wait, e.g. "Loading your assessment". */
   label: string;
   render: (stored: MockProgress | null) => ReactNode;
+  /** "room" for the voice rounds so the wait matches the room it opens into. */
+  tone?: "room" | "page";
 }) {
   const { progress, ready } = useMockProgress(sessionId);
   const location = useLocation();
@@ -71,9 +74,7 @@ export function MockProgressGate({
 
   if (!ready || (needsSession && !fetchFailed)) {
     return (
-      <div className="page page-narrow">
-        <LoadingNotice title={label} estimate="Restoring where you left off." />
-      </div>
+      <MockLoader title={label} note="Restoring where you left off." tone={tone} />
     );
   }
   return <>{render(progress)}</>;

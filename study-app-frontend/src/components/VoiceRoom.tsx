@@ -23,12 +23,16 @@ type Props = {
   nextLabel?: string;
   /** Replaces the interviewer stage with a work surface (the technical round's problem and editor). */
   workspace?: ReactNode;
+  /** Header slot before the transcript toggle, e.g. the technical round's clock and End round. */
+  headerExtra?: ReactNode;
+  /** Names each step instead of "Question n of N" (the technical round's phases). */
+  stepNames?: string[];
   voice: ReturnType<typeof useInterviewerVoice>;
 };
 
 /** Full-screen voice round: the interviewer's latest line, the controls and a running transcript. */
 export function VoiceRoom({
-  title, subtitle, interviewerName, messages, covered, total, waiting, done, onSend, onLeave, doneAction, onAdvance, nextLabel = "the next round", workspace, voice,
+  title, subtitle, interviewerName, messages, covered, total, waiting, done, onSend, onLeave, doneAction, onAdvance, nextLabel = "the next round", workspace, headerExtra, stepNames, voice,
 }: Props) {
   const threadRef = useRef<HTMLDivElement>(null);
   const lastInterviewer = [...messages].reverse().find((m) => m.role === "interviewer");
@@ -114,7 +118,16 @@ export function VoiceRoom({
           ))}
         </ol>
         <div className="voice-head-right">
-          {done ? doneAction : <span className="voice-steps-label">Question {Math.min(covered + 1, total)} of {total}</span>}
+          {done ? (
+            doneAction
+          ) : (
+            <span className="voice-steps-label">
+              {stepNames
+                ? stepNames[Math.min(covered, stepNames.length - 1)]
+                : `Question ${Math.min(covered + 1, total)} of ${total}`}
+            </span>
+          )}
+          {headerExtra}
           <button
             type="button"
             className={`voice-transcript-toggle${showTranscript ? " is-on" : ""}`}
@@ -185,6 +198,14 @@ export function VoiceRoom({
             )}
           </div>
           </>
+          )}
+          {workspace && !showTranscript && (
+            <div className="voice-work-prompt">
+              <span className="voice-prompt-status">
+                {waiting ? `${interviewerName} is thinking` : voice.speaking ? `${interviewerName} is talking` : interviewerName}
+              </span>
+              <p>{lastInterviewer?.content ?? ""}</p>
+            </div>
           )}
           {workspace && <div className="voice-transcript-answer">{answerBar}</div>}
         </aside>

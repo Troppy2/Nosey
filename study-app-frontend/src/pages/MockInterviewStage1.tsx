@@ -4,7 +4,7 @@ import { CodeIcon } from "../icons";
 import { AlertIcon, ArrowLeftIcon, PlayIcon, TimerIcon, CheckCircleIcon, ChevronLeftIcon, ChevronRightIcon, CrossCircleIcon, PencilIcon } from "../icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { LoadingNotice } from "../components/Loaders";
+import { MockLoader } from "../components/MockLoader";
 import type { ProgressStage } from "../components/Progress";
 import { ProgressOverlay, useStagedProgress } from "../components/Progress";
 import {
@@ -604,14 +604,13 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
 
   if (missingContext || !current) {
     return (
-      <div className="mock-loading" style={{ height: "100vh" }}>
-        <LoadingNotice
-          title="Loading your assessment"
-          estimate="Pulling the problems and your saved code. A few seconds."
-          slowNote="Still loading. If this does not clear, go back and reopen the assessment."
-          slowAfterMs={10000}
-        />
-      </div>
+      <MockLoader
+        tone="page"
+        title="Loading your assessment"
+        note="Pulling the problems and your saved code. A few seconds."
+        slowNote="Still loading. If this does not clear, go back and reopen the assessment."
+        slowAfterMs={10000}
+      />
     );
   }
 

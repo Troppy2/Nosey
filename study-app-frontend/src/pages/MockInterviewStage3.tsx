@@ -1,7 +1,7 @@
-import { AlertIcon, ChatIcon } from "../icons";
+import { AlertIcon } from "../icons";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { LoadingNotice } from "../components/Loaders";
+import { MockLoader } from "../components/MockLoader";
 import { sendStage3Message } from "../lib/api";
 import type { InterviewChatMessage, MockInterviewSession } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
@@ -16,6 +16,7 @@ export default function MockInterviewStage3() {
     <MockProgressGate
       sessionId={Number(sessionId)}
       label="Loading your interview"
+      tone="room"
       render={(stored) => <Stage3Runner stored={stored} />}
     />
   );
@@ -115,20 +116,12 @@ function Stage3Runner({ stored }: { stored: MockProgress | null }) {
 
   if (initializing) {
     return (
-      <div className="mock-loading" style={{ height: "100vh" }}>
-        <div
-          className="mock-interviewer-avatar"
-          style={{ width: 52, height: 52, fontSize: "0.9rem" }}
-        >
-          <ChatIcon size={18} />
-        </div>
-        <LoadingNotice
-          title="Preparing your behavioral interview"
-          estimate="Writing questions from the role and your resume. About 10 seconds."
-          slowNote="Still preparing. Your first question opens as soon as this finishes."
-          slowAfterMs={14000}
-        />
-      </div>
+      <MockLoader
+        title="Kojo is joining the call"
+        note="Writing questions from the role. About 10 seconds."
+        slowNote="Still connecting. Your first question opens as soon as Kojo is ready."
+        slowAfterMs={14000}
+      />
     );
   }
 
