@@ -5,8 +5,13 @@ export type CodingTabItem = {
     id: string;
     name: string;
     active?: boolean;
-    // Locked while a 3-Pass Drill is open: not selectable (code hidden) and not deletable.
+    // Locked while a 3-Pass Drill is open (not selectable, not deletable) or while a prep
+    // bank run is pending (not selectable, but closable: see closable).
     locked?: boolean;
+    // A locked tab that can still be closed. Prep bank locks only hide old answers.
+    closable?: boolean;
+    // Tooltip on a locked tab.
+    lockTitle?: string;
 };
 
 type CodingTabsProps = {
@@ -25,6 +30,7 @@ export default function CodingTabs({ tabs, activeTabId, onSelectTab, onAddTab, o
                 {tabs.map((tab) => {
                     const isActive = tab.active ?? tab.id === activeTabId;
                     const locked = Boolean(tab.locked);
+                    const closableWhileLocked = locked && Boolean(tab.closable);
                     return (
                         <button
                             key={tab.id}
@@ -33,14 +39,17 @@ export default function CodingTabs({ tabs, activeTabId, onSelectTab, onAddTab, o
                             onClick={() => { if (!locked) onSelectTab(tab.id); }}
                             role="tab"
                             aria-selected={isActive}
-                            disabled={locked}
+                            // A disabled button swallows clicks on its children, so a closable
+                            // locked tab stays enabled and the onClick guard keeps it unselectable.
+                            disabled={locked && !closableWhileLocked}
                             aria-disabled={locked}
-                            title={locked ? "Locked while you drill" : undefined}
+                            title={locked ? tab.lockTitle ?? "Locked while you drill" : undefined}
                         >
                             <span>{tab.name}</span>
                             {locked ? (
                                 <Lock size={12} className="lc-coding-tab-lock" aria-hidden="true" />
-                            ) : isActive ? (
+                            ) : null}
+                            {closableWhileLocked || (!locked && isActive) ? (
                                 <span
                                     className="closeTab"
                                     role="button"

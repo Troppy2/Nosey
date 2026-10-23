@@ -103,7 +103,7 @@ type Category = {
   problems: Problem[];
 };
 
-type View =
+export type View =
   | { type: "tree" }
   | { type: "browse" }
   | { type: "category"; categoryId: string }
@@ -580,6 +580,62 @@ function isGeneratedProblem(problem: LCCustomProblem): boolean {
   return problem.source === "daily_kojo" || problem.source === "streak_rescue";
 }
 
+// The KojoCode screen the user is on, per browser tab. view is plain React state, so a
+// reload (the backend waiting screen's Return button, or the browser discarding a
+// background tab) used to drop the user back on the tree. sessionStorage survives both
+// and stays per tab. A problem that no longer resolves falls back to its category.
+const VIEW_KEY = "nosey_lc_view";
+
+export function loadSavedView(): View {
+  try {
+    const raw = JSON.parse(sessionStorage.getItem(VIEW_KEY) ?? "null") as Partial<View> & {
+      categoryId?: unknown;
+      problemSlug?: unknown;
+    } | null;
+    if (!raw || typeof raw.type !== "string") return { type: "tree" };
+    switch (raw.type) {
+      case "tree":
+      case "browse":
+      case "banks":
+      case "drills":
+      case "practice":
+        return { type: raw.type };
+      case "category":
+        return typeof raw.categoryId === "string" ? { type: "category", categoryId: raw.categoryId } : { type: "tree" };
+      case "problem": {
+        if (typeof raw.categoryId !== "string" || typeof raw.problemSlug !== "string") return { type: "tree" };
+        const slug = raw.problemSlug;
+        const known =
+          CATEGORIES.some((category) => category.problems.some((problem) => problem.slug === slug)) ||
+          savedCustomSlugs().has(slug);
+        return known
+          ? { type: "problem", categoryId: raw.categoryId, problemSlug: slug }
+          : { type: "category", categoryId: raw.categoryId };
+      }
+      default:
+        return { type: "tree" };
+    }
+  } catch {
+    return { type: "tree" };
+  }
+}
+
+function savedCustomSlugs(): Set<string> {
+  try {
+    return new Set(loadCustomProblems().map((problem) => problem.slug));
+  } catch {
+    return new Set();
+  }
+}
+
+export function saveView(view: View) {
+  try {
+    sessionStorage.setItem(VIEW_KEY, JSON.stringify(view));
+  } catch {
+    // best-effort: a blocked sessionStorage just means a reload lands on the tree
+  }
+}
+
 function loadCustomProblems(): LCCustomProblem[] {
   const raw = loadJson<LCCustomProblem[]>(getCustomProblemsKey(), []);
   return Array.isArray(raw) ? raw.filter((item) => item && typeof item.slug === "string") : [];
@@ -781,7 +837,7 @@ function createDefaultWorkspace(initialCode = ""): CodeWorkspace {
   };
 }
 
-function normalizeCodeWorkspace(value: unknown): CodeWorkspace | null {
+export function normalizeCodeWorkspace(value: unknown): CodeWorkspace | null {
   if (!value || typeof value !== "object") return null;
 
   const rawWorkspace = value as Partial<CodeWorkspace>;
@@ -795,6 +851,9 @@ function normalizeCodeWorkspace(value: unknown): CodeWorkspace | null {
         // Preserve the drill-pass marker so re-opening a drilled problem finds its
         // existing pass tabs instead of spawning duplicates.
         ...(typeof tab.drillPass === "number" ? { drillPass: tab.drillPass } : {}),
+        // Same for the prep-bank run marker. Dropping it here made every reload spawn
+        // another locked "Bank" tab.
+        ...(typeof tab.bankRun === "string" ? { bankRun: tab.bankRun } : {}),
       }))
     : [];
 
@@ -2109,7 +2168,8 @@ export default function LeetCodeMode() {
     interviewRealism,
     setInterviewRealism,
   } = useSettings();
-  const [view, setView] = useState<View>({ type: "tree" });
+  const [view, setView] = useState<View>(loadSavedView);
+  useEffect(() => saveView(view), [view]);
   const [customProblems, setCustomProblems] = useState<LCCustomProblem[]>(() => loadCustomProblems());
   const [customModalOpen, setCustomModalOpen] = useState(false);
   const [editingSlug, setEditingSlug] = useState<string | null>(null);
@@ -2817,10 +2877,25 @@ export default function LeetCodeMode() {
     const starter = interviewRealism ? "" : currentProblemData?.python_snippet?.trimEnd() ?? "";
     setCodeWorkspaces((prev) => {
       const workspace = prev[slug] ?? loadCodeWorkspace(slug);
-      const existing = workspace.tabs.find((tab) => tab.bankRun === run);
-      if (existing && workspace.activeTabId === existing.id) return prev;
+      let tabs = workspace.tabs;
+      let existing = tabs.find((tab) => tab.bankRun === run);
+      if (!existing) {
+        // Repair workspaces saved before bankRun survived a reload: they hold "Bank" tabs
+        // with no marker. Adopt the newest as this run's tab and drop the other unmarked
+        // ones that are still empty (or only the starter), which are reload duplicates.
+        const orphans = tabs.filter((tab) => tab.name === "Bank" && tab.bankRun === undefined && tab.drillPass === undefined);
+        const adopt = orphans[orphans.length - 1];
+        if (adopt) {
+          const blank = (code: string) => !code.trim() || code.trimEnd() === starter;
+          tabs = tabs
+            .filter((tab) => !orphans.includes(tab) || tab === adopt || !blank(tab.code))
+            .map((tab) => (tab === adopt ? { ...tab, bankRun: run } : tab));
+          existing = tabs.find((tab) => tab.bankRun === run);
+        }
+      }
+      if (existing && workspace.activeTabId === existing.id && tabs === workspace.tabs) return prev;
       const bankTab = existing ?? { id: makeTabId(), name: "Bank", code: starter, bankRun: run };
-      const tabs = existing ? workspace.tabs : [...workspace.tabs, bankTab];
+      if (!existing) tabs = [...tabs, bankTab];
       const next = { tabs, activeTabId: bankTab.id };
       saveCodeWorkspace(slug, next);
       schedulePushWorkspaceToDb(slug, next);
@@ -4489,6 +4564,13 @@ export default function LeetCodeMode() {
     return run !== null && tab.bankRun !== run;
   }
 
+  // Only a drill blocks closing a tab (see handleDeleteCodeTab).
+  function isTabDeleteLocked(slug: string, tab: CodeTab): boolean {
+    if (!betaMode) return false;
+    const drill = drills.find((d) => d.problem_slug === slug && !d.completed_at);
+    return Boolean(drill) && tab.drillPass !== drill?.current_pass;
+  }
+
   // Prep banks are cold interview practice: a problem is "pending" while some bank holds it
   // unsolved, even if it was solved before it was added. Returns that run's key (the latest
   // added_at among those banks), or null when nothing is pending.
@@ -4530,7 +4612,9 @@ export default function LeetCodeMode() {
     const slug = currentProblem.slug;
     const workspace = codeWorkspaces[slug] ?? loadCodeWorkspace(slug);
     const target = workspace.tabs.find((tab) => tab.id === tabId);
-    if (target && isTabLockedForDrill(slug, target)) return;
+    // Drill-locked tabs can't be closed. Bank-locked ones can: the lock only hides an old
+    // answer from view, and the current run's own tab is never the one being protected.
+    if (target && isTabDeleteLocked(slug, target)) return;
 
     let nextWorkspace: CodeWorkspace;
     if (workspace.tabs.length <= 1) {
@@ -4543,6 +4627,25 @@ export default function LeetCodeMode() {
         ? nextTabs[Math.max(0, tabIndex - 1)]?.id ?? nextTabs[0].id
         : workspace.activeTabId;
       nextWorkspace = { tabs: nextTabs, activeTabId: nextActiveTabId };
+    }
+
+    // Never leave a locked tab active: that would show the old answer the lock hides.
+    // Fall back to any unlocked tab, else open a fresh attempt tab for the drill pass or
+    // bank run that is doing the locking.
+    const activeTab = nextWorkspace.tabs.find((tab) => tab.id === nextWorkspace.activeTabId);
+    if (activeTab && isTabLockedForDrill(slug, activeTab)) {
+      const unlocked = nextWorkspace.tabs.find((tab) => !isTabLockedForDrill(slug, tab));
+      if (unlocked) {
+        nextWorkspace = { ...nextWorkspace, activeTabId: unlocked.id };
+      } else {
+        const drill = drills.find((d) => d.problem_slug === slug && !d.completed_at);
+        const starter = interviewRealism ? "" : currentProblemData?.python_snippet?.trimEnd() ?? "";
+        const run = pendingBankRun(slug);
+        const fresh: CodeTab = drill
+          ? { id: makeTabId(), name: `Pass ${drill.current_pass}`, code: starter, drillPass: drill.current_pass }
+          : { id: makeTabId(), name: "Bank", code: starter, ...(run ? { bankRun: run } : {}) };
+        nextWorkspace = { tabs: [...nextWorkspace.tabs, fresh], activeTabId: fresh.id };
+      }
     }
 
     saveCodeWorkspace(slug, nextWorkspace);
@@ -7482,7 +7585,17 @@ export default function LeetCodeMode() {
 
         <div className="lc-editor-pane">
           <CodingTabs
-            tabs={(currentCodeWorkspace?.tabs ?? []).map((tab) => ({ id: tab.id, name: tab.name, locked: isTabLockedForDrill(currentProblem.slug, tab) }))}
+            tabs={(currentCodeWorkspace?.tabs ?? []).map((tab) => {
+              const locked = isTabLockedForDrill(currentProblem.slug, tab);
+              const drillLocked = isTabDeleteLocked(currentProblem.slug, tab);
+              return {
+                id: tab.id,
+                name: tab.name,
+                locked,
+                closable: locked && !drillLocked,
+                lockTitle: drillLocked ? "Locked while you drill" : "Locked until you solve it in the bank",
+              };
+            })}
             activeTabId={currentCodeWorkspace?.activeTabId ?? ""}
             onSelectTab={handleSelectCodeTab}
             onAddTab={handleAddCodeTab}
