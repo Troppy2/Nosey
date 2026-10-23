@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     # auto chain on 2026-09-25. Model id is env config like the Groq ones.
     openrouter_api_key: Optional[str] = Field(default=None, alias="OPENROUTER_API_KEY")
     openrouter_model: str = Field(default="minimax/minimax-m3", alias="OPENROUTER_MODEL")
+    # Mock interview voice. Kokoro af_heart is the warm, soothing female voice; the free Fish voice is the fallback.
+    openrouter_tts_model: str = Field(default="hexgrad/kokoro-82m", alias="OPENROUTER_TTS_MODEL")
+    openrouter_tts_voice: str = Field(default="af_heart", alias="OPENROUTER_TTS_VOICE")
+    openrouter_tts_fallback_model: str = Field(default="fish-audio/s2.1-pro-free:free", alias="OPENROUTER_TTS_FALLBACK_MODEL")
+    openrouter_tts_fallback_voice: str = Field(default="alloy", alias="OPENROUTER_TTS_FALLBACK_VOICE")
+    openrouter_stt_model: str = Field(default="openai/whisper-large-v3-turbo", alias="OPENROUTER_STT_MODEL")
     # Content moderation (GH #173). OpenAI's moderation endpoint is free; it is
     # the only thing this key is used for. Unset means moderation is off and
     # every check fails open (logged as a moderation usage error).

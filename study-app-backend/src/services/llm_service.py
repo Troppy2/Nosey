@@ -2473,6 +2473,10 @@ class LLMService:
                 ))
         return starts
 
+    async def complete_json_strongest(self, prompt: str) -> dict[str, object]:
+        """Public entry for quality-critical JSON (mock OA hidden tests and reference solutions)."""
+        return await self._complete_json_strongest(prompt)
+
     async def _complete_json_strongest(self, prompt: str) -> dict[str, object]:
         """Strongest available provider first (Claude), then the rest.
 
