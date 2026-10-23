@@ -40,6 +40,7 @@ from src.schemas.learning_module_schema import (
 from src.services.file_service import FileService
 from src.services.llm_service import LLMService
 from src.services.mcq_verification_service import MCQVerificationService
+from src.services.narration_service import schedule_episode_narration, schedule_lesson_narration
 from src.utils.exceptions import LLMException, ResourceNotFoundException, StudyAppException
 from src.utils.logger import get_logger
 from src.utils.provider_policy import resolve_request_provider
@@ -193,18 +194,18 @@ async def _generate_track_background(
                 if track is None:
                     return  # cancelled
                 track.notes_hash = _hash_notes(notes)
-                session.add(
-                    LearningModule(
-                        track_id=track_id,
-                        order_index=0,
-                        title=str(episode["title"]),
-                        episode_script=json.dumps(episode["turns"]),
-                        slides=json.dumps(episode["slides"]) if episode.get("slides") else None,
-                        checkpoints=json.dumps(episode["checkpoints"]),
-                    )
+                episode_module = LearningModule(
+                    track_id=track_id,
+                    order_index=0,
+                    title=str(episode["title"]),
+                    episode_script=json.dumps(episode["turns"]),
+                    slides=json.dumps(episode["slides"]) if episode.get("slides") else None,
+                    checkpoints=json.dumps(episode["checkpoints"]),
                 )
+                session.add(episode_module)
                 track.status = "ready"
                 await session.commit()
+                schedule_episode_narration(episode_module.id, track_format)
 
             # Usage event, same shape as the article path (one event per build,
             # successful or not; the format itself is already visible on the
@@ -305,6 +306,7 @@ async def _generate_track_background(
                 module.tts_script = str(content.get("tts_script") or "") or None
                 module.quiz_json = json.dumps(quiz)
                 await session.commit()
+                schedule_lesson_narration(module_id)
 
         # Phase 3: mark ready + usage event.
         duration_ms = int((time.monotonic() - _t0) * 1000)
@@ -852,6 +854,7 @@ async def update_module_lesson(
         module.tts_script = str(support.get("tts_script") or "") or None
         module.quiz_json = json.dumps(quiz)
         await session.commit()
+        schedule_lesson_narration(module.id)
 
         return _module_to_response(module)
     except ResourceNotFoundException as exc:

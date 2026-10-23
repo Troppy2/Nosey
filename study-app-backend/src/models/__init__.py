@@ -36,6 +36,7 @@ from src.models.slash_command import SlashCommand
 from src.models.survey_response import SurveyResponse
 from src.models.system_design import SDConceptProgress, SDCustomTopic, SDQuizAttempt, SDSubmission
 from src.models.test import Test
+from src.models.narration_clip import NarrationClip
 from src.models.usage_event import UsageEvent
 from src.models.user import User
 from src.models.user_answer import UserAnswer

@@ -25,6 +25,7 @@ from sqlalchemy.orm import selectinload
 from src.models.folder import Folder
 from src.models.learning_module import LearningModule, LearningTrack
 from src.services.mcp_tool_base import McpContext, McpTool, ToolArgs, ToolInputError, owned_folder
+from src.services.narration_service import schedule_lesson_narration
 from src.services.mcp_write_tools import CONFIRM_FIELD, CREATED_VIA, require_confirm, screen
 from src.utils.exceptions import ResourceNotFoundException
 from src.utils.lesson_blocks import normalize_tts_script, split_lesson_blocks
@@ -173,6 +174,9 @@ async def create_learning_track(ctx: McpContext, args: CreateTrackArgs) -> dict[
     modules = [_new_module(track.id, i, m) for i, m in enumerate(args.modules)]
     ctx.session.add_all(modules)
     await ctx.session.commit()
+    for m in modules:
+        if m.tts_script:
+            schedule_lesson_narration(m.id)
     return {**_track_summary(track, modules), "archived_track_ids": [t.id for t in previous]}
 
 
@@ -197,6 +201,9 @@ async def add_modules(ctx: McpContext, args: AddModulesArgs) -> dict[str, Any]:
     ctx.session.add_all(modules)
     track.module_count = len(track.modules) + len(modules)
     await ctx.session.commit()
+    for m in modules:
+        if m.tts_script:
+            schedule_lesson_narration(m.id)
     return _track_summary(track, modules)
 
 
@@ -248,6 +255,8 @@ async def edit_module(ctx: McpContext, args: EditModuleArgs) -> dict[str, Any]:
     if args.video_url is not None:
         module.video_url = args.video_url.strip() or None
     await ctx.session.commit()
+    if module.tts_script:
+        schedule_lesson_narration(module.id)
     return {"module_id": module.id, "updated": sorted(fields - {"module_id"})}
 
 
