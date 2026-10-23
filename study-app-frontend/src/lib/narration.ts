@@ -20,13 +20,12 @@ function fetchClip(text: string, voice: string): Promise<Blob> {
   const key = `${voice}|${text}`;
   let hit = cache.get(key);
   if (!hit) {
-    // One retry, then a failed clip is dropped so a later play tries again.
-    hit = narrateText(text, voice)
-      .catch(() => narrateText(text, voice))
-      .catch((e: unknown) => {
-        cache.delete(key);
-        throw e;
-      });
+    // The server already tried Kokoro then Fish, so no retry here: a failure goes straight to
+    // the browser voice, and the clip is dropped from the cache so a later play tries again.
+    hit = narrateText(text, voice).catch((e: unknown) => {
+      cache.delete(key);
+      throw e;
+    });
     cache.set(key, hit);
     if (cache.size > 24) cache.delete(cache.keys().next().value as string);
   }

@@ -15,6 +15,10 @@ logger = get_logger(__name__)
 _BASE = "https://openrouter.ai/api/v1"
 MAX_TTS_CHARS = 1500
 MAX_AUDIO_BYTES = 8 * 1024 * 1024
+# Each voice gets a short leash so a stalled provider falls through quickly:
+# Kokoro, then the free Fish voice, then (client side) the browser's own voice.
+PRIMARY_TIMEOUT_SECONDS = 15.0
+FALLBACK_TIMEOUT_SECONDS = 25.0
 
 
 def _headers() -> dict[str, str]:
@@ -31,10 +35,10 @@ class SpeechService:
             raise ValidationException("Nothing to speak.")
         text = text[:MAX_TTS_CHARS]
         last: Exception | None = None
-        async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
-            for model, voice in (
-                (settings.openrouter_tts_model, voice_override or settings.openrouter_tts_voice),
-                (settings.openrouter_tts_fallback_model, settings.openrouter_tts_fallback_voice),
+        async with httpx.AsyncClient() as client:
+            for model, voice, timeout in (
+                (settings.openrouter_tts_model, voice_override or settings.openrouter_tts_voice, PRIMARY_TIMEOUT_SECONDS),
+                (settings.openrouter_tts_fallback_model, settings.openrouter_tts_fallback_voice, FALLBACK_TIMEOUT_SECONDS),
             ):
                 try:
                     resp = await client.post(
@@ -46,6 +50,7 @@ class SpeechService:
                             "voice": voice,
                             "response_format": "mp3",
                         },
+                        timeout=timeout,
                     )
                     resp.raise_for_status()
                     if resp.content:
@@ -54,7 +59,7 @@ class SpeechService:
                     raise
                 except Exception as exc:  # try the next model
                     last = exc
-                    logger.warning("tts model %s failed: %s", model, exc)
+                    logger.warning("tts model %s failed: %s %s", model, type(exc).__name__, exc)
         raise LLMException(f"Speech synthesis failed: {last}")
 
     async def transcribe(self, audio: bytes, filename: str, content_type: str) -> str:

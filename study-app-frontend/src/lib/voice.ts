@@ -67,7 +67,7 @@ export function useInterviewerVoice() {
       const run = runRef.current;
 
       let blob: Blob | null = null;
-      for (let attempt = 0; attempt < 2 && !blob; attempt++) {
+      for (let attempt = 0; attempt < 1 && !blob; attempt++) {
         try {
           blob = await speakInterviewer(spoken);
         } catch {
