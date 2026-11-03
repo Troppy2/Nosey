@@ -86,7 +86,7 @@ export function StudyPlanWidget() {
               <span style={{ width: total ? `${(done / total) * 100}%` : 0 }} />
             </div>
             {next.length === 0 ? (
-              <p className="plan-empty">{total ? "Everything's done. Nice." : "Nothing on this plan yet."}</p>
+              <p className="plan-empty">{total ? "You've Completed everything!" : "Nothing on this plan yet."}</p>
             ) : (
               <ul className="plan-checklist">
                 {next.map((item) => (
