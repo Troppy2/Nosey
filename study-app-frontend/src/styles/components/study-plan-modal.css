@@ -33,8 +33,6 @@
 .plan-modal-switch {
   flex: 1;
   min-width: 0;
-  font-family: var(--font-serif);
-  font-size: var(--text-lg);
 }
 
 .plan-icon-btn {
@@ -459,24 +457,44 @@
   max-width: 100%;
 }
 
-/* Plan switcher: styled like the title, not a grey native box. */
-.plan-modal-switch,
-.plan-modal-switch button {
-  border: 1px solid var(--green-light-mid);
-  border-radius: var(--radius-sm);
-  background: var(--white);
-  color: var(--ink);
-  font-family: var(--font-serif);
-  font-size: var(--text-lg);
-  font-weight: 700;
-}
-
-/* Give the plan switcher room to breathe so long titles aren't cramped. */
+/* Plan switcher: styled like the modal title, not a form control. */
 .plan-modal-switch .dropdown-trigger {
-  min-width: 220px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-family: var(--font-serif);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--ink);
+  gap: 6px;
+  max-width: 100%;
 }
 
-.plan-modal-switch button {
-  border: 0;
-  padding: 6px 10px;
+.plan-modal-switch .dropdown-trigger .dropdown-chevron {
+  flex-shrink: 0;
+  color: var(--green-dark);
+  width: 18px;
+  height: 18px;
+}
+
+.plan-modal-switch .dropdown-trigger .dropdown-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.plan-modal-switch .dropdown-trigger:hover:not(:disabled) {
+  background: var(--green-lightest);
+}
+
+.plan-modal-switch .dropdown-trigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--green-dark);
+  background: var(--green-lightest);
+}
+
+.plan-modal-switch .dropdown-trigger[aria-expanded="true"] {
+  box-shadow: none;
 }
