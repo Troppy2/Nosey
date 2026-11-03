@@ -28,6 +28,7 @@ from src.services.grading_service import GradingService
 from src.services.mcp_tool_base import McpContext, McpTool, ToolArgs, dump, owned_folder
 from src.services.mcp_interview_tools import INTERVIEW_TOOLS
 from src.services.mcp_learning_tools import LEARNING_TOOLS
+from src.services.mcp_plan_tools import PLAN_TOOLS
 from src.services.mcp_write_tools import WRITE_TOOLS
 from src.services.test_service import TestService
 from src.utils.exceptions import ResourceNotFoundException, StudyAppException
@@ -428,6 +429,7 @@ TOOLS: dict[str, McpTool] = {
         *WRITE_TOOLS,
         *LEARNING_TOOLS,
         *INTERVIEW_TOOLS,
+        *PLAN_TOOLS,
     )
 }
 

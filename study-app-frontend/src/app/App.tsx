@@ -45,6 +45,7 @@ import Settings from "../pages/Settings";
 import SystemDesign from "../pages/SystemDesign";
 import SystemDesignConcept from "../pages/SystemDesignConcept";
 import SystemDesignWorkspace from "../pages/SystemDesignWorkspace";
+import Plans from "../pages/Plans";
 
 // Dependency imports for tracking the last visited path
 import { useLocation } from "react-router-dom";
@@ -118,6 +119,7 @@ export default function App() {
           <Route path="/flashcards/:folderId/modules/:moduleId" element={<LearningModuleLesson />} />
           <Route path="/flashcards/:folderId/episode/:moduleId" element={<EpisodePlayer />} />
           <Route path="/folders/:folderId/flashcards/manage" element={<FlashcardsManage />} />
+          <Route path="/plans" element={<SignedInRoute><Plans /></SignedInRoute>} />
           <Route path="/leetcode" element={<SignedInRoute><LeetCodeMode /></SignedInRoute>} />
           <Route path="/system-design" element={<SignedInRoute><SystemDesign /></SignedInRoute>} />
           <Route path="/system-design/:conceptId" element={<SignedInRoute><SystemDesignConcept /></SignedInRoute>} />

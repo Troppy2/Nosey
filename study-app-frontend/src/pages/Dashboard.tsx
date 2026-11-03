@@ -10,8 +10,12 @@ import { ConfirmModal, RenameModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
 import { SkeletonFolderMiniGrid, SkeletonStatGrid, SkeletonTestRows, SkeletonWeakStack } from "../components/Skeletons";
 import { PullToRefreshIndicator } from "../components/PullToRefreshIndicator";
-import { deleteTest, fetchFlashcardDueSummary, fetchFlashcards, fetchFolders, fetchTests, getGreetingName, getResumableTests, scopeKey, updateTest } from "../lib/api";
+import { deleteTest, fetchFlashcardDueSummary, fetchFlashcards, fetchFolders, fetchTests, getGreetingName, getResumableTests, getStoredUser, scopeKey, updateTest } from "../lib/api";
 import { ReviewTheseWidget } from "../components/ReviewTheseWidget";
+import { SettingsIcon } from "../icons";
+import { useSettings } from "../lib/useSettings";
+import { StudyPlanWidget } from "../components/StudyPlanWidget";
+import { DashboardWidgetPicker } from "../components/DashboardWidgetPicker";
 import { formatDate, formatPercent } from "../lib/format";
 import { toast } from "../lib/toast";
 import { usePullToRefresh } from "../lib/usePullToRefresh";
@@ -101,6 +105,14 @@ export default function Dashboard() {
   const [renamingTest, setRenamingTest] = useState<TestSummary | null>(null);
   const [deletingTest, setDeletingTest] = useState<TestSummary | null>(null);
   const [dismissedTestIds, setDismissedTestIds] = useState<Set<number>>(() => readCompletedTestIds());
+  const { betaMode } = useSettings();
+  const [userWidgets, setUserWidgets] = useState<string[]>(() => {
+    const u = getStoredUser();
+    return Array.isArray(u?.dashboard_widgets) && u.dashboard_widgets.length === 2
+      ? u.dashboard_widgets
+      : ["review_these", "weak_spots"];
+  });
+  const [showCustomizeWidgets, setShowCustomizeWidgets] = useState(false);
   const [displayTitle, setDisplayTitle] = useState("Your study cockpit");
   const [statsResetVersion, setStatsResetVersion] = useState(0);
   const displayTitleRef = useRef(displayTitle);
@@ -562,11 +574,34 @@ export default function Dashboard() {
               </div>
 
               <aside id="tour-review-cards">
-                <ReviewTheseWidget summary={dueSummary} />
-                <WeakSpots />
+                {betaMode && (
+                  <div className="widget-customize-row">
+                    <button type="button" className="widget-customize-btn" onClick={() => setShowCustomizeWidgets(true)}>
+                      <SettingsIcon size={14} />
+                      <span>Customize</span>
+                    </button>
+                  </div>
+                )}
+
+                {(betaMode ? userWidgets : ["review_these", "weak_spots"]).map((wKey) => {
+                  if (wKey === "review_these") return <ReviewTheseWidget key="review_these" summary={dueSummary} />;
+                  if (wKey === "weak_spots") return <WeakSpots key="weak_spots" />;
+                  if (wKey === "study_plan") return <StudyPlanWidget key="study_plan" />;
+                  return null;
+                })}
               </aside>
             </div>
           </>
+        )}
+        {showCustomizeWidgets && (
+          <DashboardWidgetPicker
+            current={userWidgets}
+            onClose={() => setShowCustomizeWidgets(false)}
+            onSaved={(widgets) => {
+              setUserWidgets(widgets);
+              setShowCustomizeWidgets(false);
+            }}
+          />
         )}
       </div>
     </>

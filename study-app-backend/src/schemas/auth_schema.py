@@ -5,7 +5,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
-from src.models.user import parse_tours_seen
+from src.models.user import DEFAULT_DASHBOARD_WIDGETS, parse_dashboard_widgets, parse_tours_seen
 
 
 class GoogleAuthRequest(BaseModel):
@@ -42,6 +42,14 @@ class UserResponse(BaseModel):
     onboarding_completed_at: Optional[datetime] = None
     # Page tours already shown. Stored as JSON text on the model.
     tours_seen: list[str] = Field(default_factory=list)
+    dashboard_widgets: list[str] = Field(default_factory=lambda: list(DEFAULT_DASHBOARD_WIDGETS))
+
+    @field_validator("dashboard_widgets", mode="before")
+    @classmethod
+    def _decode_dashboard_widgets(cls, value: object) -> object:
+        if value is None or isinstance(value, str):
+            return parse_dashboard_widgets(value)
+        return value
 
     @field_validator("tours_seen", mode="before")
     @classmethod

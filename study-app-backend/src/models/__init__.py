@@ -33,6 +33,7 @@ from src.models.question import Question
 from src.models.question_group import QuestionGroup
 from src.models.quota_charge import QuotaCharge
 from src.models.slash_command import SlashCommand
+from src.models.study_plan import StudyPlan, StudyPlanItem
 from src.models.survey_response import SurveyResponse
 from src.models.system_design import SDConceptProgress, SDCustomTopic, SDQuizAttempt, SDSubmission
 from src.models.test import Test
@@ -84,6 +85,8 @@ __all__ = [
     "QuestionGroup",
     "QuotaCharge",
     "SlashCommand",
+    "StudyPlan",
+    "StudyPlanItem",
     "SurveyResponse",
     "Test",
     "UsageEvent",

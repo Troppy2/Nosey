@@ -545,6 +545,8 @@ export type AuthUser = {
   onboarding_completed_at?: string | null;
   /** Page tours already shown (users.tours_seen). Absent on copies stored before it existed. */
   tours_seen?: string[];
+  /** Dashboard widgets customization: ordered list of 2 keys. */
+  dashboard_widgets?: string[] | null;
 };
 
 export type AdminUserRow = {
@@ -1271,4 +1273,98 @@ export type McpConnection = {
   client_name: string;
   connected_at: string;
   last_used_at?: string | null;
+};
+
+
+// Study Plans (beta)
+export type StudyPlanItemKind =
+  | "free_text"
+  | "test"
+  | "module"
+  | "flashcards"
+  | "leetcode"
+  | "system_design"
+  | "mock_interview";
+
+export type StudyPlanItem = {
+  id: ID;
+  plan_id: ID;
+  position: number;
+  kind: StudyPlanItemKind;
+  label: string;
+  target_id?: ID | null;
+  target_count?: number | null;
+  due_date?: string | null;
+  done: boolean;
+  done_at?: string | null;
+  done_source?: "manual" | "auto" | null;
+  progress?: string | null;
+  created_at: string;
+};
+
+export type StudyPlanItemInput = {
+  id?: ID;
+  kind: StudyPlanItemKind;
+  label: string;
+  target_id?: ID | null;
+  target_count?: number | null;
+  due_date?: string | null;
+  done?: boolean;
+};
+
+export type StudyPlanSummary = {
+  id: ID;
+  title: string;
+  exam_date?: string | null;
+  is_pinned: boolean;
+  created_at: string;
+  updated_at: string;
+  archived_at?: string | null;
+  total_items: number;
+  done_items: number;
+};
+
+export type StudyPlanDetail = {
+  id: ID;
+  title: string;
+  exam_date?: string | null;
+  is_pinned: boolean;
+  created_at: string;
+  updated_at: string;
+  archived_at?: string | null;
+  items: StudyPlanItem[];
+};
+
+export type CatalogItem = {
+  id: ID;
+  title: string;
+  kind: string;
+  extra?: string | null;
+};
+
+export type CatalogResponse = {
+  tests: CatalogItem[];
+  modules: CatalogItem[];
+  flashcards: CatalogItem[];
+  leetcode: CatalogItem[];
+  system_design: CatalogItem[];
+  mock_interview: CatalogItem[];
+};
+
+export type StudyPlanDraftRequest = {
+  text: string;
+};
+
+export type StudyPlanDraftResponse = {
+  title: string;
+  exam_date?: string | null;
+  items: StudyPlanItemInput[];
+};
+
+export type DashboardWidgetsUpdate = {
+  widgets: string[];
+};
+
+export type DashboardWidgetsResponse = {
+  dashboard_widgets: string[];
 };
