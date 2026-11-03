@@ -1,11 +1,12 @@
 import logging
 from typing import Any, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_session
 from src.dependencies import get_beta_user
+from src.limiter import limiter
 from src.models.user import User
 from src.repositories.user_repository import UserRepository
 from src.schemas.study_plan import (
@@ -21,6 +22,7 @@ from src.schemas.study_plan import (
     StudyPlanSummaryResponse,
     StudyPlanUpdateRequest,
 )
+from src.services.account_safety_service import screen_user_input
 from src.services.llm_service import LLMService
 from src.services.study_plan_service import StudyPlanService
 from src.utils.exceptions import (
@@ -63,11 +65,15 @@ async def get_study_plans_catalog(
 
 
 @router.post("/draft", response_model=StudyPlanDraftResponse)
+@limiter.limit("5/minute;30/hour")
 async def create_study_plan_draft(
+    request: Request,
+    response: Response,
     data: StudyPlanDraftRequest,
     user: User = Depends(get_beta_user),
     session: AsyncSession = Depends(get_session),
 ) -> StudyPlanDraftResponse:
+    await screen_user_input(user, "study_plan_draft", data.text)
     bind_usage(user.id, feature="study_plan_draft")
     catalog = await StudyPlanService().get_catalog(user.id, session)
     catalog_items = [
