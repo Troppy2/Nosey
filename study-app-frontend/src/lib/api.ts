@@ -1,3 +1,4 @@
+import type { FlashcardRating } from "./flashcardSchedule";
 import type {
   DailyQuizResponse,
   WeakSpot,
@@ -21,6 +22,7 @@ import type {
   KojoClearResponse,
   KojoClearedConversation,
   Flashcard,
+  FlashcardDueSummary,
   FlashcardUpdate,
   TidiedCard,
   Folder,
@@ -936,15 +938,24 @@ export async function deleteAllFlashcards(folderId: number): Promise<void> {
   await request(`/folders/${folderId}/flashcards`, { method: "DELETE" });
 }
 
-export async function recordFlashcardAttempt(folderId: number, cardId: number, correct: boolean, timeMs: number) {
-  try {
-    await request(`/folders/${folderId}/flashcards/${cardId}/attempt`, {
-      method: "POST",
-      body: JSON.stringify({ correct, time_ms: timeMs }),
-    });
-  } catch {
-    return;
-  }
+export async function recordFlashcardAttempt(
+  folderId: number,
+  cardId: number,
+  ratingOrCorrect: FlashcardRating | boolean,
+  timeMs?: number
+): Promise<Flashcard> {
+  const payload =
+    typeof ratingOrCorrect === "string"
+      ? { rating: ratingOrCorrect, time_ms: timeMs }
+      : { correct: ratingOrCorrect, time_ms: timeMs };
+  return request<Flashcard>(`/folders/${folderId}/flashcards/${cardId}/attempt`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchFlashcardDueSummary(): Promise<FlashcardDueSummary> {
+  return request<FlashcardDueSummary>("/flashcards/due-summary");
 }
 
 export async function fetchProviderStatus(): Promise<ProviderStatus> {

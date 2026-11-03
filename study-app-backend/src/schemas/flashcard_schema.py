@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from src.utils.time import UtcDatetime
 
 # Quizlet import caps: one request holds at most this many cards, each side at
 # most this long. The tidy pass reads at most TIDY_MAX_CHARS of pasted text so
@@ -81,8 +83,19 @@ class FlashcardTidyResponse(BaseModel):
 
 
 class FlashcardAttemptCreate(BaseModel):
-    correct: bool
+    correct: Optional[bool] = None
+    rating: Optional[Literal["hard", "medium", "easy"]] = None
     time_ms: Optional[int] = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def resolve_rating_and_correct(self) -> "FlashcardAttemptCreate":
+        if self.rating is not None:
+            self.correct = (self.rating != "hard")
+        elif self.correct is not None:
+            self.rating = "medium" if self.correct else "hard"
+        else:
+            raise ValueError("Either rating or correct must be provided.")
+        return self
 
 
 class FlashcardResponse(BaseModel):
@@ -95,9 +108,50 @@ class FlashcardResponse(BaseModel):
     source: Optional[str] = None
     topic: Optional[str] = None
     difficulty: int
+    ease: float = 2.5
+    interval_days: int = 0
+    reps: int = 0
+    lapses: int = 0
+    due_at: Optional[UtcDatetime] = None
+    last_reviewed_at: Optional[UtcDatetime] = None
+    is_due: bool = False
+    is_new: bool = True
     created_at: datetime
     updated_at: datetime
     attempt_count: int = 0
     correct_count: int = 0
     success_rate: Optional[float] = None
     last_attempted: Optional[datetime] = None
+
+    @model_validator(mode="after")
+    def compute_due_and_new(self) -> "FlashcardResponse":
+        if self.due_at is None:
+            self.is_new = True
+            self.is_due = False
+        else:
+            self.is_new = False
+            now = datetime.now(timezone.utc) if self.due_at.tzinfo else datetime.utcnow()
+            self.is_due = self.due_at <= now
+        return self
+
+
+class DueSummaryFolder(BaseModel):
+    folder_id: int
+    name: str
+    due: int
+
+
+class DueSummaryCard(BaseModel):
+    id: int
+    folder_id: int
+    folder_name: str
+    front: str
+    difficulty: int
+    due_at: Optional[UtcDatetime] = None
+    lapses: int = 0
+
+
+class FlashcardDueSummaryResponse(BaseModel):
+    total_due: int
+    folders: list[DueSummaryFolder]
+    cards: list[DueSummaryCard]

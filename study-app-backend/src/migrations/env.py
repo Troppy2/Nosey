@@ -16,7 +16,8 @@ if sys.platform.startswith("win"):
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url)
+if not config.get_main_option("sqlalchemy.url"):
+    config.set_main_option("sqlalchemy.url", settings.database_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
@@ -25,8 +26,9 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
+    url = config.get_main_option("sqlalchemy.url") or settings.database_url
     context.configure(
-        url=settings.database_url,
+        url=url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},

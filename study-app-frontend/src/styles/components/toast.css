@@ -56,6 +56,25 @@
   line-height: 1.4;
 }
 
+.toast-action {
+  justify-self: start;
+  margin-top: 6px;
+  padding: 4px 10px;
+  background: var(--green-lightest);
+  border: 1px solid var(--green-dark);
+  border-radius: var(--radius-sm);
+  color: var(--green-dark);
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.toast-action:hover {
+  background: var(--green-dark);
+  color: #fff;
+}
+
 .toast-close {
   display: grid;
   place-items: center;

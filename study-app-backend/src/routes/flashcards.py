@@ -13,6 +13,7 @@ from src.schemas.flashcard_schema import (
     FlashcardAttemptCreate,
     FlashcardBulkImportRequest,
     FlashcardCreate,
+    FlashcardDueSummaryResponse,
     FlashcardGenerateRequest,
     FlashcardResponse,
     FlashcardTidyRequest,
@@ -50,6 +51,14 @@ async def list_all_flashcards(
     user: User = Depends(get_current_user),
 ) -> list[FlashcardResponse]:
     return await FlashcardService().list_flashcards_for_user(user.id, session)
+
+
+@router.get("/flashcards/due-summary", response_model=FlashcardDueSummaryResponse)
+async def get_due_summary(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> FlashcardDueSummaryResponse:
+    return await FlashcardService().get_due_summary(user.id, session)
 
 
 @router.post(
@@ -231,12 +240,11 @@ async def delete_all_flashcards(
 @router.get("/folders/{folder_id}/flashcards/weak", response_model=list[FlashcardResponse])
 async def weak_flashcards(
     folder_id: int,
-    threshold: float = Query(default=0.5, ge=0.0, le=1.0),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> list[FlashcardResponse]:
     try:
-        return await FlashcardService().get_weak_flashcards(folder_id, user.id, threshold, session)
+        return await FlashcardService().get_weak_flashcards(folder_id, user.id, session)
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except StudyAppException as exc:
@@ -330,9 +338,12 @@ async def record_flashcard_attempt(
             folder_id,
             flashcard_id,
             user.id,
+            data.rating,
             data.correct,
             data.time_ms,
             session,
         )
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except StudyAppException as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -7,11 +7,17 @@
 
 export type ToastKind = "success" | "error" | "info";
 
+export type ToastAction = {
+  label: string;
+  onClick: () => void;
+};
+
 export type Toast = {
   id: number;
   kind: ToastKind;
   title: string;
   body?: string;
+  action?: ToastAction;
 };
 
 // Errors stay longer: they usually carry a fix the reader has to act on.
@@ -52,9 +58,9 @@ export function dismissToast(id: number) {
   emit();
 }
 
-function push(kind: ToastKind, title: string, body?: string) {
+function push(kind: ToastKind, title: string, body?: string, action?: ToastAction) {
   const id = nextId++;
-  const entry: Toast = { id, kind, title, body };
+  const entry: Toast = { id, kind, title, body, action };
   toasts = [...toasts, entry].slice(-MAX_VISIBLE);
   emit();
   timers.set(id, setTimeout(() => dismissToast(id), DURATION_MS[kind]));
@@ -63,7 +69,7 @@ function push(kind: ToastKind, title: string, body?: string) {
 
 export const toast = {
   success: (title: string, body?: string) => push("success", title, body),
-  error: (title: string, body?: string) => push("error", title, body),
+  error: (title: string, body?: string, action?: ToastAction) => push("error", title, body, action),
   info: (title: string, body?: string) => push("info", title, body),
   dismiss: dismissToast,
 };

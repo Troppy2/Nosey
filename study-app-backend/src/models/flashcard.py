@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import BIGINT_ID, Base, TimestampMixin
@@ -14,6 +15,9 @@ if TYPE_CHECKING:
 
 class Flashcard(Base, TimestampMixin):
     __tablename__ = "flashcards"
+    __table_args__ = (
+        Index("ix_flashcards_folder_id_due_at", "folder_id", "due_at"),
+    )
 
     id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)
     folder_id: Mapped[int] = mapped_column(
@@ -25,6 +29,12 @@ class Flashcard(Base, TimestampMixin):
     difficulty: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     # Short topic name (migration 071); folder stats group attempts by it.
     topic: Mapped[Optional[str]] = mapped_column(String(80), nullable=True, index=True)
+    ease: Mapped[float] = mapped_column(Float, default=2.5, nullable=False)
+    interval_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    reps: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    lapses: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    due_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     folder: Mapped[Folder] = relationship("Folder", back_populates="flashcards")
     attempts: Mapped[list[FlashcardAttempt]] = relationship(
@@ -52,6 +62,7 @@ class FlashcardAttempt(Base, TimestampMixin):
         BIGINT_ID, ForeignKey("flashcards.id", ondelete="CASCADE"), nullable=False, index=True
     )
     correct: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    rating: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     time_ms: Mapped[Optional[int]] = mapped_column(Integer)
     attempt_number: Mapped[Optional[int]] = mapped_column(Integer)
 

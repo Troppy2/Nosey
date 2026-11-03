@@ -1,4 +1,4 @@
-import { BookIcon, BrainIcon, FolderIcon, ScoreRiseIcon, TestsTakenIcon, UndoIcon } from "../icons";
+import { BookIcon, FolderIcon, ScoreRiseIcon, TestsTakenIcon, UndoIcon } from "../icons";
 import { CloseIcon, PencilIcon, PlusIcon, TrashIcon } from "../icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -8,14 +8,14 @@ import { FormError } from "../components/FormError";
 import { Card } from "../components/Card";
 import { ConfirmModal, RenameModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
-import { MarkdownContent } from "../components/MarkdownContent";
 import { SkeletonFolderMiniGrid, SkeletonStatGrid, SkeletonTestRows, SkeletonWeakStack } from "../components/Skeletons";
 import { PullToRefreshIndicator } from "../components/PullToRefreshIndicator";
-import { deleteTest, fetchFlashcards, fetchFolders, fetchTests, getGreetingName, getResumableTests, scopeKey, updateTest } from "../lib/api";
+import { deleteTest, fetchFlashcardDueSummary, fetchFlashcards, fetchFolders, fetchTests, getGreetingName, getResumableTests, scopeKey, updateTest } from "../lib/api";
+import { ReviewTheseWidget } from "../components/ReviewTheseWidget";
 import { formatDate, formatPercent } from "../lib/format";
 import { toast } from "../lib/toast";
 import { usePullToRefresh } from "../lib/usePullToRefresh";
-import type { Flashcard, Folder, ResumableTestInfo, TestSummary } from "../lib/types";
+import type { Flashcard, FlashcardDueSummary, Folder, ResumableTestInfo, TestSummary } from "../lib/types";
 import { FlashcardsIcon } from "../components/FlashcardsIcon";
 
 const TYPE_START_DELAY_MS = 3000;
@@ -30,6 +30,7 @@ type DashboardCache = {
   tests: TestSummary[];
   flashcards: Flashcard[];
   resumableTests: ResumableTestInfo[];
+  dueSummary?: FlashcardDueSummary;
 };
 
 function readCompletedTestIds(): Set<number> {
@@ -93,6 +94,8 @@ export default function Dashboard() {
   const [tests, setTests] = useState<TestSummary[]>([]);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [resumableTests, setResumableTests] = useState<ResumableTestInfo[]>([]);
+  // undefined while loading, null when the due summary could not be fetched.
+  const [dueSummary, setDueSummary] = useState<FlashcardDueSummary | null | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [renamingTest, setRenamingTest] = useState<TestSummary | null>(null);
@@ -105,21 +108,24 @@ export default function Dashboard() {
   // Shared by the initial load effect and pull-to-refresh, so a manual
   // refresh reuses the exact same fetch + cache-write path.
   async function refreshDashboardData() {
-    const [folderData, testData, flashcardData, resumableData] = await Promise.all([
+    const [folderData, testData, flashcardData, resumableData, dueData] = await Promise.all([
       fetchFolders(),
       fetchTests(),
       fetchFlashcards(),
       getResumableTests(),
+      fetchFlashcardDueSummary().catch(() => null),
     ]);
     setFolders(folderData);
     setTests(testData);
     setFlashcards(flashcardData);
     setResumableTests(resumableData);
+    // Keep the last good summary if a refresh fails; only show the error state with nothing to fall back on.
+    setDueSummary((prev) => dueData ?? prev ?? null);
     setError(null);
     try {
       sessionStorage.setItem(
         scopeKey(DASHBOARD_CACHE_KEY),
-        JSON.stringify({ folders: folderData, tests: testData, flashcards: flashcardData, resumableTests: resumableData }),
+        JSON.stringify({ folders: folderData, tests: testData, flashcards: flashcardData, resumableTests: resumableData, dueSummary: dueData }),
       );
     } catch {
       /* ignore quota errors */
@@ -146,6 +152,7 @@ export default function Dashboard() {
         setTests(cached.tests);
         setFlashcards(cached.flashcards);
         setResumableTests(cached.resumableTests);
+        if (cached.dueSummary) setDueSummary(cached.dueSummary);
         setIsLoading(false);
         hadCache = true;
       }
@@ -156,6 +163,7 @@ export default function Dashboard() {
     refreshDashboardData()
       .catch((loadError) => {
         // Keep showing cached data if the background refresh fails.
+        if (active) setDueSummary((prev) => prev ?? null);
         if (active && !hadCache) {
           setError(loadError instanceof Error ? loadError.message : "Unable to load your study data.");
         }
@@ -302,7 +310,6 @@ export default function Dashboard() {
     ];
   }, [flashcards, tests, statsResetVersion]);
 
-  const weakCards = [...flashcards].sort((a, b) => b.difficulty - a.difficulty).slice(0, 3);
   const pendingResumableTests = resumableTests.filter((t) => !dismissedTestIds.has(t.test_id));
   // Only the 5 most recently exited tests render; older ones stay resumable from their folder.
   const MAX_RESUMABLE_SHOWN = 5;
@@ -555,45 +562,7 @@ export default function Dashboard() {
               </div>
 
               <aside id="tour-review-cards">
-                <div className="section-title">
-                  <h2>Review These</h2>
-                  <Link className="text-link" to="/flashcards">
-                    Study
-                  </Link>
-                </div>
-                <div className="weak-stack">
-                  {weakCards.length === 0 ? (
-                    <EmptyState
-                      icon={<BrainIcon />}
-                      title="No flashcards yet"
-                      body="Create a test or add flashcards to see weak topics here."
-                      action={
-                        <Link to="/create-test">
-                          <Button variant="secondary">Create Test</Button>
-                        </Link>
-                      }
-                    />
-                  ) : (
-                    weakCards.map((card) => (
-                      <Link
-                        key={card.id}
-                        to={`/flashcards/${card.folder_id}/review?card=${card.id}`}
-                        className="weak-card-link"
-                      >
-                        <Card tone="dark" interactive className="weak-card">
-                          <span className="pill dark-pill">Difficulty {card.difficulty}</span>
-                          {/* role=heading rather than <h3>: MarkdownContent
-                              emits block elements, which are not valid inside
-                              a heading element. */}
-                          <div role="heading" aria-level={3} className="weak-card-front">
-                            <MarkdownContent content={card.front} />
-                          </div>
-                          <p>{Math.round((card.success_rate ?? 0) * 100)}% recall rate</p>
-                        </Card>
-                      </Link>
-                    ))
-                  )}
-                </div>
+                <ReviewTheseWidget summary={dueSummary} />
                 <WeakSpots />
               </aside>
             </div>
