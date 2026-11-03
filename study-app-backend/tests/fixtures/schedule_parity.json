@@ -1,0 +1,182 @@
+[
+  {
+    "name": "initial hard",
+    "initial": {
+      "ease": 2.5,
+      "interval_days": 0,
+      "reps": 0,
+      "lapses": 0
+    },
+    "rating": "hard",
+    "now": "2026-11-02T12:00:00Z",
+    "expected": {
+      "ease": 2.3,
+      "interval_days": 0,
+      "reps": 0,
+      "lapses": 1,
+      "due_at": "2026-11-02T12:10:00Z",
+      "last_reviewed_at": "2026-11-02T12:00:00Z",
+      "difficulty": 3
+    }
+  },
+  {
+    "name": "initial medium",
+    "initial": {
+      "ease": 2.5,
+      "interval_days": 0,
+      "reps": 0,
+      "lapses": 0
+    },
+    "rating": "medium",
+    "now": "2026-11-02T12:00:00Z",
+    "expected": {
+      "ease": 2.45,
+      "interval_days": 1,
+      "reps": 1,
+      "lapses": 0,
+      "due_at": "2026-11-03T12:00:00Z",
+      "last_reviewed_at": "2026-11-02T12:00:00Z",
+      "difficulty": 1
+    }
+  },
+  {
+    "name": "initial easy",
+    "initial": {
+      "ease": 2.5,
+      "interval_days": 0,
+      "reps": 0,
+      "lapses": 0
+    },
+    "rating": "easy",
+    "now": "2026-11-02T12:00:00Z",
+    "expected": {
+      "ease": 2.6,
+      "interval_days": 1,
+      "reps": 1,
+      "lapses": 0,
+      "due_at": "2026-11-03T12:00:00Z",
+      "last_reviewed_at": "2026-11-02T12:00:00Z",
+      "difficulty": 1
+    }
+  },
+  {
+    "name": "reps 1 to 2 medium",
+    "initial": {
+      "ease": 2.45,
+      "interval_days": 1,
+      "reps": 1,
+      "lapses": 0
+    },
+    "rating": "medium",
+    "now": "2026-11-03T12:00:00Z",
+    "expected": {
+      "ease": 2.4,
+      "interval_days": 2,
+      "reps": 2,
+      "lapses": 0,
+      "due_at": "2026-11-05T12:00:00Z",
+      "last_reviewed_at": "2026-11-03T12:00:00Z",
+      "difficulty": 1
+    }
+  },
+  {
+    "name": "reps 1 to 2 easy",
+    "initial": {
+      "ease": 2.6,
+      "interval_days": 1,
+      "reps": 1,
+      "lapses": 0
+    },
+    "rating": "easy",
+    "now": "2026-11-03T12:00:00Z",
+    "expected": {
+      "ease": 2.7,
+      "interval_days": 4,
+      "reps": 2,
+      "lapses": 0,
+      "due_at": "2026-11-07T12:00:00Z",
+      "last_reviewed_at": "2026-11-03T12:00:00Z",
+      "difficulty": 1
+    }
+  },
+  {
+    "name": "reps 2 to 3 easy with multiplication",
+    "initial": {
+      "ease": 2.7,
+      "interval_days": 4,
+      "reps": 2,
+      "lapses": 0
+    },
+    "rating": "easy",
+    "now": "2026-11-07T12:00:00Z",
+    "expected": {
+      "ease": 2.8,
+      "interval_days": 11,
+      "reps": 3,
+      "lapses": 0,
+      "due_at": "2026-11-18T12:00:00Z",
+      "last_reviewed_at": "2026-11-07T12:00:00Z",
+      "difficulty": 1
+    }
+  },
+  {
+    "name": "ease floor",
+    "initial": {
+      "ease": 1.35,
+      "interval_days": 5,
+      "reps": 2,
+      "lapses": 1
+    },
+    "rating": "hard",
+    "now": "2026-11-02T12:00:00Z",
+    "expected": {
+      "ease": 1.3,
+      "interval_days": 0,
+      "reps": 0,
+      "lapses": 2,
+      "due_at": "2026-11-02T12:10:00Z",
+      "last_reviewed_at": "2026-11-02T12:00:00Z",
+      "difficulty": 5
+    }
+  },
+  {
+    "name": "interval cap at 365",
+    "initial": {
+      "ease": 2.5,
+      "interval_days": 300,
+      "reps": 5,
+      "lapses": 0
+    },
+    "rating": "easy",
+    "now": "2026-11-02T12:00:00Z",
+    "expected": {
+      "ease": 2.6,
+      "interval_days": 365,
+      "reps": 6,
+      "lapses": 0,
+      "due_at": "2027-11-02T12:00:00Z",
+      "last_reviewed_at": "2026-11-02T12:00:00Z",
+      "difficulty": 1
+    }
+  },
+  {
+    "name": "medium interval round",
+    "initial": {
+      "ease": 2.0,
+      "interval_days": 10,
+      "reps": 3,
+      "lapses": 0
+    },
+    "rating": "medium",
+    "now": "2026-11-02T12:00:00Z",
+    "expected": {
+      "ease": 1.95,
+      "interval_days": 12,
+      "reps": 4,
+      "lapses": 0,
+      "due_at": "2026-11-14T12:00:00Z",
+      "last_reviewed_at": "2026-11-02T12:00:00Z",
+      "difficulty": 3
+    }
+  }
+]

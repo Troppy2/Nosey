@@ -11,13 +11,17 @@ from src.repositories.flashcard_repository import FlashcardRepository
 from src.repositories.folder_repository import FolderRepository
 from src.repositories.test_repository import TestRepository
 from src.schemas.flashcard_schema import (
+    DueSummaryCard,
+    DueSummaryFolder,
     FlashcardCreate,
+    FlashcardDueSummaryResponse,
     FlashcardImportItem,
     FlashcardResponse,
     FlashcardTidyItem,
     FlashcardUpdate,
 )
 from src.services.file_service import FileService
+from src.services.flashcard_scheduler import schedule
 from src.services.llm_service import LLMService
 from src.utils.exceptions import ResourceNotFoundException, ValidationException
 from typing import Optional
@@ -199,6 +203,7 @@ class FlashcardService:
         folder_id: int,
         flashcard_id: int,
         user_id: int,
+        rating: str,
         correct: bool,
         time_ms: Optional[int],
         session: AsyncSession,
@@ -210,12 +215,20 @@ class FlashcardService:
         card = await repo.get(flashcard_id)
         if card is None or card.folder_id != folder_id:
             raise ResourceNotFoundException("Flashcard")
-        await repo.record_attempt(user_id, flashcard_id, correct, time_ms)
+
+        # FlashcardAttemptCreate resolves rating and correct from each other, so both are always set here.
+        await repo.record_attempt(user_id, flashcard_id, correct, time_ms, rating=rating)
         correct_count, attempt_count, success_rate = await repo.success_rate(user_id, flashcard_id)
-        if success_rate >= 0.8:
-            card.difficulty = max(1, card.difficulty - 1)
-        elif success_rate < 0.4:
-            card.difficulty = min(5, card.difficulty + 1)
+
+        new_state = schedule(card, rating, datetime.utcnow())
+        card.ease = new_state.ease
+        card.interval_days = new_state.interval_days
+        card.reps = new_state.reps
+        card.lapses = new_state.lapses
+        card.due_at = new_state.due_at
+        card.last_reviewed_at = new_state.last_reviewed_at
+        card.difficulty = new_state.difficulty
+
         await session.commit()
         await session.refresh(card)
         return FlashcardResponse.model_validate(card).model_copy(
@@ -287,16 +300,21 @@ class FlashcardService:
         return [FlashcardResponse.model_validate(card) for card in cards]
 
     async def get_weak_flashcards(
-        self, folder_id: int, user_id: int, threshold: float, session: AsyncSession
+        self, folder_id: int, user_id: int, session: AsyncSession
     ) -> list[FlashcardResponse]:
-        if threshold < 0 or threshold > 1:
-            raise ValidationException("threshold must be between 0 and 1")
         cards = await self.list_flashcards(folder_id, user_id, session)
-        return [
-            card
-            for card in sorted(cards, key=lambda item: item.difficulty, reverse=True)
-            if card.success_rate is not None and card.success_rate < threshold
-        ]
+        weak = [card for card in cards if card.lapses >= 2 or card.ease < 2.0]
+        return sorted(weak, key=lambda c: c.lapses, reverse=True)
+
+    async def get_due_summary(
+        self, user_id: int, session: AsyncSession
+    ) -> FlashcardDueSummaryResponse:
+        total_due, folders, cards = await FlashcardRepository(session).get_due_summary(user_id)
+        return FlashcardDueSummaryResponse(
+            total_due=total_due,
+            folders=[DueSummaryFolder(**f) for f in folders],
+            cards=[DueSummaryCard(**c) for c in cards],
+        )
 
     async def _existing_flashcard_context(
         self, folder_id: int, user_id: int, session: AsyncSession

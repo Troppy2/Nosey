@@ -24,6 +24,18 @@ function ToastRow({ item }: { item: Toast }) {
       <div className="toast-copy">
         <strong>{item.title}</strong>
         {item.body ? <span>{item.body}</span> : null}
+        {item.action ? (
+          <button
+            type="button"
+            className="toast-action"
+            onClick={() => {
+              item.action?.onClick();
+              dismissToast(item.id);
+            }}
+          >
+            {item.action.label}
+          </button>
+        ) : null}
       </div>
       <button
         type="button"

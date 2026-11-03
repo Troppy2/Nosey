@@ -1,10 +1,23 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy import Select, case, delete, func, select
 
 from src.models.flashcard import Flashcard, FlashcardAttempt
 from src.repositories.base_repository import BaseRepository
 from typing import Optional
+
+
+def _due_first_order() -> tuple:
+    """Due cards first, then new (never reviewed), then scheduled for later."""
+    now = datetime.utcnow()
+    bucket = case(
+        (Flashcard.due_at.is_not(None) & (Flashcard.due_at <= now), 0),
+        (Flashcard.due_at.is_(None), 1),
+        else_=2,
+    )
+    return bucket, Flashcard.due_at.asc(), Flashcard.id.asc()
 
 
 class FlashcardRepository(BaseRepository[Flashcard]):
@@ -90,7 +103,7 @@ class FlashcardRepository(BaseRepository[Flashcard]):
             )
             .where(Flashcard.folder_id == folder_id)
             .group_by(Flashcard.id)
-            .order_by(Flashcard.created_at.desc(), Flashcard.id.desc())
+            .order_by(*_due_first_order())
         )
         if offset is not None:
             stmt = stmt.offset(offset)
@@ -118,10 +131,60 @@ class FlashcardRepository(BaseRepository[Flashcard]):
             )
             .where(Flashcard.folder.has(user_id=user_id))
             .group_by(Flashcard.id)
-            .order_by(Flashcard.created_at.desc(), Flashcard.id.desc())
+            .order_by(*_due_first_order())
         )
         rows = await self.session.execute(stmt)
         return list(rows.all())
+
+    async def get_due_summary(self, user_id: int) -> tuple[int, list[dict], list[dict]]:
+        """Single query returning total_due, per-folder due counts, and top 3 cards by overdue then lapses."""
+        from src.models.folder import Folder
+
+        now = datetime.utcnow()
+        stmt = (
+            select(
+                Flashcard.id,
+                Flashcard.folder_id,
+                Folder.name.label("folder_name"),
+                Flashcard.front,
+                Flashcard.difficulty,
+                Flashcard.due_at,
+                Flashcard.lapses,
+            )
+            .join(Folder, Folder.id == Flashcard.folder_id)
+            .where(
+                Folder.user_id == user_id,
+                # IS NOT TRUE, not == False: SQLite test DBs store the server default as the text "false".
+                Folder.is_archived.is_not(True),
+                Flashcard.due_at.is_not(None),
+                Flashcard.due_at <= now,
+            )
+            .order_by(Flashcard.due_at.asc(), Flashcard.lapses.desc(), Flashcard.id.asc())
+        )
+        rows = list((await self.session.execute(stmt)).all())
+        total_due = len(rows)
+
+        folder_map: dict[int, dict] = {}
+        for r in rows:
+            folder = folder_map.setdefault(
+                r.folder_id, {"folder_id": r.folder_id, "name": r.folder_name, "due": 0}
+            )
+            folder["due"] += 1
+        folders_list = sorted(folder_map.values(), key=lambda f: f["due"], reverse=True)
+
+        top_cards = [
+            {
+                "id": r.id,
+                "folder_id": r.folder_id,
+                "folder_name": r.folder_name,
+                "front": r.front,
+                "difficulty": r.difficulty,
+                "due_at": r.due_at,
+                "lapses": r.lapses,
+            }
+            for r in rows[:3]
+        ]
+        return total_due, folders_list, top_cards
 
     async def next_attempt_number(self, user_id: int, flashcard_id: int) -> int:
         current = await self.session.scalar(
@@ -133,7 +196,12 @@ class FlashcardRepository(BaseRepository[Flashcard]):
         return int(current or 0) + 1
 
     async def record_attempt(
-        self, user_id: int, flashcard_id: int, correct: bool, time_ms: Optional[int]
+        self,
+        user_id: int,
+        flashcard_id: int,
+        correct: bool,
+        time_ms: Optional[int],
+        rating: Optional[str] = None,
     ) -> FlashcardAttempt:
         # Compute the next attempt number inside the INSERT as a scalar subquery
         # so recording an attempt is one DB round-trip, not SELECT MAX(...) then
@@ -151,6 +219,7 @@ class FlashcardRepository(BaseRepository[Flashcard]):
             user_id=user_id,
             flashcard_id=flashcard_id,
             correct=correct,
+            rating=rating,
             time_ms=time_ms,
             attempt_number=next_number,
         )

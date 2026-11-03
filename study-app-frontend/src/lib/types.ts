@@ -330,12 +330,42 @@ export type Flashcard = {
   source?: string | null;
   topic?: string | null;
   difficulty: number;
+  ease?: number;
+  interval_days?: number;
+  reps?: number;
+  lapses?: number;
+  due_at?: string | null;
+  last_reviewed_at?: string | null;
+  is_due?: boolean;
+  is_new?: boolean;
   created_at: string;
   updated_at: string;
   attempt_count: number;
   correct_count: number;
   success_rate?: number | null;
   last_attempted?: string | null;
+};
+
+export type DueSummaryFolder = {
+  folder_id: ID;
+  name: string;
+  due: number;
+};
+
+export type DueSummaryCard = {
+  id: ID;
+  folder_id: ID;
+  folder_name: string;
+  front: string;
+  difficulty: number;
+  due_at?: string | null;
+  lapses: number;
+};
+
+export type FlashcardDueSummary = {
+  total_due: number;
+  folders: DueSummaryFolder[];
+  cards: DueSummaryCard[];
 };
 
 // Kojo's tidy pass over a messy flashcard paste. `verbatim` is false when the

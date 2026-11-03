@@ -375,8 +375,11 @@
     font-size: 0.9rem;
   }
 
+  /* Carries the next-interval hint ("10 min", "3 days"), so keep it legible. */
   .confidence-sub {
-    font-size: 0.62rem;
+    font-size: 0.72rem;
+    line-height: 1.2;
+    text-align: center;
   }
 
   /* Button: allow wrapping so text doesn't overflow */
