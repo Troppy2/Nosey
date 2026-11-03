@@ -1,18 +1,26 @@
-/* The page holds the two stacked canvases. Its height is set in JS to the
-   logical page length, so it can stand taller than the container and scroll. */
+/* The page only sizes the scroll area: its width and height are set in JS to
+   the laid-out page, so it can stand taller and wider than the container. */
 .scratchpad-page {
   position: relative;
   width: 100%;
-  /* Its own layer: scrolling moves it instead of repainting, and a zoom in
-     progress is a scale of it. */
+}
+/* The sheet is the paper and the canvases. A zoom in progress is a transform
+   of the sheet, never of the page: scaling the page shrank the scroll area
+   mid-pinch and the browser clamped the scroll position, jumping the view. */
+.scratchpad-sheet {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  /* Its own layer: scrolling moves it instead of repainting it. */
   will-change: transform;
 }
 .scratchpad-canvas {
   position: absolute;
-  inset: 0;
+  left: 0;
+  top: 0;
   display: block;
-  /* Sized in JS: the width tracks the container, the height follows the
-     logical page length, so neither is set here. */
+  /* Size and position are set in JS: the canvases cover the whole page, or a
+     window around the view on a page too big for full-density canvases. */
 }
 /* Committed strokes. Never receives input; the live layer above it does. */
 .scratchpad-canvas--static {
@@ -56,20 +64,25 @@
 /* Paper styles are CSS decoration behind a transparent canvas only. The
    exported PNG is strokes composited on a fresh white background (see
    exportScratchPadPng), so these ruled lines never reach the OCR engine.
-   background-attachment: local keeps the ruling pinned to the page as it
-   scrolls, rather than to the viewport, so lines stay under the ink. */
+   They sit on the sheet with the canvases, so they scroll and zoom with the
+   ink. */
 .scratchpad-paper-lined {
+  /* --paper-scale (set in JS) follows the ink's scale, so zooming or a narrow
+     pad keeps the ruling under the writing instead of sliding past it. A
+     repeating gradient, not a background-size tile: tile sizes are snapped
+     to whole pixels, which drifts away from the ink over a long page. */
+  --paper-step: calc(32px * var(--paper-scale, 1));
   background-image: repeating-linear-gradient(
     to bottom,
-    transparent,
-    transparent 31px,
-    var(--green-lightest) 32px
+    transparent 0 calc(var(--paper-step) - 1px),
+    var(--green-lightest) calc(var(--paper-step) - 1px) var(--paper-step)
   );
 }
 .scratchpad-paper-graph {
+  --paper-step: calc(24px * var(--paper-scale, 1));
   background-image:
-    repeating-linear-gradient(to right, var(--green-lightest) 0 1px, transparent 1px 24px),
-    repeating-linear-gradient(to bottom, var(--green-lightest) 0 1px, transparent 1px 24px);
+    repeating-linear-gradient(to right, var(--green-lightest) 0 1px, transparent 1px var(--paper-step)),
+    repeating-linear-gradient(to bottom, var(--green-lightest) 0 1px, transparent 1px var(--paper-step));
 }
 .scratchpad-extend-btn {
   display: inline-flex;

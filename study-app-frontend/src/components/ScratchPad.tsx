@@ -15,6 +15,17 @@ import {
 } from "react";
 import { scopeKey } from "../lib/api";
 import { traceInk } from "../lib/inkTrace";
+import {
+  canvasWindow,
+  createInkFilter,
+  filterInkBatch,
+  pageLayout,
+  scrollForAnchor,
+  windowNeedsMove,
+  type CanvasWindow,
+  type InkFilter,
+  type PageLimits,
+} from "../lib/inkView";
 import { recognizeShape, type ShapeKind } from "../lib/shapeRecognize";
 import {
   PASTE_TEXT_MAX_CHARS,
@@ -41,7 +52,7 @@ export type Stroke = {
   // Optional look. Absent means the default pen, so drawings saved before pen
   // colors existed load unchanged. Short names: the strokes ride in the draft.
   c?: string; // CSS color
-  w?: number; // line width in CSS pixels
+  w?: number; // line width in CSS pixels on a full-width pad at 100%; scales with the page
   h?: 1; // a highlighter stroke: wide, translucent, drawn under the ink
   p?: 1; // straight segments, not a spline: a snapped shape with sharp corners
 };
@@ -268,6 +279,7 @@ const MAX_LOGICAL_HEIGHT = 4200;
 // roomier sheet, not a zoomed one.
 const INK_SCALE = 0.75;
 const MAX_LOGICAL_WIDTH = 5000;
+const PAGE_LIMITS: PageLimits = { baseWidth: SCRATCH_PAD_LOGICAL_WIDTH, inkScale: INK_SCALE, maxWidth: MAX_LOGICAL_WIDTH };
 // The draft column holds the strokes as JSON (work_strokes max_length 200_000).
 const MAX_STROKES_JSON_CHARS = 180_000;
 // Coordinates are kept to a tenth of a logical unit: indistinguishable on
@@ -277,6 +289,19 @@ const COORD_PRECISION = 10;
 // removed enough points that the saved stroke visibly reshaped the moment the
 // pen lifted, most noticeably on a wide pad where one unit is more pixels.
 const SIMPLIFY_EPSILON = 0.4;
+// A drawn stroke is simplified to within this many CSS px of what was on
+// screen, whatever the zoom: a fixed logical epsilon reshaped strokes drawn
+// zoomed in (one unit is several pixels there) when the pen lifted.
+const SIMPLIFY_EPSILON_PX = 0.3;
+// Smoothed samples closer than this (CSS px) to the last kept one add no
+// shape, only micro-segments for the curve to wiggle through.
+const MIN_SAMPLE_STEP_PX = 0.6;
+// A tap with no movement is a dot this long (logical units): a decimal point,
+// the dot of an i. Long enough that it survives rounding, too short to see.
+const DOT_LENGTH = 0.1;
+// The browser's predicted next pen position is drawn past the tip only while
+// it is this short (CSS px) and heads the way the pen is already going.
+const PREDICT_MAX_PX = 12;
 // The parent (the whole test page) hears about edits this long after the last
 // stroke, not after every one: re-rendering it per stroke is what stalled
 // writing. The pad flushes on close and when the page is hidden.
@@ -304,12 +329,21 @@ const HIGHLIGHT_ALPHA = 0.38;
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 3;
 const ZOOM_STEP = 1.25;
-// A canvas backing store above this many pixels is rendered at a lower density
-// instead of risking the browser's memory limit when zoomed in.
+// The most backing pixels one canvas may have (iOS Safari refuses a canvas
+// over 16.7M). A page bigger than this at full density is drawn through a
+// canvas window around the view instead (see canvasWindow in lib/inkView).
 const MAX_CANVAS_PIXELS = 16_000_000;
+// Extra CSS px a canvas window covers beyond each side of the view, so a
+// scroll has room to run before the window has to move.
+const CANVAS_WINDOW_MARGIN_PX = 256;
 // A continuous zoom (pinch, Ctrl+wheel) is shown as a GPU scale of the page and
 // the canvases are rebuilt once, this long after the last zoom event.
 const ZOOM_SETTLE_MS = 140;
+// Resizing rebuilds the canvases in step with the edge, unless the last
+// rebuild took longer than this (a very full page): then it waits until the
+// resize has stopped.
+const HEAVY_REBUILD_MS = 12;
+const RESIZE_SETTLE_MS = 150;
 const ERASER_MIN_PX = 6;
 const ERASER_MAX_PX = 64;
 const ERASER_DEFAULT_PX = 16;
@@ -381,17 +415,39 @@ function drawAllStrokes(ctx: CanvasRenderingContext2D, list: Stroke[], scale: nu
   for (const stroke of list) if (!stroke.h) drawStroke(ctx, stroke, scale, scale, widthScale);
 }
 
-// How many backing pixels per CSS pixel a canvas was sized at.
-function canvasDensity(canvas: HTMLCanvasElement): number {
-  const css = parseFloat(canvas.style.width);
-  return css > 0 ? canvas.width / css : window.devicePixelRatio || 1;
+// Line widths follow the page: a stroke keeps its proportions at every zoom
+// and pad width instead of thinning or fattening against its own shape.
+function widthScaleFor(scale: number): number {
+  return scale / INK_SCALE;
 }
 
+// A region of a canvas in page CSS px.
+type DirtyBox = { x0: number; y0: number; x1: number; y1: number };
+
+function growBox(box: DirtyBox | null, x0: number, y0: number, x1: number, y1: number): DirtyBox {
+  return box
+    ? { x0: Math.min(box.x0, x0), y0: Math.min(box.y0, y0), x1: Math.max(box.x1, x1), y1: Math.max(box.y1, y1) }
+    : { x0, y0, x1, y1 };
+}
+
+// Clears only what was drawn last frame. Clearing a whole page-sized canvas
+// every frame is millions of pixels when zoomed in, and it is what made the
+// live stroke and the eraser circle lag. 2px margin for antialiasing.
+function clearBox(canvas: HTMLCanvasElement | null, box: DirtyBox | null) {
+  const ctx = ctxOf(canvas);
+  if (!ctx || !box) return;
+  ctx.clearRect(box.x0 - 2, box.y0 - 2, box.x1 - box.x0 + 4, box.y1 - box.y0 + 4);
+}
+
+// The canvases draw in page CSS px through a transform that may also shift
+// them to a canvas window, so clearing goes through the identity transform.
 function clearCanvas(canvas: HTMLCanvasElement | null) {
   const ctx = ctxOf(canvas);
   if (!canvas || !ctx) return;
-  const dpr = canvasDensity(canvas);
-  ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
 }
 
 // What is left of a stroke after an eraser of this radius passes over (x, y).
@@ -599,8 +655,16 @@ type Gesture =
   | {
       kind: "draw";
       pointerId: number;
+      // Smoothed samples, logical units. What gets saved.
       points: number[];
-      predicted: number[];
+      // The pen's raw latest position, drawn past the smoothed points so the
+      // line always reaches the pen, and kept as the stroke's end on lift.
+      tip: [number, number] | null;
+      // The browser's guess at the next position, drawn for one frame only.
+      predict: [number, number] | null;
+      filter: InkFilter;
+      // A tap leaves a dot (pen and mouse; a finger tap may be a palm).
+      dots: boolean;
       look: StrokeLook;
       // Where the pen last settled (client px) and the timer that snaps the
       // stroke to a shape if it stays there.
@@ -635,13 +699,30 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const liveCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // The page only sizes the scroll area. The sheet inside it carries the
+  // paper and the canvases, and is what a zoom preview scales: scaling the
+  // page itself shrank the scroll area mid-pinch, the browser clamped the
+  // scroll position, and the page jumped.
   const pageRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
   const gesturesRef = useRef<Map<number, Gesture>>(new Map());
   const rafPendingRef = useRef(false);
-  // The page's logical size and the CSS pixels per logical unit, set by
-  // applySize. Everything that maps pointer to page reads this, so a window
-  // resize never has to re-render React.
-  const dimsRef = useRef({ w: SCRATCH_PAD_LOGICAL_WIDTH, h: MIN_LOGICAL_HEIGHT, scale: 1 });
+  // The page's layout (logical size, CSS px per logical unit), the view size
+  // it was laid out for and where the canvases sit, set by applySize.
+  // Everything that maps pointer to page reads this, so a window resize never
+  // has to re-render React.
+  const dimsRef = useRef<ReturnType<typeof pageLayout> & { viewW: number; viewH: number; win: CanvasWindow }>({
+    scale: 1,
+    w: SCRATCH_PAD_LOGICAL_WIDTH,
+    h: MIN_LOGICAL_HEIGHT,
+    cssW: SCRATCH_PAD_LOGICAL_WIDTH,
+    cssH: MIN_LOGICAL_HEIGHT,
+    viewW: 0,
+    viewH: 0,
+    win: { ox: 0, oy: 0, w: 1, h: 1, density: 1, windowed: false, pageW: 1, pageH: 1 },
+  });
+  // How long the last canvas rebuild took, to decide how eagerly to rebuild.
+  const rebuildMsRef = useRef(0);
   // What the static canvas currently shows, so a single added stroke is drawn
   // alone instead of repainting the page.
   const paintedRef = useRef<{ strokes: Stroke[]; key: string } | null>(null);
@@ -723,6 +804,8 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
       Math.max(MIN_LOGICAL_HEIGHT, Math.ceil((bounds.maxY + 120) / LOGICAL_HEIGHT_STEP) * LOGICAL_HEIGHT_STEP),
     );
   });
+  const pageHeightRef = useRef(pageHeight);
+  pageHeightRef.current = pageHeight;
 
   const flushNotify = useCallback(() => {
     if (notifyTimerRef.current != null) {
@@ -791,11 +874,13 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
   }
 
   const toLogical = useCallback((clientX: number, clientY: number): [number, number] => {
-    const canvas = liveCanvasRef.current;
-    if (!canvas) return [0, 0];
-    // The canvas element's own rect, not the container's: the canvas may
-    // stand taller than the container and scroll inside it.
-    return toLogicalIn(canvas.getBoundingClientRect(), clientX, clientY);
+    const sheet = sheetRef.current;
+    if (!sheet) return [0, 0];
+    // The sheet's own rect, not the container's or a canvas's: the sheet is
+    // the whole page (a canvas may cover only a window of it), and its rect
+    // includes any zoom preview in progress, so a pen down mid-zoom still
+    // lands where it touched.
+    return toLogicalIn(sheet.getBoundingClientRect(), clientX, clientY);
   }, []);
 
   // Paints committed strokes. With no override and exactly one new stroke
@@ -805,10 +890,9 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
     const canvas = staticCanvasRef.current;
     const ctx = ctxOf(canvas);
     if (!canvas || !ctx) return;
-    const dpr = canvasDensity(canvas);
-    const { w, h, scale } = dimsRef.current;
+    const { scale, win } = dimsRef.current;
     const list = override ?? localStrokesRef.current;
-    const key = `${w}x${h}x${scale}x${canvas.width}`;
+    const key = `${scale}x${win.ox}x${win.oy}x${canvas.width}x${canvas.height}`;
     const prev = paintedRef.current;
     if (
       !override &&
@@ -818,43 +902,67 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
       !list[list.length - 1].h &&
       prev.strokes.every((stroke, i) => stroke === list[i])
     ) {
-      drawStroke(ctx, list[list.length - 1], scale, scale, zoomRef.current);
+      drawStroke(ctx, list[list.length - 1], scale, scale, widthScaleFor(scale));
     } else {
       // A new highlight repaints everything: it has to go under the ink.
-      ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
-      drawAllStrokes(ctx, list, scale, zoomRef.current);
+      clearCanvas(canvas);
+      drawAllStrokes(ctx, list, scale, widthScaleFor(scale));
     }
     paintedRef.current = override ? null : { strokes: list, key };
   }, []);
 
+  // What the live and overlay layers drew last frame (page CSS px).
+  const liveDirtyRef = useRef<DirtyBox | null>(null);
+  const overlayDirtyRef = useRef<DirtyBox | null>(null);
+
   function clearLive() {
     clearCanvas(liveCanvasRef.current);
+    liveDirtyRef.current = null;
   }
 
   // Redraws the in-progress strokes whole, once per frame. One stroke is at
   // most a couple of thousand points, so this is cheap, and it lets the line
-  // run all the way to the pen tip (plus the browser's predicted next
-  // samples) instead of stopping at the last midpoint behind it.
+  // run all the way to the pen tip instead of stopping at the last smoothed
+  // sample behind it. The predicted position is a separate straight tail, so
+  // a wrong guess never bends the curve through the real samples.
   function renderLive() {
     const canvas = liveCanvasRef.current;
     const ctx = ctxOf(canvas);
     if (!canvas || !ctx) return;
-    clearCanvas(canvas);
+    clearBox(canvas, liveDirtyRef.current);
     const { scale } = dimsRef.current;
+    let dirty: DirtyBox | null = null;
     for (const gesture of gesturesRef.current.values()) {
       if (gesture.kind !== "draw") continue;
       styleStroke(ctx, gesture.look);
-      ctx.lineWidth *= zoomRef.current;
-      drawSmoothPath(ctx, gesture.predicted.length ? gesture.points.concat(gesture.predicted) : gesture.points, scale, scale, gesture.look.p === 1);
+      ctx.lineWidth *= widthScaleFor(scale);
+      let pts = gesture.tip ? gesture.points.concat(gesture.tip) : gesture.points;
+      // The pen just touched down: show the dot it will leave right away.
+      if (pts.length === 2 && gesture.dots) pts = [pts[0], pts[1], pts[0] + DOT_LENGTH, pts[1]];
+      drawSmoothPath(ctx, pts, scale, scale, gesture.look.p === 1);
+      if (gesture.predict && pts.length >= 4) {
+        ctx.beginPath();
+        ctx.moveTo(pts[pts.length - 2] * scale, pts[pts.length - 1] * scale);
+        ctx.lineTo(gesture.predict[0] * scale, gesture.predict[1] * scale);
+        ctx.stroke();
+        pts = pts.concat(gesture.predict);
+      }
       ctx.globalAlpha = 1;
+      // The spline can bow out past its points by a little; the line width
+      // pad covers it.
+      const b = strokeBounds([{ points: pts }]);
+      const pad = ctx.lineWidth + 4;
+      if (b) dirty = growBox(dirty, b.minX * scale - pad, b.minY * scale - pad, b.maxX * scale + pad, b.maxY * scale + pad);
     }
+    liveDirtyRef.current = dirty;
   }
 
   function drawOverlay() {
     const canvas = overlayCanvasRef.current;
     const ctx = ctxOf(canvas);
     if (!canvas || !ctx) return;
-    clearCanvas(canvas);
+    clearBox(canvas, overlayDirtyRef.current);
+    let dirty: DirtyBox | null = null;
     const { scale } = dimsRef.current;
     let active: Extract<Gesture, { kind: "move" | "scale" | "rotate" | "select" }> | undefined;
     for (const gesture of gesturesRef.current.values()) {
@@ -868,7 +976,7 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
       // While dragging, the selection is drawn here in its own look (the
       // static layer has it lifted out). At rest it stays on the static layer
       // untouched: no blue recolor, only the box and handles mark it.
-      if (transforming) drawAllStrokes(ctx, shown, scale, zoomRef.current);
+      if (transforming) drawAllStrokes(ctx, shown, scale, widthScaleFor(scale));
       ctx.strokeStyle = SELECT_COLOR;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
@@ -905,7 +1013,11 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
           ctx.arc(rx, ry, HANDLE_PX + 1, 0, Math.PI * 2);
           ctx.fill();
           ctx.stroke();
+          dirty = growBox(dirty, rx - HANDLE_PX - 3, ry - HANDLE_PX - 3, rx + HANDLE_PX + 3, ry + HANDLE_PX + 3);
         }
+        // The box with its handles, and the widest stroke a transform draws.
+        const reach = HANDLE_PX + 3 + (transforming ? HIGHLIGHT_WIDTH * widthScaleFor(scale) : 0);
+        dirty = growBox(dirty, x - reach, y - reach, x + w + reach, y + h + reach);
       }
     }
     // The eraser's size, drawn where it will act.
@@ -922,6 +1034,7 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
       ctx.strokeStyle = "#6b7a5c";
       ctx.lineWidth = 1.5;
       ctx.stroke();
+      dirty = growBox(dirty, hover[0] * scale - radius - 2, hover[1] * scale - radius - 2, hover[0] * scale + radius + 2, hover[1] * scale + radius + 2);
     }
     if (active?.kind === "select" && active.points.length >= 4) {
       // Just a thin dashed trail of where the pen went, like Samsung Notes;
@@ -941,7 +1054,10 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
       }
       ctx.stroke();
       ctx.setLineDash([]);
+      const tb = strokeBounds([{ points: p }]);
+      if (tb) dirty = growBox(dirty, tb.minX * scale - 2, tb.minY * scale - 2, tb.maxX * scale + 2, tb.maxY * scale + 2);
     }
+    overlayDirtyRef.current = dirty;
   }
 
   // Pointer events fire faster than the display refreshes, so the live and
@@ -956,64 +1072,89 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
     });
   }
 
-  // Any assignment to canvas.width/height clears the canvas, so sizing always
-  // means: resize the backing stores, re-apply the dpr transform, full replay.
-  // The window's width sets the page's logical width (see INK_SCALE).
-  const applySize = useCallback(() => {
-    const container = containerRef.current;
-    const page = pageRef.current;
-    const canvases = [staticCanvasRef.current, overlayCanvasRef.current, liveCanvasRef.current];
-    if (!container || !page || canvases.some((c) => !c)) return;
-    const cssWidth = container.clientWidth;
-    const cssAvailHeight = container.clientHeight;
-    if (cssWidth <= 0) return;
-    const bounds = strokeBounds(localStrokesRef.current);
-    const needW = bounds ? Math.ceil((bounds.maxX + 40) / 50) * 50 : 0;
-    const logicalW = Math.min(
-      MAX_LOGICAL_WIDTH,
-      Math.max(SCRATCH_PAD_LOGICAL_WIDTH, needW, Math.ceil(cssWidth / INK_SCALE / 50) * 50),
-    );
-    // Zoom scales the page, not the stored coordinates: the logical page and
-    // the stroke data are the same at every zoom. Line widths scale with the
-    // zoom too, so a stroke keeps its proportions (and matches the GPU-scaled
-    // pinch preview) instead of thinning or fattening against its own shape.
-    // Skip the rebuild when nothing that sizes the canvases has changed. A
-    // mode switch or a scrollbar appearing fires several resize callbacks in a
-    // row, and each rebuild clears and repaints every layer: that is the
-    // flicker.
-    const z = zoomRef.current;
-    const sizeKey = [cssWidth, cssAvailHeight, logicalW, pageHeight, z, window.devicePixelRatio].join("x");
-    if (sizeKey === lastSizeKeyRef.current) return;
-    lastSizeKeyRef.current = sizeKey;
-    // Zoomed in, the page is wider than the window and scrolls. Zoomed out,
-    // the page still fills the window but holds more of the sheet, so zooming
-    // out shows more work instead of a small page in a big empty box.
-    const zoomedW = z < 1 ? Math.min(MAX_LOGICAL_WIDTH, Math.ceil(logicalW / z / 50) * 50) : logicalW;
-    const pageCssWidth = z < 1 ? cssWidth : cssWidth * z;
-    const scale = pageCssWidth / zoomedW;
-    // Never shorter than the window: a tall window gets a taller sheet, so
-    // there is no dead strip under the paper.
-    const logicalH = Math.max(pageHeight, Math.floor(cssAvailHeight / scale));
-    const cssHeight = logicalH * scale;
-    dimsRef.current = { w: zoomedW, h: logicalH, scale };
-    const wantDpr = window.devicePixelRatio || 1;
-    const dpr = Math.min(wantDpr, Math.sqrt(MAX_CANVAS_PIXELS / Math.max(1, pageCssWidth * cssHeight)));
-    page.style.width = `${pageCssWidth}px`;
-    page.style.height = `${cssHeight}px`;
-    for (const canvas of canvases as HTMLCanvasElement[]) {
-      canvas.width = Math.max(1, Math.round(pageCssWidth * dpr));
-      canvas.height = Math.max(1, Math.round(cssHeight * dpr));
-      canvas.style.width = `${pageCssWidth}px`;
-      canvas.style.height = `${cssHeight}px`;
-      const ctx = ctxOf(canvas);
-      if (ctx) ctx.setTransform(canvas.width / pageCssWidth, 0, 0, canvas.width / pageCssWidth, 0, 0);
-    }
-    paintedRef.current = null;
-    paintStatic();
-    renderLive();
-    drawOverlay();
+  // Puts the three canvases over `win` and repaints them. Any assignment to
+  // canvas.width/height clears the canvas, so a backing store is only
+  // reallocated when its size really changes; either way every layer is
+  // repainted in the same task, so nothing blinks.
+  const placeCanvases = useCallback(
+    (win: CanvasWindow) => {
+      const canvases = [staticCanvasRef.current, overlayCanvasRef.current, liveCanvasRef.current];
+      for (const canvas of canvases) {
+        if (!canvas) continue;
+        const bw = Math.max(1, Math.round(win.w * win.density));
+        const bh = Math.max(1, Math.round(win.h * win.density));
+        if (canvas.width !== bw || canvas.height !== bh) {
+          canvas.width = bw;
+          canvas.height = bh;
+        }
+        canvas.style.width = `${win.w}px`;
+        canvas.style.height = `${win.h}px`;
+        canvas.style.left = `${win.ox}px`;
+        canvas.style.top = `${win.oy}px`;
+        // Drawing code works in page CSS px; this maps them into the window.
+        const ctx = ctxOf(canvas);
+        if (ctx) ctx.setTransform(bw / win.w, 0, 0, bh / win.h, (-win.ox * bw) / win.w, (-win.oy * bh) / win.h);
+      }
+      dimsRef.current = { ...dimsRef.current, win };
+      paintedRef.current = null;
+      // The window may have moved without a reallocation: a dirty box in page
+      // px no longer covers what is on these, so they are cleared whole.
+      clearLive();
+      clearCanvas(overlayCanvasRef.current);
+      overlayDirtyRef.current = null;
+      paintStatic();
+      renderLive();
+      drawOverlay();
+    },
+    // renderLive and drawOverlay read only refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageHeight, paintStatic]);
+    [paintStatic],
+  );
+
+  // Lays the page out for the current view, zoom and page length (see
+  // pageLayout), then places the canvases. `scrollTo` is where a zoom wants
+  // the view to land. Otherwise the view stays put, or, when a narrow pad's
+  // resize changed the scale, keeps the same page point at its top-left.
+  const applySize = useCallback(
+    (scrollTo?: { left: number; top: number }) => {
+      const container = containerRef.current;
+      const page = pageRef.current;
+      const sheet = sheetRef.current;
+      if (!container || !page || !sheet) return;
+      const viewW = container.clientWidth;
+      const viewH = container.clientHeight;
+      if (viewW <= 0) return;
+      const started = performance.now();
+      const prev = dimsRef.current;
+      const layout = pageLayout(
+        { zoom: zoomRef.current, viewW, viewH, inkRight: inkRightRef.current, minHeight: pageHeightRef.current },
+        PAGE_LIMITS,
+      );
+      const dpr = window.devicePixelRatio || 1;
+      // Skip the rebuild when nothing that sizes the canvases has changed: a
+      // mode switch or a scrollbar fires several resize callbacks in a row.
+      const sizeKey = [viewW, viewH, layout.w, layout.h, layout.scale, dpr].join("x");
+      if (sizeKey === lastSizeKeyRef.current && !scrollTo) return;
+      lastSizeKeyRef.current = sizeKey;
+      const rescaled = layout.scale !== prev.scale;
+      const ratio = layout.scale / prev.scale;
+      const left = scrollTo ? scrollTo.left : rescaled ? container.scrollLeft * ratio : container.scrollLeft;
+      const top = scrollTo ? scrollTo.top : rescaled ? container.scrollTop * ratio : container.scrollTop;
+      page.style.width = `${layout.cssW}px`;
+      page.style.height = `${layout.cssH}px`;
+      // The ruling scales with the ink, so lines stay where the writing is.
+      sheet.style.setProperty("--paper-scale", String(widthScaleFor(layout.scale)));
+      dimsRef.current = { ...layout, viewW, viewH, win: prev.win };
+      placeCanvases(canvasWindow(layout, viewW, viewH, left, top, dpr, MAX_CANVAS_PIXELS, CANVAS_WINDOW_MARGIN_PX));
+      // After the page is resized, so the offset is in range.
+      if (scrollTo || rescaled) {
+        container.scrollLeft = left;
+        container.scrollTop = top;
+      }
+      rebuildMsRef.current = performance.now() - started;
+    },
+    [placeCanvases],
+  );
 
   const applySizeRef = useRef(applySize);
   useEffect(() => {
@@ -1024,27 +1165,60 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
     const container = containerRef.current;
     if (!container) return undefined;
     let timer: number | null = null;
-    // Rebuild only once the size has stopped changing, and ignore sub-pixel
-    // jitter, so a window that is still resizing is not repainted every tick.
-    let lastW = 0;
-    let lastH = 0;
-    const observer = new ResizeObserver((entries) => {
-      const box = entries[entries.length - 1]?.contentRect;
-      if (box && Math.abs(box.width - lastW) < 2 && Math.abs(box.height - lastH) < 2) return;
-      if (box) {
-        lastW = box.width;
-        lastH = box.height;
-      }
+    // Rebuilt in step with the resize, so the paper and the ink follow the
+    // pad's edge. At a fixed ink scale (any pad wider than the base page) a
+    // rebuild changes nothing on screen; the old 180ms wait existed to hide a
+    // page width rounded to 50 units, which nudged the ink size on every
+    // rebuild.
+    const observer = new ResizeObserver(() => {
       if (timer != null) window.clearTimeout(timer);
-      timer = window.setTimeout(() => applySizeRef.current(), 180);
+      timer = null;
+      if (rebuildMsRef.current > HEAVY_REBUILD_MS) {
+        timer = window.setTimeout(() => applySizeRef.current(), RESIZE_SETTLE_MS);
+      } else {
+        applySizeRef.current();
+      }
     });
     observer.observe(container);
     applySizeRef.current();
+
+    // Moving the window to another screen or zooming the browser changes the
+    // pixel density without always resizing anything: rebuild at the new one.
+    let densityQuery: MediaQueryList | null = null;
+    const onDensity = () => {
+      applySizeRef.current();
+      watchDensity();
+    };
+    function watchDensity() {
+      densityQuery?.removeEventListener("change", onDensity);
+      densityQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+      densityQuery.addEventListener("change", onDensity);
+    }
+    watchDensity();
+
+    // A canvas window moves before the view runs off it. Done in the scroll
+    // event, which lands in the same frame as the scroll it reports.
+    const onScroll = () => {
+      const d = dimsRef.current;
+      if (!d.win.windowed || previewRef.current) return;
+      const left = container.scrollLeft;
+      const top = container.scrollTop;
+      if (!windowNeedsMove(d.win, d.viewW, d.viewH, left, top, CANVAS_WINDOW_MARGIN_PX / 2)) return;
+      placeCanvasesRef.current(
+        canvasWindow(d, d.viewW, d.viewH, left, top, window.devicePixelRatio || 1, MAX_CANVAS_PIXELS, CANVAS_WINDOW_MARGIN_PX),
+      );
+    };
+    container.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       observer.disconnect();
+      densityQuery?.removeEventListener("change", onDensity);
+      container.removeEventListener("scroll", onScroll);
       if (timer != null) window.clearTimeout(timer);
     };
   }, []);
+
+  const placeCanvasesRef = useRef(placeCanvases);
+  placeCanvasesRef.current = placeCanvases;
 
   // Growing the page changes the backing stores, same treatment as a resize.
   useEffect(() => {
@@ -1052,10 +1226,16 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
   }, [pageHeight]);
 
   // Ink that reaches past the page's right edge (a drawing from a wider
-  // window) widens the logical page so it is not cropped on a narrow one.
+  // window, or a stroke run off the edge) widens the page. It scrolls; the
+  // ink is never shrunk to fit, which rescaled the whole page mid-writing
+  // whenever a stroke came near the right edge.
   const rightEdge = useMemo(() => strokeBounds(localStrokes)?.maxX ?? 0, [localStrokes]);
+  const inkRightRef = useRef(0);
+  // Only ink actually past the edge widens it: a margin here gave a phone a
+  // sideways scroll as soon as writing came near the right edge.
+  inkRightRef.current = Math.ceil(rightEdge);
   useEffect(() => {
-    if (rightEdge + 40 > dimsRef.current.w) applySizeRef.current();
+    if (inkRightRef.current > dimsRef.current.w) applySizeRef.current();
   }, [rightEdge]);
 
   // useLayoutEffect, not useEffect: a finished stroke is cleared from the live
@@ -1102,7 +1282,8 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
         // Widened by half the stroke's drawn width: the round caps of the
         // pieces left behind reach that far back into the gap, so an eraser
         // no wider than a highlighter used to cut a gap that closed itself.
-        const half = ((stroke.w ?? (stroke.h ? HIGHLIGHT_WIDTH : DEFAULT_WIDTH)) * zoomRef.current) / 2 / scale;
+        // Widths scale with the page, so in logical units this is constant.
+        const half = (stroke.w ?? (stroke.h ? HIGHLIGHT_WIDTH : DEFAULT_WIDTH)) / INK_SCALE / 2;
         const pieces = eraseFromStroke(stroke, x, y, r + half);
         if (pieces === null) next.push(stroke);
         else {
@@ -1334,11 +1515,23 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
     }
 
     if (gesture.hold) window.clearTimeout(gesture.hold.timer);
-    if (gesture.points.length < 4) {
-      clearLive();
-      return; // a tap, not a stroke
+    // The stroke ends where the pen lifted, not where the smoothed line had
+    // got to, so the saved stroke matches the live one to the last pixel.
+    let points = gesture.points;
+    const tip = gesture.shape ? null : gesture.tip;
+    if (tip && Math.hypot(tip[0] - points[points.length - 2], tip[1] - points[points.length - 1]) * scale >= MIN_SAMPLE_STEP_PX) {
+      points = points.concat(tip);
     }
-    const simplified = gesture.shape ? roundPoints(gesture.points) : roundPoints(simplifyStroke(gesture.points, SIMPLIFY_EPSILON));
+    if (points.length < 4) {
+      if (!gesture.dots) {
+        clearLive();
+        return; // a finger tap, not a stroke
+      }
+      points = [points[0], points[1], points[0] + DOT_LENGTH, points[1]];
+    }
+    const simplified = gesture.shape
+      ? roundPoints(points)
+      : roundPoints(simplifyStroke(points, SIMPLIFY_EPSILON_PX / Math.max(0.01, scale)));
     const next = [...prev, { points: simplified, ...gesture.look }].slice(-MAX_STROKES_PER_QUESTION);
     pushHistory(prev);
     // The static layer picks this stroke up on the very next paint, which
@@ -1483,7 +1676,17 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
             ...(pen.color !== DEFAULT_INK ? { c: pen.color } : {}),
             ...(pen.width !== DEFAULT_WIDTH ? { w: pen.width } : {}),
           };
-    gesturesRef.current.set(e.pointerId, { kind: "draw", pointerId: e.pointerId, points: [x, y], predicted: [], look });
+    gesturesRef.current.set(e.pointerId, {
+      kind: "draw",
+      pointerId: e.pointerId,
+      points: [x, y],
+      tip: null,
+      predict: null,
+      filter: createInkFilter(e.clientX, e.clientY, e.timeStamp),
+      dots: e.pointerType !== "touch",
+      look,
+    });
+    scheduleFrame();
   }
 
   // The pen has held still at the end of a stroke: replace the stroke with
@@ -1496,7 +1699,8 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
     const p = gesture.points;
     gesture.shape = { kind: shape.kind, base: shape.points, cx: shape.cx, cy: shape.cy, ax: p[p.length - 2], ay: p[p.length - 1] };
     gesture.points = shape.points;
-    gesture.predicted = [];
+    gesture.tip = null;
+    gesture.predict = null;
     gesture.look = shape.straight ? { ...gesture.look, p: 1 } : gesture.look;
     scheduleFrame();
   }
@@ -1533,10 +1737,11 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
       const pinch = pinchRef.current;
       if (pinch && touchesRef.current.size === 2) {
         const [a, b] = Array.from(touchesRef.current.values());
-        previewZoom(pinch.startZoom * (Math.hypot(a.x - b.x, a.y - b.y) / pinch.startDist), {
-          clientX: (a.x + b.x) / 2,
-          clientY: (a.y + b.y) / 2,
-        });
+        previewZoom(
+          pinch.startZoom * (Math.hypot(a.x - b.x, a.y - b.y) / pinch.startDist),
+          { clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 },
+          true,
+        );
         return;
       }
     }
@@ -1568,9 +1773,9 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
       return;
     }
 
-    const canvas = liveCanvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
+    const sheet = sheetRef.current;
+    if (!sheet) return;
+    const rect = sheet.getBoundingClientRect();
 
     if (gesture.kind === "move") {
       const [x, y] = toLogicalIn(rect, e.clientX, e.clientY);
@@ -1626,32 +1831,39 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
       return;
     }
 
-    // Samples closer than a fraction of a pixel to the last kept one add no
-    // shape, only jitter and length. A stroke that reaches the point cap is
-    // committed and continued as a new stroke from the same spot. It used to
-    // stop taking samples, so a long highlight froze and only the predicted
-    // tip moved, drawing a straight line to the pen.
     if (gesture.shape) {
       adjustShape(gesture, ...toLogicalIn(rect, e.clientX, e.clientY));
       scheduleFrame();
       return;
     }
-    const minStep = 0.35 / Math.max(0.01, dimsRef.current.scale);
+    // Each raw sample goes through the speed-adaptive filter (lib/inkView)
+    // in screen pixels, where digitizer jitter lives, before it becomes a
+    // point. The spline below passes through every point, so unfiltered
+    // samples a pixel apart made slow writing visibly wobble. Smoothed
+    // samples under MIN_SAMPLE_STEP_PX from the last kept one are dropped. A
+    // stroke that reaches the point cap is committed and continued as a new
+    // stroke from the same spot, with the same filter, so there is no seam.
+    const perPx = dimsRef.current.w / Math.max(1, rect.width);
+    const minStep = MIN_SAMPLE_STEP_PX * perPx;
+    const samples = events.length ? events : [native];
     let draw: Extract<Gesture, { kind: "draw" }> = gesture;
-    for (const evt of events.length ? events : [native]) {
-      const [x, y] = toLogicalIn(rect, evt.clientX, evt.clientY);
+    for (const [fx, fy] of filterInkBatch(draw.filter, samples)) {
+      const [x, y] = toLogicalIn(rect, fx, fy);
       const p: number[] = draw.points;
       if (Math.hypot(x - p[p.length - 2], y - p[p.length - 1]) < minStep) continue;
       if (p.length >= MAX_POINTS_PER_STROKE * 2) {
         const lx = p[p.length - 2];
         const ly = p[p.length - 1];
-        const look = draw.look;
+        const { look, filter } = draw;
+        draw.tip = null;
         finalizeGesture(e.pointerId);
-        draw = { kind: "draw", pointerId: e.pointerId, points: [lx, ly], predicted: [], look };
+        draw = { kind: "draw", pointerId: e.pointerId, points: [lx, ly], tip: null, predict: null, filter, dots: false, look };
         gesturesRef.current.set(e.pointerId, draw);
       }
       draw.points.push(x, y);
     }
+    const last = samples[samples.length - 1];
+    draw.tip = toLogicalIn(rect, last.clientX, last.clientY);
     // Any real movement restarts the hold-to-snap clock.
     const hold = draw.hold;
     if (!hold || Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > SHAPE_HOLD_SLOP_PX) {
@@ -1659,13 +1871,31 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
       const id = e.pointerId;
       draw.hold = { x: e.clientX, y: e.clientY, timer: window.setTimeout(() => snapShape(id), SHAPE_HOLD_MS) };
     }
-    // Where the pen is about to be, as predicted by the browser. Drawn for this
-    // frame only and never stored, so a wrong guess costs nothing.
-    draw.predicted = [];
-    if (typeof native.getPredictedEvents === "function") {
-      for (const evt of native.getPredictedEvents().slice(0, 2)) {
-        const [x, y] = toLogicalIn(rect, evt.clientX, evt.clientY);
-        draw.predicted.push(x, y);
+    // Where the pen is about to be, as predicted by the browser, to hide a
+    // frame of latency. Drawn for this frame only and never stored. Used only
+    // while it is short and carries on the way the pen is going: a guess that
+    // swings around at a turn is the flicker at the tip of a live stroke.
+    // Not for the highlighter, whose translucent overlap would show a blob.
+    draw.predict = null;
+    const guess = !draw.look.h && typeof native.getPredictedEvents === "function" ? native.getPredictedEvents()[0] : undefined;
+    const tip = draw.tip;
+    const pts = draw.points;
+    if (guess && tip && pts.length >= 4) {
+      const [gx, gy] = toLogicalIn(rect, guess.clientX, guess.clientY);
+      const ax = pts[pts.length - 2];
+      const ay = pts[pts.length - 1];
+      let dirX = tip[0] - ax;
+      let dirY = tip[1] - ay;
+      if (Math.hypot(dirX, dirY) < 1e-6) {
+        dirX = ax - pts[pts.length - 4];
+        dirY = ay - pts[pts.length - 3];
+      }
+      const vx = gx - tip[0];
+      const vy = gy - tip[1];
+      const reach = Math.hypot(vx, vy);
+      const heading = Math.hypot(dirX, dirY);
+      if (reach > 0 && reach <= PREDICT_MAX_PX * perPx && heading > 0 && vx * dirX + vy * dirY >= 0.7 * reach * heading) {
+        draw.predict = [gx, gy];
       }
     }
     scheduleFrame();
@@ -1726,35 +1956,68 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
     setSelection([]);
   }
 
-  // Sets the zoom and keeps whatever is under `anchor` (the viewport centre by
-  // default) where it is, so zooming does not throw the page off screen.
-  // A pinch or Ctrl+wheel in progress: the target zoom and the page point
-  // (in logical units) that must stay under the fingers or the pointer.
-  const previewRef = useRef<{ target: number; lx: number; ly: number; ax: number; ay: number } | null>(null);
+  // Zooming keeps one page point under the fingers, the pointer or the view's
+  // centre. The whole result (scale and clamped scroll offset) is worked out
+  // up front by pageLayout + scrollForAnchor, the preview shows exactly that,
+  // and the commit lands exactly there. The old preview scaled around a
+  // point and left the scroll clamp to the browser at commit, so the page
+  // jumped when the gesture ended near an edge or zoomed out, and the
+  // rounded page width made the committed size differ from the preview.
+  // A pinch or Ctrl+wheel in progress: the target zoom, the page point held
+  // in place (logical units) and the view it will commit to.
+  const previewRef = useRef<{ target: number; lx: number; ly: number; scale: number; left: number; top: number } | null>(null);
   const settleTimerRef = useRef<number | null>(null);
 
-  // Shows a zoom instantly as a GPU scale of the already painted page; the
-  // canvases are rebuilt once when the gesture settles. Rebuilding three
-  // full-page canvases on every wheel tick or pinch frame is what made zoom
-  // slow and stiff.
-  function previewZoom(requested: number, anchor: { clientX: number; clientY: number }) {
-    const container = containerRef.current;
-    const page = pageRef.current;
-    if (!container || !page) return;
-    const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, requested));
+  // A client point as a point in the scroll view (inside the border).
+  function viewPoint(container: HTMLDivElement, clientX: number, clientY: number): [number, number] {
     const rect = container.getBoundingClientRect();
-    const ax = Math.min(rect.width, Math.max(0, anchor.clientX - rect.left));
-    const ay = Math.min(rect.height, Math.max(0, anchor.clientY - rect.top));
-    if (!previewRef.current) {
-      const s0 = dimsRef.current.scale;
-      previewRef.current = { target: next, lx: (container.scrollLeft + ax) / s0, ly: (container.scrollTop + ay) / s0, ax, ay };
+    const { viewW, viewH } = dimsRef.current;
+    return [
+      Math.min(viewW, Math.max(0, clientX - rect.left - container.clientLeft)),
+      Math.min(viewH, Math.max(0, clientY - rect.top - container.clientTop)),
+    ];
+  }
+
+  // Where the view lands at zoom `z` with page point (lx, ly) at view point (ax, ay).
+  function viewAtZoom(z: number, lx: number, ly: number, ax: number, ay: number) {
+    const { viewW, viewH } = dimsRef.current;
+    const layout = pageLayout(
+      { zoom: z, viewW, viewH, inkRight: inkRightRef.current, minHeight: pageHeightRef.current },
+      PAGE_LIMITS,
+    );
+    return { scale: layout.scale, ...scrollForAnchor(layout, viewW, viewH, lx, ly, ax, ay) };
+  }
+
+  // Shows a zoom instantly as a GPU transform of the already painted sheet;
+  // the canvases are rebuilt once when the gesture settles. Rebuilding three
+  // full-page canvases on every wheel tick or pinch frame is what made zoom
+  // slow and stiff. `pin`: a pinch holds the page point that was under the
+  // fingers when it began, so the page follows the fingers as they move; a
+  // wheel zooms toward wherever the pointer is now.
+  function previewZoom(requested: number, anchor: { clientX: number; clientY: number }, pin = false) {
+    const container = containerRef.current;
+    const sheet = sheetRef.current;
+    if (!container || !sheet) return;
+    const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, requested));
+    const [ax, ay] = viewPoint(container, anchor.clientX, anchor.clientY);
+    const current = previewRef.current;
+    let lx: number;
+    let ly: number;
+    if (current && pin) {
+      lx = current.lx;
+      ly = current.ly;
+    } else {
+      const from = current ?? { scale: dimsRef.current.scale, left: container.scrollLeft, top: container.scrollTop };
+      lx = (from.left + ax) / from.scale;
+      ly = (from.top + ay) / from.scale;
     }
-    const preview = previewRef.current;
-    preview.target = next;
-    const s0 = dimsRef.current.scale;
-    const ratio = next / zoomRef.current;
-    page.style.transformOrigin = `${preview.lx * s0}px ${preview.ly * s0}px`;
-    page.style.transform = `scale(${ratio})`;
+    const view = viewAtZoom(next, lx, ly, ax, ay);
+    previewRef.current = { target: next, lx, ly, ...view };
+    // Page point P (at today's scale) shows at P * ratio + shift - scroll;
+    // after the commit it shows at P * ratio - view offset. Same place.
+    const ratio = view.scale / dimsRef.current.scale;
+    sheet.style.transformOrigin = "0 0";
+    sheet.style.transform = `translate(${container.scrollLeft - view.left}px, ${container.scrollTop - view.top}px) scale(${ratio})`;
     setZoom(next);
     if (settleTimerRef.current != null) window.clearTimeout(settleTimerRef.current);
     settleTimerRef.current = window.setTimeout(commitZoomPreview, ZOOM_SETTLE_MS);
@@ -1766,17 +2029,14 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
       settleTimerRef.current = null;
     }
     const preview = previewRef.current;
-    const container = containerRef.current;
-    const page = pageRef.current;
+    const sheet = sheetRef.current;
     previewRef.current = null;
-    if (!preview || !container || !page) return;
-    page.style.transform = "";
-    page.style.transformOrigin = "";
+    if (!preview || !sheet) return;
+    sheet.style.transform = "";
+    sheet.style.transformOrigin = "";
     zoomRef.current = preview.target;
     setZoom(preview.target);
-    applySizeRef.current();
-    container.scrollLeft = preview.lx * dimsRef.current.scale - preview.ax;
-    container.scrollTop = preview.ly * dimsRef.current.scale - preview.ay;
+    applySizeRef.current({ left: preview.left, top: preview.top });
   }
 
   function setZoomTo(requested: number, anchor?: { clientX: number; clientY: number }) {
@@ -1785,17 +2045,12 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
     if (previewRef.current) commitZoomPreview();
     const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, requested));
     if (Math.abs(next - zoomRef.current) < 0.001) return;
-    const rect = container.getBoundingClientRect();
-    const ax = anchor ? anchor.clientX - rect.left : rect.width / 2;
-    const ay = anchor ? anchor.clientY - rect.top : rect.height / 2;
-    const before = dimsRef.current.scale;
-    const lx = (container.scrollLeft + ax) / before;
-    const ly = (container.scrollTop + ay) / before;
+    const { scale, viewW, viewH } = dimsRef.current;
+    const [ax, ay] = anchor ? viewPoint(container, anchor.clientX, anchor.clientY) : [viewW / 2, viewH / 2];
+    const view = viewAtZoom(next, (container.scrollLeft + ax) / scale, (container.scrollTop + ay) / scale, ax, ay);
     zoomRef.current = next;
     setZoom(next);
-    applySizeRef.current();
-    container.scrollLeft = lx * dimsRef.current.scale - ax;
-    container.scrollTop = ly * dimsRef.current.scale - ay;
+    applySizeRef.current({ left: view.left, top: view.top });
   }
 
   // Applies a look to the selected ink: color and width go to pen strokes,
@@ -2335,20 +2590,22 @@ function CanvasSurface({ strokes, onStrokesChange, paperStyle, onEdgeDrag, onLoo
       ) : null}
       {onEdgeDrag ? <EdgeGrip edge="top" onDrag={onEdgeDrag} /> : null}
       <div ref={containerRef} className="scratchpad-canvas-container">
-        <div ref={pageRef} className={`scratchpad-page ${paperClass}`}>
-          <canvas ref={staticCanvasRef} className="scratchpad-canvas scratchpad-canvas--static" aria-hidden="true" />
-          <canvas ref={overlayCanvasRef} className="scratchpad-canvas scratchpad-canvas--overlay" aria-hidden="true" />
-          <canvas
-            ref={liveCanvasRef}
-            className={`scratchpad-canvas scratchpad-canvas--live${tool === "erase" ? " is-erasing" : ""}${
-              tool === "select" ? " is-selecting" : ""
-            }${allowFingerDraw ? "" : " allows-scroll"}`}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerCancel}
-            onPointerLeave={handlePointerLeave}
-          />
+        <div ref={pageRef} className="scratchpad-page">
+          <div ref={sheetRef} className={`scratchpad-sheet ${paperClass}`}>
+            <canvas ref={staticCanvasRef} className="scratchpad-canvas scratchpad-canvas--static" aria-hidden="true" />
+            <canvas ref={overlayCanvasRef} className="scratchpad-canvas scratchpad-canvas--overlay" aria-hidden="true" />
+            <canvas
+              ref={liveCanvasRef}
+              className={`scratchpad-canvas scratchpad-canvas--live${tool === "erase" ? " is-erasing" : ""}${
+                tool === "select" ? " is-selecting" : ""
+              }${allowFingerDraw ? "" : " allows-scroll"}`}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerCancel}
+              onPointerLeave={handlePointerLeave}
+            />
+          </div>
         </div>
       </div>
       {onEdgeDrag ? <EdgeGrip edge="bottom" onDrag={onEdgeDrag} /> : null}
@@ -2483,9 +2740,44 @@ function QuestionAnnotator({
     paint();
   }, [paint, locked]);
 
-  function toLocal(e: ReactPointerEvent): [number, number] {
+  // Same pen handling as the pad: every coalesced sample, smoothed, painted
+  // once per frame rather than once per pointer event.
+  const filterRef = useRef<InkFilter | null>(null);
+  const frameRef = useRef<number | null>(null);
+  const paintRef = useRef(paint);
+  useEffect(() => {
+    paintRef.current = paint;
+  }, [paint]);
+  useEffect(() => () => {
+    if (frameRef.current != null) cancelAnimationFrame(frameRef.current);
+  }, []);
+  function schedulePaint() {
+    if (frameRef.current != null) return;
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = null;
+      paintRef.current();
+    });
+  }
+
+  function toLocal(clientX: number, clientY: number): [number, number] {
     const rect = innerRef.current!.getBoundingClientRect();
-    return [round1((e.clientX - rect.left) / scale), round1((e.clientY - rect.top) / scale)];
+    return [round1((clientX - rect.left) / scale), round1((clientY - rect.top) / scale)];
+  }
+
+  function addSamples(e: ReactPointerEvent) {
+    const live = liveRef.current;
+    const filter = filterRef.current;
+    if (!live || !filter) return;
+    const native = e.nativeEvent;
+    const events = typeof native.getCoalescedEvents === "function" ? native.getCoalescedEvents() : [];
+    for (const [fx, fy] of filterInkBatch(filter, events.length ? events : [native])) {
+      if (live.points.length >= MAX_POINTS_PER_STROKE) break;
+      const [x, y] = toLocal(fx, fy);
+      const p = live.points;
+      if (Math.hypot(x - p[p.length - 2], y - p[p.length - 1]) * scale < MIN_SAMPLE_STEP_PX) continue;
+      p.push(x, y);
+    }
+    schedulePaint();
   }
 
   if (!locked) {
@@ -2511,22 +2803,25 @@ function QuestionAnnotator({
             if (!active) return;
             e.preventDefault();
             (e.target as Element).setPointerCapture(e.pointerId);
-            liveRef.current = { ...look, points: toLocal(e) };
+            filterRef.current = createInkFilter(e.clientX, e.clientY, e.timeStamp);
+            liveRef.current = { ...look, points: toLocal(e.clientX, e.clientY) };
             paint();
           }}
-          onPointerMove={(e) => {
-            const live = liveRef.current;
-            if (!live || live.points.length >= MAX_POINTS_PER_STROKE) return;
-            live.points.push(...toLocal(e));
-            paint();
-          }}
-          onPointerUp={() => {
+          onPointerMove={addSamples}
+          onPointerUp={(e) => {
             const live = liveRef.current;
             liveRef.current = null;
-            if (live) onStrokesChange([...strokes, { ...live, points: simplifyStroke(live.points, 0.6) }]);
+            filterRef.current = null;
+            if (!live) return;
+            // End where the pen lifted, as the pad does.
+            const [x, y] = toLocal(e.clientX, e.clientY);
+            const p = live.points;
+            if (Math.hypot(x - p[p.length - 2], y - p[p.length - 1]) * scale >= MIN_SAMPLE_STEP_PX) p.push(x, y);
+            onStrokesChange([...strokes, { ...live, points: simplifyStroke(p, 0.6) }]);
           }}
           onPointerCancel={() => {
             liveRef.current = null;
+            filterRef.current = null;
             paint();
           }}
         />
