@@ -40,7 +40,7 @@ export function ReviewTheseWidget({ summary }: ReviewTheseWidgetProps) {
       {summary && !hasDue ? (
         <EmptyState
           icon={<BrainIcon />}
-          title="Nothing due. Nice."
+          title="All caught up!"
           body="All caught up on flashcards for now."
           action={
             <Link to="/flashcards">

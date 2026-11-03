@@ -36,6 +36,7 @@ export { ShieldIcon } from "./ShieldIcon";
 export { MenuIcon } from "./MenuIcon";
 export { BookIcon } from "./BookIcon";
 export { BrainIcon } from "./BrainIcon";
+export { CalendarIcon } from "./CalendarIcon";
 export { UndoIcon } from "./UndoIcon";
 export { MicIcon } from "./MicIcon";
 export { SpeakerIcon } from "./SpeakerIcon";

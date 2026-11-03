@@ -59,6 +59,11 @@
   cursor: default;
 }
 
+/* Close button: a subtle turn of the X on hover so it reads as an action. */
+.plan-icon-btn:hover:not(:disabled) .icon-close .icon-part-x {
+  transform: rotate(90deg);
+}
+
 .plan-modal-loading {
   display: grid;
   place-items: center;
@@ -464,6 +469,11 @@
   font-family: var(--font-serif);
   font-size: var(--text-lg);
   font-weight: 700;
+}
+
+/* Give the plan switcher room to breathe so long titles aren't cramped. */
+.plan-modal-switch .dropdown-trigger {
+  min-width: 220px;
 }
 
 .plan-modal-switch button {

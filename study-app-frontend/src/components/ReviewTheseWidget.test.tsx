@@ -21,7 +21,7 @@ describe("ReviewTheseWidget", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText("Nothing due. Nice.")).toBeTruthy();
+    expect(screen.getByText("All caught up!")).toBeTruthy();
     expect(screen.getByText("Go to Flashcards")).toBeTruthy();
   });
 
@@ -71,7 +71,7 @@ describe("ReviewTheseWidget", () => {
       </MemoryRouter>
     );
 
-    expect(screen.queryByText("Nothing due. Nice.")).toBeNull();
+    expect(screen.queryByText("All caught up!")).toBeNull();
     expect(screen.getByRole("status", { name: "Loading review cards" })).toBeTruthy();
     expect(screen.queryByText(/Couldn't load/)).toBeNull();
   });
@@ -84,6 +84,6 @@ describe("ReviewTheseWidget", () => {
     );
 
     expect(screen.getByText("Couldn't load your due cards right now.")).toBeTruthy();
-    expect(screen.queryByText("Nothing due. Nice.")).toBeNull();
+    expect(screen.queryByText("All caught up!")).toBeNull();
   });
 });

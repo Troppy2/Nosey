@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "./Button";
 import { ConfirmModal } from "./ConfirmModal";
+import { DatePicker } from "./DatePicker";
 import { ToggleSwitch } from "./ToggleSwitch";
 import { Dropdown, type DropdownOption } from "./Dropdown";
 import KojoMascot from "./KojoMascot";
@@ -471,11 +472,12 @@ function PlanEditor({
         </label>
         <label className="field">
           <span className="field-label">Exam date</span>
-          <input
-            className="input"
-            type="date"
+          <DatePicker
+            label="Exam date"
             value={draft.exam_date}
-            onChange={(e) => onChange({ ...draft, exam_date: e.target.value })}
+            onChange={(v) => onChange({ ...draft, exam_date: v })}
+            min={todayString()}
+            placeholder="Pick a date"
           />
         </label>
       </div>
@@ -577,7 +579,12 @@ function PlanEditor({
           ) : null}
           <label className="field">
             <span className="field-label">Due (optional)</span>
-            <input className="input" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+            <DatePicker
+              label="Due date"
+              value={due}
+              onChange={setDue}
+              placeholder="Pick a date"
+            />
           </label>
         </div>
         <div className="plan-add-actions">
