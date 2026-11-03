@@ -1,4 +1,4 @@
-import { ChatIcon, CodeIcon, DashboardIcon, FolderIcon, MenuIcon, SettingsIcon, ShieldIcon, SproutIcon } from "../icons";
+import { ChatIcon, CheckIcon, CodeIcon, DashboardIcon, FolderIcon, MenuIcon, SettingsIcon, ShieldIcon, SproutIcon } from "../icons";
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from "../icons";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
@@ -15,6 +15,7 @@ const sidebarStorageKey = "nosey_sidebar_collapsed";
 
 const BASE_NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard", icon: DashboardIcon, beta: false, guestHidden: false, tourId: undefined },
+  { to: "/plans", label: "Study Plans", icon: CheckIcon, beta: true, guestHidden: true, tourId: undefined },
   { to: "/folders", label: "Folders", icon: FolderIcon, beta: false, guestHidden: false, tourId: "tour-nav-folders" },
   { to: "/flashcards", label: "Learning Modes", icon: SproutIcon, beta: false, guestHidden: false, tourId: undefined },
   { to: "/leetcode", label: "KojoCode", icon: CodeIcon, beta: true, guestHidden: true, tourId: undefined },

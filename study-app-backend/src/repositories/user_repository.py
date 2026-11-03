@@ -116,6 +116,11 @@ class UserRepository(BaseRepository[User]):
         await self.session.flush()
         return user
 
+    async def update_dashboard_widgets(self, user: User, widgets: list[str]) -> User:
+        user.dashboard_widgets = json.dumps(widgets)
+        await self.session.flush()
+        return user
+
     async def refresh_age_if_birthday(self, user: User) -> bool:
         """Recalculate age if today is the user's birthday. Returns True if updated."""
         if user.date_of_birth is None:

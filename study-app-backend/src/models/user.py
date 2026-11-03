@@ -30,8 +30,27 @@ if TYPE_CHECKING:
     from src.models.job_description import UserJobDescription
     from src.models.mock_interview import MockInterviewSession
     from src.models.slash_command import SlashCommand
+    from src.models.study_plan import StudyPlan
     from src.models.system_design import SDConceptProgress, SDQuizAttempt, SDSubmission
     from src.models.user_attempt import UserAttempt
+
+
+DEFAULT_DASHBOARD_WIDGETS = ["review_these", "weak_spots"]
+KNOWN_DASHBOARD_WIDGETS = frozenset({"review_these", "weak_spots", "study_plan"})
+
+
+def parse_dashboard_widgets(raw: Optional[str]) -> list[str]:
+    """Decode User.dashboard_widgets into exactly 2 unique known widget keys."""
+    if not raw:
+        return list(DEFAULT_DASHBOARD_WIDGETS)
+    try:
+        value = json.loads(raw)
+        if isinstance(value, list) and len(value) == 2 and len(set(value)) == 2:
+            if all(isinstance(k, str) and k in KNOWN_DASHBOARD_WIDGETS for k in value):
+                return value
+    except Exception:
+        pass
+    return list(DEFAULT_DASHBOARD_WIDGETS)
 
 
 def parse_tours_seen(raw: Optional[str]) -> list[str]:
@@ -76,6 +95,9 @@ class User(Base, TimestampMixin):
     # reason as onboarding_completed_at: a per-browser flag replays every tour
     # on a new device.
     tours_seen: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Ordered list of exactly 2 of ["review_these", "weak_spots", "study_plan"].
+    # NULL falls back to DEFAULT_DASHBOARD_WIDGETS.
+    dashboard_widgets: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # GH #173. A set banned_at locks the account out of every route (see
     # get_current_user). banned_by is the admin's user id, NULL for an
     # automatic ban by moderation.
@@ -94,6 +116,9 @@ class User(Base, TimestampMixin):
     )
     flashcard_attempts: Mapped[list[FlashcardAttempt]] = relationship(
         "FlashcardAttempt", back_populates="user", cascade="all, delete-orphan"
+    )
+    study_plans: Mapped[list[StudyPlan]] = relationship(
+        "StudyPlan", back_populates="user", cascade="all, delete-orphan"
     )
     kojo_conversations: Mapped[list[KojoConversation]] = relationship(
         "KojoConversation", back_populates="user", cascade="all, delete-orphan"

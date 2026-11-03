@@ -13,6 +13,13 @@ import type {
   RedoAnswerResponse,
   AttemptSummary,
   ConversationFile,
+  CatalogResponse,
+  DashboardWidgetsResponse,
+  StudyPlanDetail,
+  StudyPlanDraftResponse,
+  StudyPlanItem,
+  StudyPlanItemInput,
+  StudyPlanSummary,
   CreateTestResult,
   AuthUser,
   DraftAttemptAnswer,
@@ -2842,4 +2849,96 @@ export async function fetchMcpConnections(): Promise<McpConnection[]> {
 
 export async function revokeMcpConnection(connectionId: number): Promise<void> {
   await request<void>(`/oauth/connections/${connectionId}`, { method: "DELETE" });
+}
+
+
+// Study Plans (beta)
+
+export async function fetchStudyPlans(): Promise<StudyPlanSummary[]> {
+  return request<StudyPlanSummary[]>("/study-plans");
+}
+
+export async function fetchPinnedStudyPlan(): Promise<StudyPlanDetail | null> {
+  const plan = await request<StudyPlanDetail | null>("/study-plans/pinned");
+  return plan ?? null;
+}
+
+export async function fetchStudyPlan(id: ID): Promise<StudyPlanDetail> {
+  return request<StudyPlanDetail>(`/study-plans/${id}`);
+}
+
+export async function createStudyPlan(data: {
+  title: string;
+  exam_date?: string | null;
+  is_pinned?: boolean;
+  items?: StudyPlanItemInput[];
+}): Promise<StudyPlanDetail> {
+  return request<StudyPlanDetail>("/study-plans", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateStudyPlan(
+  id: ID,
+  data: {
+    title?: string;
+    exam_date?: string | null;
+    is_pinned?: boolean;
+  },
+): Promise<StudyPlanDetail> {
+  return request<StudyPlanDetail>(`/study-plans/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function replaceStudyPlanItems(
+  id: ID,
+  items: StudyPlanItemInput[],
+): Promise<StudyPlanDetail> {
+  return request<StudyPlanDetail>(`/study-plans/${id}/items`, {
+    method: "PUT",
+    body: JSON.stringify({ items }),
+  });
+}
+
+export async function toggleStudyPlanItem(
+  itemId: ID,
+  done: boolean,
+): Promise<StudyPlanItem> {
+  return request<StudyPlanItem>(`/study-plans/items/${itemId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ done }),
+  });
+}
+
+export async function deleteStudyPlan(id: ID): Promise<void> {
+  await request<void>(`/study-plans/${id}`, { method: "DELETE" });
+}
+
+export async function fetchStudyPlansCatalog(): Promise<CatalogResponse> {
+  return request<CatalogResponse>("/study-plans/catalog");
+}
+
+export async function generateStudyPlanDraft(text: string): Promise<StudyPlanDraftResponse> {
+  return request<StudyPlanDraftResponse>("/study-plans/draft", {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+}
+
+export async function updateDashboardWidgets(
+  widgets: string[],
+): Promise<DashboardWidgetsResponse> {
+  const res = await request<DashboardWidgetsResponse>("/users/me/dashboard-widgets", {
+    method: "PATCH",
+    body: JSON.stringify({ widgets }),
+  });
+  const user = getStoredUser();
+  if (user) {
+    user.dashboard_widgets = res.dashboard_widgets;
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  }
+  return res;
 }
