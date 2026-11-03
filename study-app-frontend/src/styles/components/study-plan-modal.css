@@ -440,3 +440,33 @@
   padding-right: 4px;
   scrollbar-gutter: stable;
 }
+
+/* Grid children must be allowed to shrink, or rows push past the right edge. */
+.modal-card.plan-modal {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.plan-modal > *,
+.plan-modal-meta,
+.plan-checklist,
+.plan-row {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Plan switcher: styled like the title, not a grey native box. */
+.plan-modal-switch,
+.plan-modal-switch button {
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.plan-modal-switch button {
+  border: 0;
+  padding: 6px 10px;
+}
