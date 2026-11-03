@@ -1,0 +1,442 @@
+/* Study plan modal: a paper checklist. Rows sit on hairlines, the checkbox
+   and progress bar carry the state; no cards inside the card. */
+
+.modal-card.plan-modal {
+  width: min(820px, 100%);
+  max-height: min(90dvh, 900px);
+  gap: 18px;
+  padding: 28px 32px 24px;
+  overflow: hidden;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.plan-modal > :not(.plan-modal-head) {
+  min-height: 0;
+}
+
+.plan-modal-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.plan-modal-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: var(--text-xl);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.plan-modal-switch {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+}
+
+.plan-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--green-dark);
+  cursor: pointer;
+}
+
+.plan-icon-btn:hover:not(:disabled) {
+  background: var(--green-lightest);
+}
+
+.plan-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.plan-modal-loading {
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  padding: 48px 0;
+  color: var(--green-dark);
+  font-weight: 500;
+}
+
+/* Meta line + progress */
+.plan-modal-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.plan-countdown {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+
+
+.plan-progress {
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--green-light);
+  overflow: hidden;
+}
+
+.plan-progress span {
+  display: block;
+  height: 100%;
+  background: var(--green-dark);
+  transition: width var(--transition-normal);
+}
+
+/* Checklist rows */
+.plan-checklist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.plan-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  min-height: 56px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--green-light);
+}
+
+.plan-row:last-child {
+  border-bottom: 0;
+}
+
+.plan-row-main {
+  display: flex;
+  align-items: center;
+  flex: 1 1 260px;
+  gap: 12px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.plan-check {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.plan-pin {
+  margin-left: auto;
+}
+
+.plan-row-label {
+  flex: 1;
+  min-width: 0;
+  color: var(--ink);
+  font-size: var(--text-base);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.plan-row.is-done .plan-row-label {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--green-light-mid);
+}
+
+.plan-row-meta {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.plan-kind,
+.plan-due {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.plan-kind + .plan-kind::before,
+.plan-kind + .plan-due::before,
+.plan-kind + .plan-stamp::before {
+  content: "/";
+  margin-right: 6px;
+  color: var(--green-light-mid);
+}
+
+.plan-due.is-overdue {
+  color: var(--accent-danger-strong);
+  font-weight: 600;
+}
+
+/* The one flourish: an auto-completed item gets a stamp whose tick draws in. */
+.plan-stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--green-dark);
+  border-radius: var(--radius-pill);
+  color: var(--green-dark);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  transform: rotate(-2deg);
+}
+
+.plan-stamp svg path {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: plan-stamp-draw 420ms ease-out 120ms forwards;
+}
+
+@keyframes plan-stamp-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-stamp svg path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  .plan-progress span {
+    transition: none;
+  }
+}
+
+.plan-empty {
+  margin: 8px 0;
+  color: var(--muted);
+}
+
+.plan-error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-danger-tint);
+  color: var(--accent-danger-strong);
+  font-size: var(--text-sm);
+}
+
+/* Footer */
+.plan-modal-foot {
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+.plan-foot-spacer {
+  flex: 1;
+}
+
+
+/* New plan */
+.plan-new,
+.plan-editor {
+  display: grid;
+  overflow-x: hidden;
+  gap: 12px;
+  align-content: start;
+  overflow-y: auto;
+}
+
+.plan-dump {
+  min-height: 140px;
+  resize: vertical;
+}
+
+/* Editor */
+.plan-editor {
+  gap: 22px;
+}
+
+.plan-editor-meta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 16px;
+}
+
+.plan-editor .input {
+  width: 100%;
+  min-width: 0;
+}
+
+.plan-editor .field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.plan-section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  color: var(--ink);
+}
+
+.plan-section-title .muted {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+/* Checklist being edited: a bordered list, one item per row. */
+.plan-edit-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  overflow: hidden;
+}
+
+.plan-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 64px;
+  padding: 10px 12px 10px 16px;
+}
+
+.plan-edit-row + .plan-edit-row {
+  border-top: 1px solid var(--green-light);
+}
+
+.plan-edit-index {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-edit-body {
+  display: grid;
+  flex: 1;
+  gap: 6px;
+  min-width: 0;
+}
+
+.plan-edit-body .plan-row-label {
+  font-weight: 600;
+}
+
+.plan-pill {
+  min-height: 24px;
+  padding: 2px 10px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.plan-row-tools {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+}
+
+.plan-icon-btn {
+  width: 40px;
+  height: 40px;
+  color: var(--green-dark);
+}
+
+.plan-icon-btn--danger:hover:not(:disabled) {
+  background: var(--accent-danger-tint);
+  color: var(--accent-danger-strong);
+}
+
+/* Add-an-item panel */
+.plan-add {
+  padding: 18px 20px 20px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  background: var(--white);
+}
+
+.plan-add-grid {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr) 190px;
+  align-items: end;
+  gap: 14px;
+}
+
+.plan-add-grid:has(> :nth-child(4)) {
+  grid-template-columns: 180px minmax(0, 1fr) 100px 180px;
+}
+
+.plan-add-main {
+  min-width: 0;
+}
+
+.plan-add-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+@media (max-width: 720px) {
+  .modal-backdrop:has(.plan-modal) {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal-card.plan-modal {
+    width: 100%;
+    max-height: 94dvh;
+    padding: 20px 16px calc(16px + env(safe-area-inset-bottom));
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+
+  .plan-editor-meta,
+  .plan-add-grid,
+  .plan-add-grid:has(> :nth-child(4)) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .plan-add-actions .button {
+    width: 100%;
+  }
+}
+
+/* Keep Save/Cancel reachable while the checklist scrolls. */
+.plan-editor > .plan-modal-foot,
+.plan-new > .plan-modal-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin: 0 -4px;
+  padding: 14px 4px 0;
+  background: var(--green-lightest);
+  border-top: 1px solid var(--green-light);
+}
+
+.plan-editor {
+  padding-right: 4px;
+  scrollbar-gutter: stable;
+}

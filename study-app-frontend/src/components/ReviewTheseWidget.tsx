@@ -71,11 +71,9 @@ export function ReviewTheseWidget({ summary }: ReviewTheseWidgetProps) {
             ))}
           </div>
           {topFolder ? (
-            <div style={{ marginTop: "12px" }}>
-              <Link to={`/flashcards/${topFolder.folder_id}/review`} className="text-link">
-                Review due cards
-              </Link>
-            </div>
+            <Link to={`/flashcards/${topFolder.folder_id}/review`} className="text-link weak-stack-cta">
+              Review due cards
+            </Link>
           ) : null}
         </>
       ) : null}

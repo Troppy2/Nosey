@@ -41,19 +41,24 @@ export function DashboardWidgetPicker({ current, onSaved, onClose }: Props) {
 
   return (
     <div className="modal-backdrop" onMouseDown={() => !saving && onClose()}>
-      <div className="modal-card widget-picker" role="dialog" aria-modal="true" aria-labelledby="widget-picker-title" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="widget-picker-title" onMouseDown={(e) => e.stopPropagation()}>
         <h2 id="widget-picker-title">Sidebar widgets</h2>
         <p className="muted small">Pick 2. They show in the order you pick them.</p>
 
-        <div className="widget-picker-options">
+        <div className="choice-grid widget-picker-options" role="group" aria-label="Sidebar widgets">
           {OPTIONS.map((opt) => {
             const order = picked.indexOf(opt.key);
             return (
-              <label key={opt.key} className={`widget-picker-option${order >= 0 ? " is-picked" : ""}`}>
-                <input type="checkbox" checked={order >= 0} onChange={() => toggle(opt.key)} />
-                <span className="widget-picker-label">{opt.label}</span>
+              <button
+                key={opt.key}
+                type="button"
+                className={`choice${order >= 0 ? " active" : ""}`}
+                aria-pressed={order >= 0}
+                onClick={() => toggle(opt.key)}
+              >
+                {opt.label}
                 {order >= 0 ? <span className="widget-picker-order">{order + 1}</span> : null}
-              </label>
+              </button>
             );
           })}
         </div>

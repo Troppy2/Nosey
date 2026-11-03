@@ -235,7 +235,9 @@
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 0.6rem;
   height: 100dvh;
-  max-width: 1100px;
+  /* Matches the board's own ceiling (4 columns x 13rem plus gaps) so the rail
+     and progress bar line up with the tiles instead of running past them. */
+  max-width: 54.5rem;
   margin: 0 auto;
   padding: 0.9rem 1rem 1rem;
   overflow: hidden;
@@ -324,7 +326,8 @@
 }
 
 .match-progress {
-  height: 5px;
+  height: 4px;
+  margin-bottom: 0.4rem;
 }
 
 /* Board */
@@ -386,11 +389,18 @@
     border-color var(--transition-fast), background var(--transition-fast);
 }
 
-/* Two tile families so the columns read as two things to pair: terms sit on a
-   warm cream tint, definitions on white with a green edge. */
+/* Two tile families so the board reads as two sets to pair without a
+   checkerboard of fills: both are white, terms carry an olive edge and
+   heavier text, definitions stay plain. */
 .match-tile--front {
-  background: var(--green-light);
+  background: var(--white);
   border-color: var(--green-light-mid);
+  border-left: 4px solid var(--green-dark);
+}
+
+.match-tile--front .match-tile-text {
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .match-tile--back {
@@ -399,7 +409,9 @@
 }
 
 .match-tile:hover:not(:disabled) {
-  box-shadow: var(--shadow-md);
+  border-color: var(--green-dark);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
 }
 
 .match-tile:focus-visible {
@@ -409,12 +421,13 @@
 
 .match-tile.is-selected {
   border-color: var(--green-dark);
-  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.3);
+  background: var(--green-lightest);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--green-dark) 28%, transparent);
 }
 
 .match-tile.is-mismatch {
-  border-color: var(--error);
-  background: rgba(220, 38, 38, 0.08);
+  border-color: var(--accent-danger);
+  background: var(--accent-danger-tint);
   animation: match-shake 0.4s ease;
 }
 
@@ -436,11 +449,11 @@
 /* Matched tiles keep their grid slot (no reflow jump) but drop back to a quiet
    done state with a success tint. */
 .match-tile.is-matched {
-  border-color: var(--success);
-  background: rgba(16, 185, 129, 0.1);
+  border-color: var(--accent-positive);
+  background: var(--accent-positive-tint);
   color: var(--muted);
   cursor: default;
-  opacity: 0.72;
+  opacity: 0.6;
   animation: match-pop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -449,11 +462,11 @@
   position: absolute;
   top: 0.5rem;
   right: 0.55rem;
-  width: 16px;
-  height: 16px;
-  border-radius: var(--radius-pill);
-  background: var(--success);
-  opacity: 0.9;
+  width: 8px;
+  height: 14px;
+  border: solid var(--accent-positive-strong);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
 }
 
 @keyframes match-pop {

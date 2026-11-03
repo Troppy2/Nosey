@@ -150,7 +150,11 @@ export function Dropdown<T extends string>({
     else if (event.key === "Home") setActive(0);
     else if (event.key === "End") setActive(last);
     else if (event.key === "Enter" || event.key === " ") choose(active);
-    else if (event.key === "Escape") close(true);
+    else if (event.key === "Escape") {
+      // Handled here, so a modal around the dropdown does not close too.
+      event.preventDefault();
+      close(true);
+    }
     else if (event.key === "Tab") {
       // Back on the trigger first, so the browser's Tab moves on from there
       // instead of from <body> once the list unmounts.

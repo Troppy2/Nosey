@@ -18,50 +18,43 @@
   display: flex;
 }
 
-.widget-customize-btn:hover {
-  background: var(--green-lightest);
-}
-
-.widget-picker {
-  max-width: 420px;
+.widget-customize-btn:hover,
+.widget-customize-btn:focus-visible {
+  background: var(--green-light);
+  color: var(--ink);
 }
 
 .widget-picker-options {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 16px 0 20px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.widget-picker-option {
+.widget-picker-options .choice {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  padding: 0 14px;
-  border: 1px solid var(--green-light);
-  border-radius: 8px;
-  cursor: pointer;
+  justify-content: space-between;
+  text-align: left;
 }
 
-.widget-picker-option.is-picked {
-  background: var(--green-lightest);
-}
-
-.widget-picker-label {
-  flex: 1;
-  color: var(--ink);
-  font-weight: 500;
-}
-
+/* Order badge inside an active (dark) choice. */
 .widget-picker-order {
   display: inline-grid;
   place-items: center;
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--green-dark);
-  color: var(--white);
+  background: var(--green-lightest);
+  color: var(--green-dark);
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
+}
+
+/* Sidebar widgets are rendered as siblings; give them breathing room. */
+.dashboard-layout > aside {
+  display: grid;
+  align-content: start;
+  gap: 28px;
+}
+
+.dashboard-layout > aside > .widget-customize-row {
+  margin-bottom: -20px;
 }

@@ -1,218 +1,125 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { CheckIcon } from "../icons";
 import { fetchPinnedStudyPlan, toggleStudyPlanItem } from "../lib/api";
 import { toast } from "../lib/toast";
-import type { StudyPlanDetail } from "../lib/types";
+import type { StudyPlanDetail, StudyPlanItem } from "../lib/types";
 import { Button } from "./Button";
-import { Card } from "./Card";
 import { Skeleton } from "./Skeletons";
+import { StudyPlanModal, examCountdown, todayString } from "./StudyPlanModal";
 import "../styles/components/study-plan-widget.css";
+import "../styles/components/study-plan-modal.css";
 
-function getTodayString(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function formatExamCountdown(dateStr: string): string {
-  const target = new Date(dateStr + "T00:00:00");
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDays < 0) return `Exam was ${Math.abs(diffDays)}d ago`;
-  if (diffDays === 0) return "Exam today";
-  if (diffDays === 1) return "Exam tomorrow";
-  return `Exam in ${diffDays} days`;
-}
-
+// Beta dashboard widget: the pinned plan's next open items. The full plan
+// (switching, editing, Plan with Kojo) lives in StudyPlanModal.
 export function StudyPlanWidget() {
   const [plan, setPlan] = useState<StudyPlanDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
+  function load() {
     fetchPinnedStudyPlan()
-      .then((data) => {
-        if (!cancelled) {
-          setPlan(data);
-          setLoading(false);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setFailed(true);
-          setLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+      .then((data) => setPlan(data))
+      .catch(() => setFailed(true))
+      .finally(() => setLoading(false));
+  }
 
-  async function handleToggle(itemId: number, currentDone: boolean) {
-    const nextDone = !currentDone;
-    setPlan((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        items: prev.items.map((it) =>
-          it.id === itemId
-            ? { ...it, done: nextDone, done_source: nextDone ? "manual" : null }
-            : it
-        ),
-      };
-    });
+  useEffect(load, []);
 
+  async function toggle(item: StudyPlanItem) {
+    const swap = (next: StudyPlanItem) =>
+      setPlan((p) => (p ? { ...p, items: p.items.map((it) => (it.id === item.id ? next : it)) } : p));
+    swap({ ...item, done: !item.done, done_source: "manual" });
     try {
-      const updated = await toggleStudyPlanItem(itemId, nextDone);
-      setPlan((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          items: prev.items.map((it) => (it.id === itemId ? updated : it)),
-        };
-      });
+      swap(await toggleStudyPlanItem(item.id, !item.done));
     } catch {
-      setPlan((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          items: prev.items.map((it) =>
-            it.id === itemId ? { ...it, done: currentDone } : it
-          ),
-        };
-      });
-      toast.error("Failed to update item");
+      swap(item);
+      toast.error("Couldn't save that. Try again.");
     }
   }
 
   if (failed) return null;
 
-  const today = getTodayString();
-  const openItems = (plan?.items ?? []).filter((item) => !item.done);
-  const sortedOpen = [...openItems].sort((a, b) => {
-    const aDue = a.due_date;
-    const bDue = b.due_date;
-    const aOverdue = Boolean(aDue && aDue < today);
-    const bOverdue = Boolean(bDue && bDue < today);
-    if (aOverdue && !bOverdue) return -1;
-    if (!aOverdue && bOverdue) return 1;
-
-    const aToday = Boolean(aDue && aDue === today);
-    const bToday = Boolean(bDue && bDue === today);
-    if (aToday && !bToday) return -1;
-    if (!aToday && bToday) return 1;
-
-    return a.position - b.position;
-  });
-  const displayItems = sortedOpen.slice(0, 5);
+  const today = todayString();
+  const rank = (it: StudyPlanItem) => (!it.due_date ? 2 : it.due_date < today ? 0 : it.due_date === today ? 1 : 2);
+  const next = (plan?.items ?? [])
+    .filter((it) => !it.done)
+    .sort((a, b) => rank(a) - rank(b) || a.position - b.position)
+    .slice(0, 5);
+  const done = plan?.items.filter((it) => it.done).length ?? 0;
+  const total = plan?.items.length ?? 0;
 
   return (
-    <section className="study-plan-widget" aria-label="Study Plan">
+    <section className="study-plan-widget" aria-label="Study plan">
       <div className="section-title">
         <h2>Study Plan</h2>
-        <Link className="text-link" to="/plans">
-          Open plan
-        </Link>
+        {plan ? (
+          <button type="button" className="text-link plan-widget-open" onClick={() => setOpen(true)}>
+            Open
+          </button>
+        ) : null}
       </div>
 
-      <Card className="study-plan-card">
+      <div className="plan-widget">
         {loading ? (
-          <div className="study-plan-widget-loading" role="status" aria-label="Loading your study plan">
-            <Skeleton width="60%" height="1.2rem" />
-            <Skeleton width="40%" height="0.85rem" />
-            <div className="study-plan-widget-skeleton-rows">
-              <Skeleton width="100%" height="1rem" />
-              <Skeleton width="90%" height="1rem" />
-              <Skeleton width="95%" height="1rem" />
-            </div>
+          <div className="plan-widget-loading" role="status" aria-label="Loading your study plan">
+            <Skeleton width="60%" height="1.1rem" />
+            <Skeleton width="100%" height="0.9rem" />
+            <Skeleton width="90%" height="0.9rem" />
           </div>
         ) : !plan ? (
-          <div className="study-plan-widget-empty">
-            <p className="muted small">No plan pinned</p>
-            <Link to="/plans">
-              <Button variant="secondary">
-                Make a plan
-              </Button>
-            </Link>
+          <div className="plan-widget-empty">
+            <p>No plan pinned. Make one for your next exam and check things off as you go.</p>
+            <Button variant="secondary" onClick={() => setOpen(true)}>
+              Make a plan
+            </Button>
           </div>
         ) : (
-          <div className="study-plan-widget-content">
-            <div className="study-plan-widget-header">
-              <h3 className="study-plan-widget-title" title={plan.title}>
-                <Link to="/plans" className="study-plan-title-link">
-                  {plan.title}
-                </Link>
-              </h3>
-              {plan.exam_date && (
-                <span className="study-plan-countdown-badge">
-                  {formatExamCountdown(plan.exam_date)}
-                </span>
-              )}
+          <>
+            <button type="button" className="plan-widget-head" onClick={() => setOpen(true)}>
+              <span className="plan-widget-title">{plan.title}</span>
+              <span className="plan-widget-sub">
+                {plan.exam_date ? `${examCountdown(plan.exam_date)}, ` : ""}
+                {done} of {total} done
+              </span>
+            </button>
+            <div className="plan-progress" aria-hidden="true">
+              <span style={{ width: total ? `${(done / total) * 100}%` : 0 }} />
             </div>
-
-            {displayItems.length === 0 ? (
-              <p className="muted small study-plan-widget-all-done">
-                {plan.items.length === 0
-                  ? "No items in this plan yet."
-                  : "All items completed!"}
-              </p>
+            {next.length === 0 ? (
+              <p className="plan-empty">{total ? "Everything's done. Nice." : "Nothing on this plan yet."}</p>
             ) : (
-              <ul className="study-plan-widget-items">
-                {displayItems.map((item) => {
-                  const isOverdue = Boolean(item.due_date && item.due_date < today);
-                  const isDueToday = Boolean(item.due_date && item.due_date === today);
-
-                  return (
-                    <li key={item.id} className="study-plan-widget-item-row">
-                      <label className="study-plan-widget-checkbox-label">
-                        <input
-                          type="checkbox"
-                          className="study-plan-checkbox"
-                          checked={item.done}
-                          onChange={() => handleToggle(item.id, item.done)}
-                          aria-label={`Mark "${item.label}" as done`}
-                        />
-                        <span className="study-plan-item-label" title={item.label}>
-                          {item.label}
-                        </span>
-                      </label>
-
-                      <div className="study-plan-item-meta">
-                        {item.done_source === "auto" && (
-                          <span className="study-plan-auto-badge" title="Done in Nosey">
-                            <CheckIcon size={12} className="study-plan-auto-check-anim" />
-                            Done in Nosey
+              <ul className="plan-checklist">
+                {next.map((item) => (
+                  <li key={item.id} className="plan-row">
+                    <label className="plan-row-main">
+                      <input type="checkbox" className="checkbox-input plan-check" checked={item.done} onChange={() => void toggle(item)} />
+                      <span className="plan-row-label">{item.label}</span>
+                    </label>
+                    {item.progress || item.due_date ? (
+                      <span className="plan-row-meta">
+                        {item.progress ? <span className="plan-kind">{item.progress}</span> : null}
+                        {item.due_date && item.due_date <= today ? (
+                          <span className={`plan-due${item.due_date < today ? " is-overdue" : ""}`}>
+                            {item.due_date < today ? "Overdue" : "Due today"}
                           </span>
-                        )}
-                        {item.progress && (
-                          <span className="study-plan-progress-pill">{item.progress}</span>
-                        )}
-                        {isOverdue && (
-                          <span className="study-plan-due-pill overdue">Overdue</span>
-                        )}
-                        {isDueToday && (
-                          <span className="study-plan-due-pill due-today">Due today</span>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
+                        ) : null}
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
               </ul>
             )}
-
-            <div className="study-plan-widget-footer">
-              <Link to="/plans" className="text-link small">
-                Open plan
-              </Link>
-            </div>
-          </div>
+          </>
         )}
-      </Card>
+      </div>
+
+      {open ? (
+        <StudyPlanModal
+          initialPlanId={plan?.id ?? null}
+          onClose={() => setOpen(false)}
+          onChanged={load}
+        />
+      ) : null}
     </section>
   );
 }
