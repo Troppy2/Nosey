@@ -30,6 +30,8 @@ from src.schemas.study_plan import (
 )
 from src.utils.exceptions import ResourceNotFoundException, ValidationException
 
+MAX_PLANS_PER_USER = 50
+
 
 class StudyPlanService:
     async def list_plans(
@@ -73,8 +75,16 @@ class StudyPlanService:
     async def create_plan(
         self, user_id: int, data: StudyPlanCreateRequest, session: AsyncSession
     ) -> StudyPlanDetailResponse:
-        await self.validate_target_ids(user_id, data.items, session)
         repo = StudyPlanRepository(session)
+        # SECURITY: per-account cap so plans cannot be farmed. Counts archived
+        # plans too (nothing archives yet, and they are still rows). Two
+        # parallel creates at the cap can both pass; the write rate limit
+        # bounds that to a handful.
+        if await repo.count_for_user(user_id) >= MAX_PLANS_PER_USER:
+            raise ValidationException(
+                f"You can have up to {MAX_PLANS_PER_USER} study plans. Delete one to make another."
+            )
+        await self.validate_target_ids(user_id, data.items, session)
         created = await repo.create(
             user_id=user_id,
             title=data.title,

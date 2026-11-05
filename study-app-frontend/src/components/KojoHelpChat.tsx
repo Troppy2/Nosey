@@ -11,8 +11,7 @@ import {
   scopeKey,
 } from "../lib/api";
 import type { KojoMessage, KojoTestRef } from "../lib/types";
-import { formatTime } from "./KojoChat";
-import { MarkdownContent } from "./MarkdownContent";
+import { KojoMessageRow } from "./KojoChat";
 import { SlashCommandMenu, type CommandOption } from "./SlashCommandMenu";
 import { useChatScroll } from "../lib/useChatScroll";
 import "../styles/components/kojo-help-chat.css";
@@ -310,29 +309,7 @@ export function KojoHelpChat({
                 </div>
               </div>
             ) : (
-              messages.map((msg) =>
-                msg.role === "assistant" ? (
-                  <div key={msg.id} className="kojo-message kojo-message--assistant">
-                    <div className="kojo-msg-avatar">
-                      <KojoMascot state="idle" />
-                    </div>
-                    <div className="kojo-message-body">
-                      <div className="kojo-message-meta">
-                        <span className="kojo-message-label">Kojo</span>
-                        <span className="kojo-message-time">{formatTime(msg.created_at)}</span>
-                      </div>
-                      <MarkdownContent content={msg.content} />
-                    </div>
-                  </div>
-                ) : (
-                  <div key={msg.id} className="kojo-message kojo-message--user">
-                    <div className="kojo-user-bubble">
-                      <p>{msg.content}</p>
-                      <span className="kojo-message-time kojo-message-time--user">{formatTime(msg.created_at)}</span>
-                    </div>
-                  </div>
-                ),
-              )
+              messages.map((msg) => <KojoMessageRow key={msg.id} msg={msg} />)
             )}
 
             {isLoading && (

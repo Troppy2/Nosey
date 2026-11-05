@@ -427,7 +427,16 @@ function CodeBlock({ lang, src, enableCopy }: { lang: string; src: string; enabl
 
 // ── Block parser ──────────────────────────────────────────────────────────────
 
-export function MarkdownContent({ content, enableCodeCopy = false }: { content: string; enableCodeCopy?: boolean }) {
+// Memoized: parsing + KaTeX is the expensive part of every chat render, and
+// both props are primitives. Without it, each keystroke in a chat composer and
+// each streamed token re-rendered every earlier message from scratch.
+export const MarkdownContent = React.memo(function MarkdownContent({
+  content,
+  enableCodeCopy = false,
+}: {
+  content: string;
+  enableCodeCopy?: boolean;
+}) {
   // Step 0: reflow malformed code fences onto their own lines, and swap any
   // TikZ picture (which KaTeX cannot draw) for a short note (GH #156)
   const fenced = replaceTikz(normalizeFences(content));
@@ -605,4 +614,4 @@ export function MarkdownContent({ content, enableCodeCopy = false }: { content: 
   }
 
   return <div className="kojo-markdown">{nodes}</div>;
-}
+});

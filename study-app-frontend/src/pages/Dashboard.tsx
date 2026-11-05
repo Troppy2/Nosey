@@ -10,10 +10,9 @@ import { ConfirmModal, RenameModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
 import { SkeletonFolderMiniGrid, SkeletonStatGrid, SkeletonTestRows } from "../components/Skeletons";
 import { PullToRefreshIndicator } from "../components/PullToRefreshIndicator";
-import { deleteTest, fetchFlashcardDueSummary, fetchFlashcards, fetchFolders, fetchTests, getGreetingName, getResumableTests, getStoredUser, scopeKey, updateTest } from "../lib/api";
+import { deleteTest, fetchFlashcardDueSummary, fetchFlashcards, fetchFolders, fetchTests, getGreetingName, getResumableTests, getStoredUser, isGuestSession, scopeKey, updateTest } from "../lib/api";
 import { FlashcardsDueSkeleton, ReviewTheseWidget } from "../components/ReviewTheseWidget";
 import { SettingsIcon } from "../icons";
-import { useSettings } from "../lib/useSettings";
 import { StudyPlanWidget } from "../components/StudyPlanWidget";
 import { DashboardWidgetPicker } from "../components/DashboardWidgetPicker";
 import { formatDate, formatPercent } from "../lib/format";
@@ -105,7 +104,6 @@ export default function Dashboard() {
   const [renamingTest, setRenamingTest] = useState<TestSummary | null>(null);
   const [deletingTest, setDeletingTest] = useState<TestSummary | null>(null);
   const [dismissedTestIds, setDismissedTestIds] = useState<Set<number>>(() => readCompletedTestIds());
-  const { betaMode } = useSettings();
   const [userWidgets, setUserWidgets] = useState<string[]>(() => {
     const u = getStoredUser();
     return Array.isArray(u?.dashboard_widgets) && u.dashboard_widgets.length === 2
@@ -369,7 +367,10 @@ export default function Dashboard() {
     }
   }
 
-  const widgetKeys = betaMode ? userWidgets : ["review_these", "weak_spots"];
+  // Guests cannot use study plans (backend 403s them), and without the plan
+  // widget there is only one pair left, so they get the defaults and no picker.
+  const isGuest = isGuestSession();
+  const widgetKeys = isGuest ? ["review_these", "weak_spots"] : userWidgets;
   const customizeButton = (
     <Button variant="secondary" fullWidth onClick={() => setShowCustomizeWidgets(true)} icon={<SettingsIcon size={16} />}>
       Customize widgets
@@ -601,7 +602,7 @@ export default function Dashboard() {
                     return (
                       <div key="review_these" className="dashboard-widget-stack">
                         {widget}
-                        {betaMode ? customizeButton : null}
+                        {isGuest ? null : customizeButton}
                       </div>
                     );
                   }
@@ -610,7 +611,7 @@ export default function Dashboard() {
                   return null;
                 })}
                 {/* Flashcards due hidden: keep Customize reachable at the end. */}
-                {betaMode && !widgetKeys.includes("review_these") ? (
+                {!isGuest && !widgetKeys.includes("review_these") ? (
                   <div className="dashboard-widget-stack dashboard-widget-stack--end">{customizeButton}</div>
                 ) : null}
               </aside>

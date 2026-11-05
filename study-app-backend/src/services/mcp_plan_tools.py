@@ -6,6 +6,7 @@ from typing import Any, Optional
 from pydantic import Field
 
 from src.schemas.study_plan import (
+    MAX_PLAN_ITEMS,
     StudyPlanCreateRequest,
     StudyPlanItemCreate,
     StudyPlanItemIn,
@@ -15,12 +16,12 @@ from src.services.mcp_tool_base import McpContext, McpTool, ToolArgs, ToolInputE
 from src.services.mcp_write_tools import CONFIRM_FIELD, require_confirm
 from src.services.study_plan_service import StudyPlanService
 from src.utils.exceptions import ResourceNotFoundException, ValidationException
-from src.utils.provider_policy import user_can_override_provider
 
 
-def _require_beta(ctx: McpContext) -> None:
-    if not user_can_override_provider(ctx.user):
-        raise ToolInputError("Study plans are a beta feature this account cannot use yet.")
+# Open to every connected account since 2026-11-05 (was beta-only). None of
+# these tools call an AI model: the connected app writes the plan itself.
+# Guests cannot connect at all (routes/mcp.py). Size caps come from the shared
+# schemas (MAX_PLAN_ITEMS) and StudyPlanService (MAX_PLANS_PER_USER).
 
 
 # ---------------------------------------------------------------- args
@@ -39,6 +40,7 @@ class CreateStudyPlanArgs(ToolArgs):
     is_pinned: bool = Field(default=False, description="Whether this plan should be pinned to the dashboard.")
     items: list[dict[str, Any]] = Field(
         default_factory=list,
+        max_length=MAX_PLAN_ITEMS,
         description="List of plan items: kind, label, optional target_id, optional target_count, optional due_date.",
     )
 
@@ -46,6 +48,7 @@ class CreateStudyPlanArgs(ToolArgs):
 class UpdateStudyPlanItemsArgs(ToolArgs):
     plan_id: int = Field(description="ID of the study plan to update items for.")
     items: list[dict[str, Any]] = Field(
+        max_length=MAX_PLAN_ITEMS,
         description="Complete replacement list of items: optional id, kind, label, optional target_id, optional target_count, optional due_date, optional done.",
     )
 
@@ -63,13 +66,11 @@ class DeleteStudyPlanArgs(ToolArgs):
 # ---------------------------------------------------------------- handlers
 
 async def list_study_plans(ctx: McpContext, args: ListStudyPlansArgs) -> dict[str, Any]:
-    _require_beta(ctx)
     plans = await StudyPlanService().list_plans(ctx.user.id, ctx.session)
     return {"plans": [dump(p) for p in plans]}
 
 
 async def get_study_plan(ctx: McpContext, args: GetStudyPlanArgs) -> dict[str, Any]:
-    _require_beta(ctx)
     try:
         plan = await StudyPlanService().get_plan(args.plan_id, ctx.user.id, ctx.session)
         return {"plan": dump(plan)}
@@ -78,7 +79,6 @@ async def get_study_plan(ctx: McpContext, args: GetStudyPlanArgs) -> dict[str, A
 
 
 async def create_study_plan(ctx: McpContext, args: CreateStudyPlanArgs) -> dict[str, Any]:
-    _require_beta(ctx)
     parsed_date: Optional[datetime.date] = None
     if args.exam_date:
         try:
@@ -107,7 +107,6 @@ async def create_study_plan(ctx: McpContext, args: CreateStudyPlanArgs) -> dict[
 
 
 async def update_study_plan_items(ctx: McpContext, args: UpdateStudyPlanItemsArgs) -> dict[str, Any]:
-    _require_beta(ctx)
     item_ins: list[StudyPlanItemIn] = []
     for it in args.items:
         try:
@@ -124,7 +123,6 @@ async def update_study_plan_items(ctx: McpContext, args: UpdateStudyPlanItemsArg
 
 
 async def set_plan_item_done(ctx: McpContext, args: SetPlanItemDoneArgs) -> dict[str, Any]:
-    _require_beta(ctx)
     try:
         item = await StudyPlanService().toggle_item_done(args.item_id, ctx.user.id, args.done, ctx.session)
         return {"item": dump(item)}
@@ -133,7 +131,6 @@ async def set_plan_item_done(ctx: McpContext, args: SetPlanItemDoneArgs) -> dict
 
 
 async def delete_study_plan(ctx: McpContext, args: DeleteStudyPlanArgs) -> dict[str, Any]:
-    _require_beta(ctx)
     require_confirm(args.confirm)
     try:
         await StudyPlanService().delete_plan(args.plan_id, ctx.user.id, ctx.session)

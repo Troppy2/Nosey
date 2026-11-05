@@ -47,13 +47,15 @@
   }
 }
 
+/* No blur: blurring the whole page under the panel repaints every frame while
+   the chat scrolls or streams (same lag as the study plan sheet). A slightly
+   darker scrim does the job. */
 .kojo-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(20, 28, 14, 0.45);
+  background: rgba(20, 28, 14, 0.5);
   z-index: 200;
   animation: kojo-fade-in 0.22s ease;
-  backdrop-filter: blur(2px);
 }
 
 .kojo-panel {
@@ -448,6 +450,9 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* A swipe that reaches the end of the feed stops here instead of scrolling
+     the page behind the panel. */
+  overscroll-behavior: contain;
 }
 
 

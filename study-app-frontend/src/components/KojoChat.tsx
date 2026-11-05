@@ -1,7 +1,7 @@
 import { Maximize2, Minimize2, Send } from "lucide-react";
 import { AlertIcon, ArrowDownIcon, CloseIcon, SparklesIcon, TrashIcon } from "../icons";
 import KojoMascot from "./KojoMascot";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { clearKojoConversation, fetchKojoConversation, fetchProviderStatus, isGuestSession, kojoChat, kojoChatStream } from "../lib/api";
 import type { KojoMessage, ProviderStatus } from "../lib/types";
 import { useSettings } from "../lib/useSettings";
@@ -35,6 +35,36 @@ const PROVIDER_LABELS: Record<string, string> = {
 export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
+
+// One chat bubble, shared by KojoChat and KojoHelpChat. Memoized on the message
+// object: typing in the composer or a streamed token only re-renders the bubble
+// whose message changed (streaming swaps in a new object for that one only).
+export const KojoMessageRow = memo(function KojoMessageRow({ msg }: { msg: KojoMessage }) {
+  if (msg.role === "assistant") {
+    return (
+      <div className="kojo-message kojo-message--assistant">
+        <div className="kojo-msg-avatar">
+          <KojoMascot state="idle" />
+        </div>
+        <div className="kojo-message-body">
+          <div className="kojo-message-meta">
+            <span className="kojo-message-label">Kojo</span>
+            <span className="kojo-message-time">{formatTime(msg.created_at)}</span>
+          </div>
+          <MarkdownContent content={msg.content} />
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="kojo-message kojo-message--user">
+      <div className="kojo-user-bubble">
+        <p>{msg.content}</p>
+        <span className="kojo-message-time kojo-message-time--user">{formatTime(msg.created_at)}</span>
+      </div>
+    </div>
+  );
+});
 
 export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
   const [messages, setMessages] = useState<KojoMessage[]>([]);
@@ -305,29 +335,7 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
                 </div>
               </div>
             ) : (
-              messages.map((msg) =>
-                msg.role === "assistant" ? (
-                  <div key={msg.id} className="kojo-message kojo-message--assistant">
-                    <div className="kojo-msg-avatar">
-                      <KojoMascot state="idle" />
-                    </div>
-                    <div className="kojo-message-body">
-                      <div className="kojo-message-meta">
-                        <span className="kojo-message-label">Kojo</span>
-                        <span className="kojo-message-time">{formatTime(msg.created_at)}</span>
-                      </div>
-                      <MarkdownContent content={msg.content} />
-                    </div>
-                  </div>
-                ) : (
-                  <div key={msg.id} className="kojo-message kojo-message--user">
-                    <div className="kojo-user-bubble">
-                      <p>{msg.content}</p>
-                      <span className="kojo-message-time kojo-message-time--user">{formatTime(msg.created_at)}</span>
-                    </div>
-                  </div>
-                ),
-              )
+              messages.map((msg) => <KojoMessageRow key={msg.id} msg={msg} />)
             )}
 
             {isLoading && (

@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.config import settings
 from src.database import get_session
 from src.dependencies import get_account_user, get_current_user
-from src.limiter import limiter
+from src.limiter import ip_key, limiter
 from src.models.user import User
 from src.services.mcp_oauth_service import (
     MCP_SCOPE,
@@ -129,7 +129,7 @@ class ClientRegistration(BaseModel):
 
 
 @router.post("/oauth/register", status_code=201)
-@limiter.limit("60/minute")
+@limiter.limit("60/minute", key_func=ip_key)
 async def register_client(
     request: Request,
     data: ClientRegistration,
@@ -162,7 +162,7 @@ async def register_client(
 # ---------------------------------------------------------------- authorize
 
 @router.get("/oauth/authorize")
-@limiter.limit("30/minute")
+@limiter.limit("30/minute", key_func=ip_key)
 async def authorize(
     request: Request,
     response_type: Optional[str] = None,
@@ -266,7 +266,7 @@ async def deny_consent_request(
 # ---------------------------------------------------------------- token + revoke
 
 @router.post("/oauth/token")
-@limiter.limit("300/minute")
+@limiter.limit("300/minute", key_func=ip_key)
 async def token(
     request: Request,
     grant_type: Optional[str] = Form(default=None),
@@ -291,7 +291,7 @@ async def token(
 
 
 @router.post("/oauth/revoke")
-@limiter.limit("300/minute")
+@limiter.limit("300/minute", key_func=ip_key)
 async def revoke(
     request: Request,
     token: Optional[str] = Form(default=None),

@@ -6,6 +6,13 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
+# SECURITY: caps so one request cannot write an unbounded plan. Every plan
+# read runs auto-completion over all its items, so a huge plan would slow
+# every dashboard load, not just the request that made it. The Kojo draft
+# clamps itself to 50 items (llm_service.generate_study_plan_draft).
+MAX_PLAN_ITEMS = 100
+MAX_TARGET_COUNT = 10_000
+
 VALID_KINDS = frozenset({
     "free_text",
     "test",
@@ -21,7 +28,7 @@ class StudyPlanItemBase(BaseModel):
     kind: str = Field(description="One of: free_text, test, module, flashcards, leetcode, system_design, mock_interview")
     label: str = Field(min_length=1, max_length=300)
     target_id: Optional[int] = None
-    target_count: Optional[int] = None
+    target_count: Optional[int] = Field(default=None, ge=0, le=MAX_TARGET_COUNT)
     due_date: Optional[date] = None
 
     @field_validator("kind")
@@ -65,7 +72,7 @@ class StudyPlanCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=120)
     exam_date: Optional[date] = None
     is_pinned: bool = False
-    items: list[StudyPlanItemCreate] = Field(default_factory=list)
+    items: list[StudyPlanItemCreate] = Field(default_factory=list, max_length=MAX_PLAN_ITEMS)
 
 
 class StudyPlanUpdateRequest(BaseModel):
@@ -75,7 +82,7 @@ class StudyPlanUpdateRequest(BaseModel):
 
 
 class StudyPlanReplaceItemsRequest(BaseModel):
-    items: list[StudyPlanItemIn] = Field(default_factory=list)
+    items: list[StudyPlanItemIn] = Field(default_factory=list, max_length=MAX_PLAN_ITEMS)
 
 
 class StudyPlanItemToggleRequest(BaseModel):

@@ -8696,7 +8696,7 @@ Rules:
         Clamp to at most 50 items.
         """
         import datetime
-        from src.schemas.study_plan import VALID_KINDS
+        from src.schemas.study_plan import MAX_TARGET_COUNT, VALID_KINDS
 
         clean_dump = dump_text[:6000]
         compact_catalog = catalog_items[:200]
@@ -8793,6 +8793,9 @@ Respond with raw valid JSON only:
                     target_count = int(target_count) if (target_count is not None and kind == "flashcards") else None
                 except (ValueError, TypeError):
                     target_count = None
+                if target_count is not None:
+                    # Same bounds as the schema, so a wild model number cannot fail validation.
+                    target_count = max(0, min(target_count, MAX_TARGET_COUNT))
 
                 due_date: Optional[str] = None
                 raw_due = raw_it.get("due_date")

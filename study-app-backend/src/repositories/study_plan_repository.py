@@ -27,6 +27,10 @@ class StudyPlanRepository(BaseRepository[StudyPlan]):
         result = await self.session.execute(stmt)
         return [(row[0], int(row[1] or 0), int(row[2] or 0)) for row in result.all()]
 
+    async def count_for_user(self, user_id: int) -> int:
+        stmt = select(func.count(StudyPlan.id)).where(StudyPlan.user_id == user_id)
+        return int(await self.session.scalar(stmt) or 0)
+
     async def get_for_user(self, plan_id: int, user_id: int) -> Optional[StudyPlan]:
         stmt = (
             select(StudyPlan)

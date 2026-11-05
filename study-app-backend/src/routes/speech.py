@@ -72,7 +72,7 @@ class NarrationRequest(BaseModel):
 
 
 @router.post("/tts")
-@limiter.limit("300/minute")  # coarse per-IP backstop; the real limit is per verified account
+@limiter.limit("300/minute")  # coarse per-account backstop; the real limit is the daily quota below
 async def narrate(
     request: Request,
     payload: NarrationRequest,

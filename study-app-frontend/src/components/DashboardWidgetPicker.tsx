@@ -20,7 +20,7 @@ type Props = {
   onClose: () => void;
 };
 
-// Beta-only: pick 2 sidebar widgets. They show in the order they were ticked.
+// Pick 2 sidebar widgets. They show in the order they were ticked.
 // Portalled to <body> so the backdrop covers the whole screen; inside the
 // page it is clipped by the page's own containing block.
 export function DashboardWidgetPicker({ current, onSaved, onClose }: Props) {

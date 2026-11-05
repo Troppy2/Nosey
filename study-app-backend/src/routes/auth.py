@@ -20,7 +20,7 @@ from src.schemas.auth_schema import (
 )
 from src.services.auth_service import AuthService
 from src.services.rag_service import HybridRAGService
-from src.limiter import limiter
+from src.limiter import ip_key, limiter
 from src.services.account_safety_service import (
     SUSPENDED_MESSAGE,
     add_deletion_tombstone,
@@ -37,7 +37,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/google", response_model=AuthResponse)
-@limiter.limit("10/minute")
+@limiter.limit("10/minute", key_func=ip_key)
 async def google_auth(
     request: Request,
     response: Response,
@@ -68,7 +68,7 @@ async def google_auth(
 @router.post("/guest", response_model=AuthResponse)
 # Guests are usage-limited per account and per device; the hourly cap is the
 # backstop against scripts that mint guest accounts with fresh device ids.
-@limiter.limit("5/minute;30/hour")
+@limiter.limit("5/minute;30/hour", key_func=ip_key)
 async def guest_auth(
     request: Request,
     response: Response,

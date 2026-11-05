@@ -405,33 +405,39 @@ async def test_draft_sanitizing_and_clamping():
 
 # ---------------------------------------------------------------- Gating & HTTP tests
 
-async def test_non_beta_user_forbidden(db_session_maker):
+async def test_regular_user_can_use_study_plans(db_session_maker):
+    """Ungated 2026-11-05: a plain account reaches every non-AI route."""
     async with db_session_maker() as session:
         user = await _create_user(session, "regular@test.com", is_beta=False, is_admin=False)
+        from src.database import get_session
         from src.dependencies import get_current_user
 
         async def override_get_current_user():
             return user
 
+        async def override_get_session():
+            yield session
+
         app.dependency_overrides[get_current_user] = override_get_current_user
+        app.dependency_overrides[get_session] = override_get_session
+        try:
+            async with AsyncClient(app=app, base_url="http://test") as ac:
+                r = await ac.get("/study-plans")
+                assert r.status_code == 200
 
-        async with AsyncClient(app=app, base_url="http://test") as ac:
-            r = await ac.get("/study-plans")
-            assert r.status_code == 403
+                r_pinned = await ac.get("/study-plans/pinned")
+                assert r_pinned.status_code == 200
 
-            r_pinned = await ac.get("/study-plans/pinned")
-            assert r_pinned.status_code == 403
+                r_create = await ac.post("/study-plans", json={"title": "Plan", "items": []})
+                assert r_create.status_code == 201
 
-            r_draft = await ac.post("/study-plans/draft", json={"text": "Study plan"})
-            assert r_draft.status_code == 403
-
-            r_dash = await ac.patch(
-                "/users/me/dashboard-widgets",
-                json={"widgets": ["review_these", "study_plan"]},
-            )
-            assert r_dash.status_code == 403
-
-        app.dependency_overrides.clear()
+                r_dash = await ac.patch(
+                    "/users/me/dashboard-widgets",
+                    json={"widgets": ["review_these", "study_plan"]},
+                )
+                assert r_dash.status_code == 200
+        finally:
+            app.dependency_overrides.clear()
 
 
 async def test_beta_user_endpoints_and_widgets(db_session_maker):
@@ -491,14 +497,14 @@ async def test_beta_user_endpoints_and_widgets(db_session_maker):
 
 # ---------------------------------------------------------------- MCP plan tools tests
 
-async def test_mcp_plan_tools_gating_and_crud(db_session_maker):
+async def test_mcp_plan_tools_crud(db_session_maker):
     async with db_session_maker() as session:
         reg_user = await _create_user(session, "reg_mcp@test.com", is_beta=False)
         beta_user = await _create_user(session, "beta_mcp@test.com", is_beta=True)
 
+        # Ungated 2026-11-05: a non-beta connected account can use the tools.
         reg_ctx = McpContext(user=reg_user, session=session)
-        with pytest.raises(ToolInputError):
-            await list_study_plans(reg_ctx, ListStudyPlansArgs())
+        assert (await list_study_plans(reg_ctx, ListStudyPlansArgs()))["plans"] == []
 
         beta_ctx = McpContext(user=beta_user, session=session)
         created = await create_study_plan(

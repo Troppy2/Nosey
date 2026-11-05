@@ -21,7 +21,7 @@ import "../styles/components/study-plan-widget.css";
 const STRIP_DAYS = 7;
 const LIST_LIMIT = 5;
 
-// Beta dashboard widget for the pinned plan. It answers "what do I do today":
+// Dashboard widget for the pinned plan. It answers "what do I do today":
 // a countdown to the exam, a week strip of how much is planned per day, and
 // the selected day's items. Everything else lives in StudyPlanModal.
 export function StudyPlanWidget() {
