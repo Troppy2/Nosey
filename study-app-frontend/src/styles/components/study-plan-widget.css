@@ -1,76 +1,390 @@
-/* Dashboard sidebar widget. Shares row styles with study-plan-modal.css. */
+/* Dashboard study plan widget. The countdown numeral is the one loud thing;
+   the week strip and list stay quiet so "what's due today" reads first. */
 
 .study-plan-widget {
   display: grid;
+  align-content: start;
   gap: 12px;
+  min-width: 0;
 }
 
-.plan-widget-open {
+.spw-open {
   padding: 0;
   border: 0;
   background: none;
   cursor: pointer;
 }
 
-.plan-widget {
+.spw {
   display: grid;
-  gap: 10px;
-  padding: 16px 18px;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px 18px 14px;
   border: 1px solid var(--green-light-mid);
   border-radius: var(--radius-md);
   background: var(--white);
 }
 
-.plan-widget-head {
-  display: grid;
-  gap: 2px;
-  padding: 0;
-  border: 0;
-  background: none;
-  text-align: left;
-  cursor: pointer;
-}
-
-.plan-widget-title {
-  font-family: var(--font-serif);
-  font-size: var(--text-lg);
-  font-weight: 700;
-  color: var(--ink);
-  overflow-wrap: anywhere;
-}
-
-.plan-widget-head:hover .plan-widget-title {
-  text-decoration: underline;
-  text-decoration-color: var(--green-light-mid);
-}
-
-.plan-widget-sub {
-  color: var(--muted);
-  font-size: var(--text-sm);
-}
-
-.plan-widget .plan-row {
-  min-height: 44px;
-  padding: 6px 0;
-}
-
-.plan-widget .plan-row-main {
-  flex-basis: 160px;
-}
-
-.plan-widget-loading {
+.spw-loading,
+.spw-empty {
   display: grid;
   gap: 10px;
 }
 
-.plan-widget-empty {
-  display: grid;
+.spw-empty {
   justify-items: start;
   gap: 12px;
 }
 
-.plan-widget-empty p {
+.spw-empty p {
   margin: 0;
   color: var(--muted);
   line-height: 1.5;
+}
+
+/* Countdown */
+.spw-hero {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.spw-hero:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.spw-count {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.spw-count-num {
+  font-family: var(--font-serif);
+  font-size: 3rem;
+  font-weight: 700;
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.spw-count-word {
+  font-size: var(--text-3xl);
+  color: var(--accent-caution-strong);
+}
+
+.spw-count-unit {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.spw-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: var(--ink);
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.spw-hero:hover .spw-title {
+  text-decoration: underline;
+  text-decoration-color: var(--green-light-mid);
+  text-underline-offset: 3px;
+}
+
+.spw-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.spw-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--green-lightest);
+  box-shadow: inset 0 0 0 1px var(--green-light);
+  overflow: hidden;
+}
+
+.spw-bar span {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  border-radius: inherit;
+  background: var(--green-dark);
+  transition: width var(--transition-normal);
+}
+
+.spw-progress-text {
+  flex: none;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Week strip */
+.spw-strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.spw-day {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 6px 0 7px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.spw-day:hover {
+  background: var(--green-lightest);
+}
+
+.spw-day:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 1px;
+}
+
+.spw-day-name {
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.spw-day-num {
+  color: var(--ink);
+  font-size: var(--text-base);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.spw-day-load {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 12px;
+}
+
+.spw-day-load i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--green-dark);
+}
+
+.spw-day-load.is-late i {
+  background: var(--accent-caution);
+}
+
+.spw-day-exam {
+  color: var(--accent-caution-strong);
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.spw-day.is-today {
+  border-color: var(--green-light-mid);
+}
+
+.spw-day.is-exam {
+  border-style: dashed;
+  border-color: var(--accent-caution);
+}
+
+.spw-day.is-selected {
+  border-color: var(--green-dark);
+  background: var(--green-dark);
+  color: var(--green-lightest);
+}
+
+.spw-day.is-selected .spw-day-num {
+  color: var(--white);
+}
+
+.spw-day.is-selected .spw-day-load i {
+  background: var(--white);
+}
+
+.spw-day.is-selected .spw-day-exam {
+  color: var(--white);
+}
+
+.spw-day.is-clear .spw-day-load::before {
+  content: "";
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg) translate(1px, -1px);
+  color: var(--green-dark);
+}
+
+.spw-day.is-selected.is-clear .spw-day-load::before {
+  color: var(--white);
+}
+
+/* Day list */
+.spw-list-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--green-light);
+}
+
+.spw-list-head h3 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  color: var(--ink);
+}
+
+.spw-left {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.spw-none {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.spw-list {
+  display: grid;
+  margin: -4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.spw-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 0;
+}
+
+.spw-row + .spw-row {
+  border-top: 1px solid var(--green-lightest);
+}
+
+.spw-row-main {
+  display: flex;
+  align-items: flex-start;
+  flex: 1;
+  gap: 12px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+/* Row-scoped so it beats .checkbox-input (16px) and the mobile shell's
+   rounded-input rule, which turned the box into a circle on phones. */
+.spw-row .spw-check {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 1px 0 0;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+.spw-row-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.spw-row-label {
+  color: var(--ink);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.spw-row.is-done .spw-row-label {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--green-mid);
+}
+
+.spw-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.spw-late {
+  color: var(--accent-caution-strong);
+  font-weight: 700;
+}
+
+.spw-start {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.spw-start:hover {
+  background: var(--green-light);
+  color: var(--ink);
+}
+
+.spw-start:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 1px;
+}
+
+.spw-more {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spw-bar span {
+    transition: none;
+  }
 }
