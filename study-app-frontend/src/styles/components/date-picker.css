@@ -33,6 +33,53 @@
   white-space: nowrap;
 }
 
+/* Chip trigger: a small inline date for list rows. */
+.date-picker:has(> .date-picker-chip) {
+  width: auto;
+}
+
+.date-picker-chip {
+  gap: 5px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.date-picker-chip .date-picker-value {
+  flex: none;
+}
+
+/* Icon-only chip (display=""): a square hit area. */
+.date-picker-chip .date-picker-value:empty {
+  display: none;
+}
+
+.date-picker-chip:has(.date-picker-value:empty) {
+  justify-content: center;
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+}
+
+.date-picker-chip:hover:not(:disabled),
+.date-picker-chip[aria-expanded="true"] {
+  border-color: var(--green-light-mid);
+  background: var(--white);
+  color: var(--ink);
+}
+
+.date-picker-chip:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 1px;
+}
+
 /* Panel: portalled calendar popover. */
 .date-picker-panel {
   position: fixed;

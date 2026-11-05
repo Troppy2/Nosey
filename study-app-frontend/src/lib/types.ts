@@ -1299,6 +1299,8 @@ export type StudyPlanItem = {
   done_at?: string | null;
   done_source?: "manual" | "auto" | null;
   progress?: string | null;
+  /** Folder of a linked test or module, for building its link. */
+  target_folder_id?: ID | null;
   created_at: string;
 };
 

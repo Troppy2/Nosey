@@ -23,6 +23,10 @@ export type DatePickerProps = {
   placeholder?: string;
   disabled?: boolean;
   id?: string;
+  /** "chip" is a small inline trigger for list rows; "field" (default) looks like an input. */
+  variant?: "field" | "chip";
+  /** Trigger text in place of the formatted date (e.g. "Tomorrow"). */
+  display?: string;
 };
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -65,6 +69,8 @@ export function DatePicker({
   placeholder,
   disabled,
   id,
+  variant = "field",
+  display,
 }: DatePickerProps) {
   const [open, setOpen] = useState(false);
   const [rawViewMonth, setRawViewMonth] = useState(
@@ -331,11 +337,11 @@ export function DatePicker({
       ref={triggerRef}
       id={id}
       type="button"
-      className={`date-picker-trigger input${!triggerValue ? " is-placeholder" : ""}`}
+      className={`date-picker-trigger ${variant === "chip" ? "date-picker-chip" : "input"}${!triggerValue ? " is-placeholder" : ""}`}
       aria-haspopup="grid"
       aria-expanded={open}
       aria-controls={open ? `${baseId}-panel` : undefined}
-      aria-label={label}
+      aria-label={triggerValue ? `${label}: ${triggerValue}` : label}
       disabled={disabled}
       onClick={() => {
         if (open) {
@@ -346,8 +352,8 @@ export function DatePicker({
         }
       }}
     >
-      <CalendarIcon size={16} className="date-picker-icon" aria-hidden="true" />
-      <span className="date-picker-value">{triggerValue ?? placeholder ?? "Pick a date"}</span>
+      <CalendarIcon size={variant === "chip" ? 14 : 16} className="date-picker-icon" aria-hidden="true" />
+      <span className="date-picker-value">{display ?? triggerValue ?? placeholder ?? "Pick a date"}</span>
     </button>
   );
 
