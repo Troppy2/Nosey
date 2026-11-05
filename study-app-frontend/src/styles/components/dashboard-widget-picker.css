@@ -58,3 +58,23 @@
 .dashboard-layout > aside > .widget-customize-row {
   margin-bottom: -20px;
 }
+
+/* Single-column dashboard (tablet and phone): widgets hold today's work
+   (study plan, due cards), so they come before Folders instead of after
+   Recent Tests. Tablet gets them side by side rather than as 970px slabs. */
+@media (max-width: 1100px) {
+  .dashboard-layout > aside {
+    order: -1;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1100px) {
+  .dashboard-layout > aside {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 24px;
+  }
+
+  .dashboard-layout > aside > .widget-customize-row {
+    grid-column: 1 / -1;
+  }
+}
