@@ -1,82 +1,104 @@
 import { Link } from "react-router-dom";
 import { BrainIcon } from "../icons";
 import { Button } from "./Button";
-import { Card } from "./Card";
 import { EmptyState } from "./EmptyState";
 import { MarkdownContent } from "./MarkdownContent";
-import { SkeletonWeakStack } from "./Skeletons";
+import { Skeleton } from "./Skeletons";
 import type { FlashcardDueSummary } from "../lib/types";
+import "../styles/components/flashcards-due-widget.css";
 
 interface ReviewTheseWidgetProps {
   // undefined while the parent is still loading, null when the fetch failed.
   summary: FlashcardDueSummary | null | undefined;
+  onRetry?: () => void;
 }
 
-export function ReviewTheseWidget({ summary }: ReviewTheseWidgetProps) {
+const dueLink = (folderId: number) => `/flashcards/${folderId}/review?due=1`;
+const cards = (n: number) => `${n} card${n === 1 ? "" : "s"}`;
+
+// Dashboard widget for flashcards that are due. One deck preview, one clear
+// action that starts a due-only session, and the other folders below it.
+export function ReviewTheseWidget({ summary, onRetry }: ReviewTheseWidgetProps) {
   const loading = summary === undefined;
   const failed = summary === null;
-  const topFolder = summary?.folders[0] ?? null;
-  const hasDue = !!summary && summary.total_due > 0;
+  const folders = summary?.folders.filter((f) => f.due > 0) ?? [];
+  const top = folders[0] ?? null;
+  const next = top ? summary?.cards.find((c) => c.folder_id === top.folder_id) ?? null : null;
+  const depth = Math.min(top?.due ?? 0, 3);
+  const hasDue = !!summary && summary.total_due > 0 && top != null;
 
   return (
-    <div className="review-these-widget">
+    <div className="review-these-widget fcd">
       <div className="section-title">
-        <h2>Review These</h2>
+        <h2>Flashcards due</h2>
         {hasDue ? (
-          <span className="muted small">
-            {summary.total_due} card{summary.total_due === 1 ? "" : "s"} due
-          </span>
+          <span className="muted small">{cards(summary.total_due)}</span>
         ) : (
           <Link className="text-link" to="/flashcards">
-            Study
+            All flashcards
           </Link>
         )}
       </div>
 
-      {loading ? <SkeletonWeakStack count={2} /> : null}
-      {failed ? (
-        <p className="muted small">Couldn't load your due cards right now.</p>
-      ) : null}
-      {summary && !hasDue ? (
+      {loading ? (
+        <div className="fcd-panel" role="status" aria-label="Loading due flashcards">
+          <Skeleton width="100%" height="5.5rem" />
+          <Skeleton width="100%" height="2.75rem" />
+        </div>
+      ) : failed ? (
+        <div className="fcd-panel fcd-failed">
+          <p>Couldn't load your due cards.</p>
+          {onRetry ? (
+            <Button variant="secondary" onClick={onRetry}>
+              Try again
+            </Button>
+          ) : null}
+        </div>
+      ) : !hasDue ? (
         <EmptyState
           icon={<BrainIcon />}
-          title="All caught up!"
-          body="All caught up on flashcards for now."
+          title="All caught up"
+          body="No flashcards are due right now."
           action={
             <Link to="/flashcards">
-              <Button variant="secondary">Go to Flashcards</Button>
+              <Button variant="secondary">Go to flashcards</Button>
             </Link>
           }
         />
-      ) : null}
-      {summary && hasDue ? (
-        <>
-          <div className="weak-stack">
-            {summary.cards.map((card) => (
-              <Link
-                key={card.id}
-                to={`/flashcards/${card.folder_id}/review?card=${card.id}`}
-                className="weak-card-link"
-              >
-                <Card tone="dark" interactive className="weak-card">
-                  <span className="pill dark-pill">{card.folder_name}</span>
-                  {/* role=heading rather than <h3>: MarkdownContent
-                      emits block elements, which are not valid inside
-                      a heading element. */}
-                  <div role="heading" aria-level={3} className="weak-card-front">
-                    <MarkdownContent content={card.front} />
-                  </div>
-                </Card>
-              </Link>
-            ))}
-          </div>
-          {topFolder ? (
-            <Link to={`/flashcards/${topFolder.folder_id}/review`} className="text-link weak-stack-cta">
-              Review due cards
-            </Link>
+      ) : (
+        <div className="fcd-panel">
+          <Link to={dueLink(top.folder_id)} className="fcd-deck" data-depth={depth} aria-label={`Review ${cards(top.due)} from ${top.name}`}>
+            <span className="fcd-card">
+              <span className="fcd-folder">{top.name}</span>
+              {next ? (
+                <span className="fcd-front">
+                  <MarkdownContent content={next.front} />
+                </span>
+              ) : null}
+            </span>
+          </Link>
+
+          <Link to={dueLink(top.folder_id)} className="button button-secondary button-full fcd-cta">
+            <span>Review {cards(top.due)}</span>
+          </Link>
+
+          {folders.length > 1 ? (
+            <div className="fcd-more">
+              <h3>Also due</h3>
+              <ul>
+                {folders.slice(1).map((folder) => (
+                  <li key={folder.folder_id}>
+                    <Link to={dueLink(folder.folder_id)}>
+                      <span className="fcd-more-name">{folder.name}</span>
+                      <span className="fcd-more-count">{folder.due}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ) : null}
-        </>
-      ) : null}
+        </div>
+      )}
     </div>
   );
 }

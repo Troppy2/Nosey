@@ -51,8 +51,13 @@ export default function Flashcards() {
   const { folderId } = useParams();
   const [searchParams] = useSearchParams();
   const cardParam = searchParams.get("card");
+  // ?due=1 (from the dashboard) reviews only the cards that are due, so the
+  // session size matches the "N cards due" the widget showed.
+  const dueOnly = searchParams.get("due") === "1";
   const initialFolderId = folderId ? Number(folderId) : null;
   const [cards, setCards] = useState<Flashcard[]>([]);
+  // The folder's full deck, kept for "delete all" when the session is due-only.
+  const folderCardsRef = useRef<Flashcard[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(initialFolderId);
   const [queue, setQueue] = useState<Flashcard[]>([]);
@@ -239,7 +244,10 @@ export default function Flashcards() {
 
     setLoadingCards(true);
     fetchFlashcards(selectedFolderId)
-      .then((data) => {
+      .then((all) => {
+        const due = dueOnly ? all.filter((c) => c.is_due) : [];
+        const data = due.length ? due : all;
+        folderCardsRef.current = all;
         setCards(data);
         setSessionSize(data.length);
         setClearedCardIds(new Set());
@@ -258,7 +266,7 @@ export default function Flashcards() {
         setQueue(data);
       })
       .finally(() => setLoadingCards(false));
-  }, [selectedFolderId, cardParam]);
+  }, [selectedFolderId, cardParam, dueOnly]);
 
   const selectedFolder = folders.find((folder) => folder.id === selectedFolderId) ?? null;
   const progress = sessionSize ? (clearedCardIds.size / sessionSize) * 100 : 0;
@@ -279,7 +287,10 @@ export default function Flashcards() {
     setDeletingAll(true);
     setActionError(null);
     try {
-      await Promise.all(cards.map((card) => deleteFlashcard(card.folder_id, card.id)));
+      // Every card in the folder, not just this session's (a due-only session holds a subset).
+      const everyCard = folderCardsRef.current.length ? folderCardsRef.current : cards;
+      await Promise.all(everyCard.map((card) => deleteFlashcard(card.folder_id, card.id)));
+      folderCardsRef.current = [];
       setCards([]);
       setQueue([]);
       setSessionSize(0);
