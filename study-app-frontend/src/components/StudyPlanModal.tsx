@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "./Button";
 import { ConfirmModal } from "./ConfirmModal";
 import { DatePicker } from "./DatePicker";
 import { ToggleSwitch } from "./ToggleSwitch";
 import { Dropdown, type DropdownOption } from "./Dropdown";
 import KojoMascot from "./KojoMascot";
-import { CheckIcon, ChevronDownIcon, ChevronUpIcon, CloseIcon, PencilIcon, PlusIcon, SparklesIcon, TrashIcon } from "../icons";
+import { ArrowLeftIcon, CheckIcon, CloseIcon, PlayIcon, PlusIcon, SettingsIcon, SparklesIcon, TrashIcon } from "../icons";
 import {
   createStudyPlan,
   deleteStudyPlan,
@@ -14,22 +15,12 @@ import {
   fetchStudyPlansCatalog,
   generateStudyPlanDraft,
   replaceStudyPlanItems,
-  toggleStudyPlanItem,
   updateStudyPlan,
 } from "../lib/api";
 import { toast } from "../lib/toast";
+import { examCountdown, groupByDay, itemHref, KIND_LABEL, shortDay, todayString, type DayGroup } from "../lib/studyPlan";
 import type { CatalogResponse, StudyPlanDetail, StudyPlanItem, StudyPlanItemInput, StudyPlanItemKind, StudyPlanSummary } from "../lib/types";
 import "../styles/components/study-plan-modal.css";
-
-const KIND_LABEL: Record<StudyPlanItemKind, string> = {
-  free_text: "Task",
-  test: "Test",
-  module: "Module",
-  flashcards: "Flashcards",
-  leetcode: "KojoCode",
-  system_design: "System design",
-  mock_interview: "Mock interview",
-};
 
 const CATALOG_KEY: Partial<Record<StudyPlanItemKind, keyof CatalogResponse>> = {
   test: "tests",
@@ -44,32 +35,7 @@ const KIND_OPTIONS: DropdownOption<StudyPlanItemKind>[] = (Object.keys(KIND_LABE
   (kind) => ({ value: kind, label: KIND_LABEL[kind] }),
 );
 
-type Draft = { id?: number; title: string; exam_date: string; items: StudyPlanItemInput[] };
-type View = "list" | "edit" | "new";
-
-export function todayString(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-}
-
-export function examCountdown(date: string): string {
-  const days = Math.round((new Date(`${date}T00:00:00`).getTime() - new Date(`${todayString()}T00:00:00`).getTime()) / 86_400_000);
-  if (days < 0) return `Exam was ${-days}d ago`;
-  if (days === 0) return "Exam today";
-  if (days === 1) return "Exam tomorrow";
-  return `Exam in ${days} days`;
-}
-
-function toDraft(plan: StudyPlanDetail): Draft {
-  return {
-    id: plan.id,
-    title: plan.title,
-    exam_date: plan.exam_date ?? "",
-    items: plan.items.map(({ id, kind, label, target_id, target_count, due_date, done }) => ({
-      id, kind, label, target_id, target_count, due_date, done,
-    })),
-  };
-}
+type View = "plan" | "new" | "settings";
 
 type Props = {
   initialPlanId: number | null;
@@ -78,13 +44,25 @@ type Props = {
   onChanged: () => void;
 };
 
+// The full study plan, grouped by day. Every edit (tick, rename, reschedule,
+// remove, add) saves on its own through one queue, so there is no edit mode.
 export function StudyPlanModal({ initialPlanId, onClose, onChanged }: Props) {
   const [plans, setPlans] = useState<StudyPlanSummary[]>([]);
   const [plan, setPlan] = useState<StudyPlanDetail | null>(null);
-  const [view, setView] = useState<View>(initialPlanId ? "list" : "new");
+  const [view, setView] = useState<View>(initialPlanId ? "plan" : "new");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [draft, setDraft] = useState<Draft | null>(null);
+  const [composerDate, setComposerDate] = useState("");
+  const composerInputRef = useRef<HTMLInputElement>(null);
+
+  // Save queue. Saves run one at a time with the newest local items, so two
+  // quick edits never race. New rows carry a negative temp id until the
+  // server answers; `idMap` maps those to real ids for the next save.
+  const queueRef = useRef<Promise<void>>(Promise.resolve());
+  const versionRef = useRef(0);
+  const itemsRef = useRef<StudyPlanItem[]>([]);
+  const idMap = useRef(new Map<number, number>());
+  const tempId = useRef(-1);
 
   async function load(planId: number | null) {
     setLoading(true);
@@ -92,8 +70,10 @@ export function StudyPlanModal({ initialPlanId, onClose, onChanged }: Props) {
       const list = await fetchStudyPlans();
       setPlans(list);
       const id = planId ?? list.find((p) => p.is_pinned)?.id ?? list[0]?.id ?? null;
-      setPlan(id ? await fetchStudyPlan(id) : null);
-      if (!id) setView("new");
+      const detail = id ? await fetchStudyPlan(id) : null;
+      setPlan(detail);
+      itemsRef.current = detail?.items ?? [];
+      if (!detail) setView("new");
     } catch {
       toast.error("Couldn't load your study plans.");
     } finally {
@@ -115,104 +95,195 @@ export function StudyPlanModal({ initialPlanId, onClose, onChanged }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [busy, onClose]);
 
-  async function toggle(item: StudyPlanItem) {
+  function commit(next: StudyPlanItem[]) {
     if (!plan) return;
-    const swap = (next: StudyPlanItem) =>
-      setPlan((p) => (p ? { ...p, items: p.items.map((it) => (it.id === item.id ? next : it)) } : p));
-    swap({ ...item, done: !item.done, done_source: "manual" });
-    try {
-      swap(await toggleStudyPlanItem(item.id, !item.done));
-      onChanged();
-    } catch {
-      swap(item);
-      toast.error("Couldn't save that. Try again.");
-    }
+    const planId = plan.id;
+    const previous = itemsRef.current;
+    itemsRef.current = next;
+    setPlan((p) => (p ? { ...p, items: next } : p));
+    const version = ++versionRef.current;
+
+    queueRef.current = queueRef.current.then(async () => {
+      const sending = itemsRef.current;
+      const payload: StudyPlanItemInput[] = sending.map((it) => {
+        const id = it.id > 0 ? it.id : idMap.current.get(it.id);
+        return {
+          ...(id ? { id } : {}),
+          kind: it.kind,
+          label: it.label,
+          target_id: it.target_id ?? null,
+          target_count: it.target_count ?? null,
+          due_date: it.due_date ?? null,
+          done: it.done,
+        };
+      });
+      try {
+        const saved = await replaceStudyPlanItems(planId, payload);
+        const ordered = [...saved.items].sort((a, b) => a.position - b.position);
+        sending.forEach((it, i) => {
+          if (it.id < 0 && ordered[i]) idMap.current.set(it.id, ordered[i].id);
+        });
+        if (version === versionRef.current) {
+          itemsRef.current = saved.items;
+          setPlan((p) => (p && p.id === saved.id ? saved : p));
+        }
+        onChanged();
+      } catch {
+        if (version === versionRef.current) {
+          itemsRef.current = previous;
+          setPlan((p) => (p && p.id === planId ? { ...p, items: previous } : p));
+        }
+        toast.error("Couldn't save that change. Try again.");
+      }
+    });
   }
 
-  async function togglePin() {
+  const update = (id: number, patch: Partial<StudyPlanItem>) =>
+    commit(itemsRef.current.map((it) => (it.id === id ? { ...it, ...patch } : it)));
+
+  function toggle(item: StudyPlanItem) {
+    update(item.id, { done: !item.done, done_source: "manual" });
+  }
+
+  function remove(item: StudyPlanItem) {
+    const before = itemsRef.current;
+    commit(before.filter((it) => it.id !== item.id));
+    toast.success("Removed from plan", item.label, {
+      label: "Undo",
+      onClick: () => {
+        const without = itemsRef.current;
+        const at = Math.min(before.findIndex((it) => it.id === item.id), without.length);
+        commit([...without.slice(0, at), { ...item, id: tempId.current-- }, ...without.slice(at)]);
+      },
+    });
+  }
+
+  function add(input: Omit<StudyPlanItemInput, "id">) {
     if (!plan) return;
-    setBusy(true);
+    const items = itemsRef.current;
+    const position = items.reduce((max, it) => Math.max(max, it.position), -1) + 1;
+    commit([
+      ...items,
+      {
+        id: tempId.current--,
+        plan_id: plan.id,
+        position,
+        kind: input.kind,
+        label: input.label,
+        target_id: input.target_id ?? null,
+        target_count: input.target_count ?? null,
+        due_date: input.due_date ?? null,
+        done: false,
+        created_at: new Date().toISOString(),
+      },
+    ]);
+  }
+
+  async function switchPlan(id: number) {
+    await queueRef.current;
+    idMap.current.clear();
+    setView("plan");
+    await load(id);
+  }
+
+  async function savePlanFields(body: { title?: string; exam_date?: string | null; is_pinned?: boolean }) {
+    if (!plan) return;
+    setPlan({ ...plan, ...body });
     try {
-      setPlan(await updateStudyPlan(plan.id, { is_pinned: !plan.is_pinned }));
+      const saved = await updateStudyPlan(plan.id, body);
+      setPlan((p) => (p && p.id === saved.id ? { ...saved, items: p.items } : p));
       setPlans(await fetchStudyPlans());
       onChanged();
-    } finally {
-      setBusy(false);
+    } catch {
+      toast.error("Couldn't save the plan. Try again.");
+      void load(plan.id);
     }
   }
 
-  async function remove() {
+  async function removePlan() {
     if (!plan) return;
     setBusy(true);
     try {
+      await queueRef.current;
       await deleteStudyPlan(plan.id);
       toast.success("Plan deleted");
       onChanged();
+      setView("plan");
       await load(null);
-      setView((v) => (v === "edit" ? "list" : v));
+    } catch {
+      toast.error("Couldn't delete the plan. Try again.");
     } finally {
       setBusy(false);
     }
   }
 
-  async function save(next: Draft) {
-    if (!next.title.trim()) {
-      toast.error("Give the plan a name.");
-      return;
-    }
-    setBusy(true);
-    try {
-      const body = { title: next.title.trim(), exam_date: next.exam_date || null };
-      let saved: StudyPlanDetail;
-      if (next.id) {
-        await updateStudyPlan(next.id, body);
-        saved = await replaceStudyPlanItems(next.id, next.items);
-      } else {
-        saved = await createStudyPlan({ ...body, is_pinned: plans.length === 0, items: next.items });
-      }
-      toast.success("Plan saved");
-      onChanged();
-      setDraft(null);
-      setView("list");
-      await load(saved.id);
-    } catch {
-      toast.error("Couldn't save the plan. Try again.");
-    } finally {
-      setBusy(false);
-    }
+  function addToDay(date: string | null) {
+    setComposerDate(date ?? "");
+    composerInputRef.current?.focus();
   }
 
   const titleId = "study-plan-modal-title";
-  const done = plan?.items.filter((it) => it.done).length ?? 0;
-  const total = plan?.items.length ?? 0;
+  const items = plan?.items ?? [];
+  const done = items.filter((it) => it.done).length;
+  const total = items.length;
 
   return (
     <div className="modal-backdrop" onMouseDown={() => !busy && onClose()}>
       <div
-        className="modal-card plan-modal"
+        className={`modal-card plan-modal plan-modal--${view}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <header className="plan-modal-head">
-          {view === "list" && plan && plans.length > 1 ? (
-            <Dropdown
-              bare
-              label="Switch plan"
-              className="plan-modal-switch"
-              value={String(plan.id)}
-              options={plans.map((p) => ({ value: String(p.id), label: p.title }))}
-              onChange={(id) => void load(Number(id))}
-            />
-          ) : (
-            <h2 id={titleId} className="plan-modal-title">
-              {view === "new" || (view === "edit" && !draft?.id) ? "New study plan" : view === "edit" ? "Edit plan" : plan?.title ?? "Study plan"}
-            </h2>
-          )}
-          <button type="button" className="plan-icon-btn" onClick={onClose} aria-label="Close" disabled={busy}>
-            <CloseIcon size={18} />
-          </button>
+        <header className="plan-modal-top">
+          <div className="plan-modal-head">
+            {view !== "plan" && plan ? (
+              <button type="button" className="plan-icon-btn" onClick={() => setView("plan")} aria-label="Back to plan">
+                <ArrowLeftIcon size={18} />
+              </button>
+            ) : null}
+            {view === "plan" && plan && plans.length > 1 ? (
+              <Dropdown
+                bare
+                id={titleId}
+                label="Switch plan"
+                className="plan-modal-switch"
+                value={String(plan.id)}
+                options={plans.map((p) => ({ value: String(p.id), label: p.title }))}
+                onChange={(id) => void switchPlan(Number(id))}
+              />
+            ) : (
+              <h2 id={titleId} className="plan-modal-title">
+                {view === "new" ? "New study plan" : view === "settings" ? "Plan settings" : plan?.title ?? "Study plan"}
+              </h2>
+            )}
+            {view === "plan" && plan ? (
+              <>
+                <button type="button" className="plan-icon-btn" onClick={() => setView("new")} aria-label="New plan" title="New plan">
+                  <PlusIcon size={18} />
+                </button>
+                <button type="button" className="plan-icon-btn" onClick={() => setView("settings")} aria-label="Plan settings" title="Plan settings">
+                  <SettingsIcon size={18} />
+                </button>
+              </>
+            ) : null}
+            <button type="button" className="plan-icon-btn" onClick={onClose} aria-label="Close" disabled={busy}>
+              <CloseIcon size={18} />
+            </button>
+          </div>
+
+          {view === "plan" && plan ? (
+            <div className="plan-modal-meta">
+              {plan.exam_date ? <span className="plan-countdown">{examCountdown(plan.exam_date)}</span> : null}
+              <span className="plan-progress" aria-hidden="true">
+                <span style={{ width: total ? `${(done / total) * 100}%` : 0 }} />
+              </span>
+              <span className="plan-done-count">
+                {done} of {total} done
+              </span>
+            </div>
+          ) : null}
         </header>
 
         {loading ? (
@@ -223,70 +294,38 @@ export function StudyPlanModal({ initialPlanId, onClose, onChanged }: Props) {
           <NewPlan
             busy={busy}
             setBusy={setBusy}
-            onBlank={() => {
-              setDraft({ title: "", exam_date: "", items: [] });
-              setView("edit");
+            isFirst={plans.length === 0}
+            onCreated={(created) => {
+              onChanged();
+              idMap.current.clear();
+              setView("plan");
+              void load(created.id);
             }}
-            onDraft={(d) => {
-              setDraft({ title: d.title, exam_date: d.exam_date ?? "", items: d.items });
-              setView("edit");
-            }}
-            onCancel={plan ? () => setView("list") : undefined}
+            onCancel={plan ? () => setView("plan") : undefined}
           />
-        ) : view === "edit" && draft ? (
-          <PlanEditor
-            draft={draft}
-            busy={busy}
-            onChange={setDraft}
-            onSave={() => void save(draft)}
-            onCancel={() => {
-              setDraft(null);
-              setView(plan ? "list" : "new");
-            }}
-            onDelete={draft.id ? () => void remove() : undefined}
-          />
+        ) : view === "settings" && plan ? (
+          <PlanSettings plan={plan} busy={busy} onSave={(body) => void savePlanFields(body)} onDelete={() => void removePlan()} />
         ) : plan ? (
           <>
-            <div className="plan-modal-meta">
-              {plan.exam_date ? <span className="plan-countdown">{examCountdown(plan.exam_date)}</span> : null}
-              <span className="muted small">{done} of {total} done</span>
-              <ToggleSwitch
-                className="plan-pin"
-                checked={plan.is_pinned}
-                label="Show on dashboard"
-                onClick={() => void togglePin()}
-                disabled={busy}
-              />
+            <div className="plan-body">
+              {total === 0 ? (
+                <p className="plan-empty">Nothing on this plan yet. Add the first thing below.</p>
+              ) : (
+                groupByDay(items).map((group) => (
+                  <DaySection
+                    key={group.key}
+                    group={group}
+                    onToggle={toggle}
+                    onRename={(item, label) => update(item.id, { label })}
+                    onReschedule={(item, date) => update(item.id, { due_date: date || null })}
+                    onRemove={remove}
+                    onAddHere={group.key === "overdue" ? undefined : () => addToDay(group.date)}
+                    onNavigate={onClose}
+                  />
+                ))
+              )}
             </div>
-            <div className="plan-progress" aria-hidden="true">
-              <span style={{ width: total ? `${(done / total) * 100}%` : 0 }} />
-            </div>
-
-            {total === 0 ? (
-              <p className="plan-empty">Nothing on this plan yet. Edit it to add tests, modules, flashcards or tasks.</p>
-            ) : (
-              <ul className="plan-checklist">
-                {plan.items.map((item) => (
-                  <PlanRow key={item.id} item={item} onToggle={() => void toggle(item)} />
-                ))}
-              </ul>
-            )}
-
-            <footer className="button-row plan-modal-foot">
-              <Button variant="secondary" onClick={() => setView("new")} icon={<PlusIcon size={15} />}>
-                New plan
-              </Button>
-              <span className="plan-foot-spacer" />
-              <Button
-                variant="primary"
-                onClick={() => {
-                  setDraft(toDraft(plan));
-                  setView("edit");
-                }}
-               icon={<PencilIcon size={15} />}>
-                Edit plan
-              </Button>
-            </footer>
+            <Composer inputRef={composerInputRef} date={composerDate} onDateChange={setComposerDate} onAdd={add} />
           </>
         ) : null}
       </div>
@@ -294,55 +333,373 @@ export function StudyPlanModal({ initialPlanId, onClose, onChanged }: Props) {
   );
 }
 
-function PlanRow({ item, onToggle }: { item: StudyPlanItem; onToggle: () => void }) {
+function DaySection({
+  group,
+  onToggle,
+  onRename,
+  onReschedule,
+  onRemove,
+  onAddHere,
+  onNavigate,
+}: {
+  group: DayGroup;
+  onToggle: (item: StudyPlanItem) => void;
+  onRename: (item: StudyPlanItem, label: string) => void;
+  onReschedule: (item: StudyPlanItem, date: string) => void;
+  onRemove: (item: StudyPlanItem) => void;
+  onAddHere?: () => void;
+  onNavigate: () => void;
+}) {
   const today = todayString();
-  const overdue = !item.done && item.due_date && item.due_date < today;
+  const finishedPast = group.open.length === 0 && group.date != null && group.date < today;
+  const [showDone, setShowDone] = useState(false);
+  const headingId = `plan-day-${group.key}`;
+  const row = (item: StudyPlanItem) => (
+    <PlanRow
+      key={item.id}
+      item={item}
+      showDate={group.date == null}
+      onToggle={() => onToggle(item)}
+      onRename={(label) => onRename(item, label)}
+      onReschedule={(date) => onReschedule(item, date)}
+      onRemove={() => onRemove(item)}
+      onNavigate={onNavigate}
+    />
+  );
+
+  return (
+    <section className={`plan-day${group.key === "overdue" ? " is-overdue" : ""}${finishedPast ? " is-past" : ""}`} aria-labelledby={headingId}>
+      <div className="plan-day-head">
+        <h3 id={headingId}>{group.title}</h3>
+        <span className="plan-day-count">
+          {group.open.length ? `${group.open.length} left` : "All done"}
+        </span>
+        {onAddHere ? (
+          <button type="button" className="plan-day-add" onClick={onAddHere} aria-label={`Add to ${group.title}`}>
+            <PlusIcon size={16} />
+          </button>
+        ) : null}
+      </div>
+      {group.open.length ? <ul className="plan-checklist">{group.open.map(row)}</ul> : null}
+      {group.done.length ? (
+        <>
+          <button type="button" className="plan-done-toggle" aria-expanded={showDone} onClick={() => setShowDone((s) => !s)}>
+            <CheckIcon size={14} />
+            {group.done.length} done
+          </button>
+          {showDone ? <ul className="plan-checklist">{group.done.map(row)}</ul> : null}
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+function PlanRow({
+  item,
+  onToggle,
+  onRename,
+  onReschedule,
+  onRemove,
+  onNavigate,
+  showDate,
+}: {
+  item: StudyPlanItem;
+  /** False under a day heading, where the chip would only repeat it. */
+  showDate: boolean;
+  onToggle: () => void;
+  onRename: (label: string) => void;
+  onReschedule: (date: string) => void;
+  onRemove: () => void;
+  onNavigate: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(item.label);
+  const today = todayString();
+  const overdue = !item.done && item.due_date != null && item.due_date < today;
+  const href = item.done ? null : itemHref(item);
+  const saving = item.id < 0;
+
+  function finish(save: boolean) {
+    setEditing(false);
+    const next = text.trim();
+    if (save && next && next !== item.label) onRename(next);
+    else setText(item.label);
+  }
+
   return (
     <li className={`plan-row${item.done ? " is-done" : ""}`}>
-      <label className="plan-row-main">
-        <input type="checkbox" className="checkbox-input plan-check" checked={item.done} onChange={onToggle} />
-        <span className="plan-row-label">{item.label}</span>
-      </label>
-      <span className="plan-row-meta">
-        {item.kind !== "free_text" ? <span className="pill plan-pill">{KIND_LABEL[item.kind]}</span> : null}
-        {item.progress ? <span className="pill plan-pill">{item.progress}</span> : null}
-        {item.done && item.done_source === "auto" ? (
-          <span className="plan-stamp">
-            <CheckIcon size={12} />
-            Done in Nosey
-          </span>
+      <input
+        type="checkbox"
+        className="checkbox-input plan-check"
+        checked={item.done}
+        disabled={saving}
+        onChange={onToggle}
+        aria-label={item.done ? `Mark "${item.label}" not done` : `Mark "${item.label}" done`}
+      />
+      <div className="plan-row-body">
+        {editing ? (
+          <input
+            className="input plan-row-edit"
+            value={text}
+            maxLength={300}
+            autoFocus
+            aria-label="Item name"
+            onChange={(e) => setText(e.target.value)}
+            onBlur={() => finish(true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") finish(true);
+              if (e.key === "Escape") {
+                e.preventDefault();
+                finish(false);
+              }
+            }}
+          />
+        ) : (
+          <button type="button" className="plan-row-label" onClick={() => setEditing(true)} title="Rename">
+            {item.label}
+          </button>
+        )}
+      </div>
+      {item.kind !== "free_text" || item.progress || overdue || item.done_source === "auto" ? (
+        <span className="plan-row-meta">
+          {overdue ? <span className="plan-late">Overdue</span> : null}
+          {item.kind !== "free_text" ? <span>{KIND_LABEL[item.kind]}</span> : null}
+          {item.progress ? <span>{item.progress} cards</span> : null}
+          {item.done && item.done_source === "auto" ? (
+            <span className="plan-stamp">
+              <CheckIcon size={12} />
+              Done in Nosey
+            </span>
+          ) : null}
+        </span>
+      ) : null}
+      <div className="plan-row-tools">
+        {href ? (
+          <Link className="plan-start" to={href} onClick={onNavigate} aria-label={`Start ${item.label}`}>
+            <PlayIcon size={14} />
+            Start
+          </Link>
         ) : null}
-        {!item.done && item.due_date ? (
-          <span className={`plan-due${overdue ? " is-overdue" : ""}`}>
-            {overdue ? "Overdue" : item.due_date === today ? "Due today" : `Due ${item.due_date.slice(5).replace("-", "/")}`}
-          </span>
-        ) : null}
-      </span>
+        <DatePicker
+          variant="chip"
+          label={showDate ? "Due date" : "Move to another day"}
+          value={item.due_date ?? ""}
+          display={!showDate ? "" : item.due_date ? shortDay(item.due_date, today) : "No date"}
+          onChange={onReschedule}
+          disabled={saving}
+        />
+        <button type="button" className="plan-icon-btn plan-icon-btn--danger" onClick={onRemove} disabled={saving} aria-label={`Remove ${item.label}`}>
+          <TrashIcon size={16} />
+        </button>
+      </div>
     </li>
+  );
+}
+
+function Composer({
+  inputRef,
+  date,
+  onDateChange,
+  onAdd,
+}: {
+  inputRef: RefObject<HTMLInputElement>;
+  date: string;
+  onDateChange: (date: string) => void;
+  onAdd: (input: Omit<StudyPlanItemInput, "id">) => void;
+}) {
+  const [catalog, setCatalog] = useState<CatalogResponse | null>(null);
+  const [kind, setKind] = useState<StudyPlanItemKind>("free_text");
+  const [label, setLabel] = useState("");
+  const [targetId, setTargetId] = useState("");
+  const [count, setCount] = useState("");
+
+  useEffect(() => {
+    fetchStudyPlansCatalog().then(setCatalog).catch(() => setCatalog(null));
+  }, []);
+
+  const catalogKey = CATALOG_KEY[kind];
+  const options = (catalogKey && catalog ? catalog[catalogKey] : []).map((it) => ({ value: String(it.id), label: it.title }));
+  const linked = kind !== "free_text";
+  const noun = KIND_LABEL[kind].toLowerCase();
+  const canAdd = linked ? Boolean(targetId) : Boolean(label.trim());
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!canAdd) return;
+    onAdd({
+      kind,
+      label: linked ? options.find((o) => o.value === targetId)?.label ?? "" : label.trim(),
+      target_id: linked ? Number(targetId) : null,
+      target_count: kind === "flashcards" && count ? Number(count) : null,
+      due_date: date || null,
+    });
+    setLabel("");
+    setTargetId("");
+    setCount("");
+    inputRef.current?.focus();
+  }
+
+  return (
+    <form className="plan-composer" onSubmit={submit} aria-label="Add to plan">
+      <Dropdown
+        bare
+        label="Type"
+        className="input plan-composer-kind"
+        value={kind}
+        options={KIND_OPTIONS}
+        onChange={(k) => {
+          setKind(k);
+          setTargetId("");
+        }}
+      />
+      <div className="plan-composer-main">
+        {linked ? (
+          <Dropdown
+            bare
+            label={KIND_LABEL[kind]}
+            className="input plan-composer-target"
+            value={targetId}
+            placeholder={options.length ? `Pick a ${noun}` : `No ${noun}s yet`}
+            options={options}
+            disabled={!options.length}
+            onChange={setTargetId}
+          />
+        ) : (
+          <input
+            ref={inputRef}
+            className="input"
+            value={label}
+            maxLength={300}
+            placeholder="Add a task, like Reread chapter 4"
+            aria-label="Task"
+            onChange={(e) => setLabel(e.target.value)}
+          />
+        )}
+      </div>
+      {kind === "flashcards" ? (
+        <input
+          className="input plan-composer-count"
+          type="number"
+          min={1}
+          value={count}
+          placeholder="Cards"
+          aria-label="Number of cards"
+          onChange={(e) => setCount(e.target.value)}
+        />
+      ) : null}
+      <DatePicker variant="chip" label="Due date" value={date} display={date ? shortDay(date) : "No date"} onChange={onDateChange} />
+      <Button type="submit" variant="primary" disabled={!canAdd} icon={<PlusIcon size={16} />}>
+        Add
+      </Button>
+    </form>
+  );
+}
+
+function PlanSettings({
+  plan,
+  busy,
+  onSave,
+  onDelete,
+}: {
+  plan: StudyPlanDetail;
+  busy: boolean;
+  onSave: (body: { title?: string; exam_date?: string | null; is_pinned?: boolean }) => void;
+  onDelete: () => void;
+}) {
+  const [title, setTitle] = useState(plan.title);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  return (
+    <div className="plan-settings">
+      <label className="field">
+        <span className="field-label">Plan name</span>
+        <input
+          className="input"
+          value={title}
+          maxLength={120}
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={() => {
+            const next = title.trim();
+            if (next && next !== plan.title) onSave({ title: next });
+            else setTitle(plan.title);
+          }}
+          onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+        />
+      </label>
+      <div className="field">
+        <span className="field-label">Exam date</span>
+        <DatePicker
+          label="Exam date"
+          value={plan.exam_date ?? ""}
+          onChange={(v) => onSave({ exam_date: v || null })}
+          placeholder="No exam date"
+        />
+      </div>
+      <div className="plan-settings-row">
+        <ToggleSwitch
+          checked={plan.is_pinned}
+          label="Show on dashboard"
+          onClick={() => onSave({ is_pinned: !plan.is_pinned })}
+          disabled={busy}
+        />
+        <p className="muted small">One plan shows on the dashboard at a time.</p>
+      </div>
+
+      <div className="plan-settings-danger">
+        <Button variant="danger-outline" onClick={() => setConfirmDelete(true)} disabled={busy} icon={<TrashIcon size={16} />}>
+          Delete plan
+        </Button>
+      </div>
+
+      {confirmDelete ? (
+        <ConfirmModal
+          title="Delete this plan?"
+          message={`"${plan.title}" and its checklist will be removed. This can't be undone.`}
+          confirmLabel="Delete plan"
+          danger
+          busy={busy}
+          busyLabel="Deleting"
+          onConfirm={() => {
+            setConfirmDelete(false);
+            onDelete();
+          }}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      ) : null}
+    </div>
   );
 }
 
 function NewPlan({
   busy,
   setBusy,
-  onBlank,
-  onDraft,
+  isFirst,
+  onCreated,
   onCancel,
 }: {
   busy: boolean;
   setBusy: (b: boolean) => void;
-  onBlank: () => void;
-  onDraft: (d: { title: string; exam_date?: string | null; items: StudyPlanItemInput[] }) => void;
+  isFirst: boolean;
+  onCreated: (plan: StudyPlanDetail) => void;
   onCancel?: () => void;
 }) {
+  const [title, setTitle] = useState("");
+  const [examDate, setExamDate] = useState("");
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  async function generate() {
+  async function create(withKojo: boolean) {
     setBusy(true);
     setError(null);
     try {
-      onDraft(await generateStudyPlanDraft(text));
+      const draft = withKojo ? await generateStudyPlanDraft(text) : null;
+      const created = await createStudyPlan({
+        title: title.trim() || draft?.title || "New study plan",
+        exam_date: examDate || draft?.exam_date || null,
+        is_pinned: isFirst,
+        items: draft?.items ?? [],
+      });
+      onCreated(created);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kojo couldn't make a plan. Try again.");
     } finally {
@@ -361,24 +718,35 @@ function NewPlan({
 
   return (
     <div className="plan-new">
-      <label className="field-label" htmlFor="plan-dump">What do you need to get done?</label>
-      <textarea
-        id="plan-dump"
-        className="input plan-dump"
-        rows={6}
-        value={text}
-        maxLength={6000}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="Bio midterm next Friday. Retake practice test 2, finish the photosynthesis module, review 30 cell bio flashcards, reread chapter 4."
-      />
+      <div className="plan-new-fields">
+        <label className="field">
+          <span className="field-label">Plan name</span>
+          <input className="input" value={title} maxLength={120} placeholder="Bio midterm" onChange={(e) => setTitle(e.target.value)} />
+        </label>
+        <div className="field">
+          <span className="field-label">Exam date</span>
+          <DatePicker label="Exam date" value={examDate} onChange={setExamDate} min={todayString()} placeholder="Pick a date" />
+        </div>
+      </div>
+      <label className="field">
+        <span className="field-label">What do you need to get done?</span>
+        <textarea
+          className="input plan-dump"
+          rows={6}
+          value={text}
+          maxLength={6000}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Retake practice test 2, finish the photosynthesis module, review 30 cell bio flashcards, reread chapter 4."
+        />
+      </label>
       {error ? (
         <p className="plan-error" role="alert">
           {error}
         </p>
       ) : null}
       <div className="button-row plan-modal-foot">
-        <Button variant="ghost" onClick={onBlank}>
-          Start blank instead
+        <Button variant="ghost" onClick={() => void create(false)}>
+          Start blank
         </Button>
         <span className="plan-foot-spacer" />
         {onCancel ? (
@@ -386,244 +754,10 @@ function NewPlan({
             Cancel
           </Button>
         ) : null}
-        <Button variant="primary" disabled={!text.trim()} onClick={() => void generate()} icon={<SparklesIcon size={15} />}>
+        <Button variant="primary" disabled={!text.trim()} onClick={() => void create(true)} icon={<SparklesIcon size={15} />}>
           Make my plan
         </Button>
       </div>
-    </div>
-  );
-}
-
-function PlanEditor({
-  draft,
-  busy,
-  onChange,
-  onSave,
-  onCancel,
-  onDelete,
-}: {
-  draft: Draft;
-  busy: boolean;
-  onChange: (d: Draft) => void;
-  onSave: () => void;
-  onCancel: () => void;
-  onDelete?: () => void;
-}) {
-  const [catalog, setCatalog] = useState<CatalogResponse | null>(null);
-  const [kind, setKind] = useState<StudyPlanItemKind>("free_text");
-  const [label, setLabel] = useState("");
-  const [targetId, setTargetId] = useState("");
-  const [count, setCount] = useState("");
-  const [due, setDue] = useState("");
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
-  useEffect(() => {
-    fetchStudyPlansCatalog().then(setCatalog).catch(() => setCatalog(null));
-  }, []);
-
-  const catalogKey = CATALOG_KEY[kind];
-  const options = (catalogKey && catalog ? catalog[catalogKey] : []).map((it) => ({
-    value: String(it.id),
-    label: it.title,
-  }));
-  const items = draft.items;
-  const setItems = (next: StudyPlanItemInput[]) => onChange({ ...draft, items: next });
-  const noun = KIND_LABEL[kind].toLowerCase();
-  const canAdd = kind === "free_text" ? Boolean(label.trim()) : Boolean(targetId);
-
-  function move(i: number, by: number) {
-    const next = [...items];
-    [next[i], next[i + by]] = [next[i + by], next[i]];
-    setItems(next);
-  }
-
-  function add() {
-    if (!canAdd) return;
-    const linked = kind !== "free_text";
-    const name = linked ? options.find((o) => o.value === targetId)?.label ?? "" : label.trim();
-    setItems([
-      ...items,
-      {
-        kind,
-        label: name,
-        target_id: linked ? Number(targetId) : null,
-        target_count: kind === "flashcards" && count ? Number(count) : null,
-        due_date: due || null,
-      },
-    ]);
-    setLabel("");
-    setTargetId("");
-    setCount("");
-    setDue("");
-  }
-
-  return (
-    <div className="plan-editor">
-      <div className="plan-editor-meta">
-        <label className="field">
-          <span className="field-label">Plan name</span>
-          <input
-            className="input"
-            value={draft.title}
-            maxLength={120}
-            placeholder="Bio midterm"
-            onChange={(e) => onChange({ ...draft, title: e.target.value })}
-          />
-        </label>
-        <label className="field">
-          <span className="field-label">Exam date</span>
-          <DatePicker
-            label="Exam date"
-            value={draft.exam_date}
-            onChange={(v) => onChange({ ...draft, exam_date: v })}
-            min={todayString()}
-            placeholder="Pick a date"
-          />
-        </label>
-      </div>
-
-      <section className="plan-editor-section" aria-labelledby="plan-items-heading">
-        <h3 id="plan-items-heading" className="plan-section-title">
-          Checklist <span className="muted">{items.length}</span>
-        </h3>
-        {items.length ? (
-          <ol className="plan-edit-list">
-            {items.map((it, i) => (
-              <li key={it.id ?? `new-${i}`} className="plan-edit-row">
-                <span className="plan-edit-index">{i + 1}</span>
-                <span className="plan-edit-body">
-                  <span className="plan-row-label">{it.label}</span>
-                  <span className="plan-row-meta">
-                    <span className="pill plan-pill">{KIND_LABEL[it.kind]}</span>
-                    {it.target_count ? <span className="pill plan-pill">{it.target_count} cards</span> : null}
-                    {it.due_date ? <span className="plan-due">Due {it.due_date.slice(5).replace("-", "/")}</span> : null}
-                  </span>
-                </span>
-                <span className="plan-row-tools">
-                  <button type="button" className="plan-icon-btn" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up">
-                    <ChevronUpIcon size={18} />
-                  </button>
-                  <button
-                    type="button"
-                    className="plan-icon-btn"
-                    disabled={i === items.length - 1}
-                    onClick={() => move(i, 1)}
-                    aria-label="Move down"
-                  >
-                    <ChevronDownIcon size={18} />
-                  </button>
-                  <button
-                    type="button"
-                    className="plan-icon-btn plan-icon-btn--danger"
-                    onClick={() => setItems(items.filter((_, j) => j !== i))}
-                    aria-label={`Remove ${it.label}`}
-                  >
-                    <TrashIcon size={18} />
-                  </button>
-                </span>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className="plan-empty">Nothing on the checklist yet. Add the first item below.</p>
-        )}
-      </section>
-
-      <section className="plan-add" aria-labelledby="plan-add-heading">
-        <h3 id="plan-add-heading" className="plan-section-title">Add an item</h3>
-        <div className="plan-add-grid">
-          <Dropdown
-            label="Type"
-            value={kind}
-            options={KIND_OPTIONS}
-            onChange={(k) => {
-              setKind(k);
-              setTargetId("");
-            }}
-          />
-          {kind === "free_text" ? (
-            <label className="field plan-add-main">
-              <span className="field-label">Task</span>
-              <input
-                className="input"
-                value={label}
-                placeholder="Reread chapter 4"
-                onChange={(e) => setLabel(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && add()}
-              />
-            </label>
-          ) : (
-            <div className="plan-add-main">
-              <Dropdown
-                label={KIND_LABEL[kind]}
-                value={targetId}
-                placeholder={options.length ? `Pick a ${noun}` : `No ${noun}s yet`}
-                options={options}
-                disabled={!options.length}
-                onChange={setTargetId}
-              />
-            </div>
-          )}
-          {kind === "flashcards" ? (
-            <label className="field">
-              <span className="field-label">Cards</span>
-              <input
-                className="input"
-                type="number"
-                min={1}
-                value={count}
-                placeholder="30"
-                onChange={(e) => setCount(e.target.value)}
-              />
-            </label>
-          ) : null}
-          <label className="field">
-            <span className="field-label">Due (optional)</span>
-            <DatePicker
-              label="Due date"
-              value={due}
-              onChange={setDue}
-              placeholder="Pick a date"
-            />
-          </label>
-        </div>
-        <div className="plan-add-actions">
-          <Button variant="secondary" onClick={add} disabled={!canAdd} icon={<PlusIcon size={16} />}>
-            Add to checklist
-          </Button>
-        </div>
-      </section>
-
-      <div className="button-row plan-modal-foot">
-        {onDelete ? (
-          <Button variant="danger-outline" onClick={() => setConfirmDelete(true)} disabled={busy}>
-            Delete plan
-          </Button>
-        ) : null}
-        <span className="plan-foot-spacer" />
-        <Button variant="secondary" onClick={onCancel} disabled={busy}>
-          Cancel
-        </Button>
-        <Button variant="primary" onClick={onSave} disabled={busy || !draft.title.trim()}>
-          {busy ? "Saving..." : "Save plan"}
-        </Button>
-      </div>
-
-      {confirmDelete && onDelete ? (
-        <ConfirmModal
-          title="Delete this plan?"
-          message={`"${draft.title || "This plan"}" and its checklist will be removed. This can't be undone.`}
-          confirmLabel="Delete plan"
-          danger
-          busy={busy}
-          busyLabel="Deleting"
-          onConfirm={() => {
-            setConfirmDelete(false);
-            onDelete();
-          }}
-          onCancel={() => setConfirmDelete(false)}
-        />
-      ) : null}
     </div>
   );
 }

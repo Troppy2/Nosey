@@ -1,23 +1,42 @@
-/* Study plan modal: a paper checklist. Rows sit on hairlines, the checkbox
-   and progress bar carry the state; no cards inside the card. */
+/* Study plan modal: the plan as days. Header and the add bar stay put, the
+   day list scrolls between them. One fixed height for every view so the
+   card does not jump when switching between plan, new and settings. */
 
 .modal-card.plan-modal {
   width: min(820px, 100%);
-  max-height: min(90dvh, 900px);
-  gap: 18px;
-  padding: 28px 32px 24px;
+  height: min(760px, 90dvh);
+  gap: 0;
+  padding: 0;
   overflow: hidden;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+/* Short forms (new plan, settings) size to their content. */
+.modal-card.plan-modal--new,
+.modal-card.plan-modal--settings {
+  height: auto;
+  max-height: min(760px, 90dvh);
   grid-template-rows: auto minmax(0, 1fr);
 }
 
-.plan-modal > :not(.plan-modal-head) {
-  min-height: 0;
+.plan-modal > * {
+  min-width: 0;
+}
+
+/* Top: title row + meta. Never shrinks, so the meta row cannot collapse. */
+.plan-modal-top {
+  display: grid;
+  gap: 12px;
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid var(--green-light);
 }
 
 .plan-modal-head {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 4px;
+  min-width: 0;
 }
 
 .plan-modal-title {
@@ -30,17 +49,54 @@
   overflow-wrap: anywhere;
 }
 
-.plan-modal-switch {
-  flex: 1;
+/* Plan switcher: reads as the title with a chevron, not a form field. */
+.dropdown-trigger.plan-modal-switch {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 1 auto;
+  gap: 6px;
   min-width: 0;
+  margin-left: -8px;
+  margin-right: auto;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dropdown-trigger.plan-modal-switch .dropdown-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropdown-trigger.plan-modal-switch .dropdown-chevron {
+  flex: none;
+  color: var(--green-dark);
+}
+
+.dropdown-trigger.plan-modal-switch:hover:not(:disabled) {
+  background: var(--white);
+}
+
+.dropdown-trigger.plan-modal-switch:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 0;
 }
 
 .plan-icon-btn {
   display: inline-grid;
   place-items: center;
   flex: none;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border: 0;
   border-radius: var(--radius-sm);
   background: none;
@@ -49,7 +105,13 @@
 }
 
 .plan-icon-btn:hover:not(:disabled) {
-  background: var(--green-lightest);
+  background: var(--white);
+  color: var(--ink);
+}
+
+.plan-icon-btn:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: -2px;
 }
 
 .plan-icon-btn:disabled {
@@ -57,148 +119,262 @@
   cursor: default;
 }
 
+.plan-icon-btn--danger:hover:not(:disabled) {
+  background: var(--accent-danger-tint);
+  color: var(--accent-danger-strong);
+}
+
 /* Close button: a subtle turn of the X on hover so it reads as an action. */
 .plan-icon-btn:hover:not(:disabled) .icon-close .icon-part-x {
   transform: rotate(90deg);
 }
 
-.plan-modal-loading {
-  display: grid;
-  place-items: center;
-  gap: 12px;
-  padding: 48px 0;
-  color: var(--green-dark);
-  font-weight: 500;
-}
-
-/* Meta line + progress */
 .plan-modal-meta {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 14px;
+  gap: 12px;
+  min-width: 0;
 }
 
 .plan-countdown {
-  color: var(--ink);
-  font-weight: 600;
+  flex: none;
+  color: var(--accent-caution-strong);
+  font-weight: 700;
 }
 
-
-
 .plan-progress {
-  height: 4px;
+  flex: 1;
+  min-width: 48px;
+  height: 6px;
   border-radius: var(--radius-pill);
-  background: var(--green-light);
+  background: var(--white);
+  box-shadow: inset 0 0 0 1px var(--green-light);
   overflow: hidden;
 }
 
 .plan-progress span {
   display: block;
   height: 100%;
+  border-radius: inherit;
   background: var(--green-dark);
   transition: width var(--transition-normal);
 }
 
-/* Checklist rows */
+.plan-done-count {
+  flex: none;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-modal-loading {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  padding: 48px 0;
+  color: var(--green-dark);
+  font-weight: 500;
+}
+
+/* Day list */
+.plan-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 24px 16px;
+}
+
+.plan-empty {
+  margin: 24px 0;
+  color: var(--muted);
+}
+
+.plan-day {
+  padding-bottom: 6px;
+}
+
+.plan-day-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  margin: 0 -24px;
+  padding: 10px 24px 6px;
+  background: var(--green-lightest);
+}
+
+.plan-day-head h3 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  color: var(--ink);
+}
+
+.plan-day.is-overdue .plan-day-head h3 {
+  color: var(--accent-caution-strong);
+}
+
+.plan-day.is-past .plan-day-head h3 {
+  color: var(--muted);
+}
+
+.plan-day-count {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.plan-day-add {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-left: auto;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--green-dark);
+  cursor: pointer;
+}
+
+.plan-day-add:hover {
+  background: var(--white);
+  color: var(--ink);
+}
+
+.plan-day-add:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: -2px;
+}
+
 .plan-checklist {
   margin: 0;
   padding: 0;
   list-style: none;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  border: 1px solid var(--green-light);
+  border-radius: var(--radius-md);
+  background: var(--white);
 }
 
+/* Grid so the meta line can share a line with the tools on phones. */
 .plan-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  min-height: 56px;
-  padding: 10px 4px;
-  border-bottom: 1px solid var(--green-light);
-}
-
-.plan-row:last-child {
-  border-bottom: 0;
-}
-
-.plan-row-main {
-  display: flex;
-  align-items: center;
-  flex: 1 1 260px;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "check body tools"
+    ". meta tools";
+  align-items: start;
+  column-gap: 12px;
   min-width: 0;
-  cursor: pointer;
+  min-height: 52px;
+  padding: 8px 8px 8px 14px;
 }
 
-.plan-check {
+.plan-row .plan-check {
+  grid-area: check;
+}
+
+.plan-row-body {
+  grid-area: body;
+}
+
+.plan-row-meta {
+  grid-area: meta;
+}
+
+.plan-row-tools {
+  grid-area: tools;
+}
+
+.plan-row + .plan-row {
+  border-top: 1px solid var(--green-lightest);
+}
+
+/* Row-scoped to beat .checkbox-input and the mobile shell's rounded inputs. */
+.plan-row .plan-check {
   flex: none;
   width: 20px;
   height: 20px;
+  margin: 8px 0 0;
+  border-radius: var(--radius-xs);
   cursor: pointer;
 }
 
-.plan-pin {
-  margin-left: auto;
+.plan-row-body {
+  display: grid;
+  min-width: 0;
+  padding-top: 5px;
 }
 
 .plan-row-label {
-  flex: 1;
-  min-width: 0;
+  justify-self: start;
+  max-width: 100%;
+  margin: -2px -6px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: none;
   color: var(--ink);
+  font: inherit;
   font-size: var(--text-base);
   line-height: 1.4;
+  text-align: left;
   overflow-wrap: anywhere;
+  cursor: text;
+}
+
+.plan-row-label:hover {
+  background: var(--green-lightest);
+}
+
+.plan-row-label:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 0;
 }
 
 .plan-row.is-done .plan-row-label {
   color: var(--muted);
   text-decoration: line-through;
-  text-decoration-color: var(--green-light-mid);
+  text-decoration-color: var(--green-mid);
+}
+
+.plan-row-edit {
+  width: 100%;
+  min-height: 36px;
+  margin: -6px 0 -2px;
+  padding: 4px 8px;
 }
 
 .plan-row-meta {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
-}
-
-.plan-kind,
-.plan-due {
+  gap: 4px 10px;
   color: var(--muted);
   font-size: var(--text-xs);
   font-weight: 500;
-  white-space: nowrap;
 }
 
-.plan-kind + .plan-kind::before,
-.plan-kind + .plan-due::before,
-.plan-kind + .plan-stamp::before {
-  content: "/";
-  margin-right: 6px;
-  color: var(--green-light-mid);
+.plan-late {
+  color: var(--accent-caution-strong);
+  font-weight: 700;
 }
 
-.plan-due.is-overdue {
-  color: var(--accent-danger-strong);
-  font-weight: 600;
-}
-
-/* The one flourish: an auto-completed item gets a stamp whose tick draws in. */
+/* An auto-completed item gets a stamp whose tick draws in. */
 .plan-stamp {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
+  padding: 1px 8px;
   border: 1px solid var(--green-dark);
   border-radius: var(--radius-pill);
   color: var(--green-dark);
-  font-size: var(--text-xs);
   font-weight: 600;
   white-space: nowrap;
-  transform: rotate(-2deg);
 }
 
 .plan-stamp svg path {
@@ -213,20 +389,148 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .plan-stamp svg path {
-    animation: none;
-    stroke-dashoffset: 0;
+.plan-row-tools {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 2px;
+}
+
+.plan-start {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  margin-right: 4px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.plan-start:hover {
+  background: var(--green-light);
+  color: var(--ink);
+}
+
+.plan-start:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 1px;
+}
+
+/* Trash stays quiet until the row is pointed at or focused (always shown on touch). */
+@media (hover: hover) {
+  .plan-row .plan-icon-btn--danger {
+    opacity: 0;
   }
 
-  .plan-progress span {
-    transition: none;
+  .plan-row:hover .plan-icon-btn--danger,
+  .plan-row:focus-within .plan-icon-btn--danger {
+    opacity: 1;
   }
 }
 
-.plan-empty {
-  margin: 8px 0;
-  color: var(--muted);
+.plan-done-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  margin-top: 4px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--green-dark);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.plan-done-toggle:hover {
+  background: var(--white);
+}
+
+.plan-done-toggle:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: -2px;
+}
+
+.plan-done-toggle + .plan-checklist {
+  margin-top: 4px;
+}
+
+/* Add bar */
+.plan-composer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 24px calc(14px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--green-light);
+  background: var(--green-lightest);
+}
+
+.dropdown-trigger.plan-composer-kind {
+  flex: none;
+  width: 132px;
+}
+
+.plan-composer-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.plan-composer-main .input {
+  width: 100%;
+  min-width: 0;
+}
+
+.plan-composer-count {
+  flex: none;
+  width: 84px;
+}
+
+.plan-composer .date-picker-chip {
+  min-height: 44px;
+  border-color: var(--green-light-mid);
+  background: var(--white);
+}
+
+/* New plan + settings */
+.plan-new,
+.plan-settings {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  overflow-y: auto;
+  padding: 20px 24px 20px;
+}
+
+.plan-new-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 16px;
+}
+
+.plan-new .field,
+.plan-settings .field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.plan-new .input,
+.plan-settings .input {
+  width: 100%;
+  min-width: 0;
+}
+
+.plan-dump {
+  min-height: 140px;
+  resize: vertical;
 }
 
 .plan-error {
@@ -238,171 +542,41 @@
   font-size: var(--text-sm);
 }
 
-/* Footer */
 .plan-modal-foot {
   flex-wrap: wrap;
-  padding-top: 4px;
 }
 
 .plan-foot-spacer {
   flex: 1;
 }
 
-
-/* New plan */
-.plan-new,
-.plan-editor {
+.plan-settings-row {
   display: grid;
-  overflow-x: hidden;
-  gap: 12px;
-  align-content: start;
-  overflow-y: auto;
+  gap: 4px;
 }
 
-.plan-dump {
-  min-height: 140px;
-  resize: vertical;
-}
-
-/* Editor */
-.plan-editor {
-  gap: 22px;
-}
-
-.plan-editor-meta {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
-  gap: 16px;
-}
-
-.plan-editor .input {
-  width: 100%;
-  min-width: 0;
-}
-
-.plan-editor .field {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-}
-
-.plan-section-title {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin: 0 0 10px;
-  font-family: var(--font-serif);
-  font-size: var(--text-lg);
-  color: var(--ink);
-}
-
-.plan-section-title .muted {
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  font-weight: 500;
-}
-
-/* Checklist being edited: a bordered list, one item per row. */
-.plan-edit-list {
+.plan-settings-row p {
   margin: 0;
-  padding: 0;
-  list-style: none;
-  border: 1px solid var(--green-light-mid);
-  border-radius: var(--radius-md);
-  background: var(--white);
-  overflow: hidden;
 }
 
-.plan-edit-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-height: 64px;
-  padding: 10px 12px 10px 16px;
-}
-
-.plan-edit-row + .plan-edit-row {
+.plan-settings-danger {
+  margin-top: 8px;
+  padding-top: 16px;
   border-top: 1px solid var(--green-light);
 }
 
-.plan-edit-index {
-  display: inline-grid;
-  place-items: center;
-  flex: none;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--green-lightest);
-  color: var(--green-dark);
-  font-size: var(--text-sm);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
+@media (prefers-reduced-motion: reduce) {
+  .plan-stamp svg path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  .plan-progress span {
+    transition: none;
+  }
 }
 
-.plan-edit-body {
-  display: grid;
-  flex: 1;
-  gap: 6px;
-  min-width: 0;
-}
-
-.plan-edit-body .plan-row-label {
-  font-weight: 600;
-}
-
-.plan-pill {
-  min-height: 24px;
-  padding: 2px 10px;
-  font-size: var(--text-xs);
-  font-weight: 600;
-}
-
-.plan-row-tools {
-  display: inline-flex;
-  flex: none;
-  gap: 2px;
-}
-
-.plan-icon-btn {
-  width: 40px;
-  height: 40px;
-  color: var(--green-dark);
-}
-
-.plan-icon-btn--danger:hover:not(:disabled) {
-  background: var(--accent-danger-tint);
-  color: var(--accent-danger-strong);
-}
-
-/* Add-an-item panel */
-.plan-add {
-  padding: 18px 20px 20px;
-  border: 1px solid var(--green-light-mid);
-  border-radius: var(--radius-md);
-  background: var(--white);
-}
-
-.plan-add-grid {
-  display: grid;
-  grid-template-columns: 200px minmax(0, 1fr) 190px;
-  align-items: end;
-  gap: 14px;
-}
-
-.plan-add-grid:has(> :nth-child(4)) {
-  grid-template-columns: 180px minmax(0, 1fr) 100px 180px;
-}
-
-.plan-add-main {
-  min-width: 0;
-}
-
-.plan-add-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
-}
-
+/* Phone: a bottom sheet. Row tools drop under the label, the add bar wraps. */
 @media (max-width: 720px) {
   .modal-backdrop:has(.plan-modal) {
     align-items: flex-end;
@@ -411,90 +585,67 @@
 
   .modal-card.plan-modal {
     width: 100%;
-    max-height: 94dvh;
-    padding: 20px 16px calc(16px + env(safe-area-inset-bottom));
+    height: 94dvh;
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   }
 
-  .plan-editor-meta,
-  .plan-add-grid,
-  .plan-add-grid:has(> :nth-child(4)) {
+  .modal-card.plan-modal--new,
+  .modal-card.plan-modal--settings {
+    height: auto;
+    max-height: 94dvh;
+  }
+
+  .plan-modal-top {
+    padding: 16px 16px 12px;
+  }
+
+  .plan-body {
+    padding: 0 16px 12px;
+  }
+
+  .plan-day-head {
+    margin: 0 -16px;
+    padding: 10px 16px 6px;
+  }
+
+  .plan-row {
+    grid-template-areas:
+      "check body body"
+      ". meta tools";
+    align-items: center;
+    padding: 8px 4px 4px 12px;
+  }
+
+  .plan-row .plan-check,
+  .plan-row-body {
+    align-self: start;
+  }
+
+  .plan-composer {
+    flex-wrap: wrap;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .plan-composer-main {
+    flex-basis: 100%;
+    order: -1;
+  }
+
+  .dropdown-trigger.plan-composer-kind {
+    flex: 1;
+    width: auto;
+  }
+
+  .plan-new,
+  .plan-settings {
+    padding: 16px;
+  }
+
+  .plan-new-fields {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .plan-add-actions .button {
-    width: 100%;
+  .plan-modal-foot .button {
+    flex: 1 1 auto;
   }
-}
-
-/* Keep Save/Cancel reachable while the checklist scrolls. */
-.plan-editor > .plan-modal-foot,
-.plan-new > .plan-modal-foot {
-  position: sticky;
-  bottom: 0;
-  z-index: 1;
-  margin: 0 -4px;
-  padding: 14px 4px 0;
-  background: var(--green-lightest);
-  border-top: 1px solid var(--green-light);
-}
-
-.plan-editor {
-  padding-right: 4px;
-  scrollbar-gutter: stable;
-}
-
-/* Grid children must be allowed to shrink, or rows push past the right edge. */
-.modal-card.plan-modal {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.plan-modal > *,
-.plan-modal-meta,
-.plan-checklist,
-.plan-row {
-  min-width: 0;
-  max-width: 100%;
-}
-
-/* Plan switcher: styled like the modal title, not a form control. */
-.plan-modal-switch .dropdown-trigger {
-  background: transparent;
-  border: 0;
-  border-radius: var(--radius-sm);
-  padding: 4px 8px;
-  font-family: var(--font-serif);
-  font-size: var(--text-xl);
-  font-weight: 700;
-  color: var(--ink);
-  gap: 6px;
-  max-width: 100%;
-}
-
-.plan-modal-switch .dropdown-trigger .dropdown-chevron {
-  flex-shrink: 0;
-  color: var(--green-dark);
-  width: 18px;
-  height: 18px;
-}
-
-.plan-modal-switch .dropdown-trigger .dropdown-value {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-
-.plan-modal-switch .dropdown-trigger:hover:not(:disabled) {
-  background: var(--green-lightest);
-}
-
-.plan-modal-switch .dropdown-trigger:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--green-dark);
-  background: var(--green-lightest);
-}
-
-.plan-modal-switch .dropdown-trigger[aria-expanded="true"] {
-  box-shadow: none;
 }
