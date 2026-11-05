@@ -68,7 +68,7 @@ function push(kind: ToastKind, title: string, body?: string, action?: ToastActio
 }
 
 export const toast = {
-  success: (title: string, body?: string) => push("success", title, body),
+  success: (title: string, body?: string, action?: ToastAction) => push("success", title, body, action),
   error: (title: string, body?: string, action?: ToastAction) => push("error", title, body, action),
   info: (title: string, body?: string) => push("info", title, body),
   dismiss: dismissToast,
