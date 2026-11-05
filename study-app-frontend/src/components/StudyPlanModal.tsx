@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MutableRefObject, type RefObject } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "./Button";
 import { ConfirmModal } from "./ConfirmModal";
@@ -37,8 +37,19 @@ const KIND_OPTIONS: DropdownOption<StudyPlanItemKind>[] = (Object.keys(KIND_LABE
 
 type View = "plan" | "new" | "settings";
 
+type RowActions = {
+  toggle: (item: StudyPlanItem) => void;
+  rename: (item: StudyPlanItem, label: string) => void;
+  reschedule: (item: StudyPlanItem, date: string) => void;
+  remove: (item: StudyPlanItem) => void;
+  navigate: () => void;
+};
+type RowActionsRef = MutableRefObject<RowActions>;
+
 type Props = {
   initialPlanId: number | null;
+  /** The plan the caller already has (the widget's), so the modal opens without a spinner. */
+  initialPlan?: StudyPlanDetail | null;
   onClose: () => void;
   /** Called after any change so the dashboard widget can refetch. */
   onChanged: () => void;
@@ -46,11 +57,12 @@ type Props = {
 
 // The full study plan, grouped by day. Every edit (tick, rename, reschedule,
 // remove, add) saves on its own through one queue, so there is no edit mode.
-export function StudyPlanModal({ initialPlanId, onClose, onChanged }: Props) {
+export function StudyPlanModal({ initialPlanId, initialPlan = null, onClose, onChanged }: Props) {
+  const seeded = initialPlan && initialPlan.id === initialPlanId ? initialPlan : null;
   const [plans, setPlans] = useState<StudyPlanSummary[]>([]);
-  const [plan, setPlan] = useState<StudyPlanDetail | null>(null);
+  const [plan, setPlan] = useState<StudyPlanDetail | null>(seeded);
   const [view, setView] = useState<View>(initialPlanId ? "plan" : "new");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!seeded);
   const [busy, setBusy] = useState(false);
   const [composerDate, setComposerDate] = useState("");
   const composerInputRef = useRef<HTMLInputElement>(null);
@@ -60,19 +72,28 @@ export function StudyPlanModal({ initialPlanId, onClose, onChanged }: Props) {
   // server answers; `idMap` maps those to real ids for the next save.
   const queueRef = useRef<Promise<void>>(Promise.resolve());
   const versionRef = useRef(0);
-  const itemsRef = useRef<StudyPlanItem[]>([]);
+  const itemsRef = useRef<StudyPlanItem[]>(seeded?.items ?? []);
   const idMap = useRef(new Map<number, number>());
   const tempId = useRef(-1);
 
-  async function load(planId: number | null) {
-    setLoading(true);
+  // `quiet` refreshes behind what is already on screen (no spinner). The list
+  // and the plan load in parallel when the plan id is known.
+  async function load(planId: number | null, quiet = false) {
+    if (!quiet) setLoading(true);
+    const startVersion = versionRef.current;
     try {
-      const list = await fetchStudyPlans();
+      const [list, known] = await Promise.all([
+        fetchStudyPlans(),
+        planId ? fetchStudyPlan(planId) : Promise.resolve(null),
+      ]);
       setPlans(list);
       const id = planId ?? list.find((p) => p.is_pinned)?.id ?? list[0]?.id ?? null;
-      const detail = id ? await fetchStudyPlan(id) : null;
-      setPlan(detail);
-      itemsRef.current = detail?.items ?? [];
+      const detail = known ?? (id ? await fetchStudyPlan(id) : null);
+      // An edit made while this was loading wins over the fetched copy.
+      if (versionRef.current === startVersion) {
+        setPlan(detail);
+        itemsRef.current = detail?.items ?? [];
+      }
       if (!detail) setView("new");
     } catch {
       toast.error("Couldn't load your study plans.");
@@ -82,9 +103,20 @@ export function StudyPlanModal({ initialPlanId, onClose, onChanged }: Props) {
   }
 
   useEffect(() => {
-    void load(initialPlanId);
+    void load(initialPlanId, seeded != null);
     // Runs once per open; the modal remounts each time it opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Lock the page behind the sheet. Otherwise a swipe that reaches the end of
+  // the list scrolls the dashboard, and on phones the browser bar then
+  // resizes the sheet under your finger.
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
   }, []);
 
   useEffect(() => {
@@ -217,6 +249,20 @@ export function StudyPlanModal({ initialPlanId, onClose, onChanged }: Props) {
     }
   }
 
+  // Rows get one stable ref instead of fresh callbacks, so memoized rows skip
+  // re-rendering when a sibling changes. Synced after each render; handlers
+  // only run from events, which come after that.
+  const rowActions = useRef<RowActions>(null as unknown as RowActions);
+  useLayoutEffect(() => {
+    rowActions.current = {
+      toggle,
+      rename: (item, label) => update(item.id, { label }),
+      reschedule: (item, date) => update(item.id, { due_date: date || null }),
+      remove,
+      navigate: onClose,
+    };
+  });
+
   function addToDay(date: string | null) {
     setComposerDate(date ?? "");
     composerInputRef.current?.focus();
@@ -315,12 +361,8 @@ export function StudyPlanModal({ initialPlanId, onClose, onChanged }: Props) {
                   <DaySection
                     key={group.key}
                     group={group}
-                    onToggle={toggle}
-                    onRename={(item, label) => update(item.id, { label })}
-                    onReschedule={(item, date) => update(item.id, { due_date: date || null })}
-                    onRemove={remove}
+                    actions={rowActions}
                     onAddHere={group.key === "overdue" ? undefined : () => addToDay(group.date)}
-                    onNavigate={onClose}
                   />
                 ))
               )}
@@ -335,37 +377,18 @@ export function StudyPlanModal({ initialPlanId, onClose, onChanged }: Props) {
 
 function DaySection({
   group,
-  onToggle,
-  onRename,
-  onReschedule,
-  onRemove,
+  actions,
   onAddHere,
-  onNavigate,
 }: {
   group: DayGroup;
-  onToggle: (item: StudyPlanItem) => void;
-  onRename: (item: StudyPlanItem, label: string) => void;
-  onReschedule: (item: StudyPlanItem, date: string) => void;
-  onRemove: (item: StudyPlanItem) => void;
+  actions: RowActionsRef;
   onAddHere?: () => void;
-  onNavigate: () => void;
 }) {
   const today = todayString();
   const finishedPast = group.open.length === 0 && group.date != null && group.date < today;
   const [showDone, setShowDone] = useState(false);
   const headingId = `plan-day-${group.key}`;
-  const row = (item: StudyPlanItem) => (
-    <PlanRow
-      key={item.id}
-      item={item}
-      showDate={group.date == null}
-      onToggle={() => onToggle(item)}
-      onRename={(label) => onRename(item, label)}
-      onReschedule={(date) => onReschedule(item, date)}
-      onRemove={() => onRemove(item)}
-      onNavigate={onNavigate}
-    />
-  );
+  const row = (item: StudyPlanItem) => <PlanRow key={item.id} item={item} actions={actions} />;
 
   return (
     <section className={`plan-day${group.key === "overdue" ? " is-overdue" : ""}${finishedPast ? " is-past" : ""}`} aria-labelledby={headingId}>
@@ -394,50 +417,43 @@ function DaySection({
   );
 }
 
-function PlanRow({
-  item,
-  onToggle,
-  onRename,
-  onReschedule,
-  onRemove,
-  onNavigate,
-  showDate,
-}: {
-  item: StudyPlanItem;
-  /** False under a day heading, where the chip would only repeat it. */
-  showDate: boolean;
-  onToggle: () => void;
-  onRename: (label: string) => void;
-  onReschedule: (date: string) => void;
-  onRemove: () => void;
-  onNavigate: () => void;
-}) {
+// Rows only show what you act on every day: tick it, or start it. Renaming,
+// moving to another day and removing live in a small editor that opens when
+// the label is tapped, so a 30-item plan is not 90 icon buttons. Memoized:
+// ticking one row re-renders that row only.
+const PlanRow = memo(function PlanRow({ item, actions }: { item: StudyPlanItem; actions: RowActionsRef }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(item.label);
   const today = todayString();
   const overdue = !item.done && item.due_date != null && item.due_date < today;
   const href = item.done ? null : itemHref(item);
   const saving = item.id < 0;
+  const auto = item.done && item.done_source === "auto";
+  const hasMeta = item.kind !== "free_text" || Boolean(item.progress) || overdue || auto;
+
+  function openEditor() {
+    setText(item.label);
+    setEditing(true);
+  }
 
   function finish(save: boolean) {
     setEditing(false);
     const next = text.trim();
-    if (save && next && next !== item.label) onRename(next);
-    else setText(item.label);
+    if (save && next && next !== item.label) actions.current.rename(item, next);
   }
 
   return (
-    <li className={`plan-row${item.done ? " is-done" : ""}`}>
+    <li className={`plan-row${item.done ? " is-done" : ""}${editing ? " is-editing" : ""}`}>
       <input
         type="checkbox"
         className="checkbox-input plan-check"
         checked={item.done}
         disabled={saving}
-        onChange={onToggle}
+        onChange={() => actions.current.toggle(item)}
         aria-label={item.done ? `Mark "${item.label}" not done` : `Mark "${item.label}" done`}
       />
-      <div className="plan-row-body">
-        {editing ? (
+      {editing ? (
+        <div className="plan-row-editor">
           <input
             className="input plan-row-edit"
             value={text}
@@ -445,7 +461,6 @@ function PlanRow({
             autoFocus
             aria-label="Item name"
             onChange={(e) => setText(e.target.value)}
-            onBlur={() => finish(true)}
             onKeyDown={(e) => {
               if (e.key === "Enter") finish(true);
               if (e.key === "Escape") {
@@ -454,47 +469,49 @@ function PlanRow({
               }
             }}
           />
-        ) : (
-          <button type="button" className="plan-row-label" onClick={() => setEditing(true)} title="Rename">
-            {item.label}
-          </button>
-        )}
-      </div>
-      {item.kind !== "free_text" || item.progress || overdue || item.done_source === "auto" ? (
-        <span className="plan-row-meta">
-          {overdue ? <span className="plan-late">Overdue</span> : null}
-          {item.kind !== "free_text" ? <span>{KIND_LABEL[item.kind]}</span> : null}
-          {item.progress ? <span>{item.progress} cards</span> : null}
-          {item.done && item.done_source === "auto" ? (
-            <span className="plan-stamp">
-              <CheckIcon size={12} />
-              Done in Nosey
+          <div className="plan-row-editor-bar">
+            <DatePicker
+              label="Due date"
+              value={item.due_date ?? ""}
+              placeholder="No date"
+              onChange={(date) => actions.current.reschedule(item, date)}
+              disabled={saving}
+            />
+            <Button variant="ghost" className="plan-row-remove" onClick={() => actions.current.remove(item)} disabled={saving} icon={<TrashIcon size={16} />}>
+              Remove
+            </Button>
+            <Button variant="secondary" onClick={() => finish(true)}>
+              Done
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" className="plan-row-main" onClick={openEditor} aria-label={`Edit ${item.label}`}>
+          <span className="plan-row-label">{item.label}</span>
+          {hasMeta ? (
+            <span className="plan-row-meta">
+              {overdue ? <span className="plan-late">Overdue</span> : null}
+              {item.kind !== "free_text" ? <span>{KIND_LABEL[item.kind]}</span> : null}
+              {item.progress ? <span>{item.progress} cards</span> : null}
+              {auto ? (
+                <span className="plan-stamp">
+                  <CheckIcon size={12} />
+                  Done in Nosey
+                </span>
+              ) : null}
             </span>
           ) : null}
-        </span>
-      ) : null}
-      <div className="plan-row-tools">
-        {href ? (
-          <Link className="plan-start" to={href} onClick={onNavigate} aria-label={`Start ${item.label}`}>
-            <PlayIcon size={14} />
-            Start
-          </Link>
-        ) : null}
-        <DatePicker
-          variant="chip"
-          label={showDate ? "Due date" : "Move to another day"}
-          value={item.due_date ?? ""}
-          display={!showDate ? "" : item.due_date ? shortDay(item.due_date, today) : "No date"}
-          onChange={onReschedule}
-          disabled={saving}
-        />
-        <button type="button" className="plan-icon-btn plan-icon-btn--danger" onClick={onRemove} disabled={saving} aria-label={`Remove ${item.label}`}>
-          <TrashIcon size={16} />
         </button>
-      </div>
+      )}
+      {href && !editing ? (
+        <Link className="plan-start" to={href} onClick={() => actions.current.navigate()} aria-label={`Start ${item.label}`}>
+          <PlayIcon size={14} />
+          Start
+        </Link>
+      ) : null}
     </li>
   );
-}
+});
 
 function Composer({
   inputRef,

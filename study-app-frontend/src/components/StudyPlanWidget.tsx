@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchPinnedStudyPlan, toggleStudyPlanItem } from "../lib/api";
 import { toast } from "../lib/toast";
@@ -42,6 +42,21 @@ export function StudyPlanWidget() {
   }
 
   useEffect(load, []);
+
+  const openRef = useRef(false);
+  const dirtyRef = useRef(false);
+
+  function openModal() {
+    openRef.current = true;
+    dirtyRef.current = false;
+    setOpen(true);
+  }
+
+  function refresh() {
+    dirtyRef.current = false;
+    setJustDone(new Set());
+    load();
+  }
 
   async function toggle(item: StudyPlanItem) {
     const swap = (next: StudyPlanItem) =>
@@ -98,7 +113,7 @@ export function StudyPlanWidget() {
       <div className="section-title">
         <h2>Study plan</h2>
         {plan ? (
-          <button type="button" className="text-link spw-open" onClick={() => setOpen(true)}>
+          <button type="button" className="text-link spw-open" onClick={openModal}>
             Open plan
           </button>
         ) : null}
@@ -129,13 +144,13 @@ export function StudyPlanWidget() {
         ) : !plan ? (
           <div className="spw-empty">
             <p>Tell Kojo what's coming up and get a day-by-day checklist for it.</p>
-            <Button variant="secondary" onClick={() => setOpen(true)}>
+            <Button variant="secondary" onClick={openModal}>
               Make a plan
             </Button>
           </div>
         ) : (
           <>
-            <Countdown plan={plan} done={doneCount} total={total} onOpen={() => setOpen(true)} />
+            <Countdown plan={plan} done={doneCount} total={total} onOpen={openModal} />
 
             <div className="spw-strip" role="group" aria-label="Pick a day">
               {strip.map((day) => {
@@ -197,7 +212,7 @@ export function StudyPlanWidget() {
             )}
 
             {dayItems.length > LIST_LIMIT ? (
-              <button type="button" className="text-link spw-more" onClick={() => setOpen(true)}>
+              <button type="button" className="text-link spw-more" onClick={openModal}>
                 {dayItems.length - LIST_LIMIT} more in the plan
               </button>
             ) : null}
@@ -208,10 +223,18 @@ export function StudyPlanWidget() {
       {open ? (
         <StudyPlanModal
           initialPlanId={plan?.id ?? null}
-          onClose={() => setOpen(false)}
+          initialPlan={plan}
+          onClose={() => {
+            openRef.current = false;
+            setOpen(false);
+            if (dirtyRef.current) refresh();
+          }}
           onChanged={() => {
-            setJustDone(new Set());
-            load();
+            // While the modal is open the widget is hidden behind it, so
+            // refetch once on close instead of after every edit. A save that
+            // lands after close refreshes straight away.
+            if (openRef.current) dirtyRef.current = true;
+            else refresh();
           }}
         />
       ) : null}

@@ -20,11 +20,6 @@
   color: var(--muted);
 }
 
-.date-picker-icon {
-  flex-shrink: 0;
-  color: var(--green-dark);
-}
-
 .date-picker-value {
   flex: 1;
   min-width: 0;
@@ -56,23 +51,16 @@
   flex: none;
 }
 
-/* Icon-only chip (display=""): a square hit area. */
-.date-picker-chip .date-picker-value:empty {
-  display: none;
-}
-
-.date-picker-chip:has(.date-picker-value:empty) {
-  justify-content: center;
-  width: 36px;
-  min-height: 36px;
-  padding: 0;
-}
-
-.date-picker-chip:hover:not(:disabled),
 .date-picker-chip[aria-expanded="true"] {
-  border-color: var(--green-light-mid);
-  background: var(--white);
+  border-color: var(--green-dark);
   color: var(--ink);
+}
+
+@media (hover: hover) {
+  .date-picker-chip:hover:not(:disabled) {
+    border-color: var(--green-dark);
+    color: var(--ink);
+  }
 }
 
 .date-picker-chip:focus-visible {
@@ -84,8 +72,10 @@
 .date-picker-panel {
   position: fixed;
   z-index: 1100;
-  width: 300px;
-  max-width: calc(100vw - 32px);
+  /* 7 x 40px days + 32px padding; shrinks on very small screens. */
+  width: min(314px, calc(100vw - 16px));
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
   background: var(--white);
   border: 1px solid var(--green-light-mid);
   border-radius: var(--radius-md);
@@ -186,8 +176,9 @@
 .date-picker-day {
   display: inline-grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 100%;
+  max-width: 40px;
+  aspect-ratio: 1;
   padding: 0;
   border: 1.5px solid transparent;
   border-radius: var(--radius-sm);

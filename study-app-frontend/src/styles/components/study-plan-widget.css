@@ -8,7 +8,16 @@
   min-width: 0;
 }
 
+/* A short text action stays beside the heading. Beats the legacy tablet rule
+   that stacks every .section-title into a centered column. */
+.study-plan-widget > .section-title {
+  flex-direction: row;
+  align-items: baseline;
+  margin-bottom: 0;
+}
+
 .spw-open {
+  flex: none;
   padding: 0;
   border: 0;
   background: none;

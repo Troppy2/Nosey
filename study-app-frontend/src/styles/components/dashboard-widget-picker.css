@@ -1,51 +1,102 @@
-.widget-customize-btn {
-  display: inline-flex;
+/* A widget plus whatever belongs to it (Customize under Flashcards due, using
+   the same secondary button as Review).
+   One grid cell, so the pair stays together on the 2-column tablet grid. */
+.dashboard-widget-stack {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Widget picker: a plain checkbox list. */
+.modal-card.widget-picker {
+  width: min(440px, 100%);
+  gap: 16px;
+}
+
+.widget-picker-head {
+  display: grid;
+  gap: 4px;
+}
+
+.widget-picker-head h2,
+.widget-picker-head p {
+  margin: 0;
+}
+
+.widget-picker-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--green-light);
+  border-radius: var(--radius-md);
+  background: var(--white);
+}
+
+.widget-picker-list li + li {
+  border-top: 1px solid var(--green-lightest);
+}
+
+.widget-picker-row {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  margin: 0 0 8px auto;
-  padding: 6px 8px;
-  min-height: 32px;
-  border: 0;
-  border-radius: var(--radius-sm, 4px);
-  background: none;
-  color: var(--green-dark);
-  font-size: 0.8rem;
-  font-weight: 500;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 14px;
   cursor: pointer;
 }
 
-.widget-customize-row {
-  display: flex;
+.widget-picker-row.is-locked {
+  cursor: default;
 }
 
-.widget-customize-btn:hover,
-.widget-customize-btn:focus-visible {
-  background: var(--green-light);
+.widget-picker-row.is-locked .widget-picker-text {
+  opacity: 0.55;
+}
+
+/* Row-scoped to beat the mobile shell's rounded inputs. */
+.widget-picker-row .widget-picker-check {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  border-radius: var(--radius-xs);
+}
+
+.widget-picker-text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.widget-picker-label {
   color: var(--ink);
+  font-weight: 600;
 }
 
-.widget-picker-options {
-  grid-template-columns: minmax(0, 1fr);
+.widget-picker-hint {
+  color: var(--muted);
+  font-size: var(--text-sm);
 }
 
-.widget-picker-options .choice {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  text-align: left;
-}
-
-/* Order badge inside an active (dark) choice. */
 .widget-picker-order {
-  display: inline-grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--green-lightest);
+  flex: none;
   color: var(--green-dark);
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.widget-picker-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .widget-picker-foot .button {
+    flex: 1;
+  }
 }
 
 /* Sidebar widgets are rendered as siblings; give them breathing room. */
@@ -53,10 +104,6 @@
   display: grid;
   align-content: start;
   gap: 28px;
-}
-
-.dashboard-layout > aside > .widget-customize-row {
-  margin-bottom: -20px;
 }
 
 /* Single-column dashboard (tablet and phone): widgets hold today's work
@@ -74,7 +121,7 @@
     column-gap: 24px;
   }
 
-  .dashboard-layout > aside > .widget-customize-row {
+  .dashboard-widget-stack--end {
     grid-column: 1 / -1;
   }
 }

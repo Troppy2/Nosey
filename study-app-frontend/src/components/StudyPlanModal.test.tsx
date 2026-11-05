@@ -118,14 +118,14 @@ describe("StudyPlanModal", () => {
     api.replaceStudyPlanItems.mockImplementation(async (_id: number, items: StudyPlanItemInput[]) => echo(items));
     const { onClose } = setup(makePlan([{ label: "Old name" }]));
 
-    fireEvent.click(await screen.findByRole("button", { name: "Old name" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Old name" }));
     const field = screen.getByRole("textbox", { name: "Item name" });
     fireEvent.change(field, { target: { value: "Changed" } });
     fireEvent.keyDown(field, { key: "Escape" });
     expect(onClose).not.toHaveBeenCalled();
     expect(api.replaceStudyPlanItems).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Old name" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit Old name" }));
     const again = screen.getByRole("textbox", { name: "Item name" });
     fireEvent.change(again, { target: { value: "New name" } });
     fireEvent.keyDown(again, { key: "Enter" });
@@ -137,8 +137,9 @@ describe("StudyPlanModal", () => {
     api.replaceStudyPlanItems.mockRejectedValue(new Error("offline"));
     setup(makePlan([{ label: "Keep me" }]));
 
-    fireEvent.click(await screen.findByRole("button", { name: "Remove Keep me" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Keep me" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(api.replaceStudyPlanItems).toHaveBeenCalled());
-    await waitFor(() => expect(screen.getByRole("button", { name: "Keep me" })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Edit Keep me" })).toBeTruthy());
   });
 });

@@ -2,6 +2,14 @@
    day list scrolls between them. One fixed height for every view so the
    card does not jump when switching between plan, new and settings. */
 
+/* No blur behind this one: blurring the whole dashboard under a tall,
+   scrolling sheet costs every frame on phones. A darker scrim does the job. */
+.modal-backdrop:has(.plan-modal) {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(20, 28, 16, 0.55);
+}
+
 .modal-card.plan-modal {
   width: min(820px, 100%);
   height: min(760px, 90dvh);
@@ -82,10 +90,6 @@
   color: var(--green-dark);
 }
 
-.dropdown-trigger.plan-modal-switch:hover:not(:disabled) {
-  background: var(--white);
-}
-
 .dropdown-trigger.plan-modal-switch:focus-visible {
   outline: 2px solid var(--green-dark);
   outline-offset: 0;
@@ -104,11 +108,6 @@
   cursor: pointer;
 }
 
-.plan-icon-btn:hover:not(:disabled) {
-  background: var(--white);
-  color: var(--ink);
-}
-
 .plan-icon-btn:focus-visible {
   outline: 2px solid var(--green-dark);
   outline-offset: -2px;
@@ -119,14 +118,22 @@
   cursor: default;
 }
 
-.plan-icon-btn--danger:hover:not(:disabled) {
-  background: var(--accent-danger-tint);
-  color: var(--accent-danger-strong);
+/* Hover only where there is a real pointer, so a tap on a phone does not
+   leave a button stuck in its hover look. */
+@media (hover: hover) {
+  .plan-icon-btn:hover:not(:disabled),
+  .plan-day-add:hover,
+  .plan-done-toggle:hover,
+  .dropdown-trigger.plan-modal-switch:hover:not(:disabled) {
+    background: var(--white);
+    color: var(--ink);
+  }
 }
 
-/* Close button: a subtle turn of the X on hover so it reads as an action. */
-.plan-icon-btn:hover:not(:disabled) .icon-close .icon-part-x {
-  transform: rotate(90deg);
+.plan-icon-btn:active:not(:disabled),
+.plan-day-add:active,
+.plan-done-toggle:active {
+  background: var(--white);
 }
 
 .plan-modal-meta {
@@ -241,11 +248,6 @@
   cursor: pointer;
 }
 
-.plan-day-add:hover {
-  background: var(--white);
-  color: var(--ink);
-}
-
 .plan-day-add:focus-visible {
   outline: 2px solid var(--green-dark);
   outline-offset: -2px;
@@ -260,34 +262,13 @@
   background: var(--white);
 }
 
-/* Grid so the meta line can share a line with the tools on phones. */
+/* Row: checkbox, the label (tap to edit), and Start when it links somewhere. */
 .plan-row {
-  display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
-  grid-template-areas:
-    "check body tools"
-    ". meta tools";
-  align-items: start;
-  column-gap: 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   min-width: 0;
-  min-height: 52px;
-  padding: 8px 8px 8px 14px;
-}
-
-.plan-row .plan-check {
-  grid-area: check;
-}
-
-.plan-row-body {
-  grid-area: body;
-}
-
-.plan-row-meta {
-  grid-area: meta;
-}
-
-.plan-row-tools {
-  grid-area: tools;
+  padding: 6px 10px 6px 14px;
 }
 
 .plan-row + .plan-row {
@@ -299,54 +280,50 @@
   flex: none;
   width: 20px;
   height: 20px;
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   border-radius: var(--radius-xs);
   cursor: pointer;
 }
 
-.plan-row-body {
+.plan-row-main {
   display: grid;
+  flex: 1;
+  align-content: center;
+  gap: 2px;
   min-width: 0;
-  padding-top: 5px;
-}
-
-.plan-row-label {
-  justify-self: start;
-  max-width: 100%;
-  margin: -2px -6px;
-  padding: 2px 6px;
+  min-height: 40px;
+  padding: 6px 8px;
+  margin-left: -8px;
   border: 0;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-sm);
   background: none;
   color: var(--ink);
   font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .plan-row-main:hover {
+    background: var(--green-lightest);
+  }
+}
+
+.plan-row-main:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: -2px;
+}
+
+.plan-row-label {
   font-size: var(--text-base);
   line-height: 1.4;
-  text-align: left;
   overflow-wrap: anywhere;
-  cursor: text;
-}
-
-.plan-row-label:hover {
-  background: var(--green-lightest);
-}
-
-.plan-row-label:focus-visible {
-  outline: 2px solid var(--green-dark);
-  outline-offset: 0;
 }
 
 .plan-row.is-done .plan-row-label {
   color: var(--muted);
   text-decoration: line-through;
   text-decoration-color: var(--green-mid);
-}
-
-.plan-row-edit {
-  width: 100%;
-  min-height: 36px;
-  margin: -6px 0 -2px;
-  padding: 4px 8px;
 }
 
 .plan-row-meta {
@@ -357,6 +334,46 @@
   color: var(--muted);
   font-size: var(--text-xs);
   font-weight: 500;
+}
+
+/* Inline editor, one row at a time is the norm. */
+.plan-row.is-editing {
+  background: var(--green-lightest);
+}
+
+.plan-row-editor {
+  display: grid;
+  flex: 1;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 0;
+}
+
+.plan-row-edit {
+  width: 100%;
+  min-width: 0;
+}
+
+.plan-row-editor-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.plan-row-editor-bar .date-picker {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+
+.plan-row-editor-bar .date-picker-trigger {
+  width: 100%;
+  min-width: 0;
+}
+
+.button.plan-row-remove {
+  color: var(--accent-danger-strong);
 }
 
 .plan-late {
@@ -389,20 +406,14 @@
   }
 }
 
-.plan-row-tools {
-  display: flex;
-  align-items: center;
-  flex: none;
-  gap: 2px;
-}
-
 .plan-start {
   display: inline-flex;
   align-items: center;
+  flex: none;
   gap: 4px;
   min-height: 32px;
-  margin-right: 4px;
-  padding: 0 10px;
+  margin-top: 4px;
+  padding: 0 12px;
   border-radius: var(--radius-pill);
   background: var(--green-lightest);
   color: var(--green-dark);
@@ -411,26 +422,16 @@
   text-decoration: none;
 }
 
-.plan-start:hover {
-  background: var(--green-light);
-  color: var(--ink);
+@media (hover: hover) {
+  .plan-start:hover {
+    background: var(--green-light);
+    color: var(--ink);
+  }
 }
 
 .plan-start:focus-visible {
   outline: 2px solid var(--green-dark);
   outline-offset: 1px;
-}
-
-/* Trash stays quiet until the row is pointed at or focused (always shown on touch). */
-@media (hover: hover) {
-  .plan-row .plan-icon-btn--danger {
-    opacity: 0;
-  }
-
-  .plan-row:hover .plan-icon-btn--danger,
-  .plan-row:focus-within .plan-icon-btn--danger {
-    opacity: 1;
-  }
 }
 
 .plan-done-toggle {
@@ -448,10 +449,6 @@
   font-size: var(--text-sm);
   font-weight: 600;
   cursor: pointer;
-}
-
-.plan-done-toggle:hover {
-  background: var(--white);
 }
 
 .plan-done-toggle:focus-visible {
@@ -583,6 +580,14 @@
     padding: 0;
   }
 
+  .plan-done-count {
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .modal-card.plan-modal {
     width: 100%;
     height: 94dvh;
@@ -608,32 +613,64 @@
     padding: 10px 16px 6px;
   }
 
+  .plan-modal-meta {
+    gap: 10px;
+  }
+
   .plan-row {
-    grid-template-areas:
-      "check body body"
-      ". meta tools";
-    align-items: center;
-    padding: 8px 4px 4px 12px;
+    padding: 4px 8px 4px 12px;
   }
 
-  .plan-row .plan-check,
-  .plan-row-body {
-    align-self: start;
-  }
-
-  .plan-composer {
+  .plan-row-editor-bar {
     flex-wrap: wrap;
-    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .plan-row-editor-bar .date-picker {
+    flex-basis: 100%;
+  }
+
+  .plan-row-editor-bar .button {
+    flex: 1;
+  }
+
+  /* Add bar: the text field and Add on one line, type and date under it. */
+  .plan-composer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
   }
 
   .plan-composer-main {
-    flex-basis: 100%;
-    order: -1;
+    grid-area: 1 / 1 / 2 / 3;
+  }
+
+  .plan-composer > .button {
+    grid-area: 1 / 3;
   }
 
   .dropdown-trigger.plan-composer-kind {
-    flex: 1;
+    grid-area: 2 / 1;
     width: auto;
+    min-width: 0;
+  }
+
+  .plan-composer .date-picker {
+    grid-area: 2 / 2;
+    min-width: 0;
+  }
+
+  .plan-composer-count {
+    grid-area: 2 / 3;
+  }
+
+  .plan-composer .date-picker-chip {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .input.plan-composer-count {
+    width: 72px;
   }
 
   .plan-new,

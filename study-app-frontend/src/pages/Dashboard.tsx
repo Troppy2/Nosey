@@ -369,6 +369,13 @@ export default function Dashboard() {
     }
   }
 
+  const widgetKeys = betaMode ? userWidgets : ["review_these", "weak_spots"];
+  const customizeButton = (
+    <Button variant="secondary" fullWidth onClick={() => setShowCustomizeWidgets(true)} icon={<SettingsIcon size={16} />}>
+      Customize widgets
+    </Button>
+  );
+
   return (
     <>
       {renamingTest ? (
@@ -576,20 +583,10 @@ export default function Dashboard() {
               </div>
 
               <aside id="tour-review-cards">
-                {betaMode && (
-                  <div className="widget-customize-row">
-                    <button type="button" className="widget-customize-btn" onClick={() => setShowCustomizeWidgets(true)}>
-                      <SettingsIcon size={14} />
-                      <span>Customize</span>
-                    </button>
-                  </div>
-                )}
-
-                {(betaMode ? userWidgets : ["review_these", "weak_spots"]).map((wKey) => {
-                  if (wKey === "review_these")
-                    return (
+                {widgetKeys.map((wKey) => {
+                  if (wKey === "review_these") {
+                    const widget = (
                       <ReviewTheseWidget
-                        key="review_these"
                         summary={dueSummary}
                         onRetry={() => {
                           setDueSummary(undefined);
@@ -599,10 +596,23 @@ export default function Dashboard() {
                         }}
                       />
                     );
+                    // Customize sits under the Flashcards due card, in the
+                    // same grid cell so it stays with it on the tablet grid.
+                    return (
+                      <div key="review_these" className="dashboard-widget-stack">
+                        {widget}
+                        {betaMode ? customizeButton : null}
+                      </div>
+                    );
+                  }
                   if (wKey === "weak_spots") return <WeakSpots key="weak_spots" />;
                   if (wKey === "study_plan") return <StudyPlanWidget key="study_plan" />;
                   return null;
                 })}
+                {/* Flashcards due hidden: keep Customize reachable at the end. */}
+                {betaMode && !widgetKeys.includes("review_these") ? (
+                  <div className="dashboard-widget-stack dashboard-widget-stack--end">{customizeButton}</div>
+                ) : null}
               </aside>
             </div>
           </>

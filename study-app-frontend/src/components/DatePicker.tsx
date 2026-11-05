@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "./Button";
-import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from "../icons";
+import { ChevronLeftIcon, ChevronRightIcon } from "../icons";
 import "../styles/components/date-picker.css";
 
 // A shared calendar date picker that replaces the browser's native <input type="date">.
@@ -30,6 +30,9 @@ export type DatePickerProps = {
 };
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
+// Gap between trigger and panel, and the minimum distance from the viewport edge.
+const PANEL_GAP = 6;
+const PANEL_MARGIN = 8;
 
 function monthLabel(date: Date): string {
   return date.toLocaleDateString(undefined, { month: "long", year: "numeric" });
@@ -153,13 +156,27 @@ export function DatePicker({
     close(true);
   }, [onChange, close]);
 
-  // Position panel below trigger
+  // Position the panel next to the trigger, kept inside the viewport: below
+  // when it fits, else above, else pinned to the bottom edge. Horizontally it
+  // lines up with the trigger but is clamped, so a trigger near the right
+  // edge (row date chips, phones) does not push the calendar off screen.
   useLayoutEffect(() => {
     if (!open) return;
     const place = () => {
       const rect = triggerRef.current?.getBoundingClientRect();
       if (!rect) return;
-      setPanelPos({ top: rect.bottom + 6, left: rect.left });
+      const panel = panelRef.current;
+      const width = panel?.offsetWidth ?? 300;
+      const height = panel?.offsetHeight ?? 400;
+      const vw = document.documentElement.clientWidth;
+      const vh = window.innerHeight;
+      const left = Math.max(PANEL_MARGIN, Math.min(rect.left, vw - width - PANEL_MARGIN));
+      let top = rect.bottom + PANEL_GAP;
+      if (top + height > vh - PANEL_MARGIN) {
+        const above = rect.top - PANEL_GAP - height;
+        top = above >= PANEL_MARGIN ? above : Math.max(PANEL_MARGIN, vh - height - PANEL_MARGIN);
+      }
+      setPanelPos({ top, left });
     };
     place();
     window.addEventListener("resize", place);
@@ -211,7 +228,9 @@ export function DatePicker({
   const nextDisabled = !!max && !!parseIso(max) && new Date(year, month + 1, 1) > parseIso(max)!;
 
   // Build cells for the grid: in-month days + trailing out-of-month days to fill last row
+  // Only while open: lists render many closed pickers at once.
   const cells = useMemo(() => {
+    if (!open) return [];
     const list: Array<{
       day: number;
       iso: string;
@@ -255,7 +274,7 @@ export function DatePicker({
       }
     }
     return list;
-  }, [year, month, totalDays, startWeekday, selected, todayIso, isDayDisabled]);
+  }, [open, year, month, totalDays, startWeekday, selected, todayIso, isDayDisabled]);
 
   function onPanelKey(event: ReactKeyboardEvent<HTMLDivElement>) {
     switch (event.key) {
@@ -352,7 +371,6 @@ export function DatePicker({
         }
       }}
     >
-      <CalendarIcon size={variant === "chip" ? 14 : 16} className="date-picker-icon" aria-hidden="true" />
       <span className="date-picker-value">{display ?? triggerValue ?? placeholder ?? "Pick a date"}</span>
     </button>
   );
