@@ -249,6 +249,28 @@ async def test_manual_untick_stays_unticked(db_session_maker):
         assert d2.items[0].done_source == "manual"
 
 
+async def test_linked_test_item_carries_folder_id(db_session_maker):
+    async with db_session_maker() as session:
+        user = await _create_user(session, "student-link@test.com")
+        folder = await _create_folder(session, user.id)
+        t = await _create_test(session, folder.id, "Linked Test")
+
+        plan = await StudyPlanService().create_plan(
+            user.id,
+            StudyPlanCreateRequest(
+                title="Links",
+                items=[
+                    StudyPlanItemCreate(kind="test", label="Take it", target_id=t.id),
+                    StudyPlanItemCreate(kind="free_text", label="Reread notes"),
+                ],
+            ),
+            session,
+        )
+        by_kind = {it.kind: it for it in plan.items}
+        assert by_kind["test"].target_folder_id == folder.id
+        assert by_kind["free_text"].target_folder_id is None
+
+
 # ---------------------------------------------------------------- Pin exclusivity tests
 
 async def test_pin_exclusivity(db_session_maker):

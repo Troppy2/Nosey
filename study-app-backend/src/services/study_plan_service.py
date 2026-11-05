@@ -59,8 +59,7 @@ class StudyPlanService:
         plan = await repo.get_pinned_for_user(user_id)
         if plan is None:
             return None
-        progress_map = await self.evaluate_auto_completion(plan, session)
-        return self._to_detail_response(plan, progress_map)
+        return await self._detail(plan, session)
 
     async def get_plan(
         self, plan_id: int, user_id: int, session: AsyncSession
@@ -69,8 +68,7 @@ class StudyPlanService:
         plan = await repo.get_for_user(plan_id, user_id)
         if plan is None:
             raise ResourceNotFoundException("Study plan")
-        progress_map = await self.evaluate_auto_completion(plan, session)
-        return self._to_detail_response(plan, progress_map)
+        return await self._detail(plan, session)
 
     async def create_plan(
         self, user_id: int, data: StudyPlanCreateRequest, session: AsyncSession
@@ -87,8 +85,7 @@ class StudyPlanService:
         plan_id = created.id
         await session.commit()
         plan = await repo.get_for_user(plan_id, user_id)
-        progress_map = await self.evaluate_auto_completion(plan, session)
-        return self._to_detail_response(plan, progress_map)
+        return await self._detail(plan, session)
 
     async def update_plan(
         self, plan_id: int, user_id: int, data: StudyPlanUpdateRequest, session: AsyncSession
@@ -107,8 +104,7 @@ class StudyPlanService:
         await repo.update(plan, fields)
         await session.commit()
         plan = await repo.get_for_user(plan_id, user_id)
-        progress_map = await self.evaluate_auto_completion(plan, session)
-        return self._to_detail_response(plan, progress_map)
+        return await self._detail(plan, session)
 
     async def replace_items(
         self,
@@ -126,8 +122,7 @@ class StudyPlanService:
         await repo.replace_items(plan, data.items)
         await session.commit()
         plan = await repo.get_for_user(plan_id, user_id)
-        progress_map = await self.evaluate_auto_completion(plan, session)
-        return self._to_detail_response(plan, progress_map)
+        return await self._detail(plan, session)
 
     async def toggle_item_done(
         self, item_id: int, user_id: int, done: bool, session: AsyncSession
@@ -340,9 +335,42 @@ class StudyPlanService:
             await session.commit()
         return progress
 
-    def _to_detail_response(self, plan: StudyPlan, progress: dict[int, str]) -> StudyPlanDetailResponse:
+    async def _detail(self, plan: StudyPlan, session: AsyncSession) -> StudyPlanDetailResponse:
+        progress = await self.evaluate_auto_completion(plan, session)
+        folders = await self._target_folders(plan, session)
+        return self._to_detail_response(plan, progress, folders)
+
+    async def _target_folders(self, plan: StudyPlan, session: AsyncSession) -> dict[int, int]:
+        """Folder id per test/module item, so the client can link straight to it.
+
+        One query per kind. Flashcard items already target a folder id.
+        """
+        folders: dict[int, int] = {}
+        for kind, query in (
+            ("test", lambda ids: select(Test.id, Test.folder_id).where(Test.id.in_(ids))),
+            (
+                "module",
+                lambda ids: select(LearningModule.id, LearningTrack.folder_id)
+                .join(LearningTrack, LearningTrack.id == LearningModule.track_id)
+                .where(LearningModule.id.in_(ids)),
+            ),
+        ):
+            items = [it for it in plan.items if it.kind == kind and it.target_id is not None]
+            if not items:
+                continue
+            by_target = dict((await session.execute(query({it.target_id for it in items}))).all())
+            for it in items:
+                if (folder_id := by_target.get(it.target_id)) is not None:
+                    folders[it.id] = folder_id
+        return folders
+
+    def _to_detail_response(
+        self, plan: StudyPlan, progress: dict[int, str], folders: dict[int, int]
+    ) -> StudyPlanDetailResponse:
         items = [
-            StudyPlanItemResponse.model_validate(it).model_copy(update={"progress": progress.get(it.id)})
+            StudyPlanItemResponse.model_validate(it).model_copy(
+                update={"progress": progress.get(it.id), "target_folder_id": folders.get(it.id)}
+            )
             for it in plan.items
         ]
         return StudyPlanDetailResponse.model_validate(plan).model_copy(update={"items": items})
