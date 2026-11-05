@@ -5,9 +5,9 @@ import { updateDashboardWidgets } from "../lib/api";
 import "../styles/components/dashboard-widget-picker.css";
 
 const OPTIONS = [
-  { key: "review_these", label: "Review These" },
+  { key: "review_these", label: "Flashcards due" },
   { key: "weak_spots", label: "Weak Spots" },
-  { key: "study_plan", label: "Study Plan" },
+  { key: "study_plan", label: "Study plan" },
 ];
 
 type Props = {

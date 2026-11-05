@@ -427,7 +427,7 @@ export default function Dashboard() {
               </div>
               <aside>
                 <div className="section-title">
-                  <h2>Review These</h2>
+                  <h2>Flashcards due</h2>
                 </div>
                 <SkeletonWeakStack count={2} />
               </aside>
@@ -584,7 +584,19 @@ export default function Dashboard() {
                 )}
 
                 {(betaMode ? userWidgets : ["review_these", "weak_spots"]).map((wKey) => {
-                  if (wKey === "review_these") return <ReviewTheseWidget key="review_these" summary={dueSummary} />;
+                  if (wKey === "review_these")
+                    return (
+                      <ReviewTheseWidget
+                        key="review_these"
+                        summary={dueSummary}
+                        onRetry={() => {
+                          setDueSummary(undefined);
+                          fetchFlashcardDueSummary()
+                            .then(setDueSummary)
+                            .catch(() => setDueSummary(null));
+                        }}
+                      />
+                    );
                   if (wKey === "weak_spots") return <WeakSpots key="weak_spots" />;
                   if (wKey === "study_plan") return <StudyPlanWidget key="study_plan" />;
                   return null;
