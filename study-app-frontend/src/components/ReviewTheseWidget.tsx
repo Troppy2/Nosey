@@ -16,6 +16,26 @@ interface ReviewTheseWidgetProps {
 const dueLink = (folderId: number) => `/flashcards/${folderId}/review?due=1`;
 const cards = (n: number) => `${n} card${n === 1 ? "" : "s"}`;
 
+/** Loading stand-in built from the widget's own deck and button, so nothing jumps when data lands. */
+export function FlashcardsDueSkeleton() {
+  return (
+    <div className="fcd-panel fcd-skeleton" role="status" aria-label="Loading due flashcards">
+      <div className="fcd-deck" data-depth="3">
+        <div className="fcd-card">
+          <Skeleton width="46%" height="0.7rem" />
+          <span className="fcd-skel-front">
+            <Skeleton width="92%" height="1.1rem" />
+            <Skeleton width="58%" height="1.1rem" />
+          </span>
+        </div>
+      </div>
+      <div className="button button-secondary button-full fcd-skel-cta" aria-hidden="true">
+        <Skeleton width="104px" height="0.85rem" />
+      </div>
+    </div>
+  );
+}
+
 // Dashboard widget for flashcards that are due. One deck preview, one clear
 // action that starts a due-only session, and the other folders below it.
 export function ReviewTheseWidget({ summary, onRetry }: ReviewTheseWidgetProps) {
@@ -33,7 +53,7 @@ export function ReviewTheseWidget({ summary, onRetry }: ReviewTheseWidgetProps) 
         <h2>Flashcards due</h2>
         {hasDue ? (
           <span className="muted small">{cards(summary.total_due)}</span>
-        ) : (
+        ) : loading ? null : (
           <Link className="text-link" to="/flashcards">
             All flashcards
           </Link>
@@ -41,10 +61,7 @@ export function ReviewTheseWidget({ summary, onRetry }: ReviewTheseWidgetProps) 
       </div>
 
       {loading ? (
-        <div className="fcd-panel" role="status" aria-label="Loading due flashcards">
-          <Skeleton width="100%" height="5.5rem" />
-          <Skeleton width="100%" height="2.75rem" />
-        </div>
+        <FlashcardsDueSkeleton />
       ) : failed ? (
         <div className="fcd-panel fcd-failed">
           <p>Couldn't load your due cards.</p>

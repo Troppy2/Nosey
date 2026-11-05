@@ -196,7 +196,37 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Loading state: same deck and button, bones in place of text. */
+.fcd-skeleton .fcd-card .skel {
+  display: block;
+  background: linear-gradient(90deg, rgba(233, 245, 219, 0.24) 32%, rgba(233, 245, 219, 0.46) 50%, rgba(233, 245, 219, 0.24) 68%);
+  background-size: 300% 100%;
+}
+
+.fcd-skel-front {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.fcd-skeleton .fcd-deck:hover .fcd-card {
+  transform: none;
+  box-shadow: none;
+}
+
+.fcd-skel-cta {
+  pointer-events: none;
+}
+
+.fcd-skel-cta .skel {
+  display: block;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .fcd-skeleton .fcd-card .skel {
+    background: rgba(233, 245, 219, 0.3);
+  }
+
   .fcd-card,
   .fcd-deck::before,
   .fcd-deck::after {

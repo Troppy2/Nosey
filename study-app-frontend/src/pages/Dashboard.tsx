@@ -8,10 +8,10 @@ import { FormError } from "../components/FormError";
 import { Card } from "../components/Card";
 import { ConfirmModal, RenameModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
-import { SkeletonFolderMiniGrid, SkeletonStatGrid, SkeletonTestRows, SkeletonWeakStack } from "../components/Skeletons";
+import { SkeletonFolderMiniGrid, SkeletonStatGrid, SkeletonTestRows } from "../components/Skeletons";
 import { PullToRefreshIndicator } from "../components/PullToRefreshIndicator";
 import { deleteTest, fetchFlashcardDueSummary, fetchFlashcards, fetchFolders, fetchTests, getGreetingName, getResumableTests, getStoredUser, scopeKey, updateTest } from "../lib/api";
-import { ReviewTheseWidget } from "../components/ReviewTheseWidget";
+import { FlashcardsDueSkeleton, ReviewTheseWidget } from "../components/ReviewTheseWidget";
 import { SettingsIcon } from "../icons";
 import { useSettings } from "../lib/useSettings";
 import { StudyPlanWidget } from "../components/StudyPlanWidget";
@@ -426,10 +426,12 @@ export default function Dashboard() {
                 </section>
               </div>
               <aside>
-                <div className="section-title">
-                  <h2>Flashcards due</h2>
+                <div className="fcd">
+                  <div className="section-title">
+                    <h2>Flashcards due</h2>
+                  </div>
+                  <FlashcardsDueSkeleton />
                 </div>
-                <SkeletonWeakStack count={2} />
               </aside>
             </div>
           </>
