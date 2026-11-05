@@ -56,6 +56,8 @@ class StudyPlanItemResponse(BaseModel):
     done_at: Optional[datetime] = None
     done_source: Optional[str] = None
     progress: Optional[str] = None
+    # Folder of a linked test/module, for building its link. Not stored.
+    target_folder_id: Optional[int] = None
     created_at: datetime
 
 
