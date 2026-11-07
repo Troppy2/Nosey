@@ -191,3 +191,10 @@ body:has(.walk-overlay) .dropdown-panel { z-index: 1300; min-width: 220px; }
 .walk-recording { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; background: rgba(251, 252, 247, 0.94); color: var(--green-dark-mid); cursor: default; }
 .walk-recording p { max-width: 420px; margin: 0; }
 .walk-recording-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+
+/* Pop-out (Document Picture-in-Picture): the player fills the small window. */
+.walk-overlay--pip { padding: 0; background: var(--walk-paper); }
+.walk-overlay--pip .walk-shell { width: 100%; max-width: none; height: 100%; max-height: none; border-radius: 0; }
+.walk-overlay--pip .walk-body { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+.walk-overlay--pip .walk-head { padding: 8px 12px; }
+.walk-overlay--pip .walk-chapters { display: none; }

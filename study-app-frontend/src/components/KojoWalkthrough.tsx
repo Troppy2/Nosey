@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { CloseIcon, PlayIcon, RetryIcon, SpeakerIcon } from "../icons";
 import { fetchSolutionWalkthrough, recordWalkthroughAudio } from "../lib/api";
@@ -31,6 +32,31 @@ type VoiceChoice = string;
 const INK: Record<WalkInk, string> = { ink: "var(--walk-ink)", red: "#d6453d", blue: "#2f6fd6", green: "#2f9a55" };
 // Speech that has not started this long after a segment opens no longer holds the video.
 const SPEECH_START_TIMEOUT_MS = 6000;
+
+// Chrome's Document Picture-in-Picture: a small always-on-top window the player moves
+// into, so the user can code on the page while Kojo explains. Not in Firefox/Safari.
+type PipApi = { requestWindow: (opts?: { width?: number; height?: number }) => Promise<Window> };
+function pipApi(): PipApi | null {
+  return (window as unknown as { documentPictureInPicture?: PipApi }).documentPictureInPicture ?? null;
+}
+
+/** Copies the app's styles into the pop-out window (inline rules in dev, links in prod). */
+function copyStyles(target: Window) {
+  for (const sheet of Array.from(document.styleSheets)) {
+    try {
+      const style = target.document.createElement("style");
+      style.textContent = Array.from(sheet.cssRules).map((r) => r.cssText).join("\n");
+      target.document.head.appendChild(style);
+    } catch {
+      if (sheet.href) {
+        const link = target.document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = sheet.href;
+        target.document.head.appendChild(link);
+      }
+    }
+  }
+}
 
 type Clip = { url: string; dur: number };
 type Recording =
@@ -132,18 +158,79 @@ export function KojoWalkthrough({ slug, problemTitle, statement, statementText, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, attempt]);
 
+  // The player renders into one host element that moves between this page and the
+  // pop-out window. Moving the element (not re-rendering) keeps React state, so the
+  // video keeps playing at the same spot; React's listeners live on the host and move too.
+  const [host] = useState(() => document.createElement("div"));
+  const [pip, setPip] = useState<Window | null>(null);
+
   useEffect(() => {
+    document.body.appendChild(host);
+    return () => host.remove();
+  }, [host]);
+
+  useEffect(() => {
+    if (pip) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, []);
+  }, [pip]);
 
-  return (
-    <div className="walk-overlay" role="dialog" aria-modal="true" aria-label={`Kojo's walkthrough of ${problemTitle}`}>
+  useEffect(() => {
+    if (!pip) return;
+    pip.document.body.appendChild(host);
+    // Keys pressed in the pop-out drive the same shortcuts.
+    const forward = (e: KeyboardEvent) => {
+      if (e.key === " ") e.preventDefault();
+      window.dispatchEvent(new CustomEvent("walk-key", { detail: e.key }));
+    };
+    const back = () => setPip(null);
+    pip.addEventListener("keydown", forward);
+    pip.addEventListener("pagehide", back);
+    return () => {
+      pip.removeEventListener("keydown", forward);
+      pip.removeEventListener("pagehide", back);
+      document.body.appendChild(host);
+    };
+  }, [pip, host]);
+
+  // Closing the walkthrough also closes its pop-out.
+  useEffect(() => () => pip?.close(), [pip]);
+
+  async function popOut() {
+    const api = pipApi();
+    if (!api || pip) return;
+    if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined);
+    try {
+      const win = await api.requestWindow({ width: 720, height: 520 });
+      copyStyles(win);
+      win.document.title = `Kojo: ${problemTitle}`;
+      win.document.body.style.margin = "0";
+      setPip(win);
+    } catch {
+      /* blocked or dismissed */
+    }
+  }
+  function popIn() {
+    pip?.close();
+    setPip(null);
+  }
+
+  return createPortal(
+    <div className={`walk-overlay${pip ? " walk-overlay--pip" : ""}`} role="dialog" aria-modal={!pip} aria-label={`Kojo's walkthrough of ${problemTitle}`}>
       {walk ? (
-        <WalkPlayer slug={slug} walk={walk} problemTitle={problemTitle} statement={statement} onClose={onClose} />
+        <WalkPlayer
+          slug={slug}
+          walk={walk}
+          problemTitle={problemTitle}
+          statement={statement}
+          onClose={onClose}
+          popped={!!pip}
+          onPopOut={pipApi() ? popOut : undefined}
+          onPopIn={popIn}
+        />
       ) : (
         <div className="walk-shell walk-shell--loading">
           <button type="button" className="walk-close" onClick={onClose} aria-label="Close">
@@ -164,7 +251,8 @@ export function KojoWalkthrough({ slug, problemTitle, statement, statementText, 
           )}
         </div>
       )}
-    </div>
+    </div>,
+    host,
   );
 }
 
@@ -174,12 +262,18 @@ function WalkPlayer({
   problemTitle,
   statement,
   onClose,
+  popped,
+  onPopOut,
+  onPopIn,
 }: {
   slug: string;
   walk: SolutionWalkthrough;
   problemTitle: string;
   statement: ReactNode;
   onClose: () => void;
+  popped: boolean;
+  onPopOut?: () => void;
+  onPopIn: () => void;
 }) {
   const [voice, setVoiceState] = useState<VoiceChoice>(loadVoice);
   const [recordAttempt, setRecordAttempt] = useState(0);
@@ -365,21 +459,25 @@ function WalkPlayer({
   }
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+    const onKey = (raw: Event) => {
+      // Popped out: only keys pressed in the pop-out window (forwarded as "walk-key") count,
+      // so typing in the editor on the page never drives the video.
+      const e = raw instanceof KeyboardEvent ? raw : new KeyboardEvent("keydown", { key: String((raw as CustomEvent).detail) });
       const target = e.target as HTMLElement | null;
-      if (target?.closest("input, textarea, [role='listbox'], [role='combobox']")) return;
+      if (target?.isContentEditable || target?.closest("input, textarea, [contenteditable], .cm-editor, .monaco-editor, [role='listbox'], [role='combobox']")) return;
       if (e.key === " " || e.key === "k") {
         e.preventDefault();
         togglePlay();
       } else if (e.key === "ArrowRight") seek(tRef.current + 5);
       else if (e.key === "ArrowLeft") seek(tRef.current - 5);
-      else if (e.key === "f") toggleFullscreen();
+      else if (e.key === "f" && !popped) toggleFullscreen();
       else if (e.key === "m") setMuted((m) => !m);
       else if (e.key === "c") setCaptions((c) => !c);
-      else if (e.key === "Escape" && !document.fullscreenElement) onClose();
+      else if (e.key === "Escape" && !document.fullscreenElement && !popped) onClose();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const evt = popped ? "walk-key" : "keydown";
+    window.addEventListener(evt, onKey);
+    return () => window.removeEventListener(evt, onKey);
   });
 
   const chapter = seg.chapter as ChapterIndex;
@@ -392,16 +490,29 @@ function WalkPlayer({
           <span className="eyebrow">Kojo's walkthrough</span>
           <strong>{problemTitle}</strong>
         </div>
-        <button type="button" className="walk-chip" onClick={() => setShowProblem((v) => !v)} aria-pressed={showProblem}>
-          {showProblem ? "Hide problem" : "Show problem"}
-        </button>
+        {!popped && (
+          <button type="button" className="walk-chip" onClick={() => setShowProblem((v) => !v)} aria-pressed={showProblem}>
+            {showProblem ? "Hide problem" : "Show problem"}
+          </button>
+        )}
+        {popped ? (
+          <button type="button" className="walk-chip" onClick={onPopIn} title="Put the video back on the page">
+            Back to page
+          </button>
+        ) : (
+          onPopOut && (
+            <button type="button" className="walk-chip" onClick={onPopOut} title="Watch in a small window that stays on top while you code">
+              Pop out
+            </button>
+          )
+        )}
         <button type="button" className="walk-close" onClick={onClose} aria-label="Close walkthrough">
           <CloseIcon size={18} />
         </button>
       </header>
 
-      <div className="walk-body">
-        {showProblem && (
+      <div className={`walk-body${popped ? " walk-body--popped" : ""}`}>
+        {showProblem && !popped && (
           <aside className="walk-problem" aria-label="Problem">
             <h3>{problemTitle}</h3>
             <div className="walk-problem-text">{statement}</div>
@@ -496,11 +607,15 @@ function WalkPlayer({
                 <button type="button" className={`walk-btn walk-btn--text${captions ? " is-on" : ""}`} onClick={() => setCaptions((c) => !c)} aria-pressed={captions} title="Captions (c)">
                   CC
                 </button>
-                <Dropdown bare label="Playback speed" value={speed} options={SPEEDS.map((s) => ({ value: s, label: `${s}x` }))} onChange={setSpeed} className="walk-select" />
-                <Dropdown bare label="Kojo's voice" value={voice} options={VOICE_CHOICES} onChange={changeVoice} className="walk-select walk-select--voice" />
-                <button type="button" className="walk-btn walk-btn--text" onClick={toggleFullscreen} title="Full screen (f)">
-                  Full screen
-                </button>
+                {!popped && <Dropdown bare label="Playback speed" value={speed} options={SPEEDS.map((s) => ({ value: s, label: `${s}x` }))} onChange={setSpeed} className="walk-select" />}
+                {!popped && (
+                  <>
+                    <Dropdown bare label="Kojo's voice" value={voice} options={VOICE_CHOICES} onChange={changeVoice} className="walk-select walk-select--voice" />
+                    <button type="button" className="walk-btn walk-btn--text" onClick={toggleFullscreen} title="Full screen (f)">
+                      Full screen
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>
