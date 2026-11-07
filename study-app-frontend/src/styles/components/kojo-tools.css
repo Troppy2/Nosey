@@ -1,0 +1,367 @@
+/* Kojo tools (GH #205): tool chips inside the reasoning disclosure, confirm
+   cards, question cards and action buttons. */
+
+.kojo-reasoning-count {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+/* Tool step chip */
+.kojo-tool-step {
+  margin: 0.3rem 0;
+}
+
+.kojo-tool-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  padding: 0.18rem 0.55rem 0.18rem 0.4rem;
+  border: 1px solid var(--green-lightest);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--green-dark);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.kojo-tool-chip:disabled {
+  cursor: default;
+}
+
+.kojo-tool-chip:not(:disabled):hover {
+  border-color: var(--green-light-mid);
+}
+
+.kojo-tool-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kojo-tool-chip-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--accent-positive-strong);
+  flex-shrink: 0;
+}
+
+.kojo-tool-step--error .kojo-tool-chip-status {
+  color: var(--accent-caution-strong);
+}
+
+.kojo-tool-chip-spinner {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--green-lightest);
+  border-top-color: var(--green-dark-mid);
+  border-radius: 50%;
+  animation: kojo-tool-spin 0.8s linear infinite;
+}
+
+@keyframes kojo-tool-spin {
+  to { transform: rotate(360deg); }
+}
+
+.kojo-tool-chip-chevron {
+  transition: transform 0.16s ease;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.kojo-tool-chip-chevron--open {
+  transform: rotate(90deg);
+}
+
+.kojo-tool-chip-detail {
+  margin: 0.25rem 0 0 0.6rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: 8px;
+  background: var(--green-lightest);
+  color: var(--green-dark-mid);
+  font-size: 0.72rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kojo-tool-chip-spinner { animation-duration: 2.4s; }
+}
+
+/* Confirm card */
+.kojo-confirm-card,
+.kojo-ask-card {
+  margin-top: 0.6rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--green-light);
+  border-radius: 14px;
+  background: var(--white);
+  max-width: 460px;
+}
+
+.kojo-confirm-card--danger {
+  border-color: var(--accent-danger);
+  background: var(--accent-danger-tint);
+}
+
+.kojo-confirm-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.kojo-confirm-card--danger .kojo-confirm-title {
+  color: var(--accent-danger-strong);
+}
+
+.kojo-confirm-lines {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--green-dark-mid);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.kojo-confirm-error {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0.5rem 0 0;
+  color: var(--accent-danger-strong);
+  font-size: 0.76rem;
+}
+
+.kojo-confirm-settled {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0.55rem 0 0;
+  color: var(--green-dark-mid);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.kojo-confirm-actions,
+.kojo-ask-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+}
+
+.kojo-confirm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 34px;
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--green-dark);
+  border-radius: 999px;
+  background: var(--green-dark);
+  color: var(--white);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kojo-confirm-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.kojo-confirm-btn--ghost {
+  background: transparent;
+  color: var(--green-dark);
+  border-color: var(--green-light);
+}
+
+.kojo-confirm-btn--danger {
+  background: var(--accent-danger-strong);
+  border-color: var(--accent-danger-strong);
+}
+
+/* Question card */
+.kojo-ask-card--answered {
+  color: var(--green-dark-mid);
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 0.45rem 0.85rem;
+}
+
+.kojo-ask-tabs {
+  display: flex;
+  gap: 0.3rem;
+  margin-bottom: 0.55rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.kojo-ask-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.2rem 0.65rem;
+  border: 1px solid var(--green-lightest);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--green-dark-mid);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.kojo-ask-tab--active {
+  border-color: var(--green-dark);
+  color: var(--green-dark);
+  background: var(--green-lightest);
+}
+
+.kojo-ask-question {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.kojo-ask-hint {
+  margin: 0.15rem 0 0;
+  color: var(--green-dark-mid);
+  font-size: 0.72rem;
+}
+
+.kojo-ask-options {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.55rem;
+}
+
+.kojo-ask-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--green-lightest);
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.kojo-ask-option:hover {
+  border-color: var(--green-light-mid);
+}
+
+.kojo-ask-option--on {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+}
+
+.kojo-ask-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 0.1rem;
+  border: 1.5px solid var(--green-light-mid);
+  border-radius: 50%;
+  color: var(--white);
+  flex-shrink: 0;
+}
+
+.kojo-ask-mark--box {
+  border-radius: 4px;
+}
+
+.kojo-ask-option--on .kojo-ask-mark {
+  border-color: var(--green-dark);
+  background: var(--green-dark);
+}
+
+.kojo-ask-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.kojo-ask-option-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.kojo-ask-option-desc {
+  color: var(--green-dark-mid);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.kojo-ask-other {
+  width: 100%;
+  min-height: 36px;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--green-lightest);
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.8rem;
+  box-sizing: border-box;
+}
+
+.kojo-ask-other:focus {
+  outline: none;
+  border-color: var(--green-dark);
+}
+
+/* Action buttons under an answer */
+.kojo-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+}
+
+.kojo-action-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  min-height: 32px;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--green-light);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--green-dark);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.kojo-action-link:hover {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+}
+
+@media (max-width: 600px) {
+  .kojo-confirm-card,
+  .kojo-ask-card {
+    max-width: none;
+  }
+}

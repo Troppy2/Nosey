@@ -1280,6 +1280,7 @@ class LLMService:
     _retrieval_cache: OrderedDict[str, tuple[str, dict[str, object]]] = OrderedDict()
 
     def __init__(self) -> None:
+        self.last_kojo_provider: Optional[str] = None
         self._last_generation_meta: dict[str, object] = {
             "fallback_used": False,
             "fallback_reason": None,
@@ -7087,6 +7088,7 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
             fn = _STREAM_DISPATCH.get(normalized)
             if fn is None:
                 raise LLMException(f"Unsupported LLM provider: {normalized}")
+            self.last_kojo_provider = normalized
             try:
                 async for chunk in fn(prompt):
                     yield chunk
@@ -7110,6 +7112,11 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
             emitted = False
             try:
                 async for chunk in fn(prompt):
+                    if not emitted:
+                        # Kojo tools (GH #205) pin later tool rounds to the
+                        # provider that answered the first one. Instance
+                        # state: LLMService is created per request.
+                        self.last_kojo_provider = candidate
                     emitted = True
                     yield chunk
                 return

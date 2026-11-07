@@ -11,6 +11,7 @@ from src.models.lc_sync import LCProgress
 from src.models.mock_interview import MockInterviewSession
 from src.models.system_design import SDConceptProgress
 from src.schemas.attempt_schema import FRQGrade
+from src.schemas.leetcode_schema import LCScoresResponse, LCWeaknessResponse, LCWeaknessTopic
 from tests.test_mcp_connector import _connect, _rpc, client, seeded  # noqa: F401  (fixtures)
 
 pytestmark = pytest.mark.asyncio
@@ -264,3 +265,31 @@ async def test_mock_interview_uses_custom_problem_titles(client, call) -> None: 
     problems = (await client.get(f"/mock-interview/{made['session_id']}")).json()["custom_config"]["problems"]
     assert problems[0] == {"slug": made_problem["slug"], "title": "Rotate the warehouse grid", "difficulty": "Hard"}
     assert problems[1]["title"] == "Two Sum"
+
+
+async def test_weakness_signals_read_and_log(call, seeded, db_session_maker) -> None:  # noqa: F811
+    from src.models.lc_sync import LCStruggleEvent
+
+    async with db_session_maker() as session:
+        for _ in range(3):
+            session.add(LCStruggleEvent(user_id=seeded["beta"].id, topic="arrays", subtopic="Two Pointers",
+                                        event_type="solution_viewed", problem_slug="two-sum"))
+        await session.commit()
+    # The scorer compares tz-aware datetimes, which SQLite drops; Postgres keeps them.
+    scores = LCScoresResponse(weakness=LCWeaknessResponse(topics=[LCWeaknessTopic(topic="arrays", level=3)]))
+    with patch("src.services.scoring_service.ScoringService.get_scores", AsyncMock(return_value=scores)) as scorer:
+        out = await call("get_kojocode_weakness", {"sensitivity": "high"})
+    assert scorer.await_args.kwargs["sensitivity"] == "high"
+    assert out["weakness"] == [{"topic": "arrays", "subtopic": None, "level": 3}]
+    assert len(out["signals"]) == 3 and out["signals"][0]["type"] == "solution_viewed"
+
+    logged = await call("log_kojocode_signal", {"topic": "arrays", "subtopic": "Two Pointers",
+                                                "problem_slug": "two-sum", "rating": "brutal"})
+    assert logged["logged"] == "self_rated_brutal"
+    with patch("src.services.scoring_service.ScoringService.get_scores", AsyncMock(return_value=scores)):
+        assert len((await call("get_kojocode_weakness", {}))["signals"]) == 4
+
+    await call("log_kojocode_signal", {"topic": "nope", "rating": "hard"}, expect_error=True)
+    await call("log_kojocode_signal", {"topic": "arrays", "rating": "failed_grade"}, expect_error=True)
+    await call("log_kojocode_signal", {"topic": "arrays", "problem_slug": "not-real", "rating": "hard"},
+               expect_error=True)

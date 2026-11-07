@@ -10,6 +10,7 @@ import KojoActionCard from "../components/KojoActionCard";
 import KojoMascot from "../components/KojoMascot";
 import { KojoHintCarousel } from "../components/KojoHintCarousel";
 import { KojoReasoning, KojoStagedThinking } from "../components/KojoThinking";
+import { KojoActionButtons, KojoToolCard } from "../components/KojoToolCard";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { SelectionKojoAssistant } from "../components/SelectionKojoAssistant";
 import { SkeletonChatShell } from "../components/Skeletons";
@@ -18,6 +19,7 @@ import {
   bootstrapKojoFolder,
   bootstrapKojoGeneral,
   clearKojoConversation,
+  confirmKojoAction,
   createFolder,
   createGeneralKojoConversation,
   createKojoConversation,
@@ -47,8 +49,11 @@ import { ConfirmModal } from "../components/ConfirmModal";
 import type {
   ConversationFile,
   Folder,
+  KojoActionButton,
   KojoActionCard as KojoActionCardType,
   KojoActionType,
+  KojoToolCard as KojoToolCardType,
+  KojoToolStep,
   KojoConversationSummary,
   KojoMessage,
   TestBlueprint,
@@ -1205,8 +1210,9 @@ function KojoChatPage() {
       return;
     }
 
-    // Natural-language creation triggers (beta)
-    if (betaMode && !actionType) {
+    // Natural-language creation triggers (beta). General chat skips them: Kojo
+    // tools (GH #205) handle "make me flashcards" there with a confirm card.
+    if (betaMode && !actionType && !isGeneralMode) {
       const hit = ACTION_TRIGGERS.find((t) => t.pattern.test(msg));
       if (hit) {
         await handleActionRequest(hit.type, msg, display, activeConvId);
@@ -1238,6 +1244,12 @@ function KojoChatPage() {
     let content = "";
     let reasoning = "";
     let streamedAny = false;
+    // Kojo tools (GH #205): beta, general chat only. Steps, the closing card and
+    // action buttons live on the message in the UI only (not persisted).
+    const toolsOn = isGeneralMode && betaMode;
+    let toolSteps: KojoToolStep[] = [];
+    let toolCard: KojoToolCardType | undefined;
+    let actionButtons: KojoActionButton[] | undefined;
     const onDelta = (delta: string) => {
       streamedAny = true;
       content += delta;
@@ -1248,11 +1260,27 @@ function KojoChatPage() {
       reasoning += delta;
       setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, reasoning } : m)));
     };
+    const onTool = (step: Omit<KojoToolStep, "at">) => {
+      streamedAny = true;
+      const existing = toolSteps.find((s) => s.id === step.id);
+      toolSteps = existing
+        ? toolSteps.map((s) => (s.id === step.id ? { ...s, ...step } : s))
+        : [...toolSteps, { ...step, at: reasoning.length }];
+      setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, toolSteps } : m)));
+    };
+    const onCard = (card: KojoToolCardType) => {
+      toolCard = card;
+    };
+    const onActions = (buttons: KojoActionButton[]) => {
+      actionButtons = buttons;
+    };
 
     try {
       let result;
       try {
-        const handlers = { onDelta, onReasoning, reasoning: true };
+        const handlers = toolsOn
+          ? { onDelta, onReasoning, reasoning: true, tools: true, onTool, onCard, onActions }
+          : { onDelta, onReasoning, reasoning: true };
         result = isGeneralMode
           ? await kojoChatGeneralStream(convId, msg, handlers, generationProvider, kojoStrictness, kojoCustomInstruction, controller.signal)
           : await kojoChatStream(folderId!, msg, handlers, generationProvider, kojoStrictness, convId, kojoCustomInstruction, controller.signal);
@@ -1272,6 +1300,10 @@ function KojoChatPage() {
         content: result.response,
         created_at: new Date().toISOString(),
         reasoning: reasoning || undefined,
+        toolSteps: toolSteps.length ? toolSteps : undefined,
+        toolCard,
+        toolCardState: toolCard ? "pending" : undefined,
+        actionButtons,
       };
       // The real user message id the backend assigns (one before the assistant).
       const userId = result.message_id - 1;
@@ -1324,6 +1356,42 @@ function KojoChatPage() {
 
   // Abort the in-flight stream (send or regenerate). The turn's partial output is
   // kept in the UI; the composer re-enables so a new prompt can be sent.
+  // Kojo tools (GH #205): the student confirmed a card. The token carries the
+  // tool and args; the server appends a "Done" note to the conversation.
+  async function handleToolConfirm(msg: KojoMessage) {
+    const card = msg.toolCard;
+    if (!card || card.kind !== "confirm") return;
+    const setState = (patch: Partial<KojoMessage>) =>
+      setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, ...patch } : m)));
+    setState({ toolCardState: "running", toolCardError: undefined });
+    try {
+      const result = await confirmKojoAction(card.token);
+      setState({ toolCardState: "done" });
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: result.message_id ?? Date.now(),
+          role: "assistant",
+          content: result.message,
+          created_at: new Date().toISOString(),
+          actionButtons: result.url ? [{ label: "Open", to: result.url }] : undefined,
+        },
+      ]);
+    } catch (err) {
+      const text = err instanceof Error ? err.message : "That didn't work.";
+      setState({ toolCardState: text === "Already done." ? "done" : "error", toolCardError: text });
+    }
+  }
+
+  function handleToolCancel(msg: KojoMessage) {
+    setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, toolCardState: "cancelled" } : m)));
+  }
+
+  function handleToolAnswer(msg: KojoMessage, text: string) {
+    setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, toolCardState: "done" } : m)));
+    void handleSend(text);
+  }
+
   function handleStop() {
     abortRef.current?.abort();
   }
@@ -2182,8 +2250,8 @@ function KojoChatPage() {
                         <KojoMascot state={awaitingAnswer ? "loading" : "idle"} />
                       </div>
                       <div className="kojo-message-body">
-                        {(msg.reasoning || reasoningLive) && (
-                          <KojoReasoning text={msg.reasoning ?? ""} live={reasoningLive} />
+                        {(msg.reasoning || reasoningLive || (msg.toolSteps?.length ?? 0) > 0) && (
+                          <KojoReasoning text={msg.reasoning ?? ""} live={reasoningLive} steps={msg.toolSteps} />
                         )}
                         {msg.content ? (
                           <div className="kojo-answer">
@@ -2193,6 +2261,18 @@ function KojoChatPage() {
                         ) : showStaged ? (
                           <KojoStagedThinking />
                         ) : null}
+                        {!isStreaming && msg.toolCard && (
+                          <KojoToolCard
+                            card={msg.toolCard}
+                            state={msg.toolCardState}
+                            error={msg.toolCardError}
+                            disabled={isLoading}
+                            onConfirm={() => void handleToolConfirm(msg)}
+                            onCancel={() => handleToolCancel(msg)}
+                            onAnswer={(text) => handleToolAnswer(msg, text)}
+                          />
+                        )}
+                        {!isStreaming && msg.actionButtons && <KojoActionButtons buttons={msg.actionButtons} />}
                         {!isStreaming && msg.content && (
                           <div className="kojo-answer-meta">
                             {hasAnswerVersions && (

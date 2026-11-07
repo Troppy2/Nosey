@@ -12,7 +12,7 @@ from src.services.account_safety_service import screen_user_input
 from src.dependencies import get_current_user
 from src.models.user import User
 from src.repositories.usage_event_repository import UsageEventRepository
-from src.utils.provider_policy import resolve_request_provider
+from src.utils.provider_policy import resolve_request_provider, user_can_override_provider
 from src.utils.usage_context import bind_usage
 from src.schemas.kojo_schema import (
     BulkDeleteConversationsRequest,
@@ -22,6 +22,8 @@ from src.schemas.kojo_schema import (
     ProposeActionRequest,
     ResolveActionRequest,
     GeneralChatRequest,
+    KojoActionConfirmRequest,
+    KojoActionConfirmResponse,
     KojoBootstrapDTO,
     KojoChatRequest,
     KojoChatResponse,
@@ -499,6 +501,13 @@ async def general_chat_stream(
     # GH #173: screened before the quota gate and any AI call.
     await screen_user_input(user, "kojo_general", body.message, body.custom_instruction, body.context)
     slot = await _kojo_gate(session, user, "kojo_general")
+    # Kojo tools (GH #205): beta only, and only in the plain study chat (no
+    # KojoCode persona, no in-test question, no caller-supplied context).
+    tools_on = (
+        bool(body.tools) and user_can_override_provider(user) and not body.interviewer_mode
+        and body.test_id is None and body.question_id is None and not (body.context or "").strip()
+    )
+    tools_user = user if tools_on else None
 
     async def event_stream() -> AsyncIterator[str]:
         bind_usage(user.id, "kojo_general")
@@ -519,6 +528,7 @@ async def general_chat_stream(
                 test_id=body.test_id,
                 question_id=body.question_id,
                 session=session,
+                tools_user=tools_user,
             ):
                 yield _sse(event)
         except ResourceNotFoundException as exc:
@@ -777,3 +787,59 @@ async def delete_conversation(
         )
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/actions/confirm", response_model=KojoActionConfirmResponse)
+@limiter.limit("20/minute")
+async def confirm_kojo_action(
+    request: Request,
+    response: Response,
+    body: KojoActionConfirmRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> KojoActionConfirmResponse:
+    """Run a write/delete tool Kojo proposed, after the student confirmed its
+    card (GH #205). The HMAC token is the only source of the tool and args, so
+    nothing the client sends can change what runs."""
+    import hashlib
+
+    from limits import parse as parse_limit
+
+    from src.services import kojo_tools
+    from src.repositories.kojo_repository import KojoRepository
+    from src.services.mcp_tool_base import McpContext
+
+    if not user_can_override_provider(user):
+        raise HTTPException(status_code=403, detail="This feature is only available to beta users.")
+    data = kojo_tools.verify_action(body.token, user.id)
+    if data is None or kojo_tools.kind_of(data.get("n", "")) not in ("write", "delete"):
+        raise HTTPException(status_code=400, detail="This card expired. Ask Kojo again.")
+    # Single use: a double click or replay inside the 10 minutes must not run it twice.
+    digest = hashlib.sha256(body.token.encode()).hexdigest()
+    if not limiter.limiter.hit(parse_limit("1 per 15 minutes"), "kojo-confirm", digest):
+        raise HTTPException(status_code=409, detail="Already done.")
+    name, args, conversation_id = data["n"], data["a"], int(data["c"])
+    user_id = user.id
+    ctx = McpContext(user=user, session=session)
+    title, _lines = await kojo_tools.describe(ctx, name, args)
+    bind_usage(user_id, "kojo_action")
+    result, is_error = await kojo_tools.run_tool(ctx, name, args)
+    if is_error:
+        raise HTTPException(status_code=400, detail=str(result.get("error") or "That didn't work."))
+    url = result.get("url") if isinstance(result.get("url"), str) else None
+    if url and url.startswith("http"):
+        url = None  # in-app paths only; MCP tools return absolute share links
+    done = title.rstrip("?")
+    message = f"Done: {done[0].lower() + done[1:] if done else 'finished'}."
+    if name == "generate_test":
+        message = f"Started: {done[0].lower() + done[1:]}. It'll be ready in a minute."
+    message_id = None
+    try:
+        repo = KojoRepository(session)
+        conversation = await repo.get_conversation_by_id(conversation_id, user_id)
+        if conversation is not None:
+            message_id = (await repo.add_message(conversation.id, "assistant", message)).id
+            await session.commit()
+    except Exception as exc:  # noqa: BLE001 - the action already ran; the note is best-effort
+        logger.warning("Kojo confirm note failed: %s", exc)
+    return KojoActionConfirmResponse(ok=True, message=message, message_id=message_id, url=url)

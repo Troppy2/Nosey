@@ -18,19 +18,27 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Literal, Optional
 
 from pydantic import Field, model_validator
 from sqlalchemy import select
 
 from src.config import settings
-from src.models.lc_sync import LCBankProblem, LCCustomProblem, LCDrillSchedule, LCPrepBank, LCProgress
+from src.models.lc_sync import (
+    LCBankProblem,
+    LCCustomProblem,
+    LCDrillSchedule,
+    LCPrepBank,
+    LCProgress,
+    LCStruggleEvent,
+)
 from src.models.mock_interview import MockInterviewSession
 from src.models.system_design import SDConceptProgress, SDCustomTopic, SDSubmission
 from src.schemas.mock_interview_schema import CustomProblemRef, MockCustomConfig
 from src.services import lc_catalog
 from src.services.lc_taxonomy import SUBTOPICS_BY_TOPIC, TOPIC_IDS
+from src.services import scoring_service as scoring
 from src.services.mcp_tool_base import McpContext, McpTool, ToolArgs, ToolInputError
 from src.services.mcp_write_tools import CONFIRM_FIELD, CREATED_VIA, require_confirm, screen
 from src.services.sd_custom_topic_service import (
@@ -920,6 +928,80 @@ async def delete_sd_topic(ctx: McpContext, args: DeleteSdTopicArgs) -> dict[str,
     return {"deleted_topic_id": args.topic_id}
 
 
+# ---------------------------------------------------------------- weakness signals
+
+# Signals a connector may log: the user's own self-report, relayed from the chat.
+# hint_used, failed_grade, timer_expiry, test runs and drill passes stay owned by
+# the KojoCode routes, so a connector can never fake a struggle Nosey measures.
+LOGGABLE_SIGNALS = {
+    "easy": scoring.EVENT_SELF_RATED_EASY,
+    "medium": scoring.EVENT_SELF_RATED_MEDIUM,
+    "hard": scoring.EVENT_SELF_RATED_HARD,
+    "brutal": scoring.EVENT_SELF_RATED_BRUTAL,
+}
+MAX_SIGNALS = 100
+
+
+class GetWeaknessArgs(ToolArgs):
+    sensitivity: Literal["low", "medium", "high"] = Field(
+        default="medium", description="How eagerly topics are flagged, same as the KojoCode cog setting.")
+    bank_id: Optional[int] = Field(default=None, description="Score only this prep bank's problems.")
+    days: int = Field(default=7, ge=1, le=30, description="How far back to list raw signals.")
+
+
+async def get_kojocode_weakness(ctx: McpContext, args: GetWeaknessArgs) -> dict[str, Any]:
+    _require_beta(ctx)
+    slug_scope: Optional[set[str]] = None
+    if args.bank_id is not None:
+        await _owned_bank(ctx, args.bank_id)
+        slug_scope = set(await _bank_slugs(ctx, args.bank_id))
+    scores = await scoring.ScoringService().get_scores(
+        ctx.session, ctx.user.id, sensitivity=args.sensitivity, slug_scope=slug_scope
+    )
+    since = datetime.now(timezone.utc) - timedelta(days=args.days)
+    query = select(LCStruggleEvent).where(LCStruggleEvent.user_id == ctx.user.id, LCStruggleEvent.occurred_at >= since)
+    if slug_scope is not None:
+        query = query.where(LCStruggleEvent.problem_slug.in_(slug_scope))
+    rows = (await ctx.session.execute(query.order_by(LCStruggleEvent.occurred_at.desc()).limit(MAX_SIGNALS))).scalars().all()
+    return {
+        "about": "Weakness levels run 1 to 5 (5 = weakest) from the last "
+        f"{scoring.WEAKNESS_LOOKBACK_DAYS} days of struggle signals, net of solves. Rows with a subtopic are "
+        "techniques; rows without are the topic rollup. Improvement scores compare the last 7 days.",
+        "weakness": [t.model_dump() for t in scores.weakness.topics],
+        "improvement": [t.model_dump() for t in scores.improvement.topics],
+        "signals": [
+            {"type": r.event_type, "topic": r.topic, "subtopic": r.subtopic, "problem_slug": r.problem_slug,
+             "occurred_at": _iso(r.occurred_at)}
+            for r in rows
+        ],
+    }
+
+
+class LogSignalArgs(ToolArgs):
+    topic: str = Field(description=TOPIC_FIELD_DESCRIPTION)
+    subtopic: Optional[str] = Field(default=None, max_length=120)
+    problem_slug: Optional[str] = Field(default=None, max_length=200)
+    rating: Literal["easy", "medium", "hard", "brutal"] = Field(
+        description="How the user said the problem or topic felt. hard/brutal raise weakness, easy lowers it.")
+
+    @model_validator(mode="after")
+    def _valid(self) -> "LogSignalArgs":
+        _check_topic(self.topic, self.subtopic)
+        return self
+
+
+async def log_kojocode_signal(ctx: McpContext, args: LogSignalArgs) -> dict[str, Any]:
+    _require_beta(ctx)
+    slug = None
+    if args.problem_slug:
+        slug = (await _known_slugs(ctx, [args.problem_slug]) or [None])[0]
+    event_type = LOGGABLE_SIGNALS[args.rating]
+    ctx.session.add(LCStruggleEvent(user_id=ctx.user.id, topic=args.topic, subtopic=args.subtopic,
+                                    event_type=event_type, problem_slug=slug))
+    await ctx.session.commit()
+    return {"logged": event_type, "topic": args.topic, "subtopic": args.subtopic, "problem_slug": slug}
+
+
 # ---------------------------------------------------------------- registry
 
 def _read(name: str, title: str, description: str, args, handler) -> McpTool:
@@ -972,6 +1054,15 @@ INTERVIEW_TOOLS: tuple[McpTool, ...] = (
            AddDrillArgs, add_drills),
     _write("remove_drills", "Remove problems from the drill", "Take problems out of the drill. Needs confirm=true.",
            RemoveDrillArgs, remove_drills, destructive=True),
+    _read("get_kojocode_weakness", "Get KojoCode weakness signals",
+          "The user's KojoCode weak and improving topics (same scores as the weakness panel) plus the raw "
+          "struggle signals behind them: hints, failed grades, timer expiries, solution views, self ratings "
+          "and complexity misses. Optionally scoped to one prep bank.",
+          GetWeaknessArgs, get_kojocode_weakness),
+    _write("log_kojocode_signal", "Log a KojoCode self-rating",
+           "Record how a coding problem or topic felt to the user (easy, medium, hard, brutal) when they say so "
+           "in chat. It feeds the weakness scores like a rating given in Nosey. Only log what the user said.",
+           LogSignalArgs, log_kojocode_signal),
     _read("list_mock_interviews", "List mock interviews", "The user's mock interviews, newest first.",
           ListMocksArgs, list_mock_interviews),
     _read("get_mock_interview", "Get a mock interview's results",

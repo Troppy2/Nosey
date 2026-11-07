@@ -116,6 +116,7 @@ class GeneralChatRequest(BaseModel):
     interviewer_mode: Optional[str] = Field(default=None, description="KojoCode interviewer persona controlling how much Kojo helps: 'startup' | 'local' | 'bigtech'. Absent for the general study chat.")
     test_id: Optional[int] = Field(default=None, description="In-test Kojo: the Nosey test being taken. Sent with question_id.")
     question_id: Optional[int] = Field(default=None, description="In-test Kojo: the current question. The backend loads it (ownership checked) and applies the in-test tutor rules: no answer, no confirm/deny, no option elimination.")
+    tools: Optional[bool] = Field(default=False, description="Kojo tools (GH #205): let Kojo read and act on the account. Beta only, plain study chat only; ignored otherwise.")
 
 
 class RegenerateRequest(BaseModel):
@@ -180,3 +181,15 @@ class TestBlueprintResponse(BaseModel):
     difficulty: str
     topic_focus: Optional[str] = None
     intro: str
+
+
+class KojoActionConfirmRequest(BaseModel):
+    """Confirm a Kojo tool card (GH #205). The token carries the tool + args."""
+    token: str = Field(..., min_length=10, max_length=20000)
+
+
+class KojoActionConfirmResponse(BaseModel):
+    ok: bool
+    message: str
+    message_id: Optional[int] = None
+    url: Optional[str] = None

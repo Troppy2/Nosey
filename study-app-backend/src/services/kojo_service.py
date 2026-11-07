@@ -27,7 +27,7 @@ from src.schemas.kojo_schema import (
     TestBlueprintResponse,
     GeneralChatRequest,
 )
-from src.services import kojo_context_cache, kojo_tutor
+from src.services import kojo_context_cache, kojo_tools, kojo_tutor
 from src.services.file_service import FileService
 from src.services.llm_service import LLMService
 from src.services.rag_service import HybridRAGService
@@ -351,6 +351,211 @@ async def _stream_answer(
 
 
 # ---------------------------------------------------------------------------
+# Kojo tools loop (GH #205). Approved exception to "no LLM calls in loops":
+# hard cap of kojo_tools.MAX_ROUNDS rounds, provider fallback only on round 1,
+# later rounds pinned to the provider that answered.
+# ---------------------------------------------------------------------------
+
+async def _stream_round(llm, prompt: str, provider, reasoning: bool, show_reasoning: bool,
+                        tutor_labels: bool, filt, labels: dict, prefix_reasoning: str):
+    """One streamed round. Answer text goes through the tool-tag filter, so a
+    tool round never streams; a normal answer streams live."""
+    if reasoning:
+        wrapped = _wrap_reasoning_prompt(prompt, tutor_labels=tutor_labels, private=not show_reasoning)
+        splitter = _ReasoningSplitter(expect_labels=tutor_labels)
+        first_reasoning = True
+
+        def _route(events):
+            nonlocal first_reasoning
+            for channel, text in events:
+                if channel == "reasoning":
+                    if show_reasoning and text:
+                        if first_reasoning and prefix_reasoning:
+                            text = prefix_reasoning + text
+                        first_reasoning = False
+                        yield {"type": "reasoning", "text": text}
+                else:
+                    visible = filt.feed(text)
+                    if visible:
+                        yield {"type": "delta", "text": visible}
+
+        async for chunk in llm.stream_kojo(wrapped, provider=provider):
+            for event in _route(splitter.feed(chunk)):
+                yield event
+        for event in _route(splitter.flush()):
+            yield event
+        labels.update(splitter.labels)
+    else:
+        async for chunk in llm.stream_kojo(prompt, provider=provider):
+            visible = filt.feed(chunk)
+            if visible:
+                yield {"type": "delta", "text": visible}
+    tail = filt.flush()
+    if tail:
+        yield {"type": "delta", "text": tail}
+
+
+def _tool_prompt(base_prompt: str, tools_on: bool, results: list) -> str:
+    head, _sep, _ = base_prompt.rpartition("Respond now:")
+    parts = [(head or base_prompt).rstrip(), ""]
+    parts.append(
+        kojo_tools.build_tools_block() if tools_on
+        else "Tools are not available for the rest of this turn. Answer now using the results below."
+    )
+    if results:
+        parts += ["", "TOOL RESULTS (from your calls this turn, the student cannot see them):",
+                  kojo_tools.format_results(results)]
+    if tools_on:
+        parts += ["", (
+            "REMINDER: if answering needs the student's own data (folders, scores, weak spots, due cards, "
+            "plans) or a change to their account, your reply must START with a <tool> block. Do not say "
+            "\"let me check\" or \"give me a moment\": call the tool now."
+        )]
+    parts += ["", "Respond now:"]
+    return "\n".join(parts)
+
+
+async def _stream_tool_turn(llm, base_prompt: str, provider, reasoning: bool, show_reasoning: bool,
+                            tutor_labels: bool, answer_chunks: list, labels: dict,
+                            user, conversation_id: int):
+    """Streams a general-chat turn with tools. Yields the normal reasoning /
+    delta events plus {"type": "tool"} steps, {"type": "card"} (confirm or
+    question card) and {"type": "actions"} buttons."""
+    state = kojo_tools.LoopState()
+    round_provider = provider
+    step_id = 0
+    for rnd in range(kojo_tools.MAX_ROUNDS):
+        tools_on = rnd < kojo_tools.MAX_ROUNDS - 1
+        filt = kojo_tools.ToolTagFilter()
+        round_answer: list[str] = []
+        try:
+            async for event in _stream_round(
+                llm, _tool_prompt(base_prompt, tools_on, state.results), round_provider, reasoning,
+                show_reasoning, tutor_labels, filt, labels, "\n\n" if rnd else "",
+            ):
+                if event["type"] == "delta":
+                    round_answer.append(event["text"])
+                yield event
+        except Exception as exc:
+            if rnd == 0 or round_answer:
+                raise
+            # A later round failed after tools ran: answer from what we have,
+            # with provider fallback back on.
+            logger.warning("Kojo tool round %s failed, answering without tools: %s", rnd, exc)
+            filt = kojo_tools.ToolTagFilter()
+            round_answer = []
+            async for event in _stream_round(
+                llm, _tool_prompt(base_prompt, False, state.results), provider, False,
+                False, False, filt, labels, "",
+            ):
+                if event["type"] == "delta":
+                    round_answer.append(event["text"])
+                yield event
+            answer_chunks.extend(round_answer)
+            break
+        if rnd == 0 and llm.last_kojo_provider:
+            round_provider = llm.last_kojo_provider
+
+        calls = [kojo_tools.parse_call(raw) for raw in filt.calls][: kojo_tools.MAX_CALLS_PER_ROUND]
+        if filt.leading and not tools_on:
+            # Last round and the model still tried a tool: never run it.
+            text = filt.trailing.strip() or "I couldn't finish that one. Try asking again a little differently."
+            yield {"type": "delta", "text": text}
+            answer_chunks.append(text)
+            break
+        cleaned, stray = kojo_tools.strip_stray_tags("".join(round_answer))
+        calls += [c for c in stray if c.name != "open_action"]
+        # Small models often narrate first ("let me check...") and put the
+        # tool after. That streamed text stays as a preface; the call still runs.
+        acts = any(c.name != "open_action" for c in calls)
+        if not filt.leading and not acts:
+            # Normal answer. Only open_action buttons may ride along at the end.
+            round_answer = [cleaned]
+            for call in [*calls, *stray]:
+                if call.name == "open_action" and not call.error:
+                    link = kojo_tools.action_link(call.args)
+                    if link:
+                        state.buttons.append(link)
+            answer_chunks.extend(round_answer)
+            break
+
+        preface = cleaned.strip() if not filt.leading else ""
+        if preface:
+            answer_chunks.append(preface + "\n\n")
+            yield {"type": "delta", "text": "\n\n"}
+        ran_reads = False
+        for call in calls:
+            kind = kojo_tools.kind_of(call.name) if not call.error else None
+            step_id += 1
+            if call.error or kind is None:
+                state.results.append({"name": call.name, "args": call.args,
+                                      "result": {"error": call.error or "Unknown tool."}, "error": True})
+                ran_reads = True
+                continue
+            if kind == "read":
+                yield {"type": "tool", "id": step_id, "name": call.name,
+                       "label": kojo_tools.step_label(call.name, call.args), "status": "running"}
+                result, is_error = await kojo_tools.run_isolated(user, call.name, call.args)
+                state.results.append({"name": call.name, "args": call.args, "result": result, "error": is_error})
+                ran_reads = True
+                yield {"type": "tool", "id": step_id, "name": call.name,
+                       "label": kojo_tools.step_label(call.name, call.args),
+                       "status": "error" if is_error else "done",
+                       "detail": kojo_tools.result_summary(call.name, result)}
+            elif call.name == "open_action":
+                link = kojo_tools.action_link(call.args)
+                if link:
+                    state.buttons.append(link)
+            elif call.name == "ask_student":
+                args, err = kojo_tools.validate_args(call.name, call.args)
+                if err:
+                    state.results.append({"name": call.name, "args": call.args, "result": {"error": err}, "error": True})
+                    ran_reads = True
+                    continue
+                state.card = {"kind": "question", "questions": args["questions"]}
+                break
+            else:  # write / delete: confirm card, never run here
+                args, err = kojo_tools.validate_args(call.name, call.args)
+                if err:
+                    state.results.append({"name": call.name, "args": call.args, "result": {"error": err}, "error": True})
+                    ran_reads = True
+                    continue
+                from src.database import async_session_maker
+                from src.services.mcp_tool_base import McpContext
+
+                async with async_session_maker() as s:
+                    title, lines = await kojo_tools.describe(McpContext(user=user, session=s), call.name, args)
+                state.card = {
+                    "kind": "confirm", "tool": call.name, "danger": kind == "delete",
+                    "title": title, "lines": lines,
+                    "token": kojo_tools.sign_action(user.id, conversation_id, call.name, args),
+                }
+                yield {"type": "tool", "id": step_id, "name": call.name, "label": f"Prepared: {title}",
+                       "status": "done", "detail": "Waiting for you to confirm."}
+                break
+
+        if state.card is not None:
+            text = filt.trailing.strip() or ("" if preface else (
+                "Pick an answer below." if state.card["kind"] == "question" else "Confirm below and I'll do it."
+            ))
+            if text:
+                yield {"type": "delta", "text": text}
+                answer_chunks.append(text)
+            break
+        if not ran_reads:
+            # Only buttons, or nothing usable: whatever followed is the answer.
+            text = filt.trailing.strip() or ("" if preface else "Here you go.")
+            yield {"type": "delta", "text": text}
+            answer_chunks.append(text)
+            break
+
+    if state.card is not None:
+        yield {"type": "card", "card": state.card}
+    if state.buttons:
+        yield {"type": "actions", "buttons": state.buttons[:4]}
+
+
+# ---------------------------------------------------------------------------
 # Tutor guardrails glue (GH #108). The pure logic lives in kojo_tutor; these
 # helpers wire it into every study-chat path so no path can skip it.
 # ---------------------------------------------------------------------------
@@ -580,8 +785,12 @@ class KojoService:
         interviewer_mode: Optional[str] = None,
         test_id: Optional[int] = None,
         question_id: Optional[int] = None,
+        tools_user=None,
     ):
         """Streaming variant of general_chat.
+
+        ``tools_user`` (the signed-in User) turns on Kojo tools (GH #205). The
+        route passes it only for beta users in the plain study chat.
 
         Yields event dicts: {"type": "delta", "text": str} as answer tokens
         arrive (and {"type": "reasoning", ...} when reasoning is enabled), then
@@ -622,10 +831,18 @@ class KojoService:
         answer_chunks: list[str] = []
         labels: dict[str, str] = {}
         try:
-            async for event in _stream_answer(
-                llm, prompt, provider, _use_wrapper(turn, reasoning, user_message), answer_chunks,
-                show_reasoning=_show_reasoning(turn, reasoning), tutor_labels=turn is not None, labels=labels,
-            ):
+            if tools_user is not None:
+                stream = _stream_tool_turn(
+                    llm, prompt, provider, _use_wrapper(turn, reasoning, user_message),
+                    _show_reasoning(turn, reasoning), turn is not None, answer_chunks, labels,
+                    tools_user, conversation.id,
+                )
+            else:
+                stream = _stream_answer(
+                    llm, prompt, provider, _use_wrapper(turn, reasoning, user_message), answer_chunks,
+                    show_reasoning=_show_reasoning(turn, reasoning), tutor_labels=turn is not None, labels=labels,
+                )
+            async for event in stream:
                 yield event
         except Exception as exc:
             logger.warning("Kojo general stream LLM call failed: %s", exc)

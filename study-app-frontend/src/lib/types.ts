@@ -671,6 +671,43 @@ export type KojoMessage = {
   streaming?: boolean; // frontend-only: true while this assistant message is still streaming
   failed?: boolean; // frontend-only: send failed, bubble kept so the user can retry
   stopped?: boolean; // frontend-only: stream stopped by the user; turn not persisted server-side
+  toolSteps?: KojoToolStep[]; // frontend-only: Kojo tool calls this turn (GH #205), shown in the reasoning chip
+  toolCard?: KojoToolCard; // frontend-only: confirm or question card that ended the turn
+  toolCardState?: "pending" | "running" | "done" | "cancelled" | "error"; // frontend-only
+  toolCardError?: string; // frontend-only
+  actionButtons?: KojoActionButton[]; // frontend-only: in-app links Kojo attached to the answer
+};
+
+// Kojo tools (GH #205). `at` is the reasoning length when the step started, so
+// chips render in order between the reasoning paragraphs.
+export type KojoToolStep = {
+  id: number;
+  name: string;
+  label: string;
+  status: "running" | "done" | "error";
+  detail?: string;
+  at: number;
+};
+
+export type KojoAskOption = { label: string; description?: string };
+export type KojoAskQuestion = {
+  question: string;
+  header?: string;
+  options: KojoAskOption[];
+  multi_select?: boolean;
+};
+
+export type KojoToolCard =
+  | { kind: "confirm"; tool: string; danger: boolean; title: string; lines: string[]; token: string }
+  | { kind: "question"; questions: KojoAskQuestion[] };
+
+export type KojoActionButton = { label: string; to: string };
+
+export type KojoActionConfirmResult = {
+  ok: boolean;
+  message: string;
+  message_id: ID | null;
+  url: string | null;
 };
 
 // Weekly server-generated recap of what the student has been studying. `stale`

@@ -34,6 +34,10 @@ import type {
   TidiedCard,
   Folder,
   KojoActionCard,
+  KojoActionButton,
+  KojoActionConfirmResult,
+  KojoToolCard,
+  KojoToolStep,
   KojoActionType,
   KojoBootstrap,
   KojoChatResponse,
@@ -1125,10 +1129,17 @@ export type KojoStreamHandlers =
       onDelta: (delta: string) => void;
       onReasoning?: (delta: string) => void;
       reasoning?: boolean;
+      // Kojo tools (GH #205): general chat only, beta only (the backend enforces both).
+      tools?: boolean;
+      onTool?: (step: Omit<KojoToolStep, "at">) => void;
+      onCard?: (card: KojoToolCard) => void;
+      onActions?: (buttons: KojoActionButton[]) => void;
     };
 
 function normalizeHandlers(h: KojoStreamHandlers) {
-  return typeof h === "function" ? { onDelta: h, onReasoning: undefined, reasoning: false } : h;
+  return typeof h === "function"
+    ? { onDelta: h, onReasoning: undefined, reasoning: false, onTool: undefined, onCard: undefined, onActions: undefined }
+    : h;
 }
 
 async function consumeKojoStream(
@@ -1137,7 +1148,7 @@ async function consumeKojoStream(
   handlers: KojoStreamHandlers,
   signal?: AbortSignal,
 ): Promise<KojoChatResponse> {
-  const { onDelta, onReasoning } = normalizeHandlers(handlers);
+  const { onDelta, onReasoning, onTool, onCard, onActions } = normalizeHandlers(handlers);
   const token = localStorage.getItem(TOKEN_KEY);
   const headers = new Headers({ "Content-Type": "application/json" });
   if (token) headers.set("Authorization", `Bearer ${token}`);
@@ -1184,6 +1195,18 @@ async function consumeKojoStream(
       onDelta(String(event.text ?? ""));
     } else if (event.type === "reasoning") {
       onReasoning?.(String(event.text ?? ""));
+    } else if (event.type === "tool") {
+      onTool?.({
+        id: Number(event.id),
+        name: String(event.name ?? ""),
+        label: String(event.label ?? ""),
+        status: (event.status as KojoToolStep["status"]) ?? "done",
+        detail: event.detail ? String(event.detail) : undefined,
+      });
+    } else if (event.type === "card") {
+      if (event.card) onCard?.(event.card as KojoToolCard);
+    } else if (event.type === "actions") {
+      if (Array.isArray(event.buttons)) onActions?.(event.buttons as KojoActionButton[]);
     } else if (event.type === "done") {
       done = {
         response: String(event.response ?? ""),
@@ -1269,7 +1292,17 @@ export async function kojoChatGeneralStream(
     body.question_id = testRef.questionId;
   }
   if (typeof handlers === "object" && handlers.reasoning) body.reasoning = true;
+  if (typeof handlers === "object" && handlers.tools) body.tools = true;
   return consumeKojoStream(`/kojo/conversations/${conversationId}/chat/stream`, body, handlers, signal);
+}
+
+// Run the change a Kojo confirm card proposed (GH #205). The token is all the
+// server needs: it carries the tool and its arguments, signed.
+export async function confirmKojoAction(token: string): Promise<KojoActionConfirmResult> {
+  return request<KojoActionConfirmResult>("/kojo/actions/confirm", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
 }
 
 // Regenerate the last assistant answer in a conversation (folder or general).
