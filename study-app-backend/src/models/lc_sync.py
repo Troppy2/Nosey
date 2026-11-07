@@ -371,3 +371,58 @@ class LCWalkthroughAudio(Base, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"LCWalkthroughAudio(user_id={self.user_id!r}, slug={self.problem_slug!r}, voice={self.voice!r})"
+
+
+class LCLecture(Base, TimestampMixin):
+    """A Kojo pattern lecture (prefix sum, union find, Dijkstra...): theory, how to spot
+    it, a template, and a worked catalog problem, played by the walkthrough player.
+    Shared by every user. Written by an admin's MCP connector (no Nosey LLM call);
+    `source` is "curated" for the built-in catalog or "community" for user requests."""
+
+    __tablename__ = "lc_lectures"
+
+    id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)
+    slug: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    category: Mapped[str] = mapped_column(String(60), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    summary: Mapped[str] = mapped_column(String(400), nullable=False, server_default="")
+    problem_slug: Mapped[str] = mapped_column(String(200), nullable=False)
+    source: Mapped[str] = mapped_column(String(20), nullable=False, server_default="curated")
+    lecture_json: Mapped[str] = mapped_column(Text, nullable=False)
+    author_id: Mapped[Optional[int]] = mapped_column(
+        BIGINT_ID, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+    def __repr__(self) -> str:
+        return f"LCLecture(slug={self.slug!r})"
+
+
+class LCLectureRequest(Base, TimestampMixin):
+    """A user asking for a lecture on a topic Kojo does not teach yet. Fulfilled by an
+    admin's MCP connector (create_lecture with request_id), which sets lecture_slug."""
+
+    __tablename__ = "lc_lecture_requests"
+
+    id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        BIGINT_ID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    topic: Mapped[str] = mapped_column(String(120), nullable=False)
+    normalized: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    category: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="pending")
+    lecture_slug: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+
+
+class LCLectureAudio(Base, TimestampMixin):
+    """Recorded narration for a lecture in one voice, shared by every user (lectures
+    are shared). Same contract as LCWalkthroughAudio: one voice, keyed by lines hash."""
+
+    __tablename__ = "lc_lecture_audio"
+    __table_args__ = (UniqueConstraint("lecture_slug", "voice", "lines_hash", name="uq_lc_lecture_audio"),)
+
+    id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)
+    lecture_slug: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    voice: Mapped[str] = mapped_column(String(40), nullable=False)
+    lines_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    clips_json: Mapped[str] = mapped_column(Text, nullable=False)

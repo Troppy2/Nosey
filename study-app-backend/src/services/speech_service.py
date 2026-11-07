@@ -124,3 +124,27 @@ class SpeechService:
             raise
         except Exception as exc:
             raise LLMException(f"Transcription failed: {exc}") from exc
+
+
+async def record_lines(lines: list[str], voice: str, concurrency: int = 4) -> list[str]:
+    """Record every line in ONE voice (synthesize_strict), base64 mp3 per line, in order.
+    All or nothing: the first line that fails cancels the rest (so nothing keeps
+    retrying on a closed client) and raises LLMException."""
+    import base64
+
+    speech = SpeechService()
+    gate = asyncio.Semaphore(concurrency)
+    async with httpx.AsyncClient() as client:
+
+        async def one(text: str) -> str:
+            async with gate:
+                return base64.b64encode(await speech.synthesize_strict(client, text, voice)).decode("ascii")
+
+        tasks = [asyncio.create_task(one(line)) for line in lines]
+        try:
+            return list(await asyncio.gather(*tasks))
+        except BaseException:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            raise

@@ -29,7 +29,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from src.config import settings
 from src.limiter import limiter
-from src.routes import admin, attempts, auth, flashcards, folder_files, folders, health, job_descriptions, kojo, learning_modules, leetcode, mcp, mcp_oauth, mock_interview, practice_problems, slash_commands, speech, study_plans, surveys, system_design, tests, usage
+from src.routes import admin, attempts, auth, flashcards, folder_files, folders, health, job_descriptions, kojo, learning_modules, leetcode, lectures, mcp, mcp_oauth, mock_interview, practice_problems, slash_commands, speech, study_plans, surveys, system_design, tests, usage
 from src.services import upload_recovery
 from src.utils.safety_notice import SAFETY_HEADER, SafetyNoticeMiddleware
 from src.utils.validators import MAX_UPLOAD_TOTAL_SIZE_BYTES
@@ -120,6 +120,7 @@ app.include_router(tests.router)
 app.include_router(attempts.router)
 app.include_router(flashcards.router)
 app.include_router(kojo.router)
+app.include_router(lectures.router)  # before leetcode: /leetcode/lectures must not hit a /leetcode/{x} route
 app.include_router(leetcode.router)
 app.include_router(mock_interview.router)
 app.include_router(job_descriptions.router)

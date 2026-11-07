@@ -3,6 +3,7 @@ import { Binary, Braces, Calculator, Gauge, Circle, Eye, ExternalLink, Flame, Yo
 import { BookIcon, CodeIcon, ScoreRiseIcon, SettingsIcon } from "../icons";
 import { PlayIcon } from "../icons";
 import { KojoWalkthrough } from "../components/KojoWalkthrough";
+import { LectureLibrary } from "../components/LectureLibrary";
 import { AlertIcon, ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, CrossCircleIcon, PencilIcon, PlusIcon, SearchIcon, SparklesIcon, TrashIcon } from "../icons";
 import KojoMascot from "../components/KojoMascot";
 import type { CSSProperties } from "react";
@@ -110,7 +111,8 @@ export type View =
   | { type: "problem"; categoryId: string; problemSlug: string }
   | { type: "banks" }
   | { type: "drills" }
-  | { type: "practice" };
+  | { type: "practice" }
+  | { type: "lectures" };
 
 type CachedProblemState = {
   data?: LeetCodeProblemData;
@@ -599,6 +601,7 @@ export function loadSavedView(): View {
       case "banks":
       case "drills":
       case "practice":
+      case "lectures":
         return { type: raw.type };
       case "category":
         return typeof raw.categoryId === "string" ? { type: "category", categoryId: raw.categoryId } : { type: "tree" };
@@ -1209,6 +1212,7 @@ const RAIL_ITEMS: { key: string; label: string; icon: LucideIcon; view: View }[]
   { key: "banks", label: "Prep Banks", icon: BookIcon, view: { type: "banks" } },
   { key: "drills", label: "Drills", icon: Route, view: { type: "drills" } },
   { key: "practice", label: "Practice", icon: SparklesIcon, view: { type: "practice" } },
+  { key: "lectures", label: "Lectures", icon: PlayIcon as unknown as LucideIcon, view: { type: "lectures" } },
 ];
 
 const RAIL_COLLAPSE_KEY = "nosey_lc_rail_collapsed";
@@ -2151,7 +2155,8 @@ export default function LeetCodeMode() {
     interviewRealism,
     setInterviewRealism,
   } = useSettings();
-  const [view, setView] = useState<View>(loadSavedView);
+  const [initialLecture] = useState(() => new URLSearchParams(window.location.search).get("lecture"));
+  const [view, setView] = useState<View>(() => (initialLecture ? { type: "lectures" } : loadSavedView()));
   useEffect(() => saveView(view), [view]);
   const [customProblems, setCustomProblems] = useState<LCCustomProblem[]>(() => loadCustomProblems());
   const [customModalOpen, setCustomModalOpen] = useState(false);
@@ -5735,6 +5740,33 @@ export default function LeetCodeMode() {
         {confirmDeleteNode}
         {settingsModalNode}
         {completionModalsNode}
+        </div>
+      </div>
+    );
+  }
+
+  if (view.type === "lectures") {
+    return (
+      <div className="lc-shell">
+        <LeftRail active="lectures" streak={stats.currentStreak} onNavigate={setView} />
+        <div className="page page-narrow lc-page lc-shell-body">
+          <header className="lc-category-header">
+            <div className="lc-category-title-row" style={{ "--lc-accent": "var(--green-dark)" } as CSSProperties}>
+              <span className="lc-node-icon"><PlayIcon size={22} /></span>
+              <div>
+                <h1>Lectures</h1>
+                <p className="muted">Kojo teaches the patterns behind the problems: the theory, how to spot it, a template, then a worked problem.</p>
+              </div>
+            </div>
+          </header>
+          <LectureLibrary
+            categoryLabels={new Map(CATEGORIES.map((c) => [c.id, c.label]))}
+            initialLecture={initialLecture}
+            onTryProblem={(slug) => {
+              const category = CATEGORIES.find((c) => c.problems.some((pr) => pr.slug === slug));
+              if (category) openProblem(category.id, slug);
+            }}
+          />
         </div>
       </div>
     );

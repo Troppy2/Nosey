@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-import base64
 import hashlib
 import json
 import re
@@ -11,7 +9,6 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import StreamingResponse
-import httpx
 from typing import AsyncIterator
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -115,7 +112,7 @@ _CLIENT_STRUGGLE_EVENTS = frozenset(
         EVENT_SELF_RATED_BRUTAL,
     }
 )
-from src.services.speech_service import SpeechService
+from src.services.speech_service import record_lines
 from src.utils.exceptions import LLMException, ResourceNotFoundException, ValidationException
 from src.utils.logger import get_logger
 from src.utils.provider_policy import resolve_request_provider
@@ -859,16 +856,8 @@ async def record_walkthrough_audio(
     if cached is not None:
         return LCWalkthroughAudioResponse(voice=body.voice, clips=json.loads(cached.clips_json))
 
-    speech = SpeechService()
-    gate = asyncio.Semaphore(_AUDIO_CONCURRENCY)
-
-    async def one(client: httpx.AsyncClient, text: str) -> str:
-        async with gate:
-            return base64.b64encode(await speech.synthesize_strict(client, text, body.voice)).decode("ascii")
-
     try:
-        async with httpx.AsyncClient() as client:
-            clips = list(await asyncio.gather(*(one(client, line) for line in body.lines)))
+        clips = await record_lines(body.lines, body.voice, _AUDIO_CONCURRENCY)
     except (LLMException, ValidationException) as exc:
         raise HTTPException(status_code=503, detail="Kojo couldn't record the audio right now. Try again, or use the browser voice.") from exc
 

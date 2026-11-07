@@ -2,18 +2,19 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { createPortal } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { CloseIcon, PlayIcon, RetryIcon, SpeakerIcon } from "../icons";
-import { fetchSolutionWalkthrough, recordWalkthroughAudio } from "../lib/api";
-import type { SolutionWalkthrough, WalkFrame, WalkInk } from "../lib/types";
+import { fetchLecture, fetchSolutionWalkthrough, recordLectureAudio, recordWalkthroughAudio } from "../lib/api";
+import type { LectureResponse, SolutionWalkthrough, WalkFrame, WalkInk } from "../lib/types";
 import { VOICE_OPTIONS } from "../lib/voice";
 import {
-  CHAPTERS,
+  buildLectureTimeline,
   buildTimeline,
   chapterStart,
   formatClock,
   segmentAt,
   spokenLines,
-  type ChapterIndex,
+  type Scene,
   type Segment,
+  type Timeline,
 } from "../lib/walkthroughTimeline";
 import { Dropdown } from "./Dropdown";
 import "../styles/components/kojo-walkthrough.css";
@@ -77,12 +78,18 @@ function clipFromBase64(b64: string): Promise<Clip> {
   });
 }
 
-/** Records every line of the walkthrough in one AI voice (cached on the server) and
+type Recorder = (voice: string, lines: string[]) => Promise<{ clips: string[] }>;
+type Builder = (spoken?: Map<string, number>) => Timeline;
+
+/** Records every spoken line of a video in one AI voice (cached on the server) and
  *  measures each clip, so the timeline matches the real audio. Browser voice needs none. */
-function useRecording(slug: string, walk: SolutionWalkthrough, problemTitle: string, voice: VoiceChoice, attempt: number): Recording {
+function useRecording(audioKey: string, lines: string[], record: Recorder, voice: VoiceChoice, attempt: number): Recording {
   const [rec, setRec] = useState<Recording>(() =>
     voice === "browser" ? { voice, status: "ready", clips: null } : { voice, status: "recording" },
   );
+  const recordRef = useRef(record);
+  recordRef.current = record;
+  const linesKey = lines.join("\n");
   useEffect(() => {
     if (voice === "browser") {
       setRec({ voice, status: "ready", clips: null });
@@ -91,13 +98,13 @@ function useRecording(slug: string, walk: SolutionWalkthrough, problemTitle: str
     let cancelled = false;
     const urls: string[] = [];
     setRec({ voice, status: "recording" });
-    const lines = spokenLines(walk, problemTitle);
-    recordWalkthroughAudio(slug, voice, lines)
+    const wanted = linesKey.split("\n");
+    recordRef.current(voice, wanted)
       .then(async (res) => {
         const made = await Promise.all(res.clips.map(clipFromBase64));
         made.forEach((c) => urls.push(c.url));
         if (cancelled) return;
-        setRec({ voice, status: "ready", clips: new Map(lines.map((line, i) => [line, made[i]])) });
+        setRec({ voice, status: "ready", clips: new Map(wanted.map((line, i) => [line, made[i]])) });
       })
       .catch((e: unknown) => {
         if (!cancelled) setRec({ voice, status: "error", message: e instanceof Error ? e.message : "Kojo could not record the audio." });
@@ -106,7 +113,7 @@ function useRecording(slug: string, walk: SolutionWalkthrough, problemTitle: str
       cancelled = true;
       urls.forEach((u) => URL.revokeObjectURL(u));
     };
-  }, [slug, walk, problemTitle, voice, attempt]);
+  }, [audioKey, linesKey, voice, attempt]);
   return rec;
 }
 
@@ -141,26 +148,10 @@ type Props = {
   onClose: () => void;
 };
 
-export function KojoWalkthrough({ slug, problemTitle, statement, statementText, starterCode, provider, onClose }: Props) {
-  const [walk, setWalk] = useState<SolutionWalkthrough | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    setError(null);
-    fetchSolutionWalkthrough(slug, { title: problemTitle, statement: statementText, starterCode, provider })
-      .then((res) => !cancelled && setWalk(res.walkthrough))
-      .catch((e: unknown) => !cancelled && setError(e instanceof Error ? e.message : "Kojo couldn't load the walkthrough."));
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug, attempt]);
-
-  // The player renders into one host element that moves between this page and the
-  // pop-out window. Moving the element (not re-rendering) keeps React state, so the
-  // video keeps playing at the same spot; React's listeners live on the host and move too.
+/** Hosts a Kojo video: an overlay on this page that can pop out into a Document
+ *  Picture-in-Picture window. The player renders into one host element that moves
+ *  between the two documents, so React state (and playback) survives the move. */
+function usePopOutHost(windowTitle: string) {
   const [host] = useState(() => document.createElement("div"));
   const [pip, setPip] = useState<Window | null>(null);
 
@@ -196,7 +187,7 @@ export function KojoWalkthrough({ slug, problemTitle, statement, statementText, 
     };
   }, [pip, host]);
 
-  // Closing the walkthrough also closes its pop-out.
+  // Closing the video also closes its pop-out.
   useEffect(() => () => pip?.close(), [pip]);
 
   async function popOut() {
@@ -206,7 +197,7 @@ export function KojoWalkthrough({ slug, problemTitle, statement, statementText, 
     try {
       const win = await api.requestWindow({ width: 720, height: 520 });
       copyStyles(win);
-      win.document.title = `Kojo: ${problemTitle}`;
+      win.document.title = `Kojo: ${windowTitle}`;
       win.document.body.style.margin = "0";
       setPip(win);
     } catch {
@@ -217,59 +208,155 @@ export function KojoWalkthrough({ slug, problemTitle, statement, statementText, 
     pip?.close();
     setPip(null);
   }
+  return { host, pip, popOut: pipApi() ? popOut : undefined, popIn };
+}
+
+function LoadingShell({ error, message, onRetry, onClose }: { error: string | null; message: string; onRetry: () => void; onClose: () => void }) {
+  return (
+    <div className="walk-shell walk-shell--loading">
+      <button type="button" className="walk-close" onClick={onClose} aria-label="Close">
+        <CloseIcon size={18} />
+      </button>
+      {error ? (
+        <div className="walk-loading">
+          <p>{error}</p>
+          <button type="button" className="button button-primary" onClick={onRetry}>
+            <RetryIcon size={15} /> Try again
+          </button>
+        </div>
+      ) : (
+        <div className="walk-loading">
+          <Loader2 size={22} className="spin" />
+          <p>{message}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function KojoWalkthrough({ slug, problemTitle, statement, statementText, starterCode, provider, onClose }: Props) {
+  const [walk, setWalk] = useState<SolutionWalkthrough | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const { host, pip, popOut, popIn } = usePopOutHost(problemTitle);
+
+  useEffect(() => {
+    let cancelled = false;
+    setError(null);
+    fetchSolutionWalkthrough(slug, { title: problemTitle, statement: statementText, starterCode, provider })
+      .then((res) => !cancelled && setWalk(res.walkthrough))
+      .catch((e: unknown) => !cancelled && setError(e instanceof Error ? e.message : "Kojo couldn't load the walkthrough."));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, attempt]);
+
+  const build = useCallback<Builder>((spoken) => buildTimeline(walk as SolutionWalkthrough, problemTitle, spoken), [walk, problemTitle]);
+  const record = useCallback<Recorder>((voice, lines) => recordWalkthroughAudio(slug, voice, lines), [slug]);
 
   return createPortal(
     <div className={`walk-overlay${pip ? " walk-overlay--pip" : ""}`} role="dialog" aria-modal={!pip} aria-label={`Kojo's walkthrough of ${problemTitle}`}>
       {walk ? (
-        <WalkPlayer
-          slug={slug}
-          walk={walk}
-          problemTitle={problemTitle}
+        <VideoPlayer
+          audioKey={`walk:${slug}`}
+          kicker="Kojo's walkthrough"
+          title={problemTitle}
+          build={build}
+          record={record}
           statement={statement}
           onClose={onClose}
           popped={!!pip}
-          onPopOut={pipApi() ? popOut : undefined}
+          onPopOut={popOut}
           onPopIn={popIn}
         />
       ) : (
-        <div className="walk-shell walk-shell--loading">
-          <button type="button" className="walk-close" onClick={onClose} aria-label="Close">
-            <CloseIcon size={18} />
-          </button>
-          {error ? (
-            <div className="walk-loading">
-              <p>{error}</p>
-              <button type="button" className="button button-primary" onClick={() => setAttempt((n) => n + 1)}>
-                <RetryIcon size={15} /> Try again
-              </button>
-            </div>
-          ) : (
-            <div className="walk-loading">
-              <Loader2 size={22} className="spin" />
-              <p>Kojo is recording the walkthrough. The first time takes about 30 seconds; after that it opens instantly.</p>
-            </div>
-          )}
-        </div>
+        <LoadingShell
+          error={error}
+          message="Kojo is recording the walkthrough. The first time takes about 30 seconds; after that it opens instantly."
+          onRetry={() => setAttempt((n) => n + 1)}
+          onClose={onClose}
+        />
       )}
     </div>,
     host,
   );
 }
 
-function WalkPlayer({
-  slug,
-  walk,
-  problemTitle,
+/** A Kojo pattern lecture (theory, spot it, template, worked problem). */
+export function KojoLecture({ slug, onClose, onTryProblem }: { slug: string; onClose: () => void; onTryProblem?: (problemSlug: string) => void }) {
+  const [data, setData] = useState<LectureResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const { host, pip, popOut, popIn } = usePopOutHost(data?.title ?? "Lecture");
+
+  useEffect(() => {
+    let cancelled = false;
+    setError(null);
+    fetchLecture(slug)
+      .then((res) => !cancelled && setData(res))
+      .catch((e: unknown) => !cancelled && setError(e instanceof Error ? e.message : "Kojo couldn't load the lecture."));
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, attempt]);
+
+  const build = useCallback<Builder>(
+    (spoken) => buildLectureTimeline((data as LectureResponse).lecture, (data as LectureResponse).problem_title, spoken),
+    [data],
+  );
+  const record = useCallback<Recorder>((voice, lines) => recordLectureAudio(slug, voice, lines), [slug]);
+
+  return createPortal(
+    <div className={`walk-overlay${pip ? " walk-overlay--pip" : ""}`} role="dialog" aria-modal={!pip} aria-label={`Kojo's lecture on ${data?.title ?? "a pattern"}`}>
+      {data ? (
+        <VideoPlayer
+          audioKey={`lecture:${slug}`}
+          kicker="Kojo's lecture"
+          title={data.lecture.title || data.title}
+          build={build}
+          record={record}
+          headerAction={
+            onTryProblem ? (
+              <button type="button" className="walk-chip" onClick={() => onTryProblem(data.problem_slug)} title={`Open ${data.problem_title} in KojoCode`}>
+                Try {data.problem_title}
+              </button>
+            ) : null
+          }
+          onClose={onClose}
+          popped={!!pip}
+          onPopOut={popOut}
+          onPopIn={popIn}
+        />
+      ) : (
+        <LoadingShell error={error} message="Loading Kojo's lecture..." onRetry={() => setAttempt((n) => n + 1)} onClose={onClose} />
+      )}
+    </div>,
+    host,
+  );
+}
+
+function VideoPlayer({
+  audioKey,
+  kicker,
+  title,
+  build,
+  record,
   statement,
+  headerAction,
   onClose,
   popped,
   onPopOut,
   onPopIn,
 }: {
-  slug: string;
-  walk: SolutionWalkthrough;
-  problemTitle: string;
-  statement: ReactNode;
+  audioKey: string;
+  kicker: string;
+  title: string;
+  build: Builder;
+  record: Recorder;
+  /** Shown in a side panel when given (the problem text for walkthroughs). */
+  statement?: ReactNode;
+  headerAction?: ReactNode;
   onClose: () => void;
   popped: boolean;
   onPopOut?: () => void;
@@ -277,14 +364,15 @@ function WalkPlayer({
 }) {
   const [voice, setVoiceState] = useState<VoiceChoice>(loadVoice);
   const [recordAttempt, setRecordAttempt] = useState(0);
-  const rec = useRecording(slug, walk, problemTitle, voice, recordAttempt);
+  const lines = useMemo(() => spokenLines(build()), [build]);
+  const rec = useRecording(audioKey, lines, record, voice, recordAttempt);
   const clips = rec.status === "ready" ? rec.clips : null;
   const recorded = rec.status === "ready";
   const durations = useMemo(
     () => (clips ? new Map([...clips].map(([line, c]) => [line, c.dur] as [string, number])) : undefined),
     [clips],
   );
-  const { segments, total } = useMemo(() => buildTimeline(walk, problemTitle, durations), [walk, problemTitle, durations]);
+  const { segments, total, chapters } = useMemo(() => build(durations), [build, durations]);
   const shellRef = useRef<HTMLDivElement>(null);
   const [t, setT] = useState(0);
   const tRef = useRef(0);
@@ -292,7 +380,8 @@ function WalkPlayer({
   const [speed, setSpeed] = useState<Speed>("1");
   const [muted, setMuted] = useState(false);
   const [captions, setCaptions] = useState(true);
-  const [showProblem, setShowProblem] = useState(true);
+  const [showProblemState, setShowProblem] = useState(true);
+  const showProblem = showProblemState && statement !== undefined;
   const [waitingVoice, setWaitingVoice] = useState(false);
 
   // Speech for the current segment: "loading" and "speaking" hold the clock at the
@@ -480,17 +569,18 @@ function WalkPlayer({
     return () => window.removeEventListener(evt, onKey);
   });
 
-  const chapter = seg.chapter as ChapterIndex;
+  const chapter = seg.chapter;
   const fresh = t === 0 && !playing;
 
   return (
     <div className={`walk-shell${showProblem ? "" : " walk-shell--wide"}`} ref={shellRef}>
       <header className="walk-head">
         <div className="walk-head-title">
-          <span className="eyebrow">Kojo's walkthrough</span>
-          <strong>{problemTitle}</strong>
+          <span className="eyebrow">{kicker}</span>
+          <strong>{title}</strong>
         </div>
-        {!popped && (
+        {headerAction}
+        {!popped && statement !== undefined && (
           <button type="button" className="walk-chip" onClick={() => setShowProblem((v) => !v)} aria-pressed={showProblem}>
             {showProblem ? "Hide problem" : "Show problem"}
           </button>
@@ -506,7 +596,7 @@ function WalkPlayer({
             </button>
           )
         )}
-        <button type="button" className="walk-close" onClick={onClose} aria-label="Close walkthrough">
+        <button type="button" className="walk-close" onClick={onClose} aria-label="Close video">
           <CloseIcon size={18} />
         </button>
       </header>
@@ -514,14 +604,14 @@ function WalkPlayer({
       <div className={`walk-body${popped ? " walk-body--popped" : ""}`}>
         {showProblem && !popped && (
           <aside className="walk-problem" aria-label="Problem">
-            <h3>{problemTitle}</h3>
+            <h3>{title}</h3>
             <div className="walk-problem-text">{statement}</div>
           </aside>
         )}
 
         <section className="walk-video">
           <div className="walk-screen" onClick={togglePlay}>
-            <Stage walk={walk} segments={segments} idx={idx} progress={progress} local={local} problemTitle={problemTitle} />
+            <Stage seg={seg} progress={progress} local={local} />
             {captions && seg.say && !fresh && (
               <p className="walk-caption" aria-live="polite">
                 {seg.say}
@@ -551,7 +641,7 @@ function WalkPlayer({
               </div>
             )}
             {fresh && recorded && (
-              <button type="button" className="walk-bigplay" onClick={(e) => { e.stopPropagation(); togglePlay(); }} aria-label="Play walkthrough">
+              <button type="button" className="walk-bigplay" onClick={(e) => { e.stopPropagation(); togglePlay(); }} aria-label="Play video">
                 <PlayIcon size={34} />
               </button>
             )}
@@ -569,7 +659,8 @@ function WalkPlayer({
                 aria-label="Seek"
                 style={{ "--walk-pct": `${(t / total) * 100}%` } as React.CSSProperties}
               />
-              {([1, 2, 3] as ChapterIndex[]).map((c) => {
+              {chapters.map((_, c) => {
+                if (c === 0) return null;
                 const start = chapterStart(segments, c);
                 return start === null ? null : <span key={c} className="walk-tick" style={{ left: `${(start / total) * 100}%` }} />;
               })}
@@ -582,8 +673,8 @@ function WalkPlayer({
                 {formatClock(t)} / {formatClock(total)}
               </span>
               <div className="walk-chapters" role="tablist" aria-label="Chapters">
-                {CHAPTERS.map((name, c) => {
-                  const start = chapterStart(segments, c as ChapterIndex);
+                {chapters.map((name, c) => {
+                  const start = chapterStart(segments, c);
                   if (start === null) return null;
                   return (
                     <button
@@ -625,34 +716,18 @@ function WalkPlayer({
   );
 }
 
-function Stage({
-  walk,
-  segments,
-  idx,
-  progress,
-  local,
-  problemTitle,
-}: {
-  walk: SolutionWalkthrough;
-  segments: Segment[];
-  idx: number;
-  progress: number;
-  local: number;
-  problemTitle: string;
-}) {
-  const seg = segments[idx];
-  if (seg.kind === "intro" || seg.kind === "breakdown") {
-    const step = seg.kind === "intro" ? -1 : seg.index;
-    const shownPoints =
-      step < 0 ? 0 : Math.ceil(((step + Math.min(1, progress * 1.4)) / Math.max(1, walk.breakdown.length)) * walk.key_points.length);
+function Stage({ seg, progress, local }: { seg: Segment; progress: number; local: number }) {
+  const scene = seg.scene;
+  if (scene.type === "title") {
+    const shown = scene.from + Math.ceil((scene.to - scene.from) * Math.min(1, progress * 1.4));
     return (
       <div className="walk-stage walk-stage--breakdown">
         <div className="walk-titlecard">
-          <span className="walk-kicker">Kojo explains</span>
-          <h2>{problemTitle}</h2>
+          <span className="walk-kicker">{scene.kicker}</span>
+          <h2>{scene.title}</h2>
         </div>
         <ul className="walk-points">
-          {walk.key_points.slice(0, shownPoints).map((p, i) => (
+          {scene.points.slice(0, shown).map((p, i) => (
             <li key={i} className="walk-pop">
               {p}
             </li>
@@ -661,38 +736,42 @@ function Stage({
       </div>
     );
   }
-  if (seg.kind === "approach") {
+  if (scene.type === "cards") {
     return (
       <div className="walk-stage walk-stage--approaches">
-        {walk.approaches.slice(0, seg.index + 1).map((a, i) => (
-          <article key={i} className={`walk-approach${i === seg.index ? " is-now walk-pop" : ""} walk-approach--${a.verdict.replace(" ", "-")}`}>
+        {scene.cards.slice(0, scene.current + 1).map((c, i) => (
+          <article key={i} className={`walk-approach${i === scene.current ? " is-now walk-pop" : ""}${c.tone ? ` walk-approach--${c.tone}` : ""}`}>
             <div className="walk-approach-head">
-              <strong>{a.name}</strong>
-              <span className="walk-verdict">{a.verdict}</span>
+              <strong>{c.title}</strong>
+              {c.badge ? <span className="walk-verdict">{c.badge}</span> : null}
             </div>
-            <div className="walk-pills">
-              <span>Time {a.time || "-"}</span>
-              <span>Space {a.space || "-"}</span>
-            </div>
-            <p>{a.idea}</p>
-            {i === seg.index ? <p className="walk-why">{a.why}</p> : null}
+            {c.pills?.length ? (
+              <div className="walk-pills">
+                {c.pills.map((p) => (
+                  <span key={p}>{p}</span>
+                ))}
+              </div>
+            ) : null}
+            {c.body ? <p>{c.body}</p> : null}
+            {i === scene.current && c.detail ? <p className="walk-why">{c.detail}</p> : null}
           </article>
         ))}
       </div>
     );
   }
-  if (seg.kind === "frame") {
-    return <InkBoard frames={walk.frames} current={seg.index} progress={progress} />;
+  if (scene.type === "ink") {
+    return <InkBoard frames={scene.frames} current={scene.current} progress={progress} />;
   }
-  return <CodePane walk={walk} seg={seg} local={local} />;
+  return <CodePane scene={scene} typeDur={seg.typeDur} local={local} />;
 }
 
-/** The code chapter: types the current line and keeps it in view, like a screen
- *  recording that follows the cursor. Also holds the closing complexity card. */
-function CodePane({ walk, seg, local }: { walk: SolutionWalkthrough; seg: Segment; local: number }) {
+/** Types the current line and keeps it in view, like a screen recording that follows
+ *  the cursor. Also holds the closing complexity card. */
+function CodePane({ scene, typeDur, local }: { scene: Extract<Scene, { type: "code" }>; typeDur?: number; local: number }) {
   const preRef = useRef<HTMLPreElement>(null);
-  const lineIdx = seg.kind === "code" ? seg.index : walk.code.length;
-  const typed = seg.kind === "code" ? Math.min(1, local / seg.typeDur) : 1;
+  const lineIdx = scene.current;
+  const typing = typeDur !== undefined && lineIdx < scene.lines.length;
+  const typed = typing ? Math.min(1, local / (typeDur as number)) : 1;
 
   // Follow the line being typed: keep it in the middle of the pane. Scrolls only the
   // pane (never the page) and only when the line would leave the comfortable zone.
@@ -705,12 +784,12 @@ function CodePane({ walk, seg, local }: { walk: SolutionWalkthrough; seg: Segmen
     if (top < pre.scrollTop + view * 0.2 || top + line.offsetHeight > pre.scrollTop + view * 0.75) {
       pre.scrollTo({ top: Math.max(0, top - view * 0.45), behavior: "smooth" });
     }
-  }, [lineIdx]);
+  }, [lineIdx, scene.lines]);
 
   return (
     <div className="walk-stage walk-stage--code">
-      <pre className="walk-code" ref={preRef} aria-label="Solution code">
-        {walk.code.map((c, i) => {
+      <pre className="walk-code" ref={preRef} aria-label={scene.label}>
+        {scene.lines.map((c, i) => {
           if (i > lineIdx) return null;
           const text = i < lineIdx ? c.line : c.line.slice(0, Math.floor(c.line.length * typed));
           return (
@@ -718,16 +797,16 @@ function CodePane({ walk, seg, local }: { walk: SolutionWalkthrough; seg: Segmen
               <span className="walk-ln">{i + 1}</span>
               <code>
                 {text}
-                {i === lineIdx && seg.kind === "code" ? <span className="walk-caret" /> : null}
+                {i === lineIdx && typing ? <span className="walk-caret" /> : null}
               </code>
             </div>
           );
         })}
       </pre>
-      {seg.kind === "complexity" && (
+      {scene.complexity && (
         <div className="walk-complexity walk-pop">
-          <span>Time {walk.time_complexity || "-"}</span>
-          <span>Space {walk.space_complexity || "-"}</span>
+          <span>Time {scene.complexity.time || "-"}</span>
+          <span>Space {scene.complexity.space || "-"}</span>
         </div>
       )}
     </div>

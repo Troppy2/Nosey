@@ -1,5 +1,8 @@
 import type { FlashcardRating } from "./flashcardSchedule";
 import type {
+  LectureListResponse,
+  LectureRequest,
+  LectureResponse,
   DailyQuizResponse,
   WeakSpot,
   FolderStats,
@@ -2999,4 +3002,28 @@ export async function updateDashboardWidgets(
     localStorage.setItem(USER_KEY, JSON.stringify(user));
   }
   return res;
+}
+
+// Kojo pattern lectures (shared catalog; written by an admin's MCP connector).
+export async function fetchLectures(): Promise<LectureListResponse> {
+  return request<LectureListResponse>("/leetcode/lectures");
+}
+
+export async function fetchLecture(slug: string): Promise<LectureResponse> {
+  return request<LectureResponse>(`/leetcode/lectures/${encodeURIComponent(slug)}`);
+}
+
+export async function requestLecture(topic: string, category?: string): Promise<LectureRequest> {
+  return request<LectureRequest>("/leetcode/lectures/requests", {
+    method: "POST",
+    body: JSON.stringify({ topic, category: category ?? null }),
+  });
+}
+
+// Record a lecture's narration in one AI voice (shared with every user, cached).
+export async function recordLectureAudio(slug: string, voice: string, lines: string[]): Promise<{ voice: string; clips: string[] }> {
+  return request<{ voice: string; clips: string[] }>(`/leetcode/lectures/${encodeURIComponent(slug)}/audio`, {
+    method: "POST",
+    body: JSON.stringify({ voice, lines }),
+  });
 }

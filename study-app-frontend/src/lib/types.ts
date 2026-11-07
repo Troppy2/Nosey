@@ -1439,3 +1439,36 @@ export type SolutionWalkthrough = {
   complexity_say: string;
 };
 export type SolutionWalkthroughResponse = { slug: string; solution_code: string; walkthrough: SolutionWalkthrough };
+
+/** A Kojo pattern lecture (prefix sum, union find...), played by the walkthrough player. */
+export type KojoLecture = {
+  title: string;
+  summary: string;
+  theory: { say: string; point: string }[];
+  theory_frames: WalkFrame[];
+  signals: { signal: string; example: string; say: string }[];
+  template: { line: string; say: string }[];
+  problem_intro: { say: string; point: string }[];
+  frames: WalkFrame[];
+  code: { line: string; say: string }[];
+  time_complexity: string;
+  space_complexity: string;
+  complexity_say: string;
+};
+
+export type LectureSummary = {
+  slug: string;
+  title: string;
+  category: string;
+  summary: string;
+  problem_slug: string;
+  problem_title: string;
+  source: "curated" | "community";
+  ready: boolean;
+};
+
+export type LectureRequest = { id: number; topic: string; status: "pending" | "done" | "rejected"; lecture_slug: string | null };
+
+export type LectureListResponse = { lectures: LectureSummary[]; requests: LectureRequest[]; requests_left_today: number };
+
+export type LectureResponse = Omit<LectureSummary, "ready"> & { lecture: KojoLecture };

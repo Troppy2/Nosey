@@ -1,0 +1,142 @@
+/* KojoCode Lectures tab (components/LectureLibrary.tsx). Flat green, no gradients. */
+.lec-library {
+  display: grid;
+  gap: 22px;
+}
+
+.lec-request {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+  border: 1px solid var(--lc-border, rgba(113, 131, 85, 0.24));
+  border-radius: var(--radius-lg);
+  background: #fff;
+}
+
+.lec-request p {
+  margin: 2px 0 0;
+}
+
+.lec-request-row {
+  display: flex;
+  gap: 8px;
+}
+
+.lec-request-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid rgba(113, 131, 85, 0.3);
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+.lec-request-input:focus {
+  outline: none;
+  border-color: var(--green-dark);
+}
+
+.lec-pending {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lec-error {
+  margin: 0;
+  color: #b42318;
+}
+
+.lec-group h2 {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+}
+
+.lec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.lec-card {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--lc-border, rgba(113, 131, 85, 0.24));
+  border-radius: var(--radius-lg);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.lec-card.is-soon {
+  box-shadow: none;
+  background: transparent;
+}
+
+.lec-card.is-soon strong {
+  color: var(--muted);
+}
+
+.lec-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lec-tag {
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.lec-summary {
+  margin: 0;
+  color: #2d3725;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.lec-worked {
+  margin: 0;
+}
+
+.lec-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: start;
+  margin-top: 4px;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--green-dark);
+  color: var(--green-lightest);
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.lec-play:hover {
+  background: var(--green-dark-mid);
+}
+
+.lec-soon {
+  margin-top: 4px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+@media (max-width: 560px) {
+  .lec-request-row {
+    flex-direction: column;
+  }
+}
