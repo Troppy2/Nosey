@@ -175,28 +175,37 @@ async def record_lecture_audio(
     row = (await session.execute(select(LCLecture).where(LCLecture.slug == slug))).scalar_one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail="Kojo hasn't recorded this lecture yet.")
-    allowed = spoken_lines(json.loads(row.lecture_json))
-    if any(line.strip() not in allowed for line in body.lines):
-        raise HTTPException(status_code=400, detail="Those lines aren't part of this lecture.")
-    lines_hash = hashlib.sha256("\n".join(body.lines).encode("utf-8")).hexdigest()
+    # Only the lecture's full, exact set of spoken lines can be recorded: a subset or
+    # foreign text is refused, so nobody can thrash the shared recording or use this
+    # as free TTS. The cache key is the sorted canonical set, so line order never
+    # forces a re-record, and clips are stored per line.
+    canonical = sorted(spoken_lines(json.loads(row.lecture_json)))
+    requested = [line.strip() for line in body.lines]
+    if len(requested) != len(set(requested)) or sorted(requested) != canonical:
+        raise HTTPException(status_code=400, detail="Those lines don't match this lecture. Reload and try again.")
+    lines_hash = hashlib.sha256("\n".join(canonical).encode("utf-8")).hexdigest()
     cached = (await session.execute(select(LCLectureAudio).where(
         LCLectureAudio.lecture_slug == slug, LCLectureAudio.voice == body.voice, LCLectureAudio.lines_hash == lines_hash,
     ))).scalar_one_or_none()
     if cached is not None:
-        return LCWalkthroughAudioResponse(voice=body.voice, clips=json.loads(cached.clips_json))
+        by_line = json.loads(cached.clips_json)
+        if isinstance(by_line, dict) and all(line in by_line for line in requested):
+            return LCWalkthroughAudioResponse(voice=body.voice, clips=[by_line[line] for line in requested])
 
     try:
-        clips = await record_lines(body.lines, body.voice, _AUDIO_CONCURRENCY)
+        clips = await record_lines(canonical, body.voice, _AUDIO_CONCURRENCY)
     except (LLMException, ValidationException) as exc:
         raise HTTPException(status_code=503, detail="Kojo couldn't record the audio right now. Try again, or use the browser voice.") from exc
+    by_line = dict(zip(canonical, clips))
 
+    # Replace an older recording of this voice (the lecture was edited since).
     for old in (await session.execute(select(LCLectureAudio).where(
         LCLectureAudio.lecture_slug == slug, LCLectureAudio.voice == body.voice,
     ))).scalars().all():
         await session.delete(old)
-    session.add(LCLectureAudio(lecture_slug=slug, voice=body.voice, lines_hash=lines_hash, clips_json=json.dumps(clips)))
+    session.add(LCLectureAudio(lecture_slug=slug, voice=body.voice, lines_hash=lines_hash, clips_json=json.dumps(by_line)))
     try:
         await session.commit()
     except IntegrityError:
         await session.rollback()
-    return LCWalkthroughAudioResponse(voice=body.voice, clips=clips)
+    return LCWalkthroughAudioResponse(voice=body.voice, clips=[by_line[line] for line in requested])

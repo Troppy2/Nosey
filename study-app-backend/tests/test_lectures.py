@@ -86,12 +86,17 @@ async def test_only_admins_publish_and_users_request_then_listen(client, seeded,
 
     # Shared narration: records once, then served from cache; foreign lines refused.
     speak = AsyncMock(side_effect=lambda _c, text, voice: f"{voice}:{text}".encode())
-    body = {"voice": "am_michael", "lines": ["Let's learn Prefix Sums.", "Start at zero."]}
+    lines = sorted(ls.spoken_lines(got.json()["lecture"]), key=len)
+    body = {"voice": "am_michael", "lines": lines}
     with patch("src.services.speech_service.SpeechService.synthesize_strict", speak):
         a = await client.post("/leetcode/lectures/prefix-sum/audio", json=body)
         b = await client.post("/leetcode/lectures/prefix-sum/audio", json=body)
         bad = await client.post("/leetcode/lectures/prefix-sum/audio", json={"voice": "am_michael", "lines": ["Free TTS please."]})
+        subset = await client.post("/leetcode/lectures/prefix-sum/audio", json={"voice": "am_michael", "lines": lines[:1]})
+        reordered = await client.post("/leetcode/lectures/prefix-sum/audio", json={"voice": "am_michael", "lines": lines[::-1]})
     assert a.status_code == 200, a.text
-    assert base64.b64decode(a.json()["clips"][1]).decode() == "am_michael:Start at zero."
-    assert b.json() == a.json() and speak.await_count == 2
-    assert bad.status_code == 400
+    assert [base64.b64decode(c).decode() for c in a.json()["clips"]] == [f"am_michael:{line}" for line in lines]
+    assert b.json() == a.json() and speak.await_count == len(lines)  # second call served from cache
+    assert bad.status_code == 400 and subset.status_code == 400
+    assert reordered.status_code == 200 and reordered.json()["clips"] == a.json()["clips"][::-1]
+    assert speak.await_count == len(lines)  # reordering never re-records
