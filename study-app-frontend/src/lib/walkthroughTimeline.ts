@@ -25,7 +25,8 @@ export function estimateSpeech(text: string): number {
   return words === 0 ? 0 : Math.max(MIN_SPOKEN, words / WORDS_PER_SECOND + 0.4);
 }
 
-type Draft = Omit<Segment, "start">;
+// Distributive omit: plain Omit on a union keeps only the shared keys (drops `index`).
+type Draft = Segment extends infer S ? (S extends Segment ? Omit<S, "start"> : never) : never;
 
 /** Every spoken line, in play order, without repeats: what Kojo records in one pass. */
 export function spokenLines(walk: SolutionWalkthrough, problemTitle: string): string[] {
