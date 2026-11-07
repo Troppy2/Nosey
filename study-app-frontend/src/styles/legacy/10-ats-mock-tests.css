@@ -1162,16 +1162,16 @@
 
 /* ============================================================================
    LeetCode Custom Questions mode
-   User-authored problems. Warm amber accent sets handcrafted, personal content
-   apart from the green curated roadmap, while staying in the earthy palette.
+   User-authored problems. Same green palette as the curated roadmap, flat colors,
+   no gradients (simplified 2026-11-07).
    ========================================================================== */
 
 :root {
-  --lc-custom-accent: var(--accent-caution-strong);
-  --lc-custom-accent-soft: #d97a2b;
-  --lc-custom-tint: #fdf6ec;
-  --lc-custom-tint-deep: #f7ead6;
-  --lc-custom-ink: #6b3d10;
+  --lc-custom-accent: var(--green-dark);
+  --lc-custom-accent-soft: var(--green-dark);
+  --lc-custom-tint: #fff;
+  --lc-custom-tint-deep: var(--green-lightest);
+  --lc-custom-ink: var(--green-dark);
 }
 
 /* ── Roadmap node + add button ─────────────────────────────────────────────── */
@@ -1191,12 +1191,12 @@
   padding: 16px;
   border: 1px solid color-mix(in srgb, var(--lc-custom-accent) 30%, white);
   border-radius: var(--radius-md);
-  background:
-    linear-gradient(135deg, var(--lc-custom-tint), rgba(255, 255, 255, 0.92));
+  background: #fff;
   box-shadow: var(--shadow-sm);
 }
 
 .lc-custom-node::before {
+  display: none;
   content: "";
   position: absolute;
   inset: 0;
@@ -1253,7 +1253,7 @@
   display: block;
   height: 100%;
   border-radius: var(--radius-pill);
-  background: linear-gradient(90deg, var(--lc-custom-accent), var(--lc-custom-accent-soft));
+  background: var(--lc-custom-accent);
 }
 
 .lc-custom-node-main:hover .lc-node-copy strong {
@@ -1270,19 +1270,18 @@
   min-height: 44px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--lc-custom-accent), var(--lc-custom-accent-soft));
-  color: #fff;
+  background: var(--green-dark);
+  color: var(--green-lightest);
   font-size: 0.86rem;
   font-weight: 800;
   white-space: nowrap;
   cursor: pointer;
-  box-shadow: 0 6px 14px rgba(180, 83, 9, 0.22);
+  box-shadow: none;
   transition: transform var(--transition-fast), box-shadow var(--transition-fast), filter var(--transition-fast);
 }
 
 .lc-custom-add-btn:hover {
-  filter: brightness(1.04);
-  box-shadow: 0 10px 20px rgba(180, 83, 9, 0.28);
+  background: var(--green-dark-mid);
 }
 
 .lc-custom-add-btn:active {

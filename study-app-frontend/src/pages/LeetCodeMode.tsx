@@ -5668,7 +5668,7 @@ export default function LeetCodeMode() {
             const customDone = customCategoryList.filter((problem) => progress[problem.slug]).length;
             const customPct = customCategoryList.length ? Math.round((customDone / customCategoryList.length) * 100) : 0;
             return (
-              <div className="lc-custom-node" style={{ "--lc-accent": "var(--accent-caution)" } as CSSProperties}>
+              <div className="lc-custom-node" style={{ "--lc-accent": "var(--green-dark)" } as CSSProperties}>
                 <button
                   type="button"
                   className="lc-custom-node-main"
@@ -6507,7 +6507,7 @@ export default function LeetCodeMode() {
             <ChevronLeftIcon size={16} />
             Dashboard
           </button>
-          <div className="lc-category-title-row" style={{ "--lc-accent": "var(--accent-caution)" } as CSSProperties}>
+          <div className="lc-category-title-row" style={{ "--lc-accent": "var(--green-dark)" } as CSSProperties}>
             <span className="lc-node-icon"><Code size={22} /></span>
             <div>
               <h1>{CUSTOM_CATEGORY_LABEL}</h1>

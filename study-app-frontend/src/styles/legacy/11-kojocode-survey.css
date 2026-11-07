@@ -49,16 +49,11 @@
 }
 
 /* ── Custom problem statement (rendered Markdown) ──────────────────────────── */
+/* Plain text like .lc-official-statement: no card around it. */
 .lc-custom-statement {
-  margin-top: 4px;
-  padding: 16px 18px;
-  border: 1px solid color-mix(in srgb, var(--lc-custom-accent) 22%, white);
-  border-left: 3px solid var(--lc-custom-accent);
-  border-radius: var(--radius-lg);
-  background: var(--lc-custom-tint);
-  color: var(--ink);
+  color: #2d3725;
   font-size: 0.92rem;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 .lc-custom-statement :first-child { margin-top: 0; }
@@ -82,12 +77,12 @@
 }
 
 .lc-custom-modal-header {
-  background: linear-gradient(135deg, var(--lc-custom-tint-deep), rgba(255, 255, 255, 0.6));
+  background: #fff;
 }
 
 .lc-custom-avatar {
-  color: #fff;
-  background: linear-gradient(135deg, var(--lc-custom-accent), var(--lc-custom-accent-soft));
+  color: var(--green-dark);
+  background: var(--green-lightest);
 }
 
 .lc-custom-modal-body {
@@ -104,9 +99,7 @@
   padding: 16px;
   border: 1px solid color-mix(in srgb, var(--lc-custom-accent) 26%, white);
   border-radius: var(--radius-xl);
-  background:
-    radial-gradient(120% 120% at 0% 0%, var(--lc-custom-tint-deep), transparent 55%),
-    var(--lc-custom-tint);
+  background: color-mix(in srgb, var(--green-lightest) 45%, white);
 }
 
 .lc-custom-ai-head {
@@ -125,7 +118,7 @@
   padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--lc-custom-accent) 22%, white);
   border-radius: var(--radius-md);
-  background: #fffaf3;
+  background: #fff;
   color: var(--ink);
   font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
   font-size: 0.82rem;
@@ -137,7 +130,7 @@
 
 .lc-custom-ai-code:focus {
   border-color: var(--lc-custom-accent);
-  box-shadow: 0 0 0 3px rgba(180, 83, 9, 0.14);
+  box-shadow: 0 0 0 3px rgba(79, 102, 58, 0.16);
 }
 
 .lc-custom-ai-btn {
@@ -150,17 +143,17 @@
   min-height: 42px;
   border: 0;
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--lc-custom-accent), var(--lc-custom-accent-soft));
-  color: #fff;
+  background: var(--green-dark);
+  color: var(--green-lightest);
   font-size: 0.86rem;
   font-weight: 800;
   cursor: pointer;
-  box-shadow: 0 6px 14px rgba(180, 83, 9, 0.2);
+  box-shadow: none;
   transition: transform var(--transition-fast), filter var(--transition-fast);
 }
 
 .lc-custom-ai-btn:hover:not(:disabled) {
-  filter: brightness(1.05);
+  background: var(--green-dark-mid);
 }
 
 .lc-custom-ai-btn:disabled {
@@ -1262,3 +1255,20 @@ select.lc-custom-input {
   cursor: default;
 }
 
+
+/* Custom question cards: edit/archive/delete sit on their own line under the
+   title so they no longer squeeze it to a few letters. */
+.lc-problem-row:has(> .lc-row-actions) {
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+}
+.lc-problem-row > .lc-row-actions {
+  grid-column: 2 / -1;
+  justify-self: end;
+  margin-top: -4px;
+}
+.lc-problem-row--archived:has(> .lc-row-actions) {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.lc-problem-row--archived > .lc-row-actions {
+  grid-column: 1 / -1;
+}
