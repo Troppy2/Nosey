@@ -25,6 +25,39 @@ function recognitionCtor(): RecognitionCtor | null {
 export const canRecordFallback =
   typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== "undefined";
 
+// Kojo's voice for the mock interview rounds. Mirrors InterviewerVoice in the
+// backend's mock_interview_schema.py; the server rejects anything else.
+export const VOICE_OPTIONS = [
+  { value: "af_heart", label: "Heart (warm, US)" },
+  { value: "af_bella", label: "Bella (bright, US)" },
+  { value: "af_nicole", label: "Nicole (soft, US)" },
+  { value: "af_sarah", label: "Sarah (calm, US)" },
+  { value: "am_michael", label: "Michael (steady, US)" },
+  { value: "am_fenrir", label: "Fenrir (deep, US)" },
+  { value: "bf_emma", label: "Emma (UK)" },
+  { value: "bm_george", label: "George (UK)" },
+] as const;
+export type InterviewerVoiceId = (typeof VOICE_OPTIONS)[number]["value"];
+const VOICE_KEY = "nosey_mock_voice";
+
+export function loadInterviewerVoice(): InterviewerVoiceId {
+  try {
+    const v = localStorage.getItem(VOICE_KEY);
+    if (VOICE_OPTIONS.some((o) => o.value === v)) return v as InterviewerVoiceId;
+  } catch {
+    /* storage blocked */
+  }
+  return "af_heart";
+}
+
+export function saveInterviewerVoice(voice: InterviewerVoiceId) {
+  try {
+    localStorage.setItem(VOICE_KEY, voice);
+  } catch {
+    /* storage blocked */
+  }
+}
+
 export const dictationSupported = () => recognitionCtor() !== null || canRecordFallback;
 
 /** Plays interviewer lines through the backend voice. Falls back to the browser voice if that fails. */
@@ -69,7 +102,7 @@ export function useInterviewerVoice() {
       let blob: Blob | null = null;
       for (let attempt = 0; attempt < 1 && !blob; attempt++) {
         try {
-          blob = await speakInterviewer(spoken);
+          blob = await speakInterviewer(spoken, loadInterviewerVoice());
         } catch {
           if (run !== runRef.current) return;
         }

@@ -8,6 +8,7 @@ import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems"
 import { loadMockProgress, saveMockProgress, type MockProgress, type MockCompany } from "../lib/mockInterview";
 import { MockProgressGate } from "../components/MockProgressGate";
 import { VoiceRoom } from "../components/VoiceRoom";
+import { VoiceStartCard } from "../components/VoiceStart";
 import { useInterviewerVoice } from "../lib/voice";
 
 export default function MockInterviewStage3() {
@@ -39,6 +40,8 @@ function Stage3Runner({ stored }: { stored: MockProgress | null }) {
 
   const [messages, setMessages] = useState<InterviewChatMessage[]>(() => stored?.stage3?.messages ?? []);
   const [initializing, setInitializing] = useState(() => (stored?.stage3?.messages?.length ?? 0) === 0);
+  // A fresh round waits on the start screen (voice pick + Start) before Kojo joins.
+  const [started, setStarted] = useState(() => !initializing);
   const [sending, setSending] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [isDone, setIsDone] = useState(() => stored?.stage3?.isDone ?? false);
@@ -67,7 +70,7 @@ function Stage3Runner({ stored }: { stored: MockProgress | null }) {
   }, [messages, isDone, coveredGoals]);
 
   useEffect(() => {
-    if (!initializing) return;
+    if (!initializing || !started) return;
     let cancelled = false;
     (async () => {
       try {
@@ -86,7 +89,7 @@ function Stage3Runner({ stored }: { stored: MockProgress | null }) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [numericSessionId]);
+  }, [numericSessionId, started]);
 
   async function handleSend(text: string) {
     if (!text || sending || isDone) return;
@@ -112,6 +115,22 @@ function Stage3Runner({ stored }: { stored: MockProgress | null }) {
     } finally {
       setSending(false);
     }
+  }
+
+  if (!started) {
+    return (
+      <VoiceStartCard
+        title="Behavioral interview"
+        subtitle={companyLabel}
+        points={[
+          "Kojo asks 5 behavioral questions out loud, with follow-ups on vague answers.",
+          "Answer by voice or by typing. The transcript is saved as you go.",
+          "Pick the voice you want to hear, then start when you are ready.",
+        ]}
+        onStart={() => setStarted(true)}
+        onBack={() => navigate("/mock-interview")}
+      />
+    );
   }
 
   if (initializing) {

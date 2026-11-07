@@ -1,0 +1,18 @@
+/* Pre-round start screen and Kojo voice picker (mock interview voice rounds). */
+.voice-start { padding-top: 32px; }
+.voice-start-back { margin-bottom: 12px; display: inline-flex; align-items: center; gap: 6px; }
+.voice-start-card { display: flex; flex-direction: column; gap: 14px; padding: 24px; }
+.voice-start-card h1 { margin: 0; font-size: 1.5rem; color: var(--ink); }
+.voice-start-card ul { margin: 0; padding-left: 1.1rem; color: var(--green-dark-mid); line-height: 1.55; }
+.voice-start-go { align-self: flex-start; min-width: 180px; justify-content: center; }
+.voice-picker { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+.voice-picker > :first-child { flex: 1 1 220px; min-width: 0; }
+.voice-picker--compact { align-items: center; }
+.voice-picker--compact > :first-child { flex: 0 1 220px; }
+.voice-picker-preview { display: inline-flex; align-items: center; gap: 6px; }
+@media (max-width: 600px) {
+  .voice-start { padding-top: 16px; }
+  .voice-start-card { padding: 18px 16px; }
+  .voice-start-go { align-self: stretch; }
+}
+.ats-grill-start { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }

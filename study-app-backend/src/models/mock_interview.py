@@ -55,6 +55,13 @@ class MockInterviewSession(Base, TimestampMixin):
     resume_file_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     # Resume deep-dive (grill) round feedback JSON ({feedback}).
     resume_grill: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Resume deep-dive question pool written by a connected app (MCP), as JSON
+    # {"pool": [str], "picked": [int] | null}. The grill picks 5 at random when it
+    # opens and keeps them, so the app can read back which ones were asked.
+    resume_questions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Full transcript of each voice round, JSON {"resume" | "stage2" | "stage3": [{role, content}]}.
+    # Rewritten on every interviewer turn so connected apps can read how the user answered.
+    transcripts: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Stage 1 OA results JSON: [{slug, title, difficulty, code, verdict, feedback}]
     stage1_results: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

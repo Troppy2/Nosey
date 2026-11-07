@@ -9,6 +9,7 @@ import { loadMockProgress, saveMockProgress, type MockProgress, type MockCompany
 import { MockProgressGate } from "../components/MockProgressGate";
 import { VoiceAnswerBar } from "../components/VoiceAnswerBar";
 import { useInterviewerVoice } from "../lib/voice";
+import { VoicePicker } from "../components/VoiceStart";
 
 const ACCEPT = ".pdf,.docx,.doc,.txt,.md,.tex";
 
@@ -504,10 +505,13 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
               </p>
             </div>
             {!grillOpen && (
-              <button className="button button-primary" onClick={startGrill} disabled={grillSending}>
-                {grillSending ? <Loader2 size={15} className="spin" /> : <ChatIcon size={15} />}
-                Start the deep dive
-              </button>
+              <div className="ats-grill-start">
+                <VoicePicker compact />
+                <button className="button button-primary" onClick={startGrill} disabled={grillSending}>
+                  {grillSending ? <Loader2 size={15} className="spin" /> : <ChatIcon size={15} />}
+                  Start the deep dive
+                </button>
+              </div>
             )}
           </div>
 

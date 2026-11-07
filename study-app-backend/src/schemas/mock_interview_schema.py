@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Literal, Optional
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -282,8 +282,15 @@ class FinishResponse(BaseModel):
 
 # Job-description parsing (custom company). Single LLM call turns a pasted JD into a
 # prefilled interview config the user can then edit before starting.
+# Kokoro voices the user can pick for Kojo before a voice round (mirrors VOICE_OPTIONS
+# in the frontend's lib/voice.ts). Anything else is rejected so the client cannot push
+# arbitrary strings to the TTS provider. The Fish fallback keeps its own voice.
+InterviewerVoice = Literal["af_heart", "af_bella", "af_nicole", "af_sarah", "am_michael", "am_fenrir", "bf_emma", "bm_george"]
+
+
 class SpeakRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=1500)
+    voice: Optional[InterviewerVoice] = None
 
 
 class JDParseRequest(BaseModel):

@@ -685,12 +685,47 @@ async def get_mock_interview(ctx: McpContext, args: GetMockArgs) -> dict[str, An
         custom_config=_json_or_none(row.custom_config),
         resume_screen=_json_or_none(row.resume_screen),
         resume_deep_dive=_json_or_none(row.resume_grill),
+        resume_questions=_resume_questions_out(row),
+        transcripts=_json_or_none(row.transcripts),
         stage1_online_assessment=_json_or_none(row.stage1_results),
         stage2_technical=_json_or_none(row.stage2_submission),
         stage3_behavioral=_json_or_none(row.stage3_answers),
         overall_feedback=row.overall_feedback,
     )
     return out
+
+
+RESUME_QUESTION_POOL_MAX = 50
+RESUME_QUESTIONS_FIELD = Field(
+    default_factory=list, max_length=RESUME_QUESTION_POOL_MAX,
+    description="Resume deep dive question pool you wrote (5 to 50). When the deep dive opens, Nosey picks 5 "
+    "at random and asks them in place of its own; get_mock_interview then shows which were picked.",
+)
+
+
+def _clean_pool(questions: list[str]) -> list[str]:
+    pool = list(dict.fromkeys(q.strip() for q in questions if q and q.strip()))
+    if pool and len(pool) < 5:
+        raise ToolInputError("Write at least 5 distinct resume questions so Nosey has 5 to pick from.")
+    too_long = [i for i, q in enumerate(pool) if len(q) > 600]
+    if too_long:
+        raise ToolInputError(f"Resume questions must be 600 characters or less (indexes {too_long}).")
+    return pool
+
+
+def _resume_questions_out(row: MockInterviewSession) -> Optional[dict[str, Any]]:
+    data = _json_or_none(row.resume_questions)
+    if not isinstance(data, dict) or not data.get("pool"):
+        return None
+    pool = data["pool"]
+    picked = data.get("picked") or []
+    return {
+        "pool_size": len(pool),
+        "picked": [{"index": i, "question": pool[i]} for i in picked if isinstance(i, int) and 0 <= i < len(pool)],
+        "picked_at": data.get("picked_at"),
+        "status": "picked" if picked else "not picked yet (picked when the resume deep dive opens)",
+        "unused": [{"index": i, "question": q} for i, q in enumerate(pool) if i not in picked] if picked else None,
+    }
 
 
 class CreateMockArgs(ToolArgs):
@@ -714,6 +749,7 @@ class CreateMockArgs(ToolArgs):
         default_factory=list, max_length=20,
         description="Custom only: exact problems for the coding rounds (built-in or custom slugs).",
     )
+    resume_questions: list[str] = RESUME_QUESTIONS_FIELD
 
     @model_validator(mode="after")
     def _check(self) -> "CreateMockArgs":
@@ -729,7 +765,8 @@ async def create_mock_interview(ctx: McpContext, args: CreateMockArgs) -> dict[s
     _require_beta(ctx)
     company = args.company.strip()
     key = company.lower()
-    await screen(ctx, company, args.job_description, args.role_focus, args.culture)
+    pool = _clean_pool(args.resume_questions)
+    await screen(ctx, company, args.job_description, args.role_focus, args.culture, *pool)
     stages = [s for s in MOCK_STAGES if s in args.stages]
     custom_company = custom_config = jd_text = None
     if key in BUILTIN_COMPANIES:
@@ -757,12 +794,33 @@ async def create_mock_interview(ctx: McpContext, args: CreateMockArgs) -> dict[s
     row = MockInterviewSession(
         user_id=ctx.user.id, company=company_key, level=args.level, custom_company=custom_company,
         jd_text=jd_text, custom_config=custom_config, stages_config=json.dumps(stages), status="pending",
+        resume_questions=json.dumps({"pool": pool, "picked": None}) if pool else None,
     )
     ctx.session.add(row)
     await ctx.session.commit()
     out = _mock_summary(row)
     out["url"] = _url(f"/mock-interview/{row.id}/{stages[0]}")
     return out
+
+
+class SetResumeQuestionsArgs(ToolArgs):
+    session_id: int
+    questions: list[str] = Field(min_length=5, max_length=RESUME_QUESTION_POOL_MAX,
+                                 description="The full pool (replaces any earlier one). Nosey picks 5 at random.")
+
+
+async def set_resume_questions(ctx: McpContext, args: SetResumeQuestionsArgs) -> dict[str, Any]:
+    _require_beta(ctx)
+    row = await _owned_mock(ctx, args.session_id)
+    pool = _clean_pool(args.questions)
+    await screen(ctx, *pool)
+    note = None
+    if row.resume_grill:
+        note = "This interview's deep dive already ran. The new pool is used if the user runs it again."
+    row.resume_questions = json.dumps({"pool": pool, "picked": None})
+    await ctx.session.commit()
+    return {"session_id": row.id, "pool_size": len(pool), "note": note,
+            "url": _url(f"/mock-interview/{row.id}/resume")}
 
 
 class DeleteMockArgs(ToolArgs):
@@ -1066,12 +1124,19 @@ INTERVIEW_TOOLS: tuple[McpTool, ...] = (
     _read("list_mock_interviews", "List mock interviews", "The user's mock interviews, newest first.",
           ListMocksArgs, list_mock_interviews),
     _read("get_mock_interview", "Get a mock interview's results",
-          "Everything saved on one mock interview: resume screen, each stage's results and feedback, and the "
-          "overall debrief.", GetMockArgs, get_mock_interview),
+          "Everything saved on one mock interview: resume screen, each stage's results and feedback (the online "
+          "assessment and technical round include the user's code), the full transcripts of the resume deep dive, "
+          "technical and behavioral rounds (what Kojo asked and how the user answered), which prepared resume "
+          "questions were picked, and the overall debrief.", GetMockArgs, get_mock_interview),
     _write("create_mock_interview", "Set up a mock interview",
            "Set up a mock interview loop for the user to run in Nosey: a built-in company, or any other company "
            "with a job description, focus, topics and exact problems. Other unfinished runs are kept and stay resumable. "
            "Returns the URL to start it.", CreateMockArgs, create_mock_interview),
+    _write("set_resume_questions", "Set resume deep dive questions",
+           "Give an existing mock interview a pool of resume deep dive questions you wrote (5 to 50, e.g. "
+           "grilling the user's projects). Nosey picks 5 at random when the deep dive opens and asks those. "
+           "Read get_mock_interview afterwards: resume_questions.picked lists which ones were asked, by index.",
+           SetResumeQuestionsArgs, set_resume_questions),
     _write("delete_mock_interview", "Delete a mock interview",
            "Delete a past or unfinished mock interview and its results. Needs confirm=true.",
            DeleteMockArgs, delete_mock_interview, destructive=True),

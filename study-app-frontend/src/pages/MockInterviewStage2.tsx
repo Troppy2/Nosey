@@ -13,6 +13,7 @@ import { runPythonLeetCode, type RunnerResult } from "../lib/pyodideRunner";
 import { sanitizeLeetCodeHtml } from "../lib/leetcodeHtml";
 import "../styles/components/mock-debrief.css";
 import { VoiceRoom } from "../components/VoiceRoom";
+import { VoiceStartCard } from "../components/VoiceStart";
 import { useInterviewerVoice } from "../lib/voice";
 
 // A real phone screen: 45 minutes on the clock, and Kojo checks in after a long silence.
@@ -61,6 +62,8 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
 
   const [messages, setMessages] = useState<InterviewChatMessage[]>(() => saved?.messages ?? []);
   const [initializing, setInitializing] = useState(() => (saved?.messages?.length ?? 0) === 0);
+  // A fresh round waits on the start screen (voice pick + Start) before Kojo joins.
+  const [started, setStarted] = useState(() => !initializing);
   const [sending, setSending] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [coveredGoals, setCoveredGoals] = useState<string[]>(() => saved?.coveredGoals ?? []);
@@ -137,7 +140,7 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
 
   // Start the interview only if there is no saved conversation.
   useEffect(() => {
-    if (!initializing) return;
+    if (!initializing || !started) return;
     let cancelled = false;
     (async () => {
       try {
@@ -156,7 +159,7 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [numericSessionId, initializing]);
+  }, [numericSessionId, initializing, started]);
 
   const remainingMs = Math.max(0, startedAt + ROUND_MS - now);
   const minutesLeft = Math.ceil(remainingMs / 60000);
@@ -295,6 +298,22 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
   function nextRoute() {
     if (selectedStages.includes("stage3")) return `/mock-interview/${sessionId}/stage3`;
     return `/mock-interview/${sessionId}/summary`;
+  }
+
+  if (!started) {
+    return (
+      <VoiceStartCard
+        title="Technical interview"
+        subtitle={companyLabel}
+        points={[
+          "A 45 minute voice call with Kojo and a shared code editor.",
+          "Talk through your approach, code it, then analyze and dry run it.",
+          "The clock starts when you press Start. Pick Kojo's voice first.",
+        ]}
+        onStart={() => setStarted(true)}
+        onBack={() => navigate("/mock-interview")}
+      />
+    );
   }
 
   if (initializing) {

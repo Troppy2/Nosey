@@ -3,7 +3,7 @@ import html
 import json
 import random
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
@@ -338,7 +338,7 @@ async def sync_progress(
 async def speak(request: Request, payload: SpeakRequest):
     """Interviewer voice: text in, mp3 out."""
     try:
-        audio = await SpeechService().synthesize(payload.text)
+        audio = await SpeechService().synthesize(payload.text, voice_override=payload.voice)
     except ValidationException as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except LLMException as exc:
@@ -560,6 +560,57 @@ async def screen_resume(
     return result
 
 
+TRANSCRIPT_MAX_LINES = 300
+
+
+def _record_transcript(
+    row: MockInterviewSession, stage: str, history: list[InterviewChatMessage], message: Optional[str], reply: str
+) -> None:
+    """Keep the whole round's transcript on the session (the caller commits). The
+    client holds the live history, so each turn rewrites this stage's copy with it
+    plus the new answer and reply. Connected apps read it via get_mock_interview."""
+    try:
+        data = json.loads(row.transcripts) if row.transcripts else {}
+    except ValueError:
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    lines = [{"role": m.role, "content": m.content[:4000]} for m in history]
+    if message:
+        lines.append({"role": "user", "content": message})
+    if reply:
+        lines.append({"role": "interviewer", "content": reply})
+    data[stage] = lines[-TRANSCRIPT_MAX_LINES:]
+    row.transcripts = json.dumps(data)
+
+
+RESUME_PICK_COUNT = 5
+
+
+async def _picked_resume_questions(row: MockInterviewSession, db: AsyncSession) -> list[str]:
+    """The questions this deep dive asks from a connected app's pool. 5 are picked at
+    random the first time the grill runs and saved, so a resumed run asks the same
+    ones and the app can read back which were used. Empty when there is no pool."""
+    try:
+        data = json.loads(row.resume_questions) if row.resume_questions else None
+    except ValueError:
+        data = None
+    if not isinstance(data, dict) or not isinstance(data.get("pool"), list):
+        return []
+    pool = [q for q in data["pool"] if isinstance(q, str) and q.strip()]
+    if not pool:
+        return []
+    picked = data.get("picked")
+    if not isinstance(picked, list) or not picked or not all(isinstance(i, int) and 0 <= i < len(pool) for i in picked):
+        picked = random.sample(range(len(pool)), min(RESUME_PICK_COUNT, len(pool)))
+        data["pool"] = pool
+        data["picked"] = picked
+        data["picked_at"] = datetime.now(timezone.utc).isoformat()
+        row.resume_questions = json.dumps(data)
+        await db.commit()
+    return [pool[i] for i in picked]
+
+
 # ── Resume grill: recruiter deep dive on what the resume claims ───────────────
 
 @router.post("/{session_id}/resume/grill/message", response_model=ResumeGrillMessageResponse)
@@ -604,6 +655,23 @@ async def resume_grill_message(
 
     covered = _merge_covered_goals(body.covered_goals, [], _RESUME_GOALS)
     question_number = len(covered) + 1
+    planned = await _picked_resume_questions(row, db)
+    if planned:
+        listed = "\n".join(f"  {_RESUME_GOALS[i]}: {q}" for i, q in enumerate(planned))
+        goals_text = (
+            f"YOUR GOALS: ask exactly these {len(planned)} prepared questions, in this order, one per turn, "
+            f"tracked as {_RESUME_GOALS[:len(planned)]}. Keep each question's substance; you may tie it to "
+            "the resume wording.\n" + listed + "\n"
+        )
+    else:
+        goals_text = (
+            f"YOUR GOALS: ask exactly 5 questions, one per turn, tracked as {_RESUME_GOALS}.\n"
+            "  project_deep_dive: pick ONE specific project or role from the resume and ask how it worked.\n"
+            "  impact_metrics: push on a number or claim of impact they wrote. Where did it come from?\n"
+            "  tech_choice: ask why they chose a specific technology or approach named on the resume.\n"
+            "  ownership: find out what THEY personally built versus what the team did.\n"
+            "  gap_probe: probe the weakest or vaguest item on the resume for this role.\n"
+        )
 
     system_prompt = (
         f"You are Kojo, a hiring manager at {company_label}, running a 20-minute resume deep dive with "
@@ -612,13 +680,8 @@ async def resume_grill_message(
         f"Calibrate depth to a {level_cfg['label']} candidate: {level_cfg['rigor']}\n\n"
         "RESPOND WITH ONLY RAW JSON, no markdown, no extra text:\n"
         '{"reply": "...", "covered_goals": ["..."], "is_done": false}\n\n'
-        f"YOUR GOALS: ask exactly 5 questions, one per turn, tracked as {_RESUME_GOALS}.\n"
-        "  project_deep_dive: pick ONE specific project or role from the resume and ask how it worked.\n"
-        "  impact_metrics: push on a number or claim of impact they wrote. Where did it come from?\n"
-        "  tech_choice: ask why they chose a specific technology or approach named on the resume.\n"
-        "  ownership: find out what THEY personally built versus what the team did.\n"
-        "  gap_probe: probe the weakest or vaguest item on the resume for this role.\n"
-        f"GOALS ALREADY COVERED: {covered or ['(none yet)']}\n"
+        + goals_text
+        + f"GOALS ALREADY COVERED: {covered or ['(none yet)']}\n"
         f"THIS TURN: ask question number {question_number} of 5 (or wrap up if all 5 are covered).\n\n"
         "RULES:\n"
         "- Quote or name something real from the resume below in every question. Never invent "
@@ -667,6 +730,8 @@ async def resume_grill_message(
     if len(updated_covered) >= len(_RESUME_GOALS) or turn_count + 1 >= _RESUME_TURN_CAP:
         is_done = True
 
+    _record_transcript(row, "resume", body.history, body.message, parsed.get("reply", ""))
+    await db.commit()
     if is_done and body.message is not None:
         await _save_resume_grill_feedback(
             row=row,
@@ -1302,11 +1367,13 @@ async def stage2_message(
     if turn_count + 1 >= _STAGE2_TURN_CAP:
         is_done = True
 
+    reply = str(parsed.get("reply") or "").strip() or "Go on, I'm listening."
+    _record_transcript(row, "stage2", body.history, body.message, reply)
     row.status = STATUS_STAGE2
     await db.commit()
 
     return Stage2MessageResponse(
-        reply=str(parsed.get("reply") or "").strip() or "Go on, I'm listening.",
+        reply=reply,
         coding_problem=problem if present_now else None,
         is_done=is_done,
         covered_goals=updated_covered,
@@ -1424,6 +1491,7 @@ async def stage3_message(
     if turn_count + 1 >= _STAGE3_TURN_CAP:
         is_done = True
 
+    _record_transcript(row, "stage3", body.history, body.message, parsed.get("reply", ""))
     if is_done and body.message is not None:
         # Save conversation as stage3 feedback for the final summary
         await _save_stage3_conversation_feedback(

@@ -2672,12 +2672,12 @@ export async function narrateText(text: string, voice: string): Promise<Blob> {
   return res.blob();
 }
 
-export async function speakInterviewer(text: string): Promise<Blob> {
+export async function speakInterviewer(text: string, voice?: string): Promise<Blob> {
   const token = localStorage.getItem(TOKEN_KEY);
   const res = await guardedFetch(`${API_BASE_URL}/mock-interview/speak`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(voice ? { text, voice } : { text }),
   });
   if (!res.ok) throw new Error(`Voice unavailable (${res.status})`);
   return res.blob();

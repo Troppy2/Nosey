@@ -293,3 +293,50 @@ async def test_weakness_signals_read_and_log(call, seeded, db_session_maker) -> 
     await call("log_kojocode_signal", {"topic": "arrays", "rating": "failed_grade"}, expect_error=True)
     await call("log_kojocode_signal", {"topic": "arrays", "problem_slug": "not-real", "rating": "hard"},
                expect_error=True)
+
+
+async def test_resume_question_pool_picks_five_and_reports_them(client, call, db_session_maker) -> None:  # noqa: F811
+    pool = [f"Walk me through Nosey decision {i}." for i in range(8)]
+    await call("create_mock_interview", {"company": "microsoft", "resume_questions": pool[:3]}, expect_error=True)
+    made = await call("create_mock_interview", {"company": "microsoft", "stages": ["resume"], "resume_questions": pool})
+    sid = made["session_id"]
+    assert (await call("get_mock_interview", {"session_id": sid}))["resume_questions"]["picked"] == []
+
+    async with db_session_maker() as session:
+        row = await session.get(MockInterviewSession, sid)
+        row.resume_text = "Built Nosey, an AI study app. Built Park&Go."
+        await session.commit()
+    reply = AsyncMock(return_value='{"reply": "Q1", "covered_goals": [], "is_done": false}')
+    with patch("src.routes.mock_interview.LLMService.call_kojo", reply):
+        first = await client.post(f"/mock-interview/{sid}/resume/grill/message", json={"history": [], "covered_goals": []})
+        assert first.status_code == 200, first.text
+        await client.post(f"/mock-interview/{sid}/resume/grill/message", json={"history": [], "covered_goals": []})
+
+    info = (await call("get_mock_interview", {"session_id": sid}))["resume_questions"]
+    picked = [p["question"] for p in info["picked"]]
+    assert len(picked) == 5 and len(set(picked)) == 5 and len(info["unused"]) == 3
+    prompts = [c.args[0] for c in reply.await_args_list]
+    assert all(q in prompts[0] for q in picked) and prompts[0] == prompts[1]  # same picks on a resume
+
+    await call("set_resume_questions", {"session_id": sid, "questions": pool[3:]})
+    assert (await call("get_mock_interview", {"session_id": sid}))["resume_questions"]["picked"] == []
+
+
+async def test_voice_round_transcripts_reach_the_connector(client, call) -> None:  # noqa: F811
+    made = await call("create_mock_interview", {"company": "microsoft", "stages": ["stage3"]})
+    sid = made["session_id"]
+    reply = AsyncMock(return_value='{"reply": "Tell me about a conflict.", "covered_goals": [], "is_done": false}')
+    with patch("src.routes.mock_interview.LLMService.call_kojo", reply):
+        await client.post(f"/mock-interview/{sid}/stage3/message", json={"history": []})
+        res = await client.post(f"/mock-interview/{sid}/stage3/message", json={
+            "message": "My teammate and I disagreed on the schema.",
+            "history": [{"role": "interviewer", "content": "Tell me about a conflict."}],
+        })
+        assert res.status_code == 200, res.text
+    lines = (await call("get_mock_interview", {"session_id": sid}))["transcripts"]["stage3"]
+    assert [line["role"] for line in lines] == ["interviewer", "user", "interviewer"]
+    assert lines[1]["content"].startswith("My teammate")
+
+
+async def test_speak_rejects_unknown_voice(client) -> None:  # noqa: F811
+    assert (await client.post("/mock-interview/speak", json={"text": "hi", "voice": "evil"})).status_code == 422
