@@ -339,8 +339,35 @@ class LCSolutionArticle(Base, TimestampMixin):
     time_complexity: Mapped[str] = mapped_column(String(60), nullable=False, default="")
     space_complexity: Mapped[str] = mapped_column(String(60), nullable=False, default="")
     complexity_explanation: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # Video-style walkthrough JSON (see services/solution_walkthrough.py). Null on rows
+    # made before it existed; those are rebuilt on the next open.
+    walkthrough_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     user: Mapped[User] = relationship("User", back_populates="lc_solution_articles")
 
     def __repr__(self) -> str:
         return f"LCSolutionArticle(user_id={self.user_id!r}, slug={self.problem_slug!r}, rank={self.approach_rank!r})"
+
+
+class LCWalkthroughAudio(Base, TimestampMixin):
+    """Kojo's recorded narration for one walkthrough in one voice: every spoken line,
+    made in a single pass with that voice only, so playback never mixes voices and
+    never re-pays for TTS. Keyed by a hash of the exact lines so an edited script
+    records fresh. clips_json is a JSON list of base64 mp3 clips, one per line."""
+
+    __tablename__ = "lc_walkthrough_audio"
+    __table_args__ = (
+        UniqueConstraint("user_id", "problem_slug", "voice", "lines_hash", name="uq_lc_walkthrough_audio"),
+    )
+
+    id: Mapped[int] = mapped_column(BIGINT_ID, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        BIGINT_ID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    problem_slug: Mapped[str] = mapped_column(String(200), nullable=False)
+    voice: Mapped[str] = mapped_column(String(40), nullable=False)
+    lines_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    clips_json: Mapped[str] = mapped_column(Text, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"LCWalkthroughAudio(user_id={self.user_id!r}, slug={self.problem_slug!r}, voice={self.voice!r})"

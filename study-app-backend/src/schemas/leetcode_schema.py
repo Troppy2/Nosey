@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from src.schemas.mock_interview_schema import InterviewerVoice
 
 
 class LeetCodeExample(BaseModel):
@@ -229,6 +231,49 @@ class LCSolutionCodeComment(BaseModel):
 
 class LCSolutionArticleRequest(BaseModel):
     provider: Optional[str] = Field(default=None)
+
+
+class LCWalkthroughRequest(BaseModel):
+    """Official problems send their statement (the client already loaded it); custom
+    problems are read from the DB and ignore these fields."""
+
+    provider: Optional[str] = Field(default=None)
+    title: str = Field(default="", max_length=300)
+    statement: str = Field(default="", max_length=30000)
+    starter_code: str = Field(default="", max_length=10000)
+
+
+class LCWalkthroughResponse(BaseModel):
+    """Kojo's video-style solution walkthrough. `walkthrough` has the keys built by
+    services/solution_walkthrough.py: title, breakdown, key_points, approaches, code,
+    frames, time_complexity, space_complexity, complexity_say."""
+
+    slug: str
+    solution_code: str
+    walkthrough: dict
+
+
+class LCWalkthroughAudioRequest(BaseModel):
+    """Every spoken line of a walkthrough, in play order, to record in one voice."""
+
+    voice: InterviewerVoice
+    lines: list[str] = Field(..., min_length=1, max_length=160)
+
+    @field_validator("lines")
+    @classmethod
+    def _lines(cls, v: list[str]) -> list[str]:
+        out = [line.strip()[:600] for line in v]
+        if any(not line for line in out):
+            raise ValueError("lines must not be empty")
+        if sum(len(line) for line in out) > 40_000:
+            raise ValueError("too much text to record")
+        return out
+
+
+class LCWalkthroughAudioResponse(BaseModel):
+    voice: str
+    # Base64 mp3, one per requested line, same order.
+    clips: list[str]
 
 
 class LCSolutionArticleResponse(BaseModel):

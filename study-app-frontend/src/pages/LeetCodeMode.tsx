@@ -1,6 +1,8 @@
 import Editor, { type Monaco } from "@monaco-editor/react";
 import { Binary, Braces, Calculator, Gauge, Circle, Eye, ExternalLink, Flame, Youtube, GitBranch, Hash, Layers3, Link2, ListChecks, Loader2, Network, PanelRightOpen, Play, Route, ShieldAlert, Shuffle, Trophy, Users, WrapText, type LucideIcon, Code, Notebook, Wand2, Archive, ArchiveRestore } from "lucide-react";
 import { BookIcon, CodeIcon, ScoreRiseIcon, SettingsIcon } from "../icons";
+import { PlayIcon } from "../icons";
+import { KojoWalkthrough } from "../components/KojoWalkthrough";
 import { AlertIcon, ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, CrossCircleIcon, PencilIcon, PlusIcon, SearchIcon, SparklesIcon, TrashIcon } from "../icons";
 import KojoMascot from "../components/KojoMascot";
 import type { CSSProperties } from "react";
@@ -32,7 +34,6 @@ import {
   syncLCCustomProblem,
   deleteLCCustomProblem,
   generateLCCustomProblem,
-  fetchKojoCodeSolution,
   streamLCCustomProblems,
   reclassifyLCCustomProblems,
   fetchLCStreakChallenge,
@@ -70,7 +71,6 @@ import type {
   LCCustomProblem,
   LCCustomTestCase,
   LCGeneratedCustomProblem,
-  KojoCodeSolution,
   LCStreakChallenge,
   LCWeaknessTopic,
   LCImprovementTopic,
@@ -1217,23 +1217,6 @@ const RAIL_COLLAPSE_KEY = "nosey_lc_rail_collapsed";
 const EDITOR_RAIL_COLLAPSE_KEY = "nosey_lc_rail_collapsed_editor";
 // Sentinel key for visualizerLoading when tracing the KojoCode model solution's own
 // code (rather than a per-test-case "Visualize" button, which keys on its input text).
-const SOLUTION_VIZ_KEY = "__kojocode_solution__";
-
-// Build the commented solution source for the KojoCode solution reveal. The model
-// returns clean code plus a list of {code, comment} annotations; we weave each comment
-// in as a Python comment on the line above its code (indented to match), so the result
-// reads as one naturally commented solution and renders through the shared KojoCode
-// code block (MarkdownContent ```python fence). Falls back to the raw solution code.
-function buildCommentedSolution(sol: KojoCodeSolution): string {
-  if (!sol.code_comments || sol.code_comments.length === 0) return sol.solution_code;
-  const out: string[] = [];
-  for (const line of sol.code_comments) {
-    const indent = line.code.match(/^\s*/)?.[0] ?? "";
-    if (line.comment.trim()) out.push(`${indent}# ${line.comment.trim()}`);
-    out.push(line.code);
-  }
-  return out.join("\n");
-}
 
 function LeftRail({
   active,
@@ -2239,10 +2222,7 @@ export default function LeetCodeMode() {
     }
   });
   // KojoCode solution (custom problems only): lazily fetched + cached model solution.
-  const [kojoSolutionOpen, setKojoSolutionOpen] = useState(false);
-  const [kojoSolution, setKojoSolution] = useState<KojoCodeSolution | null>(null);
-  const [kojoSolutionLoading, setKojoSolutionLoading] = useState(false);
-  const [kojoSolutionError, setKojoSolutionError] = useState<string | null>(null);
+  const [walkOpen, setWalkOpen] = useState(false);
   const [visualizerTrace, setVisualizerTrace] = useState<TraceResult | null>(null);
   const [visualizerLoading, setVisualizerLoading] = useState<string | null>(null);
   const [kojoOpen, setKojoOpen] = useState(false);
@@ -4498,9 +4478,7 @@ export default function LeetCodeMode() {
     setMobilePane("problem");
     setKojoOpen(false);
     setSolutionOpen(false);
-    setKojoSolutionOpen(false);
-    setKojoSolution(null);
-    setKojoSolutionError(null);
+    setWalkOpen(false);
     setRunnerResult(null);
     // Restore Kojo's last feedback for this problem (persisted per slug) so it survives
     // leaving and coming back. A new run overwrites it.
@@ -4755,15 +4733,10 @@ export default function LeetCodeMode() {
     }
   }
 
-  // Toggle the KojoCode solution panel (custom problems only). On the first open we
-  // log the "I couldn't solve it" weakness signal once, then lazily fetch the cached
-  // model solution (the backend generates it once and caches it).
-  async function openKojoSolution() {
-    if (!currentProblem || !currentCustomProblem) return;
-    const opening = !kojoSolutionOpen;
-    setKojoSolutionOpen(opening);
-    if (!opening) return;
-
+  // Open Kojo's video walkthrough (custom and official problems). Opening it means
+  // "I couldn't solve this", so it logs the solution_viewed weakness signal once.
+  function openWalkthrough() {
+    if (!currentProblem) return;
     if (
       betaMode &&
       !isGuestSession() &&
@@ -4777,37 +4750,9 @@ export default function LeetCodeMode() {
         resolveProblemSubtopic(currentProblem.slug),
       );
     }
-
-    if (!kojoSolution && !kojoSolutionLoading) {
-      setKojoSolutionLoading(true);
-      setKojoSolutionError(null);
-      try {
-        const result = await fetchKojoCodeSolution(currentProblem.slug, generationProvider);
-        setKojoSolution(result);
-      } catch (err) {
-        setKojoSolutionError(
-          err instanceof Error ? err.message : "Kojo couldn't load the solution. Try again.",
-        );
-      } finally {
-        setKojoSolutionLoading(false);
-      }
-    }
+    setWalkOpen(true);
   }
 
-  // Step through the model solution's own code (not the user's editor code) in the
-  // shared ExecutionVisualizer, using the problem's first runnable test case as input.
-  async function handleVisualizeSolution() {
-    if (!currentCustomProblem || !kojoSolution?.solution_code.trim() || visualizerLoading) return;
-    const firstCase = currentCustomProblem.test_cases.find((tc) => tc.input_text.trim());
-    if (!firstCase) return;
-    setVisualizerLoading(SOLUTION_VIZ_KEY);
-    try {
-      const trace = await traceLeetCodeExecution(kojoSolution.solution_code, firstCase.input_text);
-      setVisualizerTrace(trace);
-    } finally {
-      setVisualizerLoading(null);
-    }
-  }
 
   async function handleRunCode() {
     if (!currentProblem || !currentProblemData || !isRunnable(currentProblemData)) return;
@@ -7325,6 +7270,26 @@ export default function LeetCodeMode() {
                   />
                 </div>
               ) : null}
+              <button
+                type="button"
+                className="lc-solution-toggle lc-walk-toggle"
+                onClick={() => {
+                  if (!hasAttempted || assistsLocked) return;
+                  openWalkthrough();
+                }}
+                disabled={!hasAttempted || assistsLocked}
+                title={hasAttempted && !assistsLocked ? "Watch Kojo solve it" : "Attempt the problem to unlock"}
+              >
+                <SparklesIcon size={15} />
+                <span>Watch Kojo solve it</span>
+                {assistsLocked ? (
+                  <small className="lc-solution-locked">Locked on Pass {activePass}</small>
+                ) : !hasAttempted ? (
+                  <small className="lc-solution-locked">Attempt first to unlock</small>
+                ) : (
+                  <PlayIcon size={13} className="lc-solution-chevron" />
+                )}
+              </button>
             </div>
           ) : null}
 
@@ -7336,7 +7301,6 @@ export default function LeetCodeMode() {
               // just while the current runnerResult is live.
               const problemAttempted = hasAttempted || attemptedSlugs.has(currentProblem.slug);
               const kojoSolutionUnlocked = problemAttempted && activePass === 1;
-              const solutionVizCase = currentCustomProblem?.test_cases.find((tc) => tc.input_text.trim());
               return (
                 <div className="lc-solution-panel lc-kojocode-panel">
                   <button
@@ -7344,96 +7308,50 @@ export default function LeetCodeMode() {
                     className="lc-solution-toggle"
                     onClick={() => {
                       if (!kojoSolutionUnlocked) return;
-                      void openKojoSolution();
+                      openWalkthrough();
                     }}
                     disabled={!kojoSolutionUnlocked}
                     title={
                       activePass > 1
                         ? `Locked on Pass ${activePass}: no solution reveal`
                         : problemAttempted
-                          ? "Toggle KojoCode solution"
+                          ? "Watch Kojo solve it"
                           : "Attempt the problem to unlock"
                     }
                   >
                     <SparklesIcon size={15} />
-                    <span>KojoCode solution</span>
+                    <span>Watch Kojo solve it</span>
                     {activePass > 1 ? (
                       <small className="lc-solution-locked">Locked on Pass {activePass}</small>
                     ) : !problemAttempted ? (
                       <small className="lc-solution-locked">Attempt first to unlock</small>
                     ) : (
-                      <ChevronDownIcon size={14} className={kojoSolutionOpen ? "lc-solution-chevron lc-solution-chevron--open" : "lc-solution-chevron"} />
+                      <PlayIcon size={13} className="lc-solution-chevron" />
                     )}
                   </button>
-                  {kojoSolutionOpen && kojoSolutionUnlocked ? (
-                    <div className="lc-kojocode-body">
-                      {kojoSolutionLoading ? (
-                        <div className="lc-kojocode-loading">
-                          <Loader2 size={16} className="spin" />
-                          <span>Kojo is writing the solution...</span>
-                        </div>
-                      ) : kojoSolutionError ? (
-                        <div className="lc-kojocode-error">
-                          <span>{kojoSolutionError}</span>
-                          <button type="button" className="lc-inline-btn" onClick={() => void openKojoSolution()}>
-                            Retry
-                          </button>
-                        </div>
-                      ) : kojoSolution ? (
-                        <>
-                          {kojoSolution.title ? (
-                            <div className="lc-kojocode-approach-title">{kojoSolution.title}</div>
-                          ) : null}
-
-                          <section className="lc-kojocode-section">
-                            <h4 className="lc-kojocode-heading">Optimal approach</h4>
-                            <MarkdownContent content={kojoSolution.approach_summary} />
-                          </section>
-
-                          {kojoSolution.solution_code.trim() && solutionVizCase ? (
-                            <section className="lc-kojocode-section">
-                              <div className="lc-kojocode-viz-row">
-                                <h4 className="lc-kojocode-heading">Walkthrough</h4>
-                                <button
-                                  type="button"
-                                  className="lc-visualize-btn"
-                                  onClick={() => void handleVisualizeSolution()}
-                                  disabled={visualizerLoading === SOLUTION_VIZ_KEY}
-                                  title="Step through the solution code"
-                                >
-                                  {visualizerLoading === SOLUTION_VIZ_KEY ? <Loader2 size={12} className="spin" /> : <Eye size={12} />}
-                                  <span>Visualize solution</span>
-                                </button>
-                              </div>
-                              <p className="lc-kojocode-viz-hint small muted">
-                                Steps through the solution on the first example: {solutionVizCase.input_text}
-                              </p>
-                            </section>
-                          ) : null}
-
-                          <section className="lc-kojocode-section">
-                            <h4 className="lc-kojocode-heading">Solution</h4>
-                            <MarkdownContent
-                              content={"```python\n" + buildCommentedSolution(kojoSolution) + "\n```"}
-                              enableCodeCopy
-                            />
-                          </section>
-
-                          <section className="lc-kojocode-section">
-                            <h4 className="lc-kojocode-heading">Complexity</h4>
-                            <div className="lc-kojocode-complexity-row">
-                              <span className="pill">Time: {kojoSolution.time_complexity || "-"}</span>
-                              <span className="pill">Space: {kojoSolution.space_complexity || "-"}</span>
-                            </div>
-                            <MarkdownContent content={kojoSolution.complexity_explanation} />
-                          </section>
-                        </>
-                      ) : null}
-                    </div>
-                  ) : null}
                 </div>
               );
             })()
+          ) : null}
+
+          {walkOpen && currentProblem ? (
+            <KojoWalkthrough
+              slug={currentProblem.slug}
+              problemTitle={currentProblem.title}
+              statement={
+                isCustomProblem && currentCustomProblem ? (
+                  <MarkdownContent content={currentCustomProblem.description} />
+                ) : currentProblemData ? (
+                  <div className="lc-official-statement" dangerouslySetInnerHTML={{ __html: sanitizeLeetCodeHtml(currentProblemData.content_html) }} />
+                ) : null
+              }
+              statementText={
+                isCustomProblem ? "" : currentProblemData ? new DOMParser().parseFromString(currentProblemData.content_html, "text/html").body.textContent ?? "" : ""
+              }
+              starterCode={isCustomProblem ? "" : currentProblemData?.python_snippet ?? ""}
+              provider={generationProvider}
+              onClose={() => setWalkOpen(false)}
+            />
           ) : null}
 
           {runnerResult?.ok ? (

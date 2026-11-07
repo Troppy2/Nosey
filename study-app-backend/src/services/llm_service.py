@@ -5292,6 +5292,24 @@ Return only the JSON object."""
         prompt = self._build_solution_article_prompt(title, statement, starter_code)
         return await self._complete_json(prompt, provider=provider)
 
+    async def generate_walkthrough_script(
+        self, title: str, statement: str, starter_code: str, provider: Optional[str] = None
+    ) -> dict[str, object]:
+        """KojoCode walkthrough, call 1 of 2: breakdown, approaches, line by line code.
+        One JSON call, fallback handled inside _complete_json."""
+        from src.services import solution_walkthrough as sw
+
+        return await self._complete_json(sw.script_prompt(title, statement, starter_code), provider=provider, max_tokens=6000)
+
+    async def generate_walkthrough_sketch(
+        self, title: str, statement: str, approach: str, code: str, provider: Optional[str] = None
+    ) -> dict[str, object]:
+        """KojoCode walkthrough, call 2 of 2: the ink sketch frames for the chosen
+        approach (needs call 1's code, so it runs after it, never in a provider loop)."""
+        from src.services import solution_walkthrough as sw
+
+        return await self._complete_json(sw.sketch_prompt(title, statement, approach, code), provider=provider, max_tokens=6000)
+
     def _build_solution_article_prompt(self, title: str, statement: str, starter_code: str) -> str:
         title_line = (title or "").strip()[:300] or "this problem"
         statement_body = (statement or "").strip()[:12000] or "(no statement provided)"

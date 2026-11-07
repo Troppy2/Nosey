@@ -238,6 +238,34 @@ class LeetCodeService:
 
         return self._normalize_solution_article(data, fallback_code=starter_code)
 
+    async def generate_walkthrough(
+        self, title: str, statement: str, starter_code: str, provider: Optional[str] = None
+    ) -> dict[str, object]:
+        """Build the video-style KojoCode walkthrough: the script first, then the ink
+        sketch for its optimal approach. A failed sketch keeps the walkthrough (the
+        drawing chapter is skipped) rather than failing the whole thing."""
+        from src.services import solution_walkthrough as sw
+
+        llm = LLMService()
+        try:
+            script = sw.normalize_script(
+                await llm.generate_walkthrough_script(title, statement, starter_code, provider=provider)
+            )
+        except Exception as exc:
+            raise LLMException("Kojo couldn't record a walkthrough for this problem. Try again.") from exc
+        if not sw.is_usable(script):
+            raise LLMException("Kojo's walkthrough came out incomplete. Try again.")
+        optimal = script["approaches"][-1] if script["approaches"] else {}
+        approach = f"{optimal.get('name', script['title'])}: {optimal.get('idea', '')}"
+        try:
+            frames = sw.normalize_sketch(
+                await llm.generate_walkthrough_sketch(title, statement, approach, sw.code_text(script), provider=provider)
+            )
+        except Exception:
+            frames = []
+        script["frames"] = frames
+        return script
+
     def _normalize_solution_article(
         self, data: dict[str, object], fallback_code: str = ""
     ) -> dict[str, object]:

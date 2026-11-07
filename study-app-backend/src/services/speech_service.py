@@ -24,6 +24,8 @@ PRIMARY_TIMEOUT_SECONDS = 15.0
 FALLBACK_TIMEOUT_SECONDS = 25.0
 # Fish starts this long after Kokoro if Kokoro has not answered, so a slow Kokoro costs ~2s, not 15.
 HEDGE_AFTER_SECONDS = 2.0
+# Recording a walkthrough is not interactive, so the one voice gets longer to answer.
+STRICT_TIMEOUT_SECONDS = 30.0
 
 
 def _headers() -> dict[str, str]:
@@ -86,6 +88,22 @@ class SpeechService:
                 for task in (primary, fallback):
                     if task is not None and not task.done():
                         task.cancel()
+
+    async def synthesize_strict(self, client: httpx.AsyncClient, text: str, voice: str, attempts: int = 3) -> bytes:
+        """One voice only, never the Fish fallback: a recorded walkthrough must not switch
+        voices between lines. Retries Kokoro a few times, then raises."""
+        text = (text or "").strip()[:MAX_TTS_CHARS]
+        if not text:
+            raise ValidationException("Nothing to speak.")
+        last: Exception | None = None
+        for attempt in range(attempts):
+            try:
+                return await self._speak_once(client, settings.openrouter_tts_model, voice, text, STRICT_TIMEOUT_SECONDS)
+            except Exception as exc:  # noqa: BLE001 - retried, then reported
+                last = exc
+                logger.warning("strict tts attempt %d failed: %s %s", attempt + 1, type(exc).__name__, exc)
+                await asyncio.sleep(0.6 * (attempt + 1))
+        raise LLMException(f"Speech synthesis failed: {last}")
 
     async def transcribe(self, audio: bytes, filename: str, content_type: str) -> str:
         if not audio:

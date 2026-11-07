@@ -2049,6 +2049,31 @@ export async function fetchKojoCodeSolution(
   );
 }
 
+// Kojo's video walkthrough for a custom or official problem. Built once, then cached.
+export async function fetchSolutionWalkthrough(
+  slug: string,
+  problem: { title?: string; statement?: string; starterCode?: string; provider?: string },
+): Promise<import("./types").SolutionWalkthroughResponse> {
+  return request<import("./types").SolutionWalkthroughResponse>(`/leetcode/walkthrough/${encodeURIComponent(slug)}`, {
+    method: "POST",
+    body: JSON.stringify({
+      provider: problem.provider,
+      title: problem.title ?? "",
+      statement: (problem.statement ?? "").slice(0, 30000),
+      starter_code: (problem.starterCode ?? "").slice(0, 10000),
+    }),
+  });
+}
+
+// Record every spoken line of a walkthrough in one AI voice (cached server side).
+// Returns base64 mp3 clips in the same order as `lines`.
+export async function recordWalkthroughAudio(slug: string, voice: string, lines: string[]): Promise<{ voice: string; clips: string[] }> {
+  return request<{ voice: string; clips: string[] }>(`/leetcode/walkthrough/${encodeURIComponent(slug)}/audio`, {
+    method: "POST",
+    body: JSON.stringify({ voice, lines }),
+  });
+}
+
 // Stream a batch of fresh custom problems from ONE backend LLM call. onProblem fires
 // for each problem the moment it finishes streaming, so the UI can add them live.
 // Resolves with the total once the server emits "done"; rejects on an "error" event or

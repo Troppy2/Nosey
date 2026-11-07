@@ -1407,3 +1407,35 @@ export type DashboardWidgetsUpdate = {
 export type DashboardWidgetsResponse = {
   dashboard_widgets: string[];
 };
+
+// KojoCode video walkthrough (backend services/solution_walkthrough.py).
+export type WalkInk = "ink" | "red" | "blue" | "green";
+export type WalkApproach = {
+  name: string;
+  time: string;
+  space: string;
+  verdict: "optimal" | "works" | "too slow" | "fails";
+  idea: string;
+  why: string;
+  say: string;
+};
+export type WalkFrame = {
+  say: string;
+  /** Wipe the board before this frame (server layout or Kojo's own choice). */
+  clear?: boolean;
+  strokes: { points: number[]; color: WalkInk }[];
+  /** `until`: the frame that rewrote this spot, so this label is erased from then on. */
+  labels: { x: number; y: number; text: string; color: WalkInk; until?: number }[];
+};
+export type SolutionWalkthrough = {
+  title: string;
+  breakdown: string[];
+  key_points: string[];
+  approaches: WalkApproach[];
+  code: { line: string; say: string }[];
+  frames: WalkFrame[];
+  time_complexity: string;
+  space_complexity: string;
+  complexity_say: string;
+};
+export type SolutionWalkthroughResponse = { slug: string; solution_code: string; walkthrough: SolutionWalkthrough };

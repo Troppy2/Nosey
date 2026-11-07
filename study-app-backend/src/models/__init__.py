@@ -20,6 +20,7 @@ from src.models.lc_sync import (
     LCProblemNote,
     LCProgress,
     LCSolutionArticle,
+    LCWalkthroughAudio,
     LCStreakChallenge,
     LCStruggleEvent,
 )
@@ -66,6 +67,7 @@ __all__ = [
     "LCProblemNote",
     "LCProgress",
     "LCSolutionArticle",
+    "LCWalkthroughAudio",
     "LCStreakChallenge",
     "LCStruggleEvent",
     "LearningModule",

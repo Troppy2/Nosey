@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import asyncio
+import base64
+import hashlib
 import json
+import re
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import StreamingResponse
+import httpx
 from typing import AsyncIterator
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -27,6 +32,7 @@ from src.models.lc_sync import (
     LCStreakChallenge,
     LCStruggleEvent,
     LCTestRun,
+    LCWalkthroughAudio,
 )
 from src.models.user import User
 from src.schemas.leetcode_schema import (
@@ -58,6 +64,10 @@ from src.schemas.leetcode_schema import (
     LCReskinRequestBase,
     LCSolutionArticleRequest,
     LCSolutionArticleResponse,
+    LCWalkthroughAudioRequest,
+    LCWalkthroughAudioResponse,
+    LCWalkthroughRequest,
+    LCWalkthroughResponse,
     LCSolutionCodeComment,
     LCStreakChallengeCompleteRequest,
     LCStreakChallengeCreateRequest,
@@ -105,7 +115,8 @@ _CLIENT_STRUGGLE_EVENTS = frozenset(
         EVENT_SELF_RATED_BRUTAL,
     }
 )
-from src.utils.exceptions import LLMException, ResourceNotFoundException
+from src.services.speech_service import SpeechService
+from src.utils.exceptions import LLMException, ResourceNotFoundException, ValidationException
 from src.utils.logger import get_logger
 from src.utils.provider_policy import resolve_request_provider
 from src.services.account_safety_service import screen_user_input
@@ -731,6 +742,155 @@ async def get_custom_problem_solution(
         raise
     await session.refresh(row)
     return _serialize_solution_article(row)
+
+
+_WALKTHROUGH_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{0,199}$")
+
+
+@router.post("/walkthrough/{slug}", response_model=LCWalkthroughResponse)
+async def get_solution_walkthrough(
+    slug: str,
+    body: LCWalkthroughRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LCWalkthroughResponse:
+    """Kojo's video-style walkthrough for a custom or official problem. Built once (two
+    LLM calls: script, then sketch) and cached on the user's rank 1 solution article.
+    An old article without a walkthrough is rebuilt here the first time it is opened."""
+    if not _WALKTHROUGH_SLUG.match(slug):
+        raise HTTPException(status_code=400, detail="Invalid problem id.")
+    row = (
+        await session.execute(
+            select(LCSolutionArticle).where(
+                LCSolutionArticle.user_id == user.id,
+                LCSolutionArticle.problem_slug == slug,
+                LCSolutionArticle.approach_rank == 1,
+            )
+        )
+    ).scalar_one_or_none()
+    if row is not None and row.walkthrough_json:
+        try:
+            from src.services.solution_walkthrough import relayout
+
+            return LCWalkthroughResponse(
+                slug=slug, solution_code=row.solution_code, walkthrough=relayout(json.loads(row.walkthrough_json))
+            )
+        except ValueError:
+            pass  # unreadable cache: rebuild below
+
+    if slug.startswith("custom-"):
+        problem = (
+            await session.execute(
+                select(LCCustomProblem).where(LCCustomProblem.user_id == user.id, LCCustomProblem.slug == slug)
+            )
+        ).scalar_one_or_none()
+        if problem is None:
+            raise HTTPException(status_code=404, detail="Custom problem not found.")
+        title, statement, starter = problem.title, problem.description, problem.starter_code
+    else:
+        title, statement, starter = body.title.strip(), body.statement.strip(), body.starter_code
+        if not title or not statement:
+            raise HTTPException(status_code=400, detail="Send the problem title and statement.")
+        await screen_user_input(user, "leetcode_walkthrough", title, statement)
+
+    try:
+        walk = await LeetCodeService().generate_walkthrough(
+            title=title, statement=statement, starter_code=starter,
+            provider=resolve_request_provider(user, body.provider),
+        )
+    except LLMException as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    from src.services.solution_walkthrough import code_text
+
+    code = code_text(walk)
+    optimal = walk["approaches"][-1] if walk["approaches"] else {}
+    fields = dict(
+        title=walk["title"][:300],
+        approach_summary=str(optimal.get("idea", ""))[:4000],
+        solution_code=code,
+        code_comments_json=json.dumps([{"code": c["line"], "comment": c["say"]} for c in walk["code"] if c["say"]]),
+        time_complexity=walk["time_complexity"][:60],
+        space_complexity=walk["space_complexity"][:60],
+        complexity_explanation=walk["complexity_say"],
+        walkthrough_json=json.dumps(walk),
+    )
+    if row is None:
+        row = LCSolutionArticle(user_id=user.id, problem_slug=slug, approach_rank=1, **fields)
+        session.add(row)
+    else:
+        for key, value in fields.items():
+            setattr(row, key, value)
+    try:
+        await session.commit()
+    except IntegrityError:
+        # A concurrent open built it first; the fresh result is still good to return.
+        await session.rollback()
+    return LCWalkthroughResponse(slug=slug, solution_code=code, walkthrough=walk)
+
+
+# Lines recorded at once. Kokoro answers a line in about 1 to 3 seconds, so a
+# 60-line walkthrough records in well under a minute without hammering the provider.
+_AUDIO_CONCURRENCY = 4
+
+
+@router.post("/walkthrough/{slug}/audio", response_model=LCWalkthroughAudioResponse)
+async def record_walkthrough_audio(
+    slug: str,
+    body: LCWalkthroughAudioRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LCWalkthroughAudioResponse:
+    """Record every line of a walkthrough in ONE voice (no fallback voice), cache it,
+    and return the clips. No slowapi limit here: this module uses postponed
+    annotations, which break the decorator's body parsing. Cost is bounded by the
+    beta gate, the 160 line cap and the cache. All or nothing: a line that fails after retries fails the
+    recording, so playback never mixes a different voice in."""
+    if not _WALKTHROUGH_SLUG.match(slug):
+        raise HTTPException(status_code=400, detail="Invalid problem id.")
+    lines_hash = hashlib.sha256("\n".join(body.lines).encode("utf-8")).hexdigest()
+    key = (
+        LCWalkthroughAudio.user_id == user.id,
+        LCWalkthroughAudio.problem_slug == slug,
+        LCWalkthroughAudio.voice == body.voice,
+        LCWalkthroughAudio.lines_hash == lines_hash,
+    )
+    cached = (await session.execute(select(LCWalkthroughAudio).where(*key))).scalar_one_or_none()
+    if cached is not None:
+        return LCWalkthroughAudioResponse(voice=body.voice, clips=json.loads(cached.clips_json))
+
+    speech = SpeechService()
+    gate = asyncio.Semaphore(_AUDIO_CONCURRENCY)
+
+    async def one(client: httpx.AsyncClient, text: str) -> str:
+        async with gate:
+            return base64.b64encode(await speech.synthesize_strict(client, text, body.voice)).decode("ascii")
+
+    try:
+        async with httpx.AsyncClient() as client:
+            clips = list(await asyncio.gather(*(one(client, line) for line in body.lines)))
+    except (LLMException, ValidationException) as exc:
+        raise HTTPException(status_code=503, detail="Kojo couldn't record the audio right now. Try again, or use the browser voice.") from exc
+
+    # Keep only the newest recording per problem and voice: an edited script replaces it.
+    old = (
+        await session.execute(
+            select(LCWalkthroughAudio).where(
+                LCWalkthroughAudio.user_id == user.id,
+                LCWalkthroughAudio.problem_slug == slug,
+                LCWalkthroughAudio.voice == body.voice,
+            )
+        )
+    ).scalars().all()
+    for row in old:
+        await session.delete(row)
+    session.add(LCWalkthroughAudio(user_id=user.id, problem_slug=slug, voice=body.voice,
+                                   lines_hash=lines_hash, clips_json=json.dumps(clips)))
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()  # a parallel request saved the same recording
+    return LCWalkthroughAudioResponse(voice=body.voice, clips=clips)
 
 
 @router.post("/custom-problems/generate", response_model=LCGeneratedCustomProblem)
