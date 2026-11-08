@@ -5751,8 +5751,7 @@ export default function LeetCodeMode() {
         <LeftRail active="lectures" streak={stats.currentStreak} onNavigate={setView} />
         <div className="page page-narrow lc-page lc-shell-body">
           <header className="lc-category-header">
-            <div className="lc-category-title-row" style={{ "--lc-accent": "var(--green-dark)" } as CSSProperties}>
-              <span className="lc-node-icon"><PlayIcon size={22} /></span>
+            <div className="lc-category-title-row">
               <div>
                 <h1>Lectures</h1>
                 <p className="muted">Kojo teaches the patterns behind the problems: the theory, how to spot it, a template, then a worked problem.</p>
@@ -5780,8 +5779,7 @@ export default function LeetCodeMode() {
         <LeftRail active="practice" streak={stats.currentStreak} onNavigate={setView} />
         <div className="page page-narrow lc-page lc-shell-body">
           <header className="lc-category-header">
-            <div className="lc-category-title-row" style={{ "--lc-accent": "var(--green-dark)" } as CSSProperties}>
-              <span className="lc-node-icon"><SparklesIcon size={22} /></span>
+            <div className="lc-category-title-row">
               <div>
                 <h1>Weak-Area Practice</h1>
                 <p className="muted">Pick the topics that need work, run a guided queue, finish on a session recap.</p>
@@ -5986,8 +5984,7 @@ export default function LeetCodeMode() {
         <LeftRail active="banks" streak={stats.currentStreak} onNavigate={setView} />
         <div className="page page-narrow lc-page lc-shell-body">
           <header className="lc-category-header">
-            <div className="lc-category-title-row" style={{ "--lc-accent": "var(--green-dark)" } as CSSProperties}>
-              <span className="lc-node-icon"><BookIcon size={22} /></span>
+            <div className="lc-category-title-row">
               <div>
                 <h1>Interview Prep Banks</h1>
                 <p className="muted">Named problem sets for a specific interview. The active bank feeds Daily KojoCode.</p>
@@ -6290,8 +6287,7 @@ export default function LeetCodeMode() {
         <LeftRail active="drills" streak={stats.currentStreak} onNavigate={setView} />
         <div className="page page-narrow lc-page lc-shell-body">
           <header className="lc-category-header">
-            <div className="lc-category-title-row" style={{ "--lc-accent": "var(--green-dark)" } as CSSProperties}>
-              <span className="lc-node-icon"><Route size={22} /></span>
+            <div className="lc-category-title-row">
               <div>
                 <h1>3-Pass Drills</h1>
                 <p className="muted">
@@ -6442,8 +6438,7 @@ export default function LeetCodeMode() {
             <ChevronLeftIcon size={16} />
             Dashboard
           </button>
-          <div className="lc-category-title-row" style={{ "--lc-accent": "var(--green-dark)" } as CSSProperties}>
-            <span className="lc-node-icon"><SearchIcon size={22} /></span>
+          <div className="lc-category-title-row">
             <div>
               <h1>Browse all problems</h1>
               <p className="muted">{visibleProblems.length} shown · {solvedCount}/{browseProblems.length} complete</p>
@@ -6539,8 +6534,7 @@ export default function LeetCodeMode() {
             <ChevronLeftIcon size={16} />
             Dashboard
           </button>
-          <div className="lc-category-title-row" style={{ "--lc-accent": "var(--green-dark)" } as CSSProperties}>
-            <span className="lc-node-icon"><Code size={22} /></span>
+          <div className="lc-category-title-row">
             <div>
               <h1>{CUSTOM_CATEGORY_LABEL}</h1>
               <p className="muted">{done}/{customCategoryList.length} complete</p>
@@ -6673,8 +6667,6 @@ export default function LeetCodeMode() {
     const categoryProblems = [...category.problems, ...(addedProblemsForCategory.get(category.id) ?? [])];
     const visibleProblems = filterProblems(categoryProblems, progress, filter, query, difficultyFilter);
     const done = categoryProblems.filter((problem) => progress[problem.slug]).length;
-    const Icon = category.icon;
-
     return (
       <div className="lc-shell">
       <LeftRail active="problems" streak={stats.currentStreak} onNavigate={setView} />
@@ -6684,8 +6676,7 @@ export default function LeetCodeMode() {
             <ChevronLeftIcon size={16} />
             Dashboard
           </button>
-          <div className="lc-category-title-row" style={{ "--lc-accent": masteryColor(categoryProblems.length ? done / categoryProblems.length : 0) } as CSSProperties}>
-            <span className="lc-node-icon"><Icon size={22} /></span>
+          <div className="lc-category-title-row">
             <div>
               <h1>{category.label}</h1>
               <p className="muted">{done}/{categoryProblems.length} complete</p>
