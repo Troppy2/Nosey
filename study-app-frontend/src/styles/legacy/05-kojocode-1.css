@@ -41,18 +41,8 @@
 /* LeetCode mode */
 
 .lc-page {
-  --lc-border: rgba(38, 48, 31, 0.14);
-  --lc-surface: var(--white);
-}
-
-/* Keep the hub pages neutral instead of exposing the app's green canvas. */
-.lc-shell:not(.lc-shell--editor) {
-  min-height: 100dvh;
-  background: var(--white);
-}
-
-.lc-shell:not(.lc-shell--editor) > .lc-rail {
-  border-right: 1px solid rgba(38, 48, 31, 0.14);
+  --lc-border: rgba(113, 131, 85, 0.26);
+  --lc-surface: rgba(255, 255, 255, 0.72);
 }
 
 /* KojoCode: one keyboard focus ring for every interactive surface. Any element
@@ -78,8 +68,6 @@ select[class*="lc-"]:focus-visible {
   justify-content: space-between;
   gap: 16px 20px;
   margin-bottom: 24px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid var(--lc-border);
   flex-wrap: wrap;
 }
 
@@ -548,8 +536,6 @@ select[class*="lc-"]:focus-visible {
   display: grid;
   gap: 20px;
   margin-bottom: 24px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid var(--lc-border);
 }
 
 .lc-back-btn {
@@ -575,7 +561,6 @@ select[class*="lc-"]:focus-visible {
 
 .lc-category-title-row h1,
 .lc-hero h1 {
-  font-size: clamp(1.65rem, 2.8vw, 2.15rem);
   line-height: 1.2;
   overflow-wrap: anywhere;
 }
@@ -584,8 +569,6 @@ select[class*="lc-"]:focus-visible {
 .lc-hero p {
   max-width: 64ch;
   margin-top: 8px;
-  color: #62675e;
-  font-size: 0.9rem;
   line-height: 1.6;
 }
 
