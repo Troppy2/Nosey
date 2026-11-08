@@ -59,6 +59,12 @@
 .lc-custom-statement :first-child { margin-top: 0; }
 .lc-custom-statement :last-child { margin-bottom: 0; }
 
+/* Match KojoChat's light code blocks on the problem statement's white surface. */
+.lc-custom-statement .kojo-code-block {
+  background: rgba(113, 131, 85, 0.1);
+  color: var(--ink);
+}
+
 .lc-custom-statement code {
   padding: 1px 5px;
   border-radius: var(--radius-xs);

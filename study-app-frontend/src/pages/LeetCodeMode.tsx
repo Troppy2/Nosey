@@ -7059,7 +7059,7 @@ export default function LeetCodeMode() {
           {isCustomProblem && currentCustomProblem ? (
             currentCustomProblem.description.trim() ? (
               <div className="lc-custom-statement">
-                <MarkdownContent content={currentCustomProblem.description} />
+                <MarkdownContent content={currentCustomProblem.description} enableCodeCopy />
               </div>
             ) : (
               <div className="lc-source-note">
