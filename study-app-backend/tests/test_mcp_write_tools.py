@@ -44,7 +44,7 @@ def _mcq(text: str) -> dict:
 async def test_folders_can_be_created_and_renamed_never_deleted(client, call, db_session_maker) -> None:  # noqa: F811
     tools = (await _rpc(client, call.access, "tools/list")).json()["result"]["tools"]
     names = {t["name"] for t in tools}
-    assert {"create_folder", "rename_folder"} <= names
+    assert {"create_folder", "rename_folder", "archive_folder"} <= names
     assert "delete_folder" not in names
     assert next(t for t in tools if t["name"] == "delete_test")["annotations"]["destructiveHint"] is True
 
@@ -54,6 +54,40 @@ async def test_folders_can_be_created_and_renamed_never_deleted(client, call, db
     async with db_session_maker() as session:
         folder = await session.get(Folder, made["folder_id"])
         assert folder.created_via == "mcp"
+
+
+async def test_archive_folder_round_trip_preserves_contents(client, call, seeded, db_session_maker) -> None:  # noqa: F811
+    folder_id = seeded["folder_id"]
+    tools = (await _rpc(client, call.access, "tools/list")).json()["result"]["tools"]
+    tool = next(t for t in tools if t["name"] == "archive_folder")
+    assert tool["annotations"]["readOnlyHint"] is False
+    assert tool["annotations"]["destructiveHint"] is False
+    notes = await call("list_folder_notes", {"folder_id": folder_id})
+
+    for _ in range(2):
+        archived = await call("archive_folder", {"folder_id": folder_id})
+        assert archived == {"folder_id": folder_id, "name": "Chemistry", "is_archived": True}
+    assert (await call("list_folders", {}))["folders"] == []
+    folders = (await call("list_folders", {"include_archived": True}))["folders"]
+    assert [(f["id"], f["is_archived"]) for f in folders] == [(folder_id, True)]
+    assert await call("list_folder_notes", {"folder_id": folder_id}) == notes
+
+    for _ in range(2):
+        restored = await call("archive_folder", {"folder_id": folder_id, "archived": False})
+        assert restored["is_archived"] is False
+    folders = (await call("list_folders", {}))["folders"]
+    assert [(f["id"], f["is_archived"]) for f in folders] == [(folder_id, False)]
+    assert await call("list_folder_notes", {"folder_id": folder_id}) == notes
+
+
+@pytest.mark.parametrize("archived", [True, False])
+async def test_archive_folder_refuses_foreign_and_missing_folders(call, seeded, db_session_maker, archived) -> None:  # noqa: F811
+    for folder_id in (seeded["foreign_id"], 999999):
+        err = await call("archive_folder", {"folder_id": folder_id, "archived": archived}, expect_error=True)
+        assert "not found" in err["error"].lower()
+    async with db_session_maker() as session:
+        foreign = await session.get(Folder, seeded["foreign_id"])
+        assert foreign.is_archived is False
 
 
 async def test_create_test_any_order_multipart_and_custom_inputs(call, seeded, db_session_maker) -> None:  # noqa: F811

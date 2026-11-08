@@ -598,6 +598,18 @@ async def rename_folder(ctx: McpContext, args: RenameFolderArgs) -> dict[str, An
     return {"folder_id": folder.id, "name": folder.name, "subject": folder.subject}
 
 
+class ArchiveFolderArgs(ToolArgs):
+    folder_id: int = Field(description="Folder id from list_folders. Use include_archived=true to find archived folders.")
+    archived: bool = Field(default=True, description="false restores an archived folder.")
+
+
+async def archive_folder(ctx: McpContext, args: ArchiveFolderArgs) -> dict[str, Any]:
+    folder = await FolderService().update_folder(
+        args.folder_id, ctx.user.id, FolderUpdate(is_archived=args.archived), ctx.session
+    )
+    return {"folder_id": folder.id, "name": folder.name, "is_archived": folder.is_archived}
+
+
 # ---------------------------------------------------------------- grading
 
 class GradeIn(ToolArgs):
@@ -638,13 +650,16 @@ WRITE_TOOLS: tuple[McpTool, ...] = (
     _write(
         "create_folder",
         "Create a folder",
-        "Create a study folder. Folders can be created and renamed here but never deleted: only the "
+        "Create a study folder. Folders can be created, renamed, archived and restored here but never deleted: only the "
         "user deletes folders, in Nosey.",
         CreateFolderArgs,
         create_folder,
     ),
     _write("rename_folder", "Rename a folder", "Change a folder's name, subject or description.",
            RenameFolderArgs, rename_folder),
+    _write("archive_folder", "Archive or restore a folder",
+           "Archive a folder without deleting its contents, or restore it with archived=false. "
+           "Use list_folders(include_archived=true) to find archived folders.", ArchiveFolderArgs, archive_folder),
     _write(
         "add_note",
         "Save a note",
