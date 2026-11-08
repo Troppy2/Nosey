@@ -30,6 +30,27 @@ export type Segment = {
 
 export type Timeline = { chapters: readonly string[]; segments: Segment[]; total: number };
 
+/** Decide from the unrecorded timeline, before spending compute on AI audio.
+ * Playback speed and a saved AI voice must never bypass the five-minute rule. */
+export function requiresBrowserVoice(timeline: Timeline): boolean {
+  return timeline.total > 5 * 60;
+}
+
+/** Short utterances keep browser narration and captions readable during long scenes. */
+export function browserSpeechChunks(text: string): string[] {
+  const chunks: string[] = [];
+  let chunk = "";
+  for (const word of text.trim().split(/\s+/).filter(Boolean)) {
+    if (chunk && chunk.length + word.length + 1 > 180) {
+      chunks.push(chunk);
+      chunk = "";
+    }
+    chunk = chunk ? `${chunk} ${word}` : word;
+  }
+  if (chunk) chunks.push(chunk);
+  return chunks;
+}
+
 const WORDS_PER_SECOND = 2.6;
 const MIN_SPOKEN = 2.2;
 const SECONDS_PER_CHAR = 0.035;

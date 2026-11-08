@@ -23,6 +23,19 @@ class FolderRepository(BaseRepository[Folder]):
             select(Folder).where(Folder.id == folder_id, Folder.user_id == user_id)
         )
 
+    async def list_active(self, user_id: int) -> list[Folder]:
+        """Active folders without the count subqueries, for writes that only need the rows."""
+        rows = await self.session.scalars(
+            select(Folder).where(Folder.user_id == user_id, Folder.is_archived.is_(False))
+        )
+        return list(rows.all())
+
+    async def get_many_owned(self, folder_ids: list[int], user_id: int) -> list[Folder]:
+        rows = await self.session.scalars(
+            select(Folder).where(Folder.user_id == user_id, Folder.id.in_(folder_ids))
+        )
+        return list(rows.all())
+
     @staticmethod
     def _test_count_subquery():
         # Correlated scalar count on the indexed test.folder_id. Using subqueries
@@ -52,7 +65,7 @@ class FolderRepository(BaseRepository[Folder]):
                 self._flashcard_count_subquery().label("flashcard_count"),
             )
             .where(Folder.user_id == user_id, Folder.is_archived == archived)
-            .order_by(Folder.created_at.desc())
+            .order_by(Folder.display_order.asc().nulls_first(), Folder.created_at.desc(), Folder.id.desc())
         )
         rows = await self.session.execute(stmt)
         return list(rows.all())

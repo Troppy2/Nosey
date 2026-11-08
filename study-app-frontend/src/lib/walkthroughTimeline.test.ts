@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { KojoLecture, SolutionWalkthrough } from "./types";
-import { buildLectureTimeline, buildTimeline, chapterStart, formatClock, segmentAt, spokenLines } from "./walkthroughTimeline";
+import { browserSpeechChunks, buildLectureTimeline, buildTimeline, chapterStart, formatClock, requiresBrowserVoice, segmentAt, spokenLines } from "./walkthroughTimeline";
 
 const walk: SolutionWalkthrough = {
   title: "Hash map",
@@ -18,6 +18,20 @@ const walk: SolutionWalkthrough = {
 };
 
 describe("walkthrough timeline", () => {
+  it("chunks long browser narration without dropping or repeating words", () => {
+    const text = "Explain why this cut is safe. ".repeat(40).trim();
+    const chunks = browserSpeechChunks(text);
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.every((chunk) => chunk.length <= 180)).toBe(true);
+    expect(chunks.join(" ")).toBe(text);
+    expect(browserSpeechChunks("  ")).toEqual([]);
+  });
+  it("requires browser narration strictly above five minutes", () => {
+    const timeline = buildTimeline(walk, "Two Sum");
+    expect(requiresBrowserVoice({ ...timeline, total: 299.99 })).toBe(false);
+    expect(requiresBrowserVoice({ ...timeline, total: 300 })).toBe(false);
+    expect(requiresBrowserVoice({ ...timeline, total: 300.01 })).toBe(true);
+  });
   it("orders chapters and makes segments contiguous", () => {
     const { segments, total } = buildTimeline(walk, "Two Sum");
     expect(segments.map((s) => s.scene.type)).toEqual(["title", "title", "cards", "ink", "code", "code", "code"]);

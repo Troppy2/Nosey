@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import BIGINT_ID, Base, TimestampMixin
@@ -31,6 +31,7 @@ class Folder(Base, TimestampMixin):
     kojo_auto_index: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     kojo_persona: Mapped[Optional[str]] = mapped_column(String(32))
     is_archived: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    display_order: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     avoid_repeat_questions: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     # Which panel the folder page opens on: "stats" or "flashcards" (migration 072).
     default_view: Mapped[str] = mapped_column(String(16), nullable=False, default="stats", server_default="stats")

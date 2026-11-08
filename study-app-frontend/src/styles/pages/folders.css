@@ -1,0 +1,295 @@
+.folders-page .folders-actions-trigger {
+  width: auto;
+  min-height: 44px;
+  gap: 6px;
+}
+
+/* A command menu, not an unanswered field: no placeholder grey. */
+.folders-page .folders-actions-trigger.is-placeholder .dropdown-value {
+  color: inherit;
+}
+
+.folders-error-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.folders-error-row:empty {
+  display: none;
+}
+
+.folders-error-row .form-error {
+  flex: 1 1 280px;
+  margin: 0;
+}
+
+/* The mode strip. Sticky so Archive / Delete / Save stay in reach while the
+   user scrolls a long folder list picking items. */
+.folders-organize-bar {
+  position: sticky;
+  top: 8px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--green-dark);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  box-shadow: var(--shadow-md);
+}
+
+.folders-organize-bar .button-row {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+}
+
+.folders-organize-status {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding-left: 4px;
+}
+
+.folders-organize-status strong {
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+
+/* Position badge in reorder mode: the list order is the thing being edited. */
+.folders-card-position {
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.folder-card .folders-card-position {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.folders-organizable--reorder .folder-card-main > svg {
+  margin-left: 36px;
+}
+
+/* While dragging, the grabbed card is lifted and follows the pointer (inline
+   transform from Folders.tsx); the others slide aside via FLIP animations. */
+.folders-organizable--reorder:has(.folders-organize-card--dragging) {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.folders-organizable .folders-organize-card--dragging {
+  z-index: 10;
+  /* Cards are 72% white; a lifted card must hide what it passes over. */
+  background: var(--white);
+  border-color: var(--green-dark);
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+  transition: none;
+}
+
+.folders-organizable .folders-organize-card--dragging .folders-drag-handle {
+  pointer-events: auto;
+  cursor: grabbing;
+}
+
+.folders-check-minus {
+  width: 8px;
+  height: 2px;
+  background: var(--green-dark);
+}
+
+.folders-organize-card {
+  position: relative;
+  min-width: 0;
+}
+
+.folders-organizable .folders-organize-card--selected {
+  border-color: var(--green-dark);
+  box-shadow: inset 0 0 0 1px var(--green-dark);
+  background: var(--green-lightest);
+}
+
+.folders-select-main {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.folders-organize-card .folder-card-main,
+.folders-organize-card .folder-list-main {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.folders-organize-card .folder-card-main {
+  display: block;
+}
+
+.folders-card-check {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid var(--green-dark);
+  border-radius: var(--radius-xs);
+  color: var(--white);
+}
+
+.folders-card-check.is-checked {
+  background: var(--green-dark);
+}
+
+.folders-organizable--select .folder-list-main,
+.folders-organizable--reorder .folder-list-main {
+  padding-right: 0;
+}
+
+.folders-organizable--select .folder-list-row,
+.folders-organizable--reorder .folder-list-row {
+  padding-right: 68px;
+}
+
+.folder-list-row .folders-drag-handle,
+.folder-list-row .folders-card-check {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.folders-drag-handle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.folders-drag-handle:active {
+  cursor: grabbing;
+}
+
+.folders-drag-handle:hover {
+  background: var(--green-light);
+}
+
+.folders-drag-handle:disabled {
+  cursor: wait;
+}
+
+.folders-select-main:focus-visible,
+.folders-drag-handle:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 3px;
+}
+
+.folders-confirm-names {
+  display: block;
+  max-height: 160px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  margin-bottom: 12px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+
+@media (max-width: 760px), (hover: none) and (pointer: coarse) and (max-width: 1100px) {
+  .folders-page > .page-header > .toolbar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    width: 100%;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .folders-page .toolbar > .segmented {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+  }
+
+  .folders-page .toolbar > [data-tour="folders-new"] {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    padding-inline: 10px;
+  }
+
+  .folders-page .toolbar > .folders-actions-trigger {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+  }
+
+  .folders-page .toolbar > [data-tour="folders-quizlet"] {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .folders-page .folders-organize-bar .button,
+  .folders-page .file-manager-select-toggle {
+    min-height: 44px;
+  }
+
+  /* Phone: the strip docks above the bottom nav so actions sit under the thumb. */
+  .folders-page .folders-organize-bar {
+    position: fixed;
+    top: auto;
+    left: 12px;
+    right: 12px;
+    bottom: calc(var(--dock-clearance) - 12px);
+    margin: 0;
+    z-index: 40;
+  }
+
+  .folders-page:has(.folders-organize-bar) .folders-organizable {
+    padding-bottom: 120px;
+  }
+
+  .folders-page .folders-organize-bar > .button-row {
+    flex: 1 1 100%;
+    flex-direction: row;
+    flex-wrap: nowrap;
+  }
+
+  .folders-page .folders-organize-bar > .button-row > .button {
+    flex: 1 1 0;
+  }
+
+  .folders-organize-status .muted {
+    display: none;
+  }
+}

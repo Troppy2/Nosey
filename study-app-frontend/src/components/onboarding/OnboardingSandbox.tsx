@@ -9,6 +9,7 @@ import {
   type SandboxFrq,
   type SandboxMcq,
 } from "./sandboxContent";
+import { prefersReducedMotion } from "../../lib/motion";
 import "../../styles/components/onboarding.css";
 
 /*
@@ -44,10 +45,6 @@ const FRQ = SANDBOX_QUESTIONS[1] as SandboxFrq;
 
 /** Free response needs a real attempt before it can be submitted. */
 const FRQ_MIN_CHARS = 25;
-
-function prefersReducedMotion(): boolean {
-  return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-}
 
 type Props = {
   /** Called when the user finishes the run or skips out of it. */

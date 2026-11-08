@@ -4,7 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database import get_session
 from src.dependencies import get_current_user
 from src.models.user import User
-from src.schemas.folder_schema import FolderCreate, FolderResponse, FolderUpdate
+from src.schemas.folder_schema import (
+    FolderBulkAction, FolderBulkResult, FolderCreate, FolderResponse, FolderSelection, FolderUpdate,
+)
 from src.schemas.folder_stats_schema import FolderStatsResponse, WeakSpot
 from src.services.folder_service import FolderService
 from src.services.folder_stats_service import FolderStatsService
@@ -50,6 +52,33 @@ async def get_weak_spots(
 ) -> list[WeakSpot]:
     """Weakest topics across all active folders, for the Dashboard."""
     return await FolderStatsService().weak_spots(user.id, session)
+
+
+@router.patch("/order", response_model=list[FolderResponse])
+async def reorder_folders(
+    data: FolderSelection,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[FolderResponse]:
+    try:
+        return await FolderService().reorder_folders(user.id, data.folder_ids, session)
+    except StudyAppException as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/bulk", response_model=FolderBulkResult)
+async def bulk_folder_action(
+    data: FolderBulkAction,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> FolderBulkResult:
+    try:
+        affected = await FolderService().bulk_action(user.id, data.folder_ids, data.action, session)
+        return FolderBulkResult(affected=affected)
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except StudyAppException as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/{folder_id}", response_model=FolderResponse)

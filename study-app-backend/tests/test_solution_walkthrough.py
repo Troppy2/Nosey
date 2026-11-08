@@ -112,3 +112,64 @@ def test_relayout_is_idempotent():
     import copy
     twice = sw.relayout(copy.deepcopy(once))
     assert once == twice
+
+
+def test_authored_partition_solution_matches_all_valid_cuts():
+    from itertools import product
+    from src.services.partition_labels_walkthrough import partition_labels_walkthrough
+
+    walk = partition_labels_walkthrough()
+    namespace = {}
+    exec(sw.code_text(walk), namespace)
+    solve = namespace["Solution"]().partitionLabels
+    assert solve("abacbcde") == [6, 1, 1]
+    assert solve("ababcbacadefegdehijhklij") == [9, 7, 8]
+    assert solve("") == []
+    for n in range(1, 7):
+        for chars in product("abc", repeat=n):
+            text = "".join(chars)
+            # A cut is valid exactly when its prefix and suffix share no letter.
+            cuts = [i for i in range(1, n) if not (set(text[:i]) & set(text[i:]))]
+            boundaries = [0, *cuts, n]
+            assert solve(text) == [b - a for a, b in zip(boundaries, boundaries[1:])]
+
+
+def test_authored_lesson_timing_and_diagram_bounds():
+    from src.services.partition_labels_walkthrough import partition_labels_walkthrough
+
+    walk = partition_labels_walkthrough()
+    lines = ["Let's solve Partition Labels.", *walk["breakdown"],
+             *[a["say"] for a in walk["approaches"]], *[f["say"] for f in walk["frames"]],
+             *[c["say"] for c in walk["code"]], walk["complexity_say"]]
+    duration = sum(max(2.2, len(line.split()) / 2.6 + 0.4) for line in lines) + 2.2
+    assert 5 * 60 < duration <= 10 * 60
+    assert len(walk["frames"]) == 12
+    for frame in walk["frames"]:
+        boxes = []
+        for label in frame["labels"]:
+            box = sw._label_box(label["x"], label["y"], label["text"])
+            assert box[0] >= 0 and box[1] >= 0 and box[2] <= 100 and box[3] <= 60
+            assert not any(sw._overlap(box, old) for old in boxes)
+            boxes.append(box)
+        for stroke in frame["strokes"]:
+            assert all(0 <= x <= 100 for x in stroke["points"][::2])
+            assert all(0 <= y <= 60 for y in stroke["points"][1::2])
+
+
+@pytest.mark.asyncio
+async def test_partition_lesson_supersedes_saved_cache_without_generation(client, db_session_maker, seeded):
+    from src.models.lc_sync import LCSolutionArticle
+
+    async with db_session_maker() as session:
+        session.add(LCSolutionArticle(user_id=seeded["beta"].id, problem_slug="partition-labels",
+                                     approach_rank=1, title="Old lesson", solution_code="old",
+                                     walkthrough_json='{"breakdown": ["old"]}'))
+        await session.commit()
+    with patch("src.services.leetcode_service.LeetCodeService.generate_walkthrough", new_callable=AsyncMock) as generate:
+        response = await client.post("/leetcode/walkthrough/partition-labels", json={})
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert "earliest safe cut" in data["walkthrough"]["title"]
+        assert len(data["walkthrough"]["frames"]) == 12
+        assert "def partitionLabels" in data["solution_code"]
+        generate.assert_not_awaited()

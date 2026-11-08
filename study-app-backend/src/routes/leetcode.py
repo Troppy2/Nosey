@@ -756,6 +756,14 @@ async def get_solution_walkthrough(
     An old article without a walkthrough is rebuilt here the first time it is opened."""
     if not _WALKTHROUGH_SLUG.match(slug):
         raise HTTPException(status_code=400, detail="Invalid problem id.")
+    # The authored lesson supersedes older generated copies without deleting a
+    # user's cached article or spending tokens to regenerate it.
+    if slug == "partition-labels":
+        from src.services.partition_labels_walkthrough import partition_labels_walkthrough
+        from src.services.solution_walkthrough import code_text
+
+        walk = partition_labels_walkthrough()
+        return LCWalkthroughResponse(slug=slug, solution_code=code_text(walk), walkthrough=walk)
     row = (
         await session.execute(
             select(LCSolutionArticle).where(

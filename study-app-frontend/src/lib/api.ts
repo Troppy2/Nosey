@@ -507,10 +507,11 @@ export async function deleteAccount(): Promise<void> {
   localStorage.removeItem(USER_KEY);
 }
 
-export async function fetchFolders(): Promise<Folder[]> {
+export async function fetchFolders(options: { throwOnError?: boolean } = {}): Promise<Folder[]> {
   try {
     return await request<Folder[]>("/folders");
-  } catch {
+  } catch (error) {
+    if (options.throwOnError) throw error;
     return [];
   }
 }
@@ -582,6 +583,20 @@ export async function unarchiveFolder(folderId: number): Promise<Folder> {
 export async function deleteFolder(folderId: number): Promise<void> {
   await request(`/folders/${folderId}`, {
     method: "DELETE",
+  });
+}
+
+export async function reorderFolders(folderIds: number[]): Promise<Folder[]> {
+  return request<Folder[]>("/folders/order", {
+    method: "PATCH",
+    body: JSON.stringify({ folder_ids: folderIds }),
+  });
+}
+
+export async function bulkFolderAction(folderIds: number[], action: "archive" | "delete"): Promise<{ affected: number }> {
+  return request<{ affected: number }>("/folders/bulk", {
+    method: "POST",
+    body: JSON.stringify({ folder_ids: folderIds, action }),
   });
 }
 

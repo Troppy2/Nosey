@@ -3,7 +3,26 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, field_validator
+
+
+class FolderSelection(BaseModel):
+    folder_ids: list[PositiveInt] = Field(min_length=1, max_length=1000)
+
+    @field_validator("folder_ids")
+    @classmethod
+    def unique_ids(cls, ids: list[int]) -> list[int]:
+        if len(ids) != len(set(ids)):
+            raise ValueError("Folder ids must be unique.")
+        return ids
+
+
+class FolderBulkAction(FolderSelection):
+    action: Literal["archive", "delete"]
+
+
+class FolderBulkResult(BaseModel):
+    affected: int
 
 
 class FolderCreate(BaseModel):

@@ -1,6 +1,10 @@
+from typing import Literal
+
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
+from src.models.user import User
 from src.repositories.folder_repository import FolderRepository
 from src.schemas.folder_schema import FolderCreate, FolderResponse, FolderUpdate
 from src.services.kojo_context_cache import invalidate_folder
@@ -15,7 +19,50 @@ def _duplicate_name_error(name: str) -> ValidationException:
     )
 
 
+async def _lock_user(user_id: int, session: AsyncSession) -> None:
+    # Serialize order/bulk writes from multiple tabs for the same account.
+    await session.execute(select(User.id).where(User.id == user_id).with_for_update())
+
+
 class FolderService:
+    async def reorder_folders(
+        self, user_id: int, folder_ids: list[int], session: AsyncSession
+    ) -> list[FolderResponse]:
+        await _lock_user(user_id, session)
+        folders = await FolderRepository(session).list_active(user_id)
+        # A set mismatch also catches duplicates: [a, a, c] never equals {a, b, c}.
+        if len(folder_ids) != len(folders) or set(folder_ids) != {folder.id for folder in folders}:
+            raise ValidationException("Your folders changed. Refresh the list before saving its order.")
+        positions = {folder_id: index for index, folder_id in enumerate(folder_ids)}
+        for folder in folders:
+            folder.display_order = positions[folder.id]
+        await session.commit()
+        return await self.list_folders(user_id, session)
+
+    async def bulk_action(
+        self, user_id: int, folder_ids: list[int], action: Literal["archive", "delete"], session: AsyncSession
+    ) -> int:
+        # Ids are non-empty and unique per FolderSelection; action is checked by FolderBulkAction.
+        await _lock_user(user_id, session)
+        folders = await FolderRepository(session).get_many_owned(folder_ids, user_id)
+        if len(folders) != len(folder_ids):
+            raise ResourceNotFoundException("Folder")
+        try:
+            for folder in folders:
+                if action == "archive":
+                    folder.is_archived = True
+                else:
+                    # Preserve the existing single-folder ORM cascade behavior.
+                    await session.delete(folder)
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        if action == "delete":
+            for folder_id in folder_ids:
+                invalidate_folder(folder_id)
+        return len(folders)
+
     async def list_folders(self, user_id: int, session: AsyncSession) -> list[FolderResponse]:
         rows = await FolderRepository(session).list_with_counts(user_id, archived=False)
         return [

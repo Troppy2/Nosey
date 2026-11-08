@@ -22,6 +22,8 @@ type Props<T extends string> = {
   /** Trigger id, so an outside <label htmlFor> can point at it. */
   id?: string;
   title?: string;
+  /** Commands rather than a persisted single-select value. */
+  actionMenu?: boolean;
 };
 
 // Gap between the trigger and the panel, and the most the panel shows before
@@ -62,6 +64,7 @@ export function Dropdown<T extends string>({
   className,
   id,
   title,
+  actionMenu = false,
 }: Props<T>) {
   const baseId = useId();
   const labelId = `${baseId}-label`;
@@ -178,11 +181,11 @@ export function Dropdown<T extends string>({
       id={triggerId}
       type="button"
       className={`dropdown-trigger ${className ?? "input"}${selected ? "" : " is-placeholder"}`}
-      aria-haspopup="listbox"
+      aria-haspopup={actionMenu ? "menu" : "listbox"}
       aria-expanded={open}
       aria-controls={open ? listId : undefined}
       // Bare has no visible label element, so name it "Label: value" directly.
-      aria-label={bare ? `${label}: ${shown}` : undefined}
+      aria-label={bare ? actionMenu ? label : `${label}: ${shown}` : undefined}
       aria-labelledby={bare ? undefined : `${labelId} ${triggerId}`}
       disabled={disabled}
       title={title}
@@ -199,7 +202,7 @@ export function Dropdown<T extends string>({
             <ul
               ref={listRef}
               id={listId}
-              role="listbox"
+              role={actionMenu ? "menu" : "listbox"}
               tabIndex={-1}
               aria-label={bare ? label : undefined}
               aria-labelledby={bare ? undefined : labelId}
@@ -212,8 +215,8 @@ export function Dropdown<T extends string>({
                 <li
                   key={option.value}
                   id={`${listId}-${index}`}
-                  role="option"
-                  aria-selected={option.value === value}
+                  role={actionMenu ? "menuitem" : "option"}
+                  aria-selected={actionMenu ? undefined : option.value === value}
                   className={`dropdown-option${index === active ? " is-active" : ""}`}
                   onMouseDown={(event) => event.preventDefault()}
                   onMouseEnter={() => setActive(index)}

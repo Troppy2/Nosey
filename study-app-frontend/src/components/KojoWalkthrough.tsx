@@ -8,8 +8,10 @@ import { VOICE_OPTIONS } from "../lib/voice";
 import {
   buildLectureTimeline,
   buildTimeline,
+  browserSpeechChunks,
   chapterStart,
   formatClock,
+  requiresBrowserVoice,
   segmentAt,
   spokenLines,
   type Scene,
@@ -362,9 +364,12 @@ function VideoPlayer({
   onPopOut?: () => void;
   onPopIn: () => void;
 }) {
-  const [voice, setVoiceState] = useState<VoiceChoice>(loadVoice);
+  const [preferredVoice, setVoiceState] = useState<VoiceChoice>(loadVoice);
   const [recordAttempt, setRecordAttempt] = useState(0);
-  const lines = useMemo(() => spokenLines(build()), [build]);
+  const estimatedTimeline = useMemo(() => build(), [build]);
+  const browserOnly = requiresBrowserVoice(estimatedTimeline);
+  const voice = browserOnly ? "browser" : preferredVoice;
+  const lines = useMemo(() => spokenLines(estimatedTimeline), [estimatedTimeline]);
   const rec = useRecording(audioKey, lines, record, voice, recordAttempt);
   const clips = rec.status === "ready" ? rec.clips : null;
   const recorded = rec.status === "ready";
@@ -383,6 +388,7 @@ function VideoPlayer({
   const [showProblemState, setShowProblem] = useState(true);
   const showProblem = showProblemState && statement !== undefined;
   const [waitingVoice, setWaitingVoice] = useState(false);
+  const [browserCaption, setBrowserCaption] = useState<{ segment: number; text: string } | null>(null);
 
   // Speech for the current segment: "loading" and "speaking" hold the clock at the
   // segment's end (or start) so Kojo is never cut off mid-sentence.
@@ -394,12 +400,19 @@ function VideoPlayer({
   const seg = segments[idx];
   const local = Math.min(seg.dur, Math.max(0, t - seg.start));
   const progress = seg.dur > 0 ? local / seg.dur : 1;
+  const captionChunks = voice === "browser" ? browserSpeechChunks(seg.say) : [];
+  const caption = voice !== "browser" ? seg.say : (
+    browserCaption?.segment === idx && !muted
+      ? browserCaption.text
+      : captionChunks[Math.min(captionChunks.length - 1, Math.floor(progress * captionChunks.length))]
+  );
 
   const stopSpeech = useCallback(() => {
     runRef.current += 1;
     audioRef.current?.pause();
     audioRef.current = null;
     window.speechSynthesis?.cancel();
+    setBrowserCaption(null);
     speech.current = { seg: -1, state: "idle", since: 0 };
   }, []);
 
@@ -420,12 +433,19 @@ function VideoPlayer({
       };
       const browserSpeak = () => {
         if (!window.speechSynthesis) return finish();
-        const u = new SpeechSynthesisUtterance(s.say);
-        u.rate = rate;
-        u.onstart = () => run === runRef.current && (speech.current = { ...speech.current, state: "speaking" });
-        u.onend = finish;
-        u.onerror = finish;
-        window.speechSynthesis.speak(u);
+        const chunks = browserSpeechChunks(s.say);
+        const next = (chunk: number) => {
+          if (run !== runRef.current) return;
+          if (chunk >= chunks.length) return finish();
+          const u = new SpeechSynthesisUtterance(chunks[chunk]);
+          u.rate = rate;
+          setBrowserCaption({ segment: i, text: chunks[chunk] });
+          u.onstart = () => run === runRef.current && (speech.current = { ...speech.current, state: "speaking" });
+          u.onend = () => next(chunk + 1);
+          u.onerror = finish;
+          window.speechSynthesis.speak(u);
+        };
+        next(0);
       };
       if (voice === "browser") return browserSpeak();
       // Only Kojo's recorded clips play: never another voice mid-video. A line with no
@@ -520,6 +540,7 @@ function VideoPlayer({
   // start of the same line once the new timeline is ready.
   const resumeAt = useRef<number | null>(null);
   function changeVoice(v: VoiceChoice) {
+    if (browserOnly) return;
     if (v === voice) return;
     resumeAt.current = segmentAt(segments, tRef.current);
     setPlaying(false);
@@ -614,7 +635,7 @@ function VideoPlayer({
             <Stage seg={seg} progress={progress} local={local} />
             {captions && seg.say && !fresh && (
               <p className="walk-caption" aria-live="polite">
-                {seg.say}
+                {caption}
               </p>
             )}
             {waitingVoice && playing && <span className="walk-buffer"><Loader2 size={18} className="spin" /></span>}
@@ -701,7 +722,11 @@ function VideoPlayer({
                 {!popped && <Dropdown bare label="Playback speed" value={speed} options={SPEEDS.map((s) => ({ value: s, label: `${s}x` }))} onChange={setSpeed} className="walk-select" />}
                 {!popped && (
                   <>
-                    <Dropdown bare label="Kojo's voice" value={voice} options={VOICE_CHOICES} onChange={changeVoice} className="walk-select walk-select--voice" />
+                    {browserOnly ? (
+                      <span className="walk-voice-note" title="Videos over five minutes use browser narration to save compute.">Browser voice (over 5 min)</span>
+                    ) : (
+                      <Dropdown bare label="Kojo's voice" value={voice} options={VOICE_CHOICES} onChange={changeVoice} className="walk-select walk-select--voice" />
+                    )}
                     <button type="button" className="walk-btn walk-btn--text" onClick={toggleFullscreen} title="Full screen (f)">
                       Full screen
                     </button>
@@ -760,7 +785,8 @@ function Stage({ seg, progress, local }: { seg: Segment; progress: number; local
     );
   }
   if (scene.type === "ink") {
-    return <InkBoard frames={scene.frames} current={scene.current} progress={progress} />;
+    // Show the completed diagram early enough to follow a longer explanation.
+    return <InkBoard frames={scene.frames} current={scene.current} progress={Math.max(progress, Math.min(1, local / 3))} />;
   }
   return <CodePane scene={scene} typeDur={seg.typeDur} local={local} />;
 }
