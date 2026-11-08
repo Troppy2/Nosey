@@ -64,3 +64,8 @@ leetcode-redesign-concept-ui/
 /docs
 # Local launcher scripts (start/stop Nosey without VS Code)
 scripts/
+
+# Codex
+.codex/
+.agents/
+AGENTS.md
