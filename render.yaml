@@ -5,6 +5,8 @@ services:
     dockerfilePath: ./study-app-backend/Dockerfile
     dockerContext: ./study-app-backend
     healthCheckPath: /health
+    # Deploy main only after the GitHub CI checks (.github/workflows/ci.yml) pass.
+    autoDeployTrigger: checksPass
     envVars:
       - key: CUDA_VISIBLE_DEVICES
         value: ""

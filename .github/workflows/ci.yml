@@ -1,18 +1,54 @@
 name: CI
 
+# Runs on every branch in the promotion flow (testing -> feature -> main) and on
+# PRs into them. Render deploys main only after these checks pass
+# (autoDeployTrigger: checksPass in render.yaml).
 on:
   push:
-    branches: [main]
+    branches: [main, feature, testing]
   pull_request:
-    branches: [main]
+    branches: [main, feature, testing]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Shared by every backend step. Real keys are never needed: LLM calls are mocked.
+  JWT_SECRET: ci-test-secret-key-minimum-32-chars-long
+  GOOGLE_CLIENT_ID: ci-test-client-id
+  GOOGLE_CLIENT_SECRET: ci-test-client-secret
+  ENVIRONMENT: test
+  ADMIN_EMAIL: ci-admin@example.com
 
 jobs:
   backend:
-    name: Backend — pytest
+    name: Backend - lint, migrations, pytest
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: study-app-backend
+    services:
+      # Real Postgres so migrations (pg_trgm, concurrent indexes) run like prod.
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: study_app
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U user -d study_app"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://user:password@localhost:5432/study_app
 
     steps:
       - uses: actions/checkout@v4
@@ -24,21 +60,33 @@ jobs:
           cache-dependency-path: study-app-backend/requirements.txt
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt ruff==0.6.9
+
+      - name: Lint (syntax errors and undefined names)
+        run: ruff check src tests --select E9,F63,F7,F82 --output-format=github
+
+      - name: Migrations have a single head
+        run: |
+          heads=$(alembic heads | grep -c "(head)")
+          echo "Alembic heads: $heads"
+          test "$heads" -eq 1
+
+      - name: Migrations apply to a fresh Postgres
+        run: alembic upgrade head
+
+      - name: Latest migration downgrades and re-applies
+        run: alembic downgrade -1 && alembic upgrade head
 
       - name: Run tests
-        run: pytest --tb=short -q
-        env:
-          DATABASE_URL: postgresql+psycopg://user:password@localhost:5432/study_app
-          JWT_SECRET: ci-test-secret-key-minimum-32-chars-long
-          GOOGLE_CLIENT_ID: ci-test-client-id
-          GOOGLE_CLIENT_SECRET: ci-test-client-secret
-          ENVIRONMENT: test
-          ADMIN_EMAIL: ci-admin@example.com
+        # Tests use their own in-memory SQLite sessions (tests/conftest.py).
+        run: >-
+          pytest -q --tb=short --strict-markers --durations=15
+          --cov=src --cov-report=term-missing:skip-covered
 
   frontend:
-    name: Frontend — lint, type check, build
+    name: Frontend - lint, type check, tests, build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: study-app-frontend
@@ -61,5 +109,54 @@ jobs:
       - name: Type check
         run: npx tsc -p tsconfig.app.json
 
+      - name: Unit tests (vitest)
+        run: npx vitest run --reporter=default --reporter=github-actions
+
       - name: Build
         run: npm run build
+
+  docker:
+    # Render builds this exact image; catch a broken Dockerfile before it ships.
+    name: Backend Docker image builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: study-app-backend
+          file: study-app-backend/Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  hygiene:
+    name: Repo rules (no em dashes added, no committed env files)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: No .env files committed
+        run: |
+          bad=$(git ls-files | grep -E '(^|/)\.env(\.|$)' | grep -v '\.env\.example$' || true)
+          if [ -n "$bad" ]; then echo "::error::Committed env files: $bad"; exit 1; fi
+
+      - name: No em dashes in added lines
+        # Only checks what this change adds; older files still hold some.
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE" 2>/dev/null; then BASE=$(git rev-list --max-parents=0 HEAD | tail -1); fi
+          # Byte-exact UTF-8 em dash (E2 80 94), so the match never depends on the locale.
+          emdash=$(printf '\342\200\224')
+          added=$(git diff "$BASE"...HEAD --unified=0 -- '*.ts' '*.tsx' '*.py' '*.css' '*.js' \
+            | grep -E '^\+[^+]' | LC_ALL=C grep -F "$emdash" || true)
+          if [ -n "$added" ]; then
+            echo "::error::Em dashes are banned (.claude/rules/no-emdash.md). Added lines:"
+            echo "$added"
+            exit 1
+          fi
