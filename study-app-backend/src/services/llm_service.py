@@ -8662,6 +8662,7 @@ Rules:
 }"""
             rules = "- custom_instructions is null unless the conversation gives real guidance."
         else:
+            from src.utils.exceptions import LLMException
             raise LLMException(f"Unknown action type: {action_type}")
 
         prompt = f"""You are an action-planning assistant inside a study tool called Nosey.

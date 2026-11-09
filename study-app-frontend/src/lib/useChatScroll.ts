@@ -70,6 +70,10 @@ export function useChatScroll({
   const hasFollowedRef = useRef(false);
   // Guards against scheduling multiple visit passes in the same frame.
   const visitRafRef = useRef<number | null>(null);
+  // The container the effect below last set up. Its dependency is read during
+  // render (null on the first one), so it re-runs on the first re-render for
+  // the same element; only a genuinely new element may reset the state.
+  const setupElRef = useRef<HTMLDivElement | null>(null);
 
   const measureAtBottom = useCallback((): boolean => {
     const el = containerRef.current;
@@ -136,10 +140,14 @@ export function useChatScroll({
 
     // A fresh container (mount, or KojoMode's view switch remounting the
     // message column) starts deterministically: at the bottom, and the first
-    // visit pins whatever content exists there.
-    hasFollowedRef.current = false;
-    atBottomRef.current = true;
-    setAtBottom(true);
+    // visit pins whatever content exists there. A re-run for the same element
+    // keeps the user's position, or their first scroll-up would snap back down.
+    if (setupElRef.current !== el) {
+      setupElRef.current = el;
+      hasFollowedRef.current = false;
+      atBottomRef.current = true;
+      setAtBottom(true);
+    }
 
     // 1. Live scroll events: the user's position is authoritative the moment
     //    they scroll, and any scroll counts as "has followed" so the initial
@@ -175,6 +183,9 @@ export function useChatScroll({
     visit();
 
     return () => {
+      // A pass scheduled for this setup must not run (or block the guard) after it.
+      if (visitRafRef.current != null) cancelAnimationFrame(visitRafRef.current);
+      visitRafRef.current = null;
       el.removeEventListener("scroll", onScroll);
       el.removeEventListener("load", onMediaLoad, true);
       mo.disconnect();

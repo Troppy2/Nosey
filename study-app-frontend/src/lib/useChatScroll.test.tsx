@@ -1,6 +1,6 @@
-import { act, cleanup, render, waitFor } from "@testing-library/react";
+import { act, cleanup, render } from "@testing-library/react";
 import { useEffect, useRef, useState } from "react";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useChatScroll } from "./useChatScroll";
 
 // jsdom does not implement `Element.prototype.scrollTo` at all. The hook and
@@ -38,12 +38,8 @@ type HarnessProps = {
   onHandle: (h: Handle) => void;
 };
 
-let nextInstanceId = 0;
 function Harness({ initialCount, initialHeight, clientHeight, onHandle }: HarnessProps) {
   const [count, setCount] = useState(initialCount);
-  const instanceIdRef = useRef(nextInstanceId++);
-  // eslint-disable-next-line no-console
-  console.error("DEBUG render instance", instanceIdRef.current, "count", count);
   const { containerRef, endRef, atBottom, scrollToBottom } = useChatScroll({ deps: [count] });
 
   const scrollHeightRef = useRef(initialHeight);
@@ -72,11 +68,7 @@ function Harness({ initialCount, initialHeight, clientHeight, onHandle }: Harnes
   });
 
   onHandle({
-    atBottom: () => {
-      // eslint-disable-next-line no-console
-      console.error("DEBUG handle.atBottom ->", atBottom);
-      return atBottom;
-    },
+    atBottom: () => atBottom,
     scrollToOffset: (top) => {
       scrollTopRef.current = top;
       containerRef.current?.dispatchEvent(new Event("scroll"));
@@ -186,12 +178,6 @@ describe("useChatScroll", () => {
     // User scrolls up to the top: the scroll event must immediately flip
     // atBottom to false (button appears).
     await actAndFlush(() => handle!.scrollToOffset(0));
-    // eslint-disable-next-line no-console
-    console.error("DEBUG after actAndFlush");
-    void handle!.atBottom();
-    // Not using waitFor here: it interacts poorly with fake timers.
-    await flush();
-    void handle!.atBottom();
     expect(handle!.atBottom()).toBe(false);
 
     // ...and the next token must NOT drag them back down.
@@ -217,7 +203,7 @@ describe("useChatScroll", () => {
 
     // Scroll up so the test has something to return from.
     await actAndFlush(() => handle!.scrollToOffset(0));
-    await waitFor(() => expect(handle!.atBottom()).toBe(false));
+    expect(handle!.atBottom()).toBe(false);
 
     let captured: { behavior: string } | null | undefined;
     const el = handle!.containerEl();
