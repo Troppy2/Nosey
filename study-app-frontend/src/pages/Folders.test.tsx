@@ -64,7 +64,7 @@ describe("folder organization", () => {
     await chooseAction("Select folders");
     fireEvent.click(screen.getByRole("button", { name: "Select all" }));
     expect(screen.getAllByRole("checkbox").every((item) => item.getAttribute("aria-checked") === "true")).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: "Done", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(shownIds()).toEqual([1, 2, 3]);
     expect(api.bulkFolderAction).not.toHaveBeenCalled();
   });
@@ -125,7 +125,7 @@ describe("folder organization", () => {
     await chooseAction("Reorder folders");
     fireEvent.keyDown(screen.getByRole("button", { name: "Reorder Math" }), { key: "ArrowDown" });
     expect(shownIds()).toEqual([2, 1, 3]);
-    fireEvent.click(screen.getByRole("button", { name: "Cancel", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(shownIds()).toEqual([1, 2, 3]);
     expect(api.reorderFolders).not.toHaveBeenCalled();
     await chooseAction("Reorder folders");
