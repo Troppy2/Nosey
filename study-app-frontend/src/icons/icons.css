@@ -90,6 +90,16 @@
 .icon-menu .icon-part-short { transform-origin: 5px 17px; }
 :is(.nav-link, .dock-link):is(:hover, :focus-visible) .icon-menu .icon-part-short { transform: scaleX(1.75); }
 
+/* KojoCode rail + topic icons (2026-11-08). One small nudge only where the part implies the action. */
+.icon-problem-list .icon-part-handle { transform-origin: 18.6px 14.1px; }
+:is(button, a, [role="button"], [role="tab"], .icon-hover):is(:hover, :focus-visible) .icon-problem-list .icon-part-handle { transform: translate(-1px, -1px); }
+.icon-dumbbell .icon-part-bell { transform-origin: 12px 12px; }
+:is(button, a, [role="button"], [role="tab"], .icon-hover):is(:hover, :focus-visible) .icon-dumbbell .icon-part-bell { transform: rotate(-8deg); }
+:is(button, a, [role="button"], [role="tab"], .icon-hover):is(:hover, :focus-visible) .icon-stack .icon-part-top { transform: translateY(-1.5px); }
+:is(button, a, [role="button"], [role="tab"], .icon-hover):is(:hover, :focus-visible) .icon-binary-search .icon-part-arrow { transform: translateY(1px); }
+:is(button, a, [role="button"], [role="tab"], .icon-hover):is(:hover, :focus-visible) .icon-sliding-window .icon-part-window { transform: translateX(1.5px); }
+:is(button, a, [role="button"], [role="tab"], .icon-hover):is(:hover, :focus-visible) .icon-backtrack .icon-part-head { transform: translateY(1px); }
+
 @media (prefers-reduced-motion: reduce) {
   .icon, .icon * { transition: none !important; animation: none !important; }
 }
