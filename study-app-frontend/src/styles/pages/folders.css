@@ -248,13 +248,17 @@
     padding-inline: 10px;
   }
 
-  .folders-page .toolbar > .folders-actions-trigger {
+  /* .page-header scoped so it outranks the legacy
+     `.page-header .toolbar > :last-child:nth-child(2n+1)` full-row rule. */
+  .folders-page .page-header .toolbar > .folders-actions-trigger.button {
     grid-column: 3;
     grid-row: 1;
     justify-self: end;
   }
 
-  .folders-page .toolbar > [data-tour="folders-quizlet"] {
+  /* Quick search (the button with the Ctrl+P shortcut) gets a full row, like a
+     search bar. Sharing a row would widen column 1 and squeeze New Folder. */
+  .folders-page .toolbar > [aria-keyshortcuts] {
     grid-column: 1 / -1;
     grid-row: 2;
   }

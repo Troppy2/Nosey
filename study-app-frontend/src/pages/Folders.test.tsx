@@ -35,7 +35,7 @@ async function openPage() {
 }
 
 async function chooseAction(name: "Select folders" | "Reorder folders") {
-  fireEvent.click(screen.getByRole("button", { name: "Organize folders" }));
+  fireEvent.click(screen.getByRole("button", { name: "More folder actions" }));
   fireEvent.click(await screen.findByRole("menuitem", { name }));
 }
 
@@ -132,7 +132,7 @@ describe("folder organization", () => {
     fireEvent.keyDown(screen.getByRole("button", { name: "Reorder History" }), { key: "ArrowUp" });
     fireEvent.click(screen.getByRole("button", { name: "Save order" }));
     await waitFor(() => expect(api.reorderFolders).toHaveBeenCalledWith([1, 3, 2]));
-    await screen.findByRole("button", { name: "Organize folders" });
+    await screen.findByRole("button", { name: "More folder actions" });
     expect(shownIds()).toEqual([1, 3, 2]);
   });
 
@@ -145,7 +145,7 @@ describe("folder organization", () => {
     await screen.findByText("Save failed");
     expect(shownIds()).toEqual([2, 1, 3]);
     fireEvent.click(screen.getByRole("button", { name: "Save order" }));
-    await screen.findByRole("button", { name: "Organize folders" });
+    await screen.findByRole("button", { name: "More folder actions" });
   });
 
   it("ignores refresh responses started before a bulk operation", async () => {

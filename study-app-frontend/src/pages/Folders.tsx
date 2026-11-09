@@ -8,6 +8,7 @@ import { Button } from "../components/Button";
 import { FormError } from "../components/FormError";
 import { Card } from "../components/Card";
 import { ConfirmModal } from "../components/ConfirmModal";
+import { FolderQuickSearch } from "../components/FolderQuickSearch";
 import { Dropdown } from "../components/Dropdown";
 import { EmptyState } from "../components/EmptyState";
 import { TextInput } from "../components/Field";
@@ -413,6 +414,7 @@ export default function Folders() {
           <p className="muted">Organize tests and flashcards by subject or exam.</p>
         </div>
         <div className="toolbar">
+          <FolderQuickSearch activeFolderIds={folders.map((folder) => folder.id)} disabled={mode !== "normal" || busy || isModalOpen || !!folderAction || !!bulkAction || !!quizletImport} />
           <div className="segmented" aria-label="View mode">
             <button className={view === "grid" ? "active" : ""} onClick={() => { setView("grid"); localStorage.setItem(scopeKey("nosey_folder_view"), "grid"); }} type="button">
               <Grid3X3 size={18} />
@@ -421,27 +423,20 @@ export default function Folders() {
               <List size={18} />
             </button>
           </div>
-          <Button
-            data-tour="folders-quizlet"
-            variant="secondary"
-            icon={<FileUp size={18} />}
-            disabled={mode !== "normal" || busy}
-            onClick={() => setQuizletImport({})}
-          >
-            Import from Quizlet
-          </Button>
           <Button data-tour="folders-new" icon={<PlusIcon size={18} />} disabled={mode !== "normal" || busy} onClick={() => setIsModalOpen(true)}>
             New Folder
           </Button>
-          {mode === "normal" && folders.length > 0 ? (
-            <Dropdown<"" | "select" | "reorder">
-              bare actionMenu label="Organize folders" value="" placeholder="Organize"
+          {mode === "normal" ? (
+            // Less frequent actions share one menu so the header stays short.
+            <Dropdown<"" | "quizlet" | "select" | "reorder">
+              bare actionMenu id="folders-more" label="More folder actions" value="" placeholder="More"
               className="button button-secondary folders-actions-trigger"
               options={[
-                { value: "select", label: "Select folders" },
+                { value: "quizlet", label: "Import from Quizlet" },
+                ...(folders.length > 0 ? [{ value: "select" as const, label: "Select folders" }] : []),
                 ...(folders.length > 1 ? [{ value: "reorder" as const, label: "Reorder folders" }] : []),
               ]}
-              onChange={(next) => { if (next) startMode(next); }}
+              onChange={(next) => { if (next === "quizlet") setQuizletImport({}); else if (next) startMode(next); }}
               disabled={isLoading || busy}
             />
           ) : null}

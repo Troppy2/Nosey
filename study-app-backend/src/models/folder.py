@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import BIGINT_ID, Base, TimestampMixin
@@ -57,3 +57,12 @@ class Folder(Base, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"Folder(id={self.id!r}, name={self.name!r})"
+
+
+# Match the expressions used by quick search, including literal prefix queries.
+Index("ix_folders_search_trgm", func.lower(Folder.name).label("search_name"),
+      postgresql_using="gin", postgresql_ops={"search_name": "gin_trgm_ops"},
+      postgresql_where=Folder.is_archived.is_(False)).ddl_if(dialect="postgresql")
+Index("ix_folders_search_prefix", func.lower(Folder.name).label("search_name"),
+      postgresql_ops={"search_name": "text_pattern_ops"},
+      postgresql_where=Folder.is_archived.is_(False)).ddl_if(dialect="postgresql")

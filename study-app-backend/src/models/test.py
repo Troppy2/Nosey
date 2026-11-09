@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import BIGINT_ID, Base, TimestampMixin
@@ -56,3 +56,9 @@ class Test(Base, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"Test(id={self.id!r}, title={self.title!r})"
+
+
+Index("ix_tests_search_trgm", func.lower(Test.title).label("search_title"),
+      postgresql_using="gin", postgresql_ops={"search_title": "gin_trgm_ops"}).ddl_if(dialect="postgresql")
+Index("ix_tests_search_prefix", func.lower(Test.title).label("search_title"),
+      postgresql_ops={"search_title": "text_pattern_ops"}).ddl_if(dialect="postgresql")

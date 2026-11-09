@@ -334,9 +334,10 @@ export const TOURS: Record<TourId, TourDef> = {
   "quizlet-import": {
     steps: [
       {
-        element: t("folders-quizlet"),
+        // Import from Quizlet lives in the Folders page's More menu.
+        element: "#folders-more",
         title: "Coming from Quizlet?",
-        body: "Export a set on Quizlet, then paste it here to turn it into Nosey flashcards. You can send cards back to Quizlet from Manage Flashcards anytime.",
+        body: "Open More, then Import from Quizlet. Paste an exported set and it becomes Nosey flashcards. You can send cards back to Quizlet from Manage Flashcards anytime.",
         side: "bottom",
         align: "end",
       },

@@ -9,11 +9,23 @@ from src.schemas.folder_schema import (
 )
 from src.schemas.folder_stats_schema import FolderStatsResponse, WeakSpot
 from src.services.folder_service import FolderService
+from src.schemas.folder_search_schema import FolderSearchResponse
+from src.services.folder_search_service import FolderSearchService
 from src.services.folder_stats_service import FolderStatsService
 from src.utils.exceptions import ResourceNotFoundException, StudyAppException
 from src.services.account_safety_service import screen_user_input
 
 router = APIRouter(prefix="/folders", tags=["folders"])
+
+
+@router.get("/search", response_model=FolderSearchResponse)
+async def search_folders_and_tests(
+    q: str = Query(default="", max_length=160),
+    limit: int = Query(default=20, ge=1, le=20),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> FolderSearchResponse:
+    return await FolderSearchService().search(user.id, q, session, limit)
 
 
 @router.get("", response_model=list[FolderResponse])
