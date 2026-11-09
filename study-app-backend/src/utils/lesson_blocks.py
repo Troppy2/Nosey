@@ -43,6 +43,70 @@ def split_lesson_blocks(markdown: str) -> list[str]:
     return blocks
 
 
+# ── Practice scratch pads ────────────────────────────────────────────────────
+# A lesson can hold practice problems: the author puts SCRATCHPAD_MARKER on a
+# line of its own (a paragraph of its own) right after a problem statement.
+# The reader shows a scratch pad there, and every block after the marker, up
+# to the next heading, horizontal rule, marker or the end of the lesson, is the
+# walkthrough, kept collapsed until the problem is solved or given up. Mirrors
+# isScratchpadBlock / practiceLayout in study-app-frontend/src/lib/practicePads.ts.
+SCRATCHPAD_MARKER = "[[scratchpad]]"
+MAX_SCRATCHPADS_PER_LESSON = 10
+_RULE = re.compile(r"^\s*(?:-{3,}|\*{3,}|_{3,})\s*$")
+
+
+def is_scratchpad_block(block: str) -> bool:
+    return block.strip().lower() == SCRATCHPAD_MARKER
+
+
+def _ends_walkthrough(block: str) -> bool:
+    first = block.lstrip("\n").split("\n", 1)[0]
+    return bool(_HEADING.match(first)) or bool(_RULE.match(block)) or is_scratchpad_block(block)
+
+
+def count_scratchpads(markdown: Optional[str]) -> int:
+    return sum(1 for b in split_lesson_blocks(markdown or "") if is_scratchpad_block(b))
+
+
+def check_scratchpads(markdown: str) -> None:
+    """Raise ValueError when a [[scratchpad]] marker is misplaced.
+
+    Each marker needs a problem statement in the block right before it and at
+    least one walkthrough block after it.
+    """
+    blocks = split_lesson_blocks(markdown)
+    markers = 0
+    for i, block in enumerate(blocks):
+        if is_scratchpad_block(block):
+            markers += 1
+            n = markers
+            prev = blocks[i - 1] if i > 0 else ""
+            has_problem = (
+                prev
+                and not is_scratchpad_block(prev)
+                and not _RULE.match(prev)
+                and any(line.strip() and not _HEADING.match(line) for line in prev.split("\n"))
+            )
+            if not has_problem:
+                raise ValueError(
+                    f"[[scratchpad]] #{n} must come right after the problem statement (the paragraph the "
+                    "student solves), not after a heading, a rule or another marker."
+                )
+            nxt = blocks[i + 1] if i + 1 < len(blocks) else ""
+            if not nxt or _ends_walkthrough(nxt):
+                raise ValueError(
+                    f"[[scratchpad]] #{n} needs a step-by-step walkthrough right after it, before the next "
+                    "heading, horizontal rule or marker. The walkthrough stays hidden until the student "
+                    "finishes or gives up."
+                )
+        elif SCRATCHPAD_MARKER in block.lower() and not block.lstrip().startswith("```"):
+            raise ValueError(
+                "[[scratchpad]] must sit on a line of its own with a blank line above and below it."
+            )
+    if markers > MAX_SCRATCHPADS_PER_LESSON:
+        raise ValueError(f"A lesson holds at most {MAX_SCRATCHPADS_PER_LESSON} [[scratchpad]] markers.")
+
+
 def numbered_blocks(markdown: str) -> str:
     """The lesson as [1] ... [N] blocks, for prompts that map entries to blocks."""
     return "\n\n".join(f"[{i + 1}]\n{block}" for i, block in enumerate(split_lesson_blocks(markdown)))

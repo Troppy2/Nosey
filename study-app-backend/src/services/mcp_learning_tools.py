@@ -28,11 +28,27 @@ from src.services.mcp_tool_base import McpContext, McpTool, ToolArgs, ToolInputE
 from src.services.narration_service import schedule_lesson_narration
 from src.services.mcp_write_tools import CONFIRM_FIELD, CREATED_VIA, require_confirm, screen
 from src.utils.exceptions import ResourceNotFoundException
-from src.utils.lesson_blocks import normalize_tts_script, split_lesson_blocks
+from src.utils.lesson_blocks import check_scratchpads, normalize_tts_script, split_lesson_blocks
 
 ARTICLE = "article"
 MAX_MODULES_PER_TRACK = 20
 MAX_LESSON_CHARS = 100_000
+
+
+# Practice problems. Kept next to the field it documents so every tool that
+# takes a lesson tells the model the same thing.
+LESSON_DESCRIPTION = (
+    "The lesson. Markdown, LaTeX in $...$, any length. PRACTICE PROBLEMS: for every worked example the "
+    "student should try themselves, write the problem statement as its own paragraph, then a line containing "
+    "only [[scratchpad]] (blank line above and below), then a full step-by-step walkthrough you write. Nosey "
+    "puts a scratch pad exactly where the marker is. The walkthrough is every paragraph after the marker up "
+    "to the next heading, horizontal rule (---) or marker; it stays collapsed until the student marks the "
+    "problem done (after writing on the pad) or gives up, which counts it wrong. The quiz unlocks only after "
+    "every practice problem is done or given up. Example:\n\n## Worked example 1\n\nSample 1: n1 = 10 ... "
+    "Do the populations have equal variances?\n\n[[scratchpad]]\n\n**Step 1: degrees of freedom.** ...\n\n"
+    "**Step 2: ...** ...\n\n---\n\nAt most 10 markers per lesson. With narration, the marker line is a "
+    "paragraph of its own and needs its own entry (e.g. \"Pause here and try this one on the scratch pad.\")."
+)
 
 
 class QuizQuestionIn(ToolArgs):
@@ -56,7 +72,7 @@ class ModuleIn(ToolArgs):
     title: str = Field(min_length=1, max_length=255)
     summary: Optional[str] = Field(default=None, max_length=1000)
     lesson_markdown: str = Field(
-        min_length=1, max_length=MAX_LESSON_CHARS, description="The lesson. Markdown, LaTeX in $...$, any length."
+        min_length=1, max_length=MAX_LESSON_CHARS, description=LESSON_DESCRIPTION
     )
     narration: Optional[list[str]] = Field(
         default=None,
@@ -70,6 +86,7 @@ class ModuleIn(ToolArgs):
 
     @model_validator(mode="after")
     def _check(self) -> "ModuleIn":
+        check_scratchpads(self.lesson_markdown)
         _check_narration(self.narration, self.lesson_markdown)
         _check_video(self.video_url)
         return self
@@ -211,7 +228,9 @@ class EditModuleArgs(ToolArgs):
     module_id: int
     title: Optional[str] = Field(default=None, min_length=1, max_length=255)
     summary: Optional[str] = Field(default=None, max_length=1000)
-    lesson_markdown: Optional[str] = Field(default=None, min_length=1, max_length=MAX_LESSON_CHARS)
+    lesson_markdown: Optional[str] = Field(
+        default=None, min_length=1, max_length=MAX_LESSON_CHARS, description=LESSON_DESCRIPTION
+    )
     narration: Optional[list[str]] = Field(
         default=None, description="One entry per lesson paragraph. Send null to read the lesson text itself."
     )
@@ -224,6 +243,8 @@ async def edit_module(ctx: McpContext, args: EditModuleArgs) -> dict[str, Any]:
     fields = args.model_fields_set
     lesson = args.lesson_markdown if args.lesson_markdown is not None else (module.lesson_content or "")
     try:
+        if args.lesson_markdown is not None:
+            check_scratchpads(args.lesson_markdown)
         if "narration" in fields:
             _check_narration(args.narration, lesson)
         _check_video(args.video_url)
@@ -369,18 +390,25 @@ LEARNING_TOOLS: tuple[McpTool, ...] = (
         "Create a learning track",
         "Create an article learning track from modules you write: lesson, optional narration, quiz "
         "(3 to 10 questions, each with an explanation) and optional video. The student must score 80% "
-        "on a module's quiz to unlock the next. If the folder already has an active article track, it "
+        "on a module's quiz to unlock the next. Give worked examples a practice scratch pad by putting "
+        "[[scratchpad]] on its own line right after the problem statement, followed by your step-by-step "
+        "walkthrough (see lesson_markdown). If the folder already has an active article track, it "
         "is archived (kept and restorable), not overwritten.",
         CreateTrackArgs,
         create_learning_track,
     ),
-    _write("add_modules", "Add learning modules", "Append modules to an article track (20 per track at most).",
+    _write("add_modules", "Add learning modules",
+           "Append modules to an article track (20 per track at most). Lessons support [[scratchpad]] "
+           "practice problems (see lesson_markdown).",
            AddModulesArgs, add_modules),
     _write(
         "edit_module",
         "Edit a learning module",
         "Change a module's title, summary, lesson, narration, quiz or video. Changing the lesson without "
-        "new narration makes the reader read the new lesson text. The student's progress is kept.",
+        "new narration makes the reader read the new lesson text. The student's progress is kept, "
+        "including practice scratch pads, which are matched by position: the first [[scratchpad]] keeps "
+        "the first pad's work. To add practice problems to an existing lesson, send lesson_markdown with "
+        "[[scratchpad]] markers and walkthroughs.",
         EditModuleArgs,
         edit_module,
     ),

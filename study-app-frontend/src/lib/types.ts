@@ -399,6 +399,19 @@ export type LearningModule = {
   // True on episode-format modules whose script + checkpoints exist; false on
   // article modules, which never have an episode.
   episode_ready?: boolean;
+  // [[scratchpad]] practice problems in the lesson. The quiz stays locked
+  // until done + gave_up covers every one of them.
+  practice_total?: number;
+  practice_done?: number;
+  practice_gave_up?: number;
+};
+
+// One practice scratch pad's state. "done" and "gave_up" are final; gave_up
+// counts the problem as wrong. strokes is ScratchPadData JSON.
+export type PracticeStatus = "open" | "done" | "gave_up";
+export type PracticeItemState = {
+  status: PracticeStatus;
+  strokes: string | null;
 };
 
 export type TrackFormat = "article" | "podcast" | "lecture";

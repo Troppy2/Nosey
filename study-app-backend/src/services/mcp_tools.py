@@ -31,6 +31,7 @@ from src.services.mcp_lecture_tools import LECTURE_TOOLS
 from src.services.mcp_learning_tools import LEARNING_TOOLS
 from src.services.mcp_plan_tools import PLAN_TOOLS
 from src.services.mcp_write_tools import WRITE_TOOLS
+from src.services.practice_progress import practice_progress, summary as practice_summary
 from src.services.test_service import TestService
 from src.utils.exceptions import ResourceNotFoundException, StudyAppException
 
@@ -279,6 +280,7 @@ async def list_learning_tracks(ctx: McpContext, args: ListTracksArgs) -> dict[st
                         "summary": m.summary,
                         "passed": m.passed,
                         "best_score": m.best_score,
+                        "practice": practice_summary(practice_progress(m)),
                     }
                     for m in t.modules
                 ],
@@ -323,6 +325,9 @@ async def get_learning_module(ctx: McpContext, args: ModuleArgs) -> dict[str, An
         "quiz": _parse_json_list(module.quiz_json),
         "passed": module.passed,
         "best_score": module.best_score,
+        # Per [[scratchpad]] marker, in lesson order: open | done | gave_up
+        # (gave_up = counted wrong). Ink is not exposed.
+        "practice": [p["status"] for p in practice_progress(module)],
     }
 
 
@@ -422,8 +427,9 @@ TOOLS: dict[str, McpTool] = {
         McpTool(
             "get_learning_module",
             "Get a learning module",
-            "Get one learning module: lesson markdown, narration script, video URL and quiz "
-            "with correct answers.",
+            "Get one learning module: lesson markdown, narration script, video URL, quiz "
+            "with correct answers, and practice: the status of each [[scratchpad]] practice problem "
+            "in lesson order (open, done, or gave_up, which counts as wrong).",
             ModuleArgs,
             get_learning_module,
         ),

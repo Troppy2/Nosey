@@ -149,6 +149,13 @@ class LearningModule(Base, TimestampMixin):
     # listener who missed one retries just that question instead of replaying
     # the episode, and so a reload mid-episode loses nothing.
     checkpoint_progress: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # ARTICLE only. One entry per [[scratchpad]] marker in lesson_content, in
+    # order: [{"status": "open"|"done"|"gave_up", "strokes": str|null}], where
+    # strokes is the ScratchPadData JSON the pad saves. "done" and "gave_up"
+    # are final and both unlock the quiz; "gave_up" counts the problem as
+    # wrong. Indexed by marker position and padded on read, so a lesson edit
+    # that adds or drops a marker never breaks it (see lesson_blocks.py).
+    practice_progress: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     best_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     passed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 

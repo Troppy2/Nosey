@@ -53,6 +53,7 @@ import type {
   LCGeneratedCustomProblem,
   LearningModule,
   LearningTrack,
+  PracticeItemState,
   ModuleEpisode,
   CheckpointAnswerResult,
   QuizAttemptResult,
@@ -1091,6 +1092,24 @@ export async function updateModuleVideo(moduleId: number, videoUrl: string | nul
   return request<LearningModule>(`/learning-modules/${moduleId}/video`, {
     method: "PATCH",
     body: JSON.stringify({ video_url: videoUrl }),
+  });
+}
+
+// Status and ink for every [[scratchpad]] practice problem in a lesson.
+export async function fetchModulePractice(moduleId: number): Promise<{ module_id: number; items: PracticeItemState[] }> {
+  return request(`/learning-modules/${moduleId}/practice`);
+}
+
+// Saves a pad's ink and/or resolves it. "done" is refused without ink;
+// resolved pads keep their status.
+export async function saveModulePractice(
+  moduleId: number,
+  index: number,
+  body: { strokes?: string; status?: "done" | "gave_up" },
+): Promise<PracticeItemState> {
+  return request<PracticeItemState>(`/learning-modules/${moduleId}/practice/${index}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
   });
 }
 

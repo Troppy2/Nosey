@@ -159,3 +159,66 @@ async def test_mcp_quiz_with_more_than_five_questions_submits(client, call, seed
     module_id = made["modules"][0]["module_id"]
     graded = (await client.post(f"/learning-modules/{module_id}/quiz-attempt", json={"answers": [0] * 8})).json()
     assert graded["score"] == 8 and graded["passed"] is True
+
+
+PRACTICE_LESSON = (
+    "## Worked example 1\n\nSample 1: n1 = 10. Do the populations have equal variances?\n\n[[scratchpad]]\n\n"
+    "**Step 1.** v1 = 9.\n\n**Step 2.** F = 6.8.\n\n---\n\n## Worked example 2\n\nFind F for 18.2 over 6.5.\n\n"
+    "[[scratchpad]]\n\nF = 2.8."
+)
+INK = json.dumps({"version": 1, "strokes": [{"points": [0, 0, 60, 40, 120, 80]}]})
+TAP = json.dumps({"version": 1, "strokes": [{"points": [0, 0, 3, 3]}]})
+
+
+async def test_practice_pads_gate_the_quiz(client, call, seeded) -> None:  # noqa: F811
+    made = await call(
+        "create_learning_track",
+        {"folder_id": seeded["folder_id"], "modules": [_module("F", lesson_markdown=PRACTICE_LESSON)]},
+    )
+    module_id = made["modules"][0]["module_id"]
+
+    track = (await client.get(f"/folders/{seeded['folder_id']}/learning-track")).json()
+    assert track["modules"][0]["practice_total"] == 2
+
+    locked = await client.post(f"/learning-modules/{module_id}/quiz-attempt", json={"answers": [0, 0, 0]})
+    assert locked.status_code == 400 and "2 left" in locked.json()["detail"]
+
+    # Done needs real ink: nothing, or a stray tap, is refused.
+    assert (await client.put(f"/learning-modules/{module_id}/practice/0", json={"status": "done"})).status_code == 400
+    await client.put(f"/learning-modules/{module_id}/practice/0", json={"strokes": TAP})
+    assert (await client.put(f"/learning-modules/{module_id}/practice/0", json={"status": "done"})).status_code == 400
+    done = await client.put(f"/learning-modules/{module_id}/practice/0", json={"strokes": INK, "status": "done"})
+    assert done.json() == {"status": "done", "strokes": INK}
+
+    # Giving up needs no ink, and is final: it cannot be turned into a solve.
+    gave_up = await client.put(f"/learning-modules/{module_id}/practice/1", json={"status": "gave_up"})
+    assert gave_up.json()["status"] == "gave_up"
+    again = await client.put(f"/learning-modules/{module_id}/practice/1", json={"strokes": INK, "status": "done"})
+    assert again.json()["status"] == "gave_up"
+
+    state = (await client.get(f"/learning-modules/{module_id}/practice")).json()
+    assert [i["status"] for i in state["items"]] == ["done", "gave_up"]
+    assert (await client.put(f"/learning-modules/{module_id}/practice/5", json={"strokes": INK})).status_code == 400
+
+    graded = await client.post(f"/learning-modules/{module_id}/quiz-attempt", json={"answers": [0, 0, 0]})
+    assert graded.status_code == 200 and graded.json()["passed"] is True
+
+    module = await call("get_learning_module", {"module_id": module_id})
+    assert module["practice"] == ["done", "gave_up"]
+    tracks = await call("list_learning_tracks", {"folder_id": seeded["folder_id"]})
+    assert tracks["tracks"][0]["modules"][0]["practice"] == {"total": 2, "done": 1, "gave_up": 1}
+
+
+async def test_misplaced_scratchpad_is_rejected(call, seeded) -> None:  # noqa: F811
+    cases = {
+        "## H\n\n[[scratchpad]]\n\nStep.": "right after the problem statement",
+        "Problem?\n\n[[scratchpad]]\n\n## Next": "walkthrough",
+        "Problem? [[scratchpad]]\n\nStep.": "line of its own",
+    }
+    for lesson, message in cases.items():
+        err = await call(
+            "create_learning_track",
+            {"folder_id": seeded["folder_id"], "modules": [_module("x", lesson_markdown=lesson)]},
+            expect_error=True,
+        )
+        assert message in err["error"], err

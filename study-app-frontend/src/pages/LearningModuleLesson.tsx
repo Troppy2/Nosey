@@ -10,8 +10,11 @@ import { Card } from "../components/Card";
 import { useConfetti } from "../components/Confetti";
 import { InlineLoading, LoadingNotice } from "../components/Loaders";
 import { MarkdownContent } from "../components/MarkdownContent";
+import { PracticePad } from "../components/PracticePad";
+import type { PaperStyle } from "../components/ScratchPad";
 import { SkeletonText } from "../components/Skeletons";
 import {
+  fetchModulePractice,
   fetchTrackForModule,
   scopeKey,
   submitModuleQuiz,
@@ -29,10 +32,14 @@ import {
   speakNarration,
 } from "../lib/narration";
 import { looksMangled, repairLessonForDisplay, repairLessonFully } from "../lib/repairLessonMarkdown";
+import { practiceLayout } from "../lib/practicePads";
 import { isPermutationOf, shuffled, shuffledOptionOrder } from "../lib/shuffle";
 import { useMobileShell } from "../lib/useMobileShell";
 import { useSettings } from "../lib/useSettings";
-import type { LearningTrack, QuizAttemptResult } from "../lib/types";
+import type { LearningTrack, PracticeItemState, QuizAttemptResult } from "../lib/types";
+
+// Spoken where a [[scratchpad]] marker sits when there is no narration script.
+const PRACTICE_SPOKEN_CUE = "Pause here and try this problem on the scratch pad before reading the walkthrough.";
 
 // Splits a markdown lesson into paragraph-level blocks (keeping fenced code
 // blocks and display-math blocks intact) so each block can be rendered
@@ -383,6 +390,23 @@ export default function LearningModuleLesson() {
   // restored or generated.
   const [quizOrder, setQuizOrder] = useState<QuizOrder | null>(null);
 
+  // ── Practice scratch pads ([[scratchpad]] markers) ──────────────────────────
+  // Null until loaded; while null every walkthrough stays locked.
+  const [practiceItems, setPracticeItems] = useState<PracticeItemState[] | null>(null);
+  const [practiceError, setPracticeError] = useState<string | null>(null);
+  // Shared with tests: one paper preference per device.
+  const [paperStyle, setPaperStyle] = useState<PaperStyle>(
+    () => (localStorage.getItem(scopeKey("nosey_scratchpad_paper")) as PaperStyle | null) ?? "blank",
+  );
+  function changePaperStyle(style: PaperStyle) {
+    setPaperStyle(style);
+    try {
+      localStorage.setItem(scopeKey("nosey_scratchpad_paper"), style);
+    } catch {
+      // Private mode or a full quota.
+    }
+  }
+
   // Whole-track completion celebration: fired when the LAST module's quiz
   // passes and every other module is already passed.
   const { fire: fireConfetti, element: confettiElement } = useConfetti();
@@ -511,6 +535,23 @@ export default function LearningModuleLesson() {
       .finally(() => setLoaded(true));
   }, [numericModuleId]);
 
+  useEffect(() => {
+    if (numericModuleId == null) return;
+    let cancelled = false;
+    setPracticeItems(null);
+    setPracticeError(null);
+    fetchModulePractice(numericModuleId)
+      .then((res) => {
+        if (!cancelled) setPracticeItems(res.items);
+      })
+      .catch((err) => {
+        if (!cancelled) setPracticeError(err instanceof Error ? err.message : "Couldn't load your practice work.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [numericModuleId]);
+
   // Start every module at the top of its article. Only :moduleId changes when
   // "Next module" is followed, so this component stays mounted and the browser
   // keeps the old scroll position, which would drop the reader straight into
@@ -550,17 +591,29 @@ export default function LearningModuleLesson() {
   //
   // Each chunk carries the lesson block it narrates so the article can
   // highlight the paragraph currently being read (see mapScriptToBlocks).
+  const practice = useMemo(() => practiceLayout(lessonBlocks), [lessonBlocks]);
+  const practiceResolved = (padIndex: number) => {
+    const status = practiceItems?.[padIndex]?.status;
+    return status === "done" || status === "gave_up";
+  };
+  // A locked walkthrough must not be read aloud either: that would give the
+  // answer away before the student tries. Recomputed when a pad resolves.
+  const lockedKey = practice.pads.map((p) => (practiceResolved(p.index) ? "1" : "0")).join("");
   const speechChunks = useMemo(() => {
-    if (module?.tts_script) {
-      return mapScriptToBlocks(module.tts_script, module.lesson_content ?? "", lessonBlocks).flatMap(
-        ({ text: paragraph, blockIndex }) => splitForSpeech(paragraph, NARRATION_CHUNK_CHARS).map((text) => ({ text, blockIndex })),
-      );
-    }
-    return lessonBlocks.flatMap((block, blockIndex) => {
-      const text = markdownToSpeech(block);
-      return text ? splitForSpeech(text, NARRATION_CHUNK_CHARS).map((t) => ({ text: t, blockIndex })) : [];
-    });
-  }, [module?.tts_script, module?.lesson_content, lessonBlocks]);
+    const locked = (blockIndex: number) => {
+      const pad = practice.walkthroughOf[blockIndex] ?? -1;
+      return pad >= 0 && lockedKey[pad] !== "1";
+    };
+    const chunks = module?.tts_script
+      ? mapScriptToBlocks(module.tts_script, module.lesson_content ?? "", lessonBlocks).flatMap(
+          ({ text: paragraph, blockIndex }) => splitForSpeech(paragraph, NARRATION_CHUNK_CHARS).map((text) => ({ text, blockIndex })),
+        )
+      : lessonBlocks.flatMap((block, blockIndex) => {
+          const text = practice.padAt[blockIndex] >= 0 ? PRACTICE_SPOKEN_CUE : markdownToSpeech(block);
+          return text ? splitForSpeech(text, NARRATION_CHUNK_CHARS).map((t) => ({ text: t, blockIndex })) : [];
+        });
+    return chunks.filter((chunk) => !locked(chunk.blockIndex));
+  }, [module?.tts_script, module?.lesson_content, lessonBlocks, practice, lockedKey]);
 
   // The paragraph the player is on, for the article highlight.
   const currentBlock = speechChunks[chunkPos]?.blockIndex ?? 0;
@@ -1132,6 +1185,41 @@ export default function LearningModuleLesson() {
 
   const playerVisible = !editing && ttsSupported && speechChunks.length > 0;
 
+  function renderLessonBlock(index: number) {
+    // Paragraph-level "now reading" marker driven by the player. The
+    // narration is a spoken rewrite, so the highlight shows which
+    // paragraph is being covered, not a word-for-word position.
+    const isCurrent = index === currentBlock;
+    const stateClass = isCurrent
+      ? speech === "playing"
+        ? "is-speaking"
+        : speech === "paused" || chunkPos > 0
+          ? "is-cursor"
+          : ""
+      : "";
+    return (
+      <div key={index} id={`lm-lesson-block-${index}`} className={`lm-lesson-block ${stateClass}`}>
+        <MarkdownContent content={lessonBlocks[index]} />
+      </div>
+    );
+  }
+
+  // The quiz unlocks once every practice pad is done or given up (the server
+  // enforces the same rule on submit).
+  // A pad the server does not know about (lesson and stored progress
+  // disagree) cannot be resolved, so it must not lock the quiz forever.
+  const practiceOpenPads = practice.pads.filter(
+    (pad) => (practiceItems == null || practiceItems[pad.index] != null) && !practiceResolved(pad.index),
+  );
+  const quizLocked = practiceOpenPads.length > 0;
+  function jumpToPractice() {
+    const first = practiceOpenPads[0];
+    if (!first) return;
+    const el = document.getElementById(`lm-lesson-block-${first.markerBlock}`);
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+  }
+
   return (
     <div className={`page page-narrow lm-lesson-page ${playerVisible ? "is-docked" : ""}`}>
       <header className="page-header mode-header">
@@ -1491,23 +1579,41 @@ export default function LearningModuleLesson() {
 
       {editing ? null : (
       <Card className="lm-lesson-card">
+        <FormError message={practiceError} />
         {lessonBlocks.map((block, index) => {
-          // Paragraph-level "now reading" marker driven by the player. The
-          // narration is a spoken rewrite, so the highlight shows which
-          // paragraph is being covered, not a word-for-word position.
-          const isCurrent = index === currentBlock;
-          const stateClass = isCurrent
-            ? speech === "playing"
-              ? "is-speaking"
-              : speech === "paused" || chunkPos > 0
-                ? "is-cursor"
-                : ""
-            : "";
-          return (
-            <div key={index} id={`lm-lesson-block-${index}`} className={`lm-lesson-block ${stateClass}`}>
-              <MarkdownContent content={block} />
-            </div>
-          );
+          // Walkthrough blocks render inside their practice pad's chevron.
+          if (practice.walkthroughOf[index] >= 0) return null;
+          const padIndex = practice.padAt[index];
+          if (padIndex >= 0) {
+            const pad = practice.pads[padIndex];
+            const state = practiceItems?.[padIndex];
+            if (!state) {
+              // Still loading (or the stored lesson and this one disagree):
+              // keep the walkthrough hidden rather than flash it.
+              return practiceItems == null ? (
+                <div key={index} className="practice-pad">
+                  <SkeletonText lines={2} />
+                </div>
+              ) : null;
+            }
+            return (
+              <div key={index} id={`lm-lesson-block-${index}`}>
+                <PracticePad
+                  moduleId={module.id}
+                  index={padIndex}
+                  problemText={pad.problemBlock >= 0 ? lessonBlocks[pad.problemBlock] : module.title}
+                  state={state}
+                  onState={(next) =>
+                    setPracticeItems((prev) => (prev ? prev.map((item, i) => (i === padIndex ? next : item)) : prev))
+                  }
+                  paperStyle={paperStyle}
+                  onPaperStyleChange={changePaperStyle}
+                  walkthrough={pad.walkthroughBlocks.map(renderLessonBlock)}
+                />
+              </div>
+            );
+          }
+          return renderLessonBlock(index);
         })}
       </Card>
       )}
@@ -1563,11 +1669,34 @@ export default function LearningModuleLesson() {
           module.
         </p>
 
+        {quizLocked ? (
+          <Card className="lm-quiz-locked">
+            <PencilIcon size={20} />
+            <div>
+              <p>
+                <strong>
+                  Finish the practice {practice.pads.length === 1 ? "problem" : "problems"} first.
+                </strong>
+              </p>
+              <p className="muted small">
+                {practice.pads.length - practiceOpenPads.length} of {practice.pads.length} done.{" "}
+                {practice.pads.length === 1 ? "Solve it" : "Solve each one"} on the scratch pad, or give up (it
+                counts as wrong), to unlock the quiz.
+              </p>
+              <div className="button-row">
+                <Button variant="secondary" onClick={jumpToPractice}>
+                  Go to practice problem {practiceOpenPads[0].index + 1}
+                </Button>
+              </div>
+            </div>
+          </Card>
+        ) : null}
+
         {/* Rendering walks the shuffled order. `qIndex` is always the CANONICAL
             question index and `oIndex` the canonical option index, because
             answers, correct_indices and option_explanations are all canonical;
             only `displayPos` reflects where something sits on screen. */}
-        {questionOrder.map((qIndex, questionPos) => {
+        {(quizLocked ? [] : questionOrder).map((qIndex, questionPos) => {
           const question = quiz[qIndex];
           if (!question) return null;
           const chosen = answers[qIndex];
@@ -1654,7 +1783,7 @@ export default function LearningModuleLesson() {
 
         <FormError message={error} />
 
-        {result == null ? (
+        {quizLocked ? null : result == null ? (
           <div className="button-row">
             <Button onClick={() => void handleSubmitQuiz()} disabled={!allAnswered || submitting}>
               {submitting ? "Grading…" : "Submit answers"}

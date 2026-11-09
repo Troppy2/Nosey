@@ -42,3 +42,12 @@ def test_all_empty_list_counts_as_missing():
 def test_checked_script_keeps_miscounted_array():
     stored = LLMService._checked_tts_script(["a", "b"], 3)
     assert json.loads(stored) == ["a", "b"]
+
+
+def test_scratchpad_markers_count_as_their_own_block() -> None:
+    from src.utils.lesson_blocks import count_scratchpads
+
+    lesson = "Problem?\n\n[[scratchpad]]\n\nStep 1.\n\n```\n[[scratchpad]]\n```"
+    # The fenced one is code, not a marker.
+    assert count_scratchpads(lesson) == 1
+    assert count_scratchpads(None) == 0

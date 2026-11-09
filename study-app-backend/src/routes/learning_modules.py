@@ -33,9 +33,20 @@ from src.schemas.learning_module_schema import (
     QuizAttemptRequest,
     QuizAttemptResponse,
     QuizExplanation,
+    ModulePracticeResponse,
+    PracticeItemState,
     QuizQuestionPublic,
+    SavePracticeRequest,
     UpdateLearningModuleRequest,
     UpdateModuleVideoRequest,
+)
+from src.services.practice_progress import (
+    DONE,
+    RESOLVED,
+    has_ink,
+    practice_progress,
+    summary as practice_summary,
+    unresolved as practice_unresolved,
 )
 from src.services.file_service import FileService
 from src.services.llm_service import LLMService
@@ -353,6 +364,7 @@ def _module_to_response(module: LearningModule) -> LearningModuleResponse:
             ]
         except (ValueError, KeyError, TypeError):
             quiz = None
+    practice = practice_summary(practice_progress(module))
     return LearningModuleResponse(
         id=module.id,
         order_index=module.order_index,
@@ -368,6 +380,9 @@ def _module_to_response(module: LearningModule) -> LearningModuleResponse:
         if module.episode_script
         else bool(module.lesson_content and module.quiz_json),
         episode_ready=bool(module.episode_script and module.checkpoints),
+        practice_total=practice["total"],
+        practice_done=practice["done"],
+        practice_gave_up=practice["gave_up"],
     )
 
 
@@ -918,6 +933,14 @@ async def submit_quiz_attempt(
         except ValueError as exc:
             raise StudyAppException("This module's quiz is corrupted. Rebuild the track.") from exc
 
+        # The quiz unlocks once every practice scratch pad is finished or given up.
+        open_practice = practice_unresolved(practice_progress(module))
+        if open_practice:
+            plural = "problem" if open_practice == 1 else "problems"
+            raise StudyAppException(
+                f"Finish the practice {plural} in the lesson first ({open_practice} left), or give up on them."
+            )
+
         total = len(quiz)
         if len(data.answers) != total:
             raise StudyAppException(f"Expected {total} answers, got {len(data.answers)}.")
@@ -976,6 +999,62 @@ async def submit_quiz_attempt(
                 for q in quiz
             ],
         )
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except StudyAppException as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/learning-modules/{module_id}/practice", response_model=ModulePracticeResponse)
+async def get_module_practice(
+    module_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> ModulePracticeResponse:
+    """Per-scratch-pad status and ink for one article lesson."""
+    try:
+        module = await _get_owned_module(module_id, user.id, session)
+        return ModulePracticeResponse(
+            module_id=module.id,
+            items=[PracticeItemState(**p) for p in practice_progress(module)],
+        )
+    except ResourceNotFoundException as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.put("/learning-modules/{module_id}/practice/{index}", response_model=PracticeItemState)
+# Autosave fires on a debounce while drawing; no LLM call behind it.
+@limiter.limit("120/minute")
+async def save_module_practice(
+    module_id: int,
+    index: int,
+    request: Request,
+    response: Response,
+    data: SavePracticeRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> PracticeItemState:
+    """Save a scratch pad's ink and/or resolve it as done or given up.
+
+    done needs real ink (server-side twin of the pad's empty check); gave_up
+    does not. Both are final: a resolved pad keeps its status, so revealing the
+    walkthrough by giving up can never be turned into a solve afterwards.
+    """
+    try:
+        module = await _get_owned_module(module_id, user.id, session)
+        progress = practice_progress(module)
+        if not 0 <= index < len(progress):
+            raise StudyAppException("That practice problem no longer exists in this lesson. Reload the page.")
+        item = progress[index]
+        if data.strokes is not None:
+            item["strokes"] = data.strokes
+        if data.status is not None and item["status"] not in RESOLVED:
+            if data.status == DONE and not has_ink(item["strokes"]):
+                raise StudyAppException("Work the problem on the scratch pad first, or give up to see the walkthrough.")
+            item["status"] = data.status
+        module.practice_progress = json.dumps(progress)
+        await session.commit()
+        return PracticeItemState(**item)
     except ResourceNotFoundException as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except StudyAppException as exc:

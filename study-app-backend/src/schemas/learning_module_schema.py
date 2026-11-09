@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -62,6 +62,12 @@ class LearningModuleResponse(BaseModel):
     # True on episode-format modules whose script and checkpoints exist. False
     # on article modules, which never have an episode.
     episode_ready: bool = False
+    # Practice scratch pads ([[scratchpad]] markers in the lesson). The quiz is
+    # locked until practice_done + practice_gave_up == practice_total. Ink is
+    # not included here; GET /learning-modules/{id}/practice returns it.
+    practice_total: int = 0
+    practice_done: int = 0
+    practice_gave_up: int = 0
 
 
 class LearningTrackResponse(BaseModel):
@@ -118,6 +124,25 @@ class QuizAttemptResponse(BaseModel):
     # and the lazy backfill could not run or failed; the client then renders the
     # graded quiz exactly as it did before this field existed.
     explanations: list[QuizExplanation] = []
+
+
+class PracticeItemState(BaseModel):
+    # open | done | gave_up. done and gave_up are final.
+    status: str = "open"
+    # ScratchPadData JSON, null when the pad was never used.
+    strokes: Optional[str] = None
+
+
+class ModulePracticeResponse(BaseModel):
+    module_id: int
+    items: list[PracticeItemState]
+
+
+class SavePracticeRequest(BaseModel):
+    # Same cap as DraftAttemptAnswer.work_strokes. Omit to keep what is saved.
+    strokes: Optional[str] = Field(default=None, max_length=200_000)
+    # "done" needs ink on the pad; "gave_up" does not. Omit to only save ink.
+    status: Optional[Literal["done", "gave_up"]] = None
 
 
 class EpisodeTurn(BaseModel):
