@@ -1,12 +1,17 @@
 import Editor, { type Monaco } from "@monaco-editor/react";
-import { Binary, Braces, Calculator, Gauge, Circle, Eye, ExternalLink, Flame, Youtube, GitBranch, Hash, Layers3, Link2, ListChecks, Loader2, Network, PanelRightOpen, Play, Route, ShieldAlert, Shuffle, Trophy, Users, WrapText, type LucideIcon, Code, Notebook, Wand2, Archive, ArchiveRestore } from "lucide-react";
+import { Gauge, Circle, Eye, ExternalLink, Flame, Youtube, ListChecks, Loader2, Network, Play, Route, ShieldAlert, Shuffle, Trophy, Users, WrapText, type LucideIcon, Code, Notebook, Wand2, Archive, ArchiveRestore } from "lucide-react";
 import { BookIcon, CodeIcon, ScoreRiseIcon, SettingsIcon } from "../icons";
 import { PlayIcon } from "../icons";
+import {
+  ArraysIcon, BacktrackIcon, BinarySearchIcon, BinderIcon, BitsIcon, CodeWindowIcon, DpTableIcon, DrillsIcon, DumbbellIcon,
+  GraphIcon, HashTableIcon, HeapIcon, IntervalsIcon, LectureIcon, LinkedListIcon, MathIcon, ProblemListIcon, PuzzleIcon,
+  SlidingWindowIcon, StackIcon, StringsIcon, SummitIcon, SystemDesignIcon, TilesIcon, TreeIcon,
+} from "../icons";
 import { KojoWalkthrough } from "../components/KojoWalkthrough";
 import { LectureLibrary } from "../components/LectureLibrary";
 import { AlertIcon, ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, CrossCircleIcon, PencilIcon, PlusIcon, SearchIcon, SparklesIcon, TrashIcon } from "../icons";
 import KojoMascot from "../components/KojoMascot";
-import type { CSSProperties } from "react";
+import type { ComponentType, CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { LoadingNotice } from "../components/Loaders";
@@ -97,10 +102,13 @@ type Problem = {
   subtopics: string[];
 };
 
+// Category and rail icons are custom (src/icons) components, not Lucide.
+type KojoIcon = ComponentType<{ size?: number | string }>;
+
 type Category = {
   id: string;
   label: string;
-  icon: LucideIcon;
+  icon: KojoIcon;
   problems: Problem[];
 };
 
@@ -472,24 +480,24 @@ const CHAT_COMMANDS: SlashCommand[] = [
 ];
 
 const CATEGORY_META: Record<string, Omit<Category, "problems">> = {
-  arrays: { id: "arrays", label: "Arrays", icon: ListChecks },
-  strings: { id: "strings", label: "Strings", icon: Braces },
-  "hash-table": { id: "hash-table", label: "Hash Table", icon: Hash },
-  "linked-list": { id: "linked-list", label: "Linked List", icon: Link2 },
-  stack: { id: "stack", label: "Stack", icon: Layers3 },
-  "heap-priority-queue": { id: "heap-priority-queue", label: "Heap / Priority Queue", icon: PanelRightOpen },
-  tree: { id: "tree", label: "Tree", icon: GitBranch },
-  "binary-search": { id: "binary-search", label: "Binary Search", icon: SearchIcon },
-  "sliding-window": { id: "sliding-window", label: "Sliding Window", icon: Route },
-  dp: { id: "dp", label: "Dynamic Programming", icon: Binary },
-  backtracking: { id: "backtracking", label: "Backtracking", icon: GitBranch },
-  graph: { id: "graph", label: "Graph", icon: Network },
-  design: { id: "design", label: "Design", icon: BookIcon },
-  advanced: { id: "advanced", label: "Advanced", icon: Trophy },
-  math: { id: "math", label: "Math", icon: Calculator },
-  "bit-manipulation": { id: "bit-manipulation", label: "Bit Manipulation", icon: CodeIcon },
-  intervals: { id: "intervals", label: "Intervals", icon: PanelRightOpen },
-  extra: { id: "extra", label: "Extra", icon: Trophy },
+  arrays: { id: "arrays", label: "Arrays", icon: ArraysIcon },
+  strings: { id: "strings", label: "Strings", icon: StringsIcon },
+  "hash-table": { id: "hash-table", label: "Hash Table", icon: HashTableIcon },
+  "linked-list": { id: "linked-list", label: "Linked List", icon: LinkedListIcon },
+  stack: { id: "stack", label: "Stack", icon: StackIcon },
+  "heap-priority-queue": { id: "heap-priority-queue", label: "Heap / Priority Queue", icon: HeapIcon },
+  tree: { id: "tree", label: "Tree", icon: TreeIcon },
+  "binary-search": { id: "binary-search", label: "Binary Search", icon: BinarySearchIcon },
+  "sliding-window": { id: "sliding-window", label: "Sliding Window", icon: SlidingWindowIcon },
+  dp: { id: "dp", label: "Dynamic Programming", icon: DpTableIcon },
+  backtracking: { id: "backtracking", label: "Backtracking", icon: BacktrackIcon },
+  graph: { id: "graph", label: "Graph", icon: GraphIcon },
+  design: { id: "design", label: "Design", icon: SystemDesignIcon },
+  advanced: { id: "advanced", label: "Advanced", icon: SummitIcon },
+  math: { id: "math", label: "Math", icon: MathIcon },
+  "bit-manipulation": { id: "bit-manipulation", label: "Bit Manipulation", icon: BitsIcon },
+  intervals: { id: "intervals", label: "Intervals", icon: IntervalsIcon },
+  extra: { id: "extra", label: "Extra", icon: PuzzleIcon },
 };
 
 // SUBTOPICS_BY_TOPIC now lives in the shared taxonomy module (imported at the top),
@@ -542,7 +550,7 @@ function buildCategories(): Category[] {
   });
 
   return Array.from(grouped.entries()).map(([id, problems]) => {
-    const meta = CATEGORY_META[id] ?? { id, label: problems[0]?.categoryLabel ?? id, icon: CodeIcon };
+    const meta = CATEGORY_META[id] ?? { id, label: problems[0]?.categoryLabel ?? id, icon: CodeWindowIcon };
     return { ...meta, problems };
   });
 }
@@ -1206,13 +1214,13 @@ function ActivityHeatmap({
 
 // Persistent left rail for the KojoCode hub. Rendered on the dashboard and the
 // beta stub screens; the immersive problem editor stays full-screen without it.
-const RAIL_ITEMS: { key: string; label: string; icon: LucideIcon; view: View }[] = [
-  { key: "dashboard", label: "Dashboard", icon: Layers3, view: { type: "tree" } },
-  { key: "problems", label: "Problems", icon: SearchIcon, view: { type: "browse" } },
-  { key: "banks", label: "Prep Banks", icon: BookIcon, view: { type: "banks" } },
-  { key: "drills", label: "Drills", icon: Route, view: { type: "drills" } },
-  { key: "practice", label: "Practice", icon: SparklesIcon, view: { type: "practice" } },
-  { key: "lectures", label: "Lectures", icon: PlayIcon as unknown as LucideIcon, view: { type: "lectures" } },
+const RAIL_ITEMS: { key: string; label: string; icon: KojoIcon; view: View }[] = [
+  { key: "dashboard", label: "Dashboard", icon: TilesIcon, view: { type: "tree" } },
+  { key: "problems", label: "Problems", icon: ProblemListIcon, view: { type: "browse" } },
+  { key: "banks", label: "Prep Banks", icon: BinderIcon, view: { type: "banks" } },
+  { key: "drills", label: "Drills", icon: DrillsIcon, view: { type: "drills" } },
+  { key: "practice", label: "Practice", icon: DumbbellIcon, view: { type: "practice" } },
+  { key: "lectures", label: "Lectures", icon: LectureIcon, view: { type: "lectures" } },
 ];
 
 const RAIL_COLLAPSE_KEY = "nosey_lc_rail_collapsed";
@@ -5679,7 +5687,7 @@ export default function LeetCodeMode() {
                   className="lc-custom-node-main"
                   onClick={() => setView({ type: "category", categoryId: CUSTOM_CATEGORY_ID })}
                 >
-                  <span className="lc-node-icon"><Code size={22} /></span>
+                  <span className="lc-node-icon"><CodeWindowIcon size={22} /></span>
                   <span className="lc-node-copy">
                     <strong>{CUSTOM_CATEGORY_LABEL}</strong>
                     <small>
