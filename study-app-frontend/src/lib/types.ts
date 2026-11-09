@@ -1472,3 +1472,16 @@ export type LectureRequest = { id: number; topic: string; status: "pending" | "d
 export type LectureListResponse = { lectures: LectureSummary[]; requests: LectureRequest[]; requests_left_today: number };
 
 export type LectureResponse = Omit<LectureSummary, "ready"> & { lecture: KojoLecture };
+export type FolderSearchResult = {
+  kind: "folder" | "test";
+  id: number;
+  title: string;
+  folder_id: number;
+  folder_name: string | null;
+  subject?: string | null;
+};
+
+export type FolderSearchResponse = {
+  results: FolderSearchResult[];
+  has_more: boolean;
+};

@@ -36,6 +36,7 @@ import type {
   FlashcardUpdate,
   TidiedCard,
   Folder,
+  FolderSearchResponse,
   KojoActionCard,
   KojoActionButton,
   KojoActionConfirmResult,
@@ -505,6 +506,10 @@ export async function deleteAccount(): Promise<void> {
   await request<void>("/auth/account", { method: "DELETE" });
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+}
+
+export function searchFoldersAndTests(query: string, signal: AbortSignal): Promise<FolderSearchResponse> {
+  return request<FolderSearchResponse>(`/folders/search?q=${encodeURIComponent(query)}&limit=20`, { signal });
 }
 
 export async function fetchFolders(options: { throwOnError?: boolean } = {}): Promise<Folder[]> {

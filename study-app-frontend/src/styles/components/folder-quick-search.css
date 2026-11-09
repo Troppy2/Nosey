@@ -1,0 +1,54 @@
+.folder-search-dialog {
+  width: min(640px, calc(100% - 32px));
+  max-width: none;
+  max-height: min(640px, 80dvh);
+  margin: 10dvh auto auto;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+  color: var(--ink);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.folder-search-dialog::backdrop { background: rgb(27 36 22 / 40%); }
+.folder-search-panel { display: flex; flex-direction: column; max-height: min(640px, 80dvh); }
+
+/* The input is the header: no separate title row. */
+.folder-search-field { display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 20px; border-bottom: 1px solid var(--border); color: var(--green-dark); }
+.folder-search-field input { flex: 1; min-width: 0; height: 52px; border: 0; outline: none; background: transparent; color: var(--ink); font: 400 17px var(--font-sans); }
+.folder-search-field:focus-within { border-bottom-color: var(--green-dark); }
+.folder-search-close { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; background: transparent; border: 0; border-radius: 6px; color: var(--muted); cursor: pointer; }
+.folder-search-close:hover { background: var(--green-lightest); color: var(--ink); }
+
+.folder-search-status { padding: 12px 20px 6px; font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: var(--muted); }
+.folder-search-results { overflow-y: auto; overscroll-behavior: contain; padding: 0 8px 8px; min-height: 0; transition: opacity 120ms; }
+.folder-search-results.is-stale { opacity: 0.55; }
+.folder-search-result { display: flex; align-items: center; min-height: 56px; gap: 12px; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+.folder-search-result.is-active { background: var(--green-lightest); }
+.folder-search-result-icon { display: grid; place-items: center; flex-shrink: 0; color: var(--green-dark); }
+.folder-search-result-text { display: grid; gap: 2px; flex: 1; min-width: 0; }
+/* Two lines, not one: similar titles often differ only at the end. */
+.folder-search-result-text strong { font: 500 14px/1.4 var(--font-sans); overflow: hidden; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.folder-search-result-text mark { background: none; color: inherit; font-weight: 700; text-decoration: underline; text-decoration-color: var(--green-dark); text-underline-offset: 3px; }
+.folder-search-result-text > span { font-size: 12px; line-height: 1.4; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-search-enter { visibility: hidden; flex-shrink: 0; }
+.folder-search-result.is-active .folder-search-enter { visibility: visible; }
+
+.folder-search-empty, .folder-search-more, .folder-search-error { padding: 0 20px 16px; margin: 0; font-size: 13px; line-height: 1.6; color: var(--muted); }
+.folder-search-error p { margin: 0 0 12px; color: var(--accent-danger); overflow-wrap: anywhere; }
+.folder-search-hint { display: flex; gap: 16px; padding: 10px 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 11px; }
+.folder-search-hint kbd, .folder-search-shortcut, .folder-search-enter { font-family: var(--font-mono); font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; background: var(--surface, #fff); }
+.folder-search-shortcut { margin-left: 8px; white-space: nowrap; }
+
+@media (max-width: 600px) {
+  .folder-search-dialog { margin-top: max(12px, env(safe-area-inset-top)); width: calc(100% - 20px); max-height: calc(100dvh - 24px); }
+  .folder-search-panel { max-height: calc(100dvh - 24px); }
+  .folder-search-field { padding-left: 16px; }
+  .folder-search-field input { font-size: 16px; } /* 16px stops iOS zooming on focus */
+  .folder-search-status, .folder-search-empty, .folder-search-more, .folder-search-error { padding-left: 16px; padding-right: 16px; }
+}
+/* Keyboard hints mean nothing without a keyboard. */
+@media (hover: none), (max-width: 600px) {
+  .folder-search-shortcut, .folder-search-hint, .folder-search-enter { display: none; }
+}
