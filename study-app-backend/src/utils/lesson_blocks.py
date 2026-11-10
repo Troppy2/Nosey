@@ -76,10 +76,19 @@ def check_scratchpads(markdown: str) -> None:
     """
     blocks = split_lesson_blocks(markdown)
     markers = 0
+    # True while we are inside a walkthrough: after a marker, before the next
+    # heading or rule. A new problem there would be hidden in that walkthrough.
+    in_walkthrough = False
     for i, block in enumerate(blocks):
         if is_scratchpad_block(block):
             markers += 1
             n = markers
+            if in_walkthrough:
+                raise ValueError(
+                    f"[[scratchpad]] #{n}: separate it from the previous practice problem's walkthrough with a "
+                    "horizontal rule (---) or a heading. Otherwise this problem is hidden inside that walkthrough."
+                )
+            in_walkthrough = True
             prev = blocks[i - 1] if i > 0 else ""
             has_problem = (
                 prev
@@ -103,6 +112,8 @@ def check_scratchpads(markdown: str) -> None:
             raise ValueError(
                 "[[scratchpad]] must sit on a line of its own with a blank line above and below it."
             )
+        elif _ends_walkthrough(block):
+            in_walkthrough = False
     if markers > MAX_SCRATCHPADS_PER_LESSON:
         raise ValueError(f"A lesson holds at most {MAX_SCRATCHPADS_PER_LESSON} [[scratchpad]] markers.")
 

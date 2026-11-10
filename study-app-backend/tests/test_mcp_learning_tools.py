@@ -214,6 +214,8 @@ async def test_misplaced_scratchpad_is_rejected(call, seeded) -> None:  # noqa: 
         "## H\n\n[[scratchpad]]\n\nStep.": "right after the problem statement",
         "Problem?\n\n[[scratchpad]]\n\n## Next": "walkthrough",
         "Problem? [[scratchpad]]\n\nStep.": "line of its own",
+        # Problem 2 would be hidden inside Problem 1's walkthrough.
+        "P1?\n\n[[scratchpad]]\n\nStep.\n\nP2?\n\n[[scratchpad]]\n\nStep.": "horizontal rule (---) or a heading",
     }
     for lesson, message in cases.items():
         err = await call(

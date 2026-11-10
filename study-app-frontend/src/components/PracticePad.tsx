@@ -31,6 +31,72 @@ type PracticePadProps = {
   walkthrough: ReactNode;
 };
 
+type PracticeQuizGateProps = {
+  pads: { index: number; status: PracticeItemState["status"] }[];
+  onJump: (padIndex: number) => void;
+};
+
+const STATUS_LABEL: Record<PracticeItemState["status"], string> = {
+  open: "not done",
+  done: "solved",
+  gave_up: "gave up",
+};
+
+// Stands in for the quiz until every practice pad is solved or given up. Each
+// chip is a problem: its state at a glance, and a jump to it.
+export function PracticeQuizGate({ pads, onJump }: PracticeQuizGateProps) {
+  const left = pads.filter((p) => p.status === "open");
+  const next = left[0];
+  if (!next) return null;
+  const total = pads.length;
+  return (
+    <section className="practice-gate" aria-labelledby="practice-gate-title">
+      <div className="practice-gate-head">
+        <span className="practice-gate-icon" aria-hidden="true">
+          <PencilIcon size={18} />
+        </span>
+        <div className="practice-gate-text">
+          <h3 id="practice-gate-title">
+            {total === 1 ? "Solve the practice problem to unlock the quiz" : "Solve the practice problems to unlock the quiz"}
+          </h3>
+          <p className="muted small">
+            {left.length} of {total} left. Giving up counts as wrong.
+          </p>
+        </div>
+      </div>
+
+      {total > 1 ? (
+        <ol className="practice-gate-steps">
+          {pads.map((pad) => (
+            <li key={pad.index}>
+              <button
+                type="button"
+                className={`practice-gate-step is-${pad.status}`}
+                onClick={() => onJump(pad.index)}
+                aria-label={`Practice problem ${pad.index + 1}, ${STATUS_LABEL[pad.status]}`}
+                title={`Problem ${pad.index + 1}: ${STATUS_LABEL[pad.status]}`}
+              >
+                {pad.status === "done" ? (
+                  <CheckCircleIcon size={16} />
+                ) : pad.status === "gave_up" ? (
+                  <CrossCircleIcon size={16} />
+                ) : null}
+                <span>{pad.index + 1}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+
+      <div className="practice-gate-action">
+        <Button onClick={() => onJump(next.index)}>
+          {left.length === total ? "Start" : "Continue with"} problem {next.index + 1}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 // A practice problem inside a lesson: work it on the scratch pad, then mark it
 // done (needs ink) or give up (counts wrong). Either one is final and opens the
 // walkthrough, which stays collapsed and unmounted until then.

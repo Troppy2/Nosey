@@ -46,7 +46,10 @@ LESSON_DESCRIPTION = (
     "problem done (after writing on the pad) or gives up, which counts it wrong. The quiz unlocks only after "
     "every practice problem is done or given up. Example:\n\n## Worked example 1\n\nSample 1: n1 = 10 ... "
     "Do the populations have equal variances?\n\n[[scratchpad]]\n\n**Step 1: degrees of freedom.** ...\n\n"
-    "**Step 2: ...** ...\n\n---\n\nAt most 10 markers per lesson. With narration, the marker line is a "
+    "**Step 2: ...** ...\n\n---\n\nThe pad shows the student the whole problem: every paragraph from the "
+    "section's heading or --- down to the marker. For a multi-part problem, write the setup and all its parts "
+    "((a), (b), (c)) before ONE marker, then walk through every part. Separate consecutive practice problems "
+    "with --- or a heading. At most 10 markers per lesson. With narration, the marker line is a "
     "paragraph of its own and needs its own entry (e.g. \"Pause here and try this one on the scratch pad.\")."
 )
 

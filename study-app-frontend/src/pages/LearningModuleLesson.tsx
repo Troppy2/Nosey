@@ -10,7 +10,7 @@ import { Card } from "../components/Card";
 import { useConfetti } from "../components/Confetti";
 import { InlineLoading, LoadingNotice } from "../components/Loaders";
 import { MarkdownContent } from "../components/MarkdownContent";
-import { PracticePad } from "../components/PracticePad";
+import { PracticePad, PracticeQuizGate } from "../components/PracticePad";
 import type { PaperStyle } from "../components/ScratchPad";
 import { SkeletonText } from "../components/Skeletons";
 import {
@@ -1212,12 +1212,18 @@ export default function LearningModuleLesson() {
     (pad) => (practiceItems == null || practiceItems[pad.index] != null) && !practiceResolved(pad.index),
   );
   const quizLocked = practiceOpenPads.length > 0;
-  function jumpToPractice() {
-    const first = practiceOpenPads[0];
-    if (!first) return;
-    const el = document.getElementById(`lm-lesson-block-${first.markerBlock}`);
+  // Scrolls to a practice pad and pulses it once so the eye lands on it.
+  function jumpToPractice(padIndex: number) {
+    const pad = practice.pads[padIndex];
+    if (!pad) return;
+    const el = document.getElementById(`lm-lesson-block-${pad.markerBlock}`);
+    if (!el) return;
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    el?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+    el.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+    el.classList.remove("practice-jump-target");
+    void el.offsetWidth; // restart the animation on a repeat jump
+    el.classList.add("practice-jump-target");
+    window.setTimeout(() => el.classList.remove("practice-jump-target"), 2000);
   }
 
   return (
@@ -1601,7 +1607,7 @@ export default function LearningModuleLesson() {
                 <PracticePad
                   moduleId={module.id}
                   index={padIndex}
-                  problemText={pad.problemBlock >= 0 ? lessonBlocks[pad.problemBlock] : module.title}
+                  problemText={pad.problemText || module.title}
                   state={state}
                   onState={(next) =>
                     setPracticeItems((prev) => (prev ? prev.map((item, i) => (i === padIndex ? next : item)) : prev))
@@ -1670,26 +1676,12 @@ export default function LearningModuleLesson() {
         </p>
 
         {quizLocked ? (
-          <Card className="lm-quiz-locked">
-            <PencilIcon size={20} />
-            <div>
-              <p>
-                <strong>
-                  Finish the practice {practice.pads.length === 1 ? "problem" : "problems"} first.
-                </strong>
-              </p>
-              <p className="muted small">
-                {practice.pads.length - practiceOpenPads.length} of {practice.pads.length} done.{" "}
-                {practice.pads.length === 1 ? "Solve it" : "Solve each one"} on the scratch pad, or give up (it
-                counts as wrong), to unlock the quiz.
-              </p>
-              <div className="button-row">
-                <Button variant="secondary" onClick={jumpToPractice}>
-                  Go to practice problem {practiceOpenPads[0].index + 1}
-                </Button>
-              </div>
-            </div>
-          </Card>
+          <PracticeQuizGate
+            pads={practice.pads
+              .filter((pad) => practiceItems == null || practiceItems[pad.index] != null)
+              .map((pad) => ({ index: pad.index, status: practiceItems?.[pad.index]?.status ?? "open" }))}
+            onJump={jumpToPractice}
+          />
         ) : null}
 
         {/* Rendering walks the shuffled order. `qIndex` is always the CANONICAL

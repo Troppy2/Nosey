@@ -26,10 +26,39 @@ export type PracticePad = {
   // Ordinal among the lesson's markers: the index into practice_progress.
   index: number;
   markerBlock: number;
-  // The problem statement block, or -1 when the marker opens the lesson.
-  problemBlock: number;
+  // The whole problem shown on the pad: every block from the section start
+  // (heading, rule, previous marker or walkthrough) down to the marker, so a
+  // multi-part problem (setup, (a), (b), (c)) arrives whole, not just its last
+  // paragraph.
+  problemText: string;
   walkthroughBlocks: number[];
 };
+
+// Lines of a block that are not headings. A heading written with no blank
+// line before its text still contributes that text.
+function withoutHeadings(block: string): string {
+  return block
+    .split("\n")
+    .filter((line) => !HEADING.test(line))
+    .join("\n")
+    .trim();
+}
+
+function problemTextFor(blocks: string[], markerIndex: number, walkthroughOf: number[]): string {
+  const parts: string[] = [];
+  for (let j = markerIndex - 1; j >= 0; j--) {
+    const block = blocks[j];
+    if (isScratchpadBlock(block) || RULE.test(block) || walkthroughOf[j] >= 0) break;
+    const first = block.replace(/^\n+/, "").split("\n", 1)[0];
+    if (HEADING.test(first)) {
+      const rest = withoutHeadings(block);
+      if (rest) parts.unshift(rest);
+      break;
+    }
+    parts.unshift(block);
+  }
+  return parts.join("\n\n");
+}
 
 export type PracticeLayout = {
   pads: PracticePad[];
@@ -48,7 +77,7 @@ export function practiceLayout(blocks: string[]): PracticeLayout {
     const pad: PracticePad = {
       index: pads.length,
       markerBlock: i,
-      problemBlock: i > 0 && !isScratchpadBlock(blocks[i - 1]) ? i - 1 : -1,
+      problemText: problemTextFor(blocks, i, walkthroughOf),
       walkthroughBlocks: [],
     };
     for (let j = i + 1; j < blocks.length && !endsWalkthrough(blocks[j]); j++) {

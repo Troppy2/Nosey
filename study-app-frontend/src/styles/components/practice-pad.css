@@ -114,14 +114,118 @@
   border-top: 1px solid var(--border);
 }
 
-.lm-quiz-locked {
+/* Pulse after "Continue with problem N" lands on a pad. Delayed so it plays
+   once the smooth scroll has settled, not while the page is still moving. */
+.practice-jump-target .practice-pad-card {
+  animation: practice-jump 1.4s ease-out 0.45s both;
+}
+
+@keyframes practice-jump {
+  0%,
+  35% {
+    box-shadow: 0 0 0 4px var(--green-light-mid);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* ── Quiz gate: stands in for the quiz until every pad is resolved ───────── */
+
+.practice-gate {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--white);
+}
+
+.practice-gate-head {
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
+  min-width: 0;
 }
 
-.lm-quiz-locked p {
+.practice-gate-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+}
+
+.practice-gate-text {
+  min-width: 0;
+}
+
+.practice-gate-text h3 {
   margin: 0;
+  font-size: var(--text-base);
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.practice-gate-text p {
+  margin: 2px 0 0;
+}
+
+.practice-gate-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.practice-gate-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.practice-gate-step:hover {
+  border-color: var(--green-dark);
+}
+
+.practice-gate-step:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.practice-gate-step.is-done {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+  color: var(--green-dark);
+}
+
+.practice-gate-step.is-gave_up {
+  border-color: var(--accent-danger);
+  background: var(--accent-danger-tint);
+  color: var(--accent-danger-strong);
+}
+
+.practice-gate-action {
+  display: flex;
 }
 
 @media (max-width: 640px) {
@@ -131,5 +235,20 @@
 
   .practice-walk-note {
     display: none;
+  }
+
+  .practice-gate {
+    padding: var(--space-4);
+  }
+
+  .practice-gate-action > * {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .practice-jump-target .practice-pad-card {
+    animation: none;
+    box-shadow: 0 0 0 4px var(--green-light-mid);
   }
 }
