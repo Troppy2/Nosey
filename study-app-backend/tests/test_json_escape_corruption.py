@@ -104,25 +104,12 @@ class TestLessonSurvivesProseWrappedJson:
         assert parsed["questions"][0]["question"] == "What is $" + B + "text{Range}$?"
 
 
-class TestOllamaNoLongerRepairsByCorrupting:
+class TestNoRepairByCorrupting:
     """Link 3: the two crude fallbacks are gone for good.
 
     They are the difference between "this provider failed, try the next one"
     and "this provider returned prose that looks fine and is quietly ruined".
     """
-
-    def test_source_does_not_reapply_the_corrupting_transforms(self):
-        import inspect
-
-        from src.services import llm_service
-
-        source = inspect.getsource(llm_service.LLMService._complete_ollama)
-        # Strip comments: the explanation of the old bug names both transforms.
-        code = "\n".join(
-            line for line in source.splitlines() if not line.strip().startswith("#")
-        )
-        assert "unicode_escape" not in code
-        assert 'replace("' + B + B + '"' not in code
 
     def test_unparseable_payload_raises_instead_of_returning_mangled_text(self):
         from src.utils.exceptions import LLMException

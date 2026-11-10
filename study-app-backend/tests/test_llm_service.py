@@ -1,7 +1,7 @@
 """
 Unit tests for LLMService.
 
-Covers: Groq HTTP paths, Ollama fallback dispatch, metadata stripping,
+Covers: Groq HTTP paths, NVIDIA-first fallback dispatch, metadata stripping,
 validators, JSON parsing, fallback generators, and end-to-end question /
 flashcard / grading flows with mocked HTTP.
 """
@@ -84,14 +84,16 @@ def groq_text_body(text: str) -> dict:
     return {"choices": [{"message": {"content": text}}]}
 
 
-def fake_settings(groq_key: str | None = FAKE_KEY, timeout: int = 30, max_tokens: int = 200):
+def fake_settings(groq_key: str | None = FAKE_KEY, timeout: int = 30, max_tokens: int = 200,
+                  nvidia_key: str | None = "nv-test"):
     """Return a mock settings object with common LLM fields."""
     s = MagicMock()
     s.groq_api_key = groq_key
+    # Set explicitly: a bare MagicMock attribute is truthy, which would put
+    # NVIDIA in every chain.
+    s.nvidia_api_key = nvidia_key
     s.llm_timeout_seconds = timeout
     s.llm_max_tokens = max_tokens
-    s.ollama_base_url = "http://localhost:11434"
-    s.ollama_model = "llama3.1:8b"
     s.llm_provider = "auto"
     s.groq_json_model = "openai/gpt-oss-120b"
     s.groq_chat_model = "openai/gpt-oss-20b"
@@ -441,106 +443,101 @@ class TestCompleteTextGroq:
 
 class TestCompleteJsonDispatch:
 
-    async def test_prefers_ollama_when_available(self):
-        """Auto routing is cost-ascending: the free local model is tried first
+    async def test_prefers_nvidia_when_configured(self):
+        """Auto routing is cost-ascending: NVIDIA's free tier is tried first
         even when a paid provider key is present (Claude is the last resort)."""
         svc = LLMService()
         svc._complete_groq = AsyncMock(return_value={"result": "groq"})
-        svc._complete_ollama = AsyncMock(return_value={"result": "ollama"})
-        svc.check_providers_status = AsyncMock(return_value={"ollama": True})
+        svc._complete_nvidia = AsyncMock(return_value={"result": "nvidia"})
 
         with patch("src.services.llm_service.settings", fake_settings(groq_key=FAKE_KEY)):
             result = await svc._complete_json("prompt")
 
-        svc._complete_ollama.assert_awaited_once()
+        svc._complete_nvidia.assert_awaited_once()
         svc._complete_groq.assert_not_awaited()
-        assert result == {"result": "ollama"}
+        assert result == {"result": "nvidia"}
 
-    async def test_uses_groq_when_ollama_is_unavailable(self):
-        """With Ollama down, the chain moves to the cheapest paid provider."""
+    async def test_uses_groq_when_nvidia_is_not_configured(self):
+        """With no NVIDIA key, the chain moves to the cheapest paid provider."""
         svc = LLMService()
         svc._complete_groq = AsyncMock(return_value={"result": "groq"})
-        svc._complete_ollama = AsyncMock(return_value={"result": "ollama"})
-        svc.check_providers_status = AsyncMock(return_value={"ollama": False})
+        svc._complete_nvidia = AsyncMock(return_value={"result": "nvidia"})
 
-        with patch("src.services.llm_service.settings", fake_settings(groq_key=FAKE_KEY)):
+        with patch("src.services.llm_service.settings", fake_settings(groq_key=FAKE_KEY, nvidia_key=None)):
             result = await svc._complete_json("prompt")
 
         svc._complete_groq.assert_awaited_once()
-        svc._complete_ollama.assert_not_awaited()
+        svc._complete_nvidia.assert_not_awaited()
         assert result == {"result": "groq"}
 
-    async def test_falls_through_to_groq_when_ollama_errors(self):
-        """Ollama-first must not become a single point of failure: an Ollama
+    async def test_falls_through_to_groq_when_nvidia_errors(self):
+        """NVIDIA-first must not become a single point of failure: an NVIDIA
         error (e.g. a 401 from the cloud endpoint) falls through to the next
         provider rather than failing the whole generation."""
         svc = LLMService()
-        svc._complete_ollama = AsyncMock(side_effect=LLMException("Ollama error (401)"))
+        svc._complete_nvidia = AsyncMock(side_effect=LLMException("NVIDIA error (401)"))
         svc._complete_groq = AsyncMock(return_value={"result": "groq"})
-        svc.check_providers_status = AsyncMock(return_value={"ollama": True})
 
         with patch("src.services.llm_service.settings", fake_settings(groq_key=FAKE_KEY)):
             result = await svc._complete_json("prompt")
 
-        svc._complete_ollama.assert_awaited_once()
+        svc._complete_nvidia.assert_awaited_once()
         svc._complete_groq.assert_awaited_once()
         assert result == {"result": "groq"}
 
-    async def test_falls_back_to_ollama_when_key_is_none(self):
+    async def test_uses_nvidia_when_groq_key_is_none(self):
         svc = LLMService()
         svc._complete_groq = AsyncMock(return_value={"result": "groq"})
-        svc._complete_ollama = AsyncMock(return_value={"result": "ollama"})
+        svc._complete_nvidia = AsyncMock(return_value={"result": "nvidia"})
 
         with patch("src.services.llm_service.settings", fake_settings(groq_key=None)):
             result = await svc._complete_json("prompt")
 
-        svc._complete_ollama.assert_awaited_once()
+        svc._complete_nvidia.assert_awaited_once()
         svc._complete_groq.assert_not_awaited()
-        assert result == {"result": "ollama"}
+        assert result == {"result": "nvidia"}
 
 
 # ── call_kojo ──────────────────────────────────────────────────────────────────
 
 class TestCallKojo:
 
-    async def test_uses_ollama_text_when_available(self):
+    async def test_uses_nvidia_text_when_configured(self):
         """Kojo chat follows the same cost-ascending chain as JSON generation."""
         svc = LLMService()
         svc._complete_text_groq = AsyncMock(return_value="Groq answer")
-        svc._complete_text_ollama = AsyncMock(return_value="Ollama answer")
-        svc.check_providers_status = AsyncMock(return_value={"ollama": True})
+        svc._complete_text_nvidia = AsyncMock(return_value="NVIDIA answer")
 
         with patch("src.services.llm_service.settings", fake_settings(groq_key=FAKE_KEY)):
             result = await svc.call_kojo("Explain transactions")
 
-        assert result == "Ollama answer"
-        svc._complete_text_ollama.assert_awaited_once()
+        assert result == "NVIDIA answer"
+        svc._complete_text_nvidia.assert_awaited_once()
         svc._complete_text_groq.assert_not_awaited()
 
-    async def test_uses_groq_text_when_ollama_is_unavailable(self):
+    async def test_uses_groq_text_when_nvidia_is_not_configured(self):
         svc = LLMService()
         svc._complete_text_groq = AsyncMock(return_value="Groq answer")
-        svc._complete_text_ollama = AsyncMock(return_value="Ollama answer")
-        svc.check_providers_status = AsyncMock(return_value={"ollama": False})
+        svc._complete_text_nvidia = AsyncMock(return_value="NVIDIA answer")
 
-        with patch("src.services.llm_service.settings", fake_settings(groq_key=FAKE_KEY)):
+        with patch("src.services.llm_service.settings", fake_settings(groq_key=FAKE_KEY, nvidia_key=None)):
             result = await svc.call_kojo("Explain transactions")
 
         assert result == "Groq answer"
         svc._complete_text_groq.assert_awaited_once()
-        svc._complete_text_ollama.assert_not_awaited()
+        svc._complete_text_nvidia.assert_not_awaited()
 
-    async def test_uses_ollama_text_when_no_key(self):
+    async def test_uses_nvidia_text_when_no_groq_key(self):
         svc = LLMService()
         svc._complete_text_groq = AsyncMock(return_value="Groq answer")
-        svc._complete_text_ollama = AsyncMock(return_value="Ollama answer")
-        svc._candidate_providers = AsyncMock(return_value=["ollama"])
+        svc._complete_text_nvidia = AsyncMock(return_value="NVIDIA answer")
+        svc._candidate_providers = AsyncMock(return_value=["nvidia"])
 
         with patch("src.services.llm_service.settings", fake_settings(groq_key=None)):
             result = await svc.call_kojo("Explain transactions")
 
-        assert result == "Ollama answer"
-        svc._complete_text_ollama.assert_awaited_once()
+        assert result == "NVIDIA answer"
+        svc._complete_text_nvidia.assert_awaited_once()
 
     async def test_wraps_any_error_as_llm_exception(self):
         svc = LLMService()

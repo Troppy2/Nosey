@@ -143,16 +143,18 @@ async def test_minimax_replaces_gemini_in_auto_chain(monkeypatch) -> None:
     monkeypatch.setattr("src.services.llm_service.settings.google_ai_api_key", "gem")
     monkeypatch.setattr("src.services.llm_service.settings.openrouter_api_key", "or")
     monkeypatch.setattr("src.services.llm_service.settings.anthropic_api_key", "a")
+    monkeypatch.setattr("src.services.llm_service.settings.nvidia_api_key", "nv")
     svc = LLMService()
-    with patch.object(LLMService, "check_providers_status", AsyncMock(return_value={"ollama": True})):
-        assert await svc._candidate_providers("auto") == ["ollama", "groq", "minimax", "claude"]
-        # Gemini stays usable when picked explicitly (admin/beta).
-        assert (await svc._candidate_providers("gemini"))[0] == "gemini"
+    assert await svc._candidate_providers("auto") == ["nvidia", "groq", "minimax", "claude"]
+    # Gemini stays usable when picked explicitly (admin/beta).
+    assert (await svc._candidate_providers("gemini"))[0] == "gemini"
+    # A saved "ollama" preference (retired 2026-11-10) falls back to auto.
+    assert await svc._candidate_providers("ollama") == ["nvidia", "groq", "minimax", "claude"]
 
 
 async def test_minimax_not_in_chain_without_key(monkeypatch) -> None:
     monkeypatch.setattr("src.services.llm_service.settings.groq_api_key", None)
     monkeypatch.setattr("src.services.llm_service.settings.openrouter_api_key", None)
     monkeypatch.setattr("src.services.llm_service.settings.anthropic_api_key", "a")
-    with patch.object(LLMService, "check_providers_status", AsyncMock(return_value={"ollama": False})):
-        assert await LLMService()._candidate_providers("auto") == ["claude"]
+    monkeypatch.setattr("src.services.llm_service.settings.nvidia_api_key", None)
+    assert await LLMService()._candidate_providers("auto") == ["claude"]

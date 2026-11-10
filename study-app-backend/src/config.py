@@ -22,17 +22,25 @@ class Settings(BaseSettings):
     jwt_secret: str = Field(default="replace-me", alias="JWT_SECRET")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     jwt_expiration_hours: int = Field(default=720, alias="JWT_EXPIRATION_HOURS")
-    ollama_base_url: str = Field(default="https://api.ollama.com", alias="OLLAMA_BASE_URL")
-    ollama_model: str = Field(default="mistral:7b-instruct-q3_K_M", alias="OLLAMA_MODEL")
-    ollama_api_key: Optional[str] = Field(default=None, alias="OLLAMA_API_KEY")
-    ollama_is_cloud: bool = Field(default=False, alias="OLLAMA_IS_CLOUD")
-    # Input context window for Ollama. Ollama silently truncates the prompt when it
-    # exceeds num_ctx, which drops the trailing JSON-schema instructions and makes the
-    # model emit empty or off-schema output. Set this high enough to hold a full
-    # generation prompt (terms + concepts + rules + format spec). Long custom
-    # instructions unlock a 40k-char source window (~10k tokens) in llm_service, so
-    # 32768 is the floor for those prompts to arrive whole.
-    ollama_num_ctx: int = Field(default=32768, alias="OLLAMA_NUM_CTX")
+    # NVIDIA API catalog (provider name "nvidia", OpenAI-compatible). Replaced
+    # Ollama, which dropped its cloud models, on 2026-11-10; first in the auto
+    # chain. Model ids are env config so a retirement is an env change. JSON =
+    # tests, flashcards, modules; chat = Kojo. Listed models can still 404 for
+    # an account (kimi-k2.6, nemotron-3-super did), so test before switching.
+    nvidia_api_key: Optional[str] = Field(default=None, alias="NVIDIA_API_KEY")
+    nvidia_json_model: str = Field(default="nvidia/nemotron-3.5-lightning-30b-a3b", alias="NVIDIA_JSON_MODEL")
+    nvidia_chat_model: str = Field(default="nvidia/nemotron-3.5-lightning-30b-a3b", alias="NVIDIA_CHAT_MODEL")
+    # Thinking cap for tasks that need correct answers (utils/reasoning_context.py).
+    # When the budget runs out the model stops thinking and answers. Measured on
+    # 8 STAT problems in one call (Nemotron 3.5 Lightning, 2026-11-10):
+    #   off 0/8 1s | 1024 4/8 12s | 2048 5-6/8 22s | 4096 6/8 48s | unbounded 8/8 108s
+    # 2048 is the knee; MCQ verification (also thinking) re-derives and repairs
+    # answer keys after generation, so generation need not be perfect alone.
+    nvidia_reasoning_budget: int = Field(default=2048, alias="NVIDIA_REASONING_BUDGET")
+    # NVIDIA's own request timeout, shorter than the shared 180s generation one:
+    # healthy calls took 5-35s in every successful 2026-11-10 run, and a stalled
+    # free-tier call should hand over to the next provider quickly.
+    nvidia_timeout_seconds: int = Field(default=90, alias="NVIDIA_TIMEOUT_SECONDS")
     groq_api_key: Optional[str] = Field(default=None, alias="GROQ_API_KEY")
     # Groq retired llama-3.3-70b-versatile and llama-3.1-8b-instant (404
     # model_not_found). Configurable so the next retirement is an env change,
@@ -179,15 +187,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
-# If an Ollama API key is provided, prefer the cloud endpoint unless the user explicitly set another base URL.
-try:
-    if settings.ollama_api_key:
-        # If still pointing at the local default, switch to Ollama Cloud API endpoint.
-        if settings.ollama_base_url.strip() in ("http://localhost:11434", "http://127.0.0.1:11434"):
-            settings.ollama_base_url = "https://api.ollama.com"
-        # Convenience boolean for other modules to detect cloud usage.
-        settings.ollama_is_cloud = True
-except Exception:
-    # Be defensive — do not crash on config mutations
-    pass

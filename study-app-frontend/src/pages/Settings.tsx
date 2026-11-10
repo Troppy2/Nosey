@@ -42,11 +42,11 @@ import { UsageMeters } from "../components/UsageMeters";
 
 const GENERATION_PROVIDER_OPTIONS = [
   { value: "auto", label: "Auto" },
+  { value: "nvidia", label: "NVIDIA (Nemotron)" },
   { value: "groq", label: "Groq" },
   { value: "minimax", label: "MiniMax (OpenRouter)" },
   { value: "gemini", label: "Gemini" },
   { value: "claude", label: "Anthropic (Claude)" },
-  { value: "ollama", label: "Ollama" },
 ];
 
 const STATS_RESET_BASELINE_KEY = "nosey_stats_reset_baseline";
@@ -361,7 +361,7 @@ export default function Settings() {
 
         {/* Model override is a privileged control: only admins and beta users may
             pick a model. Everyone else is pinned server-side to the automatic
-            chain (Ollama-first, Claude last), so the selector is hidden for them. */}
+            chain (NVIDIA-first, Claude last), so the selector is hidden for them. */}
         {betaMode ? (
           <CollapsibleSection title="LLM model override">
             <p className="muted small">

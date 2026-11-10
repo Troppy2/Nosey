@@ -69,9 +69,11 @@ export function useSettings() {
   const [questionFallbackEnabled, setQuestionFallbackEnabledState] = useState(() =>
     readBooleanSetting(SETTINGS_KEYS.questionFallback, false),
   );
-  const [generationProvider, setGenerationProviderState] = useState(() =>
-    readStringSetting(SETTINGS_KEYS.generationProvider, "ollama"),
-  );
+  // Ollama was retired on 2026-11-10; a saved "ollama" pick reads as auto.
+  const [generationProvider, setGenerationProviderState] = useState(() => {
+    const saved = readStringSetting(SETTINGS_KEYS.generationProvider, "auto");
+    return saved === "ollama" ? "auto" : saved;
+  });
   const [kojoStrictness, setKojoStrictnessState] = useState(() =>
     readStringSetting(SETTINGS_KEYS.kojoStrictness, "medium"),
   );

@@ -31,7 +31,6 @@ from src.utils.usage_context import (
     drain_pending_writes,
     usage_from_anthropic,
     usage_from_gemini,
-    usage_from_ollama,
     usage_from_openai,
 )
 
@@ -181,8 +180,6 @@ def test_usage_parsers() -> None:
     assert usage_from_anthropic(None) is None
     assert usage_from_gemini({"usageMetadata": {"promptTokenCount": 8, "candidatesTokenCount": 5,
                                                 "thoughtsTokenCount": 2}}) == (8, 7)
-    assert usage_from_ollama({"done": True, "eval_count": 6}) == (0, 6)
-    assert usage_from_ollama({"response": "x"}) is None
 
 
 # ── Recording + attribution ─────────────────────────────────────────────────

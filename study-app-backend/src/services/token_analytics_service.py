@@ -1,7 +1,8 @@
 """Admin token analytics over llm_token_usage (real provider token counts).
 
 Weeks are calendar weeks, Monday to Sunday, in UTC. Cost is an ESTIMATE from a
-per-model price table (USD per 1M tokens); Ollama is treated as free. Prices
+per-model price table (USD per 1M tokens); NVIDIA's free API catalog tier (and
+the retired Ollama, kept for old rows) count as free. Prices
 drift, so the table can be overridden without a deploy via LLM_PRICING_JSON:
 
     {"groq:llama-3.3-70b-versatile": [0.59, 0.79], "claude:*": [1.0, 5.0]}
@@ -46,6 +47,9 @@ DEFAULT_PRICING: dict[str, tuple[float, float]] = {
     "groq:qwen/qwen3*": (0.42, 3.00),
     "gemini:gemini-3.1-flash-lite*": (0.25, 1.50),
     "minimax:minimax/minimax-m3": (0.30, 1.20),
+    # NVIDIA API catalog free tier. Ollama was retired 2026-11-10; its price is
+    # kept so old usage rows still cost out.
+    "nvidia:*": (0.0, 0.0),
     "ollama:*": (0.0, 0.0),
 }
 

@@ -29,7 +29,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   gemini: "Gemini (Google)",
   groq: "Groq (cloud)",
   minimax: "MiniMax (OpenRouter)",
-  ollama: "Ollama (local)",
+  nvidia: "NVIDIA (Nemotron)",
 };
 
 export function formatTime(iso: string): string {
@@ -115,9 +115,10 @@ export function KojoChat({ folderId, folderName, onClose }: KojoChatProps) {
     return () => { document.body.style.overflow = ""; };
   }, [isFullscreen]);
 
-  const isOllamaOffline = generationProvider === "ollama" && providerStatus !== null && !providerStatus.ollama;
-  const isOllamaModelMissing = generationProvider === "ollama" && providerStatus !== null && !!providerStatus.ollama && !providerStatus.ollama_model_available;
-  const hasProviderWarn = isOllamaOffline || isOllamaModelMissing;
+  const hasProviderWarn =
+    providerStatus !== null &&
+    generationProvider !== "auto" &&
+    providerStatus[generationProvider as keyof ProviderStatus] === false;
 
   async function handleSend(text?: string) {
     const messageText = (text ?? input).trim();

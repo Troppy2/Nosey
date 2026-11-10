@@ -1,9 +1,9 @@
 """Who is allowed to pick an LLM model, and what a request actually uses.
 
 Only admins and beta users may override the model. Every other user (including
-guests) is pinned to the automatic provider chain, which is Ollama-first with a
-Groq -> Gemini -> Claude fallback (Claude last, most expensive). This keeps the
-per-user cost down: free users default to the local model and only escalate to
+guests) is pinned to the automatic provider chain, which is NVIDIA-first with a
+Groq -> MiniMax -> Claude fallback (Claude last, most expensive). This keeps the
+per-user cost down: free users default to NVIDIA's free tier and only escalate to
 paid APIs when it fails.
 
 Enforced server-side at every route that accepts a client-supplied provider, so
@@ -25,7 +25,7 @@ def resolve_request_provider(user: User, requested: Optional[str]) -> Optional[s
 
     Admin/beta users get exactly what they asked for (``auto`` or a specific
     model). Everyone else is forced onto ``"auto"`` regardless of what the
-    client sent, so they default to Ollama and fall back through the paid
+    client sent, so they default to NVIDIA and fall back through the paid
     providers (Claude last) only on failure.
     """
     if user_can_override_provider(user):
@@ -37,7 +37,7 @@ def resolve_ocr_engine(user: User, requested: Optional[str]) -> str:
     """The OCR engine a request may actually use (STEM Scratch Pad feature).
 
     Deliberately NOT resolve_request_provider: that function validates against
-    the LLM provider set (groq/gemini/claude/ollama), so a request for
+    the LLM provider set (nvidia/groq/gemini/claude/minimax), so a request for
     engine="groq" would pass its validation and then fail to dispatch, since no
     such OCR engine exists. This validates against the real OCR registry
     instead and falls back to the default on an unknown value rather than

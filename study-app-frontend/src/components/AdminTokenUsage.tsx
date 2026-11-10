@@ -15,7 +15,9 @@ const PROVIDER_NAMES: Record<string, string> = {
   groq: "Groq",
   claude: "Claude (Anthropic)",
   gemini: "Gemini",
-  ollama: "Ollama",
+  nvidia: "NVIDIA",
+  minimax: "MiniMax",
+  ollama: "Ollama (retired)",
 };
 
 function formatTokens(value: number): string {
@@ -269,7 +271,7 @@ export function AdminTokenUsage() {
     <section className="admin-section token-usage">
       <div className="token-usage-head">
         <h2 className="admin-section-title">Token usage</h2>
-        <p className="muted small">Weeks run Monday to Sunday (UTC). Costs are estimates from list prices; Ollama counts as free.</p>
+        <p className="muted small">Weeks run Monday to Sunday (UTC). Costs are estimates from list prices; NVIDIA's free tier (and the retired Ollama) count as free.</p>
       </div>
 
       <div className="token-tiles">

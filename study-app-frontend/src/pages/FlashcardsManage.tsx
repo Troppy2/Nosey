@@ -109,7 +109,7 @@ export default function FlashcardsManage() {
       (generationProvider === "gemini" && !providerStatus.gemini) ||
       (generationProvider === "claude" && !providerStatus.claude) ||
       (generationProvider === "minimax" && !providerStatus.minimax) ||
-      (generationProvider === "ollama" && !providerStatus.ollama));
+      (generationProvider === "nvidia" && !providerStatus.nvidia));
   const effectiveProvider = providerUnavailable ? "auto" : generationProvider;
 
   function startEdit(card: Flashcard) {

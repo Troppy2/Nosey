@@ -45,7 +45,8 @@ function formatProviderName(provider: string): string {
     groq: "Groq",
     openai: "OpenAI",
     claude: "Claude (Anthropic)",
-    ollama: "Ollama (local)",
+    nvidia: "NVIDIA (Nemotron)",
+    ollama: "Ollama (retired)",
     gemini: "Gemini",
     minimax: "MiniMax (OpenRouter)",
   };

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import difflib
+import functools
 import hashlib
+import inspect
 import json
 from collections import Counter, OrderedDict
 from math import log, sqrt
@@ -32,9 +34,9 @@ from src.utils.usage_context import (
     record_parsed_usage,
     usage_from_anthropic,
     usage_from_gemini,
-    usage_from_ollama,
     usage_from_openai,
 )
+from src.utils.reasoning_context import long_output, long_output_enabled, thinking, thinking_enabled
 from typing import Any, AsyncIterator, Awaitable, Callable, Optional
 
 logger = get_logger(__name__)
@@ -144,6 +146,115 @@ def _openrouter_body(prompt_body: str, *, temperature: float, max_tokens: int,
     if stream:
         body["stream"] = True
     return body
+
+
+_NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
+# Asked of every NVIDIA JSON call (same wording as the Claude JSON system
+# prompt). Not response_format: NVIDIA's models are not guaranteed to support
+# it, and the instruction alone returned clean JSON in every benchmark run.
+_NVIDIA_JSON_SYSTEM = "Respond with raw valid JSON only. Never wrap in markdown code fences."
+
+
+def _nvidia_headers() -> dict[str, str]:
+    return {
+        "Authorization": f"Bearer {settings.nvidia_api_key or ''}",
+        "Content-Type": "application/json; charset=utf-8",
+    }
+
+
+def _nvidia_body(prompt_body: str, *, model: str, temperature: float, max_tokens: int,
+                 json_mode: bool = False, stream: bool = False) -> dict[str, object]:
+    """NVIDIA chat body, with thinking set by utils/reasoning_context.
+
+    Nemotron thinks by default; chat_template_kwargs switches it off, or on
+    with reasoning_budget as the cutoff (the model stops thinking and answers
+    when the budget is spent). max_tokens counts thinking too, so the budget is
+    added on top of the answer allowance or a long think would starve the
+    answer. reasoning_effort is ignored by these models (measured), so it is
+    not sent. Thinking arrives in reasoning_content, never in content.
+    """
+    think = thinking_enabled()
+    # Both spellings of the switch: Nemotron/GLM/Qwen templates read
+    # enable_thinking, DeepSeek reads thinking. A template ignores the other,
+    # so the switch keeps working when NVIDIA_*_MODEL changes family.
+    template: dict[str, object] = {"enable_thinking": think, "thinking": think}
+    if think:
+        template["reasoning_budget"] = settings.nvidia_reasoning_budget
+    messages: list[dict[str, str]] = []
+    if json_mode:
+        messages.append({"role": "system", "content": _NVIDIA_JSON_SYSTEM})
+    messages.append({"role": "user", "content": prompt_body})
+    body: dict[str, object] = {
+        "model": model,
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens + (settings.nvidia_reasoning_budget if think else 0),
+        "chat_template_kwargs": template,
+    }
+    if stream:
+        body["stream"] = True
+        body["stream_options"] = {"include_usage": True}
+    return body
+
+
+def _nvidia_content(payload: dict[str, Any]) -> str:
+    """The answer text; raises when the model spent its whole allowance thinking.
+
+    An empty answer with finish_reason "length" means thinking ate max_tokens.
+    Raising lets the provider chain move on instead of parsing nothing.
+    """
+    from src.utils.exceptions import LLMException
+
+    choice = (payload.get("choices") or [{}])[0]
+    content = str((choice.get("message") or {}).get("content") or "").strip()
+    if not content:
+        raise LLMException(f"NVIDIA returned no answer (finish_reason={choice.get('finish_reason')})")
+    return content
+
+
+def _thinks(fn: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
+    """Mark an LLM entry method whose output must be correct: its calls may think.
+
+    See utils/reasoning_context.py. Coroutines only: a ContextVar set inside an
+    async generator is reset from a different context, which raises.
+    """
+    if not inspect.iscoroutinefunction(fn):
+        raise TypeError(f"@_thinks needs a coroutine function, got {fn.__name__}")
+
+    @functools.wraps(fn)
+    async def wrapper(*args: Any, **kwargs: Any) -> Any:
+        with thinking():
+            return await fn(*args, **kwargs)
+
+    return wrapper
+
+
+def _no_think(fn: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
+    """Recall work called from inside a thinking method (content extraction,
+    tagging): switch thinking back off for it."""
+    if not inspect.iscoroutinefunction(fn):
+        raise TypeError(f"@_no_think needs a coroutine function, got {fn.__name__}")
+
+    @functools.wraps(fn)
+    async def wrapper(*args: Any, **kwargs: Any) -> Any:
+        with thinking(False):
+            return await fn(*args, **kwargs)
+
+    return wrapper
+
+
+def _long_output(fn: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
+    """Mark a bulk generator (tests, modules, practice sets): its auto chain
+    tries Groq before NVIDIA. See utils/reasoning_context.py. Coroutines only."""
+    if not inspect.iscoroutinefunction(fn):
+        raise TypeError(f"@_long_output needs a coroutine function, got {fn.__name__}")
+
+    @functools.wraps(fn)
+    async def wrapper(*args: Any, **kwargs: Any) -> Any:
+        with long_output():
+            return await fn(*args, **kwargs)
+
+    return wrapper
 
 
 def _gemini_headers() -> dict[str, str]:
@@ -564,7 +675,7 @@ _PRACTICE_CHUNK_CHARS = 8_000
 _PRACTICE_CHUNK_OVERLAP_CHARS = 1_200
 _PRACTICE_MAX_CHUNKS = 15
 # Chunks are parsed this many at a time; one that takes longer than the timeout
-# is retried once off Ollama (a hung Ollama call once held a chunk for 8 minutes).
+# is retried once off the cheap default provider (a hung call once held a chunk for 8 minutes).
 _PRACTICE_CHUNK_CONCURRENCY = 3
 _PRACTICE_CHUNK_TIMEOUT_S = 180
 # Questions with no answer in the document are solved in batches of this size
@@ -572,7 +683,7 @@ _PRACTICE_CHUNK_TIMEOUT_S = 180
 _PRACTICE_SOLVE_BATCH = 12
 # Course notes shown to the solver, for notation and conventions only.
 _PRACTICE_SOLVE_NOTES_CHARS = 8_000
-_STRONGEST_PROVIDER_ORDER = ("claude", "groq", "minimax", "gemini", "ollama")
+_STRONGEST_PROVIDER_ORDER = ("claude", "groq", "minimax", "gemini", "nvidia")
 # "Match its style" writes one new question per original, this many originals
 # per call, and reads at most this much of the notes for grounding.
 _PARALLEL_BATCH = 8
@@ -737,7 +848,7 @@ _RETRIEVAL_TOP_K = 6
 # Long custom instructions (an exam-style prompt that names chapters, homework and
 # labs) unlock a much larger source window: at the default 8k chars / 6 chunks the
 # model sees ~3% of a textbook-sized folder and cannot follow a detailed scope.
-# 40k chars is ~10k tokens, which needs OLLAMA_NUM_CTX >= 32768 (config.py).
+# 40k chars is ~10k tokens, well inside every provider's context window.
 _LONG_INSTRUCTIONS_THRESHOLD = 1000
 _GENERATE_CHAR_LIMIT_LONG = 40_000
 _RETRIEVAL_TOP_K_LONG = 24
@@ -1240,8 +1351,8 @@ def _extract_json_object(raw: str) -> Optional[str]:
     Replaces a regex that could only handle one level of nesting. That regex
     truncated any payload with LaTeX braces inside a NESTED object (a module
     quiz question containing $\text{Range}$, say), which made json.loads fail
-    and sent the Ollama path into its corrupting escape fallbacks. See the
-    comment in _complete_ollama.
+    and sent the (since retired) Ollama path into its corrupting escape
+    fallbacks.
 
     Braces inside string literals are ignored, which is the whole point: LaTeX
     lives in the strings. Escape sequences are skipped so a \\" inside a value
@@ -1344,6 +1455,7 @@ class LLMService:
             "  - Inside JSON strings, use \\n for every real newline so the code keeps its line breaks and indentation. Indent nested blocks (loop and if bodies) with 2 or 4 spaces; do not collapse multiple statements onto one line.\n"
         )
 
+    @_long_output
     async def generate_test_questions(
         self,
         notes: str,
@@ -1404,7 +1516,7 @@ class LLMService:
         if not provider_candidates:
             from src.utils.exceptions import LLMException
             raise LLMException(
-                "No AI provider is available. Add an API key in Settings or start Ollama."
+                "No AI provider is available. Add an API key in Settings."
             )
 
         if is_coding_mode:
@@ -1511,6 +1623,7 @@ class LLMService:
 
         return mcq, frq
 
+    @_long_output
     async def generate_extra_question_types(
         self,
         notes: str,
@@ -1577,6 +1690,7 @@ class LLMService:
         logger.warning("Extra question types: all providers failed or returned nothing")
         return [], [], []
 
+    @_long_output
     async def generate_multipart_problems(
         self,
         notes: str,
@@ -1835,6 +1949,7 @@ class LLMService:
 
         return tf[:count_tf], ms[:count_ms], rank[:count_rank]
 
+    @_no_think
     async def _extract_study_content(self, notes: str, provider: Optional[str] = None) -> _StudyContent:
         prompt = (
             "Analyze the study notes below and return JSON with exactly these keys:\n"
@@ -2063,6 +2178,7 @@ class LLMService:
             '{"mcq": [{"question_text": "...", "options": ["a", "b", "c", "d"], "correct_index": 0, "topic": "..."}], "frq": [{"question_text": "...", "expected_answer": "...", "topic": "..."}]}\n'
         )
 
+    @_thinks
     async def parse_practice_test(
         self,
         content: str,
@@ -2116,14 +2232,14 @@ class LLMService:
                         self._complete_json(prompt, provider=provider), _PRACTICE_CHUNK_TIMEOUT_S
                     )
                 except asyncio.TimeoutError:
-                    logger.warning("parse_practice_test part %d/%d timed out; retrying off Ollama", part, len(chunks))
+                    logger.warning("parse_practice_test part %d/%d timed out; retrying off NVIDIA", part, len(chunks))
                 except Exception as exc:
                     logger.warning("parse_practice_test part %d/%d failed: %s", part, len(chunks), exc)
                     if not pinned:
                         return None
                 try:
                     return await asyncio.wait_for(
-                        self._complete_json_skip_ollama(prompt), _PRACTICE_CHUNK_TIMEOUT_S
+                        self._complete_json_skip_nvidia(prompt), _PRACTICE_CHUNK_TIMEOUT_S
                     )
                 except Exception as exc:
                     logger.warning("parse_practice_test part %d/%d retry failed: %s", part, len(chunks), exc)
@@ -2227,6 +2343,7 @@ class LLMService:
             f"{_PRACTICE_SHARED_RULES}"
         )
 
+    @_thinks
     async def parse_practice_problems(
         self,
         problems: list[tuple[int, str, str]],
@@ -2320,6 +2437,7 @@ class LLMService:
             _attach_practice_groups(frq, key, {}, default_label=label or str(index + 1), default_stem=setup),
         )
 
+    @_thinks
     async def fix_practice_problem(
         self,
         source_text: str,
@@ -2474,6 +2592,7 @@ class LLMService:
                 ))
         return starts
 
+    @_thinks
     async def complete_json_strongest(self, prompt: str) -> dict[str, object]:
         """Public entry for quality-critical JSON (mock OA hidden tests and reference solutions)."""
         return await self._complete_json_strongest(prompt)
@@ -2579,6 +2698,7 @@ class LLMService:
         await asyncio.gather(*(solve(batch) for batch in batches))
         return mcq, frq
 
+    @_thinks
     async def apply_answer_sheet(
         self, mcq: list[GeneratedMCQ], frq: list[GeneratedFRQ], sheet: str
     ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
@@ -2698,6 +2818,7 @@ class LLMService:
         )
         return mcq, frq
 
+    @_long_output
     async def generate_parallel_practice_test(
         self,
         practice_test_content: str,
@@ -3037,6 +3158,7 @@ class LLMService:
                 subject_hints="",
             )
 
+    @_long_output
     async def generate_from_practice_test_template(
         self,
         notes: str,
@@ -3196,7 +3318,7 @@ class LLMService:
         if not provider_candidates:
             from src.utils.exceptions import LLMException
             raise LLMException(
-                "No AI provider is available. Add an API key in Settings or start Ollama."
+                "No AI provider is available. Add an API key in Settings."
             )
         
         try:
@@ -3223,6 +3345,7 @@ class LLMService:
             self._set_last_generation_meta(diagnostics)
             return self._fallback_questions(self._strip_metadata(notes), count_mcq, count_frq)
 
+    @_thinks
     async def grade_frq_answer(
         self,
         notes: str,
@@ -3411,6 +3534,7 @@ If the notes do not support grading, set flagged_uncertain true and confidence 0
             f"CS NOTES:\n{notes[:self._context_budget(custom_instructions)[0]]}"
         )
 
+    @_thinks
     async def grade_code_answer(
         self,
         question: str,
@@ -3587,6 +3711,7 @@ Be lenient on minor syntax errors if the logic is correct. Accept equivalent sol
             f"MATH NOTES:\n{notes[:self._context_budget(custom_instructions)[0]]}"
         )
 
+    @_thinks
     async def grade_math_answer(
         self,
         question: str,
@@ -3716,8 +3841,9 @@ Rules:
 """
         try:
             # Shown-work grading is the most nuanced grading prompt in the app,
-            # so it goes to the strongest provider first and never to Ollama
-            # (documented math failures). Plain typed math grading keeps the
+            # so it goes to the strongest provider first and never to the cheap
+            # default provider (NVIDIA; Ollama before it had documented math
+            # failures). Plain typed math grading keeps the
             # normal cost-ascending auto chain.
             candidates = await self._math_grading_candidates(shown_work=bool(work_section))
             data, used = await self._complete_json_ranked(prompt, candidates)
@@ -3897,6 +4023,7 @@ Return JSON only:
             logger.warning("LLM objective explanation failed: %s", exc)
             return ObjectiveExplanation(feedback="", reasoning=None)
 
+    @_thinks
     async def grade_complexity_answer(
         self,
         title: str,
@@ -4110,6 +4237,7 @@ Return JSON only with these exact keys:
             )
         return list(results.values())
 
+    @_thinks
     async def derive_mcq_answers(
         self,
         questions: list[str],
@@ -4235,6 +4363,7 @@ Return JSON only with these exact keys:
             results[index] = matched
         return results
 
+    @_thinks
     async def adjudicate_mcq_matches(
         self,
         items: list[dict[str, object]],
@@ -4275,6 +4404,7 @@ Return JSON only with these exact keys:
             merged.update(result)
         return merged
 
+    @_long_output
     async def regenerate_mcqs_for_topics(
         self,
         notes: str,
@@ -4390,7 +4520,7 @@ Return JSON only with these exact keys:
             if not enable_fallback:
                 from src.utils.exceptions import LLMException
                 raise LLMException(
-                    "No AI provider is available. Add an API key in Settings or start Ollama."
+                    "No AI provider is available. Add an API key in Settings."
                 )
             return self._fallback_flashcards(content, count, prompt)
         last_error: Optional[Exception] = None
@@ -4602,6 +4732,7 @@ Return JSON only with these exact keys:
                     quiz.append({"question": question, "options": options, "correct_index": correct_index})
         return quiz[:quiz_count]
 
+    @_long_output
     async def generate_module_content(
         self,
         notes: str,
@@ -4684,6 +4815,7 @@ Return JSON only with these exact keys:
             prompt, provider, _parse, max_tokens=_MODULE_CONTENT_MAX_TOKENS
         )
 
+    @_long_output
     async def regenerate_module_support(
         self,
         lesson_content: str,
@@ -4746,6 +4878,7 @@ Return JSON only with these exact keys:
             prompt, provider, _parse, max_tokens=_MODULE_CONTENT_MAX_TOKENS
         )
 
+    @_no_think
     async def moderate(self, texts: list[str]) -> list[dict[str, object]]:
         """Classify texts with OpenAI's moderation endpoint (GH #173).
 
@@ -4861,6 +4994,7 @@ Return JSON only with these exact keys:
             for i in range(len(quiz))
         ]
 
+    @_no_think
     async def generate_quiz_explanations(
         self,
         lesson_content: str,
@@ -5086,6 +5220,7 @@ Return JSON only with these exact keys:
             cleaned.append({"speaker": turn["speaker"], "text": " ".join(kept).strip() or turn["text"]})
         return cleaned
 
+    @_long_output
     async def generate_podcast_episode(
         self,
         notes: str,
@@ -5150,6 +5285,7 @@ Return JSON only with these exact keys:
             "checkpoints": checkpoints,
         }
 
+    @_long_output
     async def generate_lecture_episode(
         self,
         notes: str,
@@ -5232,6 +5368,7 @@ Return JSON only with these exact keys:
             "checkpoints": checkpoints,
         }
 
+    @_long_output
     async def generate_custom_problem(
         self,
         code: str,
@@ -5277,6 +5414,7 @@ CRITICAL rules for "test_cases" so they can actually run:
 
 Return only the JSON object."""
 
+    @_long_output
     async def generate_solution_article(
         self,
         title: str,
@@ -5390,7 +5528,7 @@ Return only the JSON object."""
         candidates = await self._candidate_providers(provider)
         if not candidates:
             raise LLMException(
-                "No AI provider is available. Add an API key in Settings or start Ollama."
+                "No AI provider is available. Add an API key in Settings."
             )
         target = candidates[0]
         prompt = self._build_custom_problems_batch_prompt(topics_text, difficulty, count)
@@ -5414,6 +5552,7 @@ Return only the JSON object."""
                     if isinstance(raw_item, dict):
                         yield raw_item
 
+    @_long_output
     async def generate_daily_problem(
         self,
         topic: str,
@@ -5601,6 +5740,7 @@ Return only the JSON object."""
     # per batch (its own provider fallback), batches run sequentially.
     _TOPIC_BATCH_SIZE = 25
 
+    @_no_think
     async def tag_topics(self, context: str, items: list[tuple[int, str]]) -> dict[int, str]:
         """Label untagged questions or flashcards with a short topic (2 to 4 words).
 
@@ -5675,21 +5815,24 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
         aliases = {
             "google": "gemini",
             "anthropic": "claude",
+            # Ollama was retired on 2026-11-10 (it dropped its cloud models). A
+            # saved "ollama" preference or an old client falls back to auto.
+            "ollama": "auto",
         }
         return aliases.get(value, value)
 
     async def _candidate_providers(self, provider: Optional[str] = None) -> list[str]:
         normalized = self._normalize_generation_provider(provider)
 
-        # Order is cost-ascending: the local Ollama model first (free), then the
-        # cheaper paid APIs, and Claude LAST because it is the most expensive.
+        # Order is cost-ascending: NVIDIA first (free API catalog tier; it
+        # replaced Ollama on 2026-11-10), then the cheaper paid APIs, and Claude
+        # LAST because it is the most expensive.
         # This ordering is the fallback chain for "auto" AND the tail order when
         # a specific provider is chosen, so Claude is always the last resort.
         providers: list[str] = []
 
-        status = await self.check_providers_status()
-        if status.get("ollama"):
-            providers.append("ollama")
+        if settings.nvidia_api_key:
+            providers.append("nvidia")
 
         if settings.groq_api_key:
             providers.append("groq")
@@ -5701,6 +5844,12 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
             providers.append("minimax")
         if settings.anthropic_api_key:
             providers.append("claude")
+
+        if long_output_enabled() and "nvidia" in providers and "groq" in providers:
+            # Long JSON (tests, modules): Groq first. NVIDIA's free tier often
+            # fails or stalls on long output, and each miss delays the fallback.
+            providers.remove("nvidia")
+            providers.insert(providers.index("groq") + 1, "nvidia")
 
         if normalized != "auto":
             # Honor the user's explicit pick by trying it first, but DON'T hard-fail if it
@@ -6366,8 +6515,10 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
             if not settings.anthropic_api_key:
                 raise LLMException("Anthropic is not configured. Add your Anthropic API key in Settings.")
             return await self._complete_anthropic(prompt, max_tokens=max_tokens)
-        if provider == "ollama":
-            return await self._complete_ollama(prompt, max_tokens=max_tokens)
+        if provider == "nvidia":
+            if not settings.nvidia_api_key:
+                raise LLMException("NVIDIA is not configured. Add NVIDIA_API_KEY.")
+            return await self._complete_nvidia(prompt, max_tokens=max_tokens)
         if provider == "minimax":
             if not settings.openrouter_api_key:
                 raise LLMException("MiniMax is not configured. Add OPENROUTER_API_KEY.")
@@ -6525,50 +6676,6 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
         finally:
             usage.finish()
 
-    async def _stream_text_ollama(self, prompt: str) -> AsyncIterator[str]:
-        prompt_body = self._prepare_llm_payload(prompt, "ollama")
-        headers = {"Content-Type": "application/json; charset=utf-8"}
-        if settings.ollama_api_key:
-            headers["Authorization"] = f"Bearer {settings.ollama_api_key}"
-        usage = StreamUsage("ollama", settings.ollama_model, prompt_body)
-        try:
-            async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
-                async with client.stream(
-                    "POST",
-                    f"{settings.ollama_base_url.rstrip('/')}/api/generate",
-                    headers=headers,
-                    json={
-                        "model": settings.ollama_model,
-                        "prompt": prompt_body,
-                        "stream": True,
-                        "format": "json",
-                        "options": {
-                            "num_predict": _JSON_MAX_TOKENS,
-                            "num_ctx": settings.ollama_num_ctx,
-                        },
-                    },
-                ) as response:
-                    response.raise_for_status()
-                    async for line in response.aiter_lines():
-                        if not line.strip():
-                            continue
-                        try:
-                            event = json.loads(line)
-                        except json.JSONDecodeError:
-                            continue
-                        usage.set_both(usage_from_ollama(event))
-                        text = event.get("response")
-                        if text:
-                            usage.add_text(text)
-                            yield str(text)
-                        if event.get("done"):
-                            break
-        except Exception:
-            usage.finish(success=False)
-            raise
-        finally:
-            usage.finish()
-
     async def _stream_llm_text(self, provider: str, prompt: str) -> AsyncIterator[str]:
         from src.utils.exceptions import LLMException
 
@@ -6584,8 +6691,10 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
             if not settings.google_ai_api_key:
                 raise LLMException("Gemini is not configured. Add GOOGLE_AI_API_KEY.")
             stream = self._stream_text_gemini(prompt)
-        elif provider == "ollama":
-            stream = self._stream_text_ollama(prompt)
+        elif provider == "nvidia":
+            if not settings.nvidia_api_key:
+                raise LLMException("NVIDIA is not configured. Add NVIDIA_API_KEY.")
+            stream = self._stream_text_nvidia(prompt)
         elif provider == "minimax":
             if not settings.openrouter_api_key:
                 raise LLMException("MiniMax is not configured. Add OPENROUTER_API_KEY.")
@@ -6847,7 +6956,7 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
         _TEXT_DISPATCH: dict[str, Any] = {
             "gemini": self._complete_text_gemini,
             "groq": self._complete_text_groq,
-            "ollama": self._complete_text_ollama,
+            "nvidia": self._complete_text_nvidia,
             "claude": self._complete_text_anthropic,
             "minimax": self._complete_text_minimax,
         }
@@ -6870,7 +6979,7 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
         candidates = await self._candidate_providers("auto")
         if not candidates:
             raise LLMException(
-                "No AI provider is available. Add an API key in Settings or start Ollama."
+                "No AI provider is available. Add an API key in Settings."
             )
 
         last_error: Optional[Exception] = None
@@ -7037,49 +7146,6 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
         finally:
             usage.finish()
 
-    async def _stream_text_kojo_ollama(self, prompt: str) -> AsyncIterator[str]:
-        prompt_body = self._prepare_llm_payload(prompt, "ollama")
-        headers = {"Content-Type": "application/json; charset=utf-8"}
-        if settings.ollama_api_key:
-            headers["Authorization"] = f"Bearer {settings.ollama_api_key}"
-        usage = StreamUsage("ollama", settings.ollama_model, prompt_body)
-        try:
-            async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
-                async with client.stream(
-                    "POST",
-                    f"{settings.ollama_base_url.rstrip('/')}/api/generate",
-                    headers=headers,
-                    json={
-                        "model": settings.ollama_model,
-                        "prompt": prompt_body,
-                        "stream": True,
-                        "options": {
-                            "num_predict": settings.llm_max_tokens,
-                            "num_ctx": settings.ollama_num_ctx,
-                        },
-                    },
-                ) as response:
-                    response.raise_for_status()
-                    async for line in response.aiter_lines():
-                        if not line.strip():
-                            continue
-                        try:
-                            event = json.loads(line)
-                        except json.JSONDecodeError:
-                            continue
-                        usage.set_both(usage_from_ollama(event))
-                        text = event.get("response")
-                        if text:
-                            usage.add_text(text)
-                            yield str(text)
-                        if event.get("done"):
-                            break
-        except Exception:
-            usage.finish(success=False)
-            raise
-        finally:
-            usage.finish()
-
     async def stream_kojo(
         self, prompt: str, provider: Optional[str] = None
     ) -> AsyncIterator[str]:
@@ -7095,7 +7161,7 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
         _STREAM_DISPATCH: dict[str, Any] = {
             "gemini": self._stream_text_kojo_gemini,
             "groq": self._stream_text_kojo_groq,
-            "ollama": self._stream_text_kojo_ollama,
+            "nvidia": self._stream_text_kojo_nvidia,
             "claude": self._stream_text_kojo_anthropic,
             "minimax": self._stream_text_kojo_minimax,
         }
@@ -7119,7 +7185,7 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
         candidates = await self._candidate_providers("auto")
         if not candidates:
             raise LLMException(
-                "No AI provider is available. Add an API key in Settings or start Ollama."
+                "No AI provider is available. Add an API key in Settings."
             )
 
         last_error: Optional[Exception] = None
@@ -7174,77 +7240,15 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
         return await self._with_retry(_do, "Gemini")
 
     async def check_providers_status(self) -> dict:
-        ollama_ok = False
-        ollama_model_available = False
-        if settings.ollama_api_key:
-            # Cloud Ollama — API key present means the service is reachable
-            ollama_ok = True
-            ollama_model_available = bool(settings.ollama_model)
-        else:
-            try:
-                async with httpx.AsyncClient(timeout=5) as client:
-                    r = await client.get(f"{settings.ollama_base_url.rstrip('/')}/api/tags")
-                    if r.status_code == 200:
-                        ollama_ok = True
-                        models = [m.get("name", "") for m in r.json().get("models", [])]
-                        model_base = settings.ollama_model.split(":")[0]
-                        ollama_model_available = any(
-                            m == settings.ollama_model or m.startswith(model_base)
-                            for m in models
-                        )
-            except Exception:
-                pass
+        # A configured key counts as available; no network ping (an NVIDIA
+        # outage is caught by the provider chain falling through instead).
         return {
+            "nvidia": bool(settings.nvidia_api_key),
             "gemini": bool(settings.google_ai_api_key),
             "minimax": bool(settings.openrouter_api_key),
             "groq": bool(settings.groq_api_key),
             "claude": bool(settings.anthropic_api_key),
-            "ollama": ollama_ok,
-            "ollama_model": settings.ollama_model,
-            "ollama_model_available": ollama_model_available,
         }
-
-    async def _complete_text_ollama(self, prompt: str) -> str:
-        from src.utils.exceptions import LLMException
-        try:
-            prompt_body = self._prepare_llm_payload(prompt, "ollama")
-            headers = {"Content-Type": "application/json; charset=utf-8"}
-            if settings.ollama_api_key:
-                headers["Authorization"] = f"Bearer {settings.ollama_api_key}"
-            async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
-                response = await client.post(
-                    f"{settings.ollama_base_url.rstrip('/')}/api/generate",
-                    headers=headers,
-                    json={
-                        "model": settings.ollama_model,
-                        "prompt": prompt_body,
-                        "stream": False,
-                        "options": {
-                            "num_predict": settings.llm_max_tokens,
-                            "num_ctx": settings.ollama_num_ctx,
-                        },
-                    },
-                )
-                response.raise_for_status()
-            payload = response.json()
-            record_parsed_usage("ollama", settings.ollama_model, usage_from_ollama(payload))
-            return str(payload.get("response", "")).strip()
-        except httpx.ConnectError:
-            raise LLMException(
-                f"Ollama is not running at {settings.ollama_base_url}. "
-                "Open a terminal and run: ollama serve"
-            )
-        except httpx.TimeoutException:
-            raise LLMException(
-                f"Ollama timed out — '{settings.ollama_model}' may still be loading. Try again in a moment."
-            )
-        except httpx.HTTPStatusError as exc:
-            if exc.response.status_code == 404:
-                raise LLMException(
-                    f"Ollama model '{settings.ollama_model}' not found. "
-                    f"Run: ollama pull {settings.ollama_model}"
-                )
-            raise LLMException(f"Ollama error ({exc.response.status_code})") from exc
 
     async def _complete_text_groq(self, prompt: str) -> str:
         async def _do() -> str:
@@ -7481,14 +7485,15 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
     async def _math_grading_candidates(self, shown_work: bool) -> list[str]:
         """Provider order for grade_math_answer.
 
-        Shown work: strongest first, never Ollama (GH #158). Otherwise the
+        Shown work: strongest first, never the cheap default NVIDIA (GH #158,
+        inherited from Ollama). Otherwise the
         normal cost-ascending auto chain.
         """
         candidates = await self._candidate_providers("auto")
         if not shown_work:
             return candidates
         rank = {name: i for i, name in enumerate(_STRONGEST_FIRST)}
-        return sorted((p for p in candidates if p != "ollama"), key=lambda p: rank.get(p, len(rank)))
+        return sorted((p for p in candidates if p != "nvidia"), key=lambda p: rank.get(p, len(rank)))
 
     async def _complete_json_ranked(self, prompt: str, candidates: list[str]) -> tuple[dict[str, object], str]:
         """Fallback chain over `candidates` in order; returns the JSON and the
@@ -7507,12 +7512,13 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
                 logger.warning("%s JSON generation failed; trying next provider: %s", candidate, exc)
         raise LLMException(_AI_SERVICES_UNAVAILABLE_MESSAGE) from last_error
 
-    async def _complete_json_skip_ollama(self, prompt: str) -> dict[str, object]:
-        """Like _complete_json("auto"), but never routes to Ollama.
+    async def _complete_json_skip_nvidia(self, prompt: str) -> dict[str, object]:
+        """Like _complete_json("auto"), but never routes to NVIDIA.
 
         Used by practice-test parsing (grade_math_answer's shown-work path
-        moved to _math_grading_candidates in GH #158). Ollama has a
-        documented history of math failures
+        moved to _math_grading_candidates in GH #158). The cheap default
+        provider stays off math-heavy parsing: Ollama, which held that slot
+        until 2026-11-10, had documented math failures
         (.claude/misc/OLLAMA_MATH_FAILURE_ANALYSIS.md). Passing a specific
         provider straight to _complete_json would bypass its fallback chain
         entirely (single point of failure), so this builds its own loop from
@@ -7522,7 +7528,7 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
         """
         from src.utils.exceptions import LLMException
 
-        candidates = [p for p in await self._candidate_providers("auto") if p != "ollama"]
+        candidates = [p for p in await self._candidate_providers("auto") if p != "nvidia"]
         if not candidates:
             raise LLMException(_AI_SERVICES_UNAVAILABLE_MESSAGE)
 
@@ -7559,104 +7565,101 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
             return self._loads_json(content)
         return await self._with_retry(_do, "Gemini")
 
-    async def _complete_ollama(self, prompt: str, max_tokens: Optional[int] = None) -> dict[str, object]:
-        from src.utils.exceptions import LLMException
-        try:
-            prompt_body = self._prepare_llm_payload(prompt, "ollama")
-            headers = {"Content-Type": "application/json; charset=utf-8"}
-            if settings.ollama_api_key:
-                headers["Authorization"] = f"Bearer {settings.ollama_api_key}"
-            async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
+    # -- NVIDIA API catalog ------------------------------------------------------
+    # OpenAI-compatible, so these mirror the MiniMax functions. Thinking is off
+    # unless the caller is inside `with thinking():` (utils/reasoning_context).
+
+    async def _complete_nvidia(self, prompt: str, max_tokens: Optional[int] = None) -> dict[str, object]:
+        async def _do() -> dict[str, object]:
+            prompt_body = self._prepare_llm_payload(prompt, "nvidia")
+            async with httpx.AsyncClient(timeout=settings.nvidia_timeout_seconds) as client:
                 response = await client.post(
-                    f"{settings.ollama_base_url.rstrip('/')}/api/generate",
-                    headers=headers,
-                    json={
-                        "model": settings.ollama_model,
-                        "prompt": prompt_body,
-                        "stream": False,
-                        "format": "json",
-                        "options": {
-                            "num_predict": max_tokens or _JSON_MAX_TOKENS,
-                            "num_ctx": settings.ollama_num_ctx,
-                        },
-                    },
+                    _NVIDIA_URL,
+                    headers=_nvidia_headers(),
+                    json=_nvidia_body(
+                        prompt_body, model=settings.nvidia_json_model, temperature=0.2,
+                        max_tokens=max_tokens or _JSON_MAX_TOKENS, json_mode=True,
+                    ),
                 )
                 response.raise_for_status()
                 payload = response.json()
-            record_parsed_usage("ollama", settings.ollama_model, usage_from_ollama(payload))
+            record_parsed_usage("nvidia", settings.nvidia_json_model, usage_from_openai(payload))
+            return self._loads_json(_nvidia_content(payload))
+        return await self._with_retry(_do, "NVIDIA")
 
-            # Ollama responses vary in shape. "response" may be a string, a dict, or nested.
-            raw_resp = payload.get("response")
-
-            # Diagnostics: log what Ollama actually returned. Without this we cannot tell a
-            # model that returned nothing from one whose output failed downstream validation.
-            done_reason = payload.get("done_reason")
-            raw_preview = str(raw_resp)[:500] if raw_resp is not None else ""
-            logger.info(
-                "Ollama JSON response: model=%s shape=%s len=%d done_reason=%s preview=%s",
-                settings.ollama_model,
-                type(raw_resp).__name__,
-                len(str(raw_resp)) if raw_resp is not None else 0,
-                done_reason,
-                raw_preview,
-            )
-
-            # If Ollama already returned structured JSON, return it directly.
-            if isinstance(raw_resp, dict):
-                return raw_resp
-
-            if isinstance(raw_resp, list):
-                # If it's a list, try to find the first dict-like element.
-                for item in raw_resp:
-                    if isinstance(item, dict):
-                        return item
-                # Fall back to packaging the list under a key.
-                return {"response": raw_resp}
-
-            # Otherwise raw_resp is likely a string. Try safe parsing with several fallbacks.
-            raw_text = "" if raw_resp is None else str(raw_resp)
-            # _loads_json is the ONLY repair allowed here. It already does the
-            # surgical thing: escape just the backslashes that are not valid
-            # JSON escapes, leaving real "\\n" newline escapes intact.
-            #
-            # There used to be two extra fallbacks below this, and they are why
-            # Ollama (and only Ollama) produced lessons rendered as one blob of
-            # literal "\\n" with the LaTeX mangled:
-            #   raw.encode().decode("unicode_escape")  ate \\t and \\n globally
-            #   raw.replace("\\", "\\\\")           doubled EVERY backslash, so a real
-            #                                          newline escape became the
-            #                                          two characters \\n in the value
-            # Both could "succeed" on a structurally broken payload and hand
-            # back silently corrupted prose, which then got persisted. Failing
-            # here is strictly better: _complete_module_json catches it and
-            # moves to the next provider.
-            try:
-                return self._loads_json(raw_text)
-            except Exception as exc:
-                logger.warning(
-                    "Ollama response JSON parsing failed; payload keys=%s; response_preview=%s",
-                    list(payload.keys()),
-                    (raw_text[:1000] + "...") if len(raw_text) > 1000 else raw_text,
+    async def _complete_text_nvidia(self, prompt: str) -> str:
+        async def _do() -> str:
+            prompt_body = self._prepare_llm_payload(prompt, "nvidia")
+            async with httpx.AsyncClient(timeout=min(settings.llm_timeout_seconds, settings.nvidia_timeout_seconds)) as client:
+                response = await client.post(
+                    _NVIDIA_URL,
+                    headers=_nvidia_headers(),
+                    json=_nvidia_body(
+                        prompt_body, model=settings.nvidia_chat_model, temperature=0.7,
+                        max_tokens=settings.llm_max_tokens,
+                    ),
                 )
-                raise LLMException(
-                    "Ollama returned an unexpected response format that couldn't be parsed as JSON."
-                ) from exc
-        except httpx.ConnectError:
-            raise LLMException(
-                f"Ollama is not running at {settings.ollama_base_url}. "
-                "Open a terminal and run: ollama serve"
-            )
-        except httpx.TimeoutException:
-            raise LLMException(
-                f"Ollama timed out — '{settings.ollama_model}' may still be loading. Try again in a moment."
-            )
-        except httpx.HTTPStatusError as exc:
-            if exc.response.status_code == 404:
-                raise LLMException(
-                    f"Ollama model '{settings.ollama_model}' not found. "
-                    f"Run: ollama pull {settings.ollama_model}"
-                )
-            raise LLMException(f"Ollama error ({exc.response.status_code})") from exc
+                response.raise_for_status()
+            payload = response.json()
+            record_parsed_usage("nvidia", settings.nvidia_chat_model, usage_from_openai(payload))
+            return _nvidia_content(payload)
+        return await self._with_retry(_do, "NVIDIA")
+
+    async def _stream_nvidia(self, prompt: str, *, model: str, json_mode: bool, temperature: float,
+                             max_tokens: int, timeout: int) -> AsyncIterator[str]:
+        prompt_body = self._prepare_llm_payload(prompt, "nvidia")
+        usage = StreamUsage("nvidia", model, prompt_body)
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                async with client.stream(
+                    "POST",
+                    _NVIDIA_URL,
+                    headers=_nvidia_headers(),
+                    json=_nvidia_body(
+                        prompt_body, model=model, temperature=temperature, max_tokens=max_tokens,
+                        json_mode=json_mode, stream=True,
+                    ),
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if not line.startswith("data:"):
+                            continue
+                        data = line[len("data:"):].strip()
+                        if not data or data == "[DONE]":
+                            continue
+                        try:
+                            event = json.loads(data)
+                        except json.JSONDecodeError:
+                            continue
+                        usage.set_both(usage_from_openai(event))
+                        choices = event.get("choices") or []
+                        delta = (choices[0].get("delta") or {}) if choices else {}
+                        # Thinking streams in delta.reasoning_content; only the answer is yielded.
+                        text = delta.get("content")
+                        if text:
+                            usage.add_text(text)
+                            yield str(text)
+        except Exception:
+            usage.finish(success=False)
+            raise
+        finally:
+            usage.finish()
+
+    async def _stream_text_nvidia(self, prompt: str) -> AsyncIterator[str]:
+        """Streamed JSON generation (per-question test streaming)."""
+        async for chunk in self._stream_nvidia(
+            prompt, model=settings.nvidia_json_model, json_mode=True, temperature=0.2,
+            max_tokens=_JSON_MAX_TOKENS, timeout=settings.nvidia_timeout_seconds,
+        ):
+            yield chunk
+
+    async def _stream_text_kojo_nvidia(self, prompt: str) -> AsyncIterator[str]:
+        """Streamed plain-text Kojo chat."""
+        async for chunk in self._stream_nvidia(
+            prompt, model=settings.nvidia_chat_model, json_mode=False, temperature=0.7,
+            max_tokens=settings.llm_max_tokens, timeout=min(settings.llm_timeout_seconds, settings.nvidia_timeout_seconds),
+        ):
+            yield chunk
 
     async def _complete_groq(self, prompt: str, max_tokens: Optional[int] = None) -> dict[str, object]:
         async def _do() -> dict[str, object]:

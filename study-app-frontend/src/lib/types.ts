@@ -921,13 +921,11 @@ export type LeetCodeComplexityCheckResponse = {
 };
 
 export type ProviderStatus = {
+  nvidia: boolean;
   gemini: boolean;
   minimax: boolean;
   groq: boolean;
   claude: boolean;
-  ollama: boolean;
-  ollama_model: string;
-  ollama_model_available: boolean;
 };
 
 export type SlashCommand = {

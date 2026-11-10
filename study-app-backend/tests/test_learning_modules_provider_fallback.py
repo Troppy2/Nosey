@@ -3,7 +3,7 @@ Regression tests: learning-module builds must fall back across providers.
 
 Bug: building modules from a KojoChat action card "succeeded" (201) but the
 Learning Modules page then showed an Ollama/LLM error. The card forwards the
-user's chat model setting (default "ollama") as the build provider, and the
+user's chat model setting (default "ollama" then, "nvidia" now) as the build provider, and the
 module generators called _complete_json(provider=...) once. A specific
 provider in _complete_json is a single attempt with no fallback, and even on
 "auto" a provider that returns well-formed but unusable JSON (no modules, empty
@@ -87,6 +87,7 @@ async def _run_build(db_session_maker, monkeypatch, provider, responses):
     monkeypatch.setattr("src.services.llm_service.settings.anthropic_api_key", "")
     # Isolate from a developer .env: a real OpenRouter key would add MiniMax to the chain.
     monkeypatch.setattr("src.services.llm_service.settings.openrouter_api_key", "")
+    monkeypatch.setattr("src.services.llm_service.settings.nvidia_api_key", "test-nvidia")
 
     track_id, folder_id = await _seed_track(db_session_maker, provider)
     fake_call, calls = _fake_provider(responses)
@@ -96,7 +97,6 @@ async def _run_build(db_session_maker, monkeypatch, provider, responses):
     with (
         patch("src.routes.learning_modules.async_session_maker", db_session_maker),
         patch("src.routes.learning_modules.FileService", return_value=fake_file_service),
-        patch.object(LLMService, "check_providers_status", AsyncMock(return_value={"ollama": True})),
         patch.object(LLMService, "_complete_json_for_provider", side_effect=fake_call, autospec=False),
     ):
         await _generate_track_background(
@@ -127,15 +127,15 @@ class TestLearningModuleProviderFallback:
         assert _run_build.last_budgets["content"] == _MODULE_CONTENT_MAX_TOKENS
         assert _run_build.last_budgets["outline"] is None
 
-    async def test_kojo_card_pinned_ollama_failure_falls_back_and_track_is_ready(
+    async def test_kojo_card_pinned_nvidia_failure_falls_back_and_track_is_ready(
         self, db_session_maker, monkeypatch,
     ):
-        """The real Kojo scenario: provider="ollama" (the chat setting default)
-        and Ollama cannot handle the request."""
+        """The real Kojo scenario: provider="nvidia" (the chat setting default)
+        and NVIDIA cannot handle the request."""
         track, module, calls = await _run_build(
-            db_session_maker, monkeypatch, "ollama",
+            db_session_maker, monkeypatch, "nvidia",
             {
-                "ollama": LLMException("Ollama returned an unexpected response format that couldn't be parsed as JSON."),
+                "nvidia": LLMException("NVIDIA returned no answer (finish_reason=length)"),
                 "groq": {"outline": OUTLINE, "content": CONTENT},
             },
         )
@@ -144,31 +144,31 @@ class TestLearningModuleProviderFallback:
         assert track.error is None
         assert module is not None and module.lesson_content == "## Lesson\nBody."
         assert module.quiz_json is not None
-        assert calls[0] == "ollama"  # the user's pick is still tried first
+        assert calls[0] == "nvidia"  # the user's pick is still tried first
         assert "groq" in calls
 
     async def test_unusable_json_from_first_provider_falls_back_on_auto(
         self, db_session_maker, monkeypatch,
     ):
-        """Ollama answers with valid JSON of the wrong shape. That is not a
+        """NVIDIA answers with valid JSON of the wrong shape. That is not a
         transport error, so the old auto chain accepted it and failed the build."""
         track, module, calls = await _run_build(
             db_session_maker, monkeypatch, "auto",
             {
-                "ollama": {"outline": {"modules": []}, "content": {"lesson": ""}},
+                "nvidia": {"outline": {"modules": []}, "content": {"lesson": ""}},
                 "groq": {"outline": OUTLINE, "content": CONTENT},
             },
         )
 
         assert track.status == "ready", track.error
         assert module is not None and module.lesson_content
-        assert calls.count("ollama") >= 1 and "groq" in calls
+        assert calls.count("nvidia") >= 1 and "groq" in calls
 
     async def test_all_providers_failing_still_marks_track_failed(self, db_session_maker, monkeypatch):
         track, module, calls = await _run_build(
-            db_session_maker, monkeypatch, "ollama",
+            db_session_maker, monkeypatch, "nvidia",
             {
-                "ollama": LLMException("Ollama timed out."),
+                "nvidia": LLMException("NVIDIA timed out."),
                 "groq": LLMException("Groq rate limited."),
             },
         )
@@ -176,11 +176,11 @@ class TestLearningModuleProviderFallback:
         assert track.status == "failed"
         assert track.error
         assert module is None
-        assert calls == ["ollama", "groq"]  # one attempt per provider, no nested retries
+        assert calls == ["nvidia", "groq"]  # one attempt per provider, no nested retries
 
     async def test_lesson_edit_regen_on_kojo_built_track_falls_back(self, monkeypatch):
         """Editing a lesson reuses track.provider, which a Kojo-built track
-        stored as "ollama", so the regen call needs the same fallback."""
+        stored as "nvidia", so the regen call needs the same fallback."""
         from src.services.llm_service import LLMService
 
         monkeypatch.setattr("src.services.llm_service.settings.groq_api_key", "test-groq")
@@ -188,16 +188,16 @@ class TestLearningModuleProviderFallback:
         monkeypatch.setattr("src.services.llm_service.settings.anthropic_api_key", "")
         # Isolate from a developer .env: a real OpenRouter key would add MiniMax to the chain.
         monkeypatch.setattr("src.services.llm_service.settings.openrouter_api_key", "")
+        monkeypatch.setattr("src.services.llm_service.settings.nvidia_api_key", "test-nvidia")
         fake_call, calls = _fake_provider({
-            "ollama": LLMException("Ollama timed out."),
+            "nvidia": LLMException("NVIDIA timed out."),
             "groq": {"outline": OUTLINE, "content": CONTENT},
         })
 
         with (
-            patch.object(LLMService, "check_providers_status", AsyncMock(return_value={"ollama": True})),
-            patch.object(LLMService, "_complete_json_for_provider", side_effect=fake_call),
+                patch.object(LLMService, "_complete_json_for_provider", side_effect=fake_call),
         ):
-            support = await LLMService().regenerate_module_support("## Edited\nBody.", "Module 1", provider="ollama")
+            support = await LLMService().regenerate_module_support("## Edited\nBody.", "Module 1", provider="nvidia")
 
         assert support["quiz"] and support["tts_script"] == "Lesson. Body."
-        assert calls == ["ollama", "groq"]
+        assert calls == ["nvidia", "groq"]

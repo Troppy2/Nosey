@@ -1,5 +1,7 @@
 """
-End-to-end TTS-script tests against the real Ollama provider (no mocks).
+End-to-end TTS-script tests against the real auto provider chain (no mocks).
+
+Modules are long output, so auto tries Groq first, then NVIDIA (2026-11-10).
 
 Purpose: guard the narration-script contract. The tts_script returned by
 generate_module_content / regenerate_module_support must be speakable prose:
@@ -7,7 +9,7 @@ no LaTeX, no markdown fences, and no raw notation like 'O(n)' that speech
 engines skip or mangle (the prompt requires 'O of n' style wording).
 
 These tests make real LLM calls, so they are skipped automatically when
-Ollama is not configured. Run them explicitly with:
+neither GROQ_API_KEY nor NVIDIA_API_KEY is set. Run them explicitly with:
 
     pytest tests/test_tts_script_e2e.py -v -s
 
@@ -24,30 +26,9 @@ import pytest
 from src.config import settings
 from src.services.llm_service import LLMService
 
-_LOCAL_HOSTS = ("http://localhost", "http://127.0.0.1")
-
-
-def _ollama_is_usable() -> bool:
-    """True only when Ollama can actually serve a request.
-
-    Checking ollama_base_url alone is not enough: it defaults to the cloud
-    endpoint, so it is always truthy and these live tests ran (and 401'd) in CI
-    where no key is set. The cloud endpoint needs a key; a local daemon does not.
-    """
-    base_url = (settings.ollama_base_url or "").strip()
-    if not base_url:
-        return False
-    if settings.ollama_api_key:
-        return True
-    return base_url.startswith(_LOCAL_HOSTS)
-
-
 pytestmark = pytest.mark.skipif(
-    not _ollama_is_usable(),
-    reason=(
-        "Ollama has no usable credentials (cloud endpoint without OLLAMA_API_KEY); "
-        "e2e TTS tests need a real provider."
-    ),
+    not (settings.groq_api_key or settings.nvidia_api_key),
+    reason="No GROQ_API_KEY or NVIDIA_API_KEY; e2e TTS tests need a real provider.",
 )
 
 # Notes dense with the notation the user reported the TTS mangling: Big-O,
@@ -125,7 +106,7 @@ async def test_generate_module_content_tts_is_speakable():
         "Algorithm Complexity and Binary Search",
         "Big-O costs of search and dynamic arrays, plus the quadratic formula.",
         quiz_count=3,
-        provider="ollama",
+        provider="auto",
     )
     assert result["lesson"], "lesson came back empty"
     assert len(result["quiz"]) >= 1, "quiz came back empty"
@@ -148,7 +129,7 @@ async def test_regenerate_module_support_tts_is_speakable():
         lesson,
         "Complexity of Search",
         quiz_count=3,
-        provider="ollama",
+        provider="auto",
     )
     assert len(result["quiz"]) >= 1, "quiz came back empty"
     _assert_speakable(str(result["tts_script"]), "regenerate_module_support")

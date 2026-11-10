@@ -43,8 +43,8 @@ class FlashcardGenerateRequest(BaseModel):
                 "anthropic": "claude",
             }
             provider = provider_aliases.get(provider, provider)
-            if provider not in ("auto", "groq", "gemini", "claude", "ollama", "minimax"):
-                raise ValueError("provider must be auto, groq, google, anthropic, gemini, claude, ollama, or minimax")
+            if provider not in ("auto", "nvidia", "groq", "gemini", "claude", "minimax", "ollama"):
+                raise ValueError("provider must be auto, nvidia, groq, google, anthropic, gemini, claude, or minimax")
             self.provider = provider
         return self
 

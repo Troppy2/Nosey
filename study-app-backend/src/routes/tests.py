@@ -1142,12 +1142,12 @@ async def create_test(
         provider_aliases = {"google": "gemini", "anthropic": "claude"}
         if provider:
             provider = provider_aliases.get(provider, provider)
-            if provider not in ("auto", "groq", "gemini", "claude", "ollama", "minimax"):
+            if provider not in ("auto", "nvidia", "groq", "gemini", "claude", "minimax", "ollama"):
                 raise StudyAppException(
-                    "provider must be auto, groq, google, anthropic, gemini, claude, ollama, or minimax"
+                    "provider must be auto, nvidia, groq, google, anthropic, gemini, claude, or minimax"
                 )
         # Non-admin/non-beta users cannot pick a model: pin to the auto chain
-        # (Ollama-first, Claude last). Enforced here so it also covers the
+        # (NVIDIA-first, Claude last). Enforced here so it also covers the
         # detached generation task spawned below.
         provider = resolve_request_provider(user, provider)
         enable_fallback = str(form.get("enable_fallback", "true")).lower() not in ("false", "0", "no")
@@ -1452,9 +1452,9 @@ async def regenerate_test(
         if provider:
             provider = provider.strip().lower()
             provider = provider_aliases.get(provider, provider)
-            if provider not in ("auto", "groq", "gemini", "claude", "ollama", "minimax"):
+            if provider not in ("auto", "nvidia", "groq", "gemini", "claude", "minimax", "ollama"):
                 raise StudyAppException(
-                    "provider must be auto, groq, google, anthropic, gemini, claude, ollama, or minimax"
+                    "provider must be auto, nvidia, groq, google, anthropic, gemini, claude, or minimax"
                 )
         provider = resolve_request_provider(user, provider)
 

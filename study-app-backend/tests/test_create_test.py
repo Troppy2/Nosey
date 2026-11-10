@@ -328,7 +328,7 @@ class TestParsePracticeTestAccuracy:
         assert frq[0].expected_answer == "parse guess"
         assert frq[0].answer_inferred is True
 
-    async def test_a_hung_chunk_is_retried_off_ollama(self, monkeypatch):
+    async def test_a_hung_chunk_is_retried_off_nvidia(self, monkeypatch):
         import src.services.llm_service as llm_module
 
         monkeypatch.setattr(llm_module, "_PRACTICE_CHUNK_TIMEOUT_S", 0.05)
@@ -339,10 +339,10 @@ class TestParsePracticeTestAccuracy:
             return {}
 
         svc._complete_json = hang  # type: ignore[method-assign]
-        svc._complete_json_skip_ollama = AsyncMock(return_value={"mcq": [VALID_MCQ], "frq": []})  # type: ignore[method-assign]
+        svc._complete_json_skip_nvidia = AsyncMock(return_value={"mcq": [VALID_MCQ], "frq": []})  # type: ignore[method-assign]
         mcq, _ = await svc.parse_practice_test(SAMPLE_PRACTICE_TEST)
         assert len(mcq) == 1
-        svc._complete_json_skip_ollama.assert_awaited_once()
+        svc._complete_json_skip_nvidia.assert_awaited_once()
 
 
 class TestParallelPracticeTest:

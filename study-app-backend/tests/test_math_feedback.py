@@ -81,8 +81,8 @@ async def test_blank_answer_is_not_retried() -> None:
     svc._complete_json_for_provider.assert_awaited_once()
 
 
-async def test_shown_work_goes_to_the_strongest_provider_first_and_skips_ollama() -> None:
-    svc = _svc(["ollama", "groq", "minimax", "claude"], [_DEEP])
+async def test_shown_work_goes_to_the_strongest_provider_first_and_skips_nvidia() -> None:
+    svc = _svc(["nvidia", "groq", "minimax", "claude"], [_DEEP])
     work = OcrResult(transcript="$c = 6$", confidence=0.9, engine="claude")
     await svc.grade_math_answer("Find c.", "c = 3", "", work=work)
     assert svc._complete_json_for_provider.await_args.args[1] == "claude"

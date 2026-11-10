@@ -182,13 +182,6 @@ def usage_from_gemini(payload: Any) -> Optional[tuple[int, int]]:
     return int(meta.get("promptTokenCount") or 0), output_tokens
 
 
-def usage_from_ollama(payload: Any) -> Optional[tuple[int, int]]:
-    """Ollama /api/generate: prompt_eval_count (absent on prompt-cache hits) / eval_count."""
-    if not isinstance(payload, dict) or "eval_count" not in payload:
-        return None
-    return int(payload.get("prompt_eval_count") or 0), int(payload.get("eval_count") or 0)
-
-
 def estimate_tokens(text: str) -> int:
     """Rough fallback when a provider returned no usage (about 4 chars per token)."""
     return max(0, len(text or "") // 4)

@@ -23,7 +23,7 @@ export function PrivacyTermsModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <div className="privacy-modal-body">
-          <p className="muted small">Last updated: October 12, 2026</p>
+          <p className="muted small">Last updated: November 10, 2026</p>
 
           <p>
             Nosey is an open source study tool. This page explains what we collect, how your
@@ -98,7 +98,8 @@ export function PrivacyTermsModal({ onClose }: { onClose: () => void }) {
           <p><strong>Who receives it.</strong> We use these providers:</p>
           <ul>
             <li>
-              <strong>Ollama Cloud</strong> (Gemma). Tried first by default for most requests.
+              <strong>NVIDIA</strong> (Nemotron models, hosted on the NVIDIA API catalog). Tried
+              first by default for most requests.
             </li>
             <li>
               <strong>Groq</strong> (OpenAI's open-weight gpt-oss models, hosted by Groq).
@@ -118,7 +119,7 @@ export function PrivacyTermsModal({ onClose }: { onClose: () => void }) {
           </ul>
           <p>
             <strong>Routing and fallback.</strong> By default Nosey runs in "auto" mode and
-            tries providers in order of cost: Ollama Cloud, then Groq, then MiniMax through
+            tries providers in order of cost: NVIDIA, then Groq, then MiniMax through
             OpenRouter, and Anthropic last. If a provider fails, is rate limited, times out, or
             returns an unusable answer, the same content is re-sent to the next provider in the
             list. A single action can therefore send your content to more than one provider
@@ -132,7 +133,7 @@ export function PrivacyTermsModal({ onClose }: { onClose: () => void }) {
             terms, not ours. We do not have a zero-retention or no-training agreement in place
             with any of them. If any part of your notes, resume, or chat messages is
             confidential, do not put it into Nosey. Review each provider's policy directly:{" "}
-            <a href="https://ollama.com/privacy" target="_blank" rel="noopener noreferrer">Ollama</a>,{" "}
+            <a href="https://www.nvidia.com/en-us/about-nvidia/privacy-policy/" target="_blank" rel="noopener noreferrer">NVIDIA</a>,{" "}
             <a href="https://groq.com/privacy-policy/" target="_blank" rel="noopener noreferrer">Groq</a>,{" "}
             <a href="https://openrouter.ai/privacy" target="_blank" rel="noopener noreferrer">OpenRouter</a>,{" "}
             <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google</a>,{" "}
@@ -297,7 +298,7 @@ export function PrivacyTermsModal({ onClose }: { onClose: () => void }) {
           <hr className="policy-divider" />
 
           <h2 className="policy-section-title" id="terms">Terms of Service</h2>
-          <p className="muted small">Last updated: October 12, 2026</p>
+          <p className="muted small">Last updated: November 10, 2026</p>
 
           <h3>1. Agreement</h3>
           <p>

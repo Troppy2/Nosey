@@ -513,12 +513,12 @@ async def create_learning_track(
         if provider:
             provider = provider.strip().lower()
             provider = provider_aliases.get(provider, provider)
-            if provider not in ("auto", "groq", "gemini", "claude", "ollama", "minimax"):
+            if provider not in ("auto", "nvidia", "groq", "gemini", "claude", "minimax", "ollama"):
                 raise StudyAppException(
-                    "provider must be auto, groq, google, anthropic, gemini, claude, ollama, or minimax"
+                    "provider must be auto, nvidia, groq, google, anthropic, gemini, claude, or minimax"
                 )
         # Non-admin/non-beta users cannot pick a model: pin to the auto chain
-        # (Ollama-first, Claude last), enforced before the detached build task.
+        # (NVIDIA-first, Claude last), enforced before the detached build task.
         provider = resolve_request_provider(user, provider)
 
         track_format = (data.format or "article").strip().lower()

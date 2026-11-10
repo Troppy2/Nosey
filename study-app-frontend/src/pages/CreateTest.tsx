@@ -218,7 +218,7 @@ export default function CreateTest() {
       (generationProvider === "gemini" && !providerStatus.gemini) ||
       (generationProvider === "claude" && !providerStatus.claude) ||
       (generationProvider === "minimax" && !providerStatus.minimax) ||
-      (generationProvider === "ollama" && !providerStatus.ollama));
+      (generationProvider === "nvidia" && !providerStatus.nvidia));
   const effectiveProvider = providerUnavailable ? "auto" : generationProvider;
 
   // The practice test only counts in Advanced mode, where its control lives.
