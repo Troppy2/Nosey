@@ -10,8 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping health endpoint
+        # The backend is noesy.onrender.com (sic). nosey.onrender.com is an
+        # unrelated Express service that 404s on everything.
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://nosey.onrender.com/health)
+          STATUS=$(curl -s -m 90 -o /dev/null -w "%{http_code}" https://noesy.onrender.com/health)
           echo "Response status: $STATUS"
           if [ "$STATUS" != "200" ]; then
             echo "Warning: backend returned $STATUS"
