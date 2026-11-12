@@ -14,6 +14,33 @@ export function isVisualLang(lang: string): boolean {
   return VISUAL_LANGS.has(lang.toLowerCase());
 }
 
+// Smaller models (NVIDIA Nemotron, 2026-11-10) sometimes fence a valid spec as
+// ```json or leave the fence untagged, so the student saw raw JSON. A closed
+// json/untagged fence whose JSON has a spec's unmistakable shape is rendered
+// as that visual; anything else stays a code block. Mermaid is text, not JSON,
+// so it is never inferred.
+export function inferVisualLang(lang: string, src: string): string | null {
+  const tag = lang.toLowerCase();
+  if (tag !== "json" && tag !== "") return null;
+  const text = src.trim();
+  if (!text.startsWith("{")) return null;
+  let spec: unknown;
+  try {
+    spec = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!spec || typeof spec !== "object" || Array.isArray(spec)) return null;
+  const obj = spec as Record<string, unknown>;
+  if (Array.isArray(obj.elements) && Array.isArray(obj.boundingbox)) return "geometry";
+  if (!Array.isArray(obj.data) || obj.data.length === 0) return null;
+  const items = obj.data.filter((d): d is Record<string, unknown> => !!d && typeof d === "object");
+  if (items.length !== obj.data.length) return null;
+  if (items.every((d) => typeof d.type === "string" && CHART_TRACE_TYPES.has(d.type))) return "chart";
+  if ((obj.xAxis || obj.yAxis) && items.every((d) => "fn" in d || "points" in d)) return "graph";
+  return null;
+}
+
 function cssVar(name: string, fallback: string): string {
   if (typeof window === "undefined") return fallback;
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();

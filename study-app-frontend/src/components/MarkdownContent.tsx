@@ -4,7 +4,7 @@ import { CheckIcon, CopyIcon } from "../icons";
 import React, { useState } from "react";
 
 import { repairMathDelimiters } from "../lib/repairMathDelimiters";
-import { VisualBlock, VisualPending, isVisualLang } from "./visuals/VisualBlock";
+import { VisualBlock, VisualPending, inferVisualLang, isVisualLang } from "./visuals/VisualBlock";
 import { replaceTikz } from "../lib/tikz";
 
 // ── KaTeX ─────────────────────────────────────────────────────────────────────
@@ -499,6 +499,12 @@ export const MarkdownContent = React.memo(function MarkdownContent({
         nodes.push(closed
           ? <VisualBlock key={k++} lang={lang} src={src} />
           : <VisualPending key={k++} lang={lang} />);
+        continue;
+      }
+      // A spec fenced as ```json (or untagged) by a model that missed the tag.
+      const inferred = closed ? inferVisualLang(lang, src) : null;
+      if (inferred) {
+        nodes.push(<VisualBlock key={k++} lang={inferred} src={src} />);
         continue;
       }
       // LLM sometimes wraps math in a code fence instead of $$ delimiters
