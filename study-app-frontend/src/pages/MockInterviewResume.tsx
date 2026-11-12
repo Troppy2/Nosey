@@ -5,7 +5,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { screenResume, sendResumeGrillMessage } from "../lib/api";
 import type { InterviewChatMessage, MockInterviewSession, ResumeScreenResult } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
-import { loadMockProgress, saveMockProgress, type MockProgress, type MockCompany } from "../lib/mockInterview";
+import { answerTooLong, loadMockProgress, saveMockProgress, type MockProgress, type MockCompany } from "../lib/mockInterview";
 import { MockProgressGate } from "../components/MockProgressGate";
 import { VoiceRoom } from "../components/VoiceRoom";
 import { useInterviewerVoice } from "../lib/voice";
@@ -117,6 +117,11 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
   // One turn of the deep dive. `message` is null for the opening question.
   async function sendGrillTurn(message: string | null) {
     if (grillSending) return;
+    const tooLong = message ? answerTooLong(message) : null;
+    if (tooLong) {
+      setGrillError(tooLong);
+      return;
+    }
     setGrillError(null);
     setGrillSending(true);
     const history = message === null ? [] : grillMessages;

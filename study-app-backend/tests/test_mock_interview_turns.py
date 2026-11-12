@@ -536,3 +536,55 @@ async def test_problem_handoff_is_said_even_when_the_model_re_greets(harness) ->
     assert res["coding_problem"]["title"] == "Single Number"
     assert "problem is up on your screen" in res["reply"]
     assert res["covered_goals"] == ["background", "coding_problem"]
+
+
+# ── Long dictated answers (2026-11-11) ────────────────────────────────────────
+
+LONG_ANSWER = (
+    "Definitely I'll start by reading it so the problem say that we're given a map of n islands numbered "
+    "from 0 to n minus 1, some pairs connected by bridges. "
+) * 30  # ~3,900 chars, like the Graph Valid Tree walkthrough that hit the old 3,000 cap
+
+
+async def test_long_spoken_answer_is_accepted_in_every_round(harness) -> None:
+    assert len(LONG_ANSWER) > 3000
+    row = _row()
+    kojo = FakeKojo(
+        [
+            {"reply": "Okay, walk me through your approach.", "step_done": False},
+            {"reply": "Got it. Next question.", "answered": True},
+            {"reply": "Thanks. Next story.", "answered": True},
+        ]
+    )
+    with patch("src.routes.mock_interview._load_session", new=AsyncMock(return_value=row)), patch(
+        "src.services.llm_service.LLMService.call_kojo", new=kojo
+    ):
+        await _post("/mock-interview/113/stage2/message", _stage2_body(LONG_ANSWER, ["background", "coding_problem"], 0))
+        await _post(
+            "/mock-interview/113/resume/grill/message",
+            {"message": LONG_ANSWER, "history": [], "covered_goals": [], "followups_on_current": 0},
+        )
+        await _post(
+            "/mock-interview/113/stage3/message",
+            {"message": LONG_ANSWER, "history": [], "covered_goals": [], "followups_on_current": 0},
+        )
+    # The whole answer reached Kojo and the saved transcript.
+    assert all(LONG_ANSWER.strip() in p for p in kojo.prompts)
+    saved = json.loads(row.transcripts)
+    assert saved["stage3"][-2]["content"] == LONG_ANSWER
+
+
+async def test_prompt_history_is_clipped_to_the_recent_conversation(harness) -> None:
+    row = _row()
+    history = [{"role": "user" if i % 2 else "interviewer", "content": f"turn {i} " + "x" * 2000} for i in range(40)]
+    kojo = FakeKojo([{"reply": "Okay.", "answered": False}])
+    with patch("src.routes.mock_interview._load_session", new=AsyncMock(return_value=row)), patch(
+        "src.services.llm_service.LLMService.call_kojo", new=kojo
+    ):
+        await _post(
+            "/mock-interview/113/stage3/message",
+            {"message": "short", "history": history, "covered_goals": [], "followups_on_current": 0},
+        )
+    prompt = kojo.prompts[0]
+    assert "turn 39 " in prompt and "turn 0 " not in prompt
+    assert "(earlier conversation trimmed)" in prompt

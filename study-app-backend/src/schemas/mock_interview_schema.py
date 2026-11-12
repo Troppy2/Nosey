@@ -179,6 +179,11 @@ class Stage2SubmitResponse(BaseModel):
 
 # ── Conversational interview (Stage 2 + Stage 3) ──────────────────────────────
 
+# One spoken answer in a voice round. Dictated answers run long (a 3,500 character
+# answer is under 4 minutes of talking), so this only stops pasted walls of text.
+MAX_ANSWER_CHARS = 12000
+
+
 class InterviewChatMessage(BaseModel):
     role: str    # "user" | "interviewer"
     content: str
@@ -211,7 +216,7 @@ class Stage2ProblemRequest(BaseModel):
 
 
 class Stage2MessageRequest(BaseModel):
-    message: Optional[str] = Field(default=None, max_length=3000)
+    message: Optional[str] = Field(default=None, max_length=MAX_ANSWER_CHARS)
     history: list[InterviewChatMessage] = Field(default=[])
     provider: Optional[str] = Field(default=None)
     # Running set of interview goals already covered, echoed back by the client
@@ -242,7 +247,7 @@ class Stage2MessageResponse(BaseModel):
 # Resume deep dive (the grill that follows the ATS scan). Same contract as the
 # Stage 2/3 chats: the client carries the transcript and the covered goals.
 class ResumeGrillMessageRequest(BaseModel):
-    message: Optional[str] = Field(default=None, max_length=3000)
+    message: Optional[str] = Field(default=None, max_length=MAX_ANSWER_CHARS)
     history: list[InterviewChatMessage] = Field(default=[])
     provider: Optional[str] = Field(default=None)
     covered_goals: list[str] = Field(default_factory=list)
@@ -258,7 +263,7 @@ class ResumeGrillMessageResponse(BaseModel):
 
 
 class Stage3MessageRequest(BaseModel):
-    message: Optional[str] = Field(default=None, max_length=3000)
+    message: Optional[str] = Field(default=None, max_length=MAX_ANSWER_CHARS)
     history: list[InterviewChatMessage] = Field(default=[])
     provider: Optional[str] = Field(default=None)
     covered_goals: list[str] = Field(default_factory=list)

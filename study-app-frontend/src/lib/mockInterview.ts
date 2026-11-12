@@ -309,3 +309,22 @@ export function resumeRouteFor(progress: MockProgress): string {
   }
   return `/mock-interview/${sessionId}/summary`;
 }
+
+/** Longest single answer the interview rounds accept. Mirrors MAX_ANSWER_CHARS in the
+ *  backend's mock_interview_schema.py. */
+export const MAX_ANSWER_CHARS = 12000;
+
+/** Too long to send: the message to show instead, or null when it fits. */
+export function answerTooLong(text: string): string | null {
+  return text.length > MAX_ANSWER_CHARS
+    ? `That answer is ${text.length.toLocaleString()} characters; the limit is ${MAX_ANSWER_CHARS.toLocaleString()}. Shorten it and send again.`
+    : null;
+}
+
+// Older runs stored failed turns as a fake interviewer line. It is not something Kojo
+// said, so it never goes back to the model.
+const FAILED_TURN = "(Connection error. Please try again.)";
+
+export function sendableHistory(history: InterviewChatMessage[]): InterviewChatMessage[] {
+  return history.filter((m) => !(m.role === "interviewer" && m.content === FAILED_TURN));
+}

@@ -5,7 +5,14 @@ import { MockLoader } from "../components/MockLoader";
 import { sendStage3Message } from "../lib/api";
 import type { InterviewChatMessage, MockInterviewSession } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
-import { loadMockProgress, saveMockProgress, type MockProgress, type MockCompany } from "../lib/mockInterview";
+import {
+  answerTooLong,
+  loadMockProgress,
+  saveMockProgress,
+  sendableHistory,
+  type MockProgress,
+  type MockCompany,
+} from "../lib/mockInterview";
 import { MockProgressGate } from "../components/MockProgressGate";
 import { VoiceRoom } from "../components/VoiceRoom";
 import { VoiceStartCard } from "../components/VoiceStart";
@@ -43,6 +50,8 @@ function Stage3Runner({ stored }: { stored: MockProgress | null }) {
   // A fresh round waits on the start screen (voice pick + Start) before Kojo joins.
   const [started, setStarted] = useState(() => !initializing);
   const [sending, setSending] = useState(false);
+  // The last answer did not reach Kojo; it stays in the transcript with a Retry.
+  const [turnError, setTurnError] = useState<string | null>(null);
   const [initError, setInitError] = useState<string | null>(null);
   const [isDone, setIsDone] = useState(() => stored?.stage3?.isDone ?? false);
   const [coveredGoals, setCoveredGoals] = useState<string[]>(() => stored?.stage3?.coveredGoals ?? []);
@@ -91,30 +100,42 @@ function Stage3Runner({ stored }: { stored: MockProgress | null }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [numericSessionId, started]);
 
-  async function handleSend(text: string) {
+  async function handleSend(text: string, base: InterviewChatMessage[] = messages) {
     if (!text || sending || isDone) return;
+    const tooLong = answerTooLong(text);
+    if (tooLong) {
+      setTurnError(tooLong);
+      return;
+    }
     voice.stop();
+    setTurnError(null);
 
     const userMsg: InterviewChatMessage = { role: "user", content: text };
-    const nextHistory = [...messages, userMsg];
+    const nextHistory = [...base, userMsg];
     setMessages(nextHistory);
     setSending(true);
 
     try {
-      const res = await sendStage3Message(numericSessionId, text, messages, coveredGoals, followups);
+      const res = await sendStage3Message(numericSessionId, text, sendableHistory(base), coveredGoals, followups);
       setFollowups(res.is_followup ? followups + 1 : 0);
       setMessages([...nextHistory, { role: "interviewer", content: res.reply }]);
       void voice.speak(res.reply);
       if (res.covered_goals) setCoveredGoals(res.covered_goals);
       if (res.is_done) setIsDone(true);
-    } catch {
-      setMessages([
-        ...nextHistory,
-        { role: "interviewer", content: "(Connection error. Please try again.)" },
-      ]);
+    } catch (e: unknown) {
+      setTurnError(e instanceof Error ? e.message : "Kojo didn't get that. Try again.");
     } finally {
       setSending(false);
     }
+  }
+
+  function retryTurn() {
+    const last = messages[messages.length - 1];
+    if (last?.role !== "user") {
+      setTurnError(null);
+      return;
+    }
+    void handleSend(last.content, messages.slice(0, -1));
   }
 
   if (!started) {
@@ -170,6 +191,20 @@ function Stage3Runner({ stored }: { stored: MockProgress | null }) {
   }
 
   return (
+    <>
+    {turnError && (
+      <div className="voice-banner" role="alert">
+        <AlertIcon size={14} /> {turnError}
+        {messages[messages.length - 1]?.role === "user" && !turnError.startsWith("That answer is") && (
+          <button type="button" onClick={retryTurn} disabled={sending}>
+            Retry
+          </button>
+        )}
+        <button type="button" onClick={() => setTurnError(null)}>
+          Dismiss
+        </button>
+      </div>
+    )}
     <VoiceRoom
       title="Behavioral interview"
       subtitle={`${companyLabel}, ${MockLoopLabel(selectedStages, "stage3")}`}
@@ -197,6 +232,7 @@ function Stage3Runner({ stored }: { stored: MockProgress | null }) {
         </button>
       }
     />
+    </>
   );
 }
 

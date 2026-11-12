@@ -42,6 +42,7 @@ from src.schemas.mock_interview_schema import (
     Stage3MessageResponse,
 )
 from src.schemas.mock_interview_schema import (
+    MAX_ANSWER_CHARS,
     SpeakRequest,
     Stage1HiddenTestsRequest,
     Stage1HiddenTestsResponse,
@@ -581,6 +582,13 @@ async def screen_resume(
 
 
 TRANSCRIPT_MAX_LINES = 300
+# The conversation sent to the model each turn. Long dictated answers add up fast;
+# the most recent exchanges are what the next reply depends on.
+_HISTORY_PROMPT_CHARS = 24000
+
+
+def _clip_history(text: str) -> str:
+    return text if len(text) <= _HISTORY_PROMPT_CHARS else "(earlier conversation trimmed)\n..." + text[-_HISTORY_PROMPT_CHARS:]
 
 
 def _record_transcript(
@@ -595,7 +603,7 @@ def _record_transcript(
         data = {}
     if not isinstance(data, dict):
         data = {}
-    lines = [{"role": m.role, "content": m.content[:4000]} for m in history]
+    lines = [{"role": m.role, "content": m.content[:MAX_ANSWER_CHARS]} for m in history]
     if message:
         lines.append({"role": "user", "content": message})
     if reply:
@@ -668,10 +676,10 @@ async def resume_grill_message(
 
     turn_count = sum(1 for m in body.history if m.role == "user")
 
-    history_text = "\n".join(
+    history_text = _clip_history("\n".join(
         f"{'You (Interviewer)' if m.role == 'interviewer' else candidate}: {m.content}"
         for m in body.history
-    )
+    ))
 
     # The server owns progress (GH #221): the model only says whether the latest
     # message answered the question it was asked last turn.
@@ -1187,7 +1195,7 @@ _STAGE2_VERDICTS = ("strong", "pass", "borderline", "needs_work")
 
 def _transcript_text(history: list[InterviewChatMessage], candidate: str, limit: int = 14000) -> str:
     lines = [
-        f"{'Kojo' if m.role == 'interviewer' else candidate}: {m.content.strip()[:1500]}"
+        f"{'Kojo' if m.role == 'interviewer' else candidate}: {m.content.strip()[:6000]}"
         for m in history
     ]
     text = "\n".join(lines)
@@ -1347,9 +1355,9 @@ async def stage2_message(
     level_cfg = _level_config(row)
 
     turn_count = sum(1 for m in body.history if m.role == "user")
-    history_text = "\n".join(
+    history_text = _clip_history("\n".join(
         f"{'You (Kojo)' if m.role == 'interviewer' else candidate}: {m.content}" for m in body.history
-    )
+    ))
 
     covered = normalize_covered(body.covered_goals, _STAGE2_GOALS)
     presented = "coding_problem" in covered
@@ -1594,10 +1602,10 @@ async def stage3_message(
 
     turn_count = sum(1 for m in body.history if m.role == "user")
 
-    history_text = "\n".join(
+    history_text = _clip_history("\n".join(
         f"{'You (Interviewer)' if m.role == 'interviewer' else candidate}: {m.content}"
         for m in body.history
-    )
+    ))
 
     # Five behavioral questions, one per goal. The client echoes the goals covered so
     # far; the server owns progress (GH #221) and the model only judges the answer.

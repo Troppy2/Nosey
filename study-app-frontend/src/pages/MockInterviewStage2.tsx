@@ -6,7 +6,14 @@ import { MockLoader } from "../components/MockLoader";
 import { fetchStage2Problem, sendStage2Message, submitStage2 } from "../lib/api";
 import type { CodingProblemInfo, InterviewChatMessage, MockInterviewSession, Stage2TurnEvent } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
-import { loadMockProgress, saveMockProgress, type MockProgress, type MockCompany } from "../lib/mockInterview";
+import {
+  answerTooLong,
+  loadMockProgress,
+  saveMockProgress,
+  sendableHistory,
+  type MockProgress,
+  type MockCompany,
+} from "../lib/mockInterview";
 import { MockProgressGate } from "../components/MockProgressGate";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { runPythonLeetCode, type RunnerResult } from "../lib/pyodideRunner";
@@ -66,6 +73,8 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
   // A fresh round waits on the start screen (voice pick + Start) before Kojo joins.
   const [started, setStarted] = useState(() => !initializing);
   const [sending, setSending] = useState(false);
+  // The last answer did not reach Kojo; it stays in the transcript with a Retry.
+  const [turnError, setTurnError] = useState<string | null>(null);
   const [initError, setInitError] = useState<string | null>(null);
   const [coveredGoals, setCoveredGoals] = useState<string[]>(() => saved?.coveredGoals ?? []);
   const [followups, setFollowups] = useState(() => saved?.followups ?? 0);
@@ -228,13 +237,23 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
     }
   }
 
-  async function sendTurn(message: string | null, event: Stage2TurnEvent | null = null) {
+  async function sendTurn(
+    message: string | null,
+    event: Stage2TurnEvent | null = null,
+    base: InterviewChatMessage[] = messages,
+  ) {
     if (sending || submitted || grading || pausedAt !== null) return;
+    const tooLong = message ? answerTooLong(message) : null;
+    if (tooLong) {
+      setTurnError(tooLong);
+      return;
+    }
     voice.stop();
     lastActivity.current = Date.now();
+    setTurnError(null);
 
     const userMsg: InterviewChatMessage | null = message ? { role: "user", content: message } : null;
-    const nextHistory = userMsg ? [...messages, userMsg] : messages;
+    const nextHistory = userMsg ? [...base, userMsg] : base;
     setMessages(nextHistory);
     setSending(true);
 
@@ -243,7 +262,7 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
     const ranOut = timeUp || event === "time_up";
 
     try {
-      const res = await sendStage2Message(numericSessionId, message, messages, coveredGoals, {
+      const res = await sendStage2Message(numericSessionId, message, sendableHistory(base), coveredGoals, {
         problem,
         code: codingProblem ? code : "",
         hintsUsed,
@@ -266,11 +285,21 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
       } else {
         void voice.speak(res.reply);
       }
-    } catch {
-      setMessages([...nextHistory, { role: "interviewer", content: "(Connection error. Please try again.)" }]);
+    } catch (e: unknown) {
+      // Only a typed or spoken answer is worth retrying; a lost nudge or hint is not.
+      if (message) setTurnError(e instanceof Error ? e.message : "Kojo didn't get that. Try again.");
     } finally {
       setSending(false);
     }
+  }
+
+  function retryTurn() {
+    const last = messages[messages.length - 1];
+    if (last?.role !== "user") {
+      setTurnError(null);
+      return;
+    }
+    void sendTurn(last.content, null, messages.slice(0, -1));
   }
 
   // Interval callbacks read the latest render through this ref.
@@ -509,6 +538,19 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
 
   return (
     <>
+      {turnError && !problemError && !gradeError && (
+        <div className="voice-banner" role="alert">
+          <AlertIcon size={14} /> {turnError}
+          {messages[messages.length - 1]?.role === "user" && !turnError.startsWith("That answer is") && (
+            <button type="button" onClick={retryTurn} disabled={sending}>
+              Retry
+            </button>
+          )}
+          <button type="button" onClick={() => setTurnError(null)}>
+            Dismiss
+          </button>
+        </div>
+      )}
       {(problemError || gradeError) && (
         <div className="voice-banner" role="alert">
           <AlertIcon size={14} /> {gradeError ?? problemError}
