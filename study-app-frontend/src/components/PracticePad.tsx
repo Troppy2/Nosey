@@ -121,14 +121,27 @@ export function PracticePad({
     if (resolved) setWalkOpen(true);
   }, [resolved]);
 
-  const data = useMemo(() => parseScratchPadJson(state.strokes), [state.strokes]);
+  // The pad's drawing, held as the SAME object the canvas emitted. The canvas
+  // recognises the echo of its own edit by array identity; handing it a
+  // re-parsed copy instead made it adopt that copy as an outside reset and
+  // drop any stroke drawn since (the "lines disappear" bug). Saved ink from
+  // the server is only parsed in when it differs from what this pad produced.
+  const [data, setData] = useState<ScratchPadData>(() => parseScratchPadJson(state.strokes));
+  const producedJsonRef = useRef<string | null>(state.strokes);
+  useEffect(() => {
+    if (state.strokes === producedJsonRef.current) return;
+    producedJsonRef.current = state.strokes;
+    setData(parseScratchPadJson(state.strokes));
+  }, [state.strokes]);
+
   const hasWork = !isScratchPadEmpty(data);
   // A cropped picture of the work under the card, so solved pads show it.
-  // The export returns bare base64 (it feeds OCR), so add the data URL prefix.
+  // Built only while the pad is closed: no offscreen render per stroke. The
+  // export returns bare base64 (it feeds OCR), so add the data URL prefix.
   const preview = useMemo(() => {
-    const png = hasWork ? exportScratchPadPng(data, { faithful: true }) : null;
+    const png = !open && hasWork ? exportScratchPadPng(data, { faithful: true }) : null;
     return png ? `data:image/png;base64,${png}` : null;
-  }, [data, hasWork]);
+  }, [data, hasWork, open]);
 
   // Unsaved ink, flushed by the debounce, on close, on resolve and on unmount.
   const pendingRef = useRef<string | null>(null);
@@ -162,9 +175,13 @@ export function PracticePad({
     [moduleId, index],
   );
 
+  // Ink stays in this component (and the autosave). The lesson page is not
+  // told per stroke: that re-rendered every KaTeX block on the page while the
+  // student was still drawing. It only hears about done / gave up.
   function handleInk(next: ScratchPadData) {
+    setData(next);
     const strokes = JSON.stringify(next);
-    onState({ ...state, strokes });
+    producedJsonRef.current = strokes;
     pendingRef.current = strokes;
     if (timerRef.current != null) window.clearTimeout(timerRef.current);
     timerRef.current = window.setTimeout(() => void flush(), SAVE_DEBOUNCE_MS);
@@ -179,6 +196,8 @@ export function PracticePad({
       timerRef.current = null;
       pendingRef.current = null;
       const saved = await saveModulePractice(moduleId, index, { strokes, status });
+      // The saved ink is what this pad already shows; keep the live object.
+      producedJsonRef.current = saved.strokes;
       onState(saved);
       setOpen(false);
       setWalkOpen(true);
