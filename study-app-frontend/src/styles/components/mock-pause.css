@@ -1,0 +1,86 @@
+/* Pause cover for the timed mock interview rounds (technical round, online assessment). */
+.mock-pause {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(38, 48, 31, 0.72);
+}
+.mock-pause-card {
+  width: min(420px, 100%);
+  padding: 28px 24px;
+  border-radius: 12px;
+  background: var(--white);
+  color: var(--ink);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: center;
+  align-items: center;
+}
+.mock-pause-eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--green-dark);
+}
+.mock-pause-card h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 600;
+}
+.mock-pause-card p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--green-dark);
+}
+.mock-pause-resume {
+  margin-top: 8px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+/* Pause button in the round headers. */
+.mock-pause-btn {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid #9db783;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 160ms cubic-bezier(0.3, 0, 0, 1), border-color 160ms cubic-bezier(0.3, 0, 0, 1);
+}
+.mock-pause-btn:hover:not(:disabled) {
+  background: #fff;
+  border-color: var(--ink);
+}
+.mock-pause-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.mock-pause-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.mock-pause-btn:focus-visible {
+  outline: 2px solid #b5e48c;
+  outline-offset: 2px;
+}
+@media (max-width: 760px) {
+  .mock-pause-btn {
+    min-height: 36px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+}

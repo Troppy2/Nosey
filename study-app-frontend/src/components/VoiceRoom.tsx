@@ -15,6 +15,8 @@ type Props = {
   waiting: boolean;
   done: boolean;
   onSend: (text: string) => void;
+  /** Fires when the candidate's mic starts or stops recording. */
+  onListeningChange?: (listening: boolean) => void;
   onLeave: () => void;
   doneAction?: ReactNode;
   /** Where the loop goes next. Called on its own once the interviewer has wrapped up. */
@@ -32,7 +34,7 @@ type Props = {
 
 /** Full-screen voice round: the interviewer's latest line, the controls and a running transcript. */
 export function VoiceRoom({
-  title, subtitle, interviewerName, messages, covered, total, waiting, done, onSend, onLeave, doneAction, onAdvance, nextLabel = "the next round", workspace, headerExtra, stepNames, voice,
+  title, subtitle, interviewerName, messages, covered, total, waiting, done, onSend, onListeningChange, onLeave, doneAction, onAdvance, nextLabel = "the next round", workspace, headerExtra, stepNames, voice,
 }: Props) {
   const threadRef = useRef<HTMLDivElement>(null);
   const lastInterviewer = [...messages].reverse().find((m) => m.role === "interviewer");
@@ -90,6 +92,7 @@ export function VoiceRoom({
   ) : (
     <VoiceAnswerBar
       onSend={onSend}
+      onListeningChange={onListeningChange}
       disabled={waiting}
       muted={voice.muted}
       onToggleMute={() => voice.setMuted(!voice.muted)}

@@ -37,17 +37,62 @@ export const VOICE_OPTIONS = [
   { value: "bf_emma", label: "Emma (UK)" },
   { value: "bm_george", label: "George (UK)" },
 ] as const;
-export type InterviewerVoiceId = (typeof VOICE_OPTIONS)[number]["value"];
+export type AiVoiceId = (typeof VOICE_OPTIONS)[number]["value"];
+/** An AI voice, the browser's default voice ("browser"), or one browser voice ("browser:<voiceURI>"). */
+export type InterviewerVoiceId = AiVoiceId | "browser" | `browser:${string}`;
 const VOICE_KEY = "nosey_mock_voice";
+
+export const isBrowserVoice = (voice: string): voice is "browser" | `browser:${string}` =>
+  voice === "browser" || voice.startsWith("browser:");
 
 export function loadInterviewerVoice(): InterviewerVoiceId {
   try {
     const v = localStorage.getItem(VOICE_KEY);
-    if (VOICE_OPTIONS.some((o) => o.value === v)) return v as InterviewerVoiceId;
+    if (v && (VOICE_OPTIONS.some((o) => o.value === v) || isBrowserVoice(v))) return v as InterviewerVoiceId;
   } catch {
     /* storage blocked */
   }
   return "af_heart";
+}
+
+/** English voices the browser can speak with, kept fresh as the list loads (Chrome fills it late). */
+export function useBrowserVoices(): SpeechSynthesisVoice[] {
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>(() => readBrowserVoices());
+  useEffect(() => {
+    const synth = typeof window !== "undefined" ? window.speechSynthesis : undefined;
+    if (!synth) return;
+    const update = () => setVoices(readBrowserVoices());
+    synth.addEventListener("voiceschanged", update);
+    return () => synth.removeEventListener("voiceschanged", update);
+  }, []);
+  return voices;
+}
+
+function readBrowserVoices(): SpeechSynthesisVoice[] {
+  if (typeof window === "undefined" || !window.speechSynthesis) return [];
+  return window.speechSynthesis.getVoices().filter((v) => v.lang.toLowerCase().startsWith("en"));
+}
+
+/** Speak with the browser's own voice. Returns false when the browser has none. */
+export function speakWithBrowser(
+  text: string,
+  voice: InterviewerVoiceId | null,
+  handlers: { onStart?: () => void; onEnd?: () => void } = {},
+): boolean {
+  if (typeof window === "undefined" || !window.speechSynthesis) return false;
+  const utt = new SpeechSynthesisUtterance(text);
+  const uri = voice && voice.startsWith("browser:") ? voice.slice("browser:".length) : null;
+  const match = uri ? window.speechSynthesis.getVoices().find((v) => v.voiceURI === uri) : undefined;
+  if (match) {
+    utt.voice = match;
+    utt.lang = match.lang;
+  }
+  utt.onstart = () => handlers.onStart?.();
+  utt.onend = () => handlers.onEnd?.();
+  utt.onerror = () => handlers.onEnd?.();
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utt);
+  return true;
 }
 
 export function saveInterviewerVoice(voice: InterviewerVoiceId) {
@@ -60,7 +105,8 @@ export function saveInterviewerVoice(voice: InterviewerVoiceId) {
 
 export const dictationSupported = () => recognitionCtor() !== null || canRecordFallback;
 
-/** Plays interviewer lines through the backend voice. Falls back to the browser voice if that fails. */
+/** Plays interviewer lines through the chosen voice: an AI voice from the backend (falling
+ *  back to the browser voice if that fails) or the browser's own voice. */
 export function useInterviewerVoice() {
   const [speaking, setSpeaking] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -98,25 +144,28 @@ export function useInterviewerVoice() {
       const spoken = text.replace(/[*_#`>~]+/g, "").replace(/\s+/g, " ").trim();
       if (muted || !spoken) return;
       const run = runRef.current;
+      const chosen = loadInterviewerVoice();
+      const browserHandlers = {
+        onStart: () => run === runRef.current && setSpeaking(true),
+        onEnd: () => run === runRef.current && setSpeaking(false),
+      };
+
+      if (isBrowserVoice(chosen)) {
+        speakWithBrowser(spoken, chosen, browserHandlers);
+        return;
+      }
 
       let blob: Blob | null = null;
-      for (let attempt = 0; attempt < 1 && !blob; attempt++) {
-        try {
-          blob = await speakInterviewer(spoken, loadInterviewerVoice());
-        } catch {
-          if (run !== runRef.current) return;
-        }
+      try {
+        blob = await speakInterviewer(spoken, chosen);
+      } catch {
+        if (run !== runRef.current) return;
       }
       if (run !== runRef.current) return;
 
       if (!blob) {
-        // Both server attempts failed: the browser voice is better than silence.
-        if (window.speechSynthesis) {
-          const utt = new SpeechSynthesisUtterance(spoken);
-          utt.onstart = () => run === runRef.current && setSpeaking(true);
-          utt.onend = () => run === runRef.current && setSpeaking(false);
-          window.speechSynthesis.speak(utt);
-        }
+        // The server voice failed: the browser voice is better than silence.
+        speakWithBrowser(spoken, null, browserHandlers);
         return;
       }
 
@@ -159,7 +208,15 @@ export function useInterviewerVoice() {
 /** Live dictation. Browser speech recognition when present, otherwise record and transcribe on stop. */
 export function useDictation(onText: (text: string) => void) {
   const [listening, setListening] = useState(false);
+  // Record-then-transcribe fallback: the audio is uploaded and not back yet.
+  const [transcribing, setTranscribing] = useState(false);
   const [interim, setInterim] = useState("");
+  // Words heard but not finalized yet. Flushed as text when recognition ends, so
+  // stopping the mic never drops the end of a sentence.
+  const interimRef = useRef("");
+  const transcribingRef = useRef(false);
+  // Callers of finish() waiting for the last words to land.
+  const waitersRef = useRef<(() => void)[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [level, setLevel] = useState(0);
   // One AudioContext for the life of the bar. Making a new one per tap leaks them,
@@ -224,12 +281,33 @@ export function useDictation(onText: (text: string) => void) {
     [],
   );
 
+  const settle = useCallback(() => {
+    const waiters = waitersRef.current;
+    waitersRef.current = [];
+    waiters.forEach((resolve) => resolve());
+  }, []);
+
   const stop = useCallback(() => {
     sessionRef.current += 1;
     stopMeter();
     recRef.current?.stop();
     if (recorderRef.current?.state === "recording") recorderRef.current.stop();
   }, [stopMeter]);
+
+  /** Stop listening and resolve once every word said so far has landed in onText
+   * (final recognition results, or the fallback's transcription). */
+  const finish = useCallback((): Promise<void> => {
+    const recording = recRef.current !== null || recorderRef.current?.state === "recording";
+    if (!recording && !transcribingRef.current) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      const timer = window.setTimeout(resolve, transcribingRef.current || !recRef.current ? 30000 : 4000);
+      waitersRef.current.push(() => {
+        window.clearTimeout(timer);
+        resolve();
+      });
+      if (recording) stop();
+    });
+  }, [stop]);
 
   const start = useCallback(async () => {
     // Created or resumed inside the click, before any await, so it is allowed to run.
@@ -243,6 +321,7 @@ export function useDictation(onText: (text: string) => void) {
     stopMeter();
     const session = ++sessionRef.current;
     setError(null);
+    interimRef.current = "";
     setInterim("");
 
     const Ctor = recognitionCtor();
@@ -260,6 +339,7 @@ export function useDictation(onText: (text: string) => void) {
           else live += r[0].transcript;
         }
         if (finalText) onTextRef.current(finalText.trim());
+        interimRef.current = live;
         setInterim(live);
       };
       rec.onerror = (e) => {
@@ -274,9 +354,14 @@ export function useDictation(onText: (text: string) => void) {
       rec.onend = () => {
         if (recRef.current !== rec) return;
         recRef.current = null;
+        // Some engines end without finalizing the last phrase: keep it anyway.
+        const pending = interimRef.current.trim();
+        interimRef.current = "";
+        if (pending) onTextRef.current(pending);
         stopMeter();
         setListening(false);
         setInterim("");
+        settle();
       };
       recRef.current = rec;
       try {
@@ -302,6 +387,8 @@ export function useDictation(onText: (text: string) => void) {
       recorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
         setListening(false);
+        transcribingRef.current = true;
+        setTranscribing(true);
         setInterim("Transcribing...");
         try {
           const text = await transcribeAnswer(new Blob(chunks, { type: "audio/webm" }));
@@ -309,7 +396,10 @@ export function useDictation(onText: (text: string) => void) {
         } catch {
           setError("Could not transcribe that. Try again or type instead.");
         } finally {
+          transcribingRef.current = false;
+          setTranscribing(false);
           setInterim("");
+          settle();
         }
       };
       recorderRef.current = recorder;
@@ -319,7 +409,7 @@ export function useDictation(onText: (text: string) => void) {
     } catch {
       setError("Microphone access is blocked. Allow it in the address bar, or type instead.");
     }
-  }, [startMeter, stopMeter]);
+  }, [startMeter, stopMeter, settle]);
 
   useEffect(
     () => () => {
@@ -329,9 +419,10 @@ export function useDictation(onText: (text: string) => void) {
       if (recorderRef.current?.state === "recording") recorderRef.current.stop();
       void ctxRef.current?.close();
       ctxRef.current = null;
+      settle();
     },
-    [stopMeter],
+    [stopMeter, settle],
   );
 
-  return { listening, interim, error, level, start, stop, supported: dictationSupported() };
+  return { listening, transcribing, interim, error, level, start, stop, finish, supported: dictationSupported() };
 }

@@ -316,7 +316,10 @@ async def test_resume_question_pool_picks_five_and_reports_them(client, call, db
     picked = [p["question"] for p in info["picked"]]
     assert len(picked) == 5 and len(set(picked)) == 5 and len(info["unused"]) == 3
     prompts = [c.args[0] for c in reply.await_args_list]
-    assert all(q in prompts[0] for q in picked) and prompts[0] == prompts[1]  # same picks on a resume
+    # The opener asks the first pick, and only it (GH #221: the server hands the model
+    # one question per turn). A resumed run asks the same pick.
+    assert picked[0] in prompts[0] and not any(q in prompts[0] for q in picked[1:])
+    assert prompts[0] == prompts[1]
 
     await call("set_resume_questions", {"session_id": sid, "questions": pool[3:]})
     assert (await call("get_mock_interview", {"session_id": sid}))["resume_questions"]["picked"] == []

@@ -13,6 +13,7 @@ import { runPythonLeetCode, type RunnerResult } from "../lib/pyodideRunner";
 import { sanitizeLeetCodeHtml } from "../lib/leetcodeHtml";
 import "../styles/components/mock-debrief.css";
 import { VoiceRoom } from "../components/VoiceRoom";
+import { MockPauseOverlay } from "../components/MockPauseOverlay";
 import { VoiceStartCard } from "../components/VoiceStart";
 import { useInterviewerVoice } from "../lib/voice";
 
@@ -67,6 +68,7 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
   const [sending, setSending] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [coveredGoals, setCoveredGoals] = useState<string[]>(() => saved?.coveredGoals ?? []);
+  const [followups, setFollowups] = useState(() => saved?.followups ?? 0);
 
   const [preparedProblem, setPreparedProblem] = useState<CodingProblemInfo | null>(() => saved?.preparedProblem ?? null);
   const [problemError, setProblemError] = useState<string | null>(null);
@@ -74,6 +76,8 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
   const [code, setCode] = useState(() => saved?.code ?? DEFAULT_CODE);
   const [hintsUsed, setHintsUsed] = useState(() => saved?.hintsUsed ?? 0);
   const [startedAt, setStartedAt] = useState(() => saved?.startedAt ?? Date.now());
+  // Paused rounds stop the clock; resuming shifts startedAt forward by the pause.
+  const [pausedAt, setPausedAt] = useState<number | null>(() => saved?.pausedAt ?? null);
   const [timeUp, setTimeUp] = useState(() => saved?.timeUp ?? false);
   const [samplesPassed, setSamplesPassed] = useState(() => saved?.samplesPassed ?? 0);
   const [samplesTotal, setSamplesTotal] = useState(() => saved?.samplesTotal ?? 0);
@@ -91,6 +95,8 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
 
   const problemRequest = useRef<Promise<CodingProblemInfo | null> | null>(null);
   const lastActivity = useRef(Date.now());
+  // True while the candidate's mic is recording: talking is activity, never a stall.
+  const userTalking = useRef(false);
   const timeUpSent = useRef(saved?.timeUp ?? false);
 
   // Persist Stage 2 progress on every meaningful change.
@@ -104,13 +110,13 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
       selectedStages,
       updatedAt: Date.now(),
       stage2: {
-        messages, codingProblem, code, codeFeedback, submitted, coveredGoals, preparedProblem,
-        hintsUsed, startedAt, timeUp, samplesPassed, samplesTotal, verdict,
+        messages, codingProblem, code, codeFeedback, submitted, coveredGoals, followups, preparedProblem,
+        hintsUsed, startedAt, pausedAt, timeUp, samplesPassed, samplesTotal, verdict,
       },
     };
     saveMockProgress(progress);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages, codingProblem, code, codeFeedback, submitted, coveredGoals, preparedProblem, hintsUsed, startedAt, timeUp, samplesPassed, samplesTotal, verdict]);
+  }, [messages, codingProblem, code, codeFeedback, submitted, coveredGoals, followups, preparedProblem, hintsUsed, startedAt, pausedAt, timeUp, samplesPassed, samplesTotal, verdict]);
 
   // The problem is picked while the candidate answers the background question, so
   // Kojo can put it on screen the moment they finish.
@@ -149,6 +155,7 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
         setMessages([{ role: "interviewer", content: res.reply }]);
         setStartedAt(Date.now());
         if (res.covered_goals) setCoveredGoals(res.covered_goals);
+        setFollowups(res.followups_on_current ?? 0);
       } catch (e: unknown) {
         if (!cancelled) setInitError(e instanceof Error ? e.message : "Failed to start interview.");
       } finally {
@@ -161,7 +168,32 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [numericSessionId, initializing, started]);
 
-  const remainingMs = Math.max(0, startedAt + ROUND_MS - now);
+  const remainingMs = Math.max(0, startedAt + ROUND_MS - (pausedAt ?? now));
+  const paused = pausedAt !== null && !submitted;
+
+  function pause() {
+    if (pausedAt !== null || submitted || grading) return;
+    voice.stop();
+    setPausedAt(Date.now());
+  }
+
+  function resume() {
+    if (pausedAt === null) return;
+    const pausedFor = Date.now() - pausedAt;
+    setStartedAt((s) => s + pausedFor);
+    setPausedAt(null);
+    lastActivity.current = Date.now();
+  }
+
+  // Leaving mid-round pauses it, so the clock never runs while you are away.
+  function leave() {
+    if (!submitted && pausedAt === null && messages.length > 0) {
+      const prev = loadMockProgress(numericSessionId);
+      if (prev?.stage2) saveMockProgress({ ...prev, updatedAt: Date.now(), stage2: { ...prev.stage2, pausedAt: Date.now() } });
+    }
+    voice.stop();
+    navigate("/mock-interview");
+  }
   const minutesLeft = Math.ceil(remainingMs / 60000);
 
   useEffect(() => {
@@ -197,7 +229,7 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
   }
 
   async function sendTurn(message: string | null, event: Stage2TurnEvent | null = null) {
-    if (sending || submitted || grading) return;
+    if (sending || submitted || grading || pausedAt !== null) return;
     voice.stop();
     lastActivity.current = Date.now();
 
@@ -217,10 +249,12 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
         hintsUsed,
         minutesLeft: ranOut ? 0 : minutesLeft,
         event,
+        followupsOnCurrent: followups,
       });
       const finalHistory = [...nextHistory, { role: "interviewer" as const, content: res.reply }];
       setMessages(finalHistory);
       if (res.covered_goals) setCoveredGoals(res.covered_goals);
+      setFollowups(res.followups_on_current ?? followups);
       if (res.hint_given) setHintsUsed((n) => n + 1);
       if (res.coding_problem && !codingProblem) {
         setCodingProblem(res.coding_problem);
@@ -245,22 +279,24 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
 
   // At zero Kojo wraps up and asks for questions; the next answer ends the round.
   useEffect(() => {
-    if (remainingMs > 0 || timeUpSent.current || submitted || initializing || sending || messages.length === 0) return;
+    if (remainingMs > 0 || timeUpSent.current || submitted || initializing || sending || paused || messages.length === 0) return;
     timeUpSent.current = true;
     setTimeUp(true);
     void sendTurnRef.current(null, "time_up");
-  }, [remainingMs, submitted, initializing, sending, messages.length]);
+  }, [remainingMs, submitted, initializing, sending, paused, messages.length]);
 
-  // A long silence on the problem gets a nudge, which counts as a hint.
+  // A long silence on the problem gets a check-in. It is not a hint (the server never
+  // counts a nudge as one), and it never fires while the candidate is talking.
   useEffect(() => {
-    if (!codingProblem || submitted || timeUp) return;
+    if (!codingProblem || submitted || timeUp || paused) return;
     const t = window.setInterval(() => {
-      if (sending || voice.speaking || Date.now() - lastActivity.current < STALL_MS) return;
+      if (userTalking.current) lastActivity.current = Date.now();
+      if (sending || voice.speaking || userTalking.current || Date.now() - lastActivity.current < STALL_MS) return;
       lastActivity.current = Date.now();
       void sendTurnRef.current(null, "nudge");
     }, 10000);
     return () => window.clearInterval(t);
-  }, [codingProblem, submitted, timeUp, sending, voice.speaking]);
+  }, [codingProblem, submitted, timeUp, paused, sending, voice.speaking]);
 
   useEffect(() => {
     if (!confirmEnd) return;
@@ -453,6 +489,11 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
       <span className={`voice-clock${remainingMs < 5 * 60000 ? " is-low" : ""}`} aria-label={`${formatClock(remainingMs)} left`}>
         {formatClock(remainingMs)} left
       </span>
+      {messages.length > 0 && (
+        <button type="button" className="mock-pause-btn" onClick={pause} disabled={grading || timeUp}>
+          Pause
+        </button>
+      )}
       {(codingProblem || preparedProblem) && (
         <button
           type="button"
@@ -479,6 +520,7 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
           </button>
         </div>
       )}
+      {paused && <MockPauseOverlay onResume={resume} />}
       <VoiceRoom
         title="Technical interview"
         subtitle={`${companyLabel}, ${roundLabel(selectedStages, "stage2")}`}
@@ -490,7 +532,11 @@ function Stage2Runner({ stored }: { stored: MockProgress | null }) {
         waiting={sending || grading}
         done={submitted}
         onSend={(text) => void sendTurn(text)}
-        onLeave={() => navigate("/mock-interview")}
+        onListeningChange={(listening) => {
+          userTalking.current = listening;
+          lastActivity.current = Date.now();
+        }}
+        onLeave={leave}
         voice={voice}
         workspace={workspace}
         headerExtra={headerExtra}

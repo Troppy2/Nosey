@@ -38,6 +38,7 @@ export type ResumeProgress = {
   // before this round existed, and runs that skipped it, have none.
   grillMessages?: InterviewChatMessage[];
   grillCoveredGoals?: string[];
+  grillFollowups?: number;
   grillDone?: boolean;
 };
 
@@ -77,6 +78,8 @@ export type Stage1Progress = {
   currentIdx: number;
   submitted: boolean;
   results?: Stage1QuestionResult[];
+  /** The assessment is paused: no question's clock is running. */
+  paused?: boolean;
 };
 
 export type Stage2Progress = {
@@ -87,11 +90,15 @@ export type Stage2Progress = {
   codeFeedback: string | null;
   submitted: boolean;
   coveredGoals?: string[];
+  /** Answers on the current step that did not finish it (server-owned, echoed back). */
+  followups?: number;
   /** Picked by /stage2/problem at the start, held until Kojo presents it. */
   preparedProblem?: CodingProblemInfo | null;
   hintsUsed?: number;
-  /** Epoch ms when the 45 minute clock started. */
+  /** Epoch ms when the 45 minute clock started (moved forward by every pause). */
   startedAt?: number;
+  /** Epoch ms the round was paused at; null or missing while the clock runs. */
+  pausedAt?: number | null;
   timeUp?: boolean;
   samplesPassed?: number;
   samplesTotal?: number;

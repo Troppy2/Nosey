@@ -1151,6 +1151,8 @@ export type CodingProblemInfo = {
   examples?: CodingProblemExample[];
   starter_code?: string;
   source?: "novel" | "catalog" | "custom";
+  /** Constraints and follow-up held back from the screen; Kojo shares them only when asked. Never render. */
+  interviewer_notes?: string;
 };
 
 export type Stage2MessageResponse = {
@@ -1159,6 +1161,8 @@ export type Stage2MessageResponse = {
   is_done: boolean;
   covered_goals?: string[];
   hint_given?: boolean;
+  /** Answers on the current step that did not finish it; echo it on the next turn. */
+  followups_on_current?: number;
 };
 
 export type Stage2TurnEvent = "hint" | "nudge" | "time_up";

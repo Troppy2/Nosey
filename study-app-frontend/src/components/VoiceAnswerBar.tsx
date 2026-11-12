@@ -5,6 +5,8 @@ import "../styles/components/voice-room.css";
 
 type Props = {
   onSend: (text: string) => void;
+  /** Fires when the mic starts or stops recording. */
+  onListeningChange?: (listening: boolean) => void;
   disabled?: boolean;
   muted: boolean;
   onToggleMute: () => void;
@@ -14,15 +16,33 @@ type Props = {
 };
 
 /** Mic, mute and keyboard controls plus a live transcript. The draft is always editable by switching to the keyboard. */
-export function VoiceAnswerBar({ onSend, disabled, muted, onToggleMute, onStartTalking, speaking, placeholder }: Props) {
-  const [draft, setDraft] = useState("");
+export function VoiceAnswerBar({
+  onSend, onListeningChange, disabled, muted, onToggleMute, onStartTalking, speaking, placeholder,
+}: Props) {
+  const [draft, setDraftState] = useState("");
+  // The draft as of the last dictation callback, read by send() after it waits for
+  // the mic to finish (state from that render would miss the last words).
+  const draftRef = useRef("");
+  const setDraft = (next: string | ((d: string) => string)) =>
+    setDraftState((d) => {
+      const value = typeof next === "function" ? next(d) : next;
+      draftRef.current = value;
+      return value;
+    });
   const [typing, setTyping] = useState(false);
+  // Send was pressed while the mic was still live: waiting for the last words.
+  const [finishing, setFinishing] = useState(false);
   const dictation = useDictation((text) => setDraft((d) => (d ? `${d} ${text}` : text)));
   const areaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (typing) areaRef.current?.focus();
   }, [typing]);
+
+  useEffect(() => {
+    onListeningChange?.(dictation.listening);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dictation.listening]);
 
   function toggleTalk() {
     if (dictation.listening) {
@@ -33,17 +53,29 @@ export function VoiceAnswerBar({ onSend, disabled, muted, onToggleMute, onStartT
     void dictation.start();
   }
 
-  function send() {
-    const text = draft.trim();
-    if (!text || disabled) return;
-    if (dictation.listening) dictation.stop();
+  // Never send half an answer: when the mic is still live (or the fallback is still
+  // transcribing), stop it and wait until every word has landed in the draft.
+  async function send() {
+    if (disabled || finishing) return;
+    if (dictation.listening || dictation.transcribing) {
+      setFinishing(true);
+      try {
+        await dictation.finish();
+      } finally {
+        setFinishing(false);
+      }
+    }
+    const text = draftRef.current.trim();
+    if (!text) return;
     onSend(text);
     setDraft("");
   }
 
   const status = disabled
     ? "Waiting for the interviewer"
-    : dictation.listening
+    : finishing || dictation.transcribing
+      ? "Finishing your answer"
+      : dictation.listening
       ? "Listening"
       : speaking
         ? ""
@@ -73,7 +105,7 @@ export function VoiceAnswerBar({ onSend, disabled, muted, onToggleMute, onStartT
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              send();
+              void send();
             }
           }}
           disabled={disabled}
@@ -98,7 +130,7 @@ export function VoiceAnswerBar({ onSend, disabled, muted, onToggleMute, onStartT
           className={`voice-btn voice-btn-mic${dictation.listening ? " is-on" : ""}`}
           style={{ "--level": dictation.level } as React.CSSProperties}
           onClick={toggleTalk}
-          disabled={disabled || !dictation.supported}
+          disabled={disabled || finishing || dictation.transcribing || !dictation.supported}
           aria-label={dictation.listening ? "Stop recording" : "Start answering"}
         >
           <MicIcon size={30} />
@@ -114,9 +146,14 @@ export function VoiceAnswerBar({ onSend, disabled, muted, onToggleMute, onStartT
         </button>
       </div>
 
-      {(draft.trim() || typing) && (
-        <button type="button" className="voice-send" onClick={send} disabled={disabled || !draft.trim()}>
-          Send answer
+      {(draft.trim() || typing || dictation.interim || finishing) && (
+        <button
+          type="button"
+          className="voice-send"
+          onClick={() => void send()}
+          disabled={disabled || finishing || dictation.transcribing || (!draft.trim() && !dictation.listening)}
+        >
+          {finishing ? "Finishing..." : "Send answer"}
         </button>
       )}
     </div>

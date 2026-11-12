@@ -201,6 +201,9 @@ class CodingProblemInfo(BaseModel):
     examples: list[CodingProblemExample] = Field(default_factory=list, max_length=10)
     starter_code: str = Field(default="", max_length=20000)
     source: str = Field(default="novel", max_length=20)  # "novel" | "catalog" | "custom"
+    # Constraints, the follow-up and any stated target complexity, held back from the
+    # candidate's screen. Kojo reveals them only when asked (GH #221).
+    interviewer_notes: str = Field(default="", max_length=8000)
 
 
 class Stage2ProblemRequest(BaseModel):
@@ -223,6 +226,8 @@ class Stage2MessageRequest(BaseModel):
     # A turn the candidate did not type: "hint" (hint button), "nudge" (long stall)
     # or "time_up" (the 45 minute clock hit zero).
     event: Optional[str] = Field(default=None, pattern="^(hint|nudge|time_up)$")
+    # Answers on the current step that did not finish it, echoed from the last response.
+    followups_on_current: int = Field(default=0, ge=0, le=50)
 
 
 class Stage2MessageResponse(BaseModel):
@@ -231,6 +236,7 @@ class Stage2MessageResponse(BaseModel):
     is_done: bool = False
     covered_goals: list[str] = Field(default_factory=list)
     hint_given: bool = False
+    followups_on_current: int = 0
 
 
 # Resume deep dive (the grill that follows the ATS scan). Same contract as the
@@ -240,12 +246,15 @@ class ResumeGrillMessageRequest(BaseModel):
     history: list[InterviewChatMessage] = Field(default=[])
     provider: Optional[str] = Field(default=None)
     covered_goals: list[str] = Field(default_factory=list)
+    # Follow-ups already asked on the current question, echoed from the last response.
+    followups_on_current: int = Field(default=0, ge=0, le=5)
 
 
 class ResumeGrillMessageResponse(BaseModel):
     reply: str
     is_done: bool = False
     covered_goals: list[str] = Field(default_factory=list)
+    followups_on_current: int = 0
 
 
 class Stage3MessageRequest(BaseModel):

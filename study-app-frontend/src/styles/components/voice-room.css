@@ -172,6 +172,9 @@
 .voice-example h2 { margin: 4px 0 6px; font-size: 15px; font-weight: 600; }
 .voice-example pre { margin: 0; font-family: "JetBrains Mono", monospace; font-size: 13px; line-height: 1.6; background: #f6f9f1; border: 1px solid #e0ebd2; border-radius: 8px; padding: 12px 14px; white-space: pre-wrap; }
 .voice-problem-text pre { font-family: "JetBrains Mono", monospace; font-size: 13px; background: #f6f9f1; border: 1px solid #e0ebd2; border-radius: 8px; padding: 12px 14px; white-space: pre-wrap; }
+/* Markdown statements use .kojo-code-block (light text for a dark block); on this
+   light panel the text must be dark or examples are unreadable. */
+.voice-problem-text pre, .voice-problem-text pre code { color: var(--v-ink, #26301f); }
 .voice-problem-meta { margin: auto 0 0; font-size: 13px; color: var(--v-mute); }
 .voice-verdict { margin: 0 0 8px; font-weight: 700; color: var(--v-ink); }
 .voice-banner { position: fixed; top: 76px; left: 50%; transform: translateX(-50%); z-index: 1001; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 32px); padding: 10px 14px; border-radius: 8px; background: #fff; border: 1px solid #f2b3a0; color: #7c2d12; font-size: 14px; box-shadow: 0 4px 16px rgba(38,48,31,.12); }

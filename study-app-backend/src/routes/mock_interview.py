@@ -56,6 +56,14 @@ from src.services.speech_service import SpeechService
 from src.utils.exceptions import LLMException, ValidationException
 from src.utils.provider_policy import resolve_request_provider
 from src.services.account_safety_service import screen_user_input
+from src.services.mock_interview_turns import (
+    model_flag,
+    normalize_covered,
+    plan_turn,
+    resolve_turn,
+    scrub_reply,
+    withhold_problem_details,
+)
 
 # SECURITY: beta-only feature, enforced server-side (see dependencies.get_beta_user).
 # It is excluded from usage limits, so basic users must not be able to reach it.
@@ -133,30 +141,42 @@ def _level_config(row: MockInterviewSession) -> dict:
     return _LEVEL_CONFIG.get(getattr(row, "level", "intern") or "intern", _LEVEL_CONFIG["intern"])
 
 
-# Ordered interview goals for the conversational stages. The LLM is told to cover
-# these one at a time and report which it has covered; the server enforces
-# advancement and a hard turn cap so the interviewer cannot ramble indefinitely.
+# Ordered interview goals for the conversational stages. The server owns coverage
+# (services/mock_interview_turns.py): each turn the model only judges whether the
+# latest answer finished the current goal, and follow-up and turn caps stop loops.
 _STAGE2_GOALS = ["background", "coding_problem", "approach", "complexity", "optimize", "dry_run", "questions"]
 _STAGE3_GOALS = ["behavioral_q1", "behavioral_q2", "behavioral_q3", "behavioral_q4", "behavioral_q5"]
 # Resume deep dive: the recruiter/HM grill that follows the ATS scan. Each goal is one
 # probe into what the candidate actually claims on their resume.
 _RESUME_GOALS = ["project_deep_dive", "impact_metrics", "tech_choice", "ownership", "gap_probe"]
 
-# Hard turn caps (counted by user turns) so the stage always terminates even if the
-# model never reports full goal coverage.
+# Without a prepared question pool the deep dive asks one question per slot.
+# Briefs Kojo writes the question from (never read aloud).
+_RESUME_GENERIC_QUESTIONS = {
+    "project_deep_dive": "how one specific project or role on the resume actually worked",
+    "impact_metrics": "where one number or claim of impact on the resume came from",
+    "tech_choice": "why they chose one specific technology or approach named on the resume",
+    "ownership": "what they personally built on one project versus what the team did",
+    "gap_probe": "the weakest or vaguest item on the resume for this role",
+}
+
+# Hard turn caps (counted by user turns) so the stage always terminates.
 _STAGE2_TURN_CAP = 40  # a full 45 minutes of back and forth while coding
 _STAGE3_TURN_CAP = 17  # 5 stories, up to 2 probes each, plus closing questions
-_RESUME_TURN_CAP = 7
+_RESUME_TURN_CAP = 11  # 5 questions, one follow-up each, plus slack
 
-
-def _merge_covered_goals(prior: list[str], reported, valid_goals: list[str]) -> list[str]:
-    """Union previously-covered goals with the model's new report, dropping any
-    goal name that is not part of the known list (guards against hallucinated goals).
-    Returned in canonical goal order."""
-    covered = set(g for g in (prior or []) if g in valid_goals)
-    if isinstance(reported, list):
-        covered.update(g for g in reported if isinstance(g, str) and g in valid_goals)
-    return [g for g in valid_goals if g in covered]
+# Answers that may go by on one question or step without finishing it before the
+# server moves on regardless (GH #221: a round must never loop on one question).
+_RESUME_FOLLOWUP_CAP = 1
+_STAGE3_FOLLOWUP_CAP = 2
+_STAGE3_CLOSING_CAP = 3  # closing Q&A turns before the round ends
+_STAGE2_FOLLOWUP_CAPS = {
+    "approach": 12,  # spans the whole coding phase
+    "complexity": 1,  # one push back on a wrong answer
+    "optimize": 2,
+    "dry_run": 1,
+    "questions": 3,  # closing Q&A, then the round ends
+}
 
 
 async def _custom_problem_statements(db: AsyncSession, user_id: int, slugs: list[str]) -> str:
@@ -653,24 +673,55 @@ async def resume_grill_message(
         for m in body.history
     )
 
-    covered = _merge_covered_goals(body.covered_goals, [], _RESUME_GOALS)
-    question_number = len(covered) + 1
+    # The server owns progress (GH #221): the model only says whether the latest
+    # message answered the question it was asked last turn.
     planned = await _picked_resume_questions(row, db)
-    if planned:
-        listed = "\n".join(f"  {_RESUME_GOALS[i]}: {q}" for i, q in enumerate(planned))
-        goals_text = (
-            f"YOUR GOALS: ask exactly these {len(planned)} prepared questions, in this order, one per turn, "
-            f"tracked as {_RESUME_GOALS[:len(planned)]}. Keep each question's substance; you may tie it to "
-            "the resume wording.\n" + listed + "\n"
+    goals = _RESUME_GOALS[: len(planned)] if planned else list(_RESUME_GOALS)
+    questions = planned or [_RESUME_GENERIC_QUESTIONS[g] for g in goals]
+    covered = normalize_covered(body.covered_goals, goals)
+    followups = body.followups_on_current
+    plan = plan_turn(covered, goals, followups, _RESUME_FOLLOWUP_CAP)
+    total = len(goals)
+
+    def _ask(goal: Optional[str]) -> str:
+        if goal is None:
+            return (
+                "wrap up: thank them in one sentence and tell them that is the end of the deep dive. "
+                "Ask nothing else."
+            )
+        number = goals.index(goal) + 1
+        if planned:
+            return (
+                f"ask question {number} of {total}. Ask it as written (you may tie it to the resume wording):\n"
+                f"  \"{questions[goals.index(goal)]}\""
+            )
+        # A brief, not a question: read aloud it sounds like the prompt leaking.
+        return (
+            f"ask question {number} of {total}. Write ONE specific question yourself that names something real "
+            f"from the resume, following this brief (never say the brief itself): {questions[goals.index(goal)]}"
+        )
+
+    if body.message is None:
+        this_turn = (
+            "Open the deep dive: one short greeting sentence, then "
+            + _ask(goals[0] if not covered else plan.current)
+        )
+    elif plan.current is None:
+        this_turn = "All questions are done. " + _ask(None)
+    elif plan.must_advance:
+        this_turn = (
+            "You already followed up on the current question, so move on now whatever they said. "
+            "Set answered true. One short neutral acknowledgment, then " + _ask(plan.next)
         )
     else:
-        goals_text = (
-            f"YOUR GOALS: ask exactly 5 questions, one per turn, tracked as {_RESUME_GOALS}.\n"
-            "  project_deep_dive: pick ONE specific project or role from the resume and ask how it worked.\n"
-            "  impact_metrics: push on a number or claim of impact they wrote. Where did it come from?\n"
-            "  tech_choice: ask why they chose a specific technology or approach named on the resume.\n"
-            "  ownership: find out what THEY personally built versus what the team did.\n"
-            "  gap_probe: probe the weakest or vaguest item on the resume for this role.\n"
+        current_q = questions[goals.index(plan.current)]
+        this_turn = (
+            f"The candidate is answering the question you asked last turn: \"{current_q}\"\n"
+            "Decide whether their latest message answers it, even partly.\n"
+            "- If it does: set answered true, give one short neutral acknowledgment, then " + _ask(plan.next) + "\n"
+            "- If it does not (off topic, a non-answer such as \"let's start\", or a thought cut off "
+            "before it reaches the question): set answered false and ask ONE short follow-up that steers "
+            "them back to this same question. Do not move on."
         )
 
     system_prompt = (
@@ -679,26 +730,21 @@ async def resume_grill_message(
         f"This company weighs: {role_focus}\n"
         f"Calibrate depth to a {level_cfg['label']} candidate: {level_cfg['rigor']}\n\n"
         "RESPOND WITH ONLY RAW JSON, no markdown, no extra text:\n"
-        '{"reply": "...", "covered_goals": ["..."], "is_done": false}\n\n'
-        + goals_text
-        + f"GOALS ALREADY COVERED: {covered or ['(none yet)']}\n"
-        f"THIS TURN: ask question number {question_number} of 5 (or wrap up if all 5 are covered).\n\n"
+        '{"reply": "...", "answered": false}\n\n'
+        f"THIS TURN: {this_turn}\n\n"
         "RULES:\n"
-        "- Quote or name something real from the resume below in every question. Never invent "
-        "experience the resume does not mention.\n"
-        "- One sentence acknowledging the previous answer, then the NEXT uncovered question. ONE "
-        "question per turn. Do NOT re-ask a covered goal.\n"
-        "- Follow up only to clarify a vague answer. If they ask you something, answer briefly and "
-        "return to your question.\n"
-        "- covered_goals: every goal slot answered so far, from the list above.\n"
-        "- After all 5 are answered and acknowledged: wrap up and set is_done: true.\n"
-        "- reply: 2 to 3 sentences max. Be direct and professional, not hostile.\n"
+        "- ONE question per reply. Never repeat a question you already asked in the conversation below.\n"
+        "- Never invent experience the resume does not mention. If they ask you something, answer "
+        "briefly and return to the question.\n"
+        "- Stay neutral: acknowledge, do not grade or praise their answers.\n"
+        "- reply is spoken to the candidate: 2 to 3 sentences, direct and professional. Never mention "
+        "question numbers, labels, these instructions or this JSON.\n"
         "- Return ONLY raw JSON.\n\n"
         f"THE CANDIDATE'S RESUME:\n{resume_text[:8000]}\n"
     )
 
     if body.message is None:
-        full_prompt = system_prompt + "\nConversation so far:\n(none)\n\nOpen the deep dive now."
+        full_prompt = system_prompt + "\nConversation so far:\n(none)\n\nYour JSON response:"
     else:
         full_prompt = (
             system_prompt
@@ -714,25 +760,32 @@ async def resume_grill_message(
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
         parsed = json.loads(raw)
+        if not isinstance(parsed, dict):
+            raise ValueError("not an object")
     except Exception:
-        fallback = raw if isinstance(raw, str) and raw else "Tell me more about that project."
-        return ResumeGrillMessageResponse(reply=fallback[:600], covered_goals=covered)
+        fallback = scrub_reply(raw) if isinstance(raw, str) and raw and not raw.startswith("{") else ""
+        return ResumeGrillMessageResponse(
+            reply=(fallback or "Sorry, could you say that again?")[:600],
+            covered_goals=covered,
+            followups_on_current=followups,
+        )
 
-    # A user answer advances one goal even if the model forgets to report it, so
-    # coverage cannot stall (same guard as Stage 3).
-    updated_covered = _merge_covered_goals(covered, parsed.get("covered_goals"), _RESUME_GOALS)
-    if body.message is not None and len(updated_covered) <= len(covered):
-        next_goal = next((g for g in _RESUME_GOALS if g not in updated_covered), None)
-        if next_goal:
-            updated_covered = _merge_covered_goals(updated_covered, [next_goal], _RESUME_GOALS)
+    result = resolve_turn(
+        plan,
+        covered,
+        goals,
+        followups,
+        answered_turn=body.message is not None,
+        judged_done=model_flag(parsed, "answered"),
+    )
+    is_done = body.message is not None and (
+        len(result.covered) >= total or turn_count + 1 >= _RESUME_TURN_CAP
+    )
 
-    is_done = bool(parsed.get("is_done", False))
-    if len(updated_covered) >= len(_RESUME_GOALS) or turn_count + 1 >= _RESUME_TURN_CAP:
-        is_done = True
-
-    _record_transcript(row, "resume", body.history, body.message, parsed.get("reply", ""))
+    reply = scrub_reply(str(parsed.get("reply") or "")) or "Go on."
+    _record_transcript(row, "resume", body.history, body.message, reply)
     await db.commit()
-    if is_done and body.message is not None:
+    if is_done:
         await _save_resume_grill_feedback(
             row=row,
             history=body.history + [InterviewChatMessage(role="user", content=body.message)],
@@ -743,9 +796,10 @@ async def resume_grill_message(
         )
 
     return ResumeGrillMessageResponse(
-        reply=parsed.get("reply", ""),
+        reply=reply,
         is_done=is_done,
-        covered_goals=updated_covered,
+        covered_goals=result.covered,
+        followups_on_current=result.followups,
     )
 
 
@@ -763,19 +817,25 @@ async def _save_resume_grill_feedback(
         for m in history
     )
     eval_prompt = (
-        f"You are a {company_label} hiring manager reviewing a resume deep-dive transcript.\n\n"
-        f"{qa_text}\n\n"
-        f"In 2 to 3 sentences, evaluate how well {candidate} defended their resume: depth of "
-        "ownership, whether their claims held up under questioning, and how clearly they "
-        "communicated. Be direct and professional."
+        f"You are writing the interviewer feedback for a resume deep dive at {company_label}.\n\n"
+        f"TRANSCRIPT:\n{qa_text[-14000:]}\n\n"
+        'Return ONLY JSON: {"feedback": "...", ' + _WRITEUP_SPEC + "}\n"
+        "- You did not run this interview; what the interviewer said is not evidence. Judge from the "
+        "candidate's own words.\n"
+        f"- feedback: 2 to 3 sentences on how well {candidate} defended their resume: depth of ownership, "
+        "whether their claims held up under questioning, and how clearly they communicated. Direct and "
+        "professional.\n"
+        + _writeup_rules()
     )
+    writeup = None
     try:
-        llm = LLMService()
-        feedback = await llm.call_kojo(eval_prompt, provider=provider)
+        data = await LLMService().complete_json_strongest(eval_prompt)
+        feedback = str(data.get("feedback") or "").strip() or "Resume deep dive evaluation unavailable."
+        writeup = _clean_writeup(data.get("writeup"))
     except Exception:
         feedback = "Resume deep dive evaluation unavailable."
 
-    row.resume_grill = json.dumps({"feedback": feedback.strip()})
+    row.resume_grill = json.dumps({"feedback": feedback, "writeup": writeup})
     if row.status == STATUS_PENDING:
         row.status = STATUS_RESUME_COMPLETE
     await db.commit()
@@ -1038,8 +1098,15 @@ async def stage2_problem(
 ) -> CodingProblemInfo:
     """Pick the technical round's problem before Kojo presents it. About 70% are novel
     problems Kojo writes; about 30% are real catalog problems chosen here, so titles
-    and slugs are never invented. Seeded by session so a retry lands on the same pick."""
+    and slugs are never invented. Seeded by session so a retry lands on the same pick.
+    Like a real phone screen, the constraints and follow-up are held back for Kojo."""
     row = await _load_session(session_id, user, db)
+    return withhold_problem_details(await _pick_stage2_problem(row, body, db, user))
+
+
+async def _pick_stage2_problem(
+    row: MockInterviewSession, body: Stage2ProblemRequest, db: AsyncSession, user: User
+) -> CodingProblemInfo:
     rng = random.Random(f"stage2-{row.id}")
     cfg = _custom_config(row)
 
@@ -1151,24 +1218,41 @@ async def submit_stage2(
         else "they never ran the sample cases"
     )
 
+    notes = ((problem.interviewer_notes if problem else "") or "").strip()
     prompt = (
-        f"You are Kojo, a senior software engineer at {company_label}, grading a 45 minute technical phone screen "
-        f"you just ran with {candidate} for a {level_cfg['label']} role.\n"
+        f"You are writing the interviewer feedback for a 45 minute technical phone screen at {company_label} "
+        f"with {candidate} for a {level_cfg['label']} role.\n"
         f"Calibrate to a {level_cfg['label']} candidate: {level_cfg['rigor']}\n\n"
         f"PROBLEM: {coding_title}\n{(problem.prompt if problem else '')[:4000]}\n\n"
+        "HIDDEN DETAILS (constraints and follow-up; NOT on the candidate's screen, they had to ask):\n"
+        f"{notes[:3000] or '(none)'}\n\n"
         f"FINAL CODE:\n```python\n{body.code[:12000] or '(no code written)'}\n```\n\n"
         f"FACTS: hints used: {body.hints_used}. Clock ran out: {'yes' if body.time_up else 'no'}. "
         f"Samples: {samples}.\n\n"
         f"TRANSCRIPT:\n{_transcript_text(body.history, candidate) or '(none)'}\n\n"
-        'Return ONLY JSON: {"verdict": "...", "feedback": "..."}\n'
+        "Return ONLY JSON, keys in this order:\n"
+        '{"complexity_check": {"time": "...", "space": "...", "candidate_said": "...", "candidate_correct": true}, '
+        '"verdict": "...", "feedback": "...", ' + _WRITEUP_SPEC + "}\n"
+        "- You did not run this interview. What Kojo, the interviewer, said in the transcript is not evidence: "
+        "Kojo may have agreed with a wrong answer. Judge from the code, the facts and the candidate's own words.\n"
+        "- complexity_check comes first. Work out the FINAL CODE's true time and space complexity yourself. "
+        "Count every extra data structure (set, map, list, stack, recursion depth) at the largest size it can "
+        "reach during the run, not its size when the function returns. For example, a set that adds each "
+        "unseen value and removes it on the second sighting can hold about n/2 values midway, so it is O(n) "
+        "space even though it ends with one value. Then record what the candidate claimed and whether it "
+        "matches.\n"
+        "- If their complexity answer was wrong, the feedback must say so and give the correct complexity.\n"
         f"- verdict: one of {', '.join(_STAGE2_VERDICTS)}.\n"
         "- Judge the whole round: clarifying questions and approach before coding, correctness of the "
-        "final code, the complexity answer, the optimize follow-up, the dry run, and how they talked.\n"
+        "final code, the complexity answer, the follow-up, the dry run, and how they talked.\n"
+        "- The constraints were hidden. Note whether they asked about input size, value ranges or edge cases "
+        "before coding; not asking is a missed signal.\n"
         "- Every hint lowers problem solving: 3 or more hints cannot be strong. Grade the code that "
         "exists if the clock ran out; unfinished code cannot be strong.\n"
         f"- feedback: 4 to 6 sentences of markdown addressed to {candidate}: what went well, what to "
         "fix, one concrete next step. End with one sentence on the questions they asked at the end "
-        "(or that they asked none). Questions are not graded."
+        "(or that they asked none). Questions are not graded.\n"
+        + _writeup_rules()
     )
 
     try:
@@ -1180,6 +1264,7 @@ async def submit_stage2(
     if verdict not in _STAGE2_VERDICTS:
         verdict = "borderline" if body.code.strip() else "needs_work"
     feedback = str(data.get("feedback") or "").strip() or _fallback_feedback(verdict, 0, 0)
+    complexity_check = data.get("complexity_check") if isinstance(data.get("complexity_check"), dict) else None
 
     row.stage2_submission = json.dumps(
         {
@@ -1190,6 +1275,8 @@ async def submit_stage2(
             "time_up": body.time_up,
             "samples_passed": body.samples_passed,
             "samples_total": body.samples_total,
+            "complexity_check": complexity_check,
+            "writeup": _clean_writeup(data.get("writeup")),
             "problem": {
                 "title": coding_title,
                 "slug": problem.slug if problem else body.problem_slug,
@@ -1205,6 +1292,43 @@ async def submit_stage2(
 
 
 # ── Stage 2: conversational interview ────────────────────────────────────────
+
+_STAGE2_STEP_NAMES = {
+    "background": "Background",
+    "coding_problem": "Present the problem",
+    "approach": "Approach and coding",
+    "complexity": "Complexity",
+    "optimize": "Follow-up",
+    "dry_run": "Dry run",
+    "questions": "Closing questions",
+}
+
+
+def _stage2_step(candidate: str, goal: str) -> str:
+    """What Kojo does on one step of the technical round."""
+    return {
+        "background": f"introduce yourself in one sentence and ask {candidate} ONE quick background question "
+        "(what they are working on now, or a recent project). No other questions",
+        "coding_problem": "thank them in a few words, then present the problem: it is now on their screen, so "
+        "summarise it in 1 or 2 sentences and invite clarifying questions before they code",
+        "approach": "answer clarifying questions and hear their approach BEFORE code. If they start coding "
+        "without explaining, ask them to talk you through the plan first. Once the plan is reasonable, let "
+        "them code: stay brief and react to what is in the editor. This step is done once the code looks "
+        "complete",
+        "complexity": "ask for the time and space complexity of the code in the editor. Work out the true answer "
+        "yourself first: count every extra data structure (set, map, list, stack, recursion depth) at the "
+        "largest size it can reach during the run, not its size at the end. If their answer is wrong, do not "
+        "give the answer: push back with one question that exposes it (for example, how big can that set get "
+        "halfway through?)",
+        "optimize": "give ONE real follow-up. Use the FOLLOW-UP in the hidden details when there is one (for "
+        "example, now do it in O(1) extra space); otherwise tighten a constraint or change the input (sorted, "
+        "streaming, far larger). Have them adapt the approach out loud, and the code if there is time",
+        "dry_run": "ask them to dry run their code on a small example or an edge case, and point at the line "
+        "if a bug shows up",
+        "questions": 'ask "Do you have any questions for me?" and answer in character as an engineer at the '
+        "company, briefly and honestly",
+    }[goal]
+
 
 @router.post("/{session_id}/stage2/message", response_model=Stage2MessageResponse)
 @limiter.limit("10/minute")
@@ -1227,41 +1351,58 @@ async def stage2_message(
         f"{'You (Kojo)' if m.role == 'interviewer' else candidate}: {m.content}" for m in body.history
     )
 
-    covered = _merge_covered_goals(body.covered_goals, [], _STAGE2_GOALS)
+    covered = normalize_covered(body.covered_goals, _STAGE2_GOALS)
     presented = "coding_problem" in covered
     problem = body.problem
     time_up = body.event == "time_up" or body.minutes_left == 0
     starting = body.message is None and body.event is None
+    user_turn = body.message is not None
+    followups = body.followups_on_current
     # The first thing the candidate says answers the background question, so the
     # problem goes up on that turn. Deterministic: no waiting on the model to decide.
     present_now = not presented and not starting and problem is not None and not time_up
+    # Closing Q&A: "Do you have any questions for me?" was already asked.
+    closing = "questions" in covered
 
-    remaining = [g for g in _STAGE2_GOALS if g not in covered]
+    steps = [g for g in _STAGE2_GOALS if g not in ("background", "coding_problem")]
+    plan = None
     if starting:
-        current_goal = "background"
+        this_turn = f"{_STAGE2_STEP_NAMES['background']}: {_stage2_step(candidate, 'background')}."
     elif present_now:
-        current_goal = "coding_problem"
-    elif time_up:
-        current_goal = "questions"
+        this_turn = f"{_STAGE2_STEP_NAMES['coding_problem']}: {_stage2_step(candidate, 'coding_problem')}."
+    elif not presented:
+        # The problem is not ready yet: keep the background chat going.
+        this_turn = "Keep the background chat going in one or two sentences while the problem is prepared."
+    elif body.event == "time_up":
+        this_turn = "Wrap up as described under RIGHT NOW."
+    elif time_up or closing:
+        this_turn = (
+            "Closing questions: they have had the chance to ask you questions. Answer what they asked briefly "
+            "and in character. Set is_done true once you have answered (or they have none)."
+        )
     else:
-        current_goal = remaining[0] if remaining else "questions"
-
-    goal_descriptions = {
-        "background": f"introduce yourself in one sentence and ask {candidate} ONE quick background question "
-        "(what they are working on now, or a recent project). No other questions",
-        "coding_problem": "thank them in a few words, then present the problem: it is now on their screen, so "
-        "summarise it in 1 or 2 sentences and invite clarifying questions before they code",
-        "approach": "answer clarifying questions and hear their approach BEFORE code. If they start coding "
-        "without explaining, ask them to talk you through the plan first. Once the plan is reasonable, let "
-        "them code: stay brief and react to what is in the editor",
-        "complexity": "once the code looks complete, ask for the time and space complexity and push back if "
-        "the answer is wrong",
-        "optimize": "ask ONE optimize follow-up: a faster or leaner approach, or a twist on the constraints",
-        "dry_run": "ask them to dry run their code on a small example or an edge case, and point at the line "
-        "if a bug shows up",
-        "questions": 'ask "Do you have any questions for me?" and answer in character as an engineer at the '
-        "company, briefly and honestly. Set is_done true once you have answered (or they have none)",
-    }
+        current_step = next((g for g in steps if g not in covered), "questions")
+        plan = plan_turn(
+            [g for g in covered if g in steps], steps, followups, _STAGE2_FOLLOWUP_CAPS.get(current_step, 1)
+        )
+        current, nxt = plan.current or "questions", plan.next or "questions"
+        start_next = f"{_STAGE2_STEP_NAMES[nxt]}: {_stage2_step(candidate, nxt)}"
+        if not user_turn:
+            this_turn = f"Stay on {_STAGE2_STEP_NAMES[current]}: {_stage2_step(candidate, current)}."
+        elif plan.must_advance:
+            this_turn = (
+                f"{_STAGE2_STEP_NAMES[current]} has run its course. Set step_done true, close it in a few neutral "
+                f"words, and start the next step now. {start_next}."
+            )
+        else:
+            this_turn = (
+                f"CURRENT STEP, {_STAGE2_STEP_NAMES[current]}: {_stage2_step(candidate, current)}.\n"
+                "Decide whether the candidate's latest message completes the current step.\n"
+                "- If it does: set step_done true, react in a few neutral words, and in the same reply start the "
+                f"next step. {start_next}.\n"
+                "- If it does not: set step_done false and stay on the current step with ONE short follow-up or "
+                "push back. Never repeat a question you already asked word for word."
+            )
 
     if problem is not None:
         origin = (
@@ -1269,9 +1410,18 @@ async def stage2_message(
             if problem.source == "catalog"
             else "You wrote this problem yourself. It is not a LeetCode problem: never name or link one."
         )
+        notes = (problem.interviewer_notes or "").strip()
         problem_block = (
             f"THE PROBLEM{' (on the candidate screen)' if presented or present_now else ' (not shown yet)'}: "
             f"{problem.title} ({problem.difficulty}). {origin}\n{problem.prompt[:5000]}\n\n"
+            "HIDDEN DETAILS (not on their screen; share one only when they ask about it, never volunteer it):\n"
+            + (
+                notes[:3000]
+                if notes
+                else "None written down. If they ask about input size, value ranges or edge cases, give "
+                "sensible constraints for this problem."
+            )
+            + "\n\n"
         )
     else:
         problem_block = ""
@@ -1289,8 +1439,8 @@ async def stage2_message(
     event_line = {
         "hint": f"{candidate} pressed the hint button. Give ONE small hint that moves them one step, based on "
         "their code and approach. Never the full solution. Set hint_given true.",
-        "nudge": f"{candidate} has been quiet for a few minutes. Check in and give ONE small nudge based on their "
-        "editor. Never the full solution. Set hint_given true.",
+        "nudge": f"{candidate} has been quiet for a few minutes. Check in briefly (ask what they are thinking "
+        "about). Do not give a hint unless they ask for one.",
         "time_up": "The 45 minutes are up. In one sentence say you are at time and thank them, then ask "
         '"Do you have any questions for me?". Do not start new topics.',
     }.get(body.event or "", "")
@@ -1305,29 +1455,26 @@ async def stage2_message(
         f"with {candidate} for a {level_cfg['label']} role. It is a voice call with a shared code editor.\n"
         f"Calibrate to a {level_cfg['label']} candidate: {level_cfg['rigor']}\n\n"
         "RESPOND WITH ONLY RAW JSON, no markdown fences, no extra text:\n"
-        '{"reply": "...", "covered_goals": ["..."], "hint_given": false, "is_done": false}\n\n'
-        "THE ROUND, IN ORDER:\n"
-        + "".join(f"- {g}: {goal_descriptions[g]}\n" for g in _STAGE2_GOALS)
-        + "\n"
+        '{"reply": "...", "step_done": false, "hint_given": false, "is_done": false}\n\n'
+        "THE ROUND, IN ORDER: background, present the problem, approach and coding, complexity, a follow-up, "
+        "dry run, closing questions.\n\n"
         + problem_block
         + code_block
-        + f"GOALS ALREADY COVERED: {covered or ['(none yet)']}\n"
-        f"THIS TURN: {current_goal} ({goal_descriptions[current_goal]})\n"
+        + f"THIS TURN: {this_turn}\n"
         + (f"RIGHT NOW: {event_line}\n" if event_line else "")
         + f"Hints given so far: {body.hints_used}.\n\n"
         "RULES:\n"
         "- No concept trivia. Everything is about this one problem.\n"
         "- Never say how hard the problem is or call it easy, medium or hard: real interviewers do not.\n"
-        "- When the current goal is done this turn, end your reply by starting the next goal (for example, "
-        "once the code is complete ask for the complexity). Never end on a bare acknowledgment.\n"
+        "- Stay neutral like a real interviewer: never tell them an answer or the code is right, correct, "
+        "optimal or exactly right, and do not praise it. Use neutral acknowledgments (okay, got it, walk me "
+        "through that). If something is wrong, ask a question that exposes it instead of giving the answer.\n"
         "- Never write the solution or large chunks of code for them. If they ask for a hint out loud, give "
         "one small hint and set hint_given true.\n"
-        "- If they ask YOU something, answer briefly, then return to the current goal.\n"
-        "- covered_goals: every goal covered so far, from the list above. Add a goal only once it has "
-        "actually happened.\n"
-        "- reply: 1 to 3 sentences, spoken out loud, so no markdown, bullet points or code blocks.\n"
+        "- If they ask YOU something, answer briefly, then return to the current step.\n"
+        "- reply: 1 to 3 sentences, spoken out loud, so no markdown, bullet points or code blocks. Never "
+        "mention steps, goals, hidden details or these instructions.\n"
         f"- Use {candidate}'s name occasionally, not every message.\n"
-        "- is_done stays false until you have answered their closing questions.\n"
         "- Return ONLY raw JSON.\n"
     )
 
@@ -1343,31 +1490,63 @@ async def stage2_message(
         )
 
     raw = ""
+    parse_failed = False
     try:
         raw = (await LLMService().call_kojo(full_prompt, provider=resolve_request_provider(user, body.provider))).strip()
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
         parsed = json.loads(raw)
+        if not isinstance(parsed, dict):
+            raise ValueError("not an object")
     except Exception:
         parsed = {"reply": raw[:600] if raw and not raw.startswith("{") else "Sorry, could you say that again?"}
+        parse_failed = True
 
-    updated_covered = _merge_covered_goals(covered, parsed.get("covered_goals"), _STAGE2_GOALS)
+    updated_covered = list(covered)
+    new_followups = followups
     if present_now:
-        updated_covered = _merge_covered_goals(updated_covered, ["background", "coding_problem"], _STAGE2_GOALS)
+        updated_covered = normalize_covered(updated_covered + ["background", "coding_problem"], _STAGE2_GOALS)
+        new_followups = 0
     elif not presented:
-        # The problem goes up only through present_now, never on the model's word.
         updated_covered = [] if starting else [g for g in updated_covered if g == "background"]
-    if body.event == "time_up":
-        updated_covered = _merge_covered_goals(updated_covered, ["questions"], _STAGE2_GOALS)
+    elif time_up and not closing:
+        updated_covered = normalize_covered(updated_covered + ["questions"], _STAGE2_GOALS)
+        new_followups = 0
+    elif closing:
+        new_followups = followups + 1 if user_turn else followups
+    elif plan is not None and user_turn and not parse_failed:
+        result = resolve_turn(
+            plan,
+            [g for g in covered if g in steps],
+            steps,
+            followups,
+            answered_turn=True,
+            judged_done=model_flag(parsed, "step_done"),
+        )
+        updated_covered = normalize_covered(covered + result.covered, _STAGE2_GOALS)
+        new_followups = result.followups
+        if result.advanced and plan.next in (None, "questions"):
+            # This reply asks the closing question, so the next answer is closing Q&A.
+            updated_covered = normalize_covered(updated_covered + ["questions"], _STAGE2_GOALS)
 
     # Done once Kojo has answered the closing questions: "questions" must have been
     # asked on an earlier turn (or at the time-up turn), then the model says so.
-    asked_before = "questions" in covered or (time_up and body.event is None)
-    is_done = bool(parsed.get("is_done")) and asked_before and body.message is not None
+    asked_before = closing or (time_up and body.event is None)
+    is_done = model_flag(parsed, "is_done") and asked_before and user_turn
+    if closing and user_turn and followups + 1 >= _STAGE2_FOLLOWUP_CAPS["questions"]:
+        is_done = True
     if turn_count + 1 >= _STAGE2_TURN_CAP:
         is_done = True
 
-    reply = str(parsed.get("reply") or "").strip() or "Go on, I'm listening."
+    reply = scrub_reply(str(parsed.get("reply") or "")) or "Go on, I'm listening."
+    if present_now and not re.search(r"(problem|screen|question|prompt)", reply, re.I):
+        # The problem just went up on their screen. Smaller models sometimes re-greet
+        # or ask something else here instead (seen on NVIDIA, session 114), which
+        # leaves the candidate staring at an unexplained problem: say it plainly.
+        reply = (
+            f"Thanks, {candidate}. The problem is up on your screen now: {problem.title}. Take a minute to "
+            "read it, and ask me anything you want to clarify before you start."
+        )
     _record_transcript(row, "stage2", body.history, body.message, reply)
     row.status = STATUS_STAGE2
     await db.commit()
@@ -1377,7 +1556,9 @@ async def stage2_message(
         coding_problem=problem if present_now else None,
         is_done=is_done,
         covered_goals=updated_covered,
-        hint_given=body.event in ("hint", "nudge") or bool(parsed.get("hint_given")),
+        # A nudge is Kojo checking in on a silence, never a hint the candidate asked for.
+        hint_given=body.event == "hint" or (body.event != "nudge" and model_flag(parsed, "hint_given")),
+        followups_on_current=new_followups,
     )
 
 
@@ -1418,12 +1599,50 @@ async def stage3_message(
         for m in body.history
     )
 
-    # Goal tracking: five behavioral questions, one per goal. The client echoes the
-    # goals covered so far; the server enforces advancement and a hard turn cap.
-    covered = _merge_covered_goals(body.covered_goals, [], _STAGE3_GOALS)
-    remaining = [g for g in _STAGE3_GOALS if g not in covered]
-    followups_left = max(0, 2 - body.followups_on_current)
-    question_number = len(covered) + 1  # the behavioral question to ask this turn
+    # Five behavioral questions, one per goal. The client echoes the goals covered so
+    # far; the server owns progress (GH #221) and the model only judges the answer.
+    covered = normalize_covered(body.covered_goals, _STAGE3_GOALS)
+    followups = body.followups_on_current
+    plan = plan_turn(covered, _STAGE3_GOALS, followups, _STAGE3_FOLLOWUP_CAP)
+    total = len(_STAGE3_GOALS)
+
+    def _ask(goal: Optional[str]) -> str:
+        if goal is None:
+            return (
+                'ask "Do you have any questions for me?" (that was the last of the 5 behavioral questions). '
+                "Nothing else."
+            )
+        number = _STAGE3_GOALS.index(goal) + 1
+        return (
+            f"ask behavioral question {number} of {total}: a NEW STAR question tailored to {company_label}'s "
+            "culture, on a different theme from every question already asked in the conversation below."
+        )
+
+    if body.message is None:
+        this_turn = (
+            "Open the interview: introduce yourself in one or two warm sentences, then "
+            + _ask(_STAGE3_GOALS[0] if not covered else plan.current)
+        )
+    elif plan.current is None:
+        this_turn = (
+            "All 5 behavioral questions are done and you asked if they have questions for you. Answer what they "
+            "asked briefly and honestly, in character as an engineer at the company. Ask no new behavioral "
+            "questions. Set is_done true once you have answered (or they have none)."
+        )
+    elif plan.must_advance:
+        this_turn = (
+            "You already probed this story twice, so move on now. Set answered true. One short neutral "
+            "acknowledgment, then " + _ask(plan.next)
+        )
+    else:
+        this_turn = (
+            "The candidate is answering the behavioral question you asked last turn.\n"
+            "- If the story is complete enough (the situation, what THEY did, and the result): set answered "
+            "true, give a one sentence acknowledgment, then " + _ask(plan.next) + "\n"
+            "- If it is vague about their OWN role, the result or the numbers, or it stops mid-story: set "
+            "answered false and ask ONE probe about that (what did you specifically do? what was the "
+            "measurable result? what would you change?). Do not move on."
+        )
 
     system_prompt = (
         f"You are Kojo, a hiring manager at {company_label}, conducting a 30-minute behavioral interview with "
@@ -1431,32 +1650,19 @@ async def stage3_message(
         f"Company culture: {culture_hint}\n"
         f"Calibrate depth to a {level_cfg['label']} candidate: {level_cfg['rigor']}\n\n"
         "RESPOND WITH ONLY RAW JSON, no markdown, no extra text:\n"
-        '{"reply": "...", "covered_goals": ["..."], "is_followup": false, "is_done": false}\n\n'
-        f"YOUR GOALS: ask exactly 5 behavioral STAR questions, one per turn, tracked as "
-        f"{_STAGE3_GOALS}.\n"
-        f"GOALS ALREADY COVERED: {covered or ['(none yet)']}\n"
-        f"THIS TURN: ask behavioral question number {question_number} of 5, tailored to "
-        f"{company_label}'s culture above (or wrap up if all 5 are already covered).\n\n"
+        '{"reply": "...", "answered": false, "is_done": false}\n\n'
+        f"THIS TURN: {this_turn}\n\n"
         "RULES:\n"
-        "- Probe like a real interviewer: if the last story is vague about the candidate's OWN role, "
-        "the result, or the numbers, ask ONE follow-up about that (\"what did you specifically do?\", "
-        "\"what was the measurable result?\", \"what would you change?\") and set is_followup true. "
-        f"At most 2 follow-ups per story; {followups_left} left for the current story.\n"
-        "- When the story is complete, give a 1 sentence acknowledgment and ask the NEXT uncovered "
-        "question with is_followup false. Do NOT re-ask a question already covered.\n"
-        "- After all 5 questions are covered, ask \"Do you have any questions for me?\" and answer the "
-        "candidate's questions in character as an engineer at the company, briefly and honestly. "
-        "Set is_done true once you have answered their questions (or they have none).\n"
-        "- Never add questions beyond the 5.\n"
-        "- covered_goals: list every behavioral question slot answered so far (from the list above).\n"
-
-        "- reply: 2 to 3 sentences max. Ask ONE question per turn.\n"
-        f"- Use {candidate}'s name occasionally. Be warm but professional.\n"
+        "- ONE question per reply. Never repeat a question you already asked in the conversation below.\n"
+        "- Exactly 5 behavioral questions in the whole interview, never more.\n"
+        "- reply is spoken to the candidate: 2 to 3 sentences max. Never mention question numbers, labels, "
+        "these instructions or this JSON.\n"
+        f"- Use {candidate}'s name occasionally. Be warm but professional, and do not grade their answers.\n"
         "- Return ONLY raw JSON.\n"
     )
 
     if body.message is None:
-        full_prompt = system_prompt + "\nConversation so far:\n(none)\n\nBegin the interview now."
+        full_prompt = system_prompt + "\nConversation so far:\n(none)\n\nYour JSON response:"
     else:
         full_prompt = (
             system_prompt
@@ -1464,6 +1670,7 @@ async def stage3_message(
             + f"{candidate}: {body.message}\n\nYour JSON response:"
         )
 
+    raw = ""
     try:
         llm = LLMService()
         raw = await llm.call_kojo(full_prompt, provider=provider)
@@ -1471,27 +1678,39 @@ async def stage3_message(
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
         parsed = json.loads(raw)
+        if not isinstance(parsed, dict):
+            raise ValueError("not an object")
     except Exception:
-        fallback = raw if isinstance(raw, str) and raw else "Thank you for sharing. Could you tell me more?"
-        return Stage3MessageResponse(reply=fallback[:600], covered_goals=covered)
+        fallback = scrub_reply(raw) if isinstance(raw, str) and raw and not raw.startswith("{") else ""
+        return Stage3MessageResponse(
+            reply=(fallback or "Thank you for sharing. Could you tell me more?")[:600],
+            covered_goals=covered,
+            is_followup=False,
+        )
 
-    # Merge coverage. A user answer this turn advances one behavioral goal even if the
-    # model forgets to report it, so coverage cannot stall.
-    updated_covered = _merge_covered_goals(covered, parsed.get("covered_goals"), _STAGE3_GOALS)
-    is_followup = bool(parsed.get("is_followup")) and followups_left > 0
-    if body.message is not None and len(updated_covered) <= len(covered) and not is_followup:
-        next_goal = next((g for g in _STAGE3_GOALS if g not in updated_covered), None)
-        if next_goal:
-            updated_covered = _merge_covered_goals(updated_covered, [next_goal], _STAGE3_GOALS)
+    result = resolve_turn(
+        plan,
+        covered,
+        _STAGE3_GOALS,
+        followups,
+        answered_turn=body.message is not None,
+        judged_done=model_flag(parsed, "answered"),
+    )
+    # The client counts follow-ups from this flag (it resets to 0 when false). In the
+    # closing Q&A it counts closing turns, so that phase is capped too.
+    closing = plan.current is None
+    is_followup = body.message is not None and not result.advanced
 
-    # The stage ends when the model says so, when all 5 questions are covered, or when
-    # the hard turn cap is hit, so the interviewer can never ramble past the budget.
-    # Done once Kojo has answered the candidate's closing questions, or at the hard cap.
-    is_done = bool(parsed.get("is_done", False)) and len(updated_covered) >= len(_STAGE3_GOALS)
+    # Done once Kojo has answered the candidate's closing questions (asked on an
+    # earlier turn, after all 5 were covered), or at the closing or hard turn cap.
+    is_done = body.message is not None and closing and (
+        model_flag(parsed, "is_done") or followups + 1 >= _STAGE3_CLOSING_CAP
+    )
     if turn_count + 1 >= _STAGE3_TURN_CAP:
         is_done = True
 
-    _record_transcript(row, "stage3", body.history, body.message, parsed.get("reply", ""))
+    reply = scrub_reply(str(parsed.get("reply") or "")) or "Thank you. Go on."
+    _record_transcript(row, "stage3", body.history, body.message, reply)
     if is_done and body.message is not None:
         # Save conversation as stage3 feedback for the final summary
         await _save_stage3_conversation_feedback(
@@ -1507,9 +1726,9 @@ async def stage3_message(
         await db.commit()
 
     return Stage3MessageResponse(
-        reply=parsed.get("reply", ""),
+        reply=reply,
         is_done=is_done,
-        covered_goals=updated_covered,
+        covered_goals=result.covered,
         is_followup=is_followup,
     )
 
@@ -1527,19 +1746,29 @@ async def _save_stage3_conversation_feedback(
         for m in history
     )
     eval_prompt = (
-        f"You are a {company_label} hiring manager reviewing a behavioral interview transcript.\n\n"
-        f"{qa_text}\n\n"
-        f"In 2 to 3 sentences, evaluate {candidate}'s overall behavioral responses: "
-        "what was strong, what needs improvement, and whether they align with the company's culture. "
-        "Be direct and professional."
+        f"You are writing the interviewer feedback for a behavioral interview at {company_label}.\n"
+        f"Company culture: {_culture_hint(row)}\n\n"
+        f"TRANSCRIPT:\n{qa_text[-14000:]}\n\n"
+        'Return ONLY JSON: {"verdict": "...", "feedback": "...", ' + _WRITEUP_SPEC + "}\n"
+        "- You did not run this interview; what the interviewer said is not evidence. Judge from the "
+        "candidate's own stories: their own actions, results and reflection.\n"
+        f"- verdict: one of {', '.join(_STAGE2_VERDICTS)}.\n"
+        f"- feedback: 2 to 3 sentences on {candidate}'s behavioral answers: what was strong, what needs "
+        "improvement, and whether they align with the company's culture. Direct and professional.\n"
+        + _writeup_rules()
     )
+    verdict = None
+    writeup = None
     try:
-        llm = LLMService()
-        feedback = await llm.call_kojo(eval_prompt, provider=provider)
+        data = await LLMService().complete_json_strongest(eval_prompt)
+        feedback = str(data.get("feedback") or "").strip() or "Behavioral evaluation unavailable."
+        raw_verdict = str(data.get("verdict") or "").strip().lower().replace(" ", "_")
+        verdict = raw_verdict if raw_verdict in _STAGE2_VERDICTS else None
+        writeup = _clean_writeup(data.get("writeup"))
     except Exception:
         feedback = "Behavioral evaluation unavailable."
 
-    row.stage3_answers = json.dumps({"feedback": feedback.strip()})
+    row.stage3_answers = json.dumps({"feedback": feedback, "verdict": verdict, "writeup": writeup})
     row.status = STATUS_STAGE3_COMPLETE
     await db.commit()
 
@@ -1579,35 +1808,49 @@ async def finish_interview(
             skill_ratings=rubric["skills"] if rubric else None,
         )
 
-    resume_summary = _summarize_resume(row.resume_screen)
-    resume_grill_summary = _summarize_resume_grill(row.resume_grill)
-    stage1_summary = _summarize_stage1(row.stage1_results)
-    stage2_summary = _summarize_stage2(row.stage2_submission)
-    stage3_summary = _summarize_stage3(row.stage3_answers)
+    # A real committee never sees the interviews: only each interviewer's packet,
+    # the OA results and the resume screen (GH #221).
+    packets = "\n\n".join(
+        [
+            f"RESUME SCREEN (ATS, context only):\n{_summarize_resume(row.resume_screen)}",
+            _packet("RESUME DEEP DIVE", row.resume_grill, _summarize_resume_grill(row.resume_grill)),
+            f"ONLINE ASSESSMENT (auto-graded on hidden tests):\n{_summarize_stage1(row.stage1_results)}",
+            _packet(
+                "TECHNICAL PHONE SCREEN",
+                row.stage2_submission,
+                _summarize_stage2(row.stage2_submission),
+                facts=_stage2_facts(row.stage2_submission),
+            ),
+            _packet("BEHAVIORAL", row.stage3_answers, _summarize_stage3(row.stage3_answers)),
+        ]
+    )
 
     scale = " / ".join(HIRE_SCALE)
     prompt = (
-        f"You are a hiring committee at {company_label} writing the debrief after a full mock interview "
-        f"loop for a {level_cfg['label']} candidate. The interviewer was Kojo.\n"
+        f"You are the hiring committee at {company_label} deciding on a {level_cfg['label']} candidate after "
+        "an interview loop.\n"
+        "Like a real committee, you did not attend any interview and you never see transcripts. You have only "
+        "each interviewer's written packet, the online assessment results and the resume screen.\n"
         f"Judge against the {level_cfg['label']} bar: {level_cfg['rigor']}\n\n"
-        f"Resume Screen (ATS):\n{resume_summary}\n\n"
-        f"Resume Deep Dive:\n{resume_grill_summary}\n\n"
-        f"Stage 1 (Online Assessment):\n{stage1_summary}\n\n"
-        f"Stage 2 (Technical Interview):\n{stage2_summary}\n\n"
-        f"Stage 3 (Behavioral):\n{stage3_summary}\n\n"
+        f"{packets}\n\n"
         "Return ONLY JSON:\n"
         '{"call": "...", "skills": {"coding": "...", "problem_solving": "...", "communication": "...", '
         '"testing": "..."}, "writeup": "..."}\n'
         f"- call and every skill use exactly one of: {scale}.\n"
+        "- Decide from the evidence and facts, not from an interviewer's tone or their own rating. Discount a "
+        "rating its evidence does not support.\n"
+        "- Weigh consistency across rounds: one strong round does not cancel a clear red flag in another. A "
+        "skipped round gives no signal either way.\n"
         "- coding: correctness and code quality (OA hidden tests, technical solution).\n"
-        "- problem_solving: approach, optimisation, and how many hints were needed (hints lower it).\n"
+        "- problem_solving: approach, complexity, the follow-up, and how many hints were needed (hints lower "
+        "it).\n"
         "- communication: clarifying questions, explaining the approach, STAR clarity, questions asked "
         "at the end.\n"
         "- testing: edge cases, dry runs, hidden test results.\n"
-        "- Skip a skill (null) only when no stage produced evidence for it.\n"
-        "- writeup: 3 to 5 sentences of markdown: strengths, what to improve, and a closing line that "
-        "agrees with call. Do not add a separate recommendation line.\n"
-        "- Base the call on Stages 1 to 3; the resume is context only. Be direct and professional."
+        "- Skip a skill (null) only when no packet has evidence for it.\n"
+        "- writeup: 3 to 5 sentences of markdown addressed to the candidate: strengths, what to improve, and "
+        "a closing line that agrees with call. Do not add a separate recommendation line.\n"
+        "- The resume screen is context only. Be direct and professional."
     )
 
     try:
@@ -1638,6 +1881,91 @@ async def finish_interview(
         hiring_recommendation=call,
         skill_ratings=skills,
     )
+
+
+# ── Interviewer write-ups for the hiring committee ────────────────────────────
+# Each graded round stores a packet; the committee reads only these (GH #221).
+
+_WRITEUP_SPEC = (
+    '"writeup": {"rating": "...", "signals": {"coding": "...", "problem_solving": "...", '
+    '"communication": "...", "testing": "..."}, "evidence": ["..."], "concerns": ["..."]}'
+)
+
+
+def _writeup_rules() -> str:
+    scale = " / ".join(HIRE_SCALE)
+    return (
+        "- writeup is your packet for the hiring committee, who never see the transcript. evidence: 3 to 6 "
+        "short factual bullets (what the candidate did, said or wrote; quote them when useful). concerns: the "
+        f"specific gaps, or []. signals: rate each skill this round actually tested with one of {scale}, null "
+        f"when the round gave no evidence for it. rating: your overall call, one of {scale}."
+    )
+
+
+def _clean_writeup(value: object) -> Optional[dict]:
+    if not isinstance(value, dict):
+        return None
+    raw_signals = value.get("signals") if isinstance(value.get("signals"), dict) else {}
+    signals = {k: r for k in SKILL_KEYS if (r := _normalize_hire(raw_signals.get(k))) is not None}
+
+    def _bullets(key: str) -> list[str]:
+        items = value.get(key)
+        if not isinstance(items, list):
+            return []
+        return [str(x).strip()[:400] for x in items if str(x).strip()][:8]
+
+    evidence, concerns = _bullets("evidence"), _bullets("concerns")
+    rating = _normalize_hire(value.get("rating"))
+    if not rating and not evidence:
+        return None
+    return {"rating": rating, "signals": signals, "evidence": evidence, "concerns": concerns}
+
+
+def _stage2_facts(stage2_submission_json: Optional[str]) -> str:
+    try:
+        data = json.loads(stage2_submission_json or "")
+    except ValueError:
+        return ""
+    if not isinstance(data, dict):
+        return ""
+    problem = data.get("problem") or {}
+    facts = (
+        f"Problem: {problem.get('title', 'unknown')} ({problem.get('difficulty') or 'unknown'}). "
+        f"Hints used: {data.get('hints_used', 0)}. Clock ran out: {'yes' if data.get('time_up') else 'no'}."
+    )
+    if data.get("samples_total"):
+        facts += f" Sample cases: {data.get('samples_passed', 0)} of {data['samples_total']} passed."
+    check = data.get("complexity_check")
+    if isinstance(check, dict) and (check.get("time") or check.get("space")):
+        facts += (
+            f" Final code complexity (checked by the grader): time {check.get('time')}, space {check.get('space')}; "
+            f"candidate said: {check.get('candidate_said') or 'nothing'}"
+            f" ({'correct' if check.get('candidate_correct') else 'incorrect'})."
+        )
+    return facts
+
+
+def _packet(title: str, raw_json: Optional[str], fallback: str, facts: str = "") -> str:
+    """One round as the committee sees it: the interviewer's write-up, or for runs
+    graded before write-ups existed, the interviewer's summary."""
+    try:
+        data = json.loads(raw_json) if raw_json else None
+    except ValueError:
+        data = None
+    writeup = data.get("writeup") if isinstance(data, dict) else None
+    if not isinstance(writeup, dict):
+        return f"{title} (no structured write-up, interviewer summary):\n{fallback}"
+    lines = [f"{title}", f"Interviewer rating: {writeup.get('rating') or 'none given'}"]
+    signals = writeup.get("signals") or {}
+    if signals:
+        lines.append("Signals: " + ", ".join(f"{k}={v}" for k, v in signals.items()))
+    if facts:
+        lines.append(f"Facts: {facts}")
+    lines.append("Evidence:")
+    lines.extend(f"- {e}" for e in writeup.get("evidence") or ["(none recorded)"])
+    lines.append("Concerns:")
+    lines.extend(f"- {c}" for c in writeup.get("concerns") or ["(none recorded)"])
+    return "\n".join(lines)
 
 
 # Six-step hiring-committee scale, used for every new debrief (old runs keep the
@@ -1851,6 +2179,8 @@ def _stage3_overall_verdict(stage3_answers_json: Optional[str]) -> Optional[str]
         return None
     try:
         data = json.loads(stage3_answers_json)
+        if data.get("verdict") in _STAGE2_VERDICTS:
+            return data["verdict"]
         fb = data.get("feedback", "").lower()
         if any(w in fb for w in ("strong", "excellent", "well-aligned", "aligned")):
             return "strong"

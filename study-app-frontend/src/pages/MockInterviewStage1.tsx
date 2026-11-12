@@ -27,6 +27,7 @@ import {
   type HiddenTestState,
   type Stage1QuestionProgress,
 } from "../lib/mockInterview";
+import { MockPauseOverlay } from "../components/MockPauseOverlay";
 import { MockProgressGate } from "../components/MockProgressGate";
 import {
   COMPANY_OPTIONS,
@@ -194,6 +195,8 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
     return initial;
   });
   const [currentIdx, setCurrentIdx] = useState(() => stored?.stage1?.currentIdx ?? 0);
+  // Paused: no question's clock runs and the work is covered until Resume.
+  const [paused, setPaused] = useState(() => stored?.stage1?.paused ?? false);
 
   // Fetched LeetCode problem statements + runner results, keyed by slug.
   const [problemData, setProblemData] = useState<Record<string, LoadedProblem>>({});
@@ -217,8 +220,10 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
     if (missingContext) navigate("/mock-interview", { replace: true });
   }, [missingContext, navigate]);
 
-  // Make sure the active question's clock is running after a resume.
+  // Make sure the active question's clock is running after a resume (unless it was
+  // left paused, which waits for the Resume button).
   useEffect(() => {
+    if (stored?.stage1?.paused) return;
     setQuestions((prev) => {
       const cur = prev[currentIdx];
       if (!cur || cur.startedAt > 0) return prev;
@@ -257,6 +262,7 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
           currentIdx,
           submitted: prev?.stage1?.submitted ?? false,
           results: prev?.stage1?.results,
+          paused,
         },
       };
       saveMockProgress(progress);
@@ -265,7 +271,7 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
       if (persistTimer.current) clearTimeout(persistTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [questions, currentIdx]);
+  }, [questions, currentIdx, paused]);
 
   // Load the current problem statement on demand.
   const currentSlug = questions[currentIdx]?.slug;
@@ -434,6 +440,43 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
       next[currentIdx] = { ...q, timeUsedMs: q.timeUsedMs + addedMs, startedAt: 0 };
       return next;
     });
+  }
+
+  // Bank the running question's time; nothing ticks until resume().
+  function pause() {
+    if (paused || submitting || finished) return;
+    saveCurrentTime();
+    setPaused(true);
+  }
+
+  function resume() {
+    if (!paused) return;
+    setPaused(false);
+    setQuestions((prev) => {
+      const next = [...prev];
+      const q = next[currentIdx];
+      if (q && q.startedAt === 0) next[currentIdx] = { ...q, startedAt: Date.now() };
+      return next;
+    });
+  }
+
+  // Leaving pauses the assessment and saves right away (the debounced save would be
+  // cancelled by the unmount), so the clock never runs while you are away.
+  function leave() {
+    if (!submitting && !finished) {
+      const banked = questions.map((q) =>
+        q.startedAt > 0 ? { ...q, timeUsedMs: q.timeUsedMs + (Date.now() - q.startedAt), startedAt: 0 } : q,
+      );
+      const prev = loadMockProgress(numericSessionId);
+      if (prev?.stage1) {
+        saveMockProgress({
+          ...prev,
+          updatedAt: Date.now(),
+          stage1: { ...prev.stage1, questions: banked, currentIdx, paused: true },
+        });
+      }
+    }
+    navigate("/mock-interview");
   }
 
   function goToQuestion(idx: number) {
@@ -612,11 +655,17 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
 
   return (
     <div className="oa">
+      {paused && !finished && (
+        <MockPauseOverlay
+          onResume={resume}
+          note="The assessment clock is stopped and your code is saved. The problems stay hidden until you resume."
+        />
+      )}
       <header className="oa-head">
         <button
           type="button"
           className="oa-leave"
-          onClick={() => navigate("/mock-interview")}
+          onClick={leave}
           disabled={submitting}
           aria-label="Pause and leave, your progress is saved"
           title="Pause and leave, your progress is saved"
@@ -664,6 +713,14 @@ function Stage1Runner({ stored }: { stored: MockProgress | null }) {
             {isExpiredNow ? "Time's up" : formatMs(remainingMs)}
           </span>
           <span className="oa-clock-of">of {formatMsCompact(limitMs)}</span>
+          <button
+            type="button"
+            className="mock-pause-btn"
+            onClick={pause}
+            disabled={submitting || finished || isExpiredNow}
+          >
+            Pause
+          </button>
           <button type="button" className="oa-submit-all" onClick={handleSubmitAll} disabled={submitting || finished}>
             {submitting ? "Grading..." : "Submit assessment"}
           </button>

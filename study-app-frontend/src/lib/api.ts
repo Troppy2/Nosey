@@ -2612,13 +2612,20 @@ export async function sendResumeGrillMessage(
   message: string | null,
   history: InterviewChatMessage[],
   coveredGoals: string[] = [],
+  followupsOnCurrent = 0,
   provider?: string,
-): Promise<{ reply: string; is_done: boolean; covered_goals: string[] }> {
-  return request<{ reply: string; is_done: boolean; covered_goals: string[] }>(
+): Promise<{ reply: string; is_done: boolean; covered_goals: string[]; followups_on_current?: number }> {
+  return request<{ reply: string; is_done: boolean; covered_goals: string[]; followups_on_current?: number }>(
     `/mock-interview/${sessionId}/resume/grill/message`,
     {
       method: "POST",
-      body: JSON.stringify({ message, history, covered_goals: coveredGoals, provider }),
+      body: JSON.stringify({
+        message,
+        history,
+        covered_goals: coveredGoals,
+        followups_on_current: followupsOnCurrent,
+        provider,
+      }),
     },
   );
 }
@@ -2682,6 +2689,7 @@ export async function sendStage2Message(
     hintsUsed?: number;
     minutesLeft?: number | null;
     event?: Stage2TurnEvent | null;
+    followupsOnCurrent?: number;
   } = {},
   provider?: string,
 ): Promise<Stage2MessageResponse> {
@@ -2696,6 +2704,7 @@ export async function sendStage2Message(
       hints_used: turn.hintsUsed ?? 0,
       minutes_left: turn.minutesLeft ?? null,
       event: turn.event ?? null,
+      followups_on_current: turn.followupsOnCurrent ?? 0,
       provider,
     }),
   });
