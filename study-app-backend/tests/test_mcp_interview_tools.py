@@ -325,6 +325,46 @@ async def test_resume_question_pool_picks_five_and_reports_them(client, call, db
     assert (await call("get_mock_interview", {"session_id": sid}))["resume_questions"]["picked"] == []
 
 
+async def test_behavioral_question_pool_picks_five_and_reports_them(client, call) -> None:  # noqa: F811
+    pool = [f"Tell me about a time you handled conflict {i}." for i in range(7)]
+    await call("create_mock_interview", {"company": "amazon", "behavioral_questions": pool[:4]}, expect_error=True)
+    made = await call("create_mock_interview", {"company": "amazon", "stages": ["stage3"], "behavioral_questions": pool})
+    sid = made["session_id"]
+    before = await call("get_mock_interview", {"session_id": sid})
+    assert before["behavioral_questions"]["picked"] == [] and before["resume_questions"] is None
+
+    reply = AsyncMock(return_value='{"reply": "Q1", "answered": false, "is_done": false}')
+    with patch("src.routes.mock_interview.LLMService.call_kojo", reply):
+        first = await client.post(f"/mock-interview/{sid}/stage3/message", json={"history": [], "covered_goals": []})
+        assert first.status_code == 200, first.text
+        await client.post(f"/mock-interview/{sid}/stage3/message", json={"history": [], "covered_goals": []})
+
+    info = (await call("get_mock_interview", {"session_id": sid}))["behavioral_questions"]
+    picked = [p["question"] for p in info["picked"]]
+    assert len(picked) == 5 and len(set(picked)) == 5 and len(info["unused"]) == 2
+    prompts = [c.args[0] for c in reply.await_args_list]
+    # The opener asks only the first pick, and a resumed run asks the same one.
+    assert picked[0] in prompts[0] and not any(q in prompts[0] for q in picked[1:])
+    assert prompts[0] == prompts[1]
+
+    out = await call("set_behavioral_questions", {"session_id": sid, "questions": pool[2:]})
+    assert out["pool_size"] == 5 and out["note"] is None
+    assert (await call("get_mock_interview", {"session_id": sid}))["behavioral_questions"]["picked"] == []
+
+    no_stage3 = await call("create_mock_interview", {"company": "amazon", "stages": ["resume"]})
+    out = await call("set_behavioral_questions", {"session_id": no_stage3["session_id"], "questions": pool})
+    assert "no behavioral round" in out["note"]
+
+
+async def test_behavioral_round_without_pool_writes_its_own_questions(client, call) -> None:  # noqa: F811
+    made = await call("create_mock_interview", {"company": "amazon", "stages": ["stage3"]})
+    reply = AsyncMock(return_value='{"reply": "Q1", "answered": false, "is_done": false}')
+    with patch("src.routes.mock_interview.LLMService.call_kojo", reply):
+        res = await client.post(f"/mock-interview/{made['session_id']}/stage3/message", json={"history": []})
+        assert res.status_code == 200, res.text
+    assert "a NEW STAR question" in reply.await_args_list[0].args[0]
+
+
 async def test_voice_round_transcripts_reach_the_connector(client, call) -> None:  # noqa: F811
     made = await call("create_mock_interview", {"company": "microsoft", "stages": ["stage3"]})
     sid = made["session_id"]

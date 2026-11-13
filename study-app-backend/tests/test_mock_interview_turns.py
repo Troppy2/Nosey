@@ -155,6 +155,7 @@ def _row(**extra: Any) -> SimpleNamespace:
         custom_config=None,
         resume_text="Inah James. Nosey: AI study app. Caring Heart Assisted Living web developer.",
         resume_questions=json.dumps({"pool": PICKED, "picked": [0, 1, 2, 3, 4]}),
+        behavioral_questions=None,
         transcripts=None,
         resume_grill=None,
         resume_screen=None,

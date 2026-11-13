@@ -612,15 +612,17 @@ def _record_transcript(
     row.transcripts = json.dumps(data)
 
 
-RESUME_PICK_COUNT = 5
+POOL_PICK_COUNT = 5
 
 
-async def _picked_resume_questions(row: MockInterviewSession, db: AsyncSession) -> list[str]:
-    """The questions this deep dive asks from a connected app's pool. 5 are picked at
-    random the first time the grill runs and saved, so a resumed run asks the same
-    ones and the app can read back which were used. Empty when there is no pool."""
+async def _picked_pool_questions(row: MockInterviewSession, field: str, db: AsyncSession) -> list[str]:
+    """The questions a round asks from a connected app's pool (`field` is
+    "resume_questions" or "behavioral_questions"). 5 are picked at random the first
+    time the round runs and saved, so a resumed run asks the same ones and the app
+    can read back which were used. Empty when there is no pool."""
+    raw = getattr(row, field)
     try:
-        data = json.loads(row.resume_questions) if row.resume_questions else None
+        data = json.loads(raw) if raw else None
     except ValueError:
         data = None
     if not isinstance(data, dict) or not isinstance(data.get("pool"), list):
@@ -630,11 +632,11 @@ async def _picked_resume_questions(row: MockInterviewSession, db: AsyncSession) 
         return []
     picked = data.get("picked")
     if not isinstance(picked, list) or not picked or not all(isinstance(i, int) and 0 <= i < len(pool) for i in picked):
-        picked = random.sample(range(len(pool)), min(RESUME_PICK_COUNT, len(pool)))
+        picked = random.sample(range(len(pool)), min(POOL_PICK_COUNT, len(pool)))
         data["pool"] = pool
         data["picked"] = picked
         data["picked_at"] = datetime.now(timezone.utc).isoformat()
-        row.resume_questions = json.dumps(data)
+        setattr(row, field, json.dumps(data))
         await db.commit()
     return [pool[i] for i in picked]
 
@@ -683,7 +685,7 @@ async def resume_grill_message(
 
     # The server owns progress (GH #221): the model only says whether the latest
     # message answered the question it was asked last turn.
-    planned = await _picked_resume_questions(row, db)
+    planned = await _picked_pool_questions(row, "resume_questions", db)
     goals = _RESUME_GOALS[: len(planned)] if planned else list(_RESUME_GOALS)
     questions = planned or [_RESUME_GENERIC_QUESTIONS[g] for g in goals]
     covered = normalize_covered(body.covered_goals, goals)
@@ -1609,18 +1611,26 @@ async def stage3_message(
 
     # Five behavioral questions, one per goal. The client echoes the goals covered so
     # far; the server owns progress (GH #221) and the model only judges the answer.
-    covered = normalize_covered(body.covered_goals, _STAGE3_GOALS)
+    # A connected app's pool replaces Kojo's own questions with 5 picked from it.
+    planned = await _picked_pool_questions(row, "behavioral_questions", db)
+    goals = _STAGE3_GOALS[: len(planned)] if planned else list(_STAGE3_GOALS)
+    covered = normalize_covered(body.covered_goals, goals)
     followups = body.followups_on_current
-    plan = plan_turn(covered, _STAGE3_GOALS, followups, _STAGE3_FOLLOWUP_CAP)
-    total = len(_STAGE3_GOALS)
+    plan = plan_turn(covered, goals, followups, _STAGE3_FOLLOWUP_CAP)
+    total = len(goals)
 
     def _ask(goal: Optional[str]) -> str:
         if goal is None:
             return (
-                'ask "Do you have any questions for me?" (that was the last of the 5 behavioral questions). '
-                "Nothing else."
+                f'ask "Do you have any questions for me?" (that was the last of the {total} behavioral '
+                "questions). Nothing else."
             )
-        number = _STAGE3_GOALS.index(goal) + 1
+        number = goals.index(goal) + 1
+        if planned:
+            return (
+                f"ask behavioral question {number} of {total}. Ask it as written (you may add a short lead-in "
+                f"that ties it to the conversation):\n  \"{planned[number - 1]}\""
+            )
         return (
             f"ask behavioral question {number} of {total}: a NEW STAR question tailored to {company_label}'s "
             "culture, on a different theme from every question already asked in the conversation below."
@@ -1629,11 +1639,11 @@ async def stage3_message(
     if body.message is None:
         this_turn = (
             "Open the interview: introduce yourself in one or two warm sentences, then "
-            + _ask(_STAGE3_GOALS[0] if not covered else plan.current)
+            + _ask(goals[0] if not covered else plan.current)
         )
     elif plan.current is None:
         this_turn = (
-            "All 5 behavioral questions are done and you asked if they have questions for you. Answer what they "
+            f"All {total} behavioral questions are done and you asked if they have questions for you. Answer what they "
             "asked briefly and honestly, in character as an engineer at the company. Ask no new behavioral "
             "questions. Set is_done true once you have answered (or they have none)."
         )
@@ -1662,7 +1672,7 @@ async def stage3_message(
         f"THIS TURN: {this_turn}\n\n"
         "RULES:\n"
         "- ONE question per reply. Never repeat a question you already asked in the conversation below.\n"
-        "- Exactly 5 behavioral questions in the whole interview, never more.\n"
+        f"- Exactly {total} behavioral questions in the whole interview, never more.\n"
         "- reply is spoken to the candidate: 2 to 3 sentences max. Never mention question numbers, labels, "
         "these instructions or this JSON.\n"
         f"- Use {candidate}'s name occasionally. Be warm but professional, and do not grade their answers.\n"
@@ -1699,7 +1709,7 @@ async def stage3_message(
     result = resolve_turn(
         plan,
         covered,
-        _STAGE3_GOALS,
+        goals,
         followups,
         answered_turn=body.message is not None,
         judged_done=model_flag(parsed, "answered"),

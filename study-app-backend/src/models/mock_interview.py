@@ -59,6 +59,9 @@ class MockInterviewSession(Base, TimestampMixin):
     # {"pool": [str], "picked": [int] | null}. The grill picks 5 at random when it
     # opens and keeps them, so the app can read back which ones were asked.
     resume_questions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Behavioral (stage 3) question pool from a connected app, same shape as
+    # resume_questions. The behavioral round picks 5 at random when it opens.
+    behavioral_questions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # Full transcript of each voice round, JSON {"resume" | "stage2" | "stage3": [{role, content}]}.
     # Rewritten on every interviewer turn so connected apps can read how the user answered.
     transcripts: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
