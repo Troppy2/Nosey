@@ -454,12 +454,23 @@ class GradingService:
         Math FRQ grading reads the shown work itself (grade_math_answer is told
         when nothing was typed). Every other grader only sees this string, so a
         draw-only answer there is graded on its transcript, not on "".
+
+        A written or code answer that was typed AND drawn is graded on both:
+        the typed text plus the drawing's read as shown work. The drawing only
+        joins when it was read with usable confidence; a bad read is left out
+        and the typed answer is graded alone, as before (no hold, since the
+        student already answered). Objective types keep the typed pick only:
+        their graders match it against the options.
         """
-        if typed.strip() or work is None:
-            return typed
         if is_math_mode and not is_coding_mode and question.question_type == "FRQ":
             return typed
-        return work.transcript
+        if work is None:
+            return typed
+        if not typed.strip():
+            return work.transcript
+        if question.question_type != "FRQ" or not GradingService._readable(work):
+            return typed
+        return _context_answer(typed, work.transcript)
 
     def _to_answer_result(
         self,

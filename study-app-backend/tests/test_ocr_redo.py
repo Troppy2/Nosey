@@ -172,7 +172,33 @@ async def test_draw_only_answer_outside_math_frq_is_graded_on_its_transcript() -
     assert pick(_q("FRQ"), "", work, is_math_mode=False, is_coding_mode=False) == "mitochondria"
     # Math FRQ grading reads the work itself.
     assert pick(_q("FRQ"), "", work, is_math_mode=True, is_coding_mode=False) == ""
-    assert pick(_q("FRQ"), "typed", work, is_math_mode=False, is_coding_mode=False) == "typed"
+
+
+async def test_typed_and_drawn_written_answer_is_graded_on_both() -> None:
+    work = OcrResult(transcript="ATP is made here", confidence=0.9, engine="claude")
+    pick = GradingService._answer_for_grading
+    both = "mitochondria\nShown work: ATP is made here"
+    # Text and code written answers now see the drawing next to the typed answer.
+    assert pick(_q("FRQ"), "mitochondria", work, is_math_mode=False, is_coding_mode=False) == both
+    assert pick(_q("FRQ"), "mitochondria", work, is_math_mode=False, is_coding_mode=True) == both
+    # Math FRQ is unchanged: its grader gets the work separately.
+    assert pick(_q("FRQ"), "x = 4", work, is_math_mode=True, is_coding_mode=False) == "x = 4"
+
+
+async def test_typed_and_drawn_falls_back_to_typed_when_drawing_adds_nothing() -> None:
+    pick = GradingService._answer_for_grading
+    # Nothing typed in the pad's read, or a bad read: the typed answer alone.
+    empty = OcrResult(transcript="", confidence=0.9, engine="claude")
+    blurry = OcrResult(transcript="7?x q", confidence=0.1, engine="claude")
+    assert pick(_q("FRQ"), "typed", empty, is_math_mode=False, is_coding_mode=False) == "typed"
+    assert pick(_q("FRQ"), "typed", blurry, is_math_mode=False, is_coding_mode=False) == "typed"
+    assert pick(_q("FRQ"), "typed", None, is_math_mode=False, is_coding_mode=False) == "typed"
+    # The drawing repeats what was typed (text pasted onto the pad): no duplicate.
+    same = OcrResult(transcript="typed", confidence=0.9, engine="claude")
+    assert pick(_q("FRQ"), "typed", same, is_math_mode=False, is_coding_mode=False) == "typed"
+    # Objective types keep the pick only, so option matching still works.
+    work = OcrResult(transcript="because 2 is even", confidence=0.9, engine="claude")
+    assert pick(_q("MCQ"), "B", work, is_math_mode=False, is_coding_mode=False) == "B"
 
 
 # ── End to end on SQLite ────────────────────────────────────────────────
