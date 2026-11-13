@@ -74,6 +74,7 @@ CATALOG: tuple[CatalogLecture, ...] = (
     CatalogLecture("dp-unbounded", "dp", "Unbounded Knapsack", "coin-change"),
     CatalogLecture("lis", "dp", "Longest Increasing Subsequence", "longest-increasing-subsequence"),
     CatalogLecture("merge-intervals", "intervals", "Merging Intervals", "non-overlapping-intervals"),
+    CatalogLecture("sweep-line", "intervals", "Sweep Line", "meeting-rooms-ii"),
     CatalogLecture("bit-tricks", "bit-manipulation", "Bit Manipulation Tricks", "single-number"),
 )
 CATALOG_BY_SLUG = {c.slug: c for c in CATALOG}
