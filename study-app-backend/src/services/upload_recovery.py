@@ -140,3 +140,14 @@ async def run_periodic_sweep(
                 logger.info("Safety purge: %d expired tombstones, %d old flags", tombstones, flags)
         except Exception as exc:
             logger.warning("Safety purge failed: %r", exc)
+        # Same heartbeat: delete stored TTS audio nobody played within the TTL
+        # (services/audio_cache.py). Own try so it never blocks the others.
+        try:
+            from src.services.audio_cache import purge_idle_audio
+
+            async with async_session_maker() as session:
+                purged = await purge_idle_audio(session)
+            if any(purged.values()):
+                logger.info("Idle audio purge: %s", purged)
+        except Exception as exc:
+            logger.warning("Idle audio purge failed: %r", exc)

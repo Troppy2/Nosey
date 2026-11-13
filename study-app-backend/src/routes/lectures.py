@@ -22,6 +22,7 @@ from src.models.user import User
 from src.schemas.leetcode_schema import LCWalkthroughAudioRequest, LCWalkthroughAudioResponse
 from src.services import lc_catalog
 from src.services.account_safety_service import screen_user_input
+from src.services.audio_cache import touch
 from src.services.lecture_service import CATALOG, SLUG_RE, normalize_topic, relayout_lecture, spoken_lines
 from src.services.speech_service import record_lines
 from src.utils.exceptions import LLMException, ValidationException
@@ -190,6 +191,7 @@ async def record_lecture_audio(
     if cached is not None:
         by_line = json.loads(cached.clips_json)
         if isinstance(by_line, dict) and all(line in by_line for line in requested):
+            await touch(session, cached)
             return LCWalkthroughAudioResponse(voice=body.voice, clips=[by_line[line] for line in requested])
 
     try:

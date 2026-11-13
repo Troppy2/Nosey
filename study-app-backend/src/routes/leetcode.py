@@ -113,6 +113,7 @@ _CLIENT_STRUGGLE_EVENTS = frozenset(
     }
 )
 from src.services.speech_service import record_lines
+from src.services.audio_cache import touch
 from src.utils.exceptions import LLMException, ResourceNotFoundException, ValidationException
 from src.utils.logger import get_logger
 from src.utils.provider_policy import resolve_request_provider
@@ -862,6 +863,7 @@ async def record_walkthrough_audio(
     )
     cached = (await session.execute(select(LCWalkthroughAudio).where(*key))).scalar_one_or_none()
     if cached is not None:
+        await touch(session, cached)
         return LCWalkthroughAudioResponse(voice=body.voice, clips=json.loads(cached.clips_json))
 
     try:

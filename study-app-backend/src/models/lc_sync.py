@@ -368,6 +368,8 @@ class LCWalkthroughAudio(Base, TimestampMixin):
     voice: Mapped[str] = mapped_column(String(40), nullable=False)
     lines_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     clips_json: Mapped[str] = mapped_column(Text, nullable=False)
+    # Bumped when the recording is served; idle rows are purged (services/audio_cache.py).
+    last_used_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False, index=True)
 
     def __repr__(self) -> str:
         return f"LCWalkthroughAudio(user_id={self.user_id!r}, slug={self.problem_slug!r}, voice={self.voice!r})"
@@ -426,3 +428,5 @@ class LCLectureAudio(Base, TimestampMixin):
     voice: Mapped[str] = mapped_column(String(40), nullable=False)
     lines_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     clips_json: Mapped[str] = mapped_column(Text, nullable=False)
+    # Bumped when the recording is served; idle rows are purged (services/audio_cache.py).
+    last_used_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False, index=True)

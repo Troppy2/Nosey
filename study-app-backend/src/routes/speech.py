@@ -18,6 +18,7 @@ from src.database import get_session
 from src.dependencies import get_current_user
 from src.limiter import limiter
 from src.models.user import User
+from src.services.audio_cache import touch
 from src.services.quota_service import is_exempt, is_guest
 from src.services.narration_service import compress, ensure_clip, get_clip
 from src.services.speech_service import MAX_TTS_CHARS, SpeechService
@@ -96,6 +97,7 @@ async def narrate(
         logger.warning("narration cache unavailable, generating without it", exc_info=True)
         clip, cache_ok = None, False
     if clip is not None:
+        await touch(session, clip)
         return Response(content=clip.audio, media_type=clip.content_type, headers=headers)
     if not is_exempt(user):
         _throttle(user)

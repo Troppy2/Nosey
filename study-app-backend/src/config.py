@@ -79,6 +79,9 @@ class Settings(BaseSettings):
     moderation_timeout_seconds: float = Field(default=4.0, alias="MODERATION_TIMEOUT_SECONDS")
     # Flags not tied to a standing ban are deleted after this many days.
     content_flag_retention_days: int = Field(default=365, alias="CONTENT_FLAG_RETENTION_DAYS")
+    # Stored TTS audio (narration, walkthrough, lecture) not played for this long
+    # is deleted by the periodic sweep; the next play regenerates it.
+    audio_cache_ttl_hours: float = Field(default=10, alias="AUDIO_CACHE_TTL_HOURS")
     # GH #172: a deleted Google account cannot sign up again for this long.
     account_recreate_cooldown_hours: int = Field(default=24, alias="ACCOUNT_RECREATE_COOLDOWN_HOURS")
     # Keys the HMAC of Google ids kept in account_tombstones. Unset derives a

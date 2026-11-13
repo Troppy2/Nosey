@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from sqlalchemy import Integer, LargeBinary, String, UniqueConstraint
+from datetime import datetime
+
+from sqlalchemy import DateTime, Integer, LargeBinary, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.models.base import BIGINT_ID, Base, TimestampMixin
@@ -23,3 +25,5 @@ class NarrationClip(Base, TimestampMixin):
     audio: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     content_type: Mapped[str] = mapped_column(String(32), nullable=False, default="audio/mpeg")
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Bumped when the clip is served; idle clips are purged (services/audio_cache.py).
+    last_used_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False, index=True)
