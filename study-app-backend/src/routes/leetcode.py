@@ -305,6 +305,18 @@ async def log_test_run(
             passed=body.passed,
         )
     )
+    # Interview realism runs without a grade, so the failed-run struggle signal that
+    # /grade would have logged is recorded here (same event, same weakness weight).
+    if body.grade_skipped and not body.passed:
+        session.add(
+            LCStruggleEvent(
+                user_id=user.id,
+                topic=body.topic,
+                subtopic=body.subtopic,
+                event_type=EVENT_FAILED_GRADE,
+                problem_slug=body.problem_slug,
+            )
+        )
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

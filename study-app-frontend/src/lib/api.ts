@@ -2332,11 +2332,20 @@ export async function postLCTestRun(
   difficulty: string,
   passed: boolean,
   subtopic?: string | null,
+  // Interview realism skips Kojo's grade, so the server logs a failed run itself.
+  gradeSkipped = false,
 ): Promise<void> {
   try {
     await request("/leetcode/test-run", {
       method: "POST",
-      body: JSON.stringify({ problem_slug: problemSlug, topic, subtopic: subtopic ?? null, difficulty, passed }),
+      body: JSON.stringify({
+        problem_slug: problemSlug,
+        topic,
+        subtopic: subtopic ?? null,
+        difficulty,
+        passed,
+        grade_skipped: gradeSkipped,
+      }),
     });
   } catch {
     // Best-effort signal, never blocks the run/grade flow it's fired from.

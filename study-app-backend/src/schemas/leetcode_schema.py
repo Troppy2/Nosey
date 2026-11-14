@@ -400,6 +400,9 @@ class LCTestRunRequest(BaseModel):
     subtopic: Optional[str] = Field(default=None, max_length=120)
     difficulty: str = Field(default="unknown", max_length=20)
     passed: bool = Field(default=False)
+    # True when the client skipped Kojo's grade (interview realism). /grade is what logs
+    # a failed run as a weakness signal, so this route logs it instead.
+    grade_skipped: bool = Field(default=False)
 
 
 class LCImprovementTopic(BaseModel):

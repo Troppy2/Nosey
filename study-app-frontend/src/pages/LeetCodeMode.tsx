@@ -4373,7 +4373,14 @@ export default function LeetCodeMode() {
           problemAtRun.difficulty,
           result.ok,
           resolveProblemSubtopic(problemAtRun.slug),
+          interviewRealism,
         );
+      }
+
+      // Interview realism: a real interviewer never tells you the bug or the fix, so Kojo
+      // does not grade the run. The pass/fail cases above are all the user sees.
+      if (result.cases?.length && !interviewRealism) {
+        const customForGrade = customProblems.find((cp) => cp.slug === problemAtRun.slug);
         setGradeLoading(true);
         const testResultsSummary = JSON.stringify(
           result.cases.map((c) => ({
@@ -4441,7 +4448,11 @@ export default function LeetCodeMode() {
       return;
     }
 
-    setTimeoutModalMessage("Time's up. Kojo graded your attempt and it still needs more work.");
+    setTimeoutModalMessage(
+      interviewRealism
+        ? "Time's up. Your attempt does not pass every test case yet."
+        : "Time's up. Kojo graded your attempt and it still needs more work.",
+    );
     setTimeoutDrillSlug(problemAtTimeout.slug);
     setTimeoutModalOpen(true);
   }
@@ -6832,7 +6843,9 @@ export default function LeetCodeMode() {
       practiceSession.disableKojo &&
       practiceSession.slugs.includes(currentProblem.slug),
   );
-  const kojoButtonLocked = assistsLocked || practiceHintsOff;
+  // Interview realism also turns off the Ask Kojo hint chat (a real interview has no
+  // assistant to ask). Turn realism off in the cog to get hints back.
+  const kojoButtonLocked = assistsLocked || practiceHintsOff || interviewRealism;
   // While a drill is open, only the current pass's tab is usable; every other tab (the user's
   // previous solution + earlier-pass attempts) is locked from view/delete. Locking itself is
   // computed by the component-scope isTabLockedForDrill (also used by the tab handlers).
@@ -6945,7 +6958,9 @@ export default function LeetCodeMode() {
                     ? `Locked on Pass ${activePass}: no resources`
                     : practiceHintsOff
                       ? "Hints off for this practice session"
-                      : "Ask Kojo for a hint"
+                      : interviewRealism
+                        ? "Hints off while interview realism is on"
+                        : "Ask Kojo for a hint"
                 }
               >
                 <SparklesIcon size={16} />
@@ -7203,7 +7218,7 @@ export default function LeetCodeMode() {
               />
             ) : null}
 
-            {gradeFeedback && !gradeLoading ? (
+            {gradeFeedback && !gradeLoading && !interviewRealism ? (
               <div className="lc-grade-feedback">
                 <div className="lc-grade-feedback-header">
                   <KojoMascot state="idle" />
@@ -7598,7 +7613,7 @@ export default function LeetCodeMode() {
         </div>
       </div>
 
-      {kojoOpen && currentProblem ? (
+      {kojoOpen && currentProblem && !interviewRealism ? (
         <KojoHelpChat
           storageKey={`lc:${currentProblem.slug}`}
           subtitle={currentProblem.title}
