@@ -1,0 +1,59 @@
+/* Resume screen (pages/MockInterviewResume.tsx). Built on the debrief layout and the
+   setup page's segment, file row and footer, so it reads like the rest of the loop.
+   Values match mock-setup.css / mock-debrief.css, which use the same literal palette. */
+.ats2 { max-width: 760px; }
+.ats2-title { margin: 0; font-family: Lora, serif; font-size: 40px; font-weight: 600; line-height: 1.15; letter-spacing: -0.01em; }
+
+/* Input */
+.ats2-input { display: flex; flex-direction: column; gap: 16px; background: #fff; border: 1px solid #cfe1b9; border-radius: 8px; padding: 24px; }
+.ats2 .ats2-segment--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ats2 .ats2-segment--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ats2-segment button:disabled { cursor: not-allowed; opacity: .6; }
+.ats2-file { background: #f6f9f1; }
+.ats2-drop { min-height: 132px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 20px; border: 1.5px dashed #b5c99a; border-radius: 8px; background: #f6f9f1; color: #4f6339; font: inherit; cursor: pointer; transition: background-color 160ms cubic-bezier(.3,0,0,1), border-color 160ms cubic-bezier(.3,0,0,1); }
+.ats2-drop:hover, .ats2-drop.is-dragging { background: #eef5e3; border-color: #718355; }
+.ats2-drop-title { font-size: 15px; font-weight: 600; color: #26301f; }
+.ats2-drop-sub { font-size: 14px; color: #596949; }
+.ats2-paste { width: 100%; box-sizing: border-box; min-height: 220px; resize: vertical; padding: 14px 16px; border: 1px solid #cfe1b9; border-radius: 8px; background: #f6f9f1; color: #26301f; font-family: "JetBrains Mono", monospace; font-size: 13px; line-height: 1.6; }
+.ats2-paste:focus { outline: none; border-color: #718355; background: #fff; }
+.ats2-keep { align-self: flex-start; }
+.ats2-error { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 14px; color: #9b2c1a; }
+.ats2-run { display: flex; justify-content: flex-end; }
+.ats2-run .debrief-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Result */
+.ats2-result { display: flex; flex-direction: column; gap: 14px; scroll-margin-top: 24px; }
+.ats2-score-row { display: flex; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
+.ats2-score { font-family: Lora, serif; font-size: 64px; font-weight: 600; line-height: 1; }
+.ats2-score-max { margin-left: 4px; font-family: Inter, sans-serif; font-size: 18px; font-weight: 500; color: #596949; }
+.ats2-score-side { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; padding-bottom: 4px; }
+.ats2-verdict { font-size: 16px; line-height: 1.5; }
+.ats2-meter { height: 8px; border-radius: 999px; background: #e0ebd2; overflow: hidden; }
+.ats2-meter span { display: block; height: 100%; border-radius: inherit; background: currentColor; transition: width 600ms cubic-bezier(.3,0,0,1); }
+.ats2-summary { margin: 0; font-size: 17px; line-height: 1.6; }
+.ats2-chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.ats2-chip { display: inline-flex; align-items: center; min-height: 28px; padding: 0 10px; border-radius: 999px; font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
+.ats2-chip--match { background: #e3f0d6; color: #2f5b1f; }
+.ats2-chip--miss { background: #fff; color: #9b2c1a; border: 1px dashed #d9a79b; }
+.ats2-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; line-height: 1.55; min-width: 0; overflow-wrap: anywhere; }
+
+/* Deep dive + footer */
+.ats2-grill-text { margin: 0; font-size: 15px; line-height: 1.6; color: #596949; }
+.ats2-grill-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
+.ats2-grill-actions .voice-picker { width: 100%; max-width: 420px; }
+.ats2-footer .setup2-footer-meta { color: #596949; }
+
+.ats2 :is(button, textarea):focus-visible { outline: 2px solid #4f6339; outline-offset: 3px; }
+
+@media (max-width: 640px) {
+  .ats2-title { font-size: 30px; }
+  .ats2-input { padding: 16px; }
+  .ats2 .ats2-segment--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ats2-segment button { font-size: 14px; padding: 0 4px; }
+  .ats2-score { font-size: 48px; }
+  .ats2-run .debrief-btn { width: 100%; justify-content: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ats2-drop, .ats2-meter span { transition: none; }
+}
+.ats2-keep .toggle-switch-label { text-align: left; }

@@ -34,6 +34,7 @@ import {
   type MockProgress,
 } from "../lib/mockInterview";
 import { MockLoopRail } from "../components/MockLoopRail";
+import { SavedResumeCard } from "../components/SavedResumeCard";
 import { formatLoopDuration, totalLoopMinutes, type LoopStageKey } from "../data/mockInterviewLoop";
 import "../styles/components/mock-debrief.css";
 import "../styles/components/mock-setup.css";
@@ -593,6 +594,9 @@ export default function MockInterviewSetup() {
         </div>
         <p className="setup2-hint">{LEVEL_OPTIONS.find((o) => o.key === selectedLevel)?.description}</p>
       </section>
+
+      {/* The saved resume the resume screen reads every run. */}
+      <SavedResumeCard />
 
       {/* Rounds: the loop rail. Tap a station to switch that round on or off. */}
       <section className="setup2-section setup2-loop">

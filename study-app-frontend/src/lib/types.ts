@@ -1099,6 +1099,14 @@ export type SavedJobDescription = {
   updated_at?: string | null;
 };
 
+/** The one resume a user keeps for mock interviews (GET/PUT /saved-resume). */
+export type SavedResume = {
+  /** Original file name; null when the resume was pasted. */
+  file_name: string | null;
+  updated_at: string | null;
+  chars: number;
+};
+
 export type ResumeScreenResult = {
   ats_score: number;
   passes_oa: boolean;

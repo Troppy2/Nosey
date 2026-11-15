@@ -2597,6 +2597,16 @@ class LLMService:
         """Public entry for quality-critical JSON (mock OA hidden tests and reference solutions)."""
         return await self._complete_json_strongest(prompt)
 
+    async def complete_json(self, prompt: str, provider: Optional[str] = None) -> dict[str, object]:
+        """Public entry for a one-off JSON answer (ATS resume screen, JD parse).
+
+        Runs the JSON-configured provider calls with `_loads_json` repair and the
+        normal auto fallback. Never ask `call_kojo` for JSON and parse it yourself:
+        that is the plain-text chat path (the small Groq chat model among them),
+        which breaks nested JSON ("Expecting ':' delimiter", 2026-11-14).
+        """
+        return await self._complete_json(prompt, provider=provider)
+
     async def _complete_json_strongest(self, prompt: str) -> dict[str, object]:
         """Strongest available provider first (Claude), then the rest.
 

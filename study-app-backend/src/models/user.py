@@ -107,6 +107,15 @@ class User(Base, TimestampMixin):
     # Last X-Device-Id seen, so a ban can also refuse guest sign-ups from that
     # browser. A weak signal (clearing storage resets it), on purpose cheap.
     last_device_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
+    # The one resume a user keeps for mock interviews: the extracted text (the
+    # file itself is never stored) that the ATS screen can reuse instead of an
+    # upload every run. All three are deferred: the auth lookup on every request
+    # never selects them (no 12k-char pull, and a deploy that lands before
+    # migration 089 cannot break sign-in). Read them with an explicit column
+    # select (services/resume_service.load_saved_resume), never by attribute access.
+    saved_resume_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True, deferred=True)
+    saved_resume_file_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, deferred=True)
+    saved_resume_updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, deferred=True)
 
     folders: Mapped[list[Folder]] = relationship(
         "Folder", back_populates="user", cascade="all, delete-orphan"

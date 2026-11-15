@@ -1,26 +1,39 @@
 import { Loader2 } from "lucide-react";
-import { AlertIcon, ArrowLeftIcon, BookIcon, ChatIcon, CheckCircleIcon, ChevronRightIcon, CloseIcon, CrossCircleIcon, PencilIcon, SearchIcon, UploadIcon } from "../icons";
+import { AlertIcon, ArrowLeftIcon, BookIcon, ChatIcon, ChevronRightIcon, CloseIcon, UploadIcon } from "../icons";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { screenResume, sendResumeGrillMessage } from "../lib/api";
-import type { InterviewChatMessage, MockInterviewSession, ResumeScreenResult } from "../lib/types";
+import { getSavedResume, screenResume, sendResumeGrillMessage } from "../lib/api";
+import type { InterviewChatMessage, MockInterviewSession, ResumeScreenResult, SavedResume } from "../lib/types";
 import { COMPANY_OPTIONS, type CompanyKey } from "../data/mockInterviewProblems";
 import { answerTooLong, loadMockProgress, saveMockProgress, type MockProgress, type MockCompany } from "../lib/mockInterview";
 import { MockProgressGate } from "../components/MockProgressGate";
 import { VoiceRoom } from "../components/VoiceRoom";
 import { useInterviewerVoice } from "../lib/voice";
 import { VoicePicker } from "../components/VoiceStart";
+import { ToggleSwitch } from "../components/ToggleSwitch";
+import { ProgressBar, useStagedProgress, type ProgressStage } from "../components/Progress";
+import { formatSavedDate } from "../components/SavedResumeCard";
+import "../styles/components/mock-debrief.css";
+import "../styles/components/mock-setup.css";
+import "../styles/components/mock-ats.css";
 
 const ACCEPT = ".pdf,.docx,.doc,.txt,.md,.tex";
 
-function scoreColor(score: number): string {
-  if (score >= 80) return "#10b981";
-  if (score >= 65) return "#3b82f6";
-  if (score >= 50) return "#d97706";
-  return "#dc2626";
+// What the scan actually does, for the progress bar. Only the ratios matter.
+const SCAN_STAGES: ProgressStage[] = [
+  { label: "Reading your resume", seconds: 2 },
+  { label: "Matching keywords to the role", seconds: 5 },
+  { label: "Writing the recruiter's read", seconds: 6 },
+];
+
+// The score color follows the verdict, so a passing 74 never reads as a warning.
+function scoreTone(result: ResumeScreenResult): string {
+  if (result.passes_oa) return "debrief-tone-good";
+  if (result.ats_score >= 50) return "debrief-tone-mid";
+  return "debrief-tone-bad";
 }
 
-type InputMode = "upload" | "paste";
+type InputMode = "saved" | "upload" | "paste";
 
 export default function MockInterviewResume() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -56,18 +69,20 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
   const missingContext = !state?.session && !stored;
 
   const [text, setText] = useState(() => stored?.resume?.inputText ?? "");
+  // A File cannot be restored after a reload, so only a file picked on this visit counts.
   const [file, setFile] = useState<File | null>(null);
-  const [fileName, setFileName] = useState<string | null>(() => stored?.resume?.fileName ?? null);
   const [mode, setMode] = useState<InputMode>(() =>
     stored?.resume?.inputText && !stored?.resume?.fileName ? "paste" : "upload",
   );
+  // Once the user picks a tab or a file, the saved resume no longer steals the default.
+  const modeTouched = useRef(Boolean(stored?.resume?.inputText));
+  const [saved, setSaved] = useState<SavedResume | null>(null);
+  const [saveAsMine, setSaveAsMine] = useState(true);
   const [dragging, setDragging] = useState(false);
   const [result, setResult] = useState<ResumeScreenResult | null>(() => stored?.resume?.result ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Drives the gauge fill animation (0 -> score) when a result appears.
-  const [gauge, setGauge] = useState(0);
+  const scan = useStagedProgress(SCAN_STAGES, { running: loading, done: false });
 
   // Resume deep dive: the interviewer grills the candidate on their own resume. Opens
   // only after a scan (the server needs the parsed resume to quote from) and is always
@@ -92,13 +107,25 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
   const GRILL_TOTAL_GOALS = 5;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const resultRef = useRef<HTMLElement>(null);
 
+  // The saved resume (from the interview home) becomes the default input when there is one.
   useEffect(() => {
-    if (!result) return;
-    setGauge(0);
-    const id = requestAnimationFrame(() => setGauge(result.ats_score));
-    return () => cancelAnimationFrame(id);
-  }, [result]);
+    let cancelled = false;
+    getSavedResume()
+      .then((row) => {
+        if (cancelled || !row) return;
+        setSaved(row);
+        setSaveAsMine(false);
+        if (!modeTouched.current) setMode("saved");
+      })
+      .catch(() => {
+        // No saved resume reachable: upload and paste still work.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function persist(partial: Partial<NonNullable<MockProgress["resume"]>>, completed?: boolean) {
     if (!Number.isFinite(numericSessionId)) return;
@@ -168,14 +195,16 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
     return `/mock-interview/${sessionId}/summary`;
   }
 
-  function takeFile(f: File | null) {
-    setFile(f);
-    setFileName(f?.name ?? null);
+  function pickMode(next: InputMode) {
+    modeTouched.current = true;
+    setMode(next);
     setError(null);
   }
 
-  function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
-    takeFile(e.target.files?.[0] ?? null);
+  function takeFile(f: File | null) {
+    modeTouched.current = true;
+    setFile(f);
+    setError(null);
   }
 
   function handleDrop(e: React.DragEvent) {
@@ -187,39 +216,51 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
 
   function clearFile() {
     setFile(null);
-    setFileName(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   async function handleScreen() {
     if (loading) return;
-    const usingFile = mode === "upload";
-    if (usingFile && !file && !fileName) {
+    if (mode === "upload" && !file) {
       setError("Choose a PDF or DOCX file to scan.");
       return;
     }
-    if (!usingFile && text.trim().length < 40) {
+    if (mode === "paste" && text.trim().length < 40) {
       setError("Paste at least a few lines of your resume to scan.");
       return;
     }
     setError(null);
     setLoading(true);
+    const keep = mode !== "saved" && saveAsMine;
     try {
       const res = await screenResume(numericSessionId, {
-        file: usingFile ? file : null,
-        text: usingFile ? "" : text,
+        file: mode === "upload" ? file : null,
+        text: mode === "paste" ? text : "",
+        useSaved: mode === "saved",
+        saveAsMine: keep,
       });
       setResult(res);
-      persist({ inputText: text, fileName, result: res });
+      const fileName = mode === "upload" ? file?.name ?? null : mode === "saved" ? saved?.file_name ?? null : null;
+      persist({ inputText: mode === "paste" ? text : "", fileName, result: res });
+      if (keep) {
+        const nextSaved: SavedResume = {
+          file_name: mode === "upload" ? file?.name ?? null : null,
+          updated_at: new Date().toISOString(),
+          chars: mode === "paste" ? text.trim().length : saved?.chars ?? 0,
+        };
+        setSaved(nextSaved);
+        setSaveAsMine(false);
+      }
+      requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Could not screen the resume. Try again.");
+      setError(e instanceof Error ? e.message : "Could not scan the resume. Try again.");
     } finally {
       setLoading(false);
     }
   }
 
   function handleContinue() {
-    persist({ inputText: text, fileName, result }, true);
+    persist({ result }, true);
     navigate(nextRoute(), { state: { session: state?.session, selectedStages } });
   }
 
@@ -277,290 +318,252 @@ function ResumeScreenView({ stored }: { stored: MockProgress | null }) {
     );
   }
 
-  const canRun = mode === "upload" ? !!(file || fileName) : text.trim().length >= 40;
-  const RING = 2 * Math.PI * 46;
-  const ringColor = result ? scoreColor(result.ats_score) : "#718355";
+  const modes: { key: InputMode; label: string }[] = [
+    ...(saved ? [{ key: "saved" as const, label: "Saved resume" }] : []),
+    { key: "upload", label: "Upload" },
+    { key: "paste", label: "Paste" },
+  ];
+  const canRun = mode === "saved" ? Boolean(saved) : mode === "upload" ? Boolean(file) : text.trim().length >= 40;
+  const hasKeywords = result ? result.matched_keywords.length + result.missing_keywords.length > 0 : false;
 
   return (
-    <div className="page page-narrow ats-page">
-      {/* Header */}
-      <header className="ats-head">
-        <div className="ats-head-text">
-          <span className="ats-eyebrow">
-            <SearchIcon size={13} /> Resume Screen
-          </span>
-          <h1 className="ats-title">ATS Resume Check</h1>
-          <p className="ats-sub">
-            <strong>{companyLabel}</strong> screen simulation. Would your resume clear the bots and a
-            recruiter to earn an OA? This never blocks you, scan it or skip ahead.
-          </p>
-        </div>
-        <button
-          className="ats-quit"
-          onClick={() => navigate("/mock-interview")}
-          title="Quit (your progress is saved)"
-        >
-          <ArrowLeftIcon size={15} /> Leave
+    <div className="debrief ats2">
+      <header className="debrief-head">
+        <button type="button" className="debrief-back" onClick={() => navigate("/mock-interview")}>
+          <ArrowLeftIcon size={16} /> Leave interview
         </button>
+        <span className="debrief-kicker">{companyLabel}, resume screen</span>
+        <h1 className="ats2-title">Would this resume get you an OA?</h1>
+        <p className="debrief-lede">
+          An ATS and a {companyLabel} recruiter read it first. This round never blocks the loop.
+        </p>
       </header>
 
-      {/* Scanner console */}
-      <section className="ats-console">
-        <div className="ats-console-bar">
-          <span className="ats-dots" aria-hidden>
-            <i /><i /><i />
-          </span>
-          <span className="ats-console-id">nosey ats scanner</span>
-          <span className="ats-console-target">TARGET: {companyLabel.toUpperCase()}</span>
+      <section className="ats2-input" aria-label="Your resume">
+        <div
+          className={`setup2-segment ats2-segment ats2-segment--${modes.length}`}
+          role="radiogroup"
+          aria-label="Resume source"
+        >
+          {modes.map((m) => (
+            <button
+              key={m.key}
+              type="button"
+              role="radio"
+              aria-checked={mode === m.key}
+              className={mode === m.key ? "is-on" : ""}
+              onClick={() => pickMode(m.key)}
+              disabled={loading}
+            >
+              {m.label}
+            </button>
+          ))}
         </div>
 
-        <div className="ats-console-body">
-          {/* Mode toggle */}
-          <div className="ats-modes" role="tablist">
-            <button
-              role="tab"
-              aria-selected={mode === "upload"}
-              className={`ats-mode${mode === "upload" ? " active" : ""}`}
-              onClick={() => setMode("upload")}
-            >
-              <UploadIcon size={14} /> Upload file
-            </button>
-            <button
-              role="tab"
-              aria-selected={mode === "paste"}
-              className={`ats-mode${mode === "paste" ? " active" : ""}`}
-              onClick={() => setMode("paste")}
-            >
-              <PencilIcon size={14} /> Paste text
-            </button>
-            <span className={`ats-mode-slider ${mode}`} aria-hidden />
+        {mode === "saved" && saved && (
+          <div className="setup2-cv ats2-file">
+            <span className="setup2-cv-icon" aria-hidden>
+              <BookIcon size={18} />
+            </span>
+            <span className="setup2-cv-text">
+              <span className="setup2-cv-name">{saved.file_name ?? "Pasted resume"}</span>
+              <span className="setup2-cv-meta">Saved {formatSavedDate(saved.updated_at)}</span>
+            </span>
           </div>
+        )}
 
-          {/* Upload mode */}
-          {mode === "upload" &&
-            (fileName ? (
-              <div className="ats-file">
-                <div className="ats-file-icon">
-                  <BookIcon size={18} />
-                </div>
-                <div className="ats-file-meta">
-                  <span className="ats-file-name">{fileName}</span>
-                  <span className="ats-file-hint">Ready to scan</span>
-                </div>
-                <button className="ats-file-remove" onClick={clearFile} title="Remove file">
-                  <CloseIcon size={16} />
-                </button>
-              </div>
-            ) : (
+        {mode === "upload" &&
+          (file ? (
+            <div className="setup2-cv ats2-file">
+              <span className="setup2-cv-icon" aria-hidden>
+                <BookIcon size={18} />
+              </span>
+              <span className="setup2-cv-text">
+                <span className="setup2-cv-name">{file.name}</span>
+                <span className="setup2-cv-meta">Ready to scan</span>
+              </span>
               <button
                 type="button"
-                className={`ats-drop${dragging ? " dragging" : ""}`}
-                onClick={() => fileInputRef.current?.click()}
-                onDragEnter={(e) => {
-                  e.preventDefault();
-                  setDragging(true);
-                }}
-                onDragOver={(e) => e.preventDefault()}
-                onDragLeave={() => setDragging(false)}
-                onDrop={handleDrop}
+                className="setup2-cv-remove"
+                onClick={clearFile}
+                disabled={loading}
+                aria-label="Remove file"
+                title="Remove file"
               >
-                <span className="ats-drop-icon">
-                  <UploadIcon size={22} />
-                </span>
-                <span className="ats-drop-title">Drop your resume here</span>
-                <span className="ats-drop-sub">or click to browse. PDF or DOCX</span>
+                <CloseIcon size={16} />
               </button>
-            ))}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={ACCEPT}
-            onChange={handleFilePick}
-            style={{ display: "none" }}
-          />
-
-          {/* Paste mode */}
-          {mode === "paste" && (
-            <div className="ats-paper">
-              <div className="ats-paper-gutter" aria-hidden>
-                <span>résumé.tex</span>
-                <span>{text.length ? `${text.length} chars` : "empty"}</span>
-              </div>
-              <textarea
-                className="ats-paper-text"
-                placeholder={"\\section{Experience}\nPaste your resume here as plain text or LaTeX source..."}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                spellCheck={false}
-                rows={9}
-              />
             </div>
-          )}
-
-          {error && (
-            <div className="ats-error">
-              <AlertIcon size={15} /> {error}
-            </div>
-          )}
-
-          {/* Run row */}
-          <div className="ats-run-row">
-            <span className="ats-run-hint">
-              {mode === "upload"
-                ? "We extract the text and run it through the screen."
-                : "Plain text or LaTeX both work."}
-            </span>
-            <button className="ats-run" onClick={handleScreen} disabled={loading || !canRun}>
-              {loading ? <Loader2 size={16} className="spin" /> : <SearchIcon size={16} />}
-              {loading ? "Scanning resume" : result ? "Re-scan" : "Run ATS Screen"}
+          ) : (
+            <button
+              type="button"
+              className={`ats2-drop${dragging ? " is-dragging" : ""}`}
+              onClick={() => fileInputRef.current?.click()}
+              onDragEnter={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragOver={(e) => e.preventDefault()}
+              onDragLeave={() => setDragging(false)}
+              onDrop={handleDrop}
+            >
+              <UploadIcon size={20} />
+              <span className="ats2-drop-title">Drop your resume here or browse</span>
+              <span className="ats2-drop-sub">PDF, DOCX, TXT or LaTeX</span>
             </button>
-          </div>
-        </div>
+          ))}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={ACCEPT}
+          onChange={(e) => takeFile(e.target.files?.[0] ?? null)}
+          hidden
+        />
 
-        {/* Scan overlay */}
-        {loading && (
-          <div className="ats-scan" aria-hidden>
-            <div className="ats-scan-beam" />
-            <span className="ats-scan-label">SCANNING / parsing keywords / matching role</span>
+        {mode === "paste" && (
+          <textarea
+            className="ats2-paste"
+            aria-label="Resume text"
+            placeholder={"Paste your resume as plain text or LaTeX source"}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            spellCheck={false}
+            rows={10}
+            disabled={loading}
+          />
+        )}
+
+        {mode !== "saved" && (
+          <ToggleSwitch
+            className="ats2-keep"
+            checked={saveAsMine}
+            onClick={() => setSaveAsMine((v) => !v)}
+            disabled={loading}
+            label={saved ? "Replace my saved resume with this one" : "Save as my resume for next time"}
+          />
+        )}
+
+        {error && (
+          <p className="ats2-error" role="alert">
+            <AlertIcon size={15} /> {error}
+          </p>
+        )}
+
+        {loading ? (
+          <ProgressBar
+            value={scan.percent}
+            label={SCAN_STAGES[Math.min(scan.activeStage, SCAN_STAGES.length - 1)].label}
+          />
+        ) : (
+          <div className="ats2-run">
+            <button
+              type="button"
+              className={result ? "debrief-btn" : "debrief-btn debrief-btn-primary"}
+              onClick={() => void handleScreen()}
+              disabled={!canRun}
+            >
+              {result ? "Scan again" : "Scan resume"}
+            </button>
           </div>
         )}
       </section>
 
-      {/* Report */}
       {result && (
-        <section className="ats-report">
-          <div className="ats-report-strip">ATS REPORT</div>
-
-          <div className="ats-report-top">
-            <div className="ats-gauge" style={{ color: ringColor }}>
-              <svg viewBox="0 0 104 104" className="ats-gauge-svg">
-                <circle className="ats-gauge-track" cx="52" cy="52" r="46" />
-                <circle
-                  className="ats-gauge-fill"
-                  cx="52"
-                  cy="52"
-                  r="46"
-                  style={{
-                    strokeDasharray: RING,
-                    strokeDashoffset: RING * (1 - gauge / 100),
-                  }}
-                />
-              </svg>
-              <div className="ats-gauge-center">
-                <span className="ats-gauge-num">{result.ats_score}</span>
-                <span className="ats-gauge-max">/ 100</span>
-              </div>
-            </div>
-
-            <div className="ats-report-headline">
-              <div className={`ats-stamp ${result.passes_oa ? "pass" : "fail"}`}>
-                {result.passes_oa ? <CheckCircleIcon size={15} /> : <CrossCircleIcon size={15} />}
-                {result.passes_oa ? "OA Likely" : "OA Unlikely"}
-              </div>
-              <p className="ats-verdict">{result.verdict}</p>
-              {result.summary && <p className="ats-summary">{result.summary}</p>}
-            </div>
+        <section className="ats2-result" ref={resultRef} aria-live="polite" aria-label="ATS result">
+          <div className="ats2-score-row">
+            <span className={`ats2-score ${scoreTone(result)}`}>
+              {result.ats_score}
+              <span className="ats2-score-max">/100</span>
+            </span>
+            <span className="ats2-score-side">
+              <span className={`debrief-verdict ${result.passes_oa ? "debrief-tone-good" : "debrief-tone-bad"}`}>
+                {result.passes_oa ? "OA likely" : "OA unlikely"}
+              </span>
+              <span className="ats2-verdict">{result.verdict}</span>
+            </span>
           </div>
+          <div className="ats2-meter" aria-hidden>
+            <span className={scoreTone(result)} style={{ width: `${result.ats_score}%` }} />
+          </div>
+          {result.summary && <p className="ats2-summary">{result.summary}</p>}
+        </section>
+      )}
 
-          {(result.matched_keywords.length > 0 || result.missing_keywords.length > 0) && (
-            <div className="ats-keywords">
-              {result.matched_keywords.length > 0 && (
-                <div className="ats-kw-group">
-                  <span className="ats-kw-label ats-kw-label--match">Matched keywords</span>
-                  <div className="ats-kw-chips">
-                    {result.matched_keywords.map((k) => (
-                      <span key={k} className="ats-kw ats-kw--match">
-                        {k}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {result.missing_keywords.length > 0 && (
-                <div className="ats-kw-group">
-                  <span className="ats-kw-label ats-kw-label--miss">Missing keywords</span>
-                  <div className="ats-kw-chips">
-                    {result.missing_keywords.map((k) => (
-                      <span key={k} className="ats-kw ats-kw--miss">
-                        {k}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
+      {result && (hasKeywords || result.strengths.length + result.gaps.length + result.fixes.length > 0) && (
+        <section className="debrief-rows" aria-label="Scan details">
+          {hasKeywords && (
+            <div className="debrief-row">
+              <div className="debrief-row-side">
+                <h2>Keywords</h2>
+                <span className="debrief-meta">
+                  {result.matched_keywords.length} matched, {result.missing_keywords.length} missing
+                </span>
+              </div>
+              <div className="ats2-chips">
+                {result.matched_keywords.map((k) => (
+                  <span key={`m-${k}`} className="ats2-chip ats2-chip--match">
+                    {k}
+                  </span>
+                ))}
+                {result.missing_keywords.map((k) => (
+                  <span key={`x-${k}`} className="ats2-chip ats2-chip--miss">
+                    {k}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
-
-          <div className="ats-cols">
-            {result.strengths.length > 0 && (
-              <div className="ats-col">
-                <span className="ats-col-label ats-col-label--good">Strengths</span>
-                <ul>
-                  {result.strengths.map((s, i) => (
-                    <li key={i}>{s}</li>
+          {[
+            { title: "Strengths", items: result.strengths },
+            { title: "Gaps", items: result.gaps },
+            { title: "How to improve", items: result.fixes },
+          ]
+            .filter((row) => row.items.length > 0)
+            .map((row) => (
+              <div key={row.title} className="debrief-row">
+                <div className="debrief-row-side">
+                  <h2>{row.title}</h2>
+                </div>
+                <ul className="ats2-list">
+                  {row.items.map((item, i) => (
+                    <li key={i}>{item}</li>
                   ))}
                 </ul>
               </div>
-            )}
-            {result.gaps.length > 0 && (
-              <div className="ats-col">
-                <span className="ats-col-label ats-col-label--bad">Gaps</span>
-                <ul>
-                  {result.gaps.map((s, i) => (
-                    <li key={i}>{s}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {result.fixes.length > 0 && (
-              <div className="ats-col">
-                <span className="ats-col-label ats-col-label--fix">How to improve</span>
-                <ul>
-                  {result.fixes.map((s, i) => (
-                    <li key={i}>{s}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+            ))}
         </section>
       )}
 
       {/* Resume deep dive: only offered once a scan has run, since the interviewer
           quotes the parsed resume back at the candidate. */}
       {result && (
-        <section className="card ats-grill">
-          <div className="ats-grill-head">
-            <div>
-              <span className="eyebrow">
-                <ChatIcon size={13} /> Resume Deep Dive
-              </span>
-              <p className="muted small" style={{ marginTop: 4 }}>
-                {grillDone
-                  ? "Deep dive complete. Your answers feed the final debrief."
-                  : grillMessages.length > 0
-                    ? `${companyLabel} hiring manager, ${Math.min(grillCoveredGoals.length, GRILL_TOTAL_GOALS)} of ${GRILL_TOTAL_GOALS} questions covered. Progress is saved.`
-                    : "The part an ATS score cannot tell you: can you defend what is on the page? Five questions on your own projects, numbers, and choices."}
-              </p>
-            </div>
-            <div className="ats-grill-start">
-              {grillMessages.length === 0 && <VoicePicker compact />}
-              <button className="button button-primary" onClick={startGrill} disabled={grillSending}>
-                {grillSending ? <Loader2 size={15} className="spin" /> : <ChatIcon size={15} />}
-                {grillDone ? "Open transcript" : grillMessages.length > 0 ? "Resume the deep dive" : "Start the deep dive"}
-              </button>
-            </div>
+        <section className="debrief-section ats2-grill">
+          <h2>Resume deep dive</h2>
+          <p className="ats2-grill-text">
+            {grillDone
+              ? "Done. Your answers feed the final debrief."
+              : grillMessages.length > 0
+                ? `${Math.min(grillCoveredGoals.length, GRILL_TOTAL_GOALS)} of ${GRILL_TOTAL_GOALS} questions covered. Progress is saved.`
+                : `Kojo, as a ${companyLabel} hiring manager, asks five questions on your own projects, numbers and choices.`}
+          </p>
+          <div className="ats2-grill-actions">
+            {grillMessages.length === 0 && <VoicePicker compact />}
+            <button
+              type="button"
+              className="debrief-btn debrief-btn-primary"
+              onClick={startGrill}
+              disabled={grillSending}
+            >
+              {grillSending ? <Loader2 size={15} className="spin" /> : <ChatIcon size={15} />}
+              {grillDone ? "Open transcript" : grillMessages.length > 0 ? "Resume the deep dive" : "Start the deep dive"}
+            </button>
           </div>
-
         </section>
       )}
 
-      {/* Continue (non-blocking) */}
-      <div className="ats-footer">
-        <span className="ats-footer-note">The resume screen never blocks your interview.</span>
-        <button className="button button-primary ats-continue" onClick={handleContinue}>
-          {result ? "Continue to next stage" : "Skip to next stage"}
-          <ChevronRightIcon size={15} />
+      <div className="setup2-footer ats2-footer">
+        <span className="setup2-footer-meta">Next up: {nextLabel()}</span>
+        <button type="button" className="setup2-start" onClick={handleContinue}>
+          {result ? "Continue" : "Skip the screen"} <ChevronRightIcon size={16} />
         </button>
       </div>
     </div>

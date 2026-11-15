@@ -1,6 +1,7 @@
 import asyncio
 import html
 import json
+import logging
 import random
 import re
 from datetime import datetime, timezone
@@ -50,7 +51,7 @@ from src.schemas.mock_interview_schema import (
 )
 from src.services import lc_catalog, lc_taxonomy
 from src.limiter import limiter
-from src.services.file_service import FileService
+from src.services.resume_service import extract_resume_text, load_saved_resume, store_saved_resume
 from src.services.leetcode_service import LeetCodeService
 from src.services.llm_service import LLMService
 from src.services.speech_service import SpeechService
@@ -69,6 +70,7 @@ from src.services.mock_interview_turns import (
 # SECURITY: beta-only feature, enforced server-side (see dependencies.get_beta_user).
 # It is excluded from usage limits, so basic users must not be able to reach it.
 router = APIRouter(prefix="/mock-interview", tags=["mock-interview"], dependencies=[Depends(get_beta_user)])
+logger = logging.getLogger(__name__)
 
 # Canonical session lifecycle. A session moves forward only; the frontend
 # resumes from its own localStorage snapshot, while these values let the
@@ -419,16 +421,12 @@ async def parse_job_description(
     )
 
     try:
-        llm = LLMService()
-        raw = await llm.call_kojo(prompt, provider=resolve_request_provider(user, body.provider))
-        raw = raw.strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-        parsed = json.loads(raw)
-    except (json.JSONDecodeError, LLMException) as exc:
-        raise HTTPException(status_code=503, detail=f"Failed to read the job description: {exc}") from exc
+        parsed = await LLMService().complete_json(prompt, provider=resolve_request_provider(user, body.provider))
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Failed to read the job description: {exc}") from exc
+        logger.warning("parse-jd failed: %s", exc)
+        raise HTTPException(
+            status_code=503, detail="Kojo could not read the job description. Try again in a moment."
+        ) from exc
 
     allowed = set(menu_ids)
     topics: list[str] = []
@@ -477,38 +475,40 @@ async def screen_resume(
     resume_file: Optional[UploadFile] = File(default=None),
     resume_text: Optional[str] = Form(default=None),
     provider: Optional[str] = Form(default=None),
+    use_saved: bool = Form(default=False),
+    save_resume: bool = Form(default=False),
     db: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> ResumeScreenResult:
+    """Simulated ATS + recruiter screen. The resume comes from an upload, pasted
+    text/LaTeX, or (use_saved, with neither of those) the user's saved resume.
+    save_resume also keeps an uploaded or pasted resume as the saved one."""
     row = await _load_session(session_id, user, db)
     company_label = _company_label(row)
     role_focus = _role_focus(row)
     level_cfg = _level_config(row)
 
-    # Resume text comes either from an uploaded file (PDF/DOCX/...) or pasted
-    # text/LaTeX. Files take priority when both are present.
-    text = ""
-    file_name: Optional[str] = None
-    if resume_file is not None and resume_file.filename:
-        file_name = resume_file.filename[:255]
+    has_upload = resume_file is not None and bool(resume_file.filename)
+    if use_saved and not has_upload and not (resume_text or "").strip():
+        saved = await load_saved_resume(db, user.id)
+        if saved is None:
+            raise HTTPException(status_code=400, detail="No saved resume yet. Upload one or paste it.")
+        text, file_name = saved.text, saved.file_name
+    else:
         try:
-            text, _ = await FileService().extract_from_file(resume_file)
+            text, file_name = await extract_resume_text(resume_file, resume_text)
         except ValidationException as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:
-            raise HTTPException(status_code=400, detail=f"Could not read the resume file: {exc}") from exc
-    elif resume_text:
-        text = resume_text
+            logger.warning("resume extraction failed: %s", exc)
+            raise HTTPException(status_code=400, detail="Could not read that file. Try a PDF or DOCX.") from exc
+        if save_resume:
+            store_saved_resume(user, text, file_name)
 
-    text = (text or "").strip()
-    if len(text) < 40:
-        raise HTTPException(
-            status_code=400,
-            detail="Please provide a resume: upload a PDF/DOCX or paste your resume text or LaTeX.",
-        )
-
-    # Keep the prompt bounded; resumes are short, but guard against huge pastes.
-    text = text[:12000]
+    # Nothing is held open across the LLM call (Neon drops idle-in-transaction
+    # connections), and a resume the user asked to save stays saved even if the
+    # scan itself fails.
+    await db.commit()
 
     prompt = (
         "You are an Applicant Tracking System (ATS) combined with a technical recruiter doing the "
@@ -537,16 +537,14 @@ async def screen_resume(
     )
 
     try:
-        llm = LLMService()
-        raw = await llm.call_kojo(prompt, provider=resolve_request_provider(user, provider))
-        raw = raw.strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-        parsed = json.loads(raw)
-    except (json.JSONDecodeError, LLMException) as exc:
-        raise HTTPException(status_code=503, detail=f"Failed to screen the resume: {exc}") from exc
+        # complete_json, not call_kojo + json.loads: the chat path broke the JSON
+        # ("Expecting ':' delimiter") and had no repair step.
+        parsed = await LLMService().complete_json(prompt, provider=resolve_request_provider(user, provider))
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Failed to screen the resume: {exc}") from exc
+        logger.warning("resume screen failed: %s", exc)
+        raise HTTPException(
+            status_code=503, detail="Kojo could not finish the resume scan. Try again in a moment."
+        ) from exc
 
     def _str_list(value) -> list[str]:
         if not isinstance(value, list):

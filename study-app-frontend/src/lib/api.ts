@@ -67,6 +67,7 @@ import type {
   MockInterviewFinishResponse,
   JDParseResponse,
   ResumeScreenResult,
+  SavedResume,
   Stage1GradeResponse,
   Stage2MessageResponse,
   Stage2TurnEvent,
@@ -2572,14 +2573,37 @@ export async function fetchActiveMockSession(): Promise<MockInterviewSession | n
   return request<MockInterviewSession | null>("/mock-interview/active");
 }
 
+// The one resume a user keeps for mock interviews. Only the extracted text is
+// stored server side; this returns what the UI needs to show it. null = none saved.
+export async function getSavedResume(): Promise<SavedResume | null> {
+  return request<SavedResume | null>("/saved-resume");
+}
+
+export async function saveResume(input: { file?: File | null; text?: string | null }): Promise<SavedResume> {
+  const formData = new FormData();
+  if (input.file) formData.append("resume_file", input.file);
+  if (input.text && input.text.trim()) formData.append("resume_text", input.text);
+  return request<SavedResume>("/saved-resume", { method: "PUT", body: formData });
+}
+
+export async function deleteSavedResume(): Promise<void> {
+  await request<void>("/saved-resume", { method: "DELETE" });
+}
+
+/**
+ * Run the ATS screen. `useSaved` scans the saved resume (no file or text needed);
+ * `saveAsMine` also keeps an uploaded or pasted resume as the saved one.
+ */
 export async function screenResume(
   sessionId: number,
-  input: { file?: File | null; text?: string | null },
+  input: { file?: File | null; text?: string | null; useSaved?: boolean; saveAsMine?: boolean },
   provider?: string,
 ): Promise<ResumeScreenResult> {
   const formData = new FormData();
   if (input.file) formData.append("resume_file", input.file);
   if (input.text && input.text.trim()) formData.append("resume_text", input.text);
+  if (input.useSaved) formData.append("use_saved", "true");
+  if (input.saveAsMine) formData.append("save_resume", "true");
   if (provider) formData.append("provider", provider);
   return request<ResumeScreenResult>(`/mock-interview/${sessionId}/resume/screen`, {
     method: "POST",

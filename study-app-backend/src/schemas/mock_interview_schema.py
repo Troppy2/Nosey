@@ -95,6 +95,14 @@ class ResumeScreenResult(BaseModel):
     summary: str = ""
 
 
+# The one resume a user keeps for mock interviews. The text itself stays server side;
+# the client only needs enough to show what is saved.
+class SavedResumeResponse(BaseModel):
+    file_name: Optional[str] = None  # None for a pasted resume
+    updated_at: Optional[str] = None
+    chars: int = 0
+
+
 # Stage 1 grading
 class Stage1Submission(BaseModel):
     slug: str = Field(..., min_length=1)

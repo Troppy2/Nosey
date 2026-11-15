@@ -63,3 +63,33 @@
 .setup2 .loop-station-time--total .loop-num { font-size: 16px; }
 .setup2 .loop-unit { font-size: 14px; font-weight: 400; letter-spacing: 0; text-transform: none; color: #596949; }
 .setup2-start { gap: 6px; }
+
+/* Saved resume card (components/SavedResumeCard.tsx). The slot reserves the row
+   height so the page does not jump when the saved resume loads. */
+.setup2-cv-slot { min-height: 72px; display: flex; align-items: flex-start; }
+.setup2-cv { flex: 1; min-width: 0; display: flex; align-items: center; gap: 14px; padding: 14px 14px 14px 18px; background: #fff; border: 1px solid #cfe1b9; border-radius: 8px; }
+.setup2-cv-icon { flex: none; width: 40px; height: 40px; border-radius: 8px; background: #e9f0de; color: #4f6339; display: inline-flex; align-items: center; justify-content: center; }
+.setup2-cv-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.setup2-cv-name { font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.setup2-cv-meta { font-size: 14px; color: #596949; }
+.setup2-cv-replace { flex: none; min-height: 44px; padding: 0 14px; border-radius: 8px; border: 1px solid #26301f; background: transparent; color: #26301f; font-size: 15px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background-color 160ms cubic-bezier(.3,0,0,1), color 160ms cubic-bezier(.3,0,0,1); }
+.setup2-cv-replace:hover:not(:disabled) { background: #26301f; color: #fff; }
+.setup2-cv-remove { flex: none; width: 44px; height: 44px; border-radius: 8px; border: 0; background: transparent; color: #596949; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: background-color 160ms cubic-bezier(.3,0,0,1), color 160ms cubic-bezier(.3,0,0,1); }
+.setup2-cv-remove:hover:not(:disabled) { background: #f7e4e0; color: #9b2c1a; }
+.setup2-cv-replace:disabled, .setup2-cv-remove:disabled, .setup2-cv-add:disabled { opacity: .55; cursor: not-allowed; }
+.setup2-cv-add { min-height: 56px; padding: 0 22px; }
+@media (max-width: 640px) {
+  .setup2-cv { gap: 10px; padding: 12px; }
+  .setup2-cv-icon { display: none; }
+  .setup2-cv-replace { padding: 0 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .setup2-cv-replace, .setup2-cv-remove { transition: none; }
+}
+@media (max-width: 640px) {
+  /* Name gets the full first row; Replace drops to its own full-width row. */
+  .setup2-cv { flex-wrap: wrap; }
+  .setup2-cv-text { flex: 1 1 0; }
+  .setup2-cv-remove { order: 1; }
+  .setup2-cv-replace { order: 2; width: 100%; justify-content: center; }
+}
