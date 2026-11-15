@@ -578,12 +578,10 @@ export default function TakeTest() {
   // submission is legal; the naive Object.entries(answers).filter(...) this
   // used to be would silently drop those questions.
   function buildSubmittedAnswers(): SubmittedAnswer[] {
-    const ids = new Set<number>([
-      ...Object.keys(answers).map(Number),
-      ...Object.keys(workStrokes).map(Number),
-    ]);
+    // Exam order. Collecting typed keys then drawing keys sent every
+    // draw-only answer last, which split multi-part problems on Results.
     const result: SubmittedAnswer[] = [];
-    for (const questionId of ids) {
+    for (const { id: questionId } of test?.questions ?? []) {
       const typedAnswer = (answers[questionId] ?? "").trim();
       const strokes = workStrokes[questionId];
       const workImage = strokes ? exportScratchPadPng(strokes) : null;

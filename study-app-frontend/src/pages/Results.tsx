@@ -648,16 +648,25 @@ function formatAnswerForDisplay(raw: string): string {
   return raw;
 }
 
-// Consecutive answers of one multi-part problem form a block (GH #151); any
-// other answer is a block of its own.
-function reviewBlocks(answers: AnswerResult[]): { groupId: AnswerResult["group_id"]; answers: AnswerResult[] }[] {
+// All answers of one multi-part problem form a block (GH #151), placed where
+// its first part appears, even if the parts arrive apart; any other answer is
+// a block of its own.
+export function reviewBlocks(answers: AnswerResult[]): { groupId: AnswerResult["group_id"]; answers: AnswerResult[] }[] {
   const blocks: { groupId: AnswerResult["group_id"]; answers: AnswerResult[] }[] = [];
+  const byGroup = new Map<number, AnswerResult[]>();
   for (const answer of answers) {
-    const last = blocks[blocks.length - 1];
-    if (answer.group_id != null && last && last.groupId === answer.group_id) {
-      last.answers.push(answer);
+    const groupId = answer.group_id;
+    if (groupId == null) {
+      blocks.push({ groupId: null, answers: [answer] });
+      continue;
+    }
+    const existing = byGroup.get(groupId);
+    if (existing) {
+      existing.push(answer);
     } else {
-      blocks.push({ groupId: answer.group_id ?? null, answers: [answer] });
+      const group = [answer];
+      byGroup.set(groupId, group);
+      blocks.push({ groupId, answers: group });
     }
   }
   return blocks;

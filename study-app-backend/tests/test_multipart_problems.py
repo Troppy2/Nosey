@@ -167,6 +167,30 @@ async def test_grading_a_part_sends_the_setup_and_results_carry_the_group(db_ses
         assert answer.question_text == "Find $\\det A$."
 
 
+async def test_results_keep_exam_order_when_parts_are_submitted_out_of_order(db_session_maker) -> None:
+    """A draw-only part used to be sent last, which split its problem on Results."""
+    async with db_session_maker() as session:
+        user, test = await _seed_test(session)
+        _, frq = LLMService()._practice_group_entry(_picker_entry(), 0, "1")
+        await add_generated_questions(Repo(session), test.id, [], [*frq, GeneratedFRQ("Define rank.", "x", seq=10)], 1)
+        await session.commit()
+        by_label = {q.part_label: q for q in await session.scalars(select(Question))}
+
+        service = GradingService(llm_service=AsyncMock())
+        service.llm_service.grade_math_answer = AsyncMock(
+            return_value=FRQGrade(is_correct=True, feedback="ok", confidence=0.9)
+        )
+        submitted = [by_label[None], by_label["c"], by_label["a"]]
+        result = await service.submit_and_grade(
+            test.id, user.id, [SubmittedAnswer(question_id=q.id, answer="x") for q in submitted], session
+        )
+        expected = [by_label["a"].id, by_label["c"].id, by_label[None].id]
+        assert [a.question_id for a in result.answers] == expected
+
+        detail = await service.get_attempt_detail(result.attempt_id, user.id, session)
+        assert [a.question_id for a in detail.answers] == expected
+
+
 async def test_the_setup_is_edited_once_for_every_part(db_session_maker) -> None:
     async with db_session_maker() as session:
         user, test = await _seed_test(session)

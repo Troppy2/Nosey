@@ -132,6 +132,22 @@ def related_context(
     return "\n\n".join(entries)
 
 
+def in_exam_order(answers: list[UserAnswer]) -> list[UserAnswer]:
+    """An attempt's answers in the order the test shows its questions.
+
+    Rows were stored in submit order, which put draw-only answers last and
+    split multi-part problems on Results. Answers whose question is gone sort
+    after the rest, by question id.
+    """
+    def key(answer: UserAnswer) -> tuple[int, int, int]:
+        question = answer.question
+        if question is None:
+            return (1, 0, answer.question_id)
+        return (0, question.display_order, question.id)
+
+    return sorted(answers, key=key)
+
+
 def _drawn_answer(work: Optional[OcrResult]) -> str:
     """What a draw-only answer is stored and shown as: the working alone when
     the reader trimmed it, else the whole transcript (GH #157)."""
@@ -242,7 +258,12 @@ class GradingService:
         }
 
         # A needs_input answer is not graded at all yet: no LLM spend on it.
-        pairs = [(question_by_id[qid], ans) for qid, ans in submitted_by_id.items()]
+        # Exam order, not submit order: the client may send draw-only answers
+        # last, and rows are stored (and Results shown) in this order.
+        pairs = sorted(
+            ((question_by_id[qid], ans) for qid, ans in submitted_by_id.items()),
+            key=lambda pair: (pair[0].display_order, pair[0].id),
+        )
 
         # Each question sees the earlier questions it builds on (GH #155).
         # Parts of one problem grade in order so a later part also sees the
@@ -1132,7 +1153,7 @@ class GradingService:
                     ocr_status=answer.ocr_status,
                     work_strokes=pending_strokes.get(answer.question_id),
                 )
-                for answer in attempt.answers
+                for answer in in_exam_order(attempt.answers)
             ],
             is_provisional=held,
         )
