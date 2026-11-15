@@ -161,12 +161,24 @@ def build_tree(values):
                 queue.append(node.right)
     return root
 
+_MAX_NODES = 100000
+
 def listnode_to_list(node):
     out = []
     while node is not None:
+        if len(out) >= _MAX_NODES:
+            raise ValueError("The returned linked list has a cycle or is too long to compare.")
         out.append(node.val)
         node = node.next
     return out
+
+# Duck-typed so a ListNode/TreeNode class the user pasted in (LeetCode's own
+# starter does this) serializes the same as the built-in ones.
+def _is_tree_node(value):
+    return hasattr(value, "val") and hasattr(value, "left") and hasattr(value, "right")
+
+def _is_list_node(value):
+    return hasattr(value, "val") and hasattr(value, "next")
 
 def tree_to_list(root):
     if root is None:
@@ -240,7 +252,17 @@ def annotation_mentions(annotation, name):
         return name.lower() in annotation.lower()
     return any(annotation_mentions(arg, name) for arg in get_args(annotation))
 
-def adapt_value(value, annotation):
+# Without type hints, LeetCode's parameter names are the only clue to a node input.
+_LIST_PARAM_NAMES = {"head", "heada", "headb", "l1", "l2", "list1", "list2", "lists"}
+_TREE_PARAM_NAMES = {"root", "root1", "root2", "p", "q", "subroot", "original", "cloned"}
+
+def adapt_value(value, annotation, name=""):
+    if isinstance(value, list) and annotation is inspect._empty:
+        key = name.lower()
+        if key in _TREE_PARAM_NAMES:
+            return build_tree(value)
+        if key in _LIST_PARAM_NAMES:
+            return [build_list_node(v) for v in value] if key == "lists" else build_list_node(value)
     if isinstance(value, list):
         is_list = annotation_is_list(annotation)
         if annotation_mentions(annotation, "TreeNode"):
@@ -250,10 +272,10 @@ def adapt_value(value, annotation):
     return value
 
 def serialize_value(value):
-    if isinstance(value, ListNode):
-        return listnode_to_list(value)
-    if isinstance(value, TreeNode):
+    if _is_tree_node(value):
         return tree_to_list(value)
+    if _is_list_node(value):
+        return listnode_to_list(value)
     if isinstance(value, list):
         return [serialize_value(v) for v in value]
     return value
@@ -332,10 +354,17 @@ try:
     _before_keys = set(namespace.keys())
     exec(user_code, namespace)
     _new_keys = [k for k in namespace.keys() if k not in _before_keys]
+    # If the user pasted their own node classes, build inputs with those.
+    ListNode = namespace.get("ListNode", ListNode)
+    TreeNode = namespace.get("TreeNode", TreeNode)
 
     method = select_callable(namespace, _new_keys, test_cases[0] if test_cases else None)
     signature = inspect.signature(method)
     parameters = list(signature.parameters.values())
+    # An empty list or tree is None in code and [] (or null) in the expected
+    # output; for node-returning methods all three mean the same answer.
+    _ret = signature.return_annotation
+    returns_nodes = annotation_mentions(_ret, "ListNode") or annotation_mentions(_ret, "TreeNode")
 
     for case in test_cases:
         raw_args = parse_named_args(case["inputText"])
@@ -343,13 +372,18 @@ try:
             raise ValueError(f"Couldn't match the testcase input to the Python method signature for {case['label']}.")
         args = []
         for (name, value), parameter in zip(raw_args, parameters):
-            args.append(adapt_value(value, parameter.annotation))
+            args.append(adapt_value(value, parameter.annotation, parameter.name))
         _sys.settrace(_make_timeout_tracer(_time.time() + _EXEC_TIMEOUT))
         try:
             actual = serialize_value(method(*args))
         finally:
             _sys.settrace(None)
         expected = normalize_expected(case["expectedOutput"])
+        if returns_nodes or (_ret is inspect._empty and expected == []):
+            if actual is None:
+                actual = []
+            if expected is None:
+                expected = []
         RESULT["cases"].append({
             "label": case["label"],
             "passed": actual == expected,

@@ -4,7 +4,7 @@ import json
 import logging
 import random
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_session
 from src.dependencies import get_beta_user, get_current_user
-from src.models.lc_sync import LCCustomProblem
+from src.models.lc_sync import LCActivityDate, LCCustomProblem
 from src.models.mock_interview import MockInterviewSession
 from src.models.user import User
 from src.schemas.mock_interview_schema import (
@@ -1891,6 +1891,7 @@ async def finish_interview(
     row.overall_feedback = overall_feedback
     row.skill_ratings = json.dumps({"call": call, "skills": skills})
     row.status = STATUS_COMPLETE
+    await _count_loop_as_solved(db, user.id, body.tz_offset_minutes)
     await db.commit()
 
     return FinishResponse(
@@ -1902,6 +1903,22 @@ async def finish_interview(
         hiring_recommendation=call,
         skill_ratings=skills,
     )
+
+
+async def _count_loop_as_solved(db: AsyncSession, user_id: int, tz_offset_minutes: int) -> None:
+    """A finished loop counts as one problem solved on the user's local day (KojoCode
+    daily tally and streak). Runs only on the first finish: later calls return the
+    cached debrief before reaching this."""
+    day = (datetime.now(timezone.utc) - timedelta(minutes=tz_offset_minutes)).strftime("%Y-%m-%d")
+    existing = (
+        await db.execute(
+            select(LCActivityDate).where(LCActivityDate.user_id == user_id, LCActivityDate.activity_date == day)
+        )
+    ).scalar_one_or_none()
+    if existing is None:
+        db.add(LCActivityDate(user_id=user_id, activity_date=day, count=1))
+    else:
+        existing.count += 1
 
 
 # ── Interviewer write-ups for the hiring committee ────────────────────────────

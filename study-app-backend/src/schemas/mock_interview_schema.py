@@ -289,6 +289,8 @@ class Stage3MessageResponse(BaseModel):
 # Final summary
 class FinishRequest(BaseModel):
     provider: Optional[str] = Field(default=None)
+    # Browser's getTimezoneOffset(): puts the finished loop on the user's local day.
+    tz_offset_minutes: int = Field(default=0, ge=-840, le=840)
 
 
 class FinishResponse(BaseModel):

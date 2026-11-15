@@ -2807,7 +2807,7 @@ export async function finishMockInterview(
 ): Promise<MockInterviewFinishResponse> {
   return request<MockInterviewFinishResponse>(`/mock-interview/${sessionId}/finish`, {
     method: "POST",
-    body: JSON.stringify({ provider }),
+    body: JSON.stringify({ provider, tz_offset_minutes: new Date().getTimezoneOffset() }),
   });
 }
 

@@ -43,7 +43,8 @@
 .oa-statement pre { margin: 0 0 12px; font-family: "JetBrains Mono", monospace; font-size: 13px; line-height: 1.6; background: #f6f9f1; border: 1px solid #e0ebd2; border-radius: 8px; padding: 12px 14px; white-space: pre-wrap; }
 .oa-statement pre code { background: none; padding: 0; }
 /* Example blocks inherited a pale global code color and no-wrap: keep them dark ink and wrapped. */
-.oa-statement pre, .oa-statement pre code { color: #26301f; opacity: 1; white-space: pre-wrap; word-break: break-word; overflow-x: visible; }
+/* .oa prefix outranks pre.kojo-code-block code, which loads later and forces white-space: pre. */
+.oa .oa-statement pre, .oa .oa-statement pre code { color: #26301f; opacity: 1; white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: hidden; }
 .oa-statement strong { font-weight: 600; }
 .oa-scratch-label { margin-top: 12px; font-size: 15px; font-weight: 600; }
 .oa-scratch { resize: vertical; min-height: 110px; border-radius: 8px; border: 1px solid #cfe1b9; font: inherit; font-size: 15px; padding: 12px; color: #26301f; background: #fff; }

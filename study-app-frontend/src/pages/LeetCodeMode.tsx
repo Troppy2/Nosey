@@ -3970,7 +3970,15 @@ export default function LeetCodeMode() {
   function markProblemDone(problem: Problem) {
     // A pass inside a pending bank run counts for the bank even when the problem was
     // already done globally (it was solved before it was added).
-    if (pendingBankRun(problem.slug)) applyBankCompletion(problem.slug, true);
+    if (pendingBankRun(problem.slug)) {
+      applyBankCompletion(problem.slug, true);
+      // Solved before, but new to this bank: it counts again for today.
+      if (progress[problem.slug]) {
+        const nextCounts = bumpTodayCount();
+        pushProgressToDb(progress, recordSolvedToday(), nextCounts);
+        return;
+      }
+    }
     if (progress[problem.slug]) return;
     const next = { ...progress, [problem.slug]: true };
     setProgress(next);

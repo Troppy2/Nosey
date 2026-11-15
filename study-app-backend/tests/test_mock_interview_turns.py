@@ -479,7 +479,7 @@ async def test_hiring_committee_reads_packets_never_transcripts(harness) -> None
     strongest = AsyncMock(return_value={"call": "LEAN HIRE", "skills": {}, "writeup": "Decision."})
     with patch("src.routes.mock_interview._load_session", new=AsyncMock(return_value=row)), patch(
         "src.services.llm_service.LLMService.complete_json_strongest", new=strongest
-    ):
+    ), patch("src.routes.mock_interview._count_loop_as_solved", new=AsyncMock()):
         res = await _post("/mock-interview/113/finish", {})
     prompt = strongest.await_args.args[0]
     assert secret not in prompt
