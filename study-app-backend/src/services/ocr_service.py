@@ -16,6 +16,7 @@ from typing import Awaitable, Callable, Optional
 
 from src.schemas.attempt_schema import OCR_LOW_CONFIDENCE_THRESHOLD, OcrResult
 from src.services.llm_service import LLMService
+from src.utils.latex_utils import repair_matrix_rows
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -38,7 +39,9 @@ _TRANSCRIBE_PROMPT = (
     "Return your response as plain text in four sections, separated by lines containing only '---':\n\n"
     "1. TRANSCRIPT: the work in reading order, one step per line. Write words as plain text and wrap every "
     "piece of math in single dollar signs, inline, for example: Since $\\epsilon_4 = 0$, $\\hat{y} = w^T x$. "
-    "Never use $$ or \\[ \\]. Never use spacing or positioning commands (\\quad, \\qquad, \\hspace, \\,, ~) "
+    "Never use $$ or \\[ \\], except for a matrix or vector, which goes on its own line as "
+    "$$\\begin{bmatrix} 1 & 2 \\\\ 3 & 4 \\end{bmatrix}$$: always bmatrix, & between columns, \\\\ between rows, "
+    "and a column vector is a one-column bmatrix. Never use spacing or positioning commands (\\quad, \\qquad, \\hspace, \\,, ~) "
     "to imitate where things sit on the page: start a new line instead, and describe position in LAYOUT. "
     "An arrow drawn between steps goes inline at the start of the step it points to ($\\Rightarrow$), never "
     "on a line by itself. If a line is crossed out, wrap its math in \\cancel{...} and still include it; a "
@@ -67,9 +70,17 @@ _DEFAULT_CONFIDENCE = 0.75
 # On a messy page they can run away into thousands of \quad tokens until the
 # output budget runs out, so they are stripped and a long run marks the read
 # as degenerate.
+# The (?<!\\) guard keeps a matrix row break intact: in "\\ 5" the second
+# backslash plus the space looked like a control space, so stripping it
+# turned every row break before a digit or \frac into nothing and a 3x3
+# matrix rendered as one row (2026-11-15).
 _SPACING_CMD_RE = re.compile(
-    r"\\(?:qquad|quad|enspace|enskip|thinspace|hfill|[,;:! ])(?![A-Za-z])|\\[hv]space\*?\{[^{}]*\}"
+    r"(?<!\\)\\(?:qquad|quad|enspace|enskip|thinspace|hfill|[,;:! ])(?![A-Za-z])|(?<!\\)\\[hv]space\*?\{[^{}]*\}"
 )
+# A matrix, vector or other multi-row block: kept as display math on its own
+# line, since inline it renders squashed with overlapping fraction rows.
+_ROW_BLOCK_RE = re.compile(r"\\begin\{(?:[pbvBV]?matrix|smallmatrix|array|cases|aligned|gathered|split)\*?\}")
+_WHOLE_LINE_INLINE_RE = re.compile(r"^\$(?!\$)((?:\\.|[^$\\])+)\$$")
 _DISPLAY_DOLLAR_RE = re.compile(r"\$\$(.+?)\$\$", re.DOTALL)
 _DISPLAY_BRACKET_RE = re.compile(r"\\\[(.+?)\\\]", re.DOTALL)
 _LONE_ARROW_RE = re.compile(
@@ -89,15 +100,25 @@ def normalize_transcript(text: str) -> str:
     line becomes its own paragraph so steps do not run together.
     """
     def _inline(match: re.Match) -> str:
-        # A display block may span lines; inline math may not.
-        return "$" + " ".join(match.group(1).split()) + "$"
+        # A display block may span lines; inline math may not. A matrix stays
+        # display, on a line of its own.
+        body = " ".join(match.group(1).split())
+        if _ROW_BLOCK_RE.search(body):
+            return f"\n$${body}$$\n"
+        return "$" + body + "$"
 
+    text = repair_matrix_rows(text)
     text = _DISPLAY_DOLLAR_RE.sub(_inline, text)
     text = _DISPLAY_BRACKET_RE.sub(_inline, text)
     text = _SPACING_CMD_RE.sub(" ", text)
     lines = [re.sub(r"[ \t]+", " ", line).strip() for line in text.splitlines()]
     # A line left holding only dollar signs was nothing but spacing.
     lines = [line for line in lines if line.strip("$ ")]
+    # A line that is one inline matrix is promoted to display math.
+    lines = [
+        f"$${m.group(1)}$$" if (m := _WHOLE_LINE_INLINE_RE.match(line)) and _ROW_BLOCK_RE.search(m.group(1)) else line
+        for line in lines
+    ]
     # An arrow alone on a line joins the step it points to, instead of
     # rendering as its own paragraph.
     merged: list[str] = []

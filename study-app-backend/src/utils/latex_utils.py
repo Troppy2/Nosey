@@ -189,6 +189,29 @@ def replace_tikz(text: str) -> str:
     return "".join(part if part.startswith("```") else _TIKZ_RE.sub(TIKZ_FALLBACK, part) for part in parts)
 
 
+# Environments whose rows are separated by \\. Inside one, a lone backslash
+# followed by whitespace is a row break that lost a backslash (a valid
+# "control space" to KaTeX, so it renders silently as one long row).
+_ROW_ENV_RE = re.compile(
+    r"(\\begin\{((?:[pbvBV]?matrix|smallmatrix|array|cases|aligned|gathered|split)\*?)\})([\s\S]*?)(\\end\{\2\})"
+)
+_LOST_ROW_BREAK_RE = re.compile(r"(?<!\\)\\(?=\s)")
+
+
+def repair_matrix_rows(text: str) -> str:
+    r"""Restore row breaks inside matrix-like environments.
+
+    "\begin{bmatrix} 4 & 2 \ 5 & 2 \end{bmatrix}" becomes
+    "\begin{bmatrix} 4 & 2 \\ 5 & 2 \end{bmatrix}". A correct "\\ " is left
+    alone: its first backslash is followed by a backslash, its second is
+    preceded by one. Text outside those environments is never touched.
+    """
+    def _fix(match: re.Match) -> str:
+        return match.group(1) + _LOST_ROW_BREAK_RE.sub(r"\\\\", match.group(3)) + match.group(4)
+
+    return _ROW_ENV_RE.sub(_fix, text)
+
+
 def normalize_latex(text: str) -> str:
     """Normalize common LaTeX usage in free text.
 

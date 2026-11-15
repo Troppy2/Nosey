@@ -22,7 +22,26 @@ export function repairTexForKatex(src: string): string {
     .replace(/(?<!\\)[#%]/g, (ch) => `\\${ch}`);
 }
 
-function rkx(src: string, display: boolean): string {
+// A matrix row break that lost one backslash ("4 & 2 \ 5 & 2") is a valid
+// control space to KaTeX, so the matrix renders as one long row with no
+// error. Stored scratch-pad reads have this (OCR cleanup bug fixed
+// 2026-11-15), so it is repaired on every render, only inside row-based
+// environments. A correct "\\" is never matched.
+const ROW_ENV_RE =
+  /(\\begin\{((?:[pbvBV]?matrix|smallmatrix|array|cases|aligned|gathered|split)\*?)\})([\s\S]*?)(\\end\{\2\})/g;
+const LOST_ROW_BREAK_RE = /(?<!\\)\\(?=\s)/g;
+
+export function repairMatrixRows(src: string): string {
+  if (!src.includes("\\begin")) return src;
+  return src.replace(
+    ROW_ENV_RE,
+    (_m, open: string, _env: string, body: string, close: string) =>
+      open + body.replace(LOST_ROW_BREAK_RE, "\\\\") + close,
+  );
+}
+
+function rkx(raw: string, display: boolean): string {
+  const src = repairMatrixRows(raw);
   const render = (tex: string) =>
     katex.renderToString(tex, { displayMode: display, throwOnError: true, output: "html" });
   try {
