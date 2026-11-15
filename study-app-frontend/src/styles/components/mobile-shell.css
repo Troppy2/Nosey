@@ -348,6 +348,10 @@
     justify-content: flex-end;
     gap: 0;
     margin-right: -8px;
+    /* The desktop divider (legacy `.test-row .row-actions` border-left) sat
+       alone at the left edge once the actions got their own line. */
+    padding-left: 0;
+    border-left: 0;
   }
 
   .shell--mobile .test-row--stacked .row-actions button {

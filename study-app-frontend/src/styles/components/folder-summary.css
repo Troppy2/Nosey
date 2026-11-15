@@ -1,0 +1,60 @@
+/* Folder description under the page title (FolderSummary.tsx): two lines,
+   a chevron opens the rest. */
+.folder-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  max-width: 70ch;
+}
+
+.folder-summary-text {
+  margin: 0;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.folder-summary--open .folder-summary-text {
+  display: block;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+  overflow: visible;
+}
+
+.folder-summary-toggle {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: -10px -10px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.folder-summary-toggle:hover {
+  color: var(--green-dark);
+  background: var(--green-lightest);
+}
+
+.folder-summary-toggle svg {
+  transition: transform var(--transition-fast);
+}
+
+.folder-summary--open .folder-summary-toggle svg {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .folder-summary-toggle svg {
+    transition: none;
+  }
+}

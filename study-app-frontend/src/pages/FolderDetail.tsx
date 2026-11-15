@@ -12,6 +12,7 @@ import { ConfirmModal, RenameModal } from "../components/ConfirmModal";
 import { EmptyState } from "../components/EmptyState";
 import { FileManager } from "../components/FileManager";
 import { FolderStats } from "../components/FolderStats";
+import { FolderSummary } from "../components/FolderSummary";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { Skeleton, SkeletonTestRows } from "../components/Skeletons";
 import { deleteTest, fetchAttempts, fetchFlashcards, fetchFolder, fetchTests, prefetchAttemptDetail, regenerateTest, reindexFolderFiles, scopeKey, updateFolder, updateTest } from "../lib/api";
@@ -351,7 +352,7 @@ export default function FolderDetail() {
         <div>
           <span className="eyebrow">{folder?.subject ?? "Folder"}</span>
           <h1>{folder?.name ?? "Folder"}</h1>
-          {folder?.description ? <p className="muted">{folder.description}</p> : null}
+          {folder?.description ? <FolderSummary text={folder.description} /> : null}
         </div>
         <div className="toolbar">
           <Button
