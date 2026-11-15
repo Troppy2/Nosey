@@ -188,6 +188,26 @@ export type AnswerResult = {
   part_label?: string | null;
   // "agent" when a connected MCP agent regraded this answer.
   graded_by?: string | null;
+  // Feedback split into sections (migration 090). Null for older answers and
+  // agent grades, which render `feedback` as Markdown.
+  feedback_sections?: FeedbackSections | null;
+};
+
+export type FeedbackStep = { description: string; expression: string };
+
+export type FeedbackSections = {
+  version: number;
+  // Right: the key idea. Right with a flaw: the warning (bad line, unfinished value).
+  note: string;
+  // Wrong only.
+  what_to_fix: string;
+  // Wrong only: the short path to the answer.
+  key_steps: FeedbackStep[];
+  // The full solution, behind a toggle.
+  steps: FeedbackStep[];
+  final_answer: string;
+  // An already-rendered chart/graph Markdown block, or "".
+  graph: string;
 };
 
 export type OcrStatus = "ok" | "needs_input" | "resolved" | "skipped";

@@ -6,6 +6,7 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { FeatureSurvey } from "../components/FeatureSurvey";
+import { GradeFeedback, gradeState } from "../components/GradeFeedback";
 import { Dropdown } from "../components/Dropdown";
 import { TextInput } from "../components/Field";
 import { LoadingNotice } from "../components/Loaders";
@@ -740,6 +741,10 @@ function ReviewItem({ answer, label }: { answer: AnswerResult; label: string }) 
   // lines of it (GH #157); show them as read handwriting, not typed text.
   const drawnOnly = isReadFromDrawing(answer.user_answer, transcript);
   const trimmed = drawnOnly && answer.user_answer.trim() !== transcript;
+  const sections = answer.feedback_sections ?? null;
+  // A math answer that is right with a note was flagged by the grader for a
+  // flaw in the work, not for a doubtful answer key: the note explains it.
+  const keyDoubt = answer.flagged_uncertain && !(sections && answer.is_math && gradeState(answer, sections) === "check");
 
   return (
     <Card className={`review-item ${answer.is_correct ? "correct" : "incorrect"}`}>
@@ -759,7 +764,7 @@ function ReviewItem({ answer, label }: { answer: AnswerResult; label: string }) 
       </button>
       {open ? (
         <div className="review-detail">
-          {answer.flagged_uncertain ? (
+          {keyDoubt ? (
             <div className="review-flagged-notice">
               <AlertTriangle size={16} />
               <span>
@@ -809,11 +814,15 @@ function ReviewItem({ answer, label }: { answer: AnswerResult; label: string }) 
               </ClampedBox>
             </div>
           ) : null}
-          <div className="math-explanation">
-            <span>Feedback</span>
-            <MarkdownContent content={answer.feedback ?? "No feedback returned for this answer."} />
-          </div>
-          {reasoning ? (
+          {sections ? (
+            <GradeFeedback answer={answer} sections={sections} />
+          ) : (
+            <div className="math-explanation">
+              <span>Feedback</span>
+              <MarkdownContent content={answer.feedback ?? "No feedback returned for this answer."} />
+            </div>
+          )}
+          {reasoning && !sections ? (
             <div className="answer-reasoning">
               <button
                 className="answer-reasoning-trigger"
@@ -821,7 +830,7 @@ function ReviewItem({ answer, label }: { answer: AnswerResult; label: string }) 
                 type="button"
               >
                 <BrainIcon size={15} />
-                <span>AI-Reasoning</span>
+                <span>Kojo's reasoning</span>
                 <ChevronDownIcon className={reasoningOpen ? "rotated" : ""} size={15} />
               </button>
               {reasoningOpen ? (

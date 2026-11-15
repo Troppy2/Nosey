@@ -78,6 +78,29 @@ class SubmitAttemptRequest(BaseModel):
         return self
 
 
+class FeedbackStep(BaseModel):
+    description: str
+    expression: str = ""
+
+
+class FeedbackSections(BaseModel):
+    """A grade's feedback split into the parts Results lays out (migration 090).
+
+    note: one sentence; on a right answer the key idea, on a right answer with
+    a flaw (a bad line, an unlabeled or unfinished final value) the warning.
+    what_to_fix: wrong answers only. key_steps: the short path (wrong only).
+    steps: the full solution, behind a toggle. final_answer: shown once.
+    graph: an already-rendered chart/graph Markdown block, or "".
+    """
+    version: int = 1
+    note: str = ""
+    what_to_fix: str = ""
+    key_steps: list[FeedbackStep] = Field(default_factory=list)
+    steps: list[FeedbackStep] = Field(default_factory=list)
+    final_answer: str = ""
+    graph: str = ""
+
+
 class AnswerResult(BaseModel):
     question_id: int
     question_text: Optional[str] = None
@@ -115,6 +138,8 @@ class AnswerResult(BaseModel):
     part_label: Optional[str] = None
     # "agent" when a connected MCP agent regraded this answer, else None.
     graded_by: Optional[str] = None
+    # Structured feedback for the Results layout; None means render `feedback`.
+    feedback_sections: Optional[FeedbackSections] = None
 
 
 class AttemptResult(BaseModel):
@@ -158,6 +183,9 @@ class FRQGrade(BaseModel):
     # without re-fetching. Not a DB column; grade_math_answer sets this only
     # when it was passed a work: OcrResult (STEM Scratch Pad feature).
     work_transcript: Optional[str] = None
+    # The same feedback as sections (migration 090). `feedback` stays the
+    # Markdown version for the MCP, Kojo and older clients.
+    sections: Optional[FeedbackSections] = None
 
 
 # Confidence floor below which a transcript is context-only in grading and

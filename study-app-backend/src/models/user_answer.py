@@ -44,6 +44,10 @@ class UserAnswer(Base):
     ocr_status: Mapped[Optional[str]] = mapped_column(String(20))
     # None = Nosey's grader, "agent" = regraded by an MCP agent (migration 073).
     graded_by: Mapped[Optional[str]] = mapped_column(String(16))
+    # Feedback as JSON sections (migration 090, see FeedbackSections in
+    # schemas/attempt_schema.py). None for older answers and agent grades,
+    # which Results renders from ai_feedback.
+    feedback_sections: Mapped[Optional[str]] = mapped_column(Text)
 
     attempt: Mapped[UserAttempt] = relationship("UserAttempt", back_populates="answers")
     question: Mapped[Question] = relationship("Question", back_populates="user_answers")

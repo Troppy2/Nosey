@@ -22,6 +22,7 @@ from src.schemas.attempt_schema import (
     AttemptSummary,
     DraftAttemptAnswer,
     DraftAttemptResponse,
+    FeedbackSections,
     FRQGrade,
     OCR_LOW_CONFIDENCE_THRESHOLD,
     GRADED_BY_AGENT,
@@ -146,6 +147,23 @@ def in_exam_order(answers: list[UserAnswer]) -> list[UserAnswer]:
         return (0, question.display_order, question.id)
 
     return sorted(answers, key=key)
+
+
+def _sections_json(grade: FRQGrade) -> Optional[str]:
+    """What user_answers.feedback_sections stores (migration 090)."""
+    return grade.sections.model_dump_json() if grade.sections is not None else None
+
+
+def _load_sections(raw: Optional[str]) -> Optional[FeedbackSections]:
+    """A stored sections column, or None when absent or unreadable (the
+    answer then renders from ai_feedback as before)."""
+    if not raw:
+        return None
+    try:
+        return FeedbackSections.model_validate_json(raw)
+    except ValueError:
+        logger.warning("Unreadable feedback_sections; falling back to ai_feedback")
+        return None
 
 
 def _drawn_answer(work: Optional[OcrResult]) -> str:
@@ -354,6 +372,7 @@ class GradingService:
                 user_answer=user_answer,
                 is_correct=grade.is_correct,
                 ai_feedback=grade.feedback,
+                feedback_sections=_sections_json(grade),
                 confidence_score=grade.confidence,
                 flagged_uncertain=grade.flagged_uncertain,
                 ai_reasoning=grade.reasoning,
@@ -365,6 +384,7 @@ class GradingService:
                 user_answer=user_answer,
                 is_correct=grade.is_correct,
                 feedback=grade.feedback,
+                feedback_sections=grade.sections,
                 reasoning=grade.reasoning,
                 confidence=grade.confidence,
                 flagged_uncertain=grade.flagged_uncertain,
@@ -508,6 +528,7 @@ class GradingService:
         work_transcript: Optional[str] = None,
         ocr_status: Optional[str] = None,
         work_strokes: Optional[str] = None,
+        feedback_sections: Optional[FeedbackSections] = None,
     ) -> AnswerResult:
         """One AnswerResult, with the answer key redacted while needs_input.
 
@@ -523,6 +544,7 @@ class GradingService:
             correct_answer=None if held or question is None else self._correct_answer_text(question),
             is_correct=is_correct,
             feedback=None if held else feedback,
+            feedback_sections=None if held else feedback_sections,
             reasoning=None if held else reasoning,
             confidence=None if held else confidence,
             flagged_uncertain=False if held else flagged_uncertain,
@@ -582,6 +604,7 @@ class GradingService:
             row = rows[grade["question_id"]]
             row.is_correct = grade["is_correct"]
             row.ai_feedback = grade["feedback"]
+            row.feedback_sections = None
             row.ai_reasoning = grade.get("reasoning")
             row.confidence_score = None
             row.flagged_uncertain = False
@@ -645,6 +668,7 @@ class GradingService:
         row.user_answer = body.answer or _drawn_answer(work)
         row.is_correct = grade.is_correct
         row.ai_feedback = grade.feedback
+        row.feedback_sections = _sections_json(grade)
         row.graded_by = None
         row.ai_reasoning = grade.reasoning
         row.confidence_score = grade.confidence
@@ -668,6 +692,7 @@ class GradingService:
                 user_answer=row.user_answer,
                 is_correct=grade.is_correct,
                 feedback=grade.feedback,
+                feedback_sections=grade.sections,
                 reasoning=grade.reasoning,
                 confidence=grade.confidence,
                 flagged_uncertain=grade.flagged_uncertain,
@@ -732,6 +757,7 @@ class GradingService:
                 verdicts[question.id] = grade.is_correct
                 row.is_correct = grade.is_correct
                 row.ai_feedback = grade.feedback
+                row.feedback_sections = _sections_json(grade)
                 row.graded_by = None
                 row.ai_reasoning = grade.reasoning
                 row.confidence_score = grade.confidence
@@ -741,6 +767,7 @@ class GradingService:
                     user_answer=row.user_answer,
                     is_correct=grade.is_correct,
                     feedback=grade.feedback,
+                    feedback_sections=grade.sections,
                     reasoning=grade.reasoning,
                     confidence=grade.confidence,
                     flagged_uncertain=grade.flagged_uncertain,
@@ -795,6 +822,7 @@ class GradingService:
         for row, grade in zip(rows, grades):
             row.is_correct = grade.is_correct
             row.ai_feedback = grade.feedback
+            row.feedback_sections = _sections_json(grade)
             row.graded_by = None
             row.ai_reasoning = grade.reasoning
             row.confidence_score = grade.confidence
@@ -808,6 +836,7 @@ class GradingService:
                 user_answer=row.user_answer,
                 is_correct=grade.is_correct,
                 feedback=grade.feedback,
+                feedback_sections=grade.sections,
                 reasoning=grade.reasoning,
                 confidence=grade.confidence,
                 flagged_uncertain=grade.flagged_uncertain,
@@ -960,6 +989,7 @@ class GradingService:
         return FRQGrade(
             is_correct=is_correct,
             feedback=result.feedback,
+            sections=result.sections,
             reasoning=result.reasoning,
             flagged_uncertain=flagged_uncertain,
             confidence=grade.confidence,
@@ -1138,6 +1168,7 @@ class GradingService:
                     user_answer=answer.user_answer,
                     is_correct=bool(answer.is_correct),
                     feedback=answer.ai_feedback,
+                    feedback_sections=_load_sections(answer.feedback_sections),
                     reasoning=answer.ai_reasoning,
                     confidence=float(answer.confidence_score)
                     if answer.confidence_score is not None
