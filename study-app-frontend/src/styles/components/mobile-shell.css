@@ -3,7 +3,7 @@
    is not a safe test on a touch device: Android page-zoom widens the layout
    viewport in CSS pixels well past 760px). */
 
-@media (max-width: 760px), (hover: none) and (pointer: coarse) and (max-width: 1100px) {
+@media (max-width: 760px), (hover: none) and (pointer: coarse) and (max-device-width: 1100px) {
   .shell--mobile {
     display: block;
     min-height: 100vh;

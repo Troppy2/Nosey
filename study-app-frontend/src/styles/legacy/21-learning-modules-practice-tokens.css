@@ -161,7 +161,7 @@
   }
 }
 
-@media (max-width: 760px), (hover: none) and (pointer: coarse) and (max-width: 1100px) {
+@media (max-width: 760px), (hover: none) and (pointer: coarse) and (max-device-width: 1100px) {
   /* No dock clearance here: the workspace is registered as an immersive route
      in MobileDock.tsx precisely so the floating dock never covers the editor,
      and reserving space for a dock that is not rendered wastes a band of screen
@@ -543,7 +543,7 @@
 
 /* Same query as useMobileShell.ts, so the markup and the styling can never
    disagree about which rate control is showing. */
-@media (max-width: 760px), (hover: none) and (pointer: coarse) and (max-width: 1100px) {
+@media (max-width: 760px), (hover: none) and (pointer: coarse) and (max-device-width: 1100px) {
   /* The player owns the bottom edge here: this route is registered in
      IMMERSIVE_PATTERNS (MobileDock.tsx), so the nav dock never renders on it
      and there is nothing to stack above. Getting back to the track is the

@@ -457,7 +457,7 @@
    space instead of obeying the desktop ceilings. Uses the shared mobile-shell
    query (rules-gotchas 11a) rather than a fresh max-width breakpoint, so a
    zoomed-out phone cannot fall into the desktop layout. */
-@media (max-width: 760px), (hover: none) and (pointer: coarse) and (max-width: 1100px) {
+@media (max-width: 760px), (hover: none) and (pointer: coarse) and (max-device-width: 1100px) {
   .match-screen {
     gap: 0.5rem;
     padding: 0.6rem 0.7rem 0.7rem;
