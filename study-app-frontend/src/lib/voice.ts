@@ -105,6 +105,38 @@ export function saveInterviewerVoice(voice: InterviewerVoiceId) {
 
 export const dictationSupported = () => recognitionCtor() !== null || canRecordFallback;
 
+// A recording this small is a mis-tap, not an answer.
+const MIN_SEGMENT_BYTES = 3000;
+// Past this the browser's own words are kept, so a slow server never stalls the round.
+const IMPROVE_TIMEOUT_MS = 8000;
+
+const wordCount = (s: string) => s.split(/\s+/).filter(Boolean).length;
+
+/** Whether the server transcript should replace what the browser heard. A transcript
+ *  that lost most of the words (a silent recording, a cut upload) is not an improvement. */
+export function isBetterTranscript(heard: string, better: string): boolean {
+  if (!better.trim()) return false;
+  return wordCount(better) * 2 >= wordCount(heard);
+}
+
+/** Swap one dictated segment in the draft for its better transcript. If the segment
+ *  was edited by hand since (no longer found), the draft is left as the user made it. */
+export function replaceSegment(draft: string, heard: string, better: string): string {
+  if (!heard) return draft ? `${draft} ${better}` : better;
+  const at = draft.lastIndexOf(heard);
+  if (at < 0) return draft;
+  return draft.slice(0, at) + better + draft.slice(at + heard.length);
+}
+
+type DictationOptions = {
+  /** The interviewer's last line, sent with the audio as a spelling hint. */
+  hint?: string;
+  /** A segment's server transcript arrived: `heard` is the browser text it replaces. */
+  onImprove?: (heard: string, better: string) => void;
+};
+
+type ShadowRecording = { recorder: MediaRecorder; chunks: BlobPart[]; discard: boolean };
+
 /** Plays interviewer lines through the chosen voice: an AI voice from the backend (falling
  *  back to the browser voice if that fails) or the browser's own voice. */
 export function useInterviewerVoice() {
@@ -205,8 +237,10 @@ export function useInterviewerVoice() {
   return { speak, stop, speaking, muted, setMuted, blocked };
 }
 
-/** Live dictation. Browser speech recognition when present, otherwise record and transcribe on stop. */
-export function useDictation(onText: (text: string) => void) {
+/** Live dictation. Browser speech recognition gives the live words; the same segment is
+ *  recorded and transcribed by the server when the mic stops, and that better text
+ *  replaces the browser's (onImprove). Without browser recognition: record, then transcribe. */
+export function useDictation(onText: (text: string) => void, options: DictationOptions = {}) {
   const [listening, setListening] = useState(false);
   // Record-then-transcribe fallback: the audio is uploaded and not back yet.
   const [transcribing, setTranscribing] = useState(false);
@@ -229,6 +263,20 @@ export function useDictation(onText: (text: string) => void) {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const onTextRef = useRef(onText);
   onTextRef.current = onText;
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+  // The recording of the segment the browser is transcribing live.
+  const shadowRef = useRef<ShadowRecording | null>(null);
+  // Everything the browser emitted this segment, in order: what onImprove replaces.
+  const heardRef = useRef<string[]>([]);
+
+  const dropShadow = useCallback(() => {
+    const shadow = shadowRef.current;
+    shadowRef.current = null;
+    if (!shadow) return;
+    shadow.discard = true;
+    if (shadow.recorder.state === "recording") shadow.recorder.stop();
+  }, []);
 
   const stopMeter = useCallback(() => {
     const m = meterRef.current;
@@ -300,7 +348,10 @@ export function useDictation(onText: (text: string) => void) {
     const recording = recRef.current !== null || recorderRef.current?.state === "recording";
     if (!recording && !transcribingRef.current) return Promise.resolve();
     return new Promise<void>((resolve) => {
-      const timer = window.setTimeout(resolve, transcribingRef.current || !recRef.current ? 30000 : 4000);
+      // Live recognition settles in a few seconds; a segment that is also being
+      // transcribed by the server gets that wait on top.
+      const wait = transcribingRef.current || !recRef.current ? 30000 : shadowRef.current ? 4000 + IMPROVE_TIMEOUT_MS + 1000 : 4000;
+      const timer = window.setTimeout(resolve, wait);
       waitersRef.current.push(() => {
         window.clearTimeout(timer);
         resolve();
@@ -318,11 +369,63 @@ export function useDictation(onText: (text: string) => void) {
     // Never stack recognisers: a second start on a live one throws and can wedge the mic.
     recRef.current?.abort();
     recRef.current = null;
+    dropShadow();
+    heardRef.current = [];
     stopMeter();
     const session = ++sessionRef.current;
     setError(null);
     interimRef.current = "";
     setInterim("");
+
+    const emit = (text: string) => {
+      heardRef.current.push(text);
+      onTextRef.current(text);
+    };
+
+    // Send the recorded segment for a better transcript, then let finish() callers go.
+    const improve = async (shadow: ShadowRecording) => {
+      const heard = heardRef.current.join(" ");
+      heardRef.current = [];
+      try {
+        if (shadow.discard) return;
+        const blob = new Blob(shadow.chunks, { type: shadow.recorder.mimeType || "audio/webm" });
+        if (blob.size < MIN_SEGMENT_BYTES) return;
+        const better = await Promise.race([
+          transcribeAnswer(blob, optionsRef.current.hint),
+          new Promise<string>((resolve) => window.setTimeout(() => resolve(""), IMPROVE_TIMEOUT_MS)),
+        ]);
+        if (!shadow.discard && isBetterTranscript(heard, better)) optionsRef.current.onImprove?.(heard, better.trim());
+      } catch {
+        /* the browser's words stay in the draft */
+      } finally {
+        transcribingRef.current = false;
+        setTranscribing(false);
+        settle();
+      }
+    };
+
+    const startShadow = async (forSession: number, forRec: Recognition) => {
+      if (!canRecordFallback) return;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (forSession !== sessionRef.current || recRef.current !== forRec) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        const recorder = new MediaRecorder(stream);
+        const shadow: ShadowRecording = { recorder, chunks: [], discard: false };
+        recorder.ondataavailable = (e) => shadow.chunks.push(e.data);
+        recorder.onstop = () => {
+          stream.getTracks().forEach((t) => t.stop());
+          if (shadowRef.current === shadow) shadowRef.current = null;
+          void improve(shadow);
+        };
+        shadowRef.current = shadow;
+        recorder.start();
+      } catch {
+        /* no recording: the browser's words are used as they are */
+      }
+    };
 
     const Ctor = recognitionCtor();
     if (Ctor) {
@@ -338,7 +441,7 @@ export function useDictation(onText: (text: string) => void) {
           if (r.isFinal) finalText += r[0].transcript;
           else live += r[0].transcript;
         }
-        if (finalText) onTextRef.current(finalText.trim());
+        if (finalText.trim()) emit(finalText.trim());
         interimRef.current = live;
         setInterim(live);
       };
@@ -357,11 +460,19 @@ export function useDictation(onText: (text: string) => void) {
         // Some engines end without finalizing the last phrase: keep it anyway.
         const pending = interimRef.current.trim();
         interimRef.current = "";
-        if (pending) onTextRef.current(pending);
+        if (pending) emit(pending);
         stopMeter();
         setListening(false);
         setInterim("");
-        settle();
+        const shadow = shadowRef.current;
+        if (shadow && shadow.recorder.state === "recording") {
+          // Its onstop sends the audio off and settles when the better text is in.
+          transcribingRef.current = true;
+          setTranscribing(true);
+          shadow.recorder.stop();
+        } else {
+          settle();
+        }
       };
       recRef.current = rec;
       try {
@@ -373,6 +484,7 @@ export function useDictation(onText: (text: string) => void) {
       }
       setListening(true);
       void startMeter(session);
+      void startShadow(session, rec);
       return;
     }
     if (!canRecordFallback) {
@@ -391,7 +503,7 @@ export function useDictation(onText: (text: string) => void) {
         setTranscribing(true);
         setInterim("Transcribing...");
         try {
-          const text = await transcribeAnswer(new Blob(chunks, { type: "audio/webm" }));
+          const text = await transcribeAnswer(new Blob(chunks, { type: "audio/webm" }), optionsRef.current.hint);
           if (text) onTextRef.current(text);
         } catch {
           setError("Could not transcribe that. Try again or type instead.");
@@ -409,11 +521,12 @@ export function useDictation(onText: (text: string) => void) {
     } catch {
       setError("Microphone access is blocked. Allow it in the address bar, or type instead.");
     }
-  }, [startMeter, stopMeter, settle]);
+  }, [startMeter, stopMeter, settle, dropShadow]);
 
   useEffect(
     () => () => {
       sessionRef.current += 1;
+      dropShadow();
       stopMeter();
       recRef.current?.abort();
       if (recorderRef.current?.state === "recording") recorderRef.current.stop();
@@ -421,7 +534,7 @@ export function useDictation(onText: (text: string) => void) {
       ctxRef.current = null;
       settle();
     },
-    [stopMeter, settle],
+    [stopMeter, settle, dropShadow],
   );
 
   return { listening, transcribing, interim, error, level, start, stop, finish, supported: dictationSupported() };

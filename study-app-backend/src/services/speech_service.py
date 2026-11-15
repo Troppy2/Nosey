@@ -1,8 +1,9 @@
 """Interviewer and lesson voice: text to speech and speech to text through OpenRouter.
 
-Stateless. TTS tries the free model first and falls back to a cheap one; the
-browser's own speech recognition is the primary transcript source, so
-transcribe() only runs for browsers without it.
+Stateless. TTS tries the free model first and falls back to a cheap one.
+transcribe() turns each recorded answer segment into text: Groq's Whisper first,
+OpenRouter's as the backup. The browser's own speech recognition only supplies
+the live preview (and the text that is kept if both fail).
 """
 import asyncio
 import time
@@ -26,6 +27,27 @@ FALLBACK_TIMEOUT_SECONDS = 25.0
 HEDGE_AFTER_SECONDS = 2.0
 # Recording a walkthrough is not interactive, so the one voice gets longer to answer.
 STRICT_TIMEOUT_SECONDS = 30.0
+# The client stops waiting at about 8s and keeps the browser's text, so neither
+# provider gets long.
+STT_TIMEOUT_SECONDS = 6.0
+_GROQ_BASE = "https://api.groq.com/openai/v1"
+MAX_STT_HINT_CHARS = 300
+# Whisper spells words it has just "read" in its prompt, so this list is what
+# keeps "hash map" from coming back as "hash nap". Keep it short: Whisper only
+# reads the last ~200 tokens of the prompt.
+_STT_TERMS = (
+    "hash map, hash set, two pointers, sliding window, binary search, linked list, "
+    "stack, queue, deque, heap, min-heap, trie, graph, BFS, DFS, recursion, "
+    "backtracking, memoization, dynamic programming, greedy, prefix sum, "
+    "topological sort, union-find, Dijkstra, Kadane's algorithm, quickselect, LRU cache, O(n), O(log n), O(n log n), O(n^2), "
+    "time complexity, space complexity, edge case, API, SQL, cache, mutex."
+)
+
+
+def stt_prompt(hint: str) -> str:
+    """Whisper's spelling hint: the interviewer's last line (what the answer is about) then the fixed terms."""
+    hint = " ".join((hint or "").split())[:MAX_STT_HINT_CHARS]
+    return f"{hint} {_STT_TERMS}".strip()
 
 
 def _headers() -> dict[str, str]:
@@ -105,25 +127,44 @@ class SpeechService:
                 await asyncio.sleep(0.6 * (attempt + 1))
         raise LLMException(f"Speech synthesis failed: {last}")
 
-    async def transcribe(self, audio: bytes, filename: str, content_type: str) -> str:
+    async def _transcribe_once(
+        self, client: httpx.AsyncClient, base: str, key: str, model: str, prompt: str, file: tuple[str, bytes, str]
+    ) -> str:
+        resp = await client.post(
+            f"{base}/audio/transcriptions",
+            headers={"Authorization": f"Bearer {key}"},
+            data={"model": model, "language": "en", "prompt": prompt},
+            files={"file": file},
+        )
+        resp.raise_for_status()
+        return (resp.json().get("text") or "").strip()
+
+    async def transcribe(self, audio: bytes, filename: str, content_type: str, hint: str = "") -> str:
         if not audio:
             raise ValidationException("No audio received.")
         if len(audio) > MAX_AUDIO_BYTES:
             raise ValidationException("Recording is too long.")
-        try:
-            async with httpx.AsyncClient(timeout=settings.llm_generation_timeout_seconds) as client:
-                resp = await client.post(
-                    f"{_BASE}/audio/transcriptions",
-                    headers=_headers(),
-                    data={"model": settings.openrouter_stt_model},
-                    files={"file": (filename or "answer.webm", audio, content_type or "audio/webm")},
-                )
-                resp.raise_for_status()
-                return (resp.json().get("text") or "").strip()
-        except LLMException:
-            raise
-        except Exception as exc:
-            raise LLMException(f"Transcription failed: {exc}") from exc
+        providers = [
+            (name, base, key, model)
+            for name, base, key, model in (
+                ("groq", _GROQ_BASE, settings.groq_api_key, settings.groq_stt_model),
+                ("openrouter", _BASE, settings.openrouter_api_key, settings.openrouter_stt_model),
+            )
+            if key
+        ]
+        if not providers:
+            raise LLMException("Voice is not configured on this server.")
+        prompt = stt_prompt(hint)
+        file = (filename or "answer.webm", audio, content_type or "audio/webm")
+        last: Exception | None = None
+        async with httpx.AsyncClient(timeout=STT_TIMEOUT_SECONDS) as client:
+            for name, base, key, model in providers:
+                try:
+                    return await self._transcribe_once(client, base, key, model, prompt, file)
+                except Exception as exc:  # noqa: BLE001 - try the backup, then report
+                    last = exc
+                    logger.warning("stt via %s failed: %s %s", name, type(exc).__name__, exc)
+        raise LLMException(f"Transcription failed: {last}")
 
 
 async def record_lines(lines: list[str], voice: str, concurrency: int = 4) -> list[str]:

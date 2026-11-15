@@ -369,11 +369,16 @@ async def speak(request: Request, payload: SpeakRequest):
 
 @router.post("/transcribe")
 @limiter.limit("20/minute")
-async def transcribe(request: Request, response: Response, audio: UploadFile = File(...)):
-    """Fallback for browsers without speech recognition."""
+async def transcribe(
+    request: Request, response: Response, audio: UploadFile = File(...), hint: str = Form(default="")
+):
+    """A recorded answer segment to text. `hint` is the interviewer's last line, used
+    only to help the speech model spell the words the answer is likely to contain."""
     data = await audio.read()
     try:
-        text = await SpeechService().transcribe(data, audio.filename or "answer.webm", audio.content_type or "audio/webm")
+        text = await SpeechService().transcribe(
+            data, audio.filename or "answer.webm", audio.content_type or "audio/webm", hint
+        )
     except ValidationException as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except LLMException as exc:

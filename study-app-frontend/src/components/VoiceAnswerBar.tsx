@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { KeyboardIcon, MicIcon, SpeakerIcon } from "../icons";
-import { useDictation } from "../lib/voice";
+import { replaceSegment, useDictation } from "../lib/voice";
 import "../styles/components/voice-room.css";
 
 type Props = {
@@ -13,11 +13,13 @@ type Props = {
   onStartTalking?: () => void;
   speaking?: boolean;
   placeholder?: string;
+  /** The interviewer's last line: helps speech recognition spell the answer's words. */
+  hint?: string;
 };
 
 /** Mic, mute and keyboard controls plus a live transcript. The draft is always editable by switching to the keyboard. */
 export function VoiceAnswerBar({
-  onSend, onListeningChange, disabled, muted, onToggleMute, onStartTalking, speaking, placeholder,
+  onSend, onListeningChange, disabled, muted, onToggleMute, onStartTalking, speaking, placeholder, hint,
 }: Props) {
   const [draft, setDraftState] = useState("");
   // The draft as of the last dictation callback, read by send() after it waits for
@@ -32,7 +34,10 @@ export function VoiceAnswerBar({
   const [typing, setTyping] = useState(false);
   // Send was pressed while the mic was still live: waiting for the last words.
   const [finishing, setFinishing] = useState(false);
-  const dictation = useDictation((text) => setDraft((d) => (d ? `${d} ${text}` : text)));
+  const dictation = useDictation((text) => setDraft((d) => (d ? `${d} ${text}` : text)), {
+    hint,
+    onImprove: (heard, better) => setDraft((d) => replaceSegment(d, heard, better)),
+  });
   const areaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {

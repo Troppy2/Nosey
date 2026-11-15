@@ -48,6 +48,8 @@ class Settings(BaseSettings):
     # A model must also be enabled for the project in the Groq console.
     groq_json_model: str = Field(default="openai/gpt-oss-120b", alias="GROQ_JSON_MODEL")
     groq_chat_model: str = Field(default="openai/gpt-oss-20b", alias="GROQ_CHAT_MODEL")
+    # Speech to text for spoken interview answers. Must be enabled for the project in the Groq console.
+    groq_stt_model: str = Field(default="whisper-large-v3-turbo", alias="GROQ_STT_MODEL")
     google_ai_api_key: Optional[str] = Field(default=None, alias="GOOGLE_AI_API_KEY")
     # gemini-2.0-flash was retired (404) and gemini-2.5-flash is closed to new
     # API users. gemini-3.8-flash exists but returned 503 "high demand" on every

@@ -98,6 +98,7 @@ export function VoiceRoom({
       onToggleMute={() => voice.setMuted(!voice.muted)}
       onStartTalking={voice.stop}
       speaking={voice.speaking}
+      hint={lastInterviewer?.content}
     />
   );
 

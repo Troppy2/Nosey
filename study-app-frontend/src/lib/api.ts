@@ -2768,9 +2768,11 @@ export async function speakInterviewer(text: string, voice?: string): Promise<Bl
   return res.blob();
 }
 
-export async function transcribeAnswer(audio: Blob): Promise<string> {
+/** `hint` is the interviewer's last line: it helps the speech model spell the answer's words. */
+export async function transcribeAnswer(audio: Blob, hint = ""): Promise<string> {
   const form = new FormData();
   form.append("audio", audio, "answer.webm");
+  if (hint) form.append("hint", hint.slice(0, 300));
   const out = await request<{ text: string }>("/mock-interview/transcribe", { method: "POST", body: form });
   return out.text;
 }
