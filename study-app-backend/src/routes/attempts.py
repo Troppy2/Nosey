@@ -17,6 +17,9 @@ from src.schemas.attempt_schema import (
     OCR_STATUS_NEEDS_INPUT,
     RedoAnswerRequest,
     RedoAnswerResponse,
+    RemakeAppealRequest,
+    RemakeRequest,
+    RemakeResponse,
     ResumableTestInfo,
     ReviewSummaryResponse,
     SaveDraftAttemptRequest,
@@ -125,6 +128,77 @@ async def skip_unreadable(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except StudyAppException as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _remake_errors(exc: Exception) -> HTTPException:
+    if isinstance(exc, ResourceNotFoundException):
+        return HTTPException(status_code=404, detail=str(exc))
+    if isinstance(exc, LLMException):
+        return HTTPException(
+            status_code=503, detail="Kojo couldn't check your remake right now. It wasn't used up; try again."
+        )
+    return HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/attempts/{attempt_id}/answers/{question_id}/remake", response_model=RemakeResponse)
+# One OCR call + one grading call per remake, one remake per wrong answer.
+@limiter.limit("20/minute;120/hour")
+async def remake_answer(
+    attempt_id: int,
+    question_id: int,
+    request: Request,
+    response: Response,
+    body: RemakeRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> RemakeResponse:
+    """A quiz remake: new answer + reflection for half credit (spec-quiz-remakes.md)."""
+    await screen_user_input(user, "test_answers", body.answer, body.what_wrong, body.what_right, block_harmful=False)
+    try:
+        if body.work_image and not can_submit_scratch_pad_work(user):
+            raise StudyAppException("Scratch-pad drawings are a beta feature. Type your work instead.")
+        ocr_engine = resolve_ocr_engine(user, body.ocr_engine)
+        return await GradingService().remake_answer(
+            attempt_id, question_id, user.id, body, session, ocr_engine=ocr_engine
+        )
+    except (ResourceNotFoundException, LLMException, StudyAppException) as exc:
+        raise _remake_errors(exc) from exc
+
+
+@router.post("/attempts/{attempt_id}/answers/{question_id}/remake/appeal", response_model=RemakeResponse)
+@limiter.limit("20/minute;120/hour")
+async def appeal_remake(
+    attempt_id: int,
+    question_id: int,
+    request: Request,
+    response: Response,
+    body: RemakeAppealRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> RemakeResponse:
+    """The one appeal of a remake that got no credit."""
+    await screen_user_input(user, "test_answers", body.reason, block_harmful=False)
+    try:
+        return await GradingService().appeal_remake(attempt_id, question_id, user.id, body, session)
+    except (ResourceNotFoundException, LLMException, StudyAppException) as exc:
+        raise _remake_errors(exc) from exc
+
+
+@router.post("/attempts/{attempt_id}/answers/{question_id}/reveal", response_model=RemakeResponse)
+@limiter.limit("60/minute")
+async def reveal_answer(
+    attempt_id: int,
+    question_id: int,
+    request: Request,
+    response: Response,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> RemakeResponse:
+    """"Show answer": shows the key and gives up the remake for this question."""
+    try:
+        return await GradingService().reveal_answer(attempt_id, question_id, user.id, session)
+    except (ResourceNotFoundException, StudyAppException) as exc:
+        raise _remake_errors(exc) from exc
 
 
 @router.post("/tests/{test_id}/attempts/draft", response_model=DraftAttemptResponse)

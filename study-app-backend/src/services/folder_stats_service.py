@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Iterable, Optional
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.flashcard import Flashcard, FlashcardAttempt
@@ -270,7 +270,12 @@ class FolderStatsService:
             raise ResourceNotFoundException("Folder")
 
         attempt_rows = (await session.execute(
-            select(UserAttempt.id, UserAttempt.test_id, Test.title, UserAttempt.total_score, UserAttempt.created_at)
+            select(
+                UserAttempt.id, UserAttempt.test_id, Test.title,
+                # Quiz remakes count (spec-quiz-remakes.md).
+                func.coalesce(UserAttempt.remake_score, UserAttempt.total_score).label("total_score"),
+                UserAttempt.created_at,
+            )
             .join(Test, Test.id == UserAttempt.test_id)
             .where(
                 Test.folder_id == folder_id,

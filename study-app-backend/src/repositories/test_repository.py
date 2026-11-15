@@ -131,7 +131,7 @@ class TestRepository(BaseRepository[Test]):
             select(
                 Test,
                 func.count(func.distinct(Question.id)).label("question_count"),
-                func.max(UserAttempt.total_score).label("best_score"),
+                func.max(func.coalesce(UserAttempt.remake_score, UserAttempt.total_score)).label("best_score"),
                 func.count(func.distinct(UserAttempt.id)).label("attempt_count"),
             )
             .join(Test.folder)
@@ -152,7 +152,7 @@ class TestRepository(BaseRepository[Test]):
             select(
                 Test,
                 func.count(func.distinct(Question.id)).label("question_count"),
-                func.max(UserAttempt.total_score).label("best_score"),
+                func.max(func.coalesce(UserAttempt.remake_score, UserAttempt.total_score)).label("best_score"),
                 func.count(func.distinct(UserAttempt.id)).label("attempt_count"),
             )
             .join(Test.folder)

@@ -41,6 +41,8 @@ class UserAttempt(Base, TimestampMixin):
     attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="in_progress", nullable=False)  # in_progress, submitted
     total_score: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2))
+    # Score with quiz remakes (half credit each, migration 091); None until the first remake.
+    remake_score: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2))
     total_questions: Mapped[Optional[int]] = mapped_column(Integer)
     correct_count: Mapped[Optional[int]] = mapped_column(Integer)
     exited_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)  # When user last exited the test

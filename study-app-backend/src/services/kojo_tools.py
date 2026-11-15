@@ -725,7 +725,7 @@ async def run_isolated(user, name: str, args: dict[str, Any]) -> tuple[dict[str,
 
     async with async_session_maker() as session:
         try:
-            return await run_tool(McpContext(user=user, session=session), name, args)
+            return await run_tool(McpContext(user=user, session=session, in_app=True), name, args)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Kojo tool %s crashed: %s", name, exc)
             return {"error": "That tool failed. Try a different approach."}, True

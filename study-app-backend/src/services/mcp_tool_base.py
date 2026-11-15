@@ -27,6 +27,9 @@ class ToolInputError(StudyAppException):
 class McpContext:
     user: User
     session: AsyncSession
+    # True when Kojo calls the tool inside the app: the student is the reader,
+    # so answers still open for a quiz remake keep their key hidden.
+    in_app: bool = False
 
 
 @dataclass(frozen=True)

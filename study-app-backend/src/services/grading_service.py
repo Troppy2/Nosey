@@ -33,6 +33,9 @@ from src.schemas.attempt_schema import (
     OcrResult,
     RedoAnswerRequest,
     RedoAnswerResponse,
+    RemakeAppealRequest,
+    RemakeRequest,
+    RemakeResponse,
     ResumableTestInfo,
     SaveDraftAttemptRequest,
     SubmittedAnswer,
@@ -164,6 +167,85 @@ def _load_sections(raw: Optional[str]) -> Optional[FeedbackSections]:
     except ValueError:
         logger.warning("Unreadable feedback_sections; falling back to ai_feedback")
         return None
+
+
+# ── Quiz remakes (spec-quiz-remakes.md) ─────────────────────────────────────
+_OBJECTIVE_TYPES = ("MCQ", "TF", "MS", "RANK")
+REMAKE_CREDITED = "credited"
+REMAKE_NO_CREDIT = "no_credit"
+_LEGACY_FIX_RE = re.compile(r"\*\*What to fix:\*\*\s*(.+?)(?:\n\s*\n|$)", re.DOTALL)
+
+
+def _fix_text(feedback: Optional[str], sections: Optional[FeedbackSections]) -> str:
+    """The "what to fix" hint of a grade: from sections, else from the older
+    Markdown feedback. Empty when there is none."""
+    if sections is not None and sections.what_to_fix:
+        return sections.what_to_fix
+    match = _LEGACY_FIX_RE.search(feedback or "")
+    return match.group(1).strip() if match else ""
+
+
+def remake_view(
+    result: AnswerResult,
+    row: Optional[UserAnswer],
+    question: Optional[Question],
+    *,
+    reveal_key: bool = False,
+) -> AnswerResult:
+    """Fill the remake fields of an AnswerResult and, while a remake is still
+    open, hide the answer key: correct answer, reasoning, steps and final
+    answer. Only the "what to fix" hint stays. `row` is None for a fresh
+    submission (no remake yet). reveal_key is for the user's own MCP agent."""
+    if question is not None:
+        result.question_type = question.question_type
+        if question.question_type in _OBJECTIVE_TYPES and question.mcq_options:
+            options = [o.option_text for o in question.mcq_options]
+            # RANK options are stored in the correct order: never send that order.
+            result.options = sorted(options, key=str.lower) if question.question_type == "RANK" else options
+    if row is not None:
+        result.remake_status = row.remake_status
+        result.remake_answer = row.remake_answer
+        result.remake_wrong = row.remake_wrong
+        result.remake_right = row.remake_right
+        result.remake_work_transcript = row.remake_work_transcript
+        result.remake_feedback = _load_sections(row.remake_feedback)
+        result.remake_appeal_status = row.remake_appeal_status
+        result.answer_revealed = bool(row.answer_revealed)
+    open_remake = (
+        question is not None
+        and not result.is_correct
+        and result.ocr_status != OCR_STATUS_NEEDS_INPUT
+        and result.remake_status is None
+        and not result.answer_revealed
+    )
+    result.remake_available = open_remake
+    if open_remake and not reveal_key:
+        fix = _fix_text(result.feedback, result.feedback_sections)
+        result.correct_answer = None
+        result.reasoning = None
+        result.feedback = f"**What to fix:** {fix}" if fix else None
+        result.feedback_sections = FeedbackSections(what_to_fix=fix) if result.feedback_sections is not None else None
+    return result
+
+
+def _remake_score(answers: list[UserAnswer], total: int):
+    """Score with remakes: each credited remake is half a point. None until a
+    remake has earned credit, so the plain score stands on its own."""
+    credited = sum(1 for a in answers if not a.is_correct and a.remake_status == REMAKE_CREDITED)
+    if not credited or not total:
+        return None
+    correct = sum(1 for a in answers if a.is_correct)
+    return round((correct + 0.5 * credited) / total * 100, 2)
+
+
+def _score_or_none(value) -> Optional[float]:
+    return float(value) if value is not None else None
+
+
+def _view_all(results: list[AnswerResult], test) -> list[AnswerResult]:
+    """remake_view for answers just regraded on the OCR redo paths."""
+    by_id = {q.id: q for q in test.questions}
+    return [remake_view(r, None, by_id.get(r.question_id)) for r in results]
 
 
 def _drawn_answer(work: Optional[OcrResult]) -> str:
@@ -395,6 +477,9 @@ class GradingService:
 
         total = len(results)
         score = round((correct_count / total) * 100, 2) if total else 0.0
+        # Built before the write: a retried write rolls back, which expires the
+        # loaded questions, and touching them afterwards would need IO.
+        results = [remake_view(r, None, question_by_id.get(r.question_id)) for r in results]
         attempt_id, attempt_number = await self._persist_submission(
             session, user_id, test_id, answer_rows, correct_count, total, score
         )
@@ -579,8 +664,156 @@ class GradingService:
         score = round((correct / total) * 100, 2) if total else 0.0
         attempt.correct_count = correct
         attempt.total_score = score
+        attempt.remake_score = _remake_score(answers, total)
         provisional = any(a.ocr_status == OCR_STATUS_NEEDS_INPUT for a in answers)
         return score, correct, total, provisional
+
+    # ── Quiz remakes (spec-quiz-remakes.md) ───────────────────────────────
+
+    async def _remake_target(self, attempt_id: int, question_id: int, user_id: int, session: AsyncSession):
+        attempt, test = await self._load_held_answer(attempt_id, user_id, session)
+        question = next((q for q in test.questions if q.id == question_id), None)
+        row = await AttemptRepository(session).get_answer(attempt.id, question_id)
+        if row is None or question is None:
+            raise ResourceNotFoundException("Answer")
+        return attempt, test, question, row
+
+    @staticmethod
+    def _check_remake_open(row: UserAnswer) -> None:
+        if row.is_correct:
+            raise ValidationException("Only a wrong answer can be remade.")
+        if row.ocr_status == OCR_STATUS_NEEDS_INPUT:
+            raise ValidationException("Fix the unreadable handwriting on this answer first.")
+        if row.remake_status is not None:
+            raise ValidationException("This answer was already remade. There is one remake per question.")
+        if row.answer_revealed:
+            raise ValidationException("The answer was shown, so this question can no longer be remade.")
+
+    def _objective_verdict(self, question: Question, answer: str) -> Optional[bool]:
+        """Deterministic check of a re-pick; None for written questions."""
+        qtype = question.question_type
+        if qtype == "MS":
+            return self._grade_ms(question, answer).is_correct
+        if qtype == "RANK":
+            return self._grade_rank(question, answer).is_correct
+        if qtype in ("MCQ", "TF"):
+            return self._grade_mcq(question, answer).is_correct
+        return None
+
+    async def _remake_response(self, attempt, test, question, row, session: AsyncSession) -> RemakeResponse:
+        return RemakeResponse(
+            attempt_id=attempt.id,
+            score=float(attempt.total_score or 0),
+            remake_score=_score_or_none(attempt.remake_score),
+            answer=self._row_result(row, question, test),
+        )
+
+    async def remake_answer(
+        self,
+        attempt_id: int,
+        question_id: int,
+        user_id: int,
+        body: RemakeRequest,
+        session: AsyncSession,
+        ocr_engine: Optional[str] = None,
+    ) -> RemakeResponse:
+        """One remake of a wrong answer for half credit. Nothing is written when
+        grading fails (LLMException), so the student keeps the remake."""
+        attempt, test, question, row = await self._remake_target(attempt_id, question_id, user_id, session)
+        self._check_remake_open(row)
+        original_answer = row.user_answer
+        original_fix = _fix_text(row.ai_feedback, _load_sections(row.feedback_sections))
+        # No transaction across OCR and LLM work (rules-gotchas).
+        await session.commit()
+
+        work = await self._transcribe(question_id, body.work_image, ocr_engine) if body.work_image else None
+        if work is not None and not work.transcript:
+            work = None
+        new_answer = body.answer or (work.transcript if work is not None else "")
+        grade = await self.llm_service.grade_remake(
+            question=full_question_text(question),
+            expected_answer=self._correct_answer_text(question) or "",
+            original_answer=original_answer,
+            original_fix=original_fix,
+            new_answer=new_answer,
+            what_wrong=body.what_wrong,
+            what_right=body.what_right,
+            answer_correct=self._objective_verdict(question, body.answer),
+            work=work,
+        )
+
+        await session.refresh(row)
+        self._check_remake_open(row)  # a second tab may have remade it meanwhile
+        row.remake_answer = new_answer
+        row.remake_wrong = body.what_wrong
+        row.remake_right = body.what_right
+        row.remake_work_transcript = work.transcript if work is not None else None
+        row.remake_status = REMAKE_CREDITED if grade.credited else REMAKE_NO_CREDIT
+        row.remake_feedback = grade.sections.model_dump_json()
+        row.remake_at = datetime.utcnow()
+        await session.flush()
+        await self._rescore(attempt, session)
+        await session.commit()
+        return await self._remake_response(attempt, test, question, row, session)
+
+    async def appeal_remake(
+        self,
+        attempt_id: int,
+        question_id: int,
+        user_id: int,
+        body: RemakeAppealRequest,
+        session: AsyncSession,
+    ) -> RemakeResponse:
+        """The one appeal of a remake that got no credit. Kojo's answer is final."""
+        attempt, test, question, row = await self._remake_target(attempt_id, question_id, user_id, session)
+        if row.remake_status != REMAKE_NO_CREDIT:
+            raise ValidationException("Only a remake that got no credit can be appealed.")
+        if row.remake_appeal_status is not None:
+            raise ValidationException("This remake was already appealed. Kojo's second answer is final.")
+        first = _load_sections(row.remake_feedback)
+        first_verdict = " ".join(part for part in ((first.note, first.what_to_fix) if first else ()) if part)
+        work = (
+            OcrResult(transcript=row.remake_work_transcript, confidence=1.0, engine="stored")
+            if row.remake_work_transcript
+            else None
+        )
+        inputs = dict(
+            question=full_question_text(question),
+            expected_answer=self._correct_answer_text(question) or "",
+            original_answer=row.user_answer,
+            original_fix=_fix_text(row.ai_feedback, _load_sections(row.feedback_sections)),
+            new_answer=row.remake_answer or "",
+            what_wrong=row.remake_wrong or "",
+            what_right=row.remake_right or "",
+            answer_correct=self._objective_verdict(question, row.remake_answer or ""),
+            work=work,
+        )
+        await session.commit()
+
+        grade = await self.llm_service.grade_remake(**inputs, appeal_reason=body.reason, first_verdict=first_verdict)
+
+        await session.refresh(row)
+        if row.remake_appeal_status is not None:
+            raise ValidationException("This remake was already appealed. Kojo's second answer is final.")
+        row.remake_appeal = body.reason
+        row.remake_appeal_status = REMAKE_CREDITED if grade.credited else "upheld"
+        row.remake_feedback = grade.sections.model_dump_json()
+        if grade.credited:
+            row.remake_status = REMAKE_CREDITED
+        await session.flush()
+        await self._rescore(attempt, session)
+        await session.commit()
+        return await self._remake_response(attempt, test, question, row, session)
+
+    async def reveal_answer(
+        self, attempt_id: int, question_id: int, user_id: int, session: AsyncSession
+    ) -> RemakeResponse:
+        """"Show answer": the key becomes visible and the remake is given up."""
+        attempt, test, question, row = await self._remake_target(attempt_id, question_id, user_id, session)
+        if not row.is_correct and row.remake_status is None and not row.answer_revealed:
+            row.answer_revealed = True
+            await session.commit()
+        return await self._remake_response(attempt, test, question, row, session)
 
     async def apply_agent_grades(
         self, attempt_id: int, user_id: int, grades: list[dict], session: AsyncSession
@@ -687,7 +920,7 @@ class GradingService:
             correct_count=correct,
             total=total,
             is_provisional=provisional,
-            answers=[self._to_answer_result(
+            answers=_view_all([self._to_answer_result(
                 question,
                 user_answer=row.user_answer,
                 is_correct=grade.is_correct,
@@ -699,7 +932,7 @@ class GradingService:
                 is_math=question_modes(question, test)[0] and question.question_type == "FRQ",
                 work_transcript=work_transcript,
                 ocr_status=OCR_STATUS_RESOLVED,
-            )] + later,
+            )] + later, test),
         )
 
     async def _stored_context(self, attempt_id: int, session: AsyncSession) -> tuple[dict[int, str], dict[int, bool]]:
@@ -854,7 +1087,7 @@ class GradingService:
             correct_count=correct,
             total=total,
             is_provisional=provisional,
-            answers=results,
+            answers=_view_all(results, test),
         )
 
     async def _grade_question(
@@ -1138,12 +1371,39 @@ class GradingService:
                 total=attempt.total_questions or 0,
                 created_at=attempt.created_at,
                 is_provisional=attempt.id in provisional,
+                remake_score=_score_or_none(attempt.remake_score),
             )
             for attempt in attempts
         ]
 
+    def _row_result(
+        self,
+        answer: UserAnswer,
+        question: Optional[Question],
+        test,
+        work_strokes: Optional[str] = None,
+        reveal_key: bool = False,
+    ) -> AnswerResult:
+        """A stored answer row as an AnswerResult, remake fields and key hiding included."""
+        result = self._to_answer_result(
+            question,
+            question_id=answer.question_id,
+            user_answer=answer.user_answer,
+            is_correct=bool(answer.is_correct),
+            feedback=answer.ai_feedback,
+            feedback_sections=_load_sections(answer.feedback_sections),
+            reasoning=answer.ai_reasoning,
+            confidence=float(answer.confidence_score) if answer.confidence_score is not None else None,
+            flagged_uncertain=answer.flagged_uncertain,
+            is_math=bool(test and question and question.question_type == "FRQ" and question_modes(question, test)[0]),
+            work_transcript=answer.work_transcript,
+            ocr_status=answer.ocr_status,
+            work_strokes=work_strokes,
+        )
+        return remake_view(result, answer, question, reveal_key=reveal_key)
+
     async def get_attempt_detail(
-        self, attempt_id: int, user_id: int, session: AsyncSession
+        self, attempt_id: int, user_id: int, session: AsyncSession, reveal_key: bool = False
     ) -> AttemptDetail:
         repo = AttemptRepository(session)
         attempt = await repo.get_detail(attempt_id, user_id)
@@ -1162,31 +1422,17 @@ class GradingService:
             folder_id=attempt.test.folder_id if attempt.test else None,
             test_title=attempt.test.title if attempt.test else "",
             answers=[
-                self._to_answer_result(
+                self._row_result(
+                    answer,
                     answer.question,
-                    question_id=answer.question_id,
-                    user_answer=answer.user_answer,
-                    is_correct=bool(answer.is_correct),
-                    feedback=answer.ai_feedback,
-                    feedback_sections=_load_sections(answer.feedback_sections),
-                    reasoning=answer.ai_reasoning,
-                    confidence=float(answer.confidence_score)
-                    if answer.confidence_score is not None
-                    else None,
-                    flagged_uncertain=answer.flagged_uncertain,
-                    is_math=bool(
-                        attempt.test
-                        and answer.question
-                        and answer.question.question_type == "FRQ"
-                        and question_modes(answer.question, attempt.test)[0]
-                    ),
-                    work_transcript=answer.work_transcript,
-                    ocr_status=answer.ocr_status,
+                    attempt.test,
                     work_strokes=pending_strokes.get(answer.question_id),
+                    reveal_key=reveal_key,
                 )
                 for answer in in_exam_order(attempt.answers)
             ],
             is_provisional=held,
+            remake_score=_score_or_none(attempt.remake_score),
         )
         topics = {a.question_id: a.question.topic if a.question else None for a in attempt.answers}
         graded_by = {a.question_id: a.graded_by for a in attempt.answers}

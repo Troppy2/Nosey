@@ -14,6 +14,7 @@ import type {
   AttemptDetail,
   AttemptResult,
   RedoAnswerResponse,
+  RemakeResponse,
   AttemptSummary,
   ConversationFile,
   CatalogResponse,
@@ -842,6 +843,30 @@ export async function redoAnswer(
     method: "POST",
     body: JSON.stringify(body),
   });
+}
+
+// Quiz remakes (spec-quiz-remakes.md): one remake per wrong answer for half
+// credit, one appeal after no credit, and "Show answer" which gives it up.
+export async function remakeAnswer(
+  attemptId: number,
+  questionId: number,
+  body: { answer: string; work_image?: string | null; what_wrong: string; what_right: string },
+): Promise<RemakeResponse> {
+  return request<RemakeResponse>(`/attempts/${attemptId}/answers/${questionId}/remake`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function appealRemake(attemptId: number, questionId: number, reason: string): Promise<RemakeResponse> {
+  return request<RemakeResponse>(`/attempts/${attemptId}/answers/${questionId}/remake/appeal`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function revealAnswer(attemptId: number, questionId: number): Promise<RemakeResponse> {
+  return request<RemakeResponse>(`/attempts/${attemptId}/answers/${questionId}/reveal`, { method: "POST" });
 }
 
 // Grade held answers without their drawing. No ids means all of them.

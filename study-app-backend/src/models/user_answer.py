@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, Text, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import BIGINT_ID, Base
@@ -48,6 +49,21 @@ class UserAnswer(Base):
     # schemas/attempt_schema.py). None for older answers and agent grades,
     # which Results renders from ai_feedback.
     feedback_sections: Mapped[Optional[str]] = mapped_column(Text)
+    # Quiz remakes (migration 091, spec-quiz-remakes.md): one remake per wrong
+    # answer for half credit. remake_status: None, "credited", "no_credit".
+    remake_answer: Mapped[Optional[str]] = mapped_column(Text)
+    remake_wrong: Mapped[Optional[str]] = mapped_column(Text)
+    remake_right: Mapped[Optional[str]] = mapped_column(Text)
+    remake_work_transcript: Mapped[Optional[str]] = mapped_column(Text)
+    remake_status: Mapped[Optional[str]] = mapped_column(String(16))
+    # Sections JSON (FeedbackSections) for the remake's grade.
+    remake_feedback: Mapped[Optional[str]] = mapped_column(Text)
+    remake_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    # One appeal after no credit. remake_appeal_status: None, "credited", "upheld".
+    remake_appeal: Mapped[Optional[str]] = mapped_column(Text)
+    remake_appeal_status: Mapped[Optional[str]] = mapped_column(String(16))
+    # "Show answer" was tapped: the key is visible and the remake is given up.
+    answer_revealed: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), nullable=False)
 
     attempt: Mapped[UserAttempt] = relationship("UserAttempt", back_populates="answers")
     question: Mapped[Question] = relationship("Question", back_populates="user_answers")

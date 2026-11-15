@@ -191,6 +191,27 @@ export type AnswerResult = {
   // Feedback split into sections (migration 090). Null for older answers and
   // agent grades, which render `feedback` as Markdown.
   feedback_sections?: FeedbackSections | null;
+  // Objective questions: type and option texts, so a remake can re-pick.
+  question_type?: string | null;
+  options?: string[] | null;
+  // Quiz remakes (spec-quiz-remakes.md). While remake_available the server
+  // hides the answer key; answer_revealed means "Show answer" gave it up.
+  remake_available?: boolean;
+  remake_status?: "credited" | "no_credit" | null;
+  remake_answer?: string | null;
+  remake_wrong?: string | null;
+  remake_right?: string | null;
+  remake_work_transcript?: string | null;
+  remake_feedback?: FeedbackSections | null;
+  remake_appeal_status?: "credited" | "upheld" | null;
+  answer_revealed?: boolean;
+};
+
+export type RemakeResponse = {
+  attempt_id: ID;
+  score: number;
+  remake_score?: number | null;
+  answer: AnswerResult;
 };
 
 export type FeedbackStep = { description: string; expression: string };
@@ -231,6 +252,8 @@ export type AttemptSummary = {
   total: number;
   created_at: string;
   is_provisional?: boolean;
+  // Score with quiz remakes (half credit each); null until one earns credit.
+  remake_score?: number | null;
 };
 
 // Response of a redo or skip on Results (GH #149): the regraded answers and

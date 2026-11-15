@@ -1,0 +1,286 @@
+/* Quiz remakes on Results (RemakePanel.tsx, spec-quiz-remakes.md, layout B).
+   Scoped under .review-detail because legacy Results rules restyle every
+   span, div and p inside it (rules-gotchas). Sentence case only. */
+
+.review-detail .rm {
+  display: grid;
+  gap: var(--space-3);
+  margin-left: calc(4px + var(--space-4));
+}
+
+.review-detail .rm p {
+  margin: 0;
+  padding: 0;
+  background: none;
+  border-radius: 0;
+}
+
+.review-detail .rm span:not(.katex, .katex *) {
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.review-detail .rm .rm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.review-detail .rm--form {
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--white);
+}
+
+.review-detail .rm .rm-title {
+  font-weight: 700;
+  font-size: var(--text-sm);
+}
+
+.review-detail .rm .rm-steps {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: rm-step;
+}
+
+.review-detail .rm .rm-steps > li {
+  display: grid;
+  gap: var(--space-2);
+  position: relative;
+  padding-left: 36px;
+  min-width: 0;
+  counter-increment: rm-step;
+}
+
+.review-detail .rm .rm-steps > li::before {
+  content: counter(rm-step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--green-light);
+  color: var(--ink);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.review-detail .rm .rm-step-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 24px;
+}
+
+.review-detail .rm textarea {
+  width: 100%;
+  min-height: 0;
+  resize: vertical;
+}
+
+.review-detail .rm .rm-options {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.review-detail .rm .rm-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.92rem;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.review-detail .rm .rm-option:hover {
+  border-color: var(--green-dark-mid);
+}
+
+.review-detail .rm .rm-option--selected {
+  border-color: var(--green-dark);
+  background: var(--green-lightest);
+}
+
+.review-detail .rm .rm-option--first:not(.rm-option--selected) {
+  color: var(--muted);
+}
+
+.review-detail .rm .rm-option-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.review-detail .rm .rm-option-tag {
+  flex: 0 0 auto;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.review-detail .rm .rm-dot,
+.review-detail .rm .rm-check {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--green-dark-mid);
+  border-radius: 50%;
+}
+
+.review-detail .rm .rm-check {
+  border-radius: var(--radius-xs);
+}
+
+.review-detail .rm .rm-option--selected .rm-dot {
+  border: 5px solid var(--green-dark);
+}
+
+.review-detail .rm .rm-option--selected .rm-check {
+  border-color: var(--green-dark);
+  background: var(--green-dark);
+}
+
+.review-detail .rm .rm-rank {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: var(--space-5);
+}
+
+.review-detail .rm .rm-rank li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.review-detail .rm .rm-rank-moves {
+  display: flex;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+
+.review-detail .rm .rm-rank-moves button {
+  min-width: 44px;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--green-dark);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.review-detail .rm .rm-rank-moves button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.review-detail .rm .rm-hint {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.review-detail .rm .rm-error {
+  font-size: var(--text-sm);
+  color: var(--accent-danger-strong);
+}
+
+.review-detail .rm .rm-field {
+  display: grid;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+/* Graded remake: same label column as the feedback ledger above it. */
+.review-detail .rm .rm-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.review-detail .rm .rm-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.review-detail .rm .rm-row dt {
+  padding-top: 2px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.review-detail .rm .rm-row dd {
+  margin: 0;
+  min-width: 0;
+  font-size: 0.92rem;
+}
+
+.review-detail .rm--credited .rm-row--verdict dd {
+  font-weight: 600;
+  color: var(--accent-positive-strong);
+}
+
+.review-detail .rm--none .rm-row--verdict dd {
+  font-weight: 600;
+  color: var(--accent-caution-strong);
+}
+
+.review-detail .rm .rm-row--fix dd {
+  color: var(--accent-caution-strong);
+}
+
+.review-detail .rm .rm-form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+@media (max-width: 480px) {
+  .review-detail .rm {
+    margin-left: 0;
+  }
+
+  .review-detail .rm--form {
+    padding: var(--space-3);
+  }
+
+  .review-detail .rm .rm-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .review-detail .rm .rm-option {
+    transition: none;
+  }
+}
+
+/* Results score card: the score with remakes, under the original score. */
+.score-hero .score-remake-pill {
+  justify-self: center;
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}

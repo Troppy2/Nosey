@@ -47,17 +47,18 @@ async def test_sections_are_stored_and_returned_with_the_attempt(db_session_make
         result = await service.submit_and_grade(
             test.id, user.id, [SubmittedAnswer(question_id=question.id, answer="0.9772")], session
         )
-        assert result.answers[0].feedback_sections == _SECTIONS
+        # Wrong and not yet remade: only the fix is shown (quiz remakes).
+        assert result.answers[0].feedback_sections == FeedbackSections(what_to_fix=_SECTIONS.what_to_fix)
 
         row = await session.scalar(select(UserAnswer))
         assert row.feedback_sections and "0.0228" in row.feedback_sections
-        detail = await service.get_attempt_detail(result.attempt_id, user.id, session)
+        detail = await service.get_attempt_detail(result.attempt_id, user.id, session, reveal_key=True)
         assert detail.answers[0].feedback_sections == _SECTIONS
 
         # An unreadable column falls back to the Markdown feedback, never an error.
         row.feedback_sections = "{not json"
         await session.commit()
-        detail = await service.get_attempt_detail(result.attempt_id, user.id, session)
+        detail = await service.get_attempt_detail(result.attempt_id, user.id, session, reveal_key=True)
         assert detail.answers[0].feedback_sections is None and detail.answers[0].feedback == "md"
 
 

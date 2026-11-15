@@ -940,7 +940,10 @@ function TestRow({
                   {/* Some answers are waiting on a handwriting redo (GH #149). */}
                   {a.is_provisional ? <span className="pill attempt-provisional-pill">Provisional</span> : null}
                 </span>
-                <span>{formatPercent(a.score)} · {formatDate(a.created_at)}</span>
+                <span>
+                  {formatPercent(a.remake_score ?? a.score)}
+                  {a.remake_score != null ? " with remakes" : ""} · {formatDate(a.created_at)}
+                </span>
               </Link>
             ))
           ) : attemptsFailed ? (

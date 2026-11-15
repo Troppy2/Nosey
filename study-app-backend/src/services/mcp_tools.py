@@ -211,7 +211,9 @@ class AttemptArgs(ToolArgs):
 
 
 async def get_attempt_result(ctx: McpContext, args: AttemptArgs) -> dict[str, Any]:
-    detail = await GradingService().get_attempt_detail(args.attempt_id, ctx.user.id, ctx.session)
+    detail = await GradingService().get_attempt_detail(
+        args.attempt_id, ctx.user.id, ctx.session, reveal_key=not ctx.in_app
+    )
     payload = dump(detail)
     answers = payload["answers"]
     if args.wrong_only:

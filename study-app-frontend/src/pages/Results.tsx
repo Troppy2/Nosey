@@ -7,6 +7,7 @@ import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { FeatureSurvey } from "../components/FeatureSurvey";
 import { GradeFeedback, gradeState } from "../components/GradeFeedback";
+import { RemakePanel } from "../components/RemakePanel";
 import { Dropdown } from "../components/Dropdown";
 import { TextInput } from "../components/Field";
 import { LoadingNotice } from "../components/Loaders";
@@ -36,7 +37,7 @@ import { CODING_LANGUAGES, formatCodingProblem } from "../lib/codingProblemForma
 import { isReadFromDrawing } from "../lib/drawnAnswer";
 import { scoreTone } from "../lib/format";
 import { useSettings } from "../lib/useSettings";
-import type { AnswerResult, AttemptDetail, RedoAnswerResponse } from "../lib/types";
+import type { AnswerResult, AttemptDetail, RedoAnswerResponse, RemakeResponse } from "../lib/types";
 import "../styles/components/regraded-pill.css";
 
 type MissedTopicCount = { topic: string; missed: number; total: number };
@@ -163,6 +164,7 @@ export default function Results() {
   }
 
   const tone = scoreTone(attempt.score);
+  const remadeCount = attempt.answers.filter((answer) => answer.remake_status === "credited").length;
   // A held answer (GH #149) is not graded yet, so it is not "missed".
   const held = attempt.answers.filter((answer) => answer.ocr_status === "needs_input");
   const missed = attempt.answers.filter((answer) => !answer.is_correct && answer.ocr_status !== "needs_input");
@@ -188,6 +190,20 @@ export default function Results() {
     });
     // The study notes were written from the old set of missed answers.
     setReviewSummary(null);
+  }
+
+  // A remake, appeal or "Show answer": one answer and the remake score change.
+  function applyRemake(response: RemakeResponse) {
+    setAttempt((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        remake_score: response.remake_score ?? null,
+        answers: prev.answers.map((answer) =>
+          answer.question_id === response.answer.question_id ? response.answer : answer,
+        ),
+      };
+    });
   }
 
   async function handleSkipAll() {
@@ -267,6 +283,12 @@ export default function Results() {
           {attempt.correct_count} of {attempt.total} correct
           {held.length > 0 ? `, ${held.length} waiting on you` : ""}
         </p>
+        {attempt.remake_score != null ? (
+          <span className="score-remake-pill">
+            With remakes {Math.round(attempt.remake_score)}%
+            {remadeCount > 0 ? ` · ${remadeCount} remade` : ""}
+          </span>
+        ) : null}
       </Card>
 
       {held.length > 0 ? (
@@ -589,7 +611,13 @@ export default function Results() {
                   onRegraded={applyRegrade}
                 />
               ) : (
-                <ReviewItem answer={answer} key={answer.question_id} label={label} />
+                <ReviewItem
+                  answer={answer}
+                  attemptId={Number(attempt.id)}
+                  key={answer.question_id}
+                  label={label}
+                  onRemade={applyRemake}
+                />
               );
             });
             if (block.groupId == null) return items;
@@ -730,7 +758,17 @@ function ClampedBox({ className, children }: { className: string; children: Reac
   );
 }
 
-function ReviewItem({ answer, label }: { answer: AnswerResult; label: string }) {
+function ReviewItem({
+  answer,
+  attemptId,
+  label,
+  onRemade,
+}: {
+  answer: AnswerResult;
+  attemptId: number;
+  label: string;
+  onRemade: (response: RemakeResponse) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [reasoningOpen, setReasoningOpen] = useState(false);
   const Icon = answer.is_correct ? CheckCircleIcon : CrossCircleIcon;
@@ -822,6 +860,7 @@ function ReviewItem({ answer, label }: { answer: AnswerResult; label: string }) 
               <MarkdownContent content={answer.feedback ?? "No feedback returned for this answer."} />
             </div>
           )}
+          {!isGuestSession() ? <RemakePanel answer={answer} attemptId={attemptId} onUpdated={onRemade} /> : null}
           {reasoning && !sections ? (
             <div className="answer-reasoning">
               <button

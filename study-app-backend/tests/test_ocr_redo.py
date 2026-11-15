@@ -296,7 +296,8 @@ async def test_skip_grades_a_held_answer_as_blank(db_session_maker, monkeypatch)
         assert not skipped.is_provisional
         assert skipped.answers[0].ocr_status == "skipped"
         assert skipped.answers[0].is_correct is False
-        assert skipped.answers[0].correct_answer == "x = 4"  # revealed once resolved
+        # Resolved as blank, so it is wrong: the key stays hidden until a quiz remake or "Show answer".
+        assert skipped.answers[0].correct_answer is None and skipped.answers[0].remake_available
         service.llm_service.grade_math_answer.assert_not_awaited()
 
 

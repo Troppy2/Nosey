@@ -140,6 +140,21 @@ class AnswerResult(BaseModel):
     graded_by: Optional[str] = None
     # Structured feedback for the Results layout; None means render `feedback`.
     feedback_sections: Optional[FeedbackSections] = None
+    # Objective questions: the type and option texts, so a remake can re-pick.
+    question_type: Optional[str] = None
+    options: Optional[list[str]] = None
+    # Quiz remakes (migration 091). While remake_available is true the answer
+    # key is redacted (correct_answer, reasoning, steps, final answer) so the
+    # remake cannot copy it; "Show answer" (answer_revealed) gives it up.
+    remake_available: bool = False
+    remake_status: Optional[str] = None
+    remake_answer: Optional[str] = None
+    remake_wrong: Optional[str] = None
+    remake_right: Optional[str] = None
+    remake_work_transcript: Optional[str] = None
+    remake_feedback: Optional[FeedbackSections] = None
+    remake_appeal_status: Optional[str] = None
+    answer_revealed: bool = False
 
 
 class AttemptResult(BaseModel):
@@ -151,6 +166,8 @@ class AttemptResult(BaseModel):
     answers: list[AnswerResult]
     # True while any answer is needs_input: the score can still change.
     is_provisional: bool = False
+    # Score with remakes (half credit each); None until the first remake.
+    remake_score: Optional[float] = None
 
 
 class AttemptSummary(BaseModel):
@@ -161,6 +178,7 @@ class AttemptSummary(BaseModel):
     total: int
     created_at: datetime
     is_provisional: bool = False
+    remake_score: Optional[float] = None
 
 
 class AttemptDetail(AttemptSummary):
@@ -317,3 +335,56 @@ class RedoAnswerResponse(BaseModel):
     total: int
     is_provisional: bool
     answers: list[AnswerResult]
+
+
+class RemakeRequest(BaseModel):
+    """One remake of a wrong answer for half credit (spec-quiz-remakes.md)."""
+
+    answer: str = Field(default="", max_length=5000)
+    work_image: Optional[str] = Field(default=None, max_length=_WORK_IMAGE_MAX_B64_CHARS)
+    ocr_engine: Optional[str] = None
+    what_wrong: str = Field(max_length=2000)
+    what_right: str = Field(max_length=2000)
+
+    @field_validator("answer", "what_wrong", "what_right")
+    @classmethod
+    def strip_text(cls, value: str) -> str:
+        return value.strip()
+
+    @model_validator(mode="after")
+    def validate_remake(self) -> "RemakeRequest":
+        if not self.answer and not self.work_image:
+            raise ValueError("Give a new answer, a drawing, or both")
+        if not self.what_wrong or not self.what_right:
+            raise ValueError("Write what you got wrong and what you got right")
+        if self.work_image:
+            try:
+                decoded = base64.b64decode(self.work_image, validate=True)
+            except Exception as exc:
+                raise ValueError("The scratch-pad drawing was not valid base64") from exc
+            if len(decoded) > _WORK_IMAGE_MAX_DECODED_BYTES:
+                raise ValueError("The scratch-pad drawing is too large")
+            if not decoded.startswith(_PNG_MAGIC):
+                raise ValueError("Scratch-pad drawings must be PNG images")
+        return self
+
+
+class RemakeAppealRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("reason")
+    @classmethod
+    def strip_reason(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Say why Kojo should look again")
+        return value
+
+
+class RemakeResponse(BaseModel):
+    """The remade (or revealed) answer plus both scores."""
+
+    attempt_id: int
+    score: float
+    remake_score: Optional[float] = None
+    answer: AnswerResult
