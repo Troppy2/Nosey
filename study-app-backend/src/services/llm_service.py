@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import aclosing
+
 import asyncio
 import difflib
 import functools
@@ -27,7 +29,12 @@ from src.services.rag_service import HybridRAGService
 from src.utils.topics import normalize_topic
 from src.utils.logger import get_logger
 from src.utils.lesson_blocks import normalize_tts_script, numbered_blocks, split_lesson_blocks, tts_entry_count
-from src.utils.latex_utils import format_final_answer as _format_final_answer, normalize_latex, replace_tikz
+from src.utils.latex_utils import (
+    clean_step_expression,
+    format_final_answer as _format_final_answer,
+    normalize_latex,
+    replace_tikz,
+)
 from src.utils.serialization import safe_serialize_payload
 from src.utils.usage_context import (
     StreamUsage,
@@ -42,7 +49,7 @@ from typing import Any, AsyncIterator, Awaitable, Callable, Optional
 logger = get_logger(__name__)
 
 # High token budget for JSON generation (test/flashcard creation).
-# Do NOT use for Kojo/text completion — those are fine at the lower
+# Do NOT use for Kojo/text completion - those are fine at the lower
 # settings.llm_max_tokens value and a global increase broke Kojo chat.
 _JSON_MAX_TOKENS = 8192
 # Module content bundles the lesson article, the full narration script and the
@@ -163,8 +170,9 @@ def _nvidia_headers() -> dict[str, str]:
 
 
 def _nvidia_body(prompt_body: str, *, model: str, temperature: float, max_tokens: int,
-                 json_mode: bool = False, stream: bool = False) -> dict[str, object]:
-    """NVIDIA chat body, with thinking set by utils/reasoning_context.
+                 json_mode: bool = False, stream: bool = False,
+                 reasoning_budget: Optional[int] = None) -> dict[str, object]:
+    """NVIDIA chat body, with explicit Kojo budget or reasoning_context thinking.
 
     Nemotron thinks by default; chat_template_kwargs switches it off, or on
     with reasoning_budget as the cutoff (the model stops thinking and answers
@@ -173,13 +181,14 @@ def _nvidia_body(prompt_body: str, *, model: str, temperature: float, max_tokens
     answer. reasoning_effort is ignored by these models (measured), so it is
     not sent. Thinking arrives in reasoning_content, never in content.
     """
-    think = thinking_enabled()
+    think = reasoning_budget is not None or thinking_enabled()
+    budget = settings.nvidia_reasoning_budget if reasoning_budget is None else reasoning_budget
     # Both spellings of the switch: Nemotron/GLM/Qwen templates read
     # enable_thinking, DeepSeek reads thinking. A template ignores the other,
     # so the switch keeps working when NVIDIA_*_MODEL changes family.
     template: dict[str, object] = {"enable_thinking": think, "thinking": think}
     if think:
-        template["reasoning_budget"] = settings.nvidia_reasoning_budget
+        template["reasoning_budget"] = budget
     messages: list[dict[str, str]] = []
     if json_mode:
         messages.append({"role": "system", "content": _NVIDIA_JSON_SYSTEM})
@@ -188,7 +197,7 @@ def _nvidia_body(prompt_body: str, *, model: str, temperature: float, max_tokens
         "model": model,
         "messages": messages,
         "temperature": temperature,
-        "max_tokens": max_tokens + (settings.nvidia_reasoning_budget if think else 0),
+        "max_tokens": max_tokens + (budget if think else 0),
         "chat_template_kwargs": template,
     }
     if stream:
@@ -1138,7 +1147,10 @@ def _trim_sentences(text: str, limit: int) -> str:
 
 
 def _feedback_steps(steps: list[dict[str, str]]) -> list[FeedbackStep]:
-    return [FeedbackStep(description=normalize_latex(s["description"]), expression=s["expression"]) for s in steps]
+    return [
+        FeedbackStep(description=normalize_latex(s["description"]), expression=clean_step_expression(s["expression"]))
+        for s in steps
+    ]
 
 
 def _render_feedback_steps(steps: list[FeedbackStep]) -> str:
@@ -2052,11 +2064,11 @@ class LLMService:
             "- terms: array of objects with 'term' (string) and 'definition' (string) "
             "for every vocabulary term, key concept, or defined idea in the notes\n"
             "- concepts: array of strings, each a core fact, rule, or idea worth testing "
-            "(not the same as terms — these are statements, not definitions)\n\n"
+            "(not the same as terms - these are statements, not definitions)\n\n"
             "RULES:\n"
             "- DO NOT include authors, publication dates, page numbers, URLs, or citation info\n"
             "- DO NOT include the title itself as a term or concept\n"
-            "- Extract as many terms and concepts as exist in the notes — be thorough\n"
+            "- Extract as many terms and concepts as exist in the notes - be thorough\n"
             "- Keep each definition and concept concise but complete\n\n"
             "Return JSON only. Example format:\n"
             '{"title":"Cell Biology","terms":[{"term":"Mitosis",'
@@ -2085,7 +2097,7 @@ class LLMService:
         except Exception as exc:
             logger.warning("Study content extraction failed; falling back to raw notes: %s", exc)
 
-        # Extraction failed — treat raw sentences as concepts so generation still works.
+        # Extraction failed - treat raw sentences as concepts so generation still works.
         return _StudyContent(title="", terms=[], concepts=self._sentences(notes)[:40])
 
     @staticmethod
@@ -2153,9 +2165,9 @@ class LLMService:
         context_header = f'SUBJECT: "{study.title}"\n\n' if study.title else ""
 
         difficulty_map = {
-            "easy": "straightforward recall questions — definitions, simple identification",
-            "medium": "application questions — use the concept, connect ideas",
-            "hard": "analysis and synthesis — compare, evaluate, multi-step reasoning",
+            "easy": "straightforward recall questions - definitions, simple identification",
+            "medium": "application questions - use the concept, connect ideas",
+            "hard": "analysis and synthesis - compare, evaluate, multi-step reasoning",
             "mixed": "a mix of easy recall, medium application, and hard analysis questions",
         }
         difficulty_line = f"DIFFICULTY: {difficulty_map.get(difficulty, difficulty_map['mixed'])}\n\n"
@@ -2198,7 +2210,7 @@ class LLMService:
 
         return (
             "You are building a study test. Use ONLY the terms, definitions, and concepts "
-            "below as source material — do not invent facts.\n\n"
+            "below as source material - do not invent facts.\n\n"
             f"{context_header}"
             f"{difficulty_line}"
             f"{topic_line}"
@@ -3334,9 +3346,9 @@ class LLMService:
             use_difficulty = difficulty
             
         difficulty_map = {
-            "easy": "straightforward recall questions — definitions, simple identification",
-            "medium": "application questions — use the concept, connect ideas",
-            "hard": "analysis and synthesis — compare, evaluate, multi-step reasoning",
+            "easy": "straightforward recall questions - definitions, simple identification",
+            "medium": "application questions - use the concept, connect ideas",
+            "hard": "analysis and synthesis - compare, evaluate, multi-step reasoning",
             "mixed": "a mix of easy recall, medium application, and hard analysis questions",
         }
         difficulty_line = f"DIFFICULTY: {difficulty_map.get(use_difficulty, difficulty_map['mixed'])}\n\n"
@@ -3394,7 +3406,7 @@ class LLMService:
         
         prompt = (
             "You are generating a new study test that MIRRORS the style of an uploaded practice test.\n"
-            "Use ONLY the terms, definitions, and concepts below as source material — do not invent facts.\n\n"
+            "Use ONLY the terms, definitions, and concepts below as source material - do not invent facts.\n\n"
             f"{context_header}"
             f"{difficulty_line}"
             f"{topic_line}"
@@ -3679,9 +3691,9 @@ STUDENT'S CODE:
 {user_code}
 
 Evaluate the student's code for:
-1. Correctness — does it solve the problem as described?
-2. Logic — is the approach sound even if syntax is slightly off?
-3. Edge cases — does it handle the given examples?
+1. Correctness - does it solve the problem as described?
+2. Logic - is the approach sound even if syntax is slightly off?
+3. Edge cases - does it handle the given examples?
 
 Put your private trace-through and any self-correction in "reasoning". The other fields
 must be clean and final: no "wait", "let me reconsider", "actually", or "oh".
@@ -3749,17 +3761,17 @@ Be lenient on minor syntax errors if the logic is correct. Accept equivalent sol
         custom_instructions: Optional[str] = None,
     ) -> str:
         latex_rule = (
-            "KATEX RENDERING RULES — follow exactly or the math will not display:\n"
+            "KATEX RENDERING RULES - follow exactly or the math will not display:\n"
             "  - EVERY math symbol, number, variable, and expression MUST be wrapped in $...$\n"
-            "  - Inline math: $expression$ — e.g. $\\frac{dx}{dt}$, $x^{2}+y^{2}$, $\\sqrt{x}$\n"
+            "  - Inline math: $expression$ - e.g. $\\frac{dx}{dt}$, $x^{2}+y^{2}$, $\\sqrt{x}$\n"
             "  - Block/display math on its own line: $$expression$$\n"
             "\n"
-            "  GREEK LETTERS — NEVER write them as words, ALWAYS use LaTeX commands inside $...$:\n"
+            "  GREEK LETTERS - NEVER write them as words, ALWAYS use LaTeX commands inside $...$:\n"
             "  - theta → $\\theta$   pi → $\\pi$   alpha → $\\alpha$   beta → $\\beta$\n"
             "  - omega → $\\omega$  phi → $\\phi$  lambda → $\\lambda$  sigma → $\\sigma$\n"
             "  - delta → $\\delta$  epsilon → $\\epsilon$  rho → $\\rho$  mu → $\\mu$\n"
             "\n"
-            "  FRACTIONS — NEVER write as a/b or frac notation, ALWAYS use \\frac:\n"
+            "  FRACTIONS - NEVER write as a/b or frac notation, ALWAYS use \\frac:\n"
             "  - 5pi/6 → $\\frac{5\\pi}{6}$    1/2 → $\\frac{1}{2}$    3x/4 → $\\frac{3x}{4}$\n"
             "\n"
             "  Example question using polar coordinates:\n"
@@ -3770,14 +3782,14 @@ Be lenient on minor syntax errors if the logic is correct. Accept equivalent sol
             "    GOOD: 'Find $\\frac{dy}{dx}$ for $x = t^{2}+1$, $y = t^{3}-t$ at $t=2$.'\n"
             "    GOOD: 'Evaluate $\\int_{0}^{3} (2x^{2}+3x)\\,dx$.'\n"
             "  - MCQ option example: '$3t^{2}+1$' or '$\\frac{5\\pi}{6}$'\n"
-            "  - Do NOT write bare math like x^2 or x² — always wrap in $...$\n"
+            "  - Do NOT write bare math like x^2 or x² - always wrap in $...$\n"
         )
         strict_math_rules = (
             "CONTENT RULES (defaults: STUDENT INSTRUCTIONS below override any of these):\n"
-            "  - Generate ONLY mathematical computation problems — the student must compute a specific numerical or algebraic answer\n"
+            "  - Generate ONLY mathematical computation problems - the student must compute a specific numerical or algebraic answer\n"
             "  - Every question MUST require calculation or algebraic manipulation, not memorization or explanation\n"
             "  - ABSOLUTELY BANNED question types: 'Explain...', 'Describe...', 'What is the formula for...', 'How do you find...', 'Why does...', 'Define...'\n"
-            "  - If the notes describe a formula (e.g. arc length), generate a problem that USES that formula on specific numbers — do not ask the student to state the formula\n"
+            "  - If the notes describe a formula (e.g. arc length), generate a problem that USES that formula on specific numbers - do not ask the student to state the formula\n"
             "  - If the notes contain non-mathematical text, IGNORE it entirely\n"
             "  - If math content is sparse, infer solvable problems from the mathematical topics mentioned\n"
         )
@@ -3797,7 +3809,7 @@ Be lenient on minor syntax errors if the logic is correct. Accept equivalent sol
             frq_block = (
                 f"Generate exactly {count_frq} FRQ math problems.\n"
                 "FRQ rules:\n"
-                "  - Every question MUST be a specific computation the student must perform — a number or expression is the answer\n"
+                "  - Every question MUST be a specific computation the student must perform - a number or expression is the answer\n"
                 "  - BANNED question starters: 'Explain', 'Describe', 'What is', 'What are', 'Define', 'How do you', 'Why', 'State'\n"
                 "  - REQUIRED starters (use one): 'Find', 'Solve', 'Evaluate', 'Compute', 'Differentiate', 'Integrate', 'Simplify', 'Calculate'\n"
                 "  - BAD example (NEVER do this): 'Explain how to find the tangent line using parametric equations.'\n"
@@ -4501,7 +4513,7 @@ Return JSON only with these exact keys:
                 questions, source_content, variant, provider, coding_language, base_index=0
             )
 
-        # Fan-out over disjoint shards of the same batch — not a retry loop and
+        # Fan-out over disjoint shards of the same batch - not a retry loop and
         # not a provider loop, so this does not violate the no-calls-in-loops
         # rule. Capped concurrency so a large test does not spike a
         # rate-limited provider.
@@ -4779,7 +4791,7 @@ Return JSON only with these exact keys:
         if not enable_fallback:
             from src.utils.exceptions import LLMException
             raise LLMException(
-                "Flashcard generation failed — the AI service is unavailable. Try again later."
+                "Flashcard generation failed - the AI service is unavailable. Try again later."
             ) from last_error
         logger.warning("LLM flashcard generation failed; using fallback")
         return self._fallback_flashcards(content, count, prompt)
@@ -6116,7 +6128,7 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
     ) -> tuple[list[GeneratedMCQ], list[GeneratedFRQ]]:
         from src.utils.exceptions import LLMException
 
-        # Extract study content once before trying providers — avoids burning rate-limited
+        # Extract study content once before trying providers - avoids burning rate-limited
         # API calls on extraction for each provider when only generation needs to be retried.
         if prompt is None:
             if generation_notes and "[Source:" in generation_notes:
@@ -6178,7 +6190,7 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
         dropped_frq: list[GeneratedFRQ] = []
 
         last_error: Optional[Exception] = None
-        # Best partial output seen across all providers — used for cross-provider topup.
+        # Best partial output seen across all providers - used for cross-provider topup.
         best_mcq: list[GeneratedMCQ] = []
         best_frq: list[GeneratedFRQ] = []
 
@@ -6266,7 +6278,7 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
                 last_error = exc
                 logger.warning("Provider %s failed test generation; trying next provider: %s", candidate, exc)
 
-        # Phase 2: cross-provider topup — use every available provider to fill the remaining
+        # Phase 2: cross-provider topup - use every available provider to fill the remaining
         # slots from the best partial output, rather than starting over from scratch.
         if best_mcq or best_frq:
             remaining_mcq = max(0, count_mcq - len(best_mcq))
@@ -7178,7 +7190,7 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
             "- What the correct answer is and why\n"
             "- The key concept or fact to remember\n"
             "- One quick tip for retaining it\n\n"
-            "Use plain markdown. Be concise — one tight paragraph per question. "
+            "Use plain markdown. Be concise - one tight paragraph per question. "
             "Do NOT repeat the question text verbatim. Number each note to match the question.\n\n"
             f"MISSED ANSWERS:\n{items_text}\n\n"
             "Study notes:"
@@ -7232,12 +7244,12 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
         if isinstance(last_error, LLMException):
             raise last_error
         raise LLMException(
-            "Kojo failed to generate a response — all providers are unavailable. Try again."
+            "Kojo failed to generate a response - all providers are unavailable. Try again."
         ) from last_error
 
     # ── Kojo plain-text streaming ────────────────────────────────────────────
     # These mirror the _complete_text_* methods (same models, temps, token
-    # budgets, plain text — NOT the JSON-configured _stream_text_* generation
+    # budgets, plain text - NOT the JSON-configured _stream_text_* generation
     # streams) but yield token deltas as they arrive. No _with_retry wrapper:
     # a mid-stream failure fails this provider so stream_kojo's auto path can
     # fall through to the next one only if nothing was emitted yet.
@@ -7409,8 +7421,9 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
                 raise LLMException(f"Unsupported LLM provider: {normalized}")
             self.last_kojo_provider = normalized
             try:
-                async for chunk in fn(prompt):
-                    yield chunk
+                async with aclosing(fn(prompt)) as stream:
+                    async for chunk in stream:
+                        yield chunk
             except LLMException:
                 raise
             except Exception as exc:
@@ -7430,14 +7443,15 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
                 continue
             emitted = False
             try:
-                async for chunk in fn(prompt):
-                    if not emitted:
-                        # Kojo tools (GH #205) pin later tool rounds to the
-                        # provider that answered the first one. Instance
-                        # state: LLMService is created per request.
-                        self.last_kojo_provider = candidate
-                    emitted = True
-                    yield chunk
+                async with aclosing(fn(prompt)) as stream:
+                    async for chunk in stream:
+                        if not emitted:
+                            # Kojo tools (GH #205) pin later tool rounds to the
+                            # provider that answered the first one. Instance
+                            # state: LLMService is created per request.
+                            self.last_kojo_provider = candidate
+                        emitted = True
+                        yield chunk
                 return
             except Exception as exc:
                 if emitted:
@@ -7449,7 +7463,7 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
         if isinstance(last_error, LLMException):
             raise last_error
         raise LLMException(
-            "Kojo failed to generate a response — all providers are unavailable. Try again."
+            "Kojo failed to generate a response - all providers are unavailable. Try again."
         ) from last_error
 
     async def _complete_text_gemini(self, prompt: str) -> str:
@@ -7682,7 +7696,7 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
             resp_data = response.json()
             record_parsed_usage("claude", settings.anthropic_model, usage_from_anthropic(resp_data))
             if resp_data.get("stop_reason") == "max_tokens":
-                raise ValueError("Claude response was truncated (max_tokens reached) — response incomplete for JSON generation")
+                raise ValueError("Claude response was truncated (max_tokens reached) - response incomplete for JSON generation")
             if not resp_data.get("content") or not isinstance(resp_data["content"], list) or len(resp_data["content"]) == 0:
                 raise ValueError(f"Claude response missing content: {resp_data}")
             content = str(resp_data["content"][0].get("text", "")).strip()
@@ -7802,7 +7816,8 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
 
     # -- NVIDIA API catalog ------------------------------------------------------
     # OpenAI-compatible, so these mirror the MiniMax functions. Thinking is off
-    # unless the caller is inside `with thinking():` (utils/reasoning_context).
+    # unless the caller is inside `with thinking():` (utils/reasoning_context),
+    # or the Kojo stream passes its explicit reasoning budget.
 
     async def _complete_nvidia(self, prompt: str, max_tokens: Optional[int] = None) -> dict[str, object]:
         async def _do() -> dict[str, object]:
@@ -7841,7 +7856,8 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
         return await self._with_retry(_do, "NVIDIA")
 
     async def _stream_nvidia(self, prompt: str, *, model: str, json_mode: bool, temperature: float,
-                             max_tokens: int, timeout: int) -> AsyncIterator[str]:
+                             max_tokens: int, timeout: int,
+                             reasoning_budget: Optional[int] = None) -> AsyncIterator[str]:
         prompt_body = self._prepare_llm_payload(prompt, "nvidia")
         usage = StreamUsage("nvidia", model, prompt_body)
         try:
@@ -7852,7 +7868,7 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
                     headers=_nvidia_headers(),
                     json=_nvidia_body(
                         prompt_body, model=model, temperature=temperature, max_tokens=max_tokens,
-                        json_mode=json_mode, stream=True,
+                        json_mode=json_mode, stream=True, reasoning_budget=reasoning_budget,
                     ),
                 ) as response:
                     response.raise_for_status()
@@ -7890,11 +7906,13 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
 
     async def _stream_text_kojo_nvidia(self, prompt: str) -> AsyncIterator[str]:
         """Streamed plain-text Kojo chat."""
-        async for chunk in self._stream_nvidia(
+        async with aclosing(self._stream_nvidia(
             prompt, model=settings.nvidia_chat_model, json_mode=False, temperature=0.7,
             max_tokens=settings.llm_max_tokens, timeout=min(settings.llm_timeout_seconds, settings.nvidia_timeout_seconds),
-        ):
-            yield chunk
+            reasoning_budget=settings.nvidia_kojo_reasoning_budget,
+        )) as stream:
+            async for chunk in stream:
+                yield chunk
 
     async def _complete_groq(self, prompt: str, max_tokens: Optional[int] = None) -> dict[str, object]:
         async def _do() -> dict[str, object]:
@@ -8094,7 +8112,7 @@ Return a JSON OBJECT ONLY with key "results": an array of {{"id": <ID as a numbe
             item["options"] = list(options) + ["None of the above"]
         # An aliased answer key (answer / correct / correct_answer) sometimes carries the
         # option TEXT instead of an index. Convert it to an index on an exact match after
-        # whitespace stripping only — anything fuzzier belongs in MCQ verification, not here.
+        # whitespace stripping only - anything fuzzier belongs in MCQ verification, not here.
         raw_index = item.get("correct_index")
         if isinstance(raw_index, str) and isinstance(options, list):
             stripped = raw_index.strip()

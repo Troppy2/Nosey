@@ -1,3 +1,4 @@
+import { KojoStreamError } from "../lib/api";
 import { ClipboardList, ExternalLink, Files, FolderPlus, GraduationCap, Layers, Lightbulb, ListChecks, MessageSquarePlus, Minus, PanelLeftClose, PanelLeftOpen, Paperclip, Puzzle, Square, Target } from "lucide-react";
 import { BookIcon, FolderIcon, MenuIcon } from "../icons";
 import { AlertIcon, ArrowDownIcon, ArrowLeftIcon, ArrowUpIcon, CheckCircleIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, CopyIcon, PencilIcon, PlusIcon, RetryIcon, SearchIcon, SparklesIcon, TrashIcon, UploadIcon } from "../icons";
@@ -1288,7 +1289,7 @@ function KojoChatPage() {
         // User pressed stop: handled in the outer catch, don't retry.
         if (controller.signal.aborted) throw streamErr;
         // Fall back to the non-streamed endpoint only if nothing streamed yet.
-        if (streamedAny) throw streamErr;
+        if (streamedAny || streamErr instanceof KojoStreamError) throw streamErr;
         result = isGeneralMode
           ? await kojoChatGeneral(convId, msg, generationProvider, kojoStrictness, kojoCustomInstruction)
           : await kojoChat(folderId!, msg, generationProvider, kojoStrictness, convId, kojoCustomInstruction);
@@ -1338,6 +1339,7 @@ function KojoChatPage() {
             : prev.filter((m) => m.id !== tempId),
         );
       } else {
+        setError(err instanceof Error ? err.message : "Kojo failed to respond. Try again.");
         // Keep the user bubble in place (flagged failed) so a Retry button can
         // resend it, rather than dropping the message and only showing a banner.
         setMessages((prev) =>
@@ -1556,7 +1558,7 @@ function KojoChatPage() {
         );
       } else {
         setMessages((prev) =>
-          prev.map((m) => (m.id === msg.id ? { ...m, content: previous, streaming: false } : m)),
+          prev.map((m) => (m.id === msg.id ? { ...m, content: previous, reasoning: undefined, streaming: false } : m)),
         );
         setError(err instanceof Error ? err.message : "Kojo couldn't regenerate that answer. Try again.");
       }

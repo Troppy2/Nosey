@@ -28,15 +28,44 @@ function Row({ label, className, children }: { label: string; className?: string
   );
 }
 
+const STEP_WRAPPERS = [/^\$\$([\s\S]*)\$\$$/, /^\\\[([\s\S]*)\\\]$/, /^\$([^$]*)\$$/];
+
+/** A step's expression as display maths, or null when it is not maths.
+ * Graders sometimes delimit it themselves (stray "$$" on screen) or put a
+ * sentence in it (rendered as maths with the spaces gone). The description
+ * already says it in words, so prose is dropped. Mirrors
+ * clean_step_expression in latex_utils.py, which cleans new grades; this
+ * also repairs grades saved before that. */
+export function stepExpressionMarkdown(raw: string): string | null {
+  let text = raw.trim();
+  for (const pattern of STEP_WRAPPERS) {
+    const match = text.match(pattern);
+    if (match) {
+      text = match[1].trim();
+      break;
+    }
+  }
+  if (!text || text.includes("$")) return null;
+  const words = text
+    .replace(/\\text\{([^{}]*)\}/g, " $1 ")
+    .replace(/\\[a-zA-Z]+/g, " ")
+    .match(/[a-zA-Z]{4,}/g);
+  if (words && words.length >= 3) return null;
+  return `$$${text}$$`;
+}
+
 function StepList({ steps }: { steps: FeedbackStep[] }) {
   return (
     <ol className="gf-steps">
-      {steps.map((step, index) => (
-        <li key={index}>
-          <MarkdownContent content={step.description} />
-          {step.expression ? <MarkdownContent content={`$$${step.expression}$$`} /> : null}
-        </li>
-      ))}
+      {steps.map((step, index) => {
+        const maths = step.expression ? stepExpressionMarkdown(step.expression) : null;
+        return (
+          <li key={index}>
+            <MarkdownContent content={step.description} />
+            {maths ? <MarkdownContent content={maths} /> : null}
+          </li>
+        );
+      })}
     </ol>
   );
 }

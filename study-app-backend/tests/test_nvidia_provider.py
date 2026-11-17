@@ -116,3 +116,57 @@ async def test_long_output_puts_groq_ahead_of_nvidia(monkeypatch) -> None:
 def test_bulk_generators_are_marked_long_output(name: str, long: bool) -> None:
     method = getattr(LLMService, name)
     assert ("_long_output" in method.__code__.co_qualname) is long
+
+
+async def test_kojo_native_thinking_is_explicit_and_hidden(monkeypatch):
+    import json
+    from unittest.mock import Mock
+
+    monkeypatch.setattr(llm_service.settings, "nvidia_kojo_reasoning_budget", 512)
+    monkeypatch.setattr(llm_service.settings, "llm_max_tokens", 1000)
+    bodies = []
+    usage = Mock()
+    monkeypatch.setattr(llm_service, "StreamUsage", Mock(return_value=usage))
+
+    class Response:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        def raise_for_status(self):
+            pass
+
+        async def aiter_lines(self):
+            for delta in ({"reasoning_content": "Their answer: 42"}, {"content": "Hello"}):
+                yield "data: " + json.dumps({"choices": [{"delta": delta}]})
+            yield "data: " + json.dumps({"choices": [], "usage": {"prompt_tokens": 10, "completion_tokens": 520}})
+            yield "data: [DONE]"
+
+    class Client:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        def stream(self, *args, **kwargs):
+            bodies.append(kwargs["json"])
+            return Response()
+
+    monkeypatch.setattr(llm_service.httpx, "AsyncClient", Client)
+    chunks = []
+    async for chunk in LLMService()._stream_text_kojo_nvidia("prompt"):
+        assert not thinking_enabled()
+        chunks.append(chunk)
+    assert chunks == ["Hello"]
+    assert bodies[0]["chat_template_kwargs"] == {"enable_thinking": True, "thinking": True, "reasoning_budget": 512}
+    assert bodies[0]["max_tokens"] == 1512
+    assert bodies[0]["stream_options"] == {"include_usage": True}
+    usage.finish.assert_called_once_with()
+    assert usage.set_both.call_args.args[0] == (10, 520)
+    assert not thinking_enabled()

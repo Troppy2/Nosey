@@ -318,10 +318,11 @@ def test_splitter_answer_starting_with_i_is_not_swallowed() -> None:
     assert answer.strip() == "I think osmosis is neat."
 
 
-def test_splitter_without_markers_promotes_everything() -> None:
-    answer, labels = _split_full_response("INTENT: concept\nJust an answer.", expect_labels=True)
-    assert labels == {"intent": "concept"}
-    assert answer.strip() == "Just an answer."
+def test_splitter_without_markers_is_malformed() -> None:
+    from src.utils.exceptions import LLMException
+
+    with pytest.raises(LLMException, match="Kojo got tangled up, try again"):
+        _split_full_response("INTENT: concept\nJust an answer.", expect_labels=True)
 
 
 def test_splitter_without_labels_unchanged() -> None:
@@ -356,8 +357,8 @@ async def test_hidden_reasoning_mode_sends_no_reasoning_events() -> None:
 def test_wrap_reasoning_prompt_includes_labels_only_for_tutor() -> None:
     assert "INTENT:" in _wrap_reasoning_prompt("P", tutor_labels=True)
     assert "INTENT:" not in _wrap_reasoning_prompt("P")
-    assert "never shown to the student" in _wrap_reasoning_prompt("P", tutor_labels=True, private=True)
-    assert "shown to the student: never write" in _wrap_reasoning_prompt("P", tutor_labels=True)
+    assert "no written reasoning or private plan" in _wrap_reasoning_prompt("P", tutor_labels=True, private=True)
+    assert "student-facing approach summary" in _wrap_reasoning_prompt("P", tutor_labels=True)
 
 
 def test_reasoning_is_never_sent_on_ladder_turns() -> None:
@@ -405,3 +406,14 @@ def test_interviewer_mode_skips_tutor_rules() -> None:
     )
     assert "TUTOR RULES" not in prompt
     assert "INTERVIEWER PERSONA - LOCAL" in prompt
+
+
+def test_tutor_wrapper_does_not_request_private_solution_in_content():
+    prompt = _wrap_reasoning_prompt('BUS QUESTION', tutor_labels=True, private=True)
+    assert 'Their answer:' not in prompt
+    assert 'Parallel answer:' not in prompt
+    assert 'genuine thinking' not in prompt
+    assert prompt.count('<<<REASONING>>>') == 1
+    assert prompt.count('<<<ANSWER>>>') == 1
+    assert 'It is not a request to solve their problem.' in prompt
+    assert "original problem's answer" in prompt

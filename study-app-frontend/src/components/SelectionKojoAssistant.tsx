@@ -2,8 +2,9 @@ import { Layers, MessageSquare } from "lucide-react";
 import { ChevronDownIcon, ChevronUpIcon, CloseIcon, SparklesIcon } from "../icons";
 import KojoMascot from "./KojoMascot";
 import { ReactNode, useEffect, useRef, useState } from "react";
-import { createFlashcard, kojoChat, kojoChatStream } from "../lib/api";
+import { createFlashcard, kojoChatStream } from "../lib/api";
 import { MarkdownContent } from "./MarkdownContent";
+import { useSettings } from "../lib/useSettings";
 
 type Position = { x: number; y: number };
 
@@ -22,6 +23,7 @@ const PANEL_WIDTH = 480;
 const TOOLBAR_MIN_WIDTH = 240;
 
 export function SelectionKojoAssistant({ folderId, folderName, children, onAskKojo }: Props) {
+  const { generationProvider } = useSettings();
   const scopeRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const isOpenRef = useRef(false);
@@ -39,6 +41,8 @@ export function SelectionKojoAssistant({ folderId, folderName, children, onAskKo
   const [response, setResponse] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryNumber, setRetryNumber] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [textExpanded, setTextExpanded] = useState(false);
   const [flashcardDone, setFlashcardDone] = useState(false);
   const [flashcardError, setFlashcardError] = useState<string | null>(null);
@@ -129,12 +133,32 @@ export function SelectionKojoAssistant({ folderId, folderName, children, onAskKo
     };
   }, []);
 
-  // Fire the Kojo query only when mode switches to "explain"
+  // Request lifetime follows the selection and explicit retries, not token
+  // updates. Closing/back/unmount aborts the request and ignores late events.
   useEffect(() => {
+    if (mode !== "explain" || !selectedText) {
+      setIsLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    let timedOut = false;
+    let active = true;
+    const started = Date.now();
+    setResponse(null);
+    setError(null);
+    setIsLoading(true);
+    setElapsedSeconds(0);
+    const ticker = window.setInterval(() => setElapsedSeconds(Math.floor((Date.now() - started) / 1000)), 1000);
+    const deadline = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+      setResponse(null);
+      setError("Kojo took too long to reply. Try again.");
+      setIsLoading(false);
+      window.clearInterval(ticker);
+    }, 60000);
+
     async function explainSelection() {
-      if (mode !== "explain" || !selectedText || response || isLoading) return;
-      setIsLoading(true);
-      setError(null);
       const prompt = [
         "You are Kojo, a study companion.",
         "Explain the selected text in simple terms and describe what the question is asking.",
@@ -146,32 +170,37 @@ export function SelectionKojoAssistant({ folderId, folderName, children, onAskKo
         `Selected text:\n${selectedText}`,
       ].join("\n");
       let streamed = "";
-      let placed = false;
       const onDelta = (delta: string) => {
+        if (!active || controller.signal.aborted) return;
         streamed += delta;
-        if (!placed) {
-          placed = true;
-          setIsLoading(false); // swap the skeleton for streaming text
-        }
         setResponse(streamed);
       };
       try {
-        try {
-          const result = await kojoChatStream(folderId, prompt, onDelta);
-          setResponse(result.response);
-        } catch (streamErr) {
-          if (placed) throw streamErr;
-          const result = await kojoChat(folderId, prompt);
-          setResponse(result.response);
-        }
+        const result = await kojoChatStream(
+          folderId, prompt, onDelta, generationProvider, undefined, undefined, undefined, controller.signal,
+        );
+        if (!active || controller.signal.aborted) return;
+        if (!result.response.trim()) throw new Error("Kojo returned an empty explanation. Try again.");
+        setResponse(result.response);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Kojo could not explain this selection.");
+        if (!active || (controller.signal.aborted && !timedOut)) return;
+        setResponse(null);
+        setError(timedOut ? "Kojo took too long to reply. Try again."
+          : err instanceof Error ? err.message : "Kojo could not explain this selection.");
       } finally {
-        setIsLoading(false);
+        window.clearTimeout(deadline);
+        window.clearInterval(ticker);
+        if (active && !controller.signal.aborted) setIsLoading(false);
       }
     }
     void explainSelection();
-  }, [mode, folderId, folderName, selectedText, response, isLoading]);
+    return () => {
+      active = false;
+      controller.abort();
+      window.clearTimeout(deadline);
+      window.clearInterval(ticker);
+    };
+  }, [mode, folderId, folderName, selectedText, retryNumber, generationProvider]);
 
   function close() {
     if (dismissTimerRef.current) {
@@ -203,7 +232,9 @@ export function SelectionKojoAssistant({ folderId, folderName, children, onAskKo
       const panelW = Math.min(PANEL_WIDTH, window.innerWidth - 32);
       const rawX = position.x + TOOLBAR_MIN_WIDTH / 2 - panelW / 2;
       const x = Math.max(16, Math.min(rawX, window.innerWidth - panelW - 16));
-      setPosition((p) => p ? { ...p, x } : p);
+      const panelH = Math.min(560, window.innerHeight - 48);
+      const y = Math.max(16, Math.min(position.y, window.innerHeight - panelH - 16));
+      setPosition((p) => p ? { x, y } : p);
     }
     setMode("explain");
   }
@@ -368,19 +399,31 @@ export function SelectionKojoAssistant({ folderId, folderName, children, onAskKo
 
           {/* Explanation section */}
           <div className="selection-kojo-explanation">
-            {isLoading ? (
-              <div className="sel-kojo-skeleton">
-                <div className="sel-kojo-skeleton-line" style={{ width: "88%" }} />
-                <div className="sel-kojo-skeleton-line" style={{ width: "76%" }} />
-                <div className="sel-kojo-skeleton-line" style={{ width: "92%" }} />
-                <div className="sel-kojo-skeleton-line" style={{ width: "60%" }} />
+            {error ? (
+              <div role="alert">
+                <p className="kojo-error">{error}</p>
+                <button type="button" className="sel-kojo-footer-btn" onClick={() => setRetryNumber((n) => n + 1)}>
+                  Try again
+                </button>
               </div>
-            ) : error ? (
-              <div className="kojo-error">{error}</div>
             ) : response ? (
               <MarkdownContent content={response} />
-            ) : (
-              <p className="muted small">Kojo is thinking...</p>
+            ) : isLoading ? (
+              <div>
+                <p role="status" aria-live="polite" className="muted small">
+                  {elapsedSeconds < 10 ? "Preparing your explanation..." : "Still working on your explanation..."}
+                  <span aria-hidden="true"> {elapsedSeconds}s</span>
+                </p>
+                <div className="sel-kojo-skeleton" aria-hidden="true">
+                  <div className="sel-kojo-skeleton-line" style={{ width: "88%" }} />
+                  <div className="sel-kojo-skeleton-line" style={{ width: "76%" }} />
+                  <div className="sel-kojo-skeleton-line" style={{ width: "92%" }} />
+                  <div className="sel-kojo-skeleton-line" style={{ width: "60%" }} />
+                </div>
+              </div>
+            ) : null}
+            {isLoading && (
+              <button type="button" className="sel-kojo-footer-btn" onClick={close}>Cancel</button>
             )}
           </div>
         </div>

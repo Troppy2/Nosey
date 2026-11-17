@@ -69,3 +69,6 @@ scripts/
 .codex/
 .agents/
 AGENTS.md
+
+# Local design previews, screenshots and benchmark output (never deployed)
+design-previews/

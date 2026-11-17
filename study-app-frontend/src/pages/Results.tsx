@@ -771,7 +771,10 @@ function ReviewItem({
 }) {
   const [open, setOpen] = useState(false);
   const [reasoningOpen, setReasoningOpen] = useState(false);
-  const Icon = answer.is_correct ? CheckCircleIcon : CrossCircleIcon;
+  // A remake that earned credit reads as fixed: green card, check icon. The
+  // original grade stays in the feedback below.
+  const passed = answer.is_correct || answer.remake_status === "credited";
+  const Icon = passed ? CheckCircleIcon : CrossCircleIcon;
   const reasoning = answer.reasoning?.trim();
   const [fullReadOpen, setFullReadOpen] = useState(false);
   const transcript = answer.work_transcript?.trim();
@@ -785,7 +788,7 @@ function ReviewItem({
   const keyDoubt = answer.flagged_uncertain && !(sections && answer.is_math && gradeState(answer, sections) === "check");
 
   return (
-    <Card className={`review-item ${answer.is_correct ? "correct" : "incorrect"}`}>
+    <Card className={`review-item ${passed ? "correct" : "incorrect"}`}>
       <button className="review-trigger" onClick={() => setOpen(!open)} type="button">
         <Icon size={22} />
         <div>

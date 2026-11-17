@@ -1191,6 +1191,9 @@ export async function kojoChat(
 // Handlers for a Kojo stream. Passing a bare function is shorthand for
 // { onDelta }, so existing callers keep working. Set reasoning: true to ask the
 // server for a visible reasoning pass, delivered via onReasoning.
+// A server error is final for this turn; callers must not retry automatically.
+export class KojoStreamError extends Error {}
+
 export type KojoStreamHandlers =
   | ((delta: string) => void)
   | {
@@ -1284,7 +1287,7 @@ async function consumeKojoStream(
         conversation_name: (event.conversation_name as string | null) ?? null,
       };
     } else if (event.type === "error") {
-      throw new Error(String(event.message ?? "Kojo failed to respond. Try again."));
+      throw new KojoStreamError(String(event.message ?? "Kojo failed to respond. Try again."));
     }
   };
 
@@ -1303,6 +1306,7 @@ async function consumeKojoStream(
     }
     if (buffer.trim()) handleEvent(buffer);
   } catch (err) {
+    if (err instanceof KojoStreamError) throw err;
     // A transport failure mid-stream means the server dropped the connection,
     // so the backend may be down. Surfacing it flips the waiting screen (the
     // debounce in backendStatus absorbs a single blip).

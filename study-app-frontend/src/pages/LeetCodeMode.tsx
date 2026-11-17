@@ -9,6 +9,7 @@ import {
 } from "../icons";
 import { KojoWalkthrough } from "../components/KojoWalkthrough";
 import { LectureLibrary } from "../components/LectureLibrary";
+import { KojoTopicGrid } from "../components/KojoTopicGrid";
 import { AlertIcon, ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, CrossCircleIcon, PencilIcon, PlusIcon, SearchIcon, SparklesIcon, TrashIcon } from "../icons";
 import KojoMascot from "../components/KojoMascot";
 import type { ComponentType, CSSProperties } from "react";
@@ -3878,7 +3879,10 @@ export default function LeetCodeMode() {
   // never overlap: if the difficulty survey will show, it goes first and the drill
   // prompt is deferred (pendingDrillPromptSlug) until it closes; otherwise the drill
   // prompt opens straight away.
-  function onProblemCompleted(problem: Problem) {
+  // ask: "never" for a manual Mark done (only a passing Run asks how hard it was),
+  // "first" for a passing Run on a problem not yet rated, "always" for a bank re-solve
+  // that counts as new, which asks again even if it was rated before.
+  function onProblemCompleted(problem: Problem, ask: "never" | "first" | "always") {
     // Optimistically stamp the solve time so the completed-questions history reflects
     // it immediately, without waiting for the next progress fetch. Server is the
     // source of truth for the first-solve time; keep an existing stamp if present.
@@ -3888,7 +3892,8 @@ export default function LeetCodeMode() {
       difficultyPromptEnabled &&
       betaMode &&
       !isGuestSession() &&
-      !loadDifficultySurveyed().has(problem.slug);
+      ask !== "never" &&
+      (ask === "always" || !loadDifficultySurveyed().has(problem.slug));
     if (willAskDifficulty) {
       setPendingDrillPromptSlug(problem.slug);
       setDifficultyPromptSlug(problem.slug);
@@ -3964,7 +3969,7 @@ export default function LeetCodeMode() {
     const nextCounts = isNewSolve ? bumpTodayCount() : solvedDayCounts;
     pushProgressToDb(next, nextDates, nextCounts).then(refreshServerCounts);
     applyBankCompletion(problem.slug, nextDone);
-    if (nextDone) onProblemCompleted(problem);
+    if (nextDone) onProblemCompleted(problem, "never");
   }
 
   function markProblemDone(problem: Problem) {
@@ -3976,6 +3981,7 @@ export default function LeetCodeMode() {
       if (progress[problem.slug]) {
         const nextCounts = bumpTodayCount();
         pushProgressToDb(progress, recordSolvedToday(), nextCounts);
+        onProblemCompleted(problem, "always");
         return;
       }
     }
@@ -3989,7 +3995,7 @@ export default function LeetCodeMode() {
     const nextCounts = solvedAt[problem.slug] ? solvedDayCounts : bumpTodayCount();
     const nextDates = recordSolveDates(problem);
     pushProgressToDb(next, nextDates, nextCounts).then(refreshServerCounts);
-    onProblemCompleted(problem);
+    onProblemCompleted(problem, "first");
   }
 
   // ── Custom problem handlers ─────────────────────────────────────────────────
@@ -5695,61 +5701,24 @@ export default function LeetCodeMode() {
 
         <h2 className="lc-zone-title">Topics</h2>
 
-        <section className="lc-custom-section" aria-label="Custom questions">
-          {(() => {
-            const customDone = customCategoryList.filter((problem) => progress[problem.slug]).length;
-            const customPct = customCategoryList.length ? Math.round((customDone / customCategoryList.length) * 100) : 0;
-            return (
-              <div className="lc-custom-node" style={{ "--lc-accent": "var(--green-dark)" } as CSSProperties}>
-                <button
-                  type="button"
-                  className="lc-custom-node-main"
-                  onClick={() => setView({ type: "category", categoryId: CUSTOM_CATEGORY_ID })}
-                >
-                  <span className="lc-node-icon"><CodeWindowIcon size={22} /></span>
-                  <span className="lc-node-copy">
-                    <strong>{CUSTOM_CATEGORY_LABEL}</strong>
-                    <small>
-                      {customCategoryList.length
-                        ? `${customDone}/${customCategoryList.length} complete`
-                        : "Add your own problems"}
-                    </small>
-                  </span>
-                  <span className="lc-node-progress"><span style={{ width: `${customPct}%` }} /></span>
-                </button>
-                <button type="button" className="lc-custom-add-btn" onClick={() => openCustomModal()}>
-                  <PlusIcon size={16} />
-                  Add question
-                </button>
-              </div>
-            );
-          })()}
-        </section>
-
-        <section className="lc-roadmap" aria-label="Skill tree">
-          {CATEGORIES.map((category, index) => {
-            const done = category.problems.filter((problem) => progress[problem.slug]).length;
-            const pct = category.problems.length ? Math.round((done / category.problems.length) * 100) : 0;
-            const Icon = category.icon;
-            return (
-              <button
-                key={category.id}
-                type="button"
-                className="lc-node"
-                style={{ "--lc-accent": masteryColor(category.problems.length ? done / category.problems.length : 0) } as CSSProperties}
-                data-side={index % 2 === 0 ? "left" : "right"}
-                onClick={() => setView({ type: "category", categoryId: category.id })}
-              >
-                <span className="lc-node-icon"><Icon size={22} /></span>
-                <span className="lc-node-copy">
-                  <strong>{category.label}</strong>
-                  <small>{done}/{category.problems.length} complete</small>
-                </span>
-                <span className="lc-node-progress"><span style={{ width: `${pct}%` }} /></span>
-              </button>
-            );
-          })}
-        </section>
+        <KojoTopicGrid
+          custom={{
+            label: CUSTOM_CATEGORY_LABEL,
+            icon: CodeWindowIcon,
+            done: customCategoryList.filter((problem) => progress[problem.slug]).length,
+            total: customCategoryList.length,
+            onOpen: () => setView({ type: "category", categoryId: CUSTOM_CATEGORY_ID }),
+            onAdd: () => openCustomModal(),
+          }}
+          topics={CATEGORIES.map((category) => ({
+            id: category.id,
+            label: category.label,
+            icon: category.icon,
+            done: category.problems.filter((problem) => progress[problem.slug]).length,
+            total: category.problems.length,
+          }))}
+          onOpen={(categoryId) => setView({ type: "category", categoryId })}
+        />
 
         {canRescueStreak ? (
           <StreakRescueCard
@@ -5776,12 +5745,12 @@ export default function LeetCodeMode() {
     return (
       <div className="lc-shell">
         <LeftRail active="lectures" streak={stats.currentStreak} onNavigate={setView} />
-        <div className="page page-narrow lc-page lc-shell-body">
+        <div className="page lc-page lc-shell-body lc-lectures-page">
           <header className="lc-category-header">
             <div className="lc-category-title-row">
               <div>
                 <h1>Lectures</h1>
-                <p className="muted">Kojo teaches the patterns behind the problems: the theory, how to spot it, a template, then a worked problem.</p>
+                <p className="muted">Learn the patterns. Work through the problems.</p>
               </div>
             </div>
           </header>

@@ -137,6 +137,35 @@ _OUTER_DELIMS_RE = re.compile(r"^\s*\$\$?([\s\S]*?)\$?\$\s*$")
 _MATH_HINT_RE = re.compile(r"[\\^_=+\-*/<>()\[\]{}|0-9]")
 
 
+_STEP_WRAPPER_RES = (
+    re.compile(r"^\$\$([\s\S]*)\$\$$"),
+    re.compile(r"^\\\[([\s\S]*)\\\]$"),
+    re.compile(r"^\$([^$]*)\$$"),
+)
+
+
+def clean_step_expression(expression: str) -> str:
+    """A worked step's expression as bare LaTeX, or "" when it is not maths.
+
+    The renderer wraps the expression in $$...$$ itself, so a model that
+    already delimited it showed stray "$$" on screen, and a sentence put in
+    the expression slot rendered as maths with its spaces gone
+    ("Eacharrivaliskept..."). The step's description already says it in words,
+    so prose and mixed text are dropped rather than shown twice.
+    """
+    text = expression.strip()
+    for pattern in _STEP_WRAPPER_RES:
+        match = pattern.match(text)
+        if match:
+            text = match.group(1).strip()
+            break
+    if not text or "$" in text:
+        return ""
+    if _looks_like_prose(_TEXT_CMD_RE.sub(lambda m: m.group(1), text)):
+        return ""
+    return text
+
+
 def format_final_answer(answer: str) -> str:
     """Markdown for a grader's final answer: display maths only when it is maths.
 

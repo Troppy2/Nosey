@@ -1,3 +1,4 @@
+import { KojoStreamError } from "../lib/api";
 import { Lock, Maximize2, Minimize2, Send } from "lucide-react";
 import { AlertIcon, ArrowDownIcon, CloseIcon, SparklesIcon } from "../icons";
 import KojoMascot from "./KojoMascot";
@@ -195,7 +196,7 @@ export function KojoHelpChat({
       } catch (streamErr) {
         // If the stream failed before producing any text, fall back to the
         // non-streamed endpoint so a transient stream issue still answers.
-        if (placed) throw streamErr;
+        if (placed || streamErr instanceof KojoStreamError) throw streamErr;
         result = await kojoChatGeneral(
           conversationId, messageText, provider, strictness, customInstruction, context, interviewerMode, testRef,
         );
@@ -213,7 +214,7 @@ export function KojoHelpChat({
       ]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kojo failed to respond. Try again.");
-      setMessages((prev) => prev.filter((m) => m.id !== tempId && m.id !== userMsg.id));
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
     } finally {
       setIsLoading(false);
       inputRef.current?.focus();

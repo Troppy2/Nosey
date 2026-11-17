@@ -1,0 +1,204 @@
+/* KojoCode dashboard topic cards (components/KojoTopicGrid.tsx).
+   Leaf cards: two rounded corners and two tight ones, a fill that rises from the
+   bottom with progress, solid green once every problem is solved. */
+
+.lc-topics {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.lc-topics-custom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Full-width card: any tilt would run across the whole row, so keep it level. */
+.lc-topics-custom .lc-topic:not([data-state="complete"]) {
+  background: linear-gradient(to top, var(--lc-leaf) var(--lc-fill), var(--white) var(--lc-fill));
+}
+
+.lc-topics-custom .button {
+  min-height: 44px;
+}
+
+.lc-topics-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.lc-topics-summary {
+  margin: 0;
+}
+
+.lc-topics-filter {
+  flex-wrap: wrap;
+}
+
+.lc-topics-filter .lc-practice-seg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 6px 12px;
+}
+
+.lc-topics-filter-count {
+  color: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.lc-topics-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid var(--green-dark);
+  background: var(--white);
+}
+
+.lc-topics-dot[data-state="in-progress"] {
+  background: var(--green-light);
+}
+
+.lc-topics-dot[data-state="complete"] {
+  background: var(--green-dark);
+}
+
+.lc-practice-seg-btn.is-active .lc-topics-dot {
+  border-color: var(--green-lightest);
+}
+
+.lc-topics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  gap: var(--space-3);
+}
+
+.lc-topic {
+  --lc-fill: 0%;
+  --lc-leaf: color-mix(in srgb, var(--green-light) 78%, var(--white));
+  position: relative;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 76px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: 22px var(--radius-xs) 22px var(--radius-xs);
+  /* Tilted edge, like the leaf fill in the tree preview, so the line never sits
+     flat under a row of text. */
+  background: linear-gradient(-4deg, var(--lc-leaf) var(--lc-fill), var(--white) var(--lc-fill));
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.lc-topic[data-state="not-started"] {
+  border-color: color-mix(in srgb, var(--border) 70%, var(--white));
+}
+
+.lc-topic:hover {
+  border-color: var(--green-dark);
+}
+
+.lc-topic:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.lc-topic-icon {
+  display: inline-grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 14px var(--radius-xs) 14px var(--radius-xs);
+  background: color-mix(in srgb, var(--green-lightest) 70%, var(--white));
+  color: var(--green-dark);
+}
+
+.lc-topic-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.lc-topic-copy strong {
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.lc-topic-copy small {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.lc-topic-check {
+  display: inline-grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--green-lightest);
+  color: var(--green-dark);
+}
+
+.lc-topic[data-state="complete"] {
+  border-color: var(--green-dark);
+  background: var(--green-dark);
+  color: var(--green-lightest);
+}
+
+.lc-topic[data-state="complete"]:hover {
+  background: var(--green-dark-mid);
+}
+
+.lc-topic[data-state="complete"] .lc-topic-icon {
+  background: color-mix(in srgb, var(--white) 18%, transparent);
+  color: var(--green-lightest);
+}
+
+.lc-topic[data-state="complete"] .lc-topic-copy small {
+  color: color-mix(in srgb, var(--green-lightest) 85%, transparent);
+}
+
+@media (max-width: 640px) {
+  .lc-topics-custom {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lc-topics-bar {
+    align-items: stretch;
+  }
+
+  /* Doubled class: legacy .lc-practice-seg loads after this sheet and sets display. */
+  .lc-practice-seg.lc-topics-filter {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .lc-topics-filter .lc-practice-seg-btn {
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  .lc-topics-grid {
+    gap: var(--space-2);
+  }
+
+  .lc-topic {
+    min-height: 64px;
+    padding: var(--space-2) var(--space-3);
+  }
+}

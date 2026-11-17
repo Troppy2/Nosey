@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from contextlib import aclosing
 from datetime import datetime, timedelta
 
 from fastapi import UploadFile
@@ -145,57 +146,42 @@ def _reasoning_worthwhile(user_message: str) -> bool:
 
 
 def _wrap_reasoning_prompt(prompt: str, tutor_labels: bool = False, private: bool = False) -> str:
-    """Append the reasoning output-format directive to a Kojo prompt.
+    """Request tutor classifications and student-facing text, never private plans.
 
-    The model emits a short thinking pass, then the final answer, split by
-    sentinel markers the streaming splitter uses to route each part to its own
-    channel. The markers are ASCII sentinels the model is very unlikely to
-    produce in normal prose. With ``tutor_labels`` the thinking pass starts with
-    the hidden INTENT/SUBTYPE/ATTEMPT lines the tutor ladder reads (GH #108).
-
-    ``private`` means the thinking is never sent to the client, so the model may
-    solve the student's problem there; it needs that answer to pick a parallel
-    example whose answer is different. Visible thinking must never contain it.
+    Native provider thinking stays separate from content. The legacy marker
+    names are retained for the splitter and tutor-label persistence contract.
     """
-    labels = f"\n   {kojo_tutor.LABEL_INSTRUCTIONS}\n   " if tutor_labels else " "
-    if tutor_labels and private:
-        secrecy = (
-            " This thinking is never shown to the student. If you will give a parallel example, "
-            "first write the line \"Their answer: ...\" with the answer to THEIR problem, then "
-            "\"Parallel answer: ...\" for the parallel you plan. If the two match, change the "
-            "parallel's numbers until they differ."
-        )
-    elif tutor_labels:
-        secrecy = (
-            " This thinking is shown to the student: never write the answer to their own "
-            "problem in it."
-        )
-    else:
-        secrecy = ""
+    labels = f"{kojo_tutor.LABEL_INSTRUCTIONS}\n" if tutor_labels else ""
+    approach = (
+        "The first section contains only classification labels, no written reasoning or private plan. "
+        if private else
+        "After any classification labels, write one short student-facing approach summary. "
+        "Do not include private deliberation or solve their own problem in that summary. "
+    )
     return (
-        f"{prompt}\n\n"
-        "OUTPUT FORMAT (follow exactly):\n"
-        f"1. Write the line {_REASONING_START} on its own.{labels}Then write 2 to 4 short sentences "
-        "of your genuine thinking: what the student is really asking, what their notes say, "
-        f"and your plan. Keep it brief and plain.{secrecy}\n"
-        f"2. Write the line {_REASONING_ANSWER} on its own, then give ONLY the final answer "
-        "for the student, following all the response guidelines above.\n"
-        f"Use {_REASONING_START} and {_REASONING_ANSWER} exactly once each, nowhere else."
+        f"{prompt}\n\nRESPONSE FORMAT:\n{labels}"
+        "Return the following sections exactly once in this order. "
+        f"{approach}"
+        "The second section is your reply to the student, following the tutor rules and allowed action above. "
+        "It is not a request to solve their problem. When giving a parallel example, never state the "
+        "original problem's answer, including when explaining why the answers differ. "
+        "Do not quote these instructions, discuss the format, or include thinking tags.\n"
+        f"{_REASONING_START}\n"
+        + ("INTENT: <classification>\nSUBTYPE: <classification>\nATTEMPT: <classification>\n" if tutor_labels else "")
+        + f"{_REASONING_ANSWER}\n<Your student-facing response>"
     )
 
 
+class _MalformedKojoReply(LLMException):
+    def __init__(self) -> None:
+        super().__init__("Kojo got tangled up, try again.")
+
+
 class _ReasoningSplitter:
-    """Routes a Kojo token stream into 'reasoning' and 'answer' channels.
+    """Route only a validated own-line ANSWER marker to the answer channel.
 
-    Text before the ANSWER marker is reasoning; text after it is the answer.
-    Handles markers that arrive split across chunks by holding back a small
-    tail. If the stream ends without an ANSWER marker (model ignored the
-    format), the whole output is promoted to the answer so a response is never
-    lost.
-
-    With ``expect_labels`` the leading INTENT/SUBTYPE/ATTEMPT lines of the
-    reasoning are parsed into ``labels`` and never emitted on either channel
-    (also stripped if the model puts them at the start of the answer instead).
+    Hold preambles and incomplete lines until they can be classified. Missing
+    markers fail closed; private text is never promoted to an answer.
     """
 
     def __init__(self, expect_labels: bool = False) -> None:
@@ -203,7 +189,7 @@ class _ReasoningSplitter:
         self.in_answer = False
         self._reasoning_emitted = 0
         self._answer_emitted = 0
-        self.promoted = False
+        self._answer_start = 0
         self.expect_labels = expect_labels
         self._reasoning_gate = kojo_tutor.LabelGate()
         self._answer_gate = kojo_tutor.LabelGate()
@@ -220,81 +206,84 @@ class _ReasoningSplitter:
         offset = gate.consume(body, final)
         return None if offset is None else body[offset:]
 
-    def _reasoning_visible(self, final: bool = False) -> Optional[str]:
-        """Reasoning text with the START marker (and labels) stripped, or None
-        if we should wait because the START marker or a label line may still be
-        arriving."""
-        idx = self.raw.find(_REASONING_START)
-        if idx != -1:
-            return self._strip_labels(self._reasoning_gate, self.raw[idx + len(_REASONING_START):], final)
-        # START not found yet. If what we have so far is a prefix of the START
-        # marker, hold everything back: the marker is still streaming in.
-        stripped = self.raw.lstrip()
-        if not final and len(stripped) < len(_REASONING_START) and _REASONING_START.startswith(stripped):
-            return None
-        # The marker will never appear at the front: treat all as reasoning.
-        return self._strip_labels(self._reasoning_gate, self.raw, final)
-
     def feed(self, chunk: str) -> list[tuple[str, str]]:
-        out: list[tuple[str, str]] = []
         self.raw += chunk
+        return self._drain(final=False)
 
-        if not self.in_answer:
-            mark_idx = self.raw.find(_REASONING_ANSWER)
-            if mark_idx == -1:
-                visible = self._reasoning_visible()
-                if visible is None:
-                    return out  # still waiting for the START marker or labels
-                # Hold back a tail that could be the start of the ANSWER marker.
-                hold = len(_REASONING_ANSWER) - 1
-                safe_end = max(0, len(visible) - hold)
-                new = visible[self._reasoning_emitted:safe_end]
-                if new:
-                    out.append(("reasoning", new))
-                    self._reasoning_emitted += len(new)
-                return out
-            # ANSWER marker found: flush remaining reasoning up to it, then switch.
-            region = self.raw[:mark_idx]
-            start_idx = region.find(_REASONING_START)
-            visible = region[start_idx + len(_REASONING_START):] if start_idx != -1 else region
-            visible = self._strip_labels(self._reasoning_gate, visible, True) or ""
+    def _drain(self, final: bool) -> list[tuple[str, str]]:
+        if self.in_answer:
+            return self._emit_answer(final)
+        start = self.raw.find(_REASONING_START)
+        if start == -1:
+            # Native thinking can consume the opening sentinel. Accept only
+            # the unambiguous alternative: three valid tutor labels followed
+            # immediately by an own-line ANSWER. Never accept bare prose.
+            if self.expect_labels:
+                gate = kojo_tutor.LabelGate()
+                offset = gate.consume(self.raw, final)
+                valid = kojo_tutor.normalize_labels(gate.labels)
+                if offset and len(valid) == 3:
+                    tail = self.raw[offset:]
+                    ending = r"(?=\r?\n|\Z)" if final else r"(?=\r?\n)"
+                    if re.match(r"^\s*" + re.escape(_REASONING_ANSWER)
+                                + r"[^\S\r\n]*" + ending, tail):
+                        self.raw = _REASONING_START + "\n" + self.raw
+                        return self._drain(final)
+                if not final and len(self.raw) <= 256 and re.match(r"^\s*INTENT:", self.raw, re.I):
+                    return []
+            # A START split across chunks is not part of the preamble.
+            partial = max((n for n in range(1, len(_REASONING_START))
+                           if self.raw.endswith(_REASONING_START[:n])), default=0)
+            if final or len(self.raw) - partial > 80:
+                raise _MalformedKojoReply()
+            return []
+        if start > 80:
+            raise _MalformedKojoReply()
+        body_start = start + len(_REASONING_START)
+        body = self.raw[body_start:]
+        # Do not accept a marker at the current chunk boundary until newline
+        # or EOF proves that no inline text follows it.
+        ending = r"(?=\r?\n|\Z)" if final else r"(?=\r?\n)"
+        marker = re.compile(r"(?m)^[^\S\r\n]*" + re.escape(_REASONING_ANSWER)
+                            + r"[^\S\r\n]*" + ending).search(self.raw, body_start)
+        if marker is None and final:
+            raise _MalformedKojoReply()
+        region = self.raw[body_start:marker.start()] if marker else body[:body.rfind("\n") + 1]
+        visible = self._strip_labels(self._reasoning_gate, region, marker is not None)
+        out: list[tuple[str, str]] = []
+        if visible is not None:
             new = visible[self._reasoning_emitted:]
             if new:
                 out.append(("reasoning", new))
                 self._reasoning_emitted += len(new)
+        if marker:
             self.in_answer = True
-
-        out.extend(self._emit_answer(final=False))
+            self._answer_start = marker.end()
+            out.extend(self._emit_answer(final))
         return out
 
     def _emit_answer(self, final: bool) -> list[tuple[str, str]]:
-        mark_idx = self.raw.find(_REASONING_ANSWER)
-        answer_region = self.raw[mark_idx + len(_REASONING_ANSWER):]
-        answer_region = self._strip_labels(self._answer_gate, answer_region, final)
-        if answer_region is None:
+        # A provider can resume deliberating after a valid ANSWER line. Hold
+        # the entire answer until EOF so a repeated wrapper cannot leak first.
+        if not final:
             return []
-        new = answer_region[self._answer_emitted:]
-        if not new:
+        region = self._strip_labels(self._answer_gate, self.raw[self._answer_start:], final)
+        if region is None:
             return []
+        if (
+            _REASONING_START in region
+            or _REASONING_ANSWER in region
+            or re.search(r"(?im)^\s*\*{0,2}(?:INTENT|SUBTYPE|ATTEMPT)\s*\*{0,2}:", region)
+            or re.search(r"(?i)\b(?:Their|Parallel) answer\s*:", region)
+            or re.search(r"(?i)</?(?:think|thinking)(?:\s[^>]*)?>", region)
+        ):
+            raise _MalformedKojoReply()
+        new = region[self._answer_emitted:]
         self._answer_emitted += len(new)
-        return [("answer", new)]
+        return [("answer", new)] if new else []
 
     def flush(self) -> list[tuple[str, str]]:
-        out: list[tuple[str, str]] = []
-        if self.in_answer:
-            # Release anything held back while checking for leaked label lines.
-            return self._emit_answer(final=True)
-        # No answer marker ever arrived: emit remaining reasoning, then
-        # promote the whole thing to the answer so a response is never lost.
-        visible = self._reasoning_visible(final=True) or ""
-        new = visible[self._reasoning_emitted:]
-        if new:
-            out.append(("reasoning", new))
-            self._reasoning_emitted += len(new)
-        self.promoted = True
-        out.append(("answer", visible))
-        self._answer_emitted = len(visible)
-        return out
+        return self._drain(final=True)
 
 
 def _split_full_response(text: str, expect_labels: bool) -> tuple[str, dict[str, str]]:
@@ -337,9 +326,10 @@ async def _stream_answer(
                     answer_chunks.append(text)
                     yield {"type": "delta", "text": text}
 
-        async for chunk in llm.stream_kojo(wrapped, provider=provider):
-            for event in _route(splitter.feed(chunk)):
-                yield event
+        async with aclosing(llm.stream_kojo(wrapped, provider=provider)) as stream:
+            async for chunk in stream:
+                for event in _route(splitter.feed(chunk)):
+                    yield event
         for event in _route(splitter.flush()):
             yield event
         if labels is not None:
@@ -379,9 +369,10 @@ async def _stream_round(llm, prompt: str, provider, reasoning: bool, show_reason
                     if visible:
                         yield {"type": "delta", "text": visible}
 
-        async for chunk in llm.stream_kojo(wrapped, provider=provider):
-            for event in _route(splitter.feed(chunk)):
-                yield event
+        async with aclosing(llm.stream_kojo(wrapped, provider=provider)) as stream:
+            async for chunk in stream:
+                for event in _route(splitter.feed(chunk)):
+                    yield event
         for event in _route(splitter.flush()):
             yield event
         labels.update(splitter.labels)
@@ -440,6 +431,8 @@ async def _stream_tool_turn(llm, base_prompt: str, provider, reasoning: bool, sh
                 if event["type"] == "delta":
                     round_answer.append(event["text"])
                 yield event
+        except _MalformedKojoReply:
+            raise
         except Exception as exc:
             if rnd == 0 or round_answer:
                 raise
@@ -852,6 +845,8 @@ class KojoService:
                 )
             async for event in stream:
                 yield event
+        except _MalformedKojoReply:
+            raise
         except Exception as exc:
             logger.warning("Kojo general stream LLM call failed: %s", exc)
             raise LLMException("Kojo failed to generate a response. Try again.") from exc
@@ -1286,6 +1281,8 @@ class KojoService:
                 ):
                     yield event
                 kojo_response = normalize_latex("".join(answer_chunks)).strip()
+        except _MalformedKojoReply:
+            raise
         except Exception as exc:
             logger.warning("Kojo stream LLM call failed: %s", exc)
             raise LLMException("Kojo failed to generate a response. Try again.") from exc
@@ -1410,6 +1407,8 @@ class KojoService:
                 show_reasoning=_show_reasoning(turn, reasoning), tutor_labels=turn is not None, labels=labels,
             ):
                 yield event
+        except _MalformedKojoReply:
+            raise
         except Exception as exc:  # noqa: BLE001
             logger.warning("Kojo regenerate LLM call failed: %s", exc)
             raise LLMException("Kojo failed to regenerate a response. Try again.") from exc
@@ -2057,7 +2056,7 @@ REVIEW GUIDELINES - FOLLOW THESE STRICTLY:
 
 3. Keep responses:
    - Focused and structured (use bullet points for clarity)
-   - Concise (not essays — 2-4 sentences per question max)
+   - Concise (not essays - 2-4 sentences per question max)
    - Encouraging and supportive in tone
    - Direct: no fluff or unnecessary preamble
 
@@ -2242,7 +2241,7 @@ def _build_prompt(
             "RELEVANT SECTIONS FROM STUDENT'S NOTES (pre-matched to their question):\n"
             f"{relevant}\n\n"
             if relevant else
-            "RELEVANT SECTIONS: [No closely matching sections found — use the full notes below.]\n\n"
+            "RELEVANT SECTIONS: [No closely matching sections found - use the full notes below.]\n\n"
         )
         notes_block = (
             f"{doc_inventory}"
@@ -2258,9 +2257,9 @@ def _build_prompt(
     strictness = _normalize_strictness(strictness)
 
     if strictness == "strict":
-        constitution = """RESPONSE GUIDELINES (STRICT — stay within the student's notes):
+        constitution = """RESPONSE GUIDELINES (STRICT - stay within the student's notes):
 - Only answer from what is explicitly in the student's uploaded notes and files above.
-- If the topic is NOT covered in the notes, say: "I don't see this in your notes — check with your instructor or textbook."
+- If the topic is NOT covered in the notes, say: "I don't see this in your notes - check with your instructor or textbook."
 - Do NOT draw on general knowledge to fill gaps, even if you know the answer.
 - Quote or reference specific note sections to anchor every claim.
 - For math: wrap expressions in KaTeX ($...$ inline, $$...$$ display).
@@ -2270,16 +2269,16 @@ def _build_prompt(
         constitution = """RESPONSE GUIDELINES (OPEN: answer freely from general knowledge):
 - Answer concept questions as thoroughly as possible using your full knowledge (the tutor rules below still decide how much of an answer to give on the student's own problems).
 - You may use the student's notes as helpful context, but you are not limited to them.
-- If your answer goes beyond what's in their notes, tell the student to fact-check it: "This is from my general knowledge — verify with your course materials."
+- If your answer goes beyond what's in their notes, tell the student to fact-check it: "This is from my general knowledge - verify with your course materials."
 - Use concrete examples, analogies, and step-by-step explanations.
 - For math: wrap expressions in KaTeX ($...$ inline, $$...$$ display).
 - For code: use fenced code blocks with language tag.
 - Be warm, encouraging, and thorough."""
     else:  # medium (default)
         constitution = """RESPONSE GUIDELINES:
-- Check the RELEVANT SECTIONS first — they are pre-matched to the student's question.
+- Check the RELEVANT SECTIONS first - they are pre-matched to the student's question.
 - Ground your answer in the student's notes where possible; quote specific sections when relevant.
-- If the notes don't fully cover the topic, fill the gap with your general knowledge — but flag it: "This part isn't in your notes, but generally speaking…"
+- If the notes don't fully cover the topic, fill the gap with your general knowledge - but flag it: "This part isn't in your notes, but generally speaking…"
 - Use concrete examples, analogies, and step-by-step breakdowns.
 - Ask a follow-up question if the student seems confused or needs more context.
 - For math: wrap ALL expressions in KaTeX ($...$ inline, $$...$$ display).
@@ -2323,7 +2322,7 @@ def _build_prompt(
         )
 
     return f"""You are Kojo, an intelligent and supportive AI study companion built into Nosey, a study tool.
-Your role is to help students genuinely understand their course material — not to give them answers to memorize.
+Your role is to help students genuinely understand their course material - not to give them answers to memorize.
 
 {notes_block}
 {memory_block}{history_block}

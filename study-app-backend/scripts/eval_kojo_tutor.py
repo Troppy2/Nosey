@@ -240,6 +240,22 @@ CASES: list[Case] = [
 ]
 
 
+# Regression: this pasted feedback previously failed on every retry because
+# native thinking exhausted its budget or consumed the opening sentinel.
+CASES.append(Case("bus-feedback-replay", [Turn(
+    "##### Source: Original; Walpole section 6.1\n"
+    "Problem V. A bus arrives at a stop at a time uniformly distributed between 8:00 and 8:20. "
+    "Let be the number of minutes after 8:00 that it arrives. Give a final numerical answer for each part.\n"
+    "Part (a) Find , and find and .\n"
+    "Part (b) You arrive at 8:00 and the bus has not come by 8:10. "
+    "Find the probability that it arrives after 8:15, and explain why it is not .\n"
+    "Your answer (read from your drawing)\nShow everything Kojo read\nWrong\nFix\n"
+    "You set up the problem with and , but this ignores the crucial condition that the bus has not arrived by 8:10. "
+    "The problem asks for a conditional probability: given that , what is ? "
+    "You need to use the conditional distribution of given , which is uniform on the interval , not ."
+)]))
+
+
 def _question_ns(q: dict) -> SimpleNamespace:
     return SimpleNamespace(
         id=q["id"],

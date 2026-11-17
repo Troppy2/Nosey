@@ -163,3 +163,20 @@ async def test_narrated_tool_call_still_runs(patched):
     assert len(llm.prompts) == 2 and "TOOL RESULTS" in llm.prompts[1]
     assert answer.startswith("Let me pull your data.") and answer.endswith("You have Bio.")
     assert any(e["type"] == "tool" for e in events)
+
+
+async def test_malformed_later_round_never_retries(patched):
+    llm = _FakeLLM([
+        '<<<REASONING>>>\nplan\n<<<ANSWER>>>\n<tool>{"name":"list_folders","args":{}}</tool>',
+        '<<<REASONING>>>\nTheir answer: 42.',
+        'This fallback must never run.',
+    ])
+    events = []
+    chunks = []
+    user = type('U', (), {'id': 5})()
+    with pytest.raises(ks._MalformedKojoReply, match='Kojo got tangled up, try again'):
+        async for event in ks._stream_tool_turn(llm, 'BASE', None, True, False, False, chunks, {}, user, 9):
+            events.append(event)
+    assert len(llm.prompts) == 2
+    assert chunks == []
+    assert not any(e['type'] == 'delta' for e in events)

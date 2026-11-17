@@ -40,6 +40,15 @@
   font-weight: normal;
 }
 
+/* Legacy `.review-detail span` sets weight 800 and a muted colour on every
+   span, KaTeX's own spans included, which made all maths bold and green.
+   Size is left alone: KaTeX scales fractions and scripts through it. */
+.review-detail .gf .katex span,
+.review-detail .rm .katex span {
+  color: inherit;
+  font-weight: inherit;
+}
+
 .review-detail .gf .gf-verdict {
   font-weight: 700;
   font-size: var(--text-sm);

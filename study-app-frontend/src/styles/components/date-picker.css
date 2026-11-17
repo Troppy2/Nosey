@@ -38,7 +38,7 @@
   min-height: 32px;
   padding: 4px 10px;
   border: 1px solid transparent;
-  border-radius: var(--radius-pill);
+  border-radius: 10%;
   background: transparent;
   color: var(--muted);
   font: inherit;

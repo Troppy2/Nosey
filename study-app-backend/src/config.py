@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     # 2048 is the knee; MCQ verification (also thinking) re-derives and repairs
     # answer keys after generation, so generation need not be perfect alone.
     nvidia_reasoning_budget: int = Field(default=2048, alias="NVIDIA_REASONING_BUDGET")
+    nvidia_kojo_reasoning_budget: int = Field(default=4096, ge=1, alias="NVIDIA_KOJO_REASONING_BUDGET")
     # NVIDIA's own request timeout, shorter than the shared 180s generation one:
     # healthy calls took 5-35s in every successful 2026-11-10 run, and a stalled
     # free-tier call should hand over to the next provider quickly.
@@ -112,9 +113,9 @@ class Settings(BaseSettings):
     max_file_size_bytes: int = Field(default=52_428_800, alias="MAX_FILE_SIZE_BYTES")
     allowed_file_types: Any = Field(default_factory=lambda: ["pdf", "txt", "md"], alias="ALLOWED_FILE_TYPES")
     llm_max_tokens: int = Field(default=4096, alias="LLM_MAX_TOKENS")
-    # Chat/interactive calls (Kojo) — keep short so a hung provider doesn't block the user.
+    # Chat/interactive calls (Kojo) - keep short so a hung provider doesn't block the user.
     llm_timeout_seconds: int = Field(default=60, alias="LLM_TIMEOUT_SECONDS")
-    # Background JSON generation (test/flashcard) — longer ceiling for slow 31B cloud models.
+    # Background JSON generation (test/flashcard) - longer ceiling for slow 31B cloud models.
     llm_generation_timeout_seconds: int = Field(default=180, alias="LLM_GENERATION_TIMEOUT_SECONDS")
     llm_uncertainty_threshold: float = Field(default=0.6, alias="LLM_UNCERTAINTY_THRESHOLD")
     llm_provider: str = Field(default="auto", alias="LLM_PROVIDER")
