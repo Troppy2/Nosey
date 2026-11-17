@@ -131,6 +131,8 @@ class PracticeItemState(BaseModel):
     status: str = "open"
     # ScratchPadData JSON, null when the pad was never used.
     strokes: Optional[str] = None
+    # Typed answer or code ([[scratchpad:text]] / [[scratchpad:code]] pads).
+    typed: Optional[str] = None
 
 
 class ModulePracticeResponse(BaseModel):
@@ -141,7 +143,9 @@ class ModulePracticeResponse(BaseModel):
 class SavePracticeRequest(BaseModel):
     # Same cap as DraftAttemptAnswer.work_strokes. Omit to keep what is saved.
     strokes: Optional[str] = Field(default=None, max_length=200_000)
-    # "done" needs ink on the pad; "gave_up" does not. Omit to only save ink.
+    # Typed answer or code. Omit to keep what is saved.
+    typed: Optional[str] = Field(default=None, max_length=50_000)
+    # "done" needs ink or a typed answer; "gave_up" does not. Omit to only save work.
     status: Optional[Literal["done", "gave_up"]] = None
 
 

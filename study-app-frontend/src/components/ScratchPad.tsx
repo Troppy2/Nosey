@@ -35,6 +35,7 @@ import {
   normalizeForPen,
 } from "../lib/textToInk";
 import { MarkdownContent } from "./MarkdownContent";
+import { PracticeTypePanel } from "./PracticeTypePanel";
 
 // ── Stroke data model ───────────────────────────────────────────────────────
 // Strokes live in a FIXED LOGICAL PAPER SPACE (not CSS pixels, not device
@@ -2846,6 +2847,14 @@ type ScratchPadModalProps = {
   paperStyle: PaperStyle;
   onPaperStyleChange: (style: PaperStyle) => void;
   onClose: () => void;
+  // A typed answer next to the ink ([[scratchpad:text]] / [[scratchpad:code]]
+  // lesson pads). Adds a Type | Draw switch; the pad opens on Type.
+  typing?: {
+    mode: "text" | "code";
+    language: string | null;
+    value: string;
+    onChange: (value: string) => void;
+  };
 };
 
 type SizeState = "comfortable" | "large" | "full";
@@ -2857,7 +2866,10 @@ export function ScratchPadModal({
   paperStyle,
   onPaperStyleChange,
   onClose,
+  typing,
 }: ScratchPadModalProps) {
+  const [tab, setTab] = useState<"type" | "draw">(typing ? "type" : "draw");
+  const showTyping = typing != null && tab === "type";
   const [size, setSize] = useState<SizeState>(
     () => (localStorage.getItem(scopeKey("nosey_scratchpad_size")) as SizeState | null) ?? "comfortable",
   );
@@ -3093,26 +3105,48 @@ export function ScratchPadModal({
           </div>
         </div>
 
-        <div className="scratchpad-paper-picker" role="group" aria-label="Paper style">
-          {(["blank", "lined", "graph"] as PaperStyle[]).map((style) => (
-            <button
-              key={style}
-              type="button"
-              className={paperStyle === style ? "is-active" : ""}
-              onClick={() => onPaperStyleChange(style)}
-            >
-              {style === "blank" ? "Blank" : style === "lined" ? "Lined" : "Graph"}
-            </button>
-          ))}
-        </div>
+        {(() => {
+          const paperPicker = showTyping ? null : (
+            <div className="scratchpad-paper-picker" role="group" aria-label="Paper style">
+              {(["blank", "lined", "graph"] as PaperStyle[]).map((style) => (
+                <button
+                  key={style}
+                  type="button"
+                  className={paperStyle === style ? "is-active" : ""}
+                  onClick={() => onPaperStyleChange(style)}
+                >
+                  {style === "blank" ? "Blank" : style === "lined" ? "Lined" : "Graph"}
+                </button>
+              ))}
+            </div>
+          );
+          if (!typing) return paperPicker;
+          return (
+            <div className="scratchpad-mode-row">
+              <div className="scratchpad-mode-switch" role="group" aria-label="Answer with">
+                <button type="button" className={tab === "type" ? "is-active" : ""} aria-pressed={tab === "type"} onClick={() => setTab("type")}>
+                  {typing.mode === "code" ? "Code" : "Type"}
+                </button>
+                <button type="button" className={tab === "draw" ? "is-active" : ""} aria-pressed={tab === "draw"} onClick={() => setTab("draw")}>
+                  Draw
+                </button>
+              </div>
+              {paperPicker}
+            </div>
+          );
+        })()}
 
-        <CanvasSurface
-          strokes={data.strokes}
-          onStrokesChange={(strokes) => onChange({ version: 1, strokes })}
-          paperStyle={paperStyle}
-          onEdgeDrag={handleEdgeDrag}
-          onLookChange={setLook}
-        />
+        {showTyping ? (
+          <PracticeTypePanel mode={typing.mode} language={typing.language} value={typing.value} onChange={typing.onChange} />
+        ) : (
+          <CanvasSurface
+            strokes={data.strokes}
+            onStrokesChange={(strokes) => onChange({ version: 1, strokes })}
+            paperStyle={paperStyle}
+            onEdgeDrag={handleEdgeDrag}
+            onLookChange={setLook}
+          />
+        )}
 
         <div
           className="scratchpad-resize-handle"

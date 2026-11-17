@@ -330,6 +330,12 @@ async def get_learning_module(ctx: McpContext, args: ModuleArgs) -> dict[str, An
         # Per [[scratchpad]] marker, in lesson order: open | done | gave_up
         # (gave_up = counted wrong). Ink is not exposed.
         "practice": [p["status"] for p in practice_progress(module)],
+        # Same order: what the student typed on a [[scratchpad:text]] or
+        # [[scratchpad:code]] pad (null when nothing was typed), capped.
+        "practice_typed": [
+            (p["typed"][:4000] if p["typed"] and p["typed"].strip() else None)
+            for p in practice_progress(module)
+        ],
     }
 
 
@@ -431,7 +437,8 @@ TOOLS: dict[str, McpTool] = {
             "Get a learning module",
             "Get one learning module: lesson markdown, narration script, video URL, quiz "
             "with correct answers, and practice: the status of each [[scratchpad]] practice problem "
-            "in lesson order (open, done, or gave_up, which counts as wrong).",
+            "in lesson order (open, done, or gave_up, which counts as wrong), and practice_typed: what the "
+            "student typed on text or code pads, same order (null if nothing).",
             ModuleArgs,
             get_learning_module,
         ),

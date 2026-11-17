@@ -455,6 +455,9 @@ export type PracticeStatus = "open" | "done" | "gave_up";
 export type PracticeItemState = {
   status: PracticeStatus;
   strokes: string | null;
+  // Typed answer or code on a [[scratchpad:text]] / [[scratchpad:code]] pad.
+  // Optional: older responses do not send it.
+  typed?: string | null;
 };
 
 export type TrackFormat = "article" | "podcast" | "lecture";

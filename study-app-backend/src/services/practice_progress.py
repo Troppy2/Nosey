@@ -1,8 +1,8 @@
 """Practice scratch pad progress on article lesson modules.
 
 A lesson's [[scratchpad]] markers (see utils/lesson_blocks.py) are practice
-problems. Each one is "open" until the student either finishes it (ink on the
-pad, then Done) or gives up; both are final and both unlock the module quiz.
+problems. Each one is "open" until the student either finishes it (ink or a
+typed answer on the pad, then Done) or gives up; both are final and both unlock the module quiz.
 Pure functions over the module row: no LLM, no shared state.
 """
 from __future__ import annotations
@@ -35,10 +35,13 @@ def practice_progress(module: LearningModule) -> list[dict[str, Any]]:
         item = raw[i] if isinstance(raw, list) and i < len(raw) and isinstance(raw[i], dict) else {}
         status = item.get("status")
         strokes = item.get("strokes")
+        typed = item.get("typed")
         out.append(
             {
                 "status": status if status in RESOLVED else OPEN,
                 "strokes": strokes if isinstance(strokes, str) else None,
+                # Typed answer or code from a [[scratchpad:text]] / [[scratchpad:code]] pad.
+                "typed": typed if isinstance(typed, str) else None,
             }
         )
     return out
@@ -83,3 +86,16 @@ def has_ink(strokes_json: Optional[str]) -> bool:
     if not xs:
         return False
     return (max(xs) - min(xs)) * (max(ys) - min(ys)) >= MIN_INK_BBOX_AREA
+
+
+# A typed answer shorter than this (after trimming) is not work: "x", "ok".
+MIN_TYPED_CHARS = 3
+
+
+def has_typed(typed: Optional[str]) -> bool:
+    return bool(typed) and len(typed.strip()) >= MIN_TYPED_CHARS
+
+
+def has_work(item: dict[str, Any]) -> bool:
+    """Done needs real ink or a typed answer."""
+    return has_ink(item.get("strokes")) or has_typed(item.get("typed"))

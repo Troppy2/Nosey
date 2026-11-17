@@ -50,13 +50,40 @@ def split_lesson_blocks(markdown: str) -> list[str]:
 # to the next heading, horizontal rule, marker or the end of the lesson, is the
 # walkthrough, kept collapsed until the problem is solved or given up. Mirrors
 # isScratchpadBlock / practiceLayout in study-app-frontend/src/lib/practicePads.ts.
+#
+# The marker also picks how the student answers. [[scratchpad]] is ink only.
+# [[scratchpad:text]] adds a typed-answer tab and [[scratchpad:code <language>]]
+# a code editor tab (language defaults to python). The pad always keeps its ink
+# tab too. Only the author picks the mode; the student cannot switch it.
 SCRATCHPAD_MARKER = "[[scratchpad]]"
 MAX_SCRATCHPADS_PER_LESSON = 10
 _RULE = re.compile(r"^\s*(?:-{3,}|\*{3,}|_{3,})\s*$")
+# Same list as CODE_LANGUAGES in practicePads.ts.
+SCRATCHPAD_CODE_LANGUAGES = (
+    "python", "javascript", "typescript", "java", "cpp", "c", "csharp", "go",
+    "rust", "kotlin", "swift", "ruby", "php", "sql", "bash",
+)
+_MARKER = re.compile(r"^\[\[scratchpad(?::(text|code)(?:\s+([a-z0-9+#]+))?)?\]\]$", re.IGNORECASE)
+_MARKER_ATTEMPT = re.compile(r"^\[\[\s*scratch\s*pad\b", re.IGNORECASE)
+
+
+def scratchpad_mode(block: str) -> Optional[tuple[str, Optional[str]]]:
+    """(mode, language) for a valid marker block, else None.
+
+    mode is "draw", "text" or "code"; language is set only for code.
+    """
+    match = _MARKER.match(block.strip())
+    if not match:
+        return None
+    kind = (match.group(1) or "draw").lower()
+    if kind != "code":
+        return kind, None
+    language = (match.group(2) or "python").lower()
+    return ("code", language) if language in SCRATCHPAD_CODE_LANGUAGES else None
 
 
 def is_scratchpad_block(block: str) -> bool:
-    return block.strip().lower() == SCRATCHPAD_MARKER
+    return scratchpad_mode(block) is not None
 
 
 def _ends_walkthrough(block: str) -> bool:
@@ -108,7 +135,14 @@ def check_scratchpads(markdown: str) -> None:
                     "heading, horizontal rule or marker. The walkthrough stays hidden until the student "
                     "finishes or gives up."
                 )
-        elif SCRATCHPAD_MARKER in block.lower() and not block.lstrip().startswith("```"):
+        elif _MARKER_ATTEMPT.match(block.strip()) and "\n" not in block.strip():
+            raise ValueError(
+                f"Unknown scratch pad marker {block.strip()!r}. Use [[scratchpad]] (ink only), "
+                "[[scratchpad:text]] (typed answer) or [[scratchpad:code <language>]] with one of: "
+                + ", ".join(SCRATCHPAD_CODE_LANGUAGES)
+                + "."
+            )
+        elif "[[scratchpad" in block.lower() and not block.lstrip().startswith("```"):
             raise ValueError(
                 "[[scratchpad]] must sit on a line of its own with a blank line above and below it."
             )

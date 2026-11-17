@@ -1615,6 +1615,8 @@ export default function LearningModuleLesson() {
                   paperStyle={paperStyle}
                   onPaperStyleChange={changePaperStyle}
                   walkthrough={pad.walkthroughBlocks.map(renderLessonBlock)}
+                  mode={pad.mode}
+                  language={pad.language}
                 />
               </div>
             );

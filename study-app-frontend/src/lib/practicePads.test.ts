@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { splitLessonBlocks } from "../pages/LearningModuleLesson";
-import { isScratchpadBlock, practiceLayout } from "./practicePads";
+import { isScratchpadBlock, practiceLayout, scratchpadMode } from "./practicePads";
 
 const LESSON = [
   "## Worked example 1 (full)",
@@ -71,5 +71,20 @@ describe("practiceLayout", () => {
   it("only matches a marker that is the whole block", () => {
     expect(isScratchpadBlock("  [[scratchpad]] ")).toBe(true);
     expect(isScratchpadBlock("Try [[scratchpad]] here")).toBe(false);
+  });
+
+  it("reads the answer mode from the marker", () => {
+    expect(scratchpadMode("[[scratchpad]]")).toEqual({ mode: "draw", language: null });
+    expect(scratchpadMode("[[Scratchpad:Text]]")).toEqual({ mode: "text", language: null });
+    expect(scratchpadMode("[[scratchpad:code]]")).toEqual({ mode: "code", language: "python" });
+    expect(scratchpadMode("[[scratchpad:code cpp]]")).toEqual({ mode: "code", language: "cpp" });
+    expect(scratchpadMode("[[scratchpad:code cobol]]")).toBeNull();
+    expect(scratchpadMode("[[scratchpad:video]]")).toBeNull();
+    const lesson = ["Explain it.", "", "[[scratchpad:text]]", "", "Because.", "", "---", "", "Code it.", "", "[[scratchpad:code go]]", "", "Done."].join(String.fromCharCode(10));
+    const { pads } = practiceLayout(splitLessonBlocks(lesson));
+    expect(pads.map((p) => [p.mode, p.language, p.problemText])).toEqual([
+      ["text", null, "Explain it."],
+      ["code", "go", "Code it."],
+    ]);
   });
 });

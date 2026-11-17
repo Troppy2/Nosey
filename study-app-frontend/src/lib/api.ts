@@ -1131,7 +1131,7 @@ export async function fetchModulePractice(moduleId: number): Promise<{ module_id
 export async function saveModulePractice(
   moduleId: number,
   index: number,
-  body: { strokes?: string; status?: "done" | "gave_up" },
+  body: { strokes?: string; typed?: string; status?: "done" | "gave_up" },
 ): Promise<PracticeItemState> {
   return request<PracticeItemState>(`/learning-modules/${moduleId}/practice/${index}`, {
     method: "PUT",

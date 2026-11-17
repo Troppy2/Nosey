@@ -188,7 +188,7 @@ async def test_practice_pads_gate_the_quiz(client, call, seeded) -> None:  # noq
     await client.put(f"/learning-modules/{module_id}/practice/0", json={"strokes": TAP})
     assert (await client.put(f"/learning-modules/{module_id}/practice/0", json={"status": "done"})).status_code == 400
     done = await client.put(f"/learning-modules/{module_id}/practice/0", json={"strokes": INK, "status": "done"})
-    assert done.json() == {"status": "done", "strokes": INK}
+    assert done.json() == {"status": "done", "strokes": INK, "typed": None}
 
     # Giving up needs no ink, and is final: it cannot be turned into a solve.
     gave_up = await client.put(f"/learning-modules/{module_id}/practice/1", json={"status": "gave_up"})
@@ -205,6 +205,7 @@ async def test_practice_pads_gate_the_quiz(client, call, seeded) -> None:  # noq
 
     module = await call("get_learning_module", {"module_id": module_id})
     assert module["practice"] == ["done", "gave_up"]
+    assert module["practice_typed"] == [None, None]
     tracks = await call("list_learning_tracks", {"folder_id": seeded["folder_id"]})
     assert tracks["tracks"][0]["modules"][0]["practice"] == {"total": 2, "done": 1, "gave_up": 1}
 
@@ -218,6 +219,56 @@ async def test_misplaced_scratchpad_is_rejected(call, seeded) -> None:  # noqa: 
         "P1?\n\n[[scratchpad]]\n\nStep.\n\nP2?\n\n[[scratchpad]]\n\nStep.": "horizontal rule (---) or a heading",
     }
     for lesson, message in cases.items():
+        err = await call(
+            "create_learning_track",
+            {"folder_id": seeded["folder_id"], "modules": [_module("x", lesson_markdown=lesson)]},
+            expect_error=True,
+        )
+        assert message in err["error"], err
+
+
+TYPED_LESSON = (
+    "## Explain it\n\nWhy does binary search need a sorted array?\n\n[[scratchpad:text]]\n\n"
+    "Because each step discards half.\n\n---\n\n## Code it\n\nWrite two_sum(nums, target).\n\n"
+    "[[scratchpad:code python]]\n\n```python\ndef two_sum(nums, target): ...\n```"
+)
+
+
+async def test_typed_and_code_pads_accept_typed_work(client, call, seeded) -> None:  # noqa: F811
+    made = await call(
+        "create_learning_track",
+        {"folder_id": seeded["folder_id"], "modules": [_module("T", lesson_markdown=TYPED_LESSON)]},
+    )
+    module_id = made["modules"][0]["module_id"]
+    track = (await client.get(f"/folders/{seeded['folder_id']}/learning-track")).json()
+    assert track["modules"][0]["practice_total"] == 2
+
+    # Too short to count as work.
+    short = await client.put(f"/learning-modules/{module_id}/practice/0", json={"typed": " ok ", "status": "done"})
+    assert short.status_code == 400
+    done = await client.put(
+        f"/learning-modules/{module_id}/practice/0",
+        json={"typed": "It halves the range each step.", "status": "done"},
+    )
+    assert done.json() == {"status": "done", "strokes": None, "typed": "It halves the range each step."}
+
+    code = "def two_sum(nums, target):\n    seen = {}\n"
+    await client.put(f"/learning-modules/{module_id}/practice/1", json={"typed": code})
+    # Saving ink later keeps the typed code.
+    saved = await client.put(f"/learning-modules/{module_id}/practice/1", json={"strokes": INK})
+    assert saved.json()["typed"] == code
+
+    module = await call("get_learning_module", {"module_id": module_id})
+    assert module["practice"] == ["done", "open"]
+    assert module["practice_typed"] == ["It halves the range each step.", code]
+
+
+async def test_unknown_scratchpad_mode_is_rejected(call, seeded) -> None:  # noqa: F811
+    for lesson, message in {
+        "Problem?\n\n[[scratchpad:video]]\n\nStep.": "Unknown scratch pad marker",
+        "Problem?\n\n[[scratchpad:code cobol]]\n\nStep.": "Unknown scratch pad marker",
+        "Problem? [[scratchpad:text]]\n\nStep.": "line of its own",
+    }.items():
         err = await call(
             "create_learning_track",
             {"folder_id": seeded["folder_id"], "modules": [_module("x", lesson_markdown=lesson)]},

@@ -43,7 +43,7 @@ from src.schemas.learning_module_schema import (
 from src.services.practice_progress import (
     DONE,
     RESOLVED,
-    has_ink,
+    has_work,
     practice_progress,
     summary as practice_summary,
     unresolved as practice_unresolved,
@@ -1034,9 +1034,9 @@ async def save_module_practice(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> PracticeItemState:
-    """Save a scratch pad's ink and/or resolve it as done or given up.
+    """Save a scratch pad's ink / typed answer and/or resolve it as done or given up.
 
-    done needs real ink (server-side twin of the pad's empty check); gave_up
+    done needs real ink or a typed answer (server-side twin of the pad's empty check); gave_up
     does not. Both are final: a resolved pad keeps its status, so revealing the
     walkthrough by giving up can never be turned into a solve afterwards.
     """
@@ -1048,8 +1048,10 @@ async def save_module_practice(
         item = progress[index]
         if data.strokes is not None:
             item["strokes"] = data.strokes
+        if data.typed is not None:
+            item["typed"] = data.typed
         if data.status is not None and item["status"] not in RESOLVED:
-            if data.status == DONE and not has_ink(item["strokes"]):
+            if data.status == DONE and not has_work(item):
                 raise StudyAppException("Work the problem on the scratch pad first, or give up to see the walkthrough.")
             item["status"] = data.status
         module.practice_progress = json.dumps(progress)

@@ -28,7 +28,12 @@ from src.services.mcp_tool_base import McpContext, McpTool, ToolArgs, ToolInputE
 from src.services.narration_service import schedule_lesson_narration
 from src.services.mcp_write_tools import CONFIRM_FIELD, CREATED_VIA, require_confirm, screen
 from src.utils.exceptions import ResourceNotFoundException
-from src.utils.lesson_blocks import check_scratchpads, normalize_tts_script, split_lesson_blocks
+from src.utils.lesson_blocks import (
+    SCRATCHPAD_CODE_LANGUAGES,
+    check_scratchpads,
+    normalize_tts_script,
+    split_lesson_blocks,
+)
 
 ARTICLE = "article"
 MAX_MODULES_PER_TRACK = 20
@@ -50,7 +55,15 @@ LESSON_DESCRIPTION = (
     "section's heading or --- down to the marker. For a multi-part problem, write the setup and all its parts "
     "((a), (b), (c)) before ONE marker, then walk through every part. Separate consecutive practice problems "
     "with --- or a heading. At most 10 markers per lesson. With narration, the marker line is a "
-    "paragraph of its own and needs its own entry (e.g. \"Pause here and try this one on the scratch pad.\")."
+    "paragraph of its own and needs its own entry (e.g. \"Pause here and try this one on the scratch pad.\"). "
+    "ANSWER MODE: plain [[scratchpad]] is a pen-and-paper pad (ink only), right for maths and diagrams. "
+    "ONLY when the user asks for typed or coding practice, use [[scratchpad:text]] (adds a Type tab with a text "
+    "box, for written explanations, proofs in words, short essays) or [[scratchpad:code <language>]] (adds a "
+    "code editor tab, e.g. [[scratchpad:code python]]; languages: "
+    + ", ".join(SCRATCHPAD_CODE_LANGUAGES)
+    + "; python if omitted). The pad opens on that tab and still has its ink tab; the student cannot change "
+    "the mode. The walkthrough rules are the same: for code, the walkthrough is the solution explained step "
+    "by step with fenced code blocks in that language."
 )
 
 

@@ -51,3 +51,16 @@ def test_scratchpad_markers_count_as_their_own_block() -> None:
     # The fenced one is code, not a marker.
     assert count_scratchpads(lesson) == 1
     assert count_scratchpads(None) == 0
+
+
+def test_scratchpad_modes() -> None:
+    from src.utils.lesson_blocks import count_scratchpads, scratchpad_mode
+
+    assert scratchpad_mode("[[scratchpad]]") == ("draw", None)
+    assert scratchpad_mode(" [[Scratchpad:Text]] ") == ("text", None)
+    assert scratchpad_mode("[[scratchpad:code]]") == ("code", "python")
+    assert scratchpad_mode("[[scratchpad:code cpp]]") == ("code", "cpp")
+    assert scratchpad_mode("[[scratchpad:code cobol]]") is None
+    assert scratchpad_mode("[[scratchpad:video]]") is None
+    lesson = "A?\n\n[[scratchpad:text]]\n\nS.\n\n---\n\nB?\n\n[[scratchpad:code go]]\n\nS."
+    assert count_scratchpads(lesson) == 2

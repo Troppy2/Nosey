@@ -13,8 +13,28 @@ export const SCRATCHPAD_MARKER = "[[scratchpad]]";
 const HEADING = /^\s*#{1,6}\s/;
 const RULE = /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/;
 
+// The marker picks how the student answers: [[scratchpad]] is ink only,
+// [[scratchpad:text]] adds a typed-answer tab, [[scratchpad:code <language>]]
+// a code editor tab. Same list and pattern as SCRATCHPAD_CODE_LANGUAGES /
+// _MARKER in lesson_blocks.py.
+export const CODE_LANGUAGES = [
+  "python", "javascript", "typescript", "java", "cpp", "c", "csharp", "go",
+  "rust", "kotlin", "swift", "ruby", "php", "sql", "bash",
+] as const;
+export type PadMode = "draw" | "text" | "code";
+const MARKER = /^\[\[scratchpad(?::(text|code)(?:\s+([a-z0-9+#]+))?)?\]\]$/i;
+
+export function scratchpadMode(block: string): { mode: PadMode; language: string | null } | null {
+  const match = MARKER.exec(block.trim());
+  if (!match) return null;
+  const kind = (match[1] ?? "draw").toLowerCase() as PadMode;
+  if (kind !== "code") return { mode: kind, language: null };
+  const language = (match[2] ?? "python").toLowerCase();
+  return (CODE_LANGUAGES as readonly string[]).includes(language) ? { mode: "code", language } : null;
+}
+
 export function isScratchpadBlock(block: string): boolean {
-  return block.trim().toLowerCase() === SCRATCHPAD_MARKER;
+  return scratchpadMode(block) !== null;
 }
 
 function endsWalkthrough(block: string): boolean {
@@ -32,6 +52,10 @@ export type PracticePad = {
   // paragraph.
   problemText: string;
   walkthroughBlocks: number[];
+  // How the student answers (set by the author's marker).
+  mode: PadMode;
+  // Code language for mode "code", else null.
+  language: string | null;
 };
 
 // Lines of a block that are not headings. A heading written with no blank
@@ -73,12 +97,15 @@ export function practiceLayout(blocks: string[]): PracticeLayout {
   const walkthroughOf = blocks.map(() => -1);
   const padAt = blocks.map(() => -1);
   blocks.forEach((block, i) => {
-    if (!isScratchpadBlock(block)) return;
+    const marker = scratchpadMode(block);
+    if (!marker) return;
     const pad: PracticePad = {
       index: pads.length,
       markerBlock: i,
       problemText: problemTextFor(blocks, i, walkthroughOf),
       walkthroughBlocks: [],
+      mode: marker.mode,
+      language: marker.language,
     };
     for (let j = i + 1; j < blocks.length && !endsWalkthrough(blocks[j]); j++) {
       pad.walkthroughBlocks.push(j);

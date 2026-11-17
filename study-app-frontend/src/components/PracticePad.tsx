@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { CheckCircleIcon, ChevronDownIcon, ChevronRightIcon, CrossCircleIcon, PencilIcon } from "../icons";
 import { saveModulePractice } from "../lib/api";
+import type { PadMode } from "../lib/practicePads";
 import type { PracticeItemState } from "../lib/types";
 import { Button } from "./Button";
 import { FormError } from "./FormError";
@@ -13,6 +14,7 @@ import {
   type PaperStyle,
   type ScratchPadData,
 } from "./ScratchPad";
+import { languageName } from "./PracticeTypePanel";
 import "../styles/components/practice-pad.css";
 
 // Ink autosaves this long after the last stroke, and again when the pad closes.
@@ -29,7 +31,17 @@ type PracticePadProps = {
   onPaperStyleChange: (style: PaperStyle) => void;
   // The walkthrough blocks, already rendered. Not mounted until unlocked.
   walkthrough: ReactNode;
+  // Set by the lesson's marker: "draw" is ink only; "text" / "code" add a
+  // typed tab to the pad (the ink tab stays).
+  mode?: PadMode;
+  language?: string | null;
 };
+
+// A typed answer shorter than this (trimmed) is not work. Same as
+// MIN_TYPED_CHARS in services/practice_progress.py.
+const MIN_TYPED_CHARS = 3;
+
+type PendingSave = { strokes?: string; typed?: string };
 
 type PracticeQuizGateProps = {
   pads: { index: number; status: PracticeItemState["status"] }[];
@@ -109,7 +121,10 @@ export function PracticePad({
   paperStyle,
   onPaperStyleChange,
   walkthrough,
+  mode = "draw",
+  language = null,
 }: PracticePadProps) {
+  const typedMode = mode === "draw" ? null : mode;
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,17 +149,31 @@ export function PracticePad({
     setData(parseScratchPadJson(state.strokes));
   }, [state.strokes]);
 
-  const hasWork = !isScratchPadEmpty(data);
+  // Typed answer, same echo guard as the ink: only adopt the server's copy
+  // when it is not what this pad last produced.
+  const [typed, setTyped] = useState<string>(state.typed ?? "");
+  const producedTypedRef = useRef<string | null>(state.typed ?? null);
+  useEffect(() => {
+    const incoming = state.typed ?? null;
+    if (incoming === producedTypedRef.current) return;
+    producedTypedRef.current = incoming;
+    setTyped(incoming ?? "");
+  }, [state.typed]);
+
+  const hasInk = !isScratchPadEmpty(data);
+  const hasTyped = typed.trim().length >= MIN_TYPED_CHARS;
+  const hasWork = hasInk || hasTyped;
   // A cropped picture of the work under the card, so solved pads show it.
   // Built only while the pad is closed: no offscreen render per stroke. The
   // export returns bare base64 (it feeds OCR), so add the data URL prefix.
   const preview = useMemo(() => {
-    const png = !open && hasWork ? exportScratchPadPng(data, { faithful: true }) : null;
+    const png = !open && hasInk ? exportScratchPadPng(data, { faithful: true }) : null;
     return png ? `data:image/png;base64,${png}` : null;
-  }, [data, hasWork, open]);
+  }, [data, hasInk, open]);
 
-  // Unsaved ink, flushed by the debounce, on close, on resolve and on unmount.
-  const pendingRef = useRef<string | null>(null);
+  // Unsaved ink / typing, flushed by the debounce, on close, on resolve and
+  // on unmount. Only the fields that changed are sent.
+  const pendingRef = useRef<PendingSave | null>(null);
   const timerRef = useRef<number | null>(null);
 
   async function flush(): Promise<boolean> {
@@ -152,14 +181,15 @@ export function PracticePad({
       window.clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    const strokes = pendingRef.current;
-    if (strokes == null) return true;
+    const pending = pendingRef.current;
+    if (pending == null) return true;
     pendingRef.current = null;
     try {
-      await saveModulePractice(moduleId, index, { strokes });
+      await saveModulePractice(moduleId, index, pending);
       return true;
     } catch (err) {
-      pendingRef.current = strokes;
+      // Keep it for the next try, under anything newer queued meanwhile.
+      pendingRef.current = { ...pending, ...(pendingRef.current ?? {}) };
       setError(err instanceof Error ? err.message : "Couldn't save your work.");
       return false;
     }
@@ -169,11 +199,17 @@ export function PracticePad({
     () => () => {
       // Leaving the page: send what is left without waiting on it.
       if (timerRef.current != null) window.clearTimeout(timerRef.current);
-      const strokes = pendingRef.current;
-      if (strokes != null) void saveModulePractice(moduleId, index, { strokes }).catch(() => undefined);
+      const pending = pendingRef.current;
+      if (pending != null) void saveModulePractice(moduleId, index, pending).catch(() => undefined);
     },
     [moduleId, index],
   );
+
+  function queueSave(change: PendingSave) {
+    pendingRef.current = { ...pendingRef.current, ...change };
+    if (timerRef.current != null) window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => void flush(), SAVE_DEBOUNCE_MS);
+  }
 
   // Ink stays in this component (and the autosave). The lesson page is not
   // told per stroke: that re-rendered every KaTeX block on the page while the
@@ -182,22 +218,27 @@ export function PracticePad({
     setData(next);
     const strokes = JSON.stringify(next);
     producedJsonRef.current = strokes;
-    pendingRef.current = strokes;
-    if (timerRef.current != null) window.clearTimeout(timerRef.current);
-    timerRef.current = window.setTimeout(() => void flush(), SAVE_DEBOUNCE_MS);
+    queueSave({ strokes });
+  }
+
+  function handleTyped(next: string) {
+    setTyped(next);
+    producedTypedRef.current = next;
+    queueSave({ typed: next });
   }
 
   async function resolve(status: "done" | "gave_up") {
     setBusy(true);
     setError(null);
     try {
-      const strokes = pendingRef.current ?? undefined;
+      const pending = pendingRef.current ?? {};
       if (timerRef.current != null) window.clearTimeout(timerRef.current);
       timerRef.current = null;
       pendingRef.current = null;
-      const saved = await saveModulePractice(moduleId, index, { strokes, status });
-      // The saved ink is what this pad already shows; keep the live object.
+      const saved = await saveModulePractice(moduleId, index, { ...pending, status });
+      // The saved work is what this pad already shows; keep the live objects.
       producedJsonRef.current = saved.strokes;
+      producedTypedRef.current = saved.typed ?? null;
       onState(saved);
       setOpen(false);
       setWalkOpen(true);
@@ -224,6 +265,17 @@ export function PracticePad({
             </span>
           ) : null}
         </div>
+
+        {typedMode && hasTyped && !open ? (
+          <button
+            type="button"
+            className="practice-pad-typed"
+            onClick={() => setOpen(true)}
+            aria-label={typedMode === "code" ? "Open your code" : "Open your answer"}
+          >
+            {typedMode === "code" ? <pre>{typed.trimEnd()}</pre> : <p>{typed.trim()}</p>}
+          </button>
+        ) : null}
 
         {preview ? (
           <button type="button" className="practice-pad-preview" onClick={() => setOpen(true)} aria-label="Open your scratch work">
@@ -265,7 +317,13 @@ export function PracticePad({
           ) : null}
         </div>
         {!resolved && !hasWork ? (
-          <p className="small muted practice-pad-hint">Write your work on the pad, then press I'm done to see the walkthrough.</p>
+          <p className="small muted practice-pad-hint">
+            {typedMode === "code"
+              ? `Write your ${languageName(language ?? "python")} solution on the pad, then press I'm done to see the walkthrough.`
+              : typedMode === "text"
+                ? "Type your answer on the pad, then press I'm done to see the walkthrough."
+                : "Write your work on the pad, then press I'm done to see the walkthrough."}
+          </p>
         ) : null}
         <FormError message={error} />
       </div>
@@ -293,6 +351,7 @@ export function PracticePad({
               onChange={handleInk}
               paperStyle={paperStyle}
               onPaperStyleChange={onPaperStyleChange}
+              typing={typedMode ? { mode: typedMode, language, value: typed, onChange: handleTyped } : undefined}
               onClose={() => {
                 setOpen(false);
                 void flush();

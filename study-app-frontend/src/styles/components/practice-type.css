@@ -1,0 +1,141 @@
+/* Typed side of a lesson practice pad ([[scratchpad:text]] / [[scratchpad:code]]):
+   the Type | Draw switch in the scratch pad modal and the text box or code
+   editor that fills the canvas area. */
+
+.scratchpad-mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  flex-shrink: 0;
+}
+
+.scratchpad-mode-switch {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-pill);
+  background: var(--white);
+}
+
+.scratchpad-mode-switch button {
+  min-height: 32px;
+  padding: 0.25rem 0.9rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.scratchpad-mode-switch button:hover {
+  color: var(--ink);
+}
+
+.scratchpad-mode-switch button.is-active {
+  background: var(--green-dark);
+  color: var(--white);
+  font-weight: 600;
+}
+
+.scratchpad-mode-switch button:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.scratchpad-type-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 180px;
+  gap: var(--space-1);
+}
+
+/* Same weight as the .field label the text box gets. */
+.scratchpad-type-panel.is-code > .field-label {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.scratchpad-type-panel .field {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.scratchpad-type-panel .textarea {
+  flex: 1;
+  min-height: 160px;
+  resize: none;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.scratchpad-type-editor {
+  position: relative;
+  flex: 1;
+  min-height: 180px;
+  overflow: hidden;
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-lg);
+  background: var(--white);
+}
+
+.scratchpad-type-editor-fill {
+  position: absolute;
+  inset: 0;
+}
+
+.scratchpad-type-editor .inline-loading {
+  margin: var(--space-3);
+}
+
+/* Typed work shown on the closed practice card. */
+.practice-pad-typed {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  color: var(--ink);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.practice-pad-typed:hover {
+  border-color: var(--green-light-mid);
+}
+
+.practice-pad-typed pre,
+.practice-pad-typed p {
+  margin: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 7;
+  overflow: hidden;
+}
+
+.practice-pad-typed pre {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.practice-pad-typed p {
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
