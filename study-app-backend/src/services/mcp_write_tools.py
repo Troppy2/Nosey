@@ -615,7 +615,16 @@ async def archive_folder(ctx: McpContext, args: ArchiveFolderArgs) -> dict[str, 
 class GradeIn(ToolArgs):
     question_id: int = Field(description="question_id from get_attempt_result.")
     is_correct: bool
-    feedback: str = Field(min_length=1, max_length=MAX_TEXT_CHARS, description="Feedback shown to the user.")
+    feedback: str = Field(
+        min_length=1,
+        max_length=MAX_TEXT_CHARS,
+        description=(
+            "Feedback shown to the user. For a WRONG answer, start with '**What to fix:** ' and keep that "
+            "section as one block with no blank lines (bullets are fine): while the answer can still be "
+            "remade, Results shows only that block and hides everything after the first blank line. "
+            "Explain why it is wrong and give hints there, not the full solution."
+        ),
+    )
     reasoning: Optional[str] = Field(default=None, max_length=MAX_TEXT_CHARS)
 
 
@@ -703,7 +712,9 @@ WRITE_TOOLS: tuple[McpTool, ...] = (
         "Overwrite Nosey's grade and feedback on answers in a submitted attempt with your own, e.g. "
         "to grade by the user's rubric. Read the answers with get_attempt_result(wrong_only=false) "
         "first. Only listed questions change; the attempt score and the user's stats are recomputed "
-        "and Results marks those answers as regraded.",
+        "and Results marks those answers as regraded. Wrong answers can be remade for half credit, so "
+        "until the user remakes or reveals one, Results shows only its '**What to fix:**' block (see "
+        "feedback); feedback without that block shows as empty.",
         RegradeAttemptArgs,
         regrade_attempt,
     ),
