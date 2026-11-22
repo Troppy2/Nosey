@@ -200,3 +200,131 @@ body:has(.walk-overlay) .dropdown-panel { z-index: 1300; min-width: 220px; }
 .walk-overlay--pip .walk-body { grid-template-columns: 1fr; grid-template-rows: 1fr; }
 .walk-overlay--pip .walk-head { padding: 8px 12px; }
 .walk-overlay--pip .walk-chapters { display: none; }
+
+/* Lecture controls use the app's touch and semantic state conventions. */
+.walk-overlay--lecture .walk-close,
+.walk-overlay--lecture .walk-btn,
+.walk-overlay--lecture .walk-chip,
+.walk-overlay--lecture .walk-select {
+  min-width: 44px;
+  min-height: 44px;
+  height: auto;
+}
+.walk-overlay--lecture .walk-close {
+  align-items: center;
+  justify-content: center;
+}
+.walk-overlay--lecture .walk-head {
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.walk-overlay--lecture .walk-head-title {
+  min-width: 0;
+  flex: 1;
+}
+.walk-overlay--lecture .walk-head-title strong {
+  overflow-wrap: anywhere;
+}
+.walk-overlay--lecture .walk-head > .walk-close {
+  margin-left: auto;
+}
+.walk-overlay--lecture .walk-bar {
+  flex-wrap: wrap;
+}
+.walk-overlay--lecture .walk-chapters {
+  min-width: 0;
+}
+.walk-overlay--lecture .walk-btn:focus-visible,
+.walk-overlay--lecture .walk-chip:focus-visible,
+.walk-overlay--lecture .walk-close:focus-visible {
+  outline: 2px solid var(--green-light);
+  outline-offset: 2px;
+}
+.walk-overlay--lecture .walk-verdict {
+  text-transform: none;
+}
+.walk-overlay--lecture .walk-approach--optimal .walk-verdict {
+  background: var(--accent-positive-tint);
+  color: var(--accent-positive-strong);
+}
+.walk-overlay--lecture .walk-approach--too-slow .walk-verdict,
+.walk-overlay--lecture .walk-approach--fails .walk-verdict {
+  background: var(--accent-danger-tint);
+  color: var(--accent-danger-strong);
+}
+.walk-lecture-practice {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 45%;
+}
+.walk-lecture-practice .button {
+  min-height: 44px;
+  white-space: normal;
+  font-size: var(--text-sm);
+}
+.walk-practice-error {
+  color: var(--accent-danger-strong);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+@media (max-width: 760px) {
+  .walk-overlay--lecture .walk-head-title {
+    flex-basis: calc(100% - 60px);
+  }
+  .walk-lecture-practice {
+    order: 3;
+    max-width: 100%;
+  }
+  .walk-overlay--lecture .walk-body,
+  .walk-overlay--lecture .walk-video {
+    min-height: 0;
+  }
+  .walk-overlay--lecture .walk-controls {
+    max-height: 42dvh;
+    overflow-y: auto;
+  }
+}
+
+.walk-overlay--lecture .walk-shell,
+.walk-overlay--lecture .walk-screen,
+.walk-overlay--lecture .walk-chip,
+.walk-overlay--lecture .walk-btn,
+.walk-overlay--lecture .walk-close,
+.walk-overlay--lecture .walk-select,
+.walk-overlay--lecture .button {
+  border-radius: var(--radius-md);
+}
+.walk-overlay--lecture .walk-head,
+.walk-overlay--lecture .walk-shell--loading,
+.walk-overlay--lecture .walk-lecture-practice .button-secondary {
+  background: var(--green-lightest);
+}
+.walk-overlay--lecture .walk-head .walk-chip,
+.walk-overlay--lecture .walk-lecture-practice .button-secondary {
+  border: 1px solid var(--green-dark-mid);
+  color: var(--green-dark);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+}
+.walk-overlay--lecture .walk-close:focus-visible,
+.walk-overlay--lecture .walk-head .walk-chip:focus-visible {
+  outline-color: var(--green-dark);
+}
+.walk-overlay--lecture .walk-scrub {
+  height: 44px;
+  min-height: 44px;
+}
+.walk-overlay--lecture .walk-tick {
+  top: 20px;
+}
+body:has(.lc-lectures-shell) .dropdown-panel {
+  background: var(--green-lightest);
+  border-radius: var(--radius-md);
+}
+.lc-lectures-shell .lc-rail-item {
+  border-radius: var(--radius-md);
+}
+body:has(.lc-lectures-shell) .dropdown-option {
+  border-radius: var(--radius-md);
+}

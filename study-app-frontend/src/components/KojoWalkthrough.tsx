@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { createPortal } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { CloseIcon, PlayIcon, RetryIcon, SpeakerIcon } from "../icons";
-import { fetchLecture, fetchSolutionWalkthrough, recordLectureAudio, recordWalkthroughAudio } from "../lib/api";
+import { fetchLecture, fetchSolutionWalkthrough, recordLectureAudio, recordWalkthroughAudio, scopeKey } from "../lib/api";
 import type { LectureResponse, SolutionWalkthrough, WalkFrame, WalkInk } from "../lib/types";
 import { VOICE_OPTIONS } from "../lib/voice";
 import {
@@ -19,6 +19,8 @@ import {
   type Timeline,
 } from "../lib/walkthroughTimeline";
 import { Dropdown } from "./Dropdown";
+import { Button } from "./Button";
+import { InlineLoading } from "./Loaders";
 import "../styles/components/kojo-walkthrough.css";
 
 // Kojo's NeetCode-style solution video for a KojoCode problem: reads and breaks the
@@ -30,7 +32,7 @@ import "../styles/components/kojo-walkthrough.css";
 const VOICE_KEY = "nosey_walkthrough_voice";
 const SPEEDS = ["0.75", "1", "1.25", "1.5", "2"] as const;
 type Speed = (typeof SPEEDS)[number];
-const VOICE_CHOICES = [{ value: "browser", label: "Browser voice (instant)" }, ...VOICE_OPTIONS.map((v) => ({ value: v.value, label: `AI: ${v.label}` }))];
+const VOICE_CHOICES = [{ value: "browser", label: "Browser voice (instant)" }, ...VOICE_OPTIONS.map((v) => ({ value: v.value, label: `Kojo: ${v.label}` }))];
 type VoiceChoice = string;
 const INK: Record<WalkInk, string> = { ink: "var(--walk-ink)", red: "#d6453d", blue: "#2f6fd6", green: "#2f9a55" };
 // Speech that has not started this long after a segment opens no longer holds the video.
@@ -216,20 +218,15 @@ function usePopOutHost(windowTitle: string) {
 function LoadingShell({ error, message, onRetry, onClose }: { error: string | null; message: string; onRetry: () => void; onClose: () => void }) {
   return (
     <div className="walk-shell walk-shell--loading">
-      <button type="button" className="walk-close" onClick={onClose} aria-label="Close">
-        <CloseIcon size={18} />
-      </button>
+      <Button variant="ghost" className="walk-close" onClick={onClose} aria-label="Close video" icon={<CloseIcon size={18} />} />
       {error ? (
         <div className="walk-loading">
-          <p>{error}</p>
-          <button type="button" className="button button-primary" onClick={onRetry}>
-            <RetryIcon size={15} /> Try again
-          </button>
+          <p role="alert">{error}</p>
+          <Button onClick={onRetry} icon={<RetryIcon size={15} />}>Try again</Button>
         </div>
       ) : (
         <div className="walk-loading">
-          <Loader2 size={22} className="spin" />
-          <p>{message}</p>
+          <InlineLoading label={message} />
         </div>
       )}
     </div>
@@ -286,15 +283,65 @@ export function KojoWalkthrough({ slug, problemTitle, statement, statementText, 
 }
 
 /** A Kojo pattern lecture (theory, spot it, template, worked problem). */
-export function KojoLecture({ slug, onClose, onTryProblem }: { slug: string; onClose: () => void; onTryProblem?: (problemSlug: string) => void }) {
+export function KojoLecture({ slug, onClose, onTryProblem }: { slug: string; onClose: () => void; onTryProblem?: (problemSlug: string) => boolean | void }) {
   const [data, setData] = useState<LectureResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [problemError, setProblemError] = useState<string | null>(null);
   const { host, pip, popOut, popIn } = usePopOutHost(data?.title ?? "Lecture");
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+
+  useEffect(() => {
+    if (pip) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const background = Array.from(document.body.children)
+      .filter((element): element is HTMLElement => element instanceof HTMLElement && element !== host)
+      .map((element) => ({ element, inert: element.inert }));
+    background.forEach(({ element }) => { element.inert = true; });
+    const focusable = () => Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), [tabindex="0"]',
+    ) ?? []).filter((element) => element.getClientRects().length > 0);
+    dialogRef.current?.querySelector<HTMLButtonElement>(".walk-close")?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (document.querySelector(".dropdown-panel")) return;
+      if (event.key === "Escape" && !document.fullscreenElement) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeRef.current();
+      }
+      if (event.key !== "Tab") return;
+      const controls = focusable();
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      const outside = !dialogRef.current?.contains(document.activeElement);
+      if (event.shiftKey && (document.activeElement === first || outside)) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || outside)) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("keydown", onKey, true);
+      background.forEach(({ element, inert }) => { element.inert = inert; });
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+    };
+  }, [host, pip]);
+
+  useEffect(() => {
+    if (!pip && !dialogRef.current?.contains(document.activeElement)) {
+      dialogRef.current?.querySelector<HTMLButtonElement>(".walk-close")?.focus();
+    }
+  }, [data, pip]);
 
   useEffect(() => {
     let cancelled = false;
     setError(null);
+    setData(null);
     fetchLecture(slug)
       .then((res) => !cancelled && setData(res))
       .catch((e: unknown) => !cancelled && setError(e instanceof Error ? e.message : "Kojo couldn't load the lecture."));
@@ -310,7 +357,7 @@ export function KojoLecture({ slug, onClose, onTryProblem }: { slug: string; onC
   const record = useCallback<Recorder>((voice, lines) => recordLectureAudio(slug, voice, lines), [slug]);
 
   return createPortal(
-    <div className={`walk-overlay${pip ? " walk-overlay--pip" : ""}`} role="dialog" aria-modal={!pip} aria-label={`Kojo's lecture on ${data?.title ?? "a pattern"}`}>
+    <div ref={dialogRef} className={`walk-overlay walk-overlay--lecture${pip ? " walk-overlay--pip" : ""}`} role="dialog" aria-modal={!pip} aria-label={`Kojo's lecture on ${data?.title ?? "a pattern"}`}>
       {data ? (
         <VideoPlayer
           audioKey={`lecture:${slug}`}
@@ -320,9 +367,16 @@ export function KojoLecture({ slug, onClose, onTryProblem }: { slug: string; onC
           record={record}
           headerAction={
             onTryProblem ? (
-              <button type="button" className="walk-chip" onClick={() => onTryProblem(data.problem_slug)} title={`Open ${data.problem_title} in KojoCode`}>
-                Try {data.problem_title}
-              </button>
+              <div className="walk-lecture-practice">
+                <Button variant="secondary" onClick={() => {
+                  if (onTryProblem(data.problem_slug) === false) {
+                    setProblemError("This worked problem isn't available in your library yet.");
+                  }
+                }} title={`Open ${data.problem_title} in KojoCode`}>
+                  Try {data.problem_title}
+                </Button>
+                {problemError ? <p className="walk-practice-error" role="alert">{problemError}</p> : null}
+              </div>
             ) : null
           }
           onClose={onClose}
@@ -379,8 +433,40 @@ function VideoPlayer({
   );
   const { segments, total, chapters } = useMemo(() => build(durations), [build, durations]);
   const shellRef = useRef<HTMLDivElement>(null);
-  const [t, setT] = useState(0);
-  const tRef = useRef(0);
+  const [resumeTime] = useState<number | null>(() => {
+    if (!audioKey.startsWith("lecture:")) return null;
+    try {
+      const value = sessionStorage.getItem(scopeKey("nosey_lecture_time_" + audioKey));
+      if (value === null) return null;
+      const saved = Number(value);
+      return Number.isFinite(saved) ? Math.max(0, saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const pendingResume = useRef(resumeTime);
+  const [t, setT] = useState(() => Math.min(resumeTime ?? 0, total));
+  const tRef = useRef(t);
+  useEffect(() => {
+    if (rec.status !== "ready" || pendingResume.current === null) return;
+    const restored = Math.min(pendingResume.current, total);
+    pendingResume.current = null;
+    tRef.current = restored;
+    setT(restored);
+  }, [rec.status, total]);
+  useEffect(() => {
+    if (!audioKey.startsWith("lecture:")) return;
+    const rememberTime = () => {
+      try {
+        sessionStorage.setItem(scopeKey("nosey_lecture_time_" + audioKey), String(pendingResume.current ?? tRef.current));
+      } catch { /* Playback works without session storage. */ }
+    };
+    window.addEventListener("pagehide", rememberTime);
+    return () => {
+      window.removeEventListener("pagehide", rememberTime);
+      rememberTime();
+    };
+  }, [audioKey]);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState<Speed>("1");
   const [muted, setMuted] = useState(false);
@@ -522,6 +608,7 @@ function VideoPlayer({
 
   const seek = useCallback(
     (to: number) => {
+      pendingResume.current = null;
       stopSpeech();
       const clamped = Math.min(Math.max(0, to), total);
       tRef.current = clamped;
@@ -575,6 +662,7 @@ function VideoPlayer({
       const e = raw instanceof KeyboardEvent ? raw : new KeyboardEvent("keydown", { key: String((raw as CustomEvent).detail) });
       const target = e.target as HTMLElement | null;
       if (target?.isContentEditable || target?.closest("input, textarea, [contenteditable], .cm-editor, .monaco-editor, [role='listbox'], [role='combobox']")) return;
+      if ((e.key === " " || e.key === "Enter") && target?.closest("button, [role='button']")) return;
       if (e.key === " " || e.key === "k") {
         e.preventDefault();
         togglePlay();
@@ -693,7 +781,7 @@ function VideoPlayer({
               <span className="walk-time">
                 {formatClock(t)} / {formatClock(total)}
               </span>
-              <div className="walk-chapters" role="tablist" aria-label="Chapters">
+              <div className="walk-chapters" role="group" aria-label="Chapters">
                 {chapters.map((name, c) => {
                   const start = chapterStart(segments, c);
                   if (start === null) return null;
@@ -701,8 +789,7 @@ function VideoPlayer({
                     <button
                       key={name}
                       type="button"
-                      role="tab"
-                      aria-selected={chapter === c}
+                      aria-pressed={chapter === c}
                       className={`walk-chip${chapter === c ? " is-on" : ""}`}
                       onClick={() => seek(start)}
                     >

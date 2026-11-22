@@ -1260,7 +1260,25 @@ function LeftRail({
   // vertical desktop rail never overflows, so this is a no-op there.
   const activeItemRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
-    activeItemRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    const item = activeItemRef.current;
+    const nav = item?.parentElement;
+    const rail = nav?.closest<HTMLElement>(".lc-rail");
+    if (!item || !nav || !rail) return;
+    const reveal = () => {
+      const scroller = nav.scrollWidth > nav.clientWidth ? nav : rail;
+      if (scroller.scrollWidth <= scroller.clientWidth) return;
+      const itemRect = item.getBoundingClientRect();
+      const rect = scroller.getBoundingClientRect();
+      if (itemRect.left < rect.left || itemRect.right > rect.right) {
+        scroller.scrollTo({ left: scroller.scrollLeft + itemRect.left - rect.left, behavior: "instant" });
+      }
+    };
+    reveal();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(reveal);
+    observer.observe(nav);
+    observer.observe(rail);
+    return () => observer.disconnect();
   }, [active]);
 
   return (
@@ -2164,8 +2182,12 @@ export default function LeetCodeMode() {
     interviewRealism,
     setInterviewRealism,
   } = useSettings();
-  const [initialLecture] = useState(() => new URLSearchParams(window.location.search).get("lecture"));
+  const [initialLecture, setInitialLecture] = useState(() => new URLSearchParams(window.location.search).get("lecture"));
   const [view, setView] = useState<View>(() => (initialLecture ? { type: "lectures" } : loadSavedView()));
+  const lectureOrigin = useRef(false);
+  useEffect(() => {
+    if (view.type !== "problem") lectureOrigin.current = false;
+  }, [view.type]);
   useEffect(() => saveView(view), [view]);
   const [customProblems, setCustomProblems] = useState<LCCustomProblem[]>(() => loadCustomProblems());
   const [customModalOpen, setCustomModalOpen] = useState(false);
@@ -5743,23 +5765,23 @@ export default function LeetCodeMode() {
 
   if (view.type === "lectures") {
     return (
-      <div className="lc-shell">
+      <div className="lc-shell lc-lectures-shell">
         <LeftRail active="lectures" streak={stats.currentStreak} onNavigate={setView} />
         <div className="page lc-page lc-shell-body lc-lectures-page">
-          <header className="lc-category-header">
-            <div className="lc-category-title-row">
-              <div>
-                <h1>Lectures</h1>
-                <p className="muted">Learn the patterns. Work through the problems.</p>
-              </div>
-            </div>
-          </header>
           <LectureLibrary
             categoryLabels={new Map(CATEGORIES.map((c) => [c.id, c.label]))}
             initialLecture={initialLecture}
             onTryProblem={(slug) => {
               const category = CATEGORIES.find((c) => c.problems.some((pr) => pr.slug === slug));
-              if (category) openProblem(category.id, slug);
+              const customProblem = allCustomProblemList.find((problem) => problem.slug === slug);
+              const categoryId = category?.id ?? customProblem?.categoryId;
+              if (!categoryId) {
+                return false;
+              }
+              lectureOrigin.current = true;
+              setInitialLecture(null);
+              openProblem(categoryId, slug);
+              return true;
             }}
           />
         </div>
@@ -6845,7 +6867,12 @@ export default function LeetCodeMode() {
       <div className="lc-editor-topbar">
         {/* The category breadcrumb names the technique, so interview realism swaps it for a
             plain route back to the dashboard. */}
-        {interviewRealism ? (
+        {lectureOrigin.current ? (
+          <button type="button" className="lc-back-btn" onClick={() => setView({ type: "lectures" })} aria-label="Back to lectures">
+            <ChevronLeftIcon size={16} />
+            <span className="lc-tb-label">Lectures</span>
+          </button>
+        ) : interviewRealism ? (
           <button type="button" className="lc-back-btn" onClick={() => setView({ type: "tree" })} aria-label="Back to KojoCode dashboard">
             <ChevronLeftIcon size={16} />
             <span className="lc-tb-label">Dashboard</span>

@@ -6,7 +6,7 @@ import { KojoLecture, KojoWalkthrough } from "./KojoWalkthrough";
 import { buildTimeline } from "../lib/walkthroughTimeline";
 
 vi.mock("../lib/api", () => ({
-  fetchLecture: vi.fn(), fetchSolutionWalkthrough: vi.fn(),
+  fetchLecture: vi.fn(), fetchSolutionWalkthrough: vi.fn(), scopeKey: (key: string) => key,
   recordLectureAudio: vi.fn(() => new Promise(() => {})),
   recordWalkthroughAudio: vi.fn(() => new Promise(() => {})),
 }));
@@ -23,6 +23,7 @@ function openWalk(content = walk) {
 }
 
 beforeEach(() => {
+  sessionStorage.clear();
   vi.clearAllMocks();
   Element.prototype.scrollIntoView = vi.fn();
   const storage = new Map<string, string>();
@@ -93,5 +94,72 @@ describe("long video narration", () => {
     openWalk();
     await screen.findByRole("button", { name: "Play video" });
     expect(recordWalkthroughAudio).not.toHaveBeenCalled();
+  });
+});
+
+const shortLecture: Lecture = {
+  title: "Prefix sums", summary: "Use running totals.",
+  theory: [{ point: "Subtract two totals.", say: "Subtract two totals to obtain the sum inside a range." }],
+  theory_frames: [], signals: [], template: [], problem_intro: [], frames: [], code: [],
+  time_complexity: "O(n)", space_complexity: "O(n)", complexity_say: "Linear time and space.",
+};
+
+function mockShortLecture() {
+  localStorage.setItem("nosey_walkthrough_voice", "browser");
+  vi.mocked(fetchLecture).mockResolvedValue({
+    slug: "prefix-sum", title: "Prefix sums", category: "arrays", summary: "Use running totals.",
+    problem_slug: "subarray-sum-equals-k", problem_title: "Subarray Sum Equals K", source: "curated", lecture: shortLecture,
+  });
+}
+
+describe("lecture dialog continuity", () => {
+  it("supports Escape and restores focus while a lecture is still loading", () => {
+    vi.mocked(fetchLecture).mockImplementation(() => new Promise(() => {}));
+    const trigger = document.createElement("button");
+    document.body.appendChild(trigger);
+    trigger.focus();
+    const close = vi.fn();
+    const view = render(<KojoLecture slug="prefix-sum" onClose={close} />);
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Close video");
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(close).toHaveBeenCalledOnce();
+    view.unmount();
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
+
+  it("contains keyboard focus and closes on Escape after a load failure", async () => {
+    const rectangles = vi.spyOn(HTMLElement.prototype, "getClientRects").mockReturnValue([{ width: 44, height: 44 }] as unknown as DOMRectList);
+    try {
+      vi.mocked(fetchLecture).mockRejectedValue(new Error("Lecture unavailable"));
+      const close = vi.fn();
+      render(<KojoLecture slug="prefix-sum" onClose={close} />);
+      const retry = await screen.findByRole("button", { name: "Try again" });
+      retry.focus();
+      fireEvent.keyDown(document, { key: "Tab" });
+      expect(document.activeElement?.getAttribute("aria-label")).toBe("Close video");
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(close).toHaveBeenCalledOnce();
+    } finally {
+      rectangles.mockRestore();
+    }
+  });
+
+  it("restores a lecture's playback position after returning from practice", async () => {
+    mockShortLecture();
+    const first = render(<KojoLecture slug="prefix-sum" onClose={() => {}} />);
+    fireEvent.change(await screen.findByRole("slider", { name: "Seek" }), { target: { value: "5" } });
+    first.unmount();
+    render(<KojoLecture slug="prefix-sum" onClose={() => {}} />);
+    expect((await screen.findByRole("slider", { name: "Seek" }) as HTMLInputElement).value).toBe("5");
+  });
+
+  it("lets focused chapter buttons retain their Space key behavior", async () => {
+    mockShortLecture();
+    render(<KojoLecture slug="prefix-sum" onClose={() => {}} />);
+    const chapter = await screen.findByRole("button", { name: "1. Theory" });
+    chapter.focus();
+    fireEvent.keyDown(chapter, { key: " " });
+    expect(screen.getByRole("button", { name: "Play" })).toBeTruthy();
   });
 });
