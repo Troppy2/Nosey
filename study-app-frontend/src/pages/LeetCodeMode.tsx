@@ -10,7 +10,7 @@ import {
 import { KojoWalkthrough } from "../components/KojoWalkthrough";
 import { LectureLibrary } from "../components/LectureLibrary";
 import { KojoTopicGrid } from "../components/KojoTopicGrid";
-import { AlertIcon, ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, CrossCircleIcon, PencilIcon, PlusIcon, SearchIcon, SparklesIcon, TrashIcon } from "../icons";
+import { AlertIcon, ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, CrossCircleIcon, PencilIcon, PlusIcon, SearchIcon, SparklesIcon, TrashIcon } from "../icons";
 import KojoMascot from "../components/KojoMascot";
 import type { ComponentType, CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -18,6 +18,9 @@ import { MarkdownContent } from "../components/MarkdownContent";
 import { LoadingNotice } from "../components/Loaders";
 import { SkeletonList } from "../components/Skeletons";
 import { ConfirmModal } from "../components/ConfirmModal";
+import { Button } from "../components/Button";
+import "../styles/components/lc-drill-select.css";
+import { toast } from "../lib/toast";
 import { Dropdown, type DropdownOption } from "../components/Dropdown";
 import { ToggleSwitch } from "../components/ToggleSwitch";
 import CodingTabs from "../components/Tab";
@@ -66,6 +69,7 @@ import {
   advanceLCDrill,
   restartLCDrill,
   deleteLCDrill,
+  bulkDeleteLCDrills,
 } from "../lib/api";
 import { runPythonLeetCode, traceLeetCodeExecution, type RunnerResult, type TraceResult } from "../lib/pyodideRunner";
 import { sanitizeLeetCodeHtml } from "../lib/leetcodeHtml";
@@ -2339,6 +2343,11 @@ export default function LeetCodeMode() {
   const [drillAgainSlug, setDrillAgainSlug] = useState<string | null>(null);
   // "Remove from 3-Pass Drill?" confirm: slug pending removal (null = closed).
   const [drillRemoveSlug, setDrillRemoveSlug] = useState<string | null>(null);
+  // Drills hub select mode: pick several drills and remove them in one call.
+  const [selectingDrills, setSelectingDrills] = useState(false);
+  const [selectedDrillSlugs, setSelectedDrillSlugs] = useState<Set<string>>(new Set());
+  // Slugs the "Remove N drills?" confirm will delete, captured when it opens (null = closed).
+  const [drillBulkRemoveSlugs, setDrillBulkRemoveSlugs] = useState<string[] | null>(null);
   // Add-a-problem-by-LeetCode-link modal, scoped to the category it was opened from.
   const [addLinkCategoryId, setAddLinkCategoryId] = useState<string | null>(null);
   const [addLinkUrl, setAddLinkUrl] = useState("");
@@ -3621,6 +3630,39 @@ export default function LeetCodeMode() {
     } finally {
       setDrillModalBusy(false);
       setDrillRemoveSlug(null);
+    }
+  }
+
+  function exitDrillSelection() {
+    setSelectingDrills(false);
+    setSelectedDrillSlugs(new Set());
+  }
+
+  function toggleDrillSelected(slug: string) {
+    setSelectedDrillSlugs((prev) => {
+      const next = new Set(prev);
+      if (next.has(slug)) next.delete(slug);
+      else next.add(slug);
+      return next;
+    });
+  }
+
+  // Removes only selected drills that are still shown: a drill hidden by a filter
+  // change after it was ticked is left alone, matching "Select all" grabbing shown only.
+  async function handleBulkRemoveDrills(slugs: string[]) {
+    if (drillModalBusy || slugs.length === 0) return;
+    setDrillModalBusy(true);
+    try {
+      const { deleted } = await bulkDeleteLCDrills(slugs);
+      const removed = new Set(slugs);
+      setDrills((prev) => prev.filter((d) => !removed.has(d.problem_slug)));
+      exitDrillSelection();
+      toast.success(`Removed ${deleted} drill${deleted === 1 ? "" : "s"}`);
+    } catch (err) {
+      toast.error("Could not remove those drills", err instanceof Error ? err.message : undefined);
+    } finally {
+      setDrillModalBusy(false);
+      setDrillBulkRemoveSlugs(null);
     }
   }
 
@@ -5084,6 +5126,21 @@ export default function LeetCodeMode() {
     />
   ) : null;
 
+  // "Remove N drills?" confirm, opened from the Drills hub select bar with the selected
+  // drills still shown under the current filters (same set the bar counts).
+  const drillBulkRemoveModalNode = drillBulkRemoveSlugs ? (
+    <ConfirmModal
+      title={`Remove ${drillBulkRemoveSlugs.length} drill${drillBulkRemoveSlugs.length === 1 ? "" : "s"}?`}
+      message="Their pass progress is lost. The problems stay in your catalog, and you can drill them again later."
+      confirmLabel="Remove"
+      danger
+      busy={drillModalBusy}
+      busyLabel="Removing"
+      onConfirm={() => void handleBulkRemoveDrills(drillBulkRemoveSlugs)}
+      onCancel={() => setDrillBulkRemoveSlugs(null)}
+    />
+  ) : null;
+
   // Completion prompts shown across every view (list toggle, editor run/grade).
   const completionModalsNode = (
     <>
@@ -5091,6 +5148,7 @@ export default function LeetCodeMode() {
       {drillPromptModalNode}
       {drillAgainModalNode}
       {drillRemoveModalNode}
+      {drillBulkRemoveModalNode}
     </>
   );
 
@@ -6300,9 +6358,61 @@ export default function LeetCodeMode() {
   }
 
   if (view.type === "drills") {
+    const visibleDrills = drills.filter(drillMatchesFilters);
+    // Selection only counts drills still shown, so a filter change can't remove hidden ones.
+    const selectedVisibleSlugs = visibleDrills
+      .map((drill) => drill.problem_slug)
+      .filter((slug) => selectedDrillSlugs.has(slug));
+    const allVisibleSelected = visibleDrills.length > 0 && selectedVisibleSlugs.length === visibleDrills.length;
+    const selectedCount = selectedVisibleSlugs.length;
+    // Lives in the "Due today" heading row, the first thing above the cards it acts on.
+    const drillSelectControls = selectingDrills ? (
+      <div className="lc-drill-select-bar">
+        <button
+          type="button"
+          className="file-manager-select-toggle"
+          data-active={selectedCount > 0 ? "true" : "false"}
+          aria-pressed={allVisibleSelected}
+          disabled={visibleDrills.length === 0}
+          onClick={() =>
+            setSelectedDrillSlugs(
+              allVisibleSelected ? new Set() : new Set(visibleDrills.map((drill) => drill.problem_slug)),
+            )
+          }
+        >
+          <span className={`fm-check${allVisibleSelected ? " is-checked" : ""}`} aria-hidden="true">
+            {allVisibleSelected ? <CheckIcon size={11} strokeWidth={3} /> : null}
+          </span>
+          {selectedCount > 0 ? `${selectedCount} selected` : "Select all"}
+        </button>
+        <Button variant="ghost" className="lc-drill-select-btn" onClick={exitDrillSelection}>
+          Cancel
+        </Button>
+        <Button
+          variant="danger-outline"
+          icon={<TrashIcon size={14} />}
+          className="file-manager-bulk-delete"
+          disabled={selectedCount === 0}
+          onClick={() => setDrillBulkRemoveSlugs(selectedVisibleSlugs)}
+        >
+          {selectedCount > 0 ? `Remove ${selectedCount}` : "Remove"}
+        </Button>
+      </div>
+    ) : (
+      <Button variant="ghost" className="lc-drill-select-btn" onClick={() => setSelectingDrills(true)}>
+        Select
+      </Button>
+    );
     return (
       <div className="lc-shell">
-        <LeftRail active="drills" streak={stats.currentStreak} onNavigate={setView} />
+        <LeftRail
+          active="drills"
+          streak={stats.currentStreak}
+          onNavigate={(next) => {
+            exitDrillSelection();
+            setView(next);
+          }}
+        />
         <div className="page page-narrow lc-page lc-shell-body">
           <header className="lc-category-header">
             <div className="lc-category-title-row">
@@ -6344,7 +6454,6 @@ export default function LeetCodeMode() {
           ) : (
             (() => {
               const now = Date.now();
-              const visibleDrills = drills.filter(drillMatchesFilters);
               const dueToday = visibleDrills
                 .filter((drill) => new Date(drill.next_due_at).getTime() <= now)
                 .sort((a, b) => a.current_pass - b.current_pass);
@@ -6355,6 +6464,35 @@ export default function LeetCodeMode() {
               const renderDrill = (drill: LCDrillSchedule, due: boolean) => {
                 const dueDate = new Date(drill.next_due_at);
                 const passColor = PASS_RAMP[Math.min(drill.current_pass, 3) - 1];
+                if (selectingDrills) {
+                  // Select mode: the whole card is the checkbox target; open/advance are hidden
+                  // so a tap can only toggle selection.
+                  const checked = selectedDrillSlugs.has(drill.problem_slug);
+                  return (
+                    <label
+                      key={drill.problem_slug}
+                      className={`lc-drill-card lc-drill-card--selectable${due ? " is-due" : ""}${checked ? " is-selected" : ""}`}
+                    >
+                      <div className="lc-drill-card-head">
+                        <PassRung current={drill.current_pass} />
+                        <span className="lc-drill-when">
+                          {due ? "due now" : `due ${dueDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`}
+                        </span>
+                        <input
+                          type="checkbox"
+                          className="checkbox-input"
+                          checked={checked}
+                          onChange={() => toggleDrillSelected(drill.problem_slug)}
+                          aria-label={`Select ${findProblemTitle(drill.problem_slug)}`}
+                        />
+                      </div>
+                      <span className="lc-drill-title">{findProblemTitle(drill.problem_slug)}</span>
+                      <p className="lc-drill-rule" style={{ color: passColor }}>
+                        Pass {drill.current_pass} // {PASS_RULE[Math.min(drill.current_pass, 3) - 1]}
+                      </p>
+                    </label>
+                  );
+                }
                 return (
                   <div key={drill.problem_slug} className={`lc-drill-card${due ? " is-due" : ""}`}>
                     <div className="lc-drill-card-head">
@@ -6415,10 +6553,13 @@ export default function LeetCodeMode() {
               return (
                 <div className="lc-drill-sections">
                   <section className="lc-drill-section">
-                    <h2 className="lc-drill-section-title">
-                      Due today
-                      <span className="lc-drill-count">{dueToday.length}</span>
-                    </h2>
+                    <div className="lc-drill-section-head">
+                      <h2 className="lc-drill-section-title">
+                        Due today
+                        <span className="lc-drill-count">{dueToday.length}</span>
+                      </h2>
+                      {drillSelectControls}
+                    </div>
                     {dueToday.length === 0 ? (
                       <p className="lc-inline-empty">Nothing due. Come back when a drill resurfaces.</p>
                     ) : (

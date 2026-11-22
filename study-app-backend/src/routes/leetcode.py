@@ -43,6 +43,8 @@ from src.schemas.leetcode_schema import (
     LCCustomTestCase,
     LCDailyProblemRequest,
     LCDrillAdvanceRequest,
+    LCDrillBulkDeleteRequest,
+    LCDrillBulkDeleteResponse,
     LCDrillCreateRequest,
     LCDrillScheduleResponse,
     LCGenerateCustomProblemRequest,
@@ -1711,6 +1713,28 @@ async def restart_drill(
     await session.commit()
     await session.refresh(row)
     return _serialize_drill(row)
+
+
+@router.post("/drills/bulk-delete", response_model=LCDrillBulkDeleteResponse)
+async def bulk_delete_drills(
+    body: LCDrillBulkDeleteRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> LCDrillBulkDeleteResponse:
+    """Remove several problems from the 3-Pass Drill at once. Scoped to the caller's
+    rows; slugs that are not drills are ignored, so the count is what was removed."""
+    rows = (
+        await session.execute(
+            select(LCDrillSchedule).where(
+                LCDrillSchedule.user_id == user.id,
+                LCDrillSchedule.problem_slug.in_(set(body.slugs)),
+            )
+        )
+    ).scalars().all()
+    for row in rows:
+        await session.delete(row)
+    await session.commit()
+    return LCDrillBulkDeleteResponse(deleted=len(rows))
 
 
 @router.delete("/drills/{slug}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)

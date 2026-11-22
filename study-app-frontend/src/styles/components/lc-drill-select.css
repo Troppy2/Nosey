@@ -1,0 +1,60 @@
+/* KojoCode 3-Pass Drills: select mode for removing several drills at once
+   (LeetCodeMode.tsx drills view). The controls sit in the "Due today" heading
+   row and reuse the file-manager select toggle, check glyph and bulk-delete
+   button; this file only adds layout and the selected-card state. */
+
+.lc-drill-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  margin: 0 0 12px;
+}
+
+.lc-drill-section-head .lc-drill-section-title {
+  margin: 0;
+}
+
+.lc-drill-select-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.lc-drill-select-btn {
+  min-height: 36px;
+  padding: 6px 14px;
+  font-size: 0.82rem;
+}
+
+/* Whole card is the checkbox target in select mode. Three classes so it wins the
+   tie against the legacy `.lc-drill-card.is-due` border. */
+.lc-drill-card.lc-drill-card--selectable {
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+
+.lc-drill-card.lc-drill-card--selectable .lc-drill-title {
+  cursor: pointer;
+}
+
+.lc-drill-card.lc-drill-card--selectable .lc-drill-title:hover {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.lc-drill-card.lc-drill-card--selectable.is-selected {
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 1px var(--green-dark), var(--shadow-sm);
+}
+
+.lc-drill-card--selectable .checkbox-input {
+  flex-shrink: 0;
+}
+
+.lc-drill-card--selectable:has(.checkbox-input:focus-visible) {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}

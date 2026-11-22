@@ -2511,6 +2511,14 @@ export async function deleteLCDrill(slug: string): Promise<void> {
   await request(`/leetcode/drills/${slug}`, { method: "DELETE" });
 }
 
+// Remove several drills in one call (the Drills hub "Remove all"). Returns rows removed.
+export async function bulkDeleteLCDrills(slugs: string[]): Promise<{ deleted: number }> {
+  return request<{ deleted: number }>("/leetcode/drills/bulk-delete", {
+    method: "POST",
+    body: JSON.stringify({ slugs }),
+  });
+}
+
 // ── Mock Interview ────────────────────────────────────────────────────────────
 
 export async function createMockInterviewSession(

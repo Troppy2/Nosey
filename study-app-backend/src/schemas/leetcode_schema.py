@@ -468,6 +468,14 @@ class LCDrillCreateRequest(BaseModel):
     problem_slug: str = Field(..., min_length=1, max_length=200)
 
 
+class LCDrillBulkDeleteRequest(BaseModel):
+    slugs: list[str] = Field(..., min_length=1, max_length=500)
+
+
+class LCDrillBulkDeleteResponse(BaseModel):
+    deleted: int
+
+
 class LCDrillAdvanceRequest(BaseModel):
     """Optional topic so the advance can log a drill_advanced_2/3/completed struggle
     event for the improvement/weakness scorers (lc_drill_schedule itself has no
