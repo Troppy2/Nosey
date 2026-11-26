@@ -30,6 +30,7 @@ from src.services.mcp_interview_tools import INTERVIEW_TOOLS
 from src.services.mcp_lecture_tools import LECTURE_TOOLS
 from src.services.mcp_learning_tools import LEARNING_TOOLS
 from src.services.mcp_plan_tools import PLAN_TOOLS
+from src.services.mcp_trail_tools import TRAIL_TOOLS
 from src.services.mcp_write_tools import WRITE_TOOLS
 from src.services.practice_progress import practice_progress, summary as practice_summary
 from src.services.test_service import TestService
@@ -447,6 +448,7 @@ TOOLS: dict[str, McpTool] = {
         *INTERVIEW_TOOLS,
         *LECTURE_TOOLS,
         *PLAN_TOOLS,
+        *TRAIL_TOOLS,
     )
 }
 

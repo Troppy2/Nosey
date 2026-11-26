@@ -33,6 +33,17 @@ from src.models.mcp_oauth import McpOAuthClient, McpOAuthRequest, McpOAuthToken
 from src.models.mcq_option import MCQOption
 from src.models.mock_interview import MockInterviewSession
 from src.models.note import Note
+from src.models.pattern_trail import (
+    PTGateAnswer,
+    PTGateAttempt,
+    PTGateItem,
+    PTRedo,
+    PTStep,
+    PTSubtopic,
+    PTTopic,
+    PTUserLesson,
+    PTUserStep,
+)
 from src.models.question import Question
 from src.models.question_group import QuestionGroup
 from src.models.quota_charge import QuotaCharge
@@ -89,6 +100,15 @@ __all__ = [
     "SDQuizAttempt",
     "SDSubmission",
     "Note",
+    "PTGateAnswer",
+    "PTGateAttempt",
+    "PTGateItem",
+    "PTRedo",
+    "PTStep",
+    "PTSubtopic",
+    "PTTopic",
+    "PTUserLesson",
+    "PTUserStep",
     "Question",
     "QuestionGroup",
     "QuotaCharge",
