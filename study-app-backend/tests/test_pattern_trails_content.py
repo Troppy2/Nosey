@@ -114,16 +114,19 @@ async def test_subtopic_slug_cannot_move_between_topics(db_session_maker):
             await content.upsert_topic(session, other)
 
 
-async def test_mcp_tools_are_beta_only_and_work(db_session_maker):
+async def test_mcp_tools_write_is_admin_only_and_list_is_beta(db_session_maker):
     async with db_session_maker() as session:
+        admin = User(email="a@example.com", google_id="g-a", is_beta=True, is_admin=True)
         beta = User(email="b@example.com", google_id="g-b", is_beta=True, is_admin=False)
         basic = User(email="c@example.com", google_id="g-c", is_beta=False, is_admin=False)
-        session.add_all([beta, basic])
+        session.add_all([admin, beta, basic])
         await session.commit()
         args = AddTrailArgs(topic=_small("two-sum", "valid-anagram"))
-        with pytest.raises(ToolInputError):
-            await add_trail_content(McpContext(user=basic, session=session), args)
-        out = await add_trail_content(McpContext(user=beta, session=session), args)
+        # Shared content: a beta account can play trails but not rewrite them.
+        for user in (basic, beta):
+            with pytest.raises(ToolInputError):
+                await add_trail_content(McpContext(user=user, session=session), args)
+        out = await add_trail_content(McpContext(user=admin, session=session), args)
         assert "subtopic:demo-path" in out["created"]
         listed = await list_trails(McpContext(user=beta, session=session), ListTrailsArgs())
         demo = next(t for t in listed["topics"] if t["slug"] == "demo")
