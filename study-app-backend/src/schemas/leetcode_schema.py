@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator
@@ -387,6 +388,12 @@ class LCWeaknessTopic(BaseModel):
 
 class LCWeaknessResponse(BaseModel):
     topics: list[LCWeaknessTopic] = Field(default_factory=list)
+
+
+class LCTestRunSummary(BaseModel):
+    id: int
+    passed: bool
+    run_at: datetime
 
 
 class LCTestRunRequest(BaseModel):

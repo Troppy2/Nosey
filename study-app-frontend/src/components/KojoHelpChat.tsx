@@ -24,7 +24,8 @@ export interface KojoHelpChatProps {
   storageKey: string;
   /** Header subtitle, e.g. the problem title or test name. */
   subtitle: string;
-  onClose: () => void;
+  embedded?: boolean;
+  onClose?: () => void;
   /** Ephemeral per-turn grounding (problem statement + code, or the current
    * test question) sent alongside each message but never persisted as a
    * visible chat bubble. */
@@ -60,6 +61,7 @@ const DEFAULT_SUGGESTIONS = [
 export function KojoHelpChat({
   storageKey,
   subtitle,
+  embedded = false,
   onClose,
   buildContext,
   buildTestRef,
@@ -130,15 +132,16 @@ export function KojoHelpChat({
   }, [storageKey]);
 
   useEffect(() => {
-    if (!loadingThread) inputRef.current?.focus();
-  }, [loadingThread]);
+    if (!embedded && !loadingThread) inputRef.current?.focus();
+  }, [embedded, loadingThread]);
 
   useEffect(() => {
+    if (embedded) return;
     document.body.style.overflow = isFullscreen ? "hidden" : "";
     return () => {
       document.body.style.overflow = "";
     };
-  }, [isFullscreen]);
+  }, [embedded, isFullscreen]);
 
   const showsCommands = !!slashCommands?.length && input.trimStart().startsWith("/");
   const inputDisabled = isLoading || disabled || loadingThread || conversationId == null;
@@ -237,10 +240,10 @@ export function KojoHelpChat({
 
   return (
     <>
-      {!isFullscreen && <div className="kojo-backdrop" onClick={onClose} aria-hidden="true" />}
+      {!embedded && !isFullscreen && <div className="kojo-backdrop" onClick={onClose} aria-hidden="true" />}
       <div
         className={`kojo-panel kojo-panel--help${isFullscreen ? " kojo-panel--fullscreen" : ""}`}
-        role="dialog"
+        role={embedded ? "region" : "dialog"}
         aria-label="Ask Kojo"
       >
         {/* ── Header ── */}
@@ -258,7 +261,7 @@ export function KojoHelpChat({
             </div>
           </div>
 
-          <div className="kojo-header-actions">
+          {!embedded && <div className="kojo-header-actions">
             <button
               className="kojo-header-btn"
               onClick={() => setIsFullscreen((f) => !f)}
@@ -271,7 +274,7 @@ export function KojoHelpChat({
             <button className="kojo-header-btn" onClick={onClose} type="button" aria-label="Close Kojo" title="Close">
               <CloseIcon size={18} />
             </button>
-          </div>
+          </div>}
         </div>
 
         {contractNote ? (

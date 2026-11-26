@@ -102,3 +102,20 @@
   .icon, .icon * { transition: none !important; animation: none !important; }
 }
 
+
+/* Pattern trails + tabbed editor (2026-11-25, proposed). Nudges only where they carry meaning. */
+.icon-history .icon-part-loop { transform-origin: 12px 12px; }
+:is(button, a, [role="button"], [role="tab"], .icon-hover):is(:hover, :focus-visible) .icon-history .icon-part-loop { transform: rotate(-10deg); }
+
+.icon-complexity .icon-part-needle { transform-box: view-box; transform-origin: 12px 15.5px; transition: transform var(--icon-nudge-dur) var(--icon-ease), stroke-opacity var(--icon-fill-dur) var(--icon-ease); }
+:is(button, a, [role="button"], [role="tab"], .icon-hover):is(:hover, :focus-visible) .icon-complexity .icon-part-needle { transform: rotate(10deg); }
+
+.icon-trail .icon-part-flag { transform-origin: 17px 5.4px; }
+:is(button, a, [role="button"], [role="tab"], .icon-hover):is(:hover, :focus-visible) .icon-trail .icon-part-flag { transform: rotate(-8deg); }
+
+.icon-yarn .icon-part-ball { transform-origin: 11.5px 11.5px; }
+:is(button, a, [role="button"], [role="tab"], .icon-hover):is(:hover, :focus-visible) .icon-yarn .icon-part-ball { transform: rotate(10deg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-history .icon-part-loop, .icon-complexity .icon-part-needle, .icon-trail .icon-part-flag, .icon-yarn .icon-part-ball { transition: none; }
+}

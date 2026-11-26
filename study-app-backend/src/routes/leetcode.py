@@ -55,6 +55,7 @@ from src.schemas.leetcode_schema import (
     LCScoresResponse,
     LCStruggleEventRequest,
     LCTestRunRequest,
+    LCTestRunSummary,
     LCNotesResponse,
     LCNotesSyncRequest,
     LCProgressResponse,
@@ -287,6 +288,21 @@ async def log_struggle_event(
     )
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/test-runs/{slug}", response_model=list[LCTestRunSummary])
+async def list_test_runs(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[LCTestRunSummary]:
+    rows = await session.execute(
+        select(LCTestRun.id, LCTestRun.passed, LCTestRun.run_at)
+        .where(LCTestRun.user_id == user.id, LCTestRun.problem_slug == slug)
+        .order_by(LCTestRun.run_at.desc(), LCTestRun.id.desc())
+        .limit(100)
+    )
+    return [LCTestRunSummary(**row) for row in rows.mappings()]
 
 
 @router.post("/test-run", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)

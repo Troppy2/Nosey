@@ -69,3 +69,18 @@ export { MathIcon } from "./MathIcon";
 export { BitsIcon } from "./BitsIcon";
 export { IntervalsIcon } from "./IntervalsIcon";
 export { PuzzleIcon } from "./PuzzleIcon";
+// Pattern trails + KojoCode tabbed editor (drawn 2026-11-25, PROPOSED: awaiting the
+// user's approval on design-previews/pattern-trails/icons.html; not used in the UI yet).
+export { DescriptionIcon } from "./DescriptionIcon";
+export { SolutionsIcon } from "./SolutionsIcon";
+export { NotebookIcon } from "./NotebookIcon";
+export { HistoryIcon } from "./HistoryIcon";
+export { TestcaseIcon } from "./TestcaseIcon";
+export { TerminalIcon } from "./TerminalIcon";
+export { ComplexityIcon } from "./ComplexityIcon";
+export { MaximizeIcon } from "./MaximizeIcon";
+export { RestoreIcon } from "./RestoreIcon";
+export { GripIcon } from "./GripIcon";
+export { LayoutIcon } from "./LayoutIcon";
+export { TrailIcon } from "./TrailIcon";
+export { YarnIcon } from "./YarnIcon";

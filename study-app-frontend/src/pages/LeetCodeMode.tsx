@@ -1,6 +1,6 @@
 import Editor, { type Monaco } from "@monaco-editor/react";
-import { Gauge, Circle, Eye, ExternalLink, Flame, Youtube, ListChecks, Loader2, Network, Play, Route, ShieldAlert, Shuffle, Trophy, Users, WrapText, type LucideIcon, Code, Notebook, Wand2, Archive, ArchiveRestore } from "lucide-react";
-import { BookIcon, CodeIcon, ScoreRiseIcon, SettingsIcon } from "../icons";
+import { Gauge, Circle, Eye, ExternalLink, Flame, ListChecks, Loader2, Network, Route, ShieldAlert, Shuffle, Trophy, Users, WrapText, type LucideIcon, Code, Wand2, Archive, ArchiveRestore } from "lucide-react";
+import { BookIcon, ScoreRiseIcon, SettingsIcon } from "../icons";
 import { PlayIcon } from "../icons";
 import {
   ArraysIcon, BacktrackIcon, BinarySearchIcon, BinderIcon, BitsIcon, CodeWindowIcon, DpTableIcon, DrillsIcon, DumbbellIcon,
@@ -15,7 +15,9 @@ import KojoMascot from "../components/KojoMascot";
 import type { ComponentType, CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MarkdownContent } from "../components/MarkdownContent";
-import { LoadingNotice } from "../components/Loaders";
+import { EditorDock } from "../components/EditorDock";
+import { EditorNotes, EditorSolutions, EditorSubmissions } from "../components/EditorStudyTabs";
+import { InlineLoading, LoadingNotice } from "../components/Loaders";
 import { SkeletonList } from "../components/Skeletons";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { Button } from "../components/Button";
@@ -28,13 +30,11 @@ import { type CommandOption as SlashCommand } from "../components/SlashCommandMe
 import { KojoHelpChat } from "../components/KojoHelpChat";
 import {
   scopeKey,
-  fetchLCNotes,
   fetchLCProgress,
   fetchLCWorkspace,
   fetchLCWorkspaces,
   getStoredUser,
   isGuestSession,
-  syncLCNotes,
   syncLCProgress,
   syncLCWorkspace,
   fetchLeetCodeProblem,
@@ -1231,7 +1231,6 @@ const RAIL_ITEMS: { key: string; label: string; icon: KojoIcon; view: View }[] =
 const RAIL_COLLAPSE_KEY = "nosey_lc_rail_collapsed";
 // The problem editor renders the same rail but starts icon-only and remembers its own
 // preference, so collapsing it there never collapses the hub rail (and vice versa).
-const EDITOR_RAIL_COLLAPSE_KEY = "nosey_lc_rail_collapsed_editor";
 // Sentinel key for visualizerLoading when tracing the KojoCode model solution's own
 // code (rather than a per-test-case "Visualize" button, which keys on its input text).
 
@@ -2209,7 +2208,6 @@ export default function LeetCodeMode() {
   const [aiHint, setAiHint] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [mobilePane, setMobilePane] = useState<"problem" | "code">("problem");
   const [progress, setProgress] = useState<Record<string, boolean>>(() => loadJson(getProgressKey(), {}));
   const [activityDates, setActivityDates] = useState<string[]>(() => loadJson(getActivityKey(), []));
   // Per-day solved tally keyed by YYYY-MM-DD, cached in localStorage for instant display
@@ -2228,11 +2226,11 @@ export default function LeetCodeMode() {
   const [customCases, setCustomCases] = useState<Record<string, CustomCase[]>>({});
   const [runnerLoading, setRunnerLoading] = useState(false);
   const [runnerResult, setRunnerResult] = useState<RunnerResult | null>(null);
+  const [historyRevision,setHistoryRevision] = useState(0);
   const [gradeLoading, setGradeLoading] = useState(false);
   const [gradeFeedback, setGradeFeedback] = useState<string | null>(null);
   // Complexity self-assessment: the user states and justifies the time/space Big-O of
   // their own solution, and Kojo grades it. Only shown once the run passes.
-  const [complexityOpen, setComplexityOpen] = useState(false);
   const [complexityTimeClaim, setComplexityTimeClaim] = useState("");
   const [complexityTimeWhy, setComplexityTimeWhy] = useState("");
   const [complexitySpaceClaim, setComplexitySpaceClaim] = useState("");
@@ -2250,7 +2248,6 @@ export default function LeetCodeMode() {
   // Slug whose "Time's up" modal is open on a FAILED attempt; the "Add to 3-Pass Drill?"
   // prompt is offered when that modal closes (so the two modals never stack).
   const [timeoutDrillSlug, setTimeoutDrillSlug] = useState<string | null>(null);
-  const [solutionOpen, setSolutionOpen] = useState(false);
   // Slugs the user has run code against at least once, loaded from localStorage. Keeps
   // the KojoCode solution unlocked across code edits / problem switches (see getAttemptedKey).
   const [attemptedSlugs, setAttemptedSlugs] = useState<Set<string>>(() => {
@@ -2265,7 +2262,6 @@ export default function LeetCodeMode() {
   const [walkOpen, setWalkOpen] = useState(false);
   const [visualizerTrace, setVisualizerTrace] = useState<TraceResult | null>(null);
   const [visualizerLoading, setVisualizerLoading] = useState<string | null>(null);
-  const [kojoOpen, setKojoOpen] = useState(false);
   const [customSlashCommands, setCustomSlashCommands] = useState<SlashCommand[]>([]);
   const editorRef = useRef<any>(null);
   const currentCodeRef = useRef("");
@@ -2274,11 +2270,6 @@ export default function LeetCodeMode() {
   const timerExpiryHandledRef = useRef(false);
   const workspaceSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingWorkspaceSyncRef = useRef<{ slug: string; workspace: CodeWorkspace } | null>(null);
-  const [notesOpen, setNotesOpen] = useState(false);
-  const [notesContent, setNotesContent] = useState("");
-  const [notesPos, setNotesPos] = useState<{ x: number; y: number } | null>(null);
-  const notesSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const notesDragOffset = useRef<{ x: number; y: number } | null>(null);
   const [streakChallenge, setStreakChallenge] = useState<LCStreakChallenge | null>(null);
   const [streakRescueLoading, setStreakRescueLoading] = useState(false);
   const [streakRescueError, setStreakRescueError] = useState<string | null>(null);
@@ -2567,7 +2558,6 @@ export default function LeetCodeMode() {
     setComplexitySpaceClaim(draft?.spaceClaim ?? "");
     setComplexitySpaceWhy(draft?.spaceWhy ?? "");
     setComplexityResult(draft?.result ?? null);
-    setComplexityOpen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentProblem?.slug, currentComplexityPass]);
 
@@ -2805,6 +2795,13 @@ export default function LeetCodeMode() {
       return { ...prev, [currentProblem.slug]: nextWorkspace };
     });
   }, [currentProblemData?.python_snippet, currentProblem?.slug, interviewRealism]);
+
+  // A reload restores the editor view straight from storage (no openProblem call), so
+  // load the problem's code tabs here when they are not in state yet.
+  useEffect(() => {
+    if (currentProblem && !codeWorkspaces[currentProblem.slug]) ensureCodeWorkspace(currentProblem.slug);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentProblem?.slug]);
 
   useEffect(() => {
     currentCustomCasesRef.current = currentCustomCases;
@@ -3571,6 +3568,7 @@ export default function LeetCodeMode() {
         resolveProblemSubtopic(slug),
       );
       setComplexityResult(result);
+      toast.success("Complexity checked");
       saveComplexityDraft(slug, pass, {
         timeClaim: complexityTimeClaim,
         timeWhy: complexityTimeWhy,
@@ -3579,7 +3577,7 @@ export default function LeetCodeMode() {
         result,
       });
     } catch {
-      // best-effort , keep the user's inputs so they can retry
+      toast.error("Could not check complexity");
     } finally {
       setComplexityLoading(false);
     }
@@ -4333,55 +4331,6 @@ export default function LeetCodeMode() {
     return `${NOTES_KEY_PREFIX}:${getUserStoragePrefix()}:${problemSlug}`;
   }
 
-  function openNotes(problemSlug: string) {
-    const local = localStorage.getItem(getNotesKey(problemSlug)) ?? "";
-    setNotesContent(local);
-    setNotesPos({ x: window.innerWidth - 520, y: Math.max(24, window.innerHeight - 580) });
-    setNotesOpen(true);
-    if (!local && !isGuestSession()) {
-      fetchLCNotes(problemSlug).then((remote) => {
-        if (!remote) return;
-        localStorage.setItem(getNotesKey(problemSlug), remote);
-        setNotesContent(remote);
-      }).catch(() => {});
-    }
-  }
-
-  function handleNotesDragStart(event: React.MouseEvent<HTMLDivElement>) {
-    if ((event.target as HTMLElement).closest("button")) return;
-    const modal = (event.currentTarget as HTMLElement).closest(".lc-notes-modal") as HTMLElement | null;
-    if (!modal) return;
-    const rect = modal.getBoundingClientRect();
-    notesDragOffset.current = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-
-    function onMove(moveEvent: MouseEvent) {
-      if (!notesDragOffset.current) return;
-      const x = Math.max(0, Math.min(window.innerWidth - rect.width, moveEvent.clientX - notesDragOffset.current.x));
-      const y = Math.max(0, Math.min(window.innerHeight - 60, moveEvent.clientY - notesDragOffset.current.y));
-      setNotesPos({ x, y });
-    }
-
-    function onUp() {
-      notesDragOffset.current = null;
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    }
-
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  }
-
-  function handleNotesChange(problemSlug: string, value: string) {
-    setNotesContent(value);
-    localStorage.setItem(getNotesKey(problemSlug), value);
-    if (!isGuestSession()) {
-      if (notesSyncTimerRef.current) clearTimeout(notesSyncTimerRef.current);
-      notesSyncTimerRef.current = setTimeout(() => {
-        syncLCNotes(problemSlug, value).catch(() => {});
-      }, 1500);
-    }
-  }
-
   function clearActiveTabWork() {
     if (!currentProblem) return;
     const slug = currentProblem.slug;
@@ -4403,6 +4352,7 @@ export default function LeetCodeMode() {
     // Timer-expiry runs pass false: they show the "Time's up" modal and defer the
     // "Add to 3-Pass Drill?" prompt until that modal closes, so two modals never stack.
     promptDrillOnFail = true,
+    preview = false,
   ) {
     if (!problemDataAtRun || !isRunnable(problemDataAtRun)) return null;
 
@@ -4452,7 +4402,12 @@ export default function LeetCodeMode() {
           result.ok,
           resolveProblemSubtopic(problemAtRun.slug),
           interviewRealism,
-        );
+        ).then(() => setHistoryRevision(v => v + 1));
+      }
+
+      if (preview) {
+        (result.ok ? toast.success : toast.info)(result.ok ? "Tests passed" : "Check the test result");
+        return result;
       }
 
       // Interview realism: a real interviewer never tells you the bug or the fix, so Kojo
@@ -4489,6 +4444,7 @@ export default function LeetCodeMode() {
         }
       }
 
+      (result.ok ? toast.success : toast.info)(result.ok ? "Submission accepted" : "Submission checked");
       if (result.ok) {
         markProblemDone(problemAtRun);
         void maybeAutoAdvanceDrill(problemAtRun.slug);
@@ -4536,6 +4492,24 @@ export default function LeetCodeMode() {
   }
 
   function openProblem(categoryId: string, problemSlug: string) {
+    ensureCodeWorkspace(problemSlug);
+
+    setLastProblemSlug(problemSlug);
+    localStorage.setItem(getLastProblemKey(), JSON.stringify(problemSlug));
+
+    setView({ type: "problem", categoryId, problemSlug });
+    setWalkOpen(false);
+    setRunnerResult(null);
+    // Restore Kojo's last feedback for this problem (persisted per slug) so it survives
+    // leaving and coming back. A new run overwrites it.
+    setGradeFeedback(loadGradeFeedback(problemSlug));
+    resetTimerState();
+  }
+
+  // Loads (or seeds) a problem's code tabs into state. openProblem calls it, and so does
+  // the restore effect: a page reload brings back the saved editor view without going
+  // through openProblem, which used to leave the editor blank with no code tabs.
+  function ensureCodeWorkspace(problemSlug: string) {
     const cached = problemStates[problemSlug]?.data;
     // Interview realism opens a blank editor: no function signature to work backwards from.
     const initialCode = interviewRealism ? "" : cached?.python_snippet?.trimEnd() ?? "";
@@ -4572,20 +4546,6 @@ export default function LeetCodeMode() {
         })
         .catch(() => { });
     }
-
-    setLastProblemSlug(problemSlug);
-    localStorage.setItem(getLastProblemKey(), JSON.stringify(problemSlug));
-
-    setView({ type: "problem", categoryId, problemSlug });
-    setMobilePane("problem");
-    setKojoOpen(false);
-    setSolutionOpen(false);
-    setWalkOpen(false);
-    setRunnerResult(null);
-    // Restore Kojo's last feedback for this problem (persisted per slug) so it survives
-    // leaving and coming back. A new run overwrites it.
-    setGradeFeedback(loadGradeFeedback(problemSlug));
-    resetTimerState();
   }
 
   function handleCodeChange(value: string) {
@@ -4837,7 +4797,7 @@ export default function LeetCodeMode() {
 
   // Open Kojo's video walkthrough (custom and official problems). Opening it means
   // "I couldn't solve this", so it logs the solution_viewed weakness signal once.
-  function openWalkthrough() {
+  function recordSolutionView() {
     if (!currentProblem) return;
     if (
       betaMode &&
@@ -4852,14 +4812,18 @@ export default function LeetCodeMode() {
         resolveProblemSubtopic(currentProblem.slug),
       );
     }
+  }
+
+  function openWalkthrough() {
+    recordSolutionView();
     setWalkOpen(true);
   }
 
 
-  async function handleRunCode() {
+  async function handleRunCode(preview = false) {
     if (!currentProblem || !currentProblemData || !isRunnable(currentProblemData)) return;
     const problemAtRun = currentProblem;
-    await runAndGradeCurrentCode(problemAtRun, currentCode, currentProblemData, currentCustomCases);
+    await runAndGradeCurrentCode(problemAtRun, currentCode, currentProblemData, currentCustomCases, true, preview);
   }
 
   const pendingDeleteProblem = pendingDeleteSlug
@@ -6958,7 +6922,7 @@ export default function LeetCodeMode() {
   }
 
   const showNextButton = Boolean(progress[currentProblem.slug]) || Boolean(runnerResult?.ok);
-  const hasAttempted = runnerResult !== null || Boolean(progress[currentProblem.slug]);
+  const hasAttempted = runnerResult !== null || attemptedSlugs.has(currentProblem.slug) || Boolean(progress[currentProblem.slug]);
 
   const problemLoading = currentProblem.isOfficial && currentProblemState?.loading;
   const problemError = currentProblemState?.error;
@@ -6990,541 +6954,745 @@ export default function LeetCodeMode() {
   // previous solution + earlier-pass attempts) is locked from view/delete. Locking itself is
   // computed by the component-scope isTabLockedForDrill (also used by the tab handlers).
   const drillActive = betaMode && Boolean(activeDrill);
+  const drillLock = `Locked on pass ${activePass}. Opens after you submit pass 3.`;
 
   return (
-    <div className="lc-shell lc-shell--editor">
-      {/* key forces a remount when switching hub <-> editor: React would otherwise reuse
-          the hub rail's instance (same type + position), carrying its expanded state over
-          and persisting it under the editor's storage key before the initializer ran. */}
-      <LeftRail
-        key="editor-rail"
-        active=""
-        streak={stats.currentStreak}
-        onNavigate={setView}
-        storageKey={EDITOR_RAIL_COLLAPSE_KEY}
-        defaultCollapsed
-      />
+    <div className="lc-shell lc-shell--editor lc-docked">
       <div className="lc-editor-shell">
-      <div className="lc-editor-topbar">
-        {/* The category breadcrumb names the technique, so interview realism swaps it for a
-            plain route back to the dashboard. */}
-        {lectureOrigin.current ? (
-          <button type="button" className="lc-back-btn" onClick={() => setView({ type: "lectures" })} aria-label="Back to lectures">
-            <ChevronLeftIcon size={16} />
-            <span className="lc-tb-label">Lectures</span>
-          </button>
-        ) : interviewRealism ? (
-          <button type="button" className="lc-back-btn" onClick={() => setView({ type: "tree" })} aria-label="Back to KojoCode dashboard">
-            <ChevronLeftIcon size={16} />
-            <span className="lc-tb-label">Dashboard</span>
-          </button>
-        ) : (
-          <button type="button" className="lc-back-btn" onClick={() => setView({ type: "category", categoryId: currentProblem.categoryId })} aria-label={`Back to ${currentProblem.categoryLabel}`}>
-            <ChevronLeftIcon size={16} />
-            <span className="lc-tb-label">{currentProblem.categoryLabel}</span>
-          </button>
-        )}
-        <div className="lc-editor-title">
-          <span>{currentProblem.title}</span>
-          <span className={`lc-difficulty lc-difficulty--${difficultyClass(currentProblem.difficulty)}`}>{currentProblem.difficulty}</span>
-        </div>
-        <div className="lc-editor-actions">
-          <div className="lc-toolbar-cluster" aria-label="Reference links">
-            <span className="lc-toolbar-cluster-label">Links</span>
-            {!isStreakChallengeProblem ? (
-              <a className="lc-toolbar-btn" href={`https://www.youtube.com/results?search_query=neetcode+${encodeURIComponent(currentProblem.title)}`} target="_blank" rel="noreferrer" aria-label="Search NeetCode on YouTube">
-                <Youtube size={16} />
-                <span className="lc-tb-label">NeetCode</span>
-              </a>
-            ) : null}
-            <a className="lc-toolbar-btn" href={currentProblem.url} target="_blank" rel="noreferrer" aria-label="Open on LeetCode">
-              <ExternalLink size={16} />
-              <span className="lc-tb-label">Open</span>
-            </a>
-          </div>
-
-          <div className="lc-toolbar-cluster" data-cluster="run" aria-label="Run and submit">
-            <span className="lc-toolbar-cluster-label">Run / Submit</span>
-            <button type="button" className="lc-toolbar-btn" onClick={handleFormat} aria-label="Format code">
-              <WrapText size={16} />
-              <span className="lc-tb-label">Format</span>
-            </button>
-            <button type="button" className="lc-toolbar-btn" onClick={handleRunCode} disabled={!runnable || runnerLoading} aria-label="Run code">
-              {runnerLoading ? <Loader2 size={16} className="spin" /> : <Play size={16} />}
-              <span className="lc-tb-label">Run code</span>
-            </button>
-            {progress[currentProblem.slug] && pendingBankRun(currentProblem.slug) ? (
-              // Solved before it joined a bank: done globally, still cold in the bank.
-              <button type="button" className="lc-toolbar-btn" onClick={() => applyBankCompletion(currentProblem.slug, true)} aria-label="Mark done in bank">
-                <Circle size={16} />
-                <span className="lc-tb-label">Done in bank</span>
-              </button>
-            ) : (
-              <button type="button" className={progress[currentProblem.slug] ? "lc-toolbar-btn lc-toolbar-btn--done" : "lc-toolbar-btn"} onClick={() => toggleProgress(currentProblem)} aria-label={progress[currentProblem.slug] ? "Mark incomplete" : "Mark done"}>
-                {progress[currentProblem.slug] ? <CheckCircleIcon size={16} /> : <Circle size={16} />}
-                <span className="lc-tb-label">{progress[currentProblem.slug] ? "Done" : "Mark done"}</span>
-              </button>
-            )}
-          </div>
-
-          <div className="lc-toolbar-cluster" data-cluster="timer" aria-label="Timer">
-            <span className="lc-toolbar-cluster-label">Timer</span>
-            <button
-              type="button"
-              className={`lc-toolbar-btn lc-toolbar-btn--timer lc-toolbar-btn--timer-${timerTone}`}
-              onClick={openTimerPicker}
-              aria-label={timerRemainingSeconds == null ? "Set timer" : `${timerButtonLabel} remaining, click to change timer`}
-              title={timerRemainingSeconds == null ? "Set a problem timer" : `${timerButtonLabel} remaining, click to change timer`}
-            >
-              <TimerRing fraction={timerFraction ?? 1} tone={timerTone} size={18} stroke={2} />
-              <span className="lc-tb-label lc-tb-label--timer">{timerButtonLabel}</span>
-            </button>
-          </div>
-
-          <div className="lc-toolbar-cluster" data-cluster="notes" aria-label="Notes">
-            <span className="lc-toolbar-cluster-label">Notes</span>
-            <button type="button" className="lc-toolbar-btn" onClick={() => openNotes(currentProblem.slug)} aria-label="Open notes">
-              <Notebook size={16} />
-              <span className="lc-tb-label">Notes</span>
-            </button>
-          </div>
-
-          {!isStreakChallengeProblem ? (
-            <div className="lc-toolbar-cluster" data-cluster="kojo" aria-label="Ask Kojo">
-              <span className="lc-toolbar-cluster-label">Ask Kojo</span>
+      <EditorDock
+        key={scopeKey("editor:" + currentProblem.slug)}
+        locks={{
+          Solutions: assistsLocked
+            ? drillLock
+            : isStreakChallengeProblem
+              ? "Solutions open after the streak challenge."
+              : !hasAttempted
+                ? "Run your code to open Solutions."
+                : undefined,
+          Kojo: assistsLocked
+            ? drillLock
+            : isStreakChallengeProblem
+              ? "Kojo opens after the streak challenge."
+              : interviewRealism
+                ? "Turn off interview realism to ask Kojo."
+                : kojoButtonLocked
+                  ? "Kojo opens after this practice session."
+                  : undefined,
+        }}
+        toolbar={(layoutMenu, select) => (
+          <div className="lc-editor-topbar">
+            {/* The category breadcrumb names the technique, so interview realism swaps it for a
+                plain route back to the dashboard. */}
+            {lectureOrigin.current ? (
               <button
                 type="button"
-                className="lc-toolbar-btn lc-toolbar-btn--kojo"
-                onClick={() => setKojoOpen(true)}
-                disabled={kojoButtonLocked}
-                aria-label="Ask Kojo for a hint"
+                className="lc-back-btn"
+                onClick={() => setView({ type: "lectures" })}
+                aria-label="Back to lectures"
+              >
+                <ChevronLeftIcon size={16} />
+                <span className="lc-tb-label">Lectures</span>
+              </button>
+            ) : interviewRealism ? (
+              <button
+                type="button"
+                className="lc-back-btn"
+                onClick={() => setView({ type: "tree" })}
+                aria-label="Back to KojoCode dashboard"
+              >
+                <ChevronLeftIcon size={16} />
+                <span className="lc-tb-label">Dashboard</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="lc-back-btn"
+                onClick={() => setView({ type: "category", categoryId: currentProblem.categoryId })}
+                aria-label={`Back to ${currentProblem.categoryLabel}`}
+              >
+                <ChevronLeftIcon size={16} />
+                <span className="lc-tb-label">{currentProblem.categoryLabel}</span>
+              </button>
+            )}
+            <div className="lc-editor-title">
+              <span>{currentProblem.title}</span>
+              <span className={`lc-difficulty lc-difficulty--${difficultyClass(currentProblem.difficulty)}`}>
+                {currentProblem.difficulty}
+              </span>
+            </div>
+            <div className="lc-dock-tools">
+              <Button
+                variant="secondary"
+                disabled={!runnable || runnerLoading}
+                onClick={() => {
+                  select("Test result");
+                  void handleRunCode(true);
+                }}
+              >
+                <PlayIcon size={15} /> Run
+              </Button>
+              <Button
+                disabled={!runnable || runnerLoading}
+                onClick={() => {
+                  select("Test result");
+                  void handleRunCode();
+                }}
+              >
+                Submit
+              </Button>
+              <button
+                type="button"
+                className={`lc-toolbar-btn lc-toolbar-btn--timer lc-toolbar-btn--timer-${timerTone}`}
+                onClick={openTimerPicker}
+                aria-label={
+                  timerRemainingSeconds == null ? "Set timer" : `${timerButtonLabel} remaining, click to change timer`
+                }
                 title={
-                  assistsLocked
-                    ? `Locked on Pass ${activePass}: no resources`
-                    : practiceHintsOff
-                      ? "Hints off for this practice session"
-                      : interviewRealism
-                        ? "Hints off while interview realism is on"
-                        : "Ask Kojo for a hint"
+                  timerRemainingSeconds == null
+                    ? "Set a problem timer"
+                    : `${timerButtonLabel} remaining, click to change timer`
                 }
               >
-                <SparklesIcon size={16} />
-                <span className="lc-tb-label">Ask Kojo</span>
+                <TimerRing fraction={timerFraction ?? 1} tone={timerTone} size={18} stroke={2} />
+                <span className="lc-tb-label lc-tb-label--timer">{timerButtonLabel}</span>
               </button>
-            </div>
-          ) : null}
-
-        </div>
-      </div>
-
-      {activeDrill ? (
-        <div className={`lc-pass-banner lc-pass-banner--p${activePass}`} style={{ "--pass-color": PASS_RAMP[Math.min(activePass, 3) - 1] } as CSSProperties}>
-          <PassRung current={activePass} />
-          <span className="lc-pass-banner-rule">Pass {activePass} // {PASS_RULE[Math.min(activePass, 3) - 1]}</span>
-          <button
-            type="button"
-            className="lc-pass-banner-clear"
-            onClick={() => void handleAdvanceDrill(currentProblem.slug)}
-            disabled={advancingDrill === currentProblem.slug}
-            title={activePass >= 3 ? "Clear this drill for good" : "Mark this pass cleared and schedule the next"}
-          >
-            {advancingDrill === currentProblem.slug ? <Loader2 size={13} className="spin" /> : null}
-            {activePass >= 3 ? "Clear drill" : "Pass cleared"}
-          </button>
-        </div>
-      ) : null}
-
-      <div className="lc-mobile-pane-toggle" role="group" aria-label="Switch between problem and code">
-        <button
-          type="button"
-          className={mobilePane === "problem" ? "lc-mobile-pane-btn lc-mobile-pane-btn--active" : "lc-mobile-pane-btn"}
-          onClick={() => setMobilePane("problem")}
-          aria-pressed={mobilePane === "problem"}
-        >
-          <BookIcon size={15} />
-          Problem
-        </button>
-        <button
-          type="button"
-          className={mobilePane === "code" ? "lc-mobile-pane-btn lc-mobile-pane-btn--active" : "lc-mobile-pane-btn"}
-          onClick={() => setMobilePane("code")}
-          aria-pressed={mobilePane === "code"}
-        >
-          <CodeIcon size={15} />
-          Code
-        </button>
-      </div>
-
-      <div className="lc-editor-body" data-mobile-pane={mobilePane}>
-        <aside className="lc-problem-pane">
-          <div className="lc-problem-source">
-            <span>{isCustomProblem ? "Custom problem" : currentProblem.isOfficial ? "Official LeetCode statement" : "Reference-only topic"}</span>
-            <div className="lc-row-actions">
-              {!isCustomProblem || currentCustomProblem?.url ? (
-                <a href={currentProblem.url} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Source</a>
-              ) : null}
-              {isCustomProblem && currentCustomProblem ? (
-                <>
-                  <button type="button" className="lc-inline-icon-btn" onClick={() => openCustomModal(currentCustomProblem)} aria-label="Edit custom question" title="Edit">
-                    <PencilIcon size={15} />
+              {activeDrill ? (
+                <div
+                  className={`lc-pass-banner lc-pass-banner--p${activePass}`}
+                  style={{ "--pass-color": PASS_RAMP[Math.min(activePass, 3) - 1] } as CSSProperties}
+                >
+                  <PassRung current={activePass} />
+                  <span className="lc-pass-banner-rule">
+                    Pass {activePass} // {PASS_RULE[Math.min(activePass, 3) - 1]}
+                  </span>
+                  <button
+                    type="button"
+                    className="lc-pass-banner-clear"
+                    onClick={() => void handleAdvanceDrill(currentProblem.slug)}
+                    disabled={advancingDrill === currentProblem.slug}
+                    title={activePass >= 3 ? "Clear this drill for good" : "Mark this pass cleared and schedule the next"}
+                  >
+                    {advancingDrill === currentProblem.slug ? <Loader2 size={13} className="spin" /> : null}
+                    {activePass >= 3 ? "Clear drill" : "Pass cleared"}
                   </button>
-                  {currentCustomProblem.is_archived ? (
-                    <button type="button" className="lc-inline-icon-btn" onClick={() => setCustomProblemArchived(currentCustomProblem.slug, false)} aria-label="Restore custom question" title="Restore">
-                      <ArchiveRestore size={15} />
-                    </button>
-                  ) : (
-                    <button type="button" className="lc-inline-icon-btn" onClick={() => setCustomProblemArchived(currentCustomProblem.slug, true)} aria-label="Archive custom question" title="Archive">
-                      <Archive size={15} />
-                    </button>
-                  )}
-                </>
-              ) : null}
-            </div>
-          </div>
-
-          <h2 className="lc-problem-heading">{currentProblem.title}</h2>
-          <div className="lc-problem-meta">
-            <span className={`lc-difficulty lc-difficulty--${difficultyClass(currentProblem.difficulty)}`}>{currentProblem.difficulty}</span>
-            {interviewRealism ? null : <span>{currentProblem.categoryLabel}</span>}
-            {currentProblem.isExtra ? <span>Extra</span> : null}
-          </div>
-
-          {isStreakChallengeProblem ? (
-            <div className="lc-streak-challenge-banner">
-              <ShieldAlert size={15} />
-              <span><strong>Save My Streak challenge.</strong> Kojo and NeetCode are disabled. Solve this on your own to restore your streak.</span>
-            </div>
-          ) : null}
-
-          {problemLoading ? (
-            <div className="lc-statement-skeleton" role="status" aria-busy="true">
-              {[94, 100, 82, 38, 97, 68].map((width, i) => (
-                <span key={i} className="lc-skeleton-line" style={{ width: `${width}%` }} />
-              ))}
-              <span className="lc-visually-hidden">Loading official statement…</span>
-            </div>
-          ) : null}
-
-          {problemError ? (
-            <div className="lc-statement-state lc-statement-state--error"><AlertIcon size={18} /><span>{problemError}</span></div>
-          ) : null}
-
-          {!currentProblem.isOfficial && !isCustomProblem ? (
-            <div className="lc-source-note">
-              <p>This item is kept as a reference drill because it is not an official LeetCode problem title. The editor and Kojo coach still work here, but there is no official statement to render.</p>
-            </div>
-          ) : null}
-
-          {isCustomProblem && currentCustomProblem ? (
-            currentCustomProblem.description.trim() ? (
-              <div className="lc-custom-statement">
-                <MarkdownContent content={currentCustomProblem.description} enableCodeCopy />
-              </div>
-            ) : (
-              <div className="lc-source-note">
-                <p>No write-up yet. Edit this problem and use Generate with AI to add a walkthrough and test cases, or just start coding.</p>
-              </div>
-            )
-          ) : null}
-
-          {currentProblemData && !isCustomProblem ? (
-            <>
-              {interviewRealism ? null : (
-                <div className="lc-topic-tags">
-                  {currentProblemData.topic_tags.slice(0, 4).map((tag) => (
-                    <span key={tag.slug}>{tag.name}</span>
-                  ))}
                 </div>
-              )}
-              <div className="lc-official-statement" dangerouslySetInnerHTML={{ __html: sanitizeLeetCodeHtml(currentProblemData.content_html) }} />
-            </>
-          ) : null}
-
-          <div className="lc-tests-panel">
-            <div className="lc-tests-header">
-              <h3>Tests</h3>
-              <button type="button" className="lc-add-test-btn" onClick={addCustomCase} disabled={currentCustomCases.length >= CUSTOM_TEST_LIMIT}>
-                <PlusIcon size={14} />
-                Add custom
-              </button>
+              ) : null}
+              {layoutMenu}
             </div>
-            <p className="muted small">
-              {isCustomProblem
-                ? "These cases come from this problem. You can add up to 2 ad-hoc cases for a quick run."
-                : "You can add up to 2 custom cases on top of the official LeetCode examples."}
-            </p>
-
-            <div className="lc-test-list">
-              {officialExamples.map((example) => (
-                <div key={example.index} className="lc-test-card">
-                  <div className="lc-test-card-top">
-                    <strong>{isCustomProblem ? "Test" : "Official"} {example.index}</strong>
-                    {currentCode.trim() && runnable ? (
+          </div>
+        )}
+        contents={{
+          Description: (
+            <div className="lc-dock-description">
+              <div className="lc-problem-source">
+                <span>
+                  {isCustomProblem
+                    ? "Custom problem"
+                    : currentProblem.isOfficial
+                      ? "Official LeetCode statement"
+                      : "Reference-only topic"}
+                </span>
+                <div className="lc-row-actions">
+                  {!isCustomProblem || currentCustomProblem?.url ? (
+                    <a href={currentProblem.url} target="_blank" rel="noreferrer">
+                      <ExternalLink size={15} /> {isCustomProblem ? "Open source" : "Open on LeetCode"}
+                    </a>
+                  ) : null}
+                  {isCustomProblem && currentCustomProblem ? (
+                    <>
                       <button
                         type="button"
-                        className="lc-visualize-btn"
-                        onClick={() => handleVisualize(example.input_text)}
-                        disabled={visualizerLoading === example.input_text}
-                        title="Step through this test case"
+                        className="lc-inline-icon-btn"
+                        onClick={() => openCustomModal(currentCustomProblem)}
+                        aria-label="Edit custom question"
+                        title="Edit"
                       >
-                        {visualizerLoading === example.input_text ? <Loader2 size={12} className="spin" /> : <Eye size={12} />}
-                        Visualize
+                        <PencilIcon size={15} />
                       </button>
-                    ) : null}
-                  </div>
-                  <label>
-                    <span>Input</span>
-                    <textarea value={example.input_text} readOnly rows={Math.min(5, Math.max(2, example.input_text.split("\n").length))} />
-                  </label>
-                  <label>
-                    <span>Expected</span>
-                    <textarea value={example.output_text} readOnly rows={Math.min(4, Math.max(2, example.output_text.split("\n").length))} />
-                  </label>
+                      {currentCustomProblem.is_archived ? (
+                        <button
+                          type="button"
+                          className="lc-inline-icon-btn"
+                          onClick={() => setCustomProblemArchived(currentCustomProblem.slug, false)}
+                          aria-label="Restore custom question"
+                          title="Restore"
+                        >
+                          <ArchiveRestore size={15} />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="lc-inline-icon-btn"
+                          onClick={() => setCustomProblemArchived(currentCustomProblem.slug, true)}
+                          aria-label="Archive custom question"
+                          title="Archive"
+                        >
+                          <Archive size={15} />
+                        </button>
+                      )}
+                    </>
+                  ) : null}
                 </div>
-              ))}
+              </div>
 
-              {currentCustomCases.map((testCase, index) => (
-                <div key={testCase.id} className="lc-test-card lc-test-card--custom">
-                  <div className="lc-test-card-top">
-                    <strong>Custom {index + 1}</strong>
-                    <div className="lc-test-card-actions">
-                      {currentCode.trim() && runnable && testCase.inputText.trim() ? (
+              <h2 className="lc-problem-heading">{currentProblem.title}</h2>
+              <div className="lc-problem-meta">
+                <span className={`lc-difficulty lc-difficulty--${difficultyClass(currentProblem.difficulty)}`}>
+                  {currentProblem.difficulty}
+                </span>
+                {interviewRealism ? null : <span>{currentProblem.categoryLabel}</span>}
+                {currentProblem.isExtra ? <span>Extra</span> : null}
+              </div>
+
+              {isStreakChallengeProblem ? (
+                <div className="lc-streak-challenge-banner">
+                  <ShieldAlert size={15} />
+                  <span>
+                    <strong>Save My Streak challenge.</strong> Kojo and NeetCode are disabled. Solve this on your own to
+                    restore your streak.
+                  </span>
+                </div>
+              ) : null}
+
+              {problemLoading ? (
+                <div className="lc-statement-skeleton" role="status" aria-busy="true">
+                  {[94, 100, 82, 38, 97, 68].map((width, i) => (
+                    <span key={i} className="lc-skeleton-line" style={{ width: `${width}%` }} />
+                  ))}
+                  <span className="lc-visually-hidden">Loading official statement…</span>
+                </div>
+              ) : null}
+
+              {problemError ? (
+                <div className="lc-statement-state lc-statement-state--error">
+                  <AlertIcon size={18} />
+                  <span>{problemError}</span>
+                </div>
+              ) : null}
+
+              {!currentProblem.isOfficial && !isCustomProblem ? (
+                <div className="lc-source-note">
+                  <p>
+                    This item is kept as a reference drill because it is not an official LeetCode problem title. The
+                    editor and Kojo coach still work here, but there is no official statement to render.
+                  </p>
+                </div>
+              ) : null}
+
+              {isCustomProblem && currentCustomProblem ? (
+                currentCustomProblem.description.trim() ? (
+                  <div className="lc-custom-statement">
+                    <MarkdownContent content={currentCustomProblem.description} enableCodeCopy />
+                  </div>
+                ) : (
+                  <div className="lc-source-note">
+                    <p>
+                      No write-up yet. Edit this problem and use Generate with AI to add a walkthrough and test cases, or
+                      just start coding.
+                    </p>
+                  </div>
+                )
+              ) : null}
+
+              {currentProblemData && !isCustomProblem ? (
+                <>
+                  {interviewRealism ? null : (
+                    <div className="lc-topic-tags">
+                      {currentProblemData.topic_tags.slice(0, 4).map((tag) => (
+                        <span key={tag.slug}>{tag.name}</span>
+                      ))}
+                    </div>
+                  )}
+                  <div
+                    className="lc-official-statement"
+                    dangerouslySetInnerHTML={{ __html: sanitizeLeetCodeHtml(currentProblemData.content_html) }}
+                  />
+                </>
+              ) : null}
+
+              {progress[currentProblem.slug] && pendingBankRun(currentProblem.slug) ? (
+                // Solved before it joined a bank: done globally, still cold in the bank.
+                <button
+                  type="button"
+                  className="lc-toolbar-btn"
+                  onClick={() => applyBankCompletion(currentProblem.slug, true)}
+                  aria-label="Mark done in bank"
+                >
+                  <Circle size={16} />
+                  <span className="lc-tb-label">Done in bank</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={progress[currentProblem.slug] ? "lc-toolbar-btn lc-toolbar-btn--done" : "lc-toolbar-btn"}
+                  onClick={() => toggleProgress(currentProblem)}
+                  aria-label={progress[currentProblem.slug] ? "Mark incomplete" : "Mark done"}
+                >
+                  {progress[currentProblem.slug] ? <CheckCircleIcon size={16} /> : <Circle size={16} />}
+                  <span className="lc-tb-label">{progress[currentProblem.slug] ? "Done" : "Mark done"}</span>
+                </button>
+              )}
+            </div>
+          ),
+          Testcase: (
+            <div className="lc-tests-panel">
+              <div className="lc-tests-header">
+                <h3>Tests</h3>
+                <button
+                  type="button"
+                  className="lc-add-test-btn"
+                  onClick={addCustomCase}
+                  disabled={currentCustomCases.length >= CUSTOM_TEST_LIMIT}
+                >
+                  <PlusIcon size={14} />
+                  Add custom
+                </button>
+              </div>
+              <p className="muted small">
+                {isCustomProblem
+                  ? "These cases come from this problem. You can add up to 2 ad-hoc cases for a quick run."
+                  : "You can add up to 2 custom cases on top of the official LeetCode examples."}
+              </p>
+
+              <div className="lc-test-list">
+                {officialExamples.map((example) => (
+                  <div key={example.index} className="lc-test-card">
+                    <div className="lc-test-card-top">
+                      <strong>
+                        {isCustomProblem ? "Test" : "Official"} {example.index}
+                      </strong>
+                      {currentCode.trim() && runnable ? (
                         <button
                           type="button"
                           className="lc-visualize-btn"
-                          onClick={() => handleVisualize(testCase.inputText)}
-                          disabled={visualizerLoading === testCase.inputText}
+                          onClick={() => handleVisualize(example.input_text)}
+                          disabled={visualizerLoading === example.input_text}
                           title="Step through this test case"
                         >
-                          {visualizerLoading === testCase.inputText ? <Loader2 size={12} className="spin" /> : <Eye size={12} />}
+                          {visualizerLoading === example.input_text ? (
+                            <Loader2 size={12} className="spin" />
+                          ) : (
+                            <Eye size={12} />
+                          )}
                           Visualize
                         </button>
                       ) : null}
-                      <button type="button" className="lc-inline-icon-btn" onClick={() => removeCustomCase(testCase.id)} aria-label="Remove custom test case">
-                        <CloseIcon size={14} />
-                      </button>
                     </div>
+                    <label>
+                      <span>Input</span>
+                      <textarea
+                        value={example.input_text}
+                        readOnly
+                        rows={Math.min(5, Math.max(2, example.input_text.split("\n").length))}
+                      />
+                    </label>
+                    <label>
+                      <span>Expected</span>
+                      <textarea
+                        value={example.output_text}
+                        readOnly
+                        rows={Math.min(4, Math.max(2, example.output_text.split("\n").length))}
+                      />
+                    </label>
                   </div>
-                  <label>
-                    <span>Input</span>
-                    <textarea
-                      value={testCase.inputText}
-                      onChange={(event) => updateCustomCase(testCase.id, "inputText", event.target.value)}
-                      rows={3}
-                      placeholder='nums = [1,2,3], target = 4'
-                    />
-                  </label>
-                  <label>
-                    <span>Expected</span>
-                    <textarea
-                      value={testCase.expectedOutput}
-                      onChange={(event) => updateCustomCase(testCase.id, "expectedOutput", event.target.value)}
-                      rows={2}
-                      placeholder="[0,2]"
-                    />
-                  </label>
-                </div>
-              ))}
+                ))}
+
+                {currentCustomCases.map((testCase, index) => (
+                  <div key={testCase.id} className="lc-test-card lc-test-card--custom">
+                    <div className="lc-test-card-top">
+                      <strong>Custom {index + 1}</strong>
+                      <div className="lc-test-card-actions">
+                        {currentCode.trim() && runnable && testCase.inputText.trim() ? (
+                          <button
+                            type="button"
+                            className="lc-visualize-btn"
+                            onClick={() => handleVisualize(testCase.inputText)}
+                            disabled={visualizerLoading === testCase.inputText}
+                            title="Step through this test case"
+                          >
+                            {visualizerLoading === testCase.inputText ? (
+                              <Loader2 size={12} className="spin" />
+                            ) : (
+                              <Eye size={12} />
+                            )}
+                            Visualize
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="lc-inline-icon-btn"
+                          onClick={() => removeCustomCase(testCase.id)}
+                          aria-label="Remove custom test case"
+                        >
+                          <CloseIcon size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    <label>
+                      <span>Input</span>
+                      <textarea
+                        value={testCase.inputText}
+                        onChange={(event) => updateCustomCase(testCase.id, "inputText", event.target.value)}
+                        rows={3}
+                        placeholder="nums = [1,2,3], target = 4"
+                      />
+                    </label>
+                    <label>
+                      <span>Expected</span>
+                      <textarea
+                        value={testCase.expectedOutput}
+                        onChange={(event) => updateCustomCase(testCase.id, "expectedOutput", event.target.value)}
+                        rows={2}
+                        placeholder="[0,2]"
+                      />
+                    </label>
+                  </div>
+                ))}
+              </div>
+
+              {!runnable && currentProblem.isOfficial ? (
+                <p className="lc-runner-note">
+                  Automatic running currently supports Python `class Solution` problems with official example inputs.
+                  Design-style problems still open with the official statement and editor, but they do not auto-run yet.
+                </p>
+              ) : null}
+
+              {!runnable && isCustomProblem ? (
+                <p className="lc-runner-note">Add starter code and at least one test case to run this problem.</p>
+              ) : null}
             </div>
+          ),
+          "Test result": (
+            <div aria-live="polite">
+              {runnerLoading && !runnerResult ? (
+                <InlineLoading label="Running tests" />
+              ) : !runnerResult ? (
+                <p>Run your code to see test results.</p>
+              ) : null}{" "}
+              {runnerResult ? (
+                <div
+                  className={
+                    runnerResult.ok ? "lc-runner-result lc-runner-result--ok" : "lc-runner-result lc-runner-result--error"
+                  }
+                >
+                  <strong>{runnerResult.output}</strong>
+                  {runnerResult.error ? <pre>{runnerResult.error}</pre> : null}
+                  {runnerResult.cases?.length ? (
+                    <div className="lc-runner-case-list">
+                      {runnerResult.cases.map((testCase) => (
+                        <div key={testCase.label} className="lc-runner-case">
+                          <span>{testCase.label}</span>
+                          <span>{testCase.passed ? "Pass" : "Fail"}</span>
+                          {!testCase.passed ? (
+                            <small>
+                              Expected {testCase.expected} but got {testCase.actual}
+                            </small>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+              {gradeLoading ? (
+                <LoadingNotice
+                  compact
+                  title="Kojo is grading your submission"
+                  estimate="Reading your solution and checking the approach. About 15 seconds."
+                  slowNote="Still reading. A long solution takes Kojo longer to work through."
+                  slowAfterMs={18000}
+                />
+              ) : null}
+              {gradeFeedback && !gradeLoading && !interviewRealism ? (
+                <div className="lc-grade-feedback">
+                  <div className="lc-grade-feedback-header">
+                    <KojoMascot state="idle" />
+                    <span>Kojo's feedback</span>
+                  </div>
+                  <MarkdownContent content={gradeFeedback} />
+                </div>
+              ) : null}
+              {showNextButton && (nextProblemInCategory || suggestedNext) ? (
+                <div className="lc-next-problem">
+                  <span className="lc-next-problem-eyebrow">
+                    {nextProblemInCategory ? "Up next" : `Continue , ${suggestedNext!.category.label}`}
+                  </span>
+                  <button
+                    type="button"
+                    className="lc-next-problem-btn"
+                    onClick={() => {
+                      const target = nextProblemInCategory ?? suggestedNext!.problem;
+                      const targetCategoryId = nextProblemInCategory
+                        ? currentProblem.categoryId
+                        : suggestedNext!.category.id;
+                      openProblem(targetCategoryId, target.slug);
+                    }}
+                  >
+                    <div className="lc-next-problem-info">
+                      <span className="lc-next-problem-title">
+                        {nextProblemInCategory ? nextProblemInCategory.title : suggestedNext!.problem.title}
+                      </span>
+                    </div>
+                    <span
+                      className={`lc-difficulty lc-difficulty--${difficultyClass(
+                        nextProblemInCategory ? nextProblemInCategory.difficulty : suggestedNext!.problem.difficulty,
+                      )}`}
+                    >
+                      {nextProblemInCategory ? nextProblemInCategory.difficulty : suggestedNext!.problem.difficulty}
+                    </span>
+                    <ArrowRightIcon size={16} className="lc-next-arrow" />
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ),
+          Complexity: runnerResult?.ok ? (
+            <div className="lc-complexity-body">
+              <p className="lc-complexity-intro">
+                Before Kojo weighs in, state the time and space complexity of your solution and explain why. An
+                interviewer will ask you to defend it.
+              </p>
 
-            {!runnable && currentProblem.isOfficial ? (
-              <p className="lc-runner-note">Automatic running currently supports Python `class Solution` problems with official example inputs. Design-style problems still open with the official statement and editor, but they do not auto-run yet.</p>
-            ) : null}
+              <div className="lc-complexity-field">
+                <label className="lc-complexity-label">Time complexity</label>
+                <input
+                  className="lc-complexity-claim"
+                  placeholder="O(?)"
+                  value={complexityTimeClaim}
+                  onChange={(event) => setComplexityTimeClaim(event.target.value)}
+                />
+                <textarea
+                  className="lc-complexity-why"
+                  placeholder="Why? Walk through your reasoning."
+                  rows={3}
+                  value={complexityTimeWhy}
+                  onChange={(event) => setComplexityTimeWhy(event.target.value)}
+                />
+              </div>
 
-            {!runnable && isCustomProblem ? (
-              <p className="lc-runner-note">Add starter code and at least one test case to run this problem. Editing it and using Generate with AI fills both in automatically.</p>
-            ) : null}
+              <div className="lc-complexity-field">
+                <label className="lc-complexity-label">Space complexity</label>
+                <input
+                  className="lc-complexity-claim"
+                  placeholder="O(?)"
+                  value={complexitySpaceClaim}
+                  onChange={(event) => setComplexitySpaceClaim(event.target.value)}
+                />
+                <textarea
+                  className="lc-complexity-why"
+                  placeholder="Why? Walk through your reasoning."
+                  rows={3}
+                  value={complexitySpaceWhy}
+                  onChange={(event) => setComplexitySpaceWhy(event.target.value)}
+                />
+              </div>
 
-            {runnerResult ? (
-              <div className={runnerResult.ok ? "lc-runner-result lc-runner-result--ok" : "lc-runner-result lc-runner-result--error"}>
-                <strong>{runnerResult.output}</strong>
-                {runnerResult.error ? <pre>{runnerResult.error}</pre> : null}
-                {runnerResult.cases?.length ? (
-                  <div className="lc-runner-case-list">
-                    {runnerResult.cases.map((testCase) => (
-                      <div key={testCase.label} className="lc-runner-case">
-                        <span>{testCase.label}</span>
-                        <span>{testCase.passed ? "Pass" : "Fail"}</span>
-                        {!testCase.passed ? <small>Expected {testCase.expected} but got {testCase.actual}</small> : null}
+              <button
+                type="button"
+                className="lc-complexity-submit"
+                onClick={() => void handleComplexitySubmit()}
+                disabled={complexityLoading || !complexityTimeClaim.trim() || !complexitySpaceClaim.trim()}
+              >
+                {complexityLoading ? (
+                  <>
+                    <Loader2 size={15} className="lc-complexity-spin" /> Kojo is checking
+                  </>
+                ) : complexityResult ? (
+                  "Re-check"
+                ) : (
+                  "Submit for review"
+                )}
+              </button>
+
+              {complexityResult ? (
+                <div className="lc-complexity-result">
+                  <div className="lc-cx-cards">
+                    {(
+                      [
+                        {
+                          metric: "Time",
+                          correct: complexityResult.time_correct,
+                          said: complexityTimeClaim.trim(),
+                          actual: complexityResult.actual_time_complexity,
+                        },
+                        {
+                          metric: "Space",
+                          correct: complexityResult.space_correct,
+                          said: complexitySpaceClaim.trim(),
+                          actual: complexityResult.actual_space_complexity,
+                        },
+                      ] as const
+                    ).map((row) => (
+                      <div
+                        key={row.metric}
+                        className={`lc-cx-card ${row.correct ? "lc-cx-card--ok" : "lc-cx-card--off"}`}
+                      >
+                        <div className="lc-cx-card-top">
+                          <span className="lc-cx-metric">{row.metric}</span>
+                          <span className="lc-cx-status">
+                            {row.correct ? <CheckCircleIcon size={15} /> : <CrossCircleIcon size={15} />}
+                            {row.correct ? "Correct" : "Not quite"}
+                          </span>
+                        </div>
+                        {row.correct ? (
+                          <div className="lc-cx-answer">{row.actual || "?"}</div>
+                        ) : (
+                          <div className="lc-cx-diff">
+                            <span className="lc-cx-diff-key">You said</span>
+                            <span className="lc-cx-diff-val lc-cx-diff-val--said">{row.said || "Unspecified"}</span>
+                            <span className="lc-cx-diff-key">Correct</span>
+                            <span className="lc-cx-diff-val lc-cx-diff-val--right">{row.actual || "?"}</span>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
-                ) : null}
-              </div>
-            ) : null}
 
-            {gradeLoading ? (
-              <LoadingNotice
-                compact
-                title="Kojo is grading your submission"
-                estimate="Reading your solution and checking the approach. About 15 seconds."
-                slowNote="Still reading. A long solution takes Kojo longer to work through."
-                slowAfterMs={18000}
-              />
-            ) : null}
-
-            {gradeFeedback && !gradeLoading && !interviewRealism ? (
-              <div className="lc-grade-feedback">
-                <div className="lc-grade-feedback-header">
-                  <KojoMascot state="idle" />
-                  <span>Kojo's feedback</span>
-                </div>
-                <MarkdownContent content={gradeFeedback} />
-              </div>
-            ) : null}
-
-            {showNextButton && (nextProblemInCategory || suggestedNext) ? (
-              <div className="lc-next-problem">
-                <span className="lc-next-problem-eyebrow">
-                  {nextProblemInCategory ? "Up next" : `Continue , ${suggestedNext!.category.label}`}
-                </span>
-                <button
-                  type="button"
-                  className="lc-next-problem-btn"
-                  onClick={() => {
-                    const target = nextProblemInCategory ?? suggestedNext!.problem;
-                    const targetCategoryId = nextProblemInCategory
-                      ? currentProblem.categoryId
-                      : suggestedNext!.category.id;
-                    openProblem(targetCategoryId, target.slug);
-                  }}
-                >
-                  <div className="lc-next-problem-info">
-                    <span className="lc-next-problem-title">
-                      {nextProblemInCategory ? nextProblemInCategory.title : suggestedNext!.problem.title}
+                  <div className="lc-cx-meta">
+                    <span className="lc-cx-meter" aria-hidden="true">
+                      <span style={{ width: `${Math.round(complexityResult.confidence * 100)}%` }} />
+                    </span>
+                    <span className="lc-cx-meta-label">
+                      Kojo is {Math.round(complexityResult.confidence * 100)}% sure of this grade
                     </span>
                   </div>
-                  <span className={`lc-difficulty lc-difficulty--${difficultyClass(
-                    nextProblemInCategory ? nextProblemInCategory.difficulty : suggestedNext!.problem.difficulty
-                  )}`}>
-                    {nextProblemInCategory ? nextProblemInCategory.difficulty : suggestedNext!.problem.difficulty}
-                  </span>
-                  <ArrowRightIcon size={16} className="lc-next-arrow" />
-                </button>
-              </div>
-            ) : null}
-          </div>
 
-          {!isCustomProblem && !isStreakChallengeProblem ? (
-            <div className="lc-solution-panel">
-              <button
-                type="button"
-                className="lc-solution-toggle"
-                onClick={() => {
-                  if (!hasAttempted || assistsLocked) return;
-                  const opening = !solutionOpen;
-                  setSolutionOpen(opening);
-                  // Opening the solution means "I couldn't solve this": log it as a
-                  // weakness signal, once per problem.
-                  if (
-                    opening &&
-                    betaMode &&
-                    !isGuestSession() &&
-                    !solutionViewedLoggedRef.current.has(currentProblem.slug)
-                  ) {
-                    solutionViewedLoggedRef.current.add(currentProblem.slug);
-                    void logLCStruggleEvent(
-                      resolveProblemTopic(currentProblem.slug),
-                      "solution_viewed",
-                      currentProblem.slug,
-                      resolveProblemSubtopic(currentProblem.slug),
-                    );
-                  }
-                }}
-                disabled={!hasAttempted || assistsLocked}
-                title={
-                  assistsLocked
-                    ? `Locked on Pass ${activePass}: no solution reveal`
-                    : hasAttempted
-                      ? "Toggle NeetCode solution"
-                      : "Attempt the problem to unlock"
-                }
-              >
-                <Youtube size={15} />
-                <span>NeetCode solution</span>
-                {assistsLocked ? (
-                  <small className="lc-solution-locked">Locked on Pass {activePass}</small>
-                ) : !hasAttempted ? (
-                  <small className="lc-solution-locked">Attempt first to unlock</small>
-                ) : (
-                  <ChevronDownIcon size={14} className={solutionOpen ? "lc-solution-chevron lc-solution-chevron--open" : "lc-solution-chevron"} />
-                )}
-              </button>
-              {solutionOpen && hasAttempted && !assistsLocked ? (
-                <div className="lc-solution-frame-wrap">
-                  <iframe
-                    src={`https://neetcode.io/solutions/${currentProblem.slug}`}
-                    title={`NeetCode solution for ${currentProblem.title}`}
-                    className="lc-solution-iframe"
-                    allow="autoplay; encrypted-media"
-                    allowFullScreen
-                  />
+                  {complexityResult.flagged_uncertain ? (
+                    <div className="lc-cx-uncertain">
+                      <AlertIcon size={15} />
+                      <span>
+                        Kojo isn't fully sure of this grade. Double-check the analysis against your own reasoning.
+                      </span>
+                    </div>
+                  ) : null}
+
+                  <hr className="lc-cx-divider" />
+                  <div className="lc-cx-feedback">
+                    <MarkdownContent content={complexityResult.feedback} />
+                  </div>
                 </div>
               ) : null}
-              <button
-                type="button"
-                className="lc-solution-toggle lc-walk-toggle"
-                onClick={() => {
-                  if (!hasAttempted || assistsLocked) return;
-                  openWalkthrough();
-                }}
-                disabled={!hasAttempted || assistsLocked}
-                title={hasAttempted && !assistsLocked ? "Watch Kojo solve it" : "Attempt the problem to unlock"}
-              >
-                <SparklesIcon size={15} />
-                <span>Watch Kojo solve it</span>
-                {assistsLocked ? (
-                  <small className="lc-solution-locked">Locked on Pass {activePass}</small>
-                ) : !hasAttempted ? (
-                  <small className="lc-solution-locked">Attempt first to unlock</small>
-                ) : (
-                  <PlayIcon size={13} className="lc-solution-chevron" />
-                )}
-              </button>
             </div>
-          ) : null}
+          ) : (
+            <p>Pass the test cases to check your complexity.</p>
+          ),
+          Code: (
+            <div className="lc-editor-pane">
+              <div className="lc-dock-code-tools">
+              <button type="button" className="lc-toolbar-btn" onClick={handleFormat} aria-label="Format code">
+                <WrapText size={16} />
+                <span className="lc-tb-label">Format</span>
+              </button>
+              <CodingTabs
+                tabs={(currentCodeWorkspace?.tabs ?? []).map((tab) => {
+                  const locked = isTabLockedForDrill(currentProblem.slug, tab);
+                  const drillLocked = isTabDeleteLocked(currentProblem.slug, tab);
+                  return {
+                    id: tab.id,
+                    name: tab.name,
+                    locked,
+                    closable: locked && !drillLocked,
+                    lockTitle: drillLocked ? "Locked while you drill" : "Locked until you solve it in the bank",
+                  };
+                })}
+                activeTabId={currentCodeWorkspace?.activeTabId ?? ""}
+                onSelectTab={handleSelectCodeTab}
+                onAddTab={handleAddCodeTab}
+                onDeleteTab={handleDeleteCodeTab}
+                canAddTab={!drillActive && (currentCodeWorkspace?.tabs?.length ?? 0) < MAX_CODE_TABS}
+              />
 
-          {isCustomProblem && !isStreakChallengeProblem ? (
-            (() => {
-              // Custom problems have no NeetCode page, so Kojo writes the model solution.
-              // Unlocks on Pass 1 only, once the user has attempted (run) it. attemptedSlugs
-              // persists that attempt so it stays unlocked across code edits / revisits, not
-              // just while the current runnerResult is live.
-              const problemAttempted = hasAttempted || attemptedSlugs.has(currentProblem.slug);
-              const kojoSolutionUnlocked = problemAttempted && activePass === 1;
-              return (
-                <div className="lc-solution-panel lc-kojocode-panel">
-                  <button
-                    type="button"
-                    className="lc-solution-toggle"
-                    onClick={() => {
-                      if (!kojoSolutionUnlocked) return;
-                      openWalkthrough();
-                    }}
-                    disabled={!kojoSolutionUnlocked}
-                    title={
-                      activePass > 1
-                        ? `Locked on Pass ${activePass}: no solution reveal`
-                        : problemAttempted
-                          ? "Watch Kojo solve it"
-                          : "Attempt the problem to unlock"
-                    }
-                  >
-                    <SparklesIcon size={15} />
-                    <span>Watch Kojo solve it</span>
-                    {activePass > 1 ? (
-                      <small className="lc-solution-locked">Locked on Pass {activePass}</small>
-                    ) : !problemAttempted ? (
-                      <small className="lc-solution-locked">Attempt first to unlock</small>
-                    ) : (
-                      <PlayIcon size={13} className="lc-solution-chevron" />
-                    )}
-                  </button>
-                </div>
-              );
-            })()
-          ) : null}
-
+              </div>
+              <div className="lc-editor-surface">
+                <Editor
+                  height="100%"
+                  loading={<InlineLoading label="Opening code editor" />}
+                  defaultLanguage="python"
+                  // Give each (problem, tab) its own Monaco model via `path`, and seed
+                  // it with `defaultValue` instead of driving `value`. A controlled
+                  // `value` prop makes @monaco-editor/react replace the whole document
+                  // whenever the prop lags Monaco's live buffer by even one keystroke,
+                  // which snaps the caret to the end of the file when typing fast.
+                  // Uncontrolled-per-tab keeps the caret put; state still syncs via onChange.
+                  path={`${currentProblem?.slug ?? "none"}:${currentCodeTab?.id ?? "none"}`}
+                  defaultValue={currentCode}
+                  onChange={(value) => handleCodeChange(value ?? "")}
+                  onMount={handleMonacoMount}
+                  theme="vs-dark"
+                  options={{
+                    // The code pane starts hidden (display:none) behind the mobile
+                    // problem/code toggle, so Monaco first measures a 0-size container.
+                    // automaticLayout makes it re-measure when it becomes visible,
+                    // otherwise it paints a collapsed black box you cannot type into.
+                    automaticLayout: true,
+                    fontSize: 14,
+                    fontFamily: "Menlo, Consolas, 'Cascadia Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+                    minimap: { enabled: false },
+                    // Word-based completion only (finishing identifiers the user already typed).
+                    // Monaco ships no Python language service, so this is the ONLY completion
+                    // source available here: it can never suggest an algorithm, library method, or
+                    // solution, just the user's own variable/function names + keywords. Kept ON for
+                    // normal practice (spares retyping, matches CoderPad/CodeSignal), but forced OFF
+                    // whenever a 3-pass drill is active so drills stay bare mock-interview realism.
+                    // IntelliSense-style helpers (parameter hints, trigger-char popups) stay off.
+                    quickSuggestions: !drillActive,
+                    suggestOnTriggerCharacters: false,
+                    parameterHints: { enabled: false },
+                    wordBasedSuggestions: drillActive ? "off" : "currentDocument",
+                    tabSize: 4,
+                    scrollBeyondLastLine: false,
+                    lineNumbers: "on",
+                    renderLineHighlight: "line",
+                    padding: { top: 16, bottom: 16 },
+                  }}
+                />
+              </div>
+            </div>
+          ),
+          Notes: (
+            <EditorNotes
+              key={currentProblem.slug}
+              slug={currentProblem.slug}
+              storageKey={getNotesKey(currentProblem.slug)}
+            />
+          ),
+          Submissions: (
+            <EditorSubmissions key={currentProblem.slug} slug={currentProblem.slug} revision={historyRevision} />
+          ),
+          Solutions: (
+            <EditorSolutions
+              key={currentProblem.slug}
+              slug={currentProblem.slug}
+              title={currentProblem.title}
+              custom={isCustomProblem}
+              statement={currentCustomProblem?.description ?? currentProblemData?.content_html ?? ""}
+              starterCode={currentProblemData?.python_snippet ?? ""}
+              provider={generationProvider}
+              onReveal={recordSolutionView}
+              onWatch={openWalkthrough}
+            />
+          ),
+          Kojo: (
+            <KojoHelpChat
+              storageKey={`lc:${currentProblem.slug}`}
+              subtitle={currentProblem.title}
+              embedded
+              buildContext={buildLeetCodeKojoContext}
+              customInstruction="Give hints, debugging direction, edge cases, and complexity guidance. Never give the full solution code."
+              interviewerMode={resolveInterviewerMode(interviewerMode)}
+              provider={generationProvider}
+              initialDraft={`I'm stuck on ${currentProblem.title}. Give me one hint without solving it for me.`}
+              contractNote={INTERVIEWER_COPY[resolveInterviewerMode(interviewerMode)].contract}
+              slashCommands={allKojoCommands}
+              disabled={assistsLocked}
+              disabledNote={assistsLocked ? `Locked on Pass ${activePass}: no assists` : undefined}
+              emptyTitle="Stuck on this one?"
+              emptySub={INTERVIEWER_COPY[resolveInterviewerMode(interviewerMode)].emptySub}
+              suggestions={INTERVIEWER_COPY[resolveInterviewerMode(interviewerMode)].suggestions}
+            />
+          ),
+        }}
+      />
           {walkOpen && currentProblem ? (
             <KojoWalkthrough
               slug={currentProblem.slug}
@@ -7544,240 +7712,6 @@ export default function LeetCodeMode() {
               onClose={() => setWalkOpen(false)}
             />
           ) : null}
-
-          {runnerResult?.ok ? (
-            <div className="lc-complexity-panel">
-              <button
-                type="button"
-                className="lc-complexity-toggle"
-                onClick={() => setComplexityOpen((open) => !open)}
-                title="Assess the time and space complexity of your solution"
-              >
-                <Gauge size={15} />
-                <span>Complexity check</span>
-                {complexityResult ? (
-                  <small className="lc-complexity-done">
-                    {complexityResult.time_correct && complexityResult.space_correct ? "Both correct" : "Reviewed"}
-                  </small>
-                ) : null}
-                <ChevronDownIcon
-                  size={14}
-                  className={complexityOpen ? "lc-complexity-chevron lc-complexity-chevron--open" : "lc-complexity-chevron"}
-                />
-              </button>
-              {complexityOpen ? (
-                <div className="lc-complexity-body">
-                  <p className="lc-complexity-intro">
-                    Before Kojo weighs in, state the time and space complexity of your solution and explain why. An interviewer will ask you to defend it.
-                  </p>
-
-                  <div className="lc-complexity-field">
-                    <label className="lc-complexity-label">Time complexity</label>
-                    <input
-                      className="lc-complexity-claim"
-                      placeholder="O(?)"
-                      value={complexityTimeClaim}
-                      onChange={(event) => setComplexityTimeClaim(event.target.value)}
-                    />
-                    <textarea
-                      className="lc-complexity-why"
-                      placeholder="Why? Walk through your reasoning."
-                      rows={3}
-                      value={complexityTimeWhy}
-                      onChange={(event) => setComplexityTimeWhy(event.target.value)}
-                    />
-                  </div>
-
-                  <div className="lc-complexity-field">
-                    <label className="lc-complexity-label">Space complexity</label>
-                    <input
-                      className="lc-complexity-claim"
-                      placeholder="O(?)"
-                      value={complexitySpaceClaim}
-                      onChange={(event) => setComplexitySpaceClaim(event.target.value)}
-                    />
-                    <textarea
-                      className="lc-complexity-why"
-                      placeholder="Why? Walk through your reasoning."
-                      rows={3}
-                      value={complexitySpaceWhy}
-                      onChange={(event) => setComplexitySpaceWhy(event.target.value)}
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    className="lc-complexity-submit"
-                    onClick={() => void handleComplexitySubmit()}
-                    disabled={complexityLoading || !complexityTimeClaim.trim() || !complexitySpaceClaim.trim()}
-                  >
-                    {complexityLoading ? (
-                      <>
-                        <Loader2 size={15} className="lc-complexity-spin" /> Kojo is checking
-                      </>
-                    ) : complexityResult ? (
-                      "Re-check"
-                    ) : (
-                      "Submit for review"
-                    )}
-                  </button>
-
-                  {complexityResult ? (
-                    <div className="lc-complexity-result">
-                      <div className="lc-cx-cards">
-                        {([
-                          {
-                            metric: "Time",
-                            correct: complexityResult.time_correct,
-                            said: complexityTimeClaim.trim(),
-                            actual: complexityResult.actual_time_complexity,
-                          },
-                          {
-                            metric: "Space",
-                            correct: complexityResult.space_correct,
-                            said: complexitySpaceClaim.trim(),
-                            actual: complexityResult.actual_space_complexity,
-                          },
-                        ] as const).map((row) => (
-                          <div
-                            key={row.metric}
-                            className={`lc-cx-card ${row.correct ? "lc-cx-card--ok" : "lc-cx-card--off"}`}
-                          >
-                            <div className="lc-cx-card-top">
-                              <span className="lc-cx-metric">{row.metric}</span>
-                              <span className="lc-cx-status">
-                                {row.correct ? <CheckCircleIcon size={15} /> : <CrossCircleIcon size={15} />}
-                                {row.correct ? "Correct" : "Not quite"}
-                              </span>
-                            </div>
-                            {row.correct ? (
-                              <div className="lc-cx-answer">{row.actual || "?"}</div>
-                            ) : (
-                              <div className="lc-cx-diff">
-                                <span className="lc-cx-diff-key">You said</span>
-                                <span className="lc-cx-diff-val lc-cx-diff-val--said">{row.said || "—"}</span>
-                                <span className="lc-cx-diff-key">Correct</span>
-                                <span className="lc-cx-diff-val lc-cx-diff-val--right">{row.actual || "?"}</span>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="lc-cx-meta">
-                        <span className="lc-cx-meter" aria-hidden="true">
-                          <span style={{ width: `${Math.round(complexityResult.confidence * 100)}%` }} />
-                        </span>
-                        <span className="lc-cx-meta-label">
-                          Kojo is {Math.round(complexityResult.confidence * 100)}% sure of this grade
-                        </span>
-                      </div>
-
-                      {complexityResult.flagged_uncertain ? (
-                        <div className="lc-cx-uncertain">
-                          <AlertIcon size={15} />
-                          <span>Kojo isn't fully sure of this grade. Double-check the analysis against your own reasoning.</span>
-                        </div>
-                      ) : null}
-
-                      <hr className="lc-cx-divider" />
-                      <div className="lc-cx-feedback">
-                        <MarkdownContent content={complexityResult.feedback} />
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-        </aside>
-
-        <div className="lc-editor-pane">
-          <CodingTabs
-            tabs={(currentCodeWorkspace?.tabs ?? []).map((tab) => {
-              const locked = isTabLockedForDrill(currentProblem.slug, tab);
-              const drillLocked = isTabDeleteLocked(currentProblem.slug, tab);
-              return {
-                id: tab.id,
-                name: tab.name,
-                locked,
-                closable: locked && !drillLocked,
-                lockTitle: drillLocked ? "Locked while you drill" : "Locked until you solve it in the bank",
-              };
-            })}
-            activeTabId={currentCodeWorkspace?.activeTabId ?? ""}
-            onSelectTab={handleSelectCodeTab}
-            onAddTab={handleAddCodeTab}
-            onDeleteTab={handleDeleteCodeTab}
-            canAddTab={!drillActive && (currentCodeWorkspace?.tabs?.length ?? 0) < MAX_CODE_TABS}
-          />
-
-          <div className="lc-editor-surface">
-            <Editor
-              height="100%"
-              defaultLanguage="python"
-              // Give each (problem, tab) its own Monaco model via `path`, and seed
-              // it with `defaultValue` instead of driving `value`. A controlled
-              // `value` prop makes @monaco-editor/react replace the whole document
-              // whenever the prop lags Monaco's live buffer by even one keystroke,
-              // which snaps the caret to the end of the file when typing fast.
-              // Uncontrolled-per-tab keeps the caret put; state still syncs via onChange.
-              path={`${currentProblem?.slug ?? "none"}:${currentCodeTab?.id ?? "none"}`}
-              defaultValue={currentCode}
-              onChange={(value) => handleCodeChange(value ?? "")}
-              onMount={handleMonacoMount}
-              theme="vs-dark"
-              options={{
-                // The code pane starts hidden (display:none) behind the mobile
-                // problem/code toggle, so Monaco first measures a 0-size container.
-                // automaticLayout makes it re-measure when it becomes visible,
-                // otherwise it paints a collapsed black box you cannot type into.
-                automaticLayout: true,
-                fontSize: 14,
-                fontFamily: "Menlo, Consolas, 'Cascadia Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
-                minimap: { enabled: false },
-                // Word-based completion only (finishing identifiers the user already typed).
-                // Monaco ships no Python language service, so this is the ONLY completion
-                // source available here: it can never suggest an algorithm, library method, or
-                // solution, just the user's own variable/function names + keywords. Kept ON for
-                // normal practice (spares retyping, matches CoderPad/CodeSignal), but forced OFF
-                // whenever a 3-pass drill is active so drills stay bare mock-interview realism.
-                // IntelliSense-style helpers (parameter hints, trigger-char popups) stay off.
-                quickSuggestions: !drillActive,
-                suggestOnTriggerCharacters: false,
-                parameterHints: { enabled: false },
-                wordBasedSuggestions: drillActive ? "off" : "currentDocument",
-                tabSize: 4,
-                scrollBeyondLastLine: false,
-                lineNumbers: "on",
-                renderLineHighlight: "line",
-                padding: { top: 16, bottom: 16 },
-              }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {kojoOpen && currentProblem && !interviewRealism ? (
-        <KojoHelpChat
-          storageKey={`lc:${currentProblem.slug}`}
-          subtitle={currentProblem.title}
-          onClose={() => setKojoOpen(false)}
-          buildContext={buildLeetCodeKojoContext}
-          customInstruction="Give hints, debugging direction, edge cases, and complexity guidance. Never give the full solution code."
-          interviewerMode={resolveInterviewerMode(interviewerMode)}
-          provider={generationProvider}
-          initialDraft={`I'm stuck on ${currentProblem.title}. Give me one hint without solving it for me.`}
-          contractNote={INTERVIEWER_COPY[resolveInterviewerMode(interviewerMode)].contract}
-          slashCommands={allKojoCommands}
-          disabled={assistsLocked}
-          disabledNote={assistsLocked ? `Locked on Pass ${activePass}: no assists` : undefined}
-          emptyTitle="Stuck on this one?"
-          emptySub={INTERVIEWER_COPY[resolveInterviewerMode(interviewerMode)].emptySub}
-          suggestions={INTERVIEWER_COPY[resolveInterviewerMode(interviewerMode)].suggestions}
-        />
-      ) : null}
-
       {visualizerTrace ? (
         <ExecutionVisualizer
           code={currentCode}
@@ -7833,33 +7767,6 @@ export default function LeetCodeMode() {
               <button type="button" className="button button-primary lc-timeout-action" onClick={applyTimerFromInput}>
                 Start timer
               </button>
-            </div>
-          </div>
-        </>
-      ) : null}
-
-      {notesOpen ? (
-        <>
-          <div className="lc-kojo-backdrop" onClick={() => setNotesOpen(false)} />
-          <div
-            className="lc-kojo-modal lc-notes-modal"
-            style={notesPos ? { left: notesPos.x, top: notesPos.y, right: "unset", bottom: "unset" } : undefined}
-          >
-            <div className="lc-kojo-modal-header lc-notes-modal-header" onMouseDown={handleNotesDragStart}>
-              <div className="kojo-avatar"><Notebook size={16} /></div>
-              <span>Notes</span>
-              <button type="button" className="lc-kojo-close" onClick={() => setNotesOpen(false)} aria-label="Close notes">
-                <CloseIcon size={17} />
-              </button>
-            </div>
-            <div className="lc-notes-body">
-              <textarea
-                className="lc-notes-textarea"
-                value={notesContent}
-                onChange={(event) => handleNotesChange(currentProblem.slug, event.target.value)}
-                placeholder="Jot down your approach, key observations, or edge cases..."
-                rows={14}
-              />
             </div>
           </div>
         </>

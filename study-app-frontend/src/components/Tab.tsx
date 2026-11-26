@@ -1,6 +1,8 @@
 import type { MouseEvent } from "react";
 import { Lock } from "lucide-react";
 
+export { Lock as CodingLock };
+
 export type CodingTabItem = {
     id: string;
     name: string;

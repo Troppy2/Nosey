@@ -2055,12 +2055,8 @@ export async function syncLCWorkspace(problemSlug: string, workspace: unknown): 
 }
 
 export async function fetchLCNotes(problemSlug: string): Promise<string> {
-  try {
-    const result = await request<{ notes: string }>(`/leetcode/notes/${problemSlug}`);
-    return result.notes ?? "";
-  } catch {
-    return "";
-  }
+  const result = await request<{ notes: string }>(`/leetcode/notes/${encodeURIComponent(problemSlug)}`);
+  return result.notes ?? "";
 }
 
 export async function syncLCNotes(problemSlug: string, notes: string): Promise<void> {
@@ -2354,6 +2350,10 @@ export async function logLCStruggleEvent(
   } catch {
     // Best-effort signal, never blocks the flow it's fired from.
   }
+}
+
+export function listLCTestRuns(slug: string) {
+  return request<import("./types").LCTestRunSummary[]>(`/leetcode/test-runs/${encodeURIComponent(slug)}`);
 }
 
 export async function postLCTestRun(

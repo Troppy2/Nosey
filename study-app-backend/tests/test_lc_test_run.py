@@ -36,3 +36,16 @@ async def test_failed_run_without_grade_logs_struggle_signal(client, db_session_
     async with db_session_maker() as session:
         runs = (await session.execute(select(LCTestRun))).scalars().all()
     assert len(runs) == 3
+
+
+@pytest.mark.asyncio
+async def test_history_is_scoped_to_user_and_problem(client, seeded, db_session_maker):
+    async with db_session_maker() as session:
+        session.add(LCTestRun(user_id=seeded["other"].id, **RUN, passed=True))
+        await session.commit()
+    for slug, passed in [("two-sum", False), ("three-sum", False), ("two-sum", True)]:
+        response = await client.post("/leetcode/test-run", json={**RUN, "problem_slug": slug, "passed": passed})
+        assert response.status_code == 204
+    response = await client.get("/leetcode/test-runs/two-sum")
+    assert response.status_code == 200
+    assert [row["passed"] for row in response.json()] == [True, False]

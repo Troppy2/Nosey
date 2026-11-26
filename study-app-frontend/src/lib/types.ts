@@ -1507,6 +1507,8 @@ export type SolutionWalkthrough = {
   space_complexity: string;
   complexity_say: string;
 };
+export type LCTestRunSummary = { id: number; passed: boolean; run_at: string };
+
 export type SolutionWalkthroughResponse = { slug: string; solution_code: string; walkthrough: SolutionWalkthrough };
 
 /** A Kojo pattern lecture (prefix sum, union find...), played by the walkthrough player. */
