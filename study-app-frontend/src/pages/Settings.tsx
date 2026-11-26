@@ -88,6 +88,8 @@ export default function Settings() {
     setKojoStrictness,
     kojoCustomInstruction,
     setKojoCustomInstruction,
+    markdownAnswers,
+    setMarkdownAnswers,
     betaMode,
   } = useSettings();
   const [memory, setMemory] = useState<KojoMemory | null>(null);
@@ -595,6 +597,21 @@ export default function Settings() {
             >
               Replay page tips
             </Button>
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection title="Markdown answers">
+          <p className="muted small">
+            Format written answers in tests and lesson practice with markdown, Obsidian style:
+            ==highlights==, callouts, task lists, $math$ and more. Your answer shows formatted
+            when you click away, and on your results.
+          </p>
+          <div className="settings-reset-row">
+            <ToggleSwitch
+              checked={markdownAnswers}
+              onClick={() => setMarkdownAnswers(!markdownAnswers)}
+              label={markdownAnswers ? "Markdown on" : "Markdown off"}
+            />
           </div>
         </CollapsibleSection>
 

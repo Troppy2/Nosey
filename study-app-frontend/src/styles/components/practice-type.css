@@ -113,6 +113,15 @@
   cursor: pointer;
 }
 
+/* Markdown answers on: the formatted answer, clipped to the card height. */
+.practice-pad-typed--md {
+  cursor: pointer;
+}
+
+.practice-pad-typed--md .kojo-markdown > :first-child {
+  margin-top: 0;
+}
+
 .practice-pad-typed:hover {
   border-color: var(--green-light-mid);
 }

@@ -10,6 +10,7 @@ export const SETTINGS_KEYS = {
   difficultyPrompt: "nosey_lc_difficulty_prompt",
   interviewerMode: "nosey_lc_interviewer_mode",
   interviewRealism: "nosey_lc_interview_realism",
+  markdownAnswers: "nosey_markdown_answers",
 } as const;
 
 // Kojo custom instructions are capped so they can't crowd out the notes context
@@ -33,16 +34,21 @@ function deriveBetaAccess(): boolean {
 // is migrated forward to the scoped key so this only happens once. Without this,
 // settings saved before key scoping (e.g. beta mode) silently read as default.
 function resolveSettingValue(bareKey: string): string | null {
-  const scoped = scopeKey(bareKey);
-  const scopedVal = localStorage.getItem(scoped);
-  if (scopedVal !== null) return scopedVal;
-  // No scoped value yet. Migrate the legacy unscoped value if one exists.
-  if (scoped !== bareKey) {
-    const legacy = localStorage.getItem(bareKey);
-    if (legacy !== null) {
-      localStorage.setItem(scoped, legacy);
-      return legacy;
+  // Storage can be missing or blocked (private mode, tests): fall back to defaults.
+  try {
+    const scoped = scopeKey(bareKey);
+    const scopedVal = localStorage.getItem(scoped);
+    if (scopedVal !== null) return scopedVal;
+    // No scoped value yet. Migrate the legacy unscoped value if one exists.
+    if (scoped !== bareKey) {
+      const legacy = localStorage.getItem(bareKey);
+      if (legacy !== null) {
+        localStorage.setItem(scoped, legacy);
+        return legacy;
+      }
     }
+  } catch {
+    // ignore: the caller's default applies
   }
   return null;
 }
@@ -61,7 +67,11 @@ function readStringSetting(bareKey: string, defaultValue: string) {
 
 // Writes to localStorage and notifies all useSettings instances in the same tab.
 function writeSetting(key: string, value: string) {
-  localStorage.setItem(key, value);
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Storage blocked: the setting still applies for this page through the event.
+  }
   window.dispatchEvent(new StorageEvent("storage", { key, newValue: value }));
 }
 
@@ -101,6 +111,11 @@ export function useSettings() {
   const [interviewRealism, setInterviewRealismState] = useState(() =>
     readBooleanSetting(SETTINGS_KEYS.interviewRealism, true),
   );
+  // Written answers (test mode, lesson typed practice pads) render as Obsidian-style
+  // markdown when not being edited, and on Results. Off by default: plain text.
+  const [markdownAnswers, setMarkdownAnswersState] = useState(() =>
+    readBooleanSetting(SETTINGS_KEYS.markdownAnswers, false),
+  );
   const [betaMode, setBetaModeState] = useState(deriveBetaAccess);
 
   // Sync state when another instance of useSettings writes a setting.
@@ -129,6 +144,9 @@ export function useSettings() {
       }
       if (e.key === scopeKey(SETTINGS_KEYS.interviewRealism) && e.newValue !== null) {
         setInterviewRealismState(e.newValue !== "false");
+      }
+      if (e.key === scopeKey(SETTINGS_KEYS.markdownAnswers) && e.newValue !== null) {
+        setMarkdownAnswersState(e.newValue !== "false");
       }
       // Beta access follows the stored user record (admin-granted). Re-derive
       // when it changes in another tab (login/logout or an admin grant picked
@@ -182,6 +200,11 @@ export function useSettings() {
     writeSetting(scopeKey(SETTINGS_KEYS.interviewRealism), String(value));
   }
 
+  function setMarkdownAnswers(value: boolean) {
+    setMarkdownAnswersState(value);
+    writeSetting(scopeKey(SETTINGS_KEYS.markdownAnswers), String(value));
+  }
+
   return {
     questionFallbackEnabled,
     setQuestionFallbackEnabled,
@@ -199,6 +222,8 @@ export function useSettings() {
     setInterviewerMode,
     interviewRealism,
     setInterviewRealism,
+    markdownAnswers,
+    setMarkdownAnswers,
     betaMode,
   };
 }

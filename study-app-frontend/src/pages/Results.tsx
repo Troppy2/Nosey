@@ -771,6 +771,7 @@ function ReviewItem({
 }) {
   const [open, setOpen] = useState(false);
   const [reasoningOpen, setReasoningOpen] = useState(false);
+  const { markdownAnswers } = useSettings();
   // A remake that earned credit reads as fixed: green card, check icon. The
   // original grade stays in the feedback below.
   const passed = answer.is_correct || answer.remake_status === "credited";
@@ -833,7 +834,10 @@ function ReviewItem({
           <div>
             <span>{drawnOnly ? "Your answer (read from your drawing)" : "Your answer"}</span>
             <ClampedBox className={`review-answer-markdown ${drawnOnly ? "review-work-transcript" : "review-answer-text"}`}>
-              <MarkdownContent content={formatAnswerForDisplay(answer.user_answer)} />
+              <MarkdownContent
+                content={formatAnswerForDisplay(answer.user_answer)}
+                obsidian={markdownAnswers && !drawnOnly}
+              />
             </ClampedBox>
             {trimmed ? (
               <button className="review-full-read-toggle" onClick={() => setFullReadOpen(!fullReadOpen)} type="button">

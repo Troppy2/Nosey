@@ -5,6 +5,8 @@ import type { ScratchPadData } from "./ScratchPad";
 const api = vi.hoisted(() => ({
   saveModulePractice: vi.fn(() => Promise.resolve({ status: "open", strokes: null })),
   scopeKey: (key: string) => key,
+  // useSettings (markdown answers) reads the stored user for beta access.
+  getStoredUser: () => null,
 }));
 vi.mock("../lib/api", () => api);
 

@@ -1,5 +1,7 @@
 import Editor from "@monaco-editor/react";
 import { TextArea } from "./Field";
+import { MarkdownAnswerBox } from "./MarkdownAnswerBox";
+import { useSettings } from "../lib/useSettings";
 import { InlineLoading } from "./Loaders";
 import "../styles/components/practice-type.css";
 
@@ -40,16 +42,28 @@ type PracticeTypePanelProps = {
 };
 
 export function PracticeTypePanel({ mode, language, value, onChange }: PracticeTypePanelProps) {
+  const { markdownAnswers } = useSettings();
   if (mode === "text") {
     return (
       <div className="scratchpad-type-panel">
-        <TextArea
-          label="Your answer"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder="Write your answer in your own words."
-          autoFocus
-        />
+        {markdownAnswers ? (
+          <MarkdownAnswerBox
+            id="practice-typed-answer"
+            label="Your answer"
+            value={value}
+            onChange={onChange}
+            placeholder="Write your answer in your own words."
+            autoFocus
+          />
+        ) : (
+          <TextArea
+            label="Your answer"
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder="Write your answer in your own words."
+            autoFocus
+          />
+        )}
       </div>
     );
   }

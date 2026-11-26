@@ -6,6 +6,8 @@ import type { PadMode } from "../lib/practicePads";
 import type { PracticeItemState } from "../lib/types";
 import { Button } from "./Button";
 import { FormError } from "./FormError";
+import { MarkdownContent } from "./MarkdownContent";
+import { useSettings } from "../lib/useSettings";
 import {
   exportScratchPadPng,
   isScratchPadEmpty,
@@ -152,6 +154,7 @@ export function PracticePad({
   // Typed answer, same echo guard as the ink: only adopt the server's copy
   // when it is not what this pad last produced.
   const [typed, setTyped] = useState<string>(state.typed ?? "");
+  const { markdownAnswers } = useSettings();
   const producedTypedRef = useRef<string | null>(state.typed ?? null);
   useEffect(() => {
     const incoming = state.typed ?? null;
@@ -266,7 +269,29 @@ export function PracticePad({
           ) : null}
         </div>
 
-        {typedMode && hasTyped && !open ? (
+        {typedMode === "text" && hasTyped && !open && markdownAnswers ? (
+          // Markdown answers on: the closed card shows the answer formatted. A div,
+          // not a <button>, because the answer can hold links and folding callouts.
+          <div
+            role="button"
+            tabIndex={0}
+            className="practice-pad-typed practice-pad-typed--md"
+            aria-label="Open your answer"
+            onClick={(event) => {
+              if ((event.target as HTMLElement).closest("a, summary")) return;
+              setOpen(true);
+            }}
+            onKeyDown={(event) => {
+              if (event.target !== event.currentTarget) return;
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setOpen(true);
+              }
+            }}
+          >
+            <MarkdownContent content={typed} obsidian />
+          </div>
+        ) : typedMode && hasTyped && !open ? (
           <button
             type="button"
             className="practice-pad-typed"

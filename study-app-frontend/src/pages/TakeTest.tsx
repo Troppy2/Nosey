@@ -9,6 +9,7 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { TextArea } from "../components/Field";
+import { MarkdownAnswerBox } from "../components/MarkdownAnswerBox";
 import { InlineLoading, LoadingNotice } from "../components/Loaders";
 import { KojoHelpChat } from "../components/KojoHelpChat";
 import { MarkdownContent } from "../components/MarkdownContent";
@@ -100,7 +101,7 @@ export default function TakeTest() {
   const built = useMemo(() => buildScreens(test?.questions ?? []), [test]);
 
   // ── Learning Mode (beta only) ──────────────────────────────────────────────
-  const { betaMode, generationProvider, kojoStrictness } = useSettings();
+  const { betaMode, generationProvider, kojoStrictness, markdownAnswers } = useSettings();
   const [learningMode, setLearningMode] = useState(() =>
     localStorage.getItem(scopeKey(`nosey_learning_mode_${numericTestId}`)) === "true",
   );
@@ -226,7 +227,7 @@ export default function TakeTest() {
   // Arrow keys to navigate test questions
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || (event.target instanceof HTMLElement && event.target.isContentEditable)) {
         return; // Don't interfere with typing
       }
       // Don't interfere with the STEM answer editor: the MathLive <math-field>
@@ -551,7 +552,7 @@ export default function TakeTest() {
   // Letter keys A-D to select MCQ options
   useEffect(() => {
     function handleLetterKey(event: KeyboardEvent) {
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || (event.target instanceof HTMLElement && event.target.isContentEditable)) return;
       // The scratch pad's canvas is not a text input, so without this guard
       // pressing "a" while drawing would change the MCQ answer underneath it.
       if (event.target instanceof HTMLCanvasElement) return;
@@ -801,6 +802,15 @@ export default function TakeTest() {
             value={answers[item.id] ?? ""}
             onChange={setAnswer}
             preferText={looksLikeProsePrompt(item.question_text)}
+          />
+        ) : markdownAnswers ? (
+          <MarkdownAnswerBox
+            key={item.id}
+            id={`answer-${item.id}`}
+            label="Your answer"
+            value={answers[item.id] ?? ""}
+            onChange={setAnswer}
+            placeholder="Use the details from your notes..."
           />
         ) : (
           <TextArea
