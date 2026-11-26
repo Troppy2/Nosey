@@ -1556,3 +1556,117 @@ export type FolderSearchResponse = {
   results: FolderSearchResult[];
   has_more: boolean;
 };
+
+// ── Pattern Trails (backend routes/pattern_trails.py, schemas/pattern_trails_schema.py) ──
+
+export type PTPattern = { key: string; title: string };
+
+export type PTRedo = {
+  id: number;
+  problem_slug: string;
+  step_id: number | null;
+  subtopic_slug: string | null;
+  position: number | null;
+  gate_item_id: number | null;
+  time_limit_s: number;
+  interval_index: number;
+  due_at: string;
+  due: boolean;
+  last_result: "failed" | "slow" | "passed";
+};
+
+/** Rates are null until there is at least one sample. */
+export type PTStats = {
+  recognition: number | null;
+  picks: number;
+  solve_rate: number | null;
+  solve_attempts: number;
+  weak: boolean;
+};
+
+export type PTStepState = "locked" | "open" | "passed";
+
+export type PTSubtopicSummary = {
+  slug: string;
+  title: string;
+  summary: string;
+  open: boolean;
+  finished: boolean;
+  lesson_watched: boolean;
+  step_states: PTStepState[];
+  passed_count: number;
+  stats: PTStats;
+};
+
+export type PTGateState = {
+  state: "locked" | "open" | "in_progress" | "cooldown";
+  cleared: boolean;
+  need: number;
+  size: number;
+  attempt_id: number | null;
+  locked_until: string | null;
+  best_correct: number | null;
+};
+
+export type PTTopicSummary = {
+  slug: string;
+  title: string;
+  icon_key: string | null;
+  subtopics: PTSubtopicSummary[];
+  finished: boolean;
+  gate: PTGateState;
+  stats: PTStats;
+};
+
+export type PTWeakest = {
+  pattern: PTPattern;
+  topic_slug: string;
+  /** recognition: solves it when told but misses it unlabeled; solve: misses it either way. */
+  kind: "recognition" | "solve";
+  recognition: number | null;
+  solve_rate: number | null;
+};
+
+export type PTMap = {
+  topics: PTTopicSummary[];
+  current_topic_slug: string | null;
+  solved_total: number;
+  redos_due: PTRedo[];
+  redos_waiting: number;
+  weakest: PTWeakest | null;
+};
+
+export type PTLesson = { lecture_slug: string | null; watched: boolean; watched_at: string | null };
+
+export type PTStep = {
+  id: number;
+  position: number;
+  problem_slug: string;
+  difficulty: string;
+  time_limit_s: number;
+  state: PTStepState;
+  locked_reason: string | null;
+  attempts: number;
+  best_seconds: number | null;
+  passed_at: string | null;
+  redo: PTRedo | null;
+};
+
+export type PTPath = {
+  topic_slug: string;
+  topic_title: string;
+  slug: string;
+  title: string;
+  summary: string;
+  cues: string[];
+  template_code: string;
+  open: boolean;
+  locked_reason: string | null;
+  lesson: PTLesson;
+  steps: PTStep[];
+  finished: boolean;
+  solved_count: number;
+  next_subtopic_slug: string | null;
+};
+
+export type PTRedoList = { due: PTRedo[]; waiting: PTRedo[] };

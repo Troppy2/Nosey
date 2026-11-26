@@ -343,4 +343,42 @@ export const TOURS: Record<TourId, TourDef> = {
       },
     ],
   },
+  "pattern-trails": {
+    signedInOnly: true,
+    steps: [
+      {
+        element: t("pt-map-title"),
+        title: "Pattern trails",
+        body: "Each land is one technique. Its paths teach one way the technique shows up, from a short lesson to five problems, easy to hard.",
+        side: "bottom",
+        align: "start",
+      },
+      {
+        element: t("pt-land"),
+        title: "Walk the paths in order",
+        body: "The next path opens when you finish the one above it. After every path, the gate mixes in unlabeled problems: pick the technique before you solve.",
+        side: "top",
+        align: "start",
+      },
+    ],
+  },
+  "pattern-trail-path": {
+    signedInOnly: true,
+    steps: [
+      {
+        element: t("pt-path-title"),
+        title: "One problem per step",
+        body: "Start with Kojo's lesson. Each step opens in the editor as a three-pass drill; pass 3 starts blank and must pass every test inside the time limit.",
+        side: "bottom",
+        align: "start",
+      },
+      {
+        element: t("pt-quest"),
+        title: "Pass it and Kojo walks on",
+        body: "A pass adds one to your solved count. Fail or run slow and Kojo stays put, and the problem comes back later as a timed redo.",
+        side: "top",
+        align: "start",
+      },
+    ],
+  },
 };

@@ -114,6 +114,23 @@
   --border: var(--green-light-mid);
   --gray-200: rgba(113, 131, 85, 0.18);
   --gray-500: #5c6b50;
+
+  /* Pattern Trails scene (styles/pages/pattern-trails.css only). The game's
+     sky, sun, dirt path, wood and flowers have no place in the app palette;
+     the hills reuse the green ramp above. Approved by the user 2026-11-26. */
+  --pt-sky: #bfe0ee;
+  --pt-sky-low: #eef6e2;
+  --pt-sun: #f7dc8f;
+  --pt-dirt: #efe4c3;
+  --pt-dirt-edge: #d8c597;
+  --pt-wood: #7a6a48;
+  --pt-paper: #fffdf6;
+  --pt-petal-pink: #f2b8c6;
+  --pt-petal-gold: #f3cf7a;
+  --pt-petal-lilac: #c9b8ef;
+  --pt-yarn: #e9b44c;
+  --pt-wilt: #c9bfae;
+  --pt-storm: #8d989c;
 }
 
 * { box-sizing: border-box; }

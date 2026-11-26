@@ -373,3 +373,41 @@ export function SkeletonChatShell({ label = "Loading your classes" }: { label?: 
     </div>
   );
 }
+
+/**
+ * Pattern Trails map stand-in: a title, the wide scene, then the land panel
+ * (path rows) beside the side cards. Mirrors pages/PatternTrails.tsx.
+ */
+export function SkeletonTrailMap({ label = "Loading pattern trails" }: { label?: string }) {
+  return (
+    <div className="page pt-page skel-trail" role="status" aria-label={label}>
+      <Skeleton width="220px" height="1.8rem" />
+      <Skeleton width="min(420px, 80%)" height="0.9rem" />
+      <Skeleton className="skel-trail-scene" />
+      <div className="skel-trail-below">
+        <div className="skel-trail-panel">
+          <Skeleton width="40%" height="1.3rem" />
+          {Array.from({ length: 3 }, (_, i) => (
+            <Skeleton key={i} width="100%" height="64px" />
+          ))}
+        </div>
+        <div className="skel-trail-side">
+          <Skeleton width="100%" height="120px" />
+          <Skeleton width="100%" height="140px" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Pattern Trails path stand-in: the scene, then the quest card. Mirrors pages/PatternTrailPath.tsx. */
+export function SkeletonTrailPath({ label = "Loading this path" }: { label?: string }) {
+  return (
+    <div className="page pt-page skel-trail" role="status" aria-label={label}>
+      <Skeleton width="140px" height="0.9rem" />
+      <Skeleton width="min(320px, 70%)" height="1.8rem" />
+      <Skeleton className="skel-trail-scene skel-trail-scene--path" />
+      <Skeleton width="100%" height="140px" />
+    </div>
+  );
+}

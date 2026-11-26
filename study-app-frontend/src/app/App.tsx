@@ -26,6 +26,8 @@ import SignIn from "../pages/SignIn";
 import ConnectAuthorize from "../pages/ConnectAuthorize";
 import KojoMode from "../pages/KojoMode";
 import LeetCodeMode from "../pages/LeetCodeMode";
+import PatternTrails from "../pages/PatternTrails";
+import PatternTrailPath from "../pages/PatternTrailPath";
 import { isAuthenticated, isGuestSession, scopeKey } from "../lib/api";
 import MockInterviewSetup from "../pages/MockInterviewSetup";
 import MockInterviewResume from "../pages/MockInterviewResume";
@@ -119,6 +121,8 @@ export default function App() {
           <Route path="/flashcards/:folderId/episode/:moduleId" element={<EpisodePlayer />} />
           <Route path="/folders/:folderId/flashcards/manage" element={<FlashcardsManage />} />
           <Route path="/leetcode" element={<SignedInRoute><LeetCodeMode /></SignedInRoute>} />
+          <Route path="/pattern-trails" element={<SignedInRoute><PatternTrails /></SignedInRoute>} />
+          <Route path="/pattern-trails/:subtopicSlug" element={<SignedInRoute><PatternTrailPath /></SignedInRoute>} />
           <Route path="/system-design" element={<SignedInRoute><SystemDesign /></SignedInRoute>} />
           <Route path="/system-design/:conceptId" element={<SignedInRoute><SystemDesignConcept /></SignedInRoute>} />
           <Route

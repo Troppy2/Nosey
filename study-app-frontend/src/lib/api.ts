@@ -405,7 +405,9 @@ export type TourId =
   | "manage-flashcards"
   | "kojo"
   | "quizlet-import"
-  | "settings";
+  | "settings"
+  | "pattern-trails"
+  | "pattern-trail-path";
 
 // Same-tab mirror of users.tours_seen, so a tour cannot replay in the moment
 // before the POST lands. The account is the source of truth.
@@ -3146,4 +3148,25 @@ export async function recordLectureAudio(slug: string, voice: string, lines: str
     method: "POST",
     body: JSON.stringify({ voice, lines }),
   });
+}
+
+// ── Pattern Trails (beta; the server's get_beta_user is the boundary) ─────────
+
+export async function fetchTrailMap(): Promise<import("./types").PTMap> {
+  return request<import("./types").PTMap>("/pattern-trails");
+}
+
+export async function fetchTrailPath(slug: string): Promise<import("./types").PTPath> {
+  return request<import("./types").PTPath>(`/pattern-trails/subtopics/${encodeURIComponent(slug)}`);
+}
+
+/** The lesson stop is done: opens step 1. Returns the updated path. */
+export async function markTrailLessonWatched(slug: string): Promise<import("./types").PTPath> {
+  return request<import("./types").PTPath>(`/pattern-trails/subtopics/${encodeURIComponent(slug)}/lesson-watched`, {
+    method: "POST",
+  });
+}
+
+export async function fetchTrailRedos(): Promise<import("./types").PTRedoList> {
+  return request<import("./types").PTRedoList>("/pattern-trails/redos");
 }

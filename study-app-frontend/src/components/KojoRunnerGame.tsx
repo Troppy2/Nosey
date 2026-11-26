@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { KOJO_SPRITE, KOJO_SPRITE_COLS, KOJO_SPRITE_ROWS } from "../lib/kojoSprite";
 
 // Kojo chases a yarn ball through a Chrome-dino-style runner, drawn on a fixed
 // logical canvas (960x300) that CSS scales down to fit. Everything is pixel art:
@@ -15,24 +16,11 @@ const KOJO_X = 130;
 // Every sprite is a grid of CELL x CELL pixels. Dots are empty; the other
 // characters map to palette colors through the sprite's own legend.
 const CELL = 5;
-// Kojo the cat, in profile and mid-run: tail up and curled at the left, a
-// rounded body, and a head with two ears, one eye, a light muzzle and a nose.
-// The bottom two rows are left clear for the animated legs.
-const SPRITE_COLS = 14;
-const SPRITE_ROWS = 11;
-const KOJO_SPRITE = [
-  ".#............",
-  "#.........#..#",
-  "#........#b##b",
-  ".#.......###e#",
-  "..#########bbn",
-  "..###########.",
-  "..##bbb#####..",
-  "..##bbb###....",
-  "..########....",
-  "..............",
-  "..............",
-];
+// Kojo the cat, in profile and mid-run (map shared with the Pattern Trails
+// sprite in lib/kojoSprite.ts). The bottom two rows are left clear for the
+// animated legs.
+const SPRITE_COLS = KOJO_SPRITE_COLS;
+const SPRITE_ROWS = KOJO_SPRITE_ROWS;
 const KOJO_W = SPRITE_COLS * CELL;
 const KOJO_H = SPRITE_ROWS * CELL;
 

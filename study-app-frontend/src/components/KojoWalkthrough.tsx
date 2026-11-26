@@ -283,7 +283,21 @@ export function KojoWalkthrough({ slug, problemTitle, statement, statementText, 
 }
 
 /** A Kojo pattern lecture (theory, spot it, template, worked problem). */
-export function KojoLecture({ slug, onClose, onTryProblem }: { slug: string; onClose: () => void; onTryProblem?: (problemSlug: string) => boolean | void }) {
+export function KojoLecture({
+  slug,
+  onClose,
+  onTryProblem,
+  onFinished,
+  onLoadError,
+}: {
+  slug: string;
+  onClose: () => void;
+  onTryProblem?: (problemSlug: string) => boolean | void;
+  /** Playback reached the end (Pattern Trails counts the lesson as watched). */
+  onFinished?: () => void;
+  /** The lecture could not be loaded; the caller may show something else instead. */
+  onLoadError?: () => void;
+}) {
   const [data, setData] = useState<LectureResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -292,6 +306,8 @@ export function KojoLecture({ slug, onClose, onTryProblem }: { slug: string; onC
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+  const onLoadErrorRef = useRef(onLoadError);
+  onLoadErrorRef.current = onLoadError;
 
   useEffect(() => {
     if (pip) return;
@@ -344,7 +360,11 @@ export function KojoLecture({ slug, onClose, onTryProblem }: { slug: string; onC
     setData(null);
     fetchLecture(slug)
       .then((res) => !cancelled && setData(res))
-      .catch((e: unknown) => !cancelled && setError(e instanceof Error ? e.message : "Kojo couldn't load the lecture."));
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : "Kojo couldn't load the lecture.");
+        onLoadErrorRef.current?.();
+      });
     return () => {
       cancelled = true;
     };
@@ -380,6 +400,7 @@ export function KojoLecture({ slug, onClose, onTryProblem }: { slug: string; onC
             ) : null
           }
           onClose={onClose}
+          onFinished={onFinished}
           popped={!!pip}
           onPopOut={popOut}
           onPopIn={popIn}
@@ -401,6 +422,7 @@ function VideoPlayer({
   statement,
   headerAction,
   onClose,
+  onFinished,
   popped,
   onPopOut,
   onPopIn,
@@ -414,10 +436,14 @@ function VideoPlayer({
   statement?: ReactNode;
   headerAction?: ReactNode;
   onClose: () => void;
+  /** Playback reached the end on its own (not a seek to the end). */
+  onFinished?: () => void;
   popped: boolean;
   onPopOut?: () => void;
   onPopIn: () => void;
 }) {
+  const finishedRef = useRef(onFinished);
+  finishedRef.current = onFinished;
   const [preferredVoice, setVoiceState] = useState<VoiceChoice>(loadVoice);
   const [recordAttempt, setRecordAttempt] = useState(0);
   const estimatedTimeline = useMemo(() => build(), [build]);
@@ -576,6 +602,7 @@ function VideoPlayer({
         tRef.current = next;
         setT(next);
         setPlaying(false);
+        finishedRef.current?.();
         return;
       }
       tRef.current = next;

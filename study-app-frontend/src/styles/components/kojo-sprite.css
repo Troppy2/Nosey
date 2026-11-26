@@ -1,0 +1,49 @@
+/* Kojo pixel sprite (components/KojoSprite.tsx). */
+.kojo-sprite {
+  display: block;
+  height: auto;
+  overflow: visible;
+}
+.kojo-sprite-body {
+  fill: var(--green-dark);
+}
+.kojo-sprite-light {
+  fill: var(--green-light);
+}
+.kojo-sprite-ink {
+  fill: var(--ink);
+}
+
+/* Two-frame walk: the leg pairs step a whole pixel, out of phase, so the cycle
+   stays on the grid like the runner game's. */
+.kojo-sprite.is-walking .kojo-sprite-leg--a {
+  animation: kojo-leg-a 0.32s steps(1) infinite;
+}
+.kojo-sprite.is-walking .kojo-sprite-leg--b {
+  animation: kojo-leg-b 0.32s steps(1) infinite;
+}
+@keyframes kojo-leg-a {
+  0%,
+  49% {
+    transform: translateY(0);
+  }
+  50%,
+  100% {
+    transform: translateY(-1px);
+  }
+}
+@keyframes kojo-leg-b {
+  0%,
+  49% {
+    transform: translateY(-1px);
+  }
+  50%,
+  100% {
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kojo-sprite.is-walking .kojo-sprite-leg {
+    animation: none;
+  }
+}
