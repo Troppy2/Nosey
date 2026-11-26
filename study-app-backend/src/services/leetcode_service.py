@@ -569,6 +569,36 @@ class LeetCodeService:
                 )
             )
 
+        if examples:
+            return examples
+
+        # Paragraph format (LeetCode, late 2026): every line is its own <p>, e.g.
+        # <p><strong>Example 1:</strong></p><p><strong>Input:</strong> <code>nums = [2,7]</code></p>
+        return self._parse_paragraph_examples(content_html)
+
+    def _parse_paragraph_examples(self, content_html: str) -> list[LeetCodeExample]:
+        text = self._html_to_text(content_html)
+        headings = list(re.finditer(r"^\s*Example\s*(\d+)\s*:\s*$", text, flags=re.MULTILINE | re.IGNORECASE))
+        examples: list[LeetCodeExample] = []
+        for position, heading in enumerate(headings):
+            end = headings[position + 1].start() if position + 1 < len(headings) else len(text)
+            block = text[heading.end():end]
+            # The last example runs into the constraints / follow-up sections.
+            block = re.split(r"^\s*(?:Constraints|Follow[- ]?up|Note)\s*:", block, maxsplit=1, flags=re.MULTILINE | re.IGNORECASE)[0]
+            input_match = re.search(r"Input:\s*(.+?)(?=\n\s*Output:|\Z)", block, flags=re.DOTALL)
+            output_match = re.search(r"Output:\s*(.+?)(?=\n\s*Explanation:|\Z)", block, flags=re.DOTALL)
+            explanation_match = re.search(r"Explanation:\s*(.+?)\Z", block, flags=re.DOTALL)
+            if not input_match or not output_match:
+                continue
+            explanation = explanation_match.group(1).strip() if explanation_match else ""
+            examples.append(
+                LeetCodeExample(
+                    index=int(heading.group(1)),
+                    input_text=input_match.group(1).strip(),
+                    output_text=output_match.group(1).strip(),
+                    explanation_text=explanation or None,
+                )
+            )
         return examples
 
     def _html_to_text(self, html: str) -> str:
