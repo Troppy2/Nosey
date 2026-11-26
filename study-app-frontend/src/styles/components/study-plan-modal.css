@@ -491,9 +491,21 @@
 }
 
 .plan-composer .date-picker-chip {
-  min-height: 44px;
-  border-color: var(--green-light-mid);
-  background: var(--white);
+  min-height: 48px;
+  padding: 12px 18px;
+  border: 1.5px solid var(--green-mid);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--green-dark);
+  font-weight: 700;
+}
+
+@media (hover: hover) {
+  .plan-composer .date-picker-chip:hover:not(:disabled) {
+    border-color: var(--green-dark);
+    background: rgba(255, 255, 255, 0.96);
+    color: var(--green-dark);
+  }
 }
 
 /* New plan + settings */
