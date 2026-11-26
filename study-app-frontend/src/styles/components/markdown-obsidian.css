@@ -1,0 +1,138 @@
+/* Obsidian flavor of MarkdownContent (obsidian prop): student-written answers in
+   tests and lesson practice pads. Highlights, strike, safe links, quotes,
+   callouts and read-only task lists. */
+
+.md-obsidian .md-highlight {
+  padding: 0 2px;
+  border-radius: var(--radius-xs);
+  background: var(--accent-caution-tint);
+  color: inherit;
+}
+
+/* Code in answers uses the light chat-style block (same as the KojoCode solution
+   block), not the default dark one. The language label stays sentence case. */
+.md-obsidian .kojo-code-block {
+  background: rgba(113, 131, 85, 0.1);
+  border: 1px solid var(--border);
+  color: var(--ink);
+}
+
+.md-obsidian .kojo-code-block .kojo-code-lang {
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.md-obsidian .kojo-inline-code {
+  background: rgba(113, 131, 85, 0.12);
+  color: var(--ink);
+}
+
+.md-obsidian del {
+  color: var(--muted);
+}
+
+.md-obsidian .md-link {
+  color: var(--accent-info-strong);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+
+.md-obsidian .md-link:hover {
+  color: var(--green-dark);
+}
+
+.md-obsidian .md-quote {
+  margin: var(--space-2) 0;
+  padding: var(--space-1) 0 var(--space-1) var(--space-3);
+  border-left: 3px solid var(--green-light);
+  color: var(--muted);
+}
+
+/* Callouts: > [!type] title, foldable with + / - like Obsidian. */
+.md-obsidian .md-callout {
+  --callout-accent: var(--accent-info);
+  --callout-tint: var(--accent-info-tint);
+  --callout-strong: var(--accent-info-strong);
+  margin: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--callout-accent);
+  border-radius: var(--radius-md);
+  background: var(--callout-tint);
+}
+
+.md-obsidian .md-callout--positive {
+  --callout-accent: var(--accent-positive);
+  --callout-tint: var(--accent-positive-tint);
+  --callout-strong: var(--accent-positive-strong);
+}
+
+.md-obsidian .md-callout--caution {
+  --callout-accent: var(--accent-caution);
+  --callout-tint: var(--accent-caution-tint);
+  --callout-strong: var(--accent-caution-strong);
+}
+
+.md-obsidian .md-callout--danger {
+  --callout-accent: var(--accent-danger);
+  --callout-tint: var(--accent-danger-tint);
+  --callout-strong: var(--accent-danger-strong);
+}
+
+.md-obsidian .md-callout--neutral {
+  --callout-accent: var(--green-dark);
+  --callout-tint: var(--green-lightest);
+  --callout-strong: var(--ink);
+}
+
+.md-obsidian .md-callout-title {
+  display: block;
+  font-weight: 600;
+  color: var(--callout-strong);
+}
+
+.md-obsidian details.md-callout > summary {
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.md-obsidian details.md-callout > summary .md-callout-title {
+  display: inline;
+}
+
+.md-obsidian .md-callout-body {
+  margin-top: var(--space-1);
+}
+
+.md-obsidian .md-callout-body > .kojo-markdown > :first-child,
+.md-obsidian .md-quote > .kojo-markdown > :first-child {
+  margin-top: 0;
+}
+
+.md-obsidian .md-callout-body > .kojo-markdown > :last-child,
+.md-obsidian .md-quote > .kojo-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+/* Task lists: - [ ] / - [x], display only. */
+.md-obsidian .md-task-list {
+  padding-left: var(--space-1);
+  list-style: none;
+}
+
+.md-obsidian .md-task {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.md-obsidian .md-task .checkbox-input {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.md-obsidian .md-task.is-done > span {
+  color: var(--muted);
+  text-decoration: line-through;
+}

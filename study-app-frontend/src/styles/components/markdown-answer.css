@@ -1,0 +1,300 @@
+/* MarkdownAnswerBox / MarkdownLiveEditor: Obsidian-style Live Preview answer
+   box. Framed like .input.textarea so turning the setting on does not change
+   the page. The class prefix is md-live / md-answer. */
+
+/* .field sets font-weight 700 for its label; a textarea ignores that, but the
+   editor's content would inherit it. */
+.md-live {
+  font-weight: 400;
+}
+
+/* Fixed size like the text box it replaces: the box never grows or shrinks as
+   blocks switch between raw and formatted; long answers scroll inside, and the
+   corner drag resizes it, as with the old textarea. */
+.md-live .cm-editor {
+  height: 240px;
+  min-height: 160px;
+  resize: vertical;
+  overflow: hidden;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid var(--green-light-mid);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.md-live .cm-editor.cm-focused {
+  outline: none;
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(113, 131, 85, 0.18);
+}
+
+.md-live .cm-scroller {
+  overflow: auto;
+  font-family: var(--font-sans);
+  line-height: 1.6;
+}
+
+.md-live .cm-content {
+  padding: 12px 16px;
+  caret-color: var(--ink);
+}
+
+/* Lesson practice pad (Type tab): fill the panel exactly like its textarea. */
+.scratchpad-type-panel .md-answer-field {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.scratchpad-type-panel .md-live {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 160px;
+}
+
+.scratchpad-type-panel .md-live .cm-editor {
+  flex: 1;
+  height: auto;
+  resize: none;
+}
+
+/* Format toolbar over a selection (CodeMirror tooltip on <body>, above modals). */
+.cm-tooltip:has(> .md-format-bar) {
+  z-index: 10001;
+  border: 0;
+  background: transparent;
+}
+
+.md-format-bar {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  box-shadow: var(--shadow-md);
+}
+
+.md-format-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 32px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.md-format-btn:hover,
+.md-format-btn:focus-visible {
+  background: var(--green-lightest);
+  outline: none;
+}
+
+.md-format-btn code {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  background: none;
+}
+
+.md-format-btn .md-highlight {
+  padding: 0 3px;
+  border-radius: var(--radius-xs);
+  background: var(--accent-caution-tint);
+  color: inherit;
+}
+
+@media (pointer: coarse) {
+  .md-format-btn {
+    min-width: 44px;
+    height: 44px;
+  }
+}
+
+/* Three classes: CodeMirror injects its own `.cm-line` padding at runtime. */
+.md-live .cm-content .cm-line {
+  padding: 0;
+}
+
+.md-live .cm-placeholder {
+  color: var(--green-mid);
+}
+
+/* ── Live preview styling (always on, so nothing jumps as the cursor moves) ── */
+
+.md-live .cm-line.md-live-h {
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.md-live .cm-line.md-live-h1 { font-size: 1.45em; padding-top: 4px; }
+.md-live .cm-line.md-live-h2 { font-size: 1.28em; padding-top: 3px; }
+.md-live .cm-line.md-live-h3 { font-size: 1.14em; }
+
+.md-live .md-live-highlight {
+  border-radius: var(--radius-xs);
+  background: var(--accent-caution-tint);
+}
+
+.md-live .md-live-inline-code {
+  padding: 1px 3px;
+  border-radius: var(--radius-xs);
+  background: rgba(113, 131, 85, 0.12);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.md-live .md-live-link {
+  color: var(--accent-info-strong);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.md-live .md-live-link--blocked {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.md-live .md-live-comment {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Code fences: the light block, line by line; the ``` lines stay small and dim. */
+.md-live .cm-line.md-live-code {
+  padding: 0 12px;
+  background: rgba(113, 131, 85, 0.1);
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+}
+
+.md-live .cm-line.md-live-code--first {
+  border-top-left-radius: var(--radius-md);
+  border-top-right-radius: var(--radius-md);
+  padding-top: 4px;
+}
+
+.md-live .cm-line.md-live-code--last {
+  border-bottom-left-radius: var(--radius-md);
+  border-bottom-right-radius: var(--radius-md);
+  padding-bottom: 4px;
+}
+
+.md-live .cm-line.md-live-code--fence {
+  color: var(--green-mid);
+  font-size: 0.78em;
+}
+
+/* Quotes and callouts: a left rule (and a tint for callouts) on every line. */
+.md-live .cm-line.md-live-quote {
+  padding-left: 12px;
+  border-left: 3px solid var(--green-light);
+  color: var(--muted);
+}
+
+.md-live .cm-line.md-live-callout {
+  --callout-accent: var(--accent-info);
+  --callout-tint: var(--accent-info-tint);
+  --callout-strong: var(--accent-info-strong);
+  padding-right: 12px;
+  border-left-color: var(--callout-accent);
+  background: var(--callout-tint);
+  color: var(--ink);
+}
+
+.md-live .cm-line.md-live-callout--positive {
+  --callout-accent: var(--accent-positive);
+  --callout-tint: var(--accent-positive-tint);
+  --callout-strong: var(--accent-positive-strong);
+}
+
+.md-live .cm-line.md-live-callout--caution {
+  --callout-accent: var(--accent-caution);
+  --callout-tint: var(--accent-caution-tint);
+  --callout-strong: var(--accent-caution-strong);
+}
+
+.md-live .cm-line.md-live-callout--danger {
+  --callout-accent: var(--accent-danger);
+  --callout-tint: var(--accent-danger-tint);
+  --callout-strong: var(--accent-danger-strong);
+}
+
+.md-live .cm-line.md-live-callout--neutral {
+  --callout-accent: var(--green-dark);
+  --callout-tint: var(--green-lightest);
+  --callout-strong: var(--ink);
+}
+
+.md-live .cm-line.md-live-callout.md-live-quote--first {
+  padding-top: 4px;
+  border-top-right-radius: var(--radius-md);
+}
+
+.md-live .cm-line.md-live-callout.md-live-quote--last {
+  padding-bottom: 4px;
+  border-bottom-right-radius: var(--radius-md);
+}
+
+.md-live .cm-line.md-live-callout-title {
+  font-weight: 600;
+  color: var(--callout-strong);
+}
+
+.md-live .md-live-callout-label {
+  font-weight: 600;
+}
+
+/* Lists and tasks. */
+.md-live .md-live-bullet {
+  display: inline-block;
+  width: 1.1em;
+  color: var(--green-dark);
+}
+
+.md-live .md-live-task {
+  margin: 0 6px 0 0;
+  vertical-align: -2px;
+  cursor: pointer;
+}
+
+.md-live .md-live-task-done {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.md-live .cm-line.md-live-hr {
+  color: var(--green-mid);
+}
+
+/* Rendered math (cursor elsewhere on the page). */
+.md-live .md-live-math {
+  padding: 0 1px;
+}
+
+.md-live .md-live-math--display {
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+  vertical-align: middle;
+}
+
+/* Display math inside a callout or quote: no second frame around it. */
+.md-obsidian .md-callout .math-block,
+.md-obsidian .md-quote .math-block {
+  margin: var(--space-1) 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}

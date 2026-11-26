@@ -52,7 +52,7 @@ export function SelectionKojoAssistant({ folderId, folderName, children, onAskKo
 
   useEffect(() => {
     function handleMouseUp(event: MouseEvent) {
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || (event.target instanceof HTMLElement && event.target.isContentEditable)) return;
       if (isOpenRef.current) return;
 
       window.setTimeout(() => {

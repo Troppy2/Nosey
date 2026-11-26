@@ -6,6 +6,7 @@ import React, { useState } from "react";
 import { repairMathDelimiters } from "../lib/repairMathDelimiters";
 import { VisualBlock, VisualPending, inferVisualLang, isVisualLang } from "./visuals/VisualBlock";
 import { replaceTikz } from "../lib/tikz";
+import "../styles/components/markdown-obsidian.css";
 
 // ── KaTeX ─────────────────────────────────────────────────────────────────────
 
@@ -235,7 +236,35 @@ type Seg =
   | { k: "bold"; v: string }
   | { k: "italic"; v: string }
   | { k: "code"; v: string }
+  | { k: "mark"; v: string }
+  | { k: "strike"; v: string }
+  | { k: "link"; v: string; href: string }
   | { k: "math"; entry: MathEntry };
+
+// ── Obsidian flavor (student-written answers) ─────────────────────────────────
+// Student text is untrusted. Nothing here ever produces raw HTML: every node is
+// a React element, so typed <script> or <img onerror> shows as literal text.
+// Links are the only way out of the page, and only http(s) URLs become anchors;
+// javascript:, data:, vbscript: and anything unparseable stay plain text.
+export function safeHttpUrl(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!/^https?:\/\//i.test(trimmed)) return null;
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+// Bare URLs in prose, trailing punctuation left out so "see https://x.com." works.
+const BARE_URL_RE = /(https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"\]])/g;
+
+// Finds the closing two-character delimiter ("==" or "~~") for a run opened at `start`.
+function findPairCloser(chunk: string, start: number, delim: string): number {
+  const close = chunk.indexOf(delim, start);
+  return close > start ? close : -1;
+}
 
 // Finds the closing delimiter for an emphasis run starting at `start`.
 // For bold (**), a matching ** is preferred; if none exists, a lone * is
@@ -264,7 +293,7 @@ function findEmphasisCloser(chunk: string, start: number, wantDouble: boolean): 
 // Scans a non-math text chunk into bold / italic / code / text segments.
 // A hand-rolled scanner (rather than one regex) so an unbalanced bold run can
 // gracefully close on a single star instead of failing outright.
-function scanEmphasis(chunk: string): Seg[] {
+function scanEmphasis(chunk: string, obsidian = false): Seg[] {
   const out: Seg[] = [];
   let buf = "";
   const flush = () => { if (buf) { out.push({ k: "text", v: buf }); buf = ""; } };
@@ -276,6 +305,31 @@ function scanEmphasis(chunk: string): Seg[] {
     if (c === "`") {
       const end = chunk.indexOf("`", i + 1);
       if (end > i + 1) { flush(); out.push({ k: "code", v: chunk.slice(i + 1, end) }); i = end + 1; continue; }
+    }
+
+    if (obsidian) {
+      // ==highlight== and ~~strike~~
+      const pair = chunk.slice(i, i + 2);
+      if ((pair === "==" || pair === "~~") && chunk[i + 2] !== undefined && chunk[i + 2] !== pair[0]) {
+        const closeIdx = findPairCloser(chunk, i + 2, pair);
+        if (closeIdx !== -1) {
+          flush();
+          out.push({ k: pair === "==" ? "mark" : "strike", v: chunk.slice(i + 2, closeIdx) });
+          i = closeIdx + 2;
+          continue;
+        }
+      }
+      // [label](http(s) url). Anything else (including [[wikilinks]]) stays text.
+      if (c === "[" && chunk[i + 1] !== "[") {
+        const m = /^\[([^\]\n]+)\]\(([^()\s]+)\)/.exec(chunk.slice(i));
+        const href = m ? safeHttpUrl(m[2]) : null;
+        if (m && href) {
+          flush();
+          out.push({ k: "link", v: m[1], href });
+          i += m[0].length;
+          continue;
+        }
+      }
     }
 
     if (c === "*") {
@@ -302,10 +356,22 @@ function scanEmphasis(chunk: string): Seg[] {
   return out;
 }
 
-function tokenizeInline(text: string, reg: MathEntry[]): Seg[] {
+// Splits plain text on bare http(s) URLs (Obsidian flavor only).
+function autolink(text: string): Seg[] {
+  const out: Seg[] = [];
+  const parts = text.split(BARE_URL_RE);
+  for (let i = 0; i < parts.length; i++) {
+    if (!parts[i]) continue;
+    const href = i % 2 === 1 ? safeHttpUrl(parts[i]) : null;
+    out.push(href ? { k: "link", v: parts[i], href } : { k: "text", v: parts[i] });
+  }
+  return out;
+}
+
+function tokenizeInline(text: string, reg: MathEntry[], obsidian = false): Seg[] {
   const segs: Seg[] = [];
 
-  for (const seg of scanEmphasis(text)) {
+  for (const seg of scanEmphasis(text, obsidian)) {
     // Bold and italic runs are re-tokenized by Inline's recursion, and a code
     // span is literal by definition, so only plain text is split here.
     if (seg.k !== "text") {
@@ -321,7 +387,9 @@ function tokenizeInline(text: string, reg: MathEntry[]): Seg[] {
         if (entry) segs.push({ k: "math", entry });
         continue;
       }
-      if (parts[i]) segs.push({ k: "text", v: parts[i] });
+      if (!parts[i]) continue;
+      if (obsidian) segs.push(...autolink(parts[i]));
+      else segs.push({ k: "text", v: parts[i] });
     }
   }
 
@@ -330,10 +398,10 @@ function tokenizeInline(text: string, reg: MathEntry[]): Seg[] {
 
 // Bold/italic segments are rendered recursively so that any math or formatting
 // nested inside them is also processed (e.g. *Distribute the $x$ term:*).
-function Inline({ text, reg, pk }: { text: string; reg: MathEntry[]; pk: string }) {
+function Inline({ text, reg, pk, ob = false }: { text: string; reg: MathEntry[]; pk: string; ob?: boolean }) {
   return (
     <>
-      {tokenizeInline(text, reg).map((seg, i) => {
+      {tokenizeInline(text, reg, ob).map((seg, i) => {
         const key = `${pk}-${i}`;
         if (seg.k === "math") {
           const html = rkx(seg.entry.src, seg.entry.display);
@@ -346,9 +414,18 @@ function Inline({ text, reg, pk }: { text: string; reg: MathEntry[]; pk: string 
             ? <span key={key} className="math-block" dangerouslySetInnerHTML={{ __html: html }} />
             : <span key={key} className="math-inline" dangerouslySetInnerHTML={{ __html: html }} />;
         }
-        if (seg.k === "bold") return <strong key={key}><Inline text={seg.v} reg={reg} pk={`${key}b`} /></strong>;
-        if (seg.k === "italic") return <em key={key}><Inline text={seg.v} reg={reg} pk={`${key}i`} /></em>;
+        if (seg.k === "bold") return <strong key={key}><Inline text={seg.v} reg={reg} pk={`${key}b`} ob={ob} /></strong>;
+        if (seg.k === "italic") return <em key={key}><Inline text={seg.v} reg={reg} pk={`${key}i`} ob={ob} /></em>;
         if (seg.k === "code") return <code key={key} className="kojo-inline-code">{seg.v}</code>;
+        if (seg.k === "mark") return <mark key={key} className="md-highlight"><Inline text={seg.v} reg={reg} pk={`${key}m`} ob={ob} /></mark>;
+        if (seg.k === "strike") return <del key={key}><Inline text={seg.v} reg={reg} pk={`${key}s`} ob={ob} /></del>;
+        if (seg.k === "link") {
+          return (
+            <a key={key} className="md-link" href={seg.href} target="_blank" rel="noopener noreferrer nofollow">
+              {seg.v}
+            </a>
+          );
+        }
         return <React.Fragment key={key}>{seg.v}</React.Fragment>;
       })}
     </>
@@ -446,16 +523,157 @@ function CodeBlock({ lang, src, enableCopy }: { lang: string; src: string; enabl
 
 // ── Block parser ──────────────────────────────────────────────────────────────
 
+// ── Obsidian block pre-pass ───────────────────────────────────────────────────
+// %%comments%% are hidden (outside code fences), and runs of "> " lines are
+// split out as blockquotes / callouts so their bodies can be rendered
+// recursively, before math extraction ever sees them.
+
+export function stripObsidianComments(raw: string): string {
+  return raw
+    .split(/(```[\s\S]*?```)/g)
+    .map((part, i) => (i % 2 === 1 ? part : part.replace(/%%[\s\S]*?%%/g, "")))
+    .join("");
+}
+
+type ObsidianBlock = { kind: "md"; text: string } | { kind: "quote"; lines: string[] };
+
+export function splitObsidianQuotes(raw: string): ObsidianBlock[] {
+  const blocks: ObsidianBlock[] = [];
+  let md: string[] = [];
+  let inFence = false;
+  const lines = raw.split("\n");
+  const flushMd = () => {
+    if (md.length) blocks.push({ kind: "md", text: md.join("\n") });
+    md = [];
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trimStart().startsWith("```")) inFence = !inFence;
+    if (!inFence && /^\s{0,3}>/.test(line)) {
+      flushMd();
+      const quote: string[] = [];
+      while (i < lines.length && /^\s{0,3}>/.test(lines[i])) {
+        quote.push(lines[i].replace(/^\s{0,3}> ?/, ""));
+        i++;
+      }
+      i--;
+      blocks.push({ kind: "quote", lines: quote });
+      continue;
+    }
+    md.push(line);
+  }
+  flushMd();
+  return blocks;
+}
+
+// Obsidian callout types grouped onto the app's semantic accents.
+const CALLOUT_TONE: Record<string, string> = {
+  note: "info", info: "info", todo: "info", abstract: "neutral", summary: "neutral", tldr: "neutral",
+  tip: "positive", hint: "positive", important: "positive", success: "positive", check: "positive", done: "positive",
+  question: "caution", help: "caution", faq: "caution", warning: "caution", caution: "caution", attention: "caution",
+  failure: "danger", fail: "danger", missing: "danger", danger: "danger", error: "danger", bug: "danger",
+  example: "neutral", quote: "neutral", cite: "neutral",
+};
+
+const CALLOUT_HEAD_RE = /^\[!([A-Za-z-]+)\]([+-]?)\s*(.*)$/;
+
+function ObsidianQuote({ lines, enableCodeCopy }: { lines: string[]; enableCodeCopy: boolean }) {
+  const head = lines[0]?.match(CALLOUT_HEAD_RE);
+  if (!head) {
+    return (
+      <blockquote className="md-quote">
+        <MarkdownContent content={lines.join("\n")} enableCodeCopy={enableCodeCopy} obsidian />
+      </blockquote>
+    );
+  }
+  const type = head[1].toLowerCase();
+  const fold = head[2];
+  const title = head[3].trim() || type.charAt(0).toUpperCase() + type.slice(1);
+  const body = lines.slice(1).join("\n");
+  const className = `md-callout md-callout--${CALLOUT_TONE[type] ?? "info"}`;
+  const titleNode = (
+    <span className="md-callout-title">
+      <Inline text={title} reg={[]} pk="ct" ob />
+    </span>
+  );
+  const bodyNode = body.trim() ? (
+    <div className="md-callout-body">
+      <MarkdownContent content={body} enableCodeCopy={enableCodeCopy} obsidian />
+    </div>
+  ) : null;
+  if (fold) {
+    return (
+      <details className={className} open={fold === "+"}>
+        <summary>{titleNode}</summary>
+        {bodyNode}
+      </details>
+    );
+  }
+  return (
+    <div className={className} role="note">
+      {titleNode}
+      {bodyNode}
+    </div>
+  );
+}
+
+const TASK_RE = /^\[([ xX])\]\s+/;
+
 // Memoized: parsing + KaTeX is the expensive part of every chat render, and
 // both props are primitives. Without it, each keystroke in a chat composer and
 // each streamed token re-rendered every earlier message from scratch.
+//
+// `obsidian` turns on the student-answer flavor (highlights, strike, safe links,
+// callouts, quotes, task lists, hidden comments) and turns OFF everything that
+// interprets text as a spec (graph/chart/mermaid visuals): student text is shown,
+// never executed. Off, the renderer behaves exactly as before.
 export const MarkdownContent = React.memo(function MarkdownContent({
   content,
   enableCodeCopy = false,
+  obsidian = false,
 }: {
   content: string;
   enableCodeCopy?: boolean;
+  obsidian?: boolean;
 }) {
+  if (obsidian) {
+    const blocks = splitObsidianQuotes(stripObsidianComments(content));
+    if (blocks.some((block) => block.kind === "quote")) {
+      return (
+        <div className="kojo-markdown md-obsidian">
+          {blocks.map((block, idx) =>
+            block.kind === "quote" ? (
+              <ObsidianQuote key={idx} lines={block.lines} enableCodeCopy={enableCodeCopy} />
+            ) : (
+              <MarkdownBlocks key={idx} content={block.text} enableCodeCopy={enableCodeCopy} obsidian />
+            ),
+          )}
+        </div>
+      );
+    }
+    return (
+      <div className="kojo-markdown md-obsidian">
+        <MarkdownBlocks content={blocks[0]?.kind === "md" ? blocks[0].text : ""} enableCodeCopy={enableCodeCopy} obsidian />
+      </div>
+    );
+  }
+  return (
+    <div className="kojo-markdown">
+      <MarkdownBlocks content={content} enableCodeCopy={enableCodeCopy} obsidian={false} />
+    </div>
+  );
+});
+
+function MarkdownBlocks({
+  content,
+  enableCodeCopy,
+  obsidian,
+}: {
+  content: string;
+  enableCodeCopy: boolean;
+  obsidian: boolean;
+}) {
+  const ob = obsidian;
   // Step 0: reflow malformed code fences onto their own lines, and swap any
   // TikZ picture (which KaTeX cannot draw) for a short note (GH #156)
   const fenced = replaceTikz(normalizeFences(content));
@@ -514,14 +732,15 @@ export const MarkdownContent = React.memo(function MarkdownContent({
       // Declarative visual spec (graph/geometry/mermaid/chart). While the reply
       // is still streaming the fence is unclosed, so show a placeholder instead
       // of trying to parse half a spec.
-      if (isVisualLang(lang)) {
+      // Student text (obsidian) never becomes a visual: a fence is shown as code.
+      if (!ob && isVisualLang(lang)) {
         nodes.push(closed
           ? <VisualBlock key={k++} lang={lang} src={src} />
           : <VisualPending key={k++} lang={lang} />);
         continue;
       }
       // A spec fenced as ```json (or untagged) by a model that missed the tag.
-      const inferred = closed ? inferVisualLang(lang, src) : null;
+      const inferred = closed && !ob ? inferVisualLang(lang, src) : null;
       if (inferred) {
         nodes.push(<VisualBlock key={k++} lang={inferred} src={src} />);
         continue;
@@ -547,7 +766,7 @@ export const MarkdownContent = React.memo(function MarkdownContent({
       const level = line.match(/^(#+)/)?.[1].length ?? 1;
       const text = line.replace(/^#+\s+/, "");
       const Tag = `h${Math.min(level + 2, 6)}` as keyof React.JSX.IntrinsicElements;
-      nodes.push(<Tag key={k++} className="kojo-md-heading"><Inline text={text} reg={reg} pk={`h${k}`} /></Tag>);
+      nodes.push(<Tag key={k++} className="kojo-md-heading"><Inline text={text} reg={reg} pk={`h${k}`} ob={ob} /></Tag>);
       i++;
       continue;
     }
@@ -559,9 +778,23 @@ export const MarkdownContent = React.memo(function MarkdownContent({
         items.push(lines[i].replace(/^[-*+]\s+/, ""));
         i++;
       }
+      // Obsidian task items ("- [ ] todo", "- [x] done") show a read-only checkbox.
+      const isTaskList = ob && items.some((item) => TASK_RE.test(item));
       nodes.push(
-        <ul key={k++} className="kojo-md-list">
-          {items.map((item, j) => <li key={j}><Inline text={item} reg={reg} pk={`ul${k}-${j}`} /></li>)}
+        <ul key={k++} className={`kojo-md-list${isTaskList ? " md-task-list" : ""}`}>
+          {items.map((item, j) => {
+            const task = ob ? item.match(TASK_RE) : null;
+            if (task) {
+              const done = task[1] !== " ";
+              return (
+                <li key={j} className={`md-task${done ? " is-done" : ""}`}>
+                  <input type="checkbox" className="checkbox-input" checked={done} disabled readOnly aria-label={done ? "Done" : "Not done"} />
+                  <span><Inline text={item.slice(task[0].length)} reg={reg} pk={`ul${k}-${j}`} ob={ob} /></span>
+                </li>
+              );
+            }
+            return <li key={j}><Inline text={item} reg={reg} pk={`ul${k}-${j}`} ob={ob} /></li>;
+          })}
         </ul>,
       );
       continue;
@@ -576,7 +809,7 @@ export const MarkdownContent = React.memo(function MarkdownContent({
       }
       nodes.push(
         <ol key={k++} className="kojo-md-list">
-          {items.map((item, j) => <li key={j}><Inline text={item} reg={reg} pk={`ol${k}-${j}`} /></li>)}
+          {items.map((item, j) => <li key={j}><Inline text={item} reg={reg} pk={`ol${k}-${j}`} ob={ob} /></li>)}
         </ol>,
       );
       continue;
@@ -601,11 +834,11 @@ export const MarkdownContent = React.memo(function MarkdownContent({
         <div key={tk} className="kojo-md-table-wrapper">
           <table className="kojo-md-table">
             {headers.length > 0 && (
-              <thead><tr>{headers.map((c, ci) => <th key={ci}><Inline text={c} reg={reg} pk={`th${tk}-${ci}`} /></th>)}</tr></thead>
+              <thead><tr>{headers.map((c, ci) => <th key={ci}><Inline text={c} reg={reg} pk={`th${tk}-${ci}`} ob={ob} /></th>)}</tr></thead>
             )}
             <tbody>
               {body.map((row, ri) => (
-                <tr key={ri}>{row.map((c, ci) => <td key={ci}><Inline text={c} reg={reg} pk={`td${tk}-${ri}-${ci}`} /></td>)}</tr>
+                <tr key={ri}>{row.map((c, ci) => <td key={ci}><Inline text={c} reg={reg} pk={`td${tk}-${ri}-${ci}`} ob={ob} /></td>)}</tr>
               ))}
             </tbody>
           </table>
@@ -632,11 +865,11 @@ export const MarkdownContent = React.memo(function MarkdownContent({
     if (paraLines.length > 0) {
       nodes.push(
         <p key={k++} className="kojo-md-p">
-          <Inline text={paraLines.join(" ")} reg={reg} pk={`p${k}`} />
+          <Inline text={paraLines.join(" ")} reg={reg} pk={`p${k}`} ob={ob} />
         </p>,
       );
     }
   }
 
-  return <div className="kojo-markdown">{nodes}</div>;
-});
+  return <>{nodes}</>;
+}
