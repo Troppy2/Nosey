@@ -1724,3 +1724,15 @@ export type PTPickResponse = {
 };
 
 export type PTGateSolveResponse = { item_id: number; solved: boolean; slow: boolean; redo: PTRedo | null };
+
+export type PTStepResult = {
+  passed: boolean;
+  slow: boolean;
+  solved_delta: number;
+  walked_to: number | null;
+  redo: PTRedo | null;
+  path_finished: boolean;
+  next_subtopic_opened: string | null;
+  gate_opened: boolean;
+  path: PTPath;
+};

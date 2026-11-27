@@ -146,10 +146,10 @@ export default function PatternTrailPath() {
     }
     if (stop.kind === "step" && step) {
       if (stop.state === "current")
-        return <Button onClick={() => navigate(stepEditorUrl(step.problem_slug, step.id))}>Solve step {step.position}</Button>;
+        return <Button onClick={() => navigate(stepEditorUrl(step.problem_slug, step.id, path.slug))}>Solve step {step.position}</Button>;
       if (stop.state === "done")
         return (
-          <Button variant="secondary" onClick={() => navigate(stepEditorUrl(step.problem_slug, step.id))}>
+          <Button variant="secondary" onClick={() => navigate(stepEditorUrl(step.problem_slug, step.id, path.slug))}>
             Practice it again
           </Button>
         );

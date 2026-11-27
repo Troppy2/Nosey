@@ -223,8 +223,9 @@ export function readWalkState(state: unknown): TrailWalkState | null {
 }
 
 /** The editor URL for a trail step (WP6 reads `trailStep`). */
-export function stepEditorUrl(problemSlug: string, stepId: number): string {
-  return `/leetcode?problem=${encodeURIComponent(problemSlug)}&trailStep=${stepId}`;
+export function stepEditorUrl(problemSlug: string, stepId: number, pathSlug?: string): string {
+  const back = pathSlug ? `&trailPath=${encodeURIComponent(pathSlug)}` : "";
+  return `/leetcode?problem=${encodeURIComponent(problemSlug)}&trailStep=${stepId}${back}`;
 }
 
 /** The editor URL that runs due redos back to back, first one first (WP6 reads `trailRedos`). */

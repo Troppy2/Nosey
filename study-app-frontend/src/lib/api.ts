@@ -3208,3 +3208,21 @@ export async function postTrailGateSolve(
     body: JSON.stringify(body),
   });
 }
+
+/** Pass 3 of a trail step (passes 1 and 2 are practice the server ignores). */
+export async function postTrailStepResult(
+  stepId: number,
+  body: { pass_number: number; accepted: boolean; seconds: number },
+): Promise<import("./types").PTStepResult> {
+  return request<import("./types").PTStepResult>(`/pattern-trails/steps/${stepId}/result`, {
+    method: "POST",
+    body: JSON.stringify({ ...body, tz_offset_minutes: new Date().getTimezoneOffset() }),
+  });
+}
+
+export async function postTrailRedoResult(
+  redoId: number,
+  body: { accepted: boolean; seconds: number },
+): Promise<{ passed: boolean; retired: boolean; redo: import("./types").PTRedo | null }> {
+  return request(`/pattern-trails/redos/${redoId}/result`, { method: "POST", body: JSON.stringify(body) });
+}
