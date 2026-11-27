@@ -110,6 +110,8 @@ def upgrade() -> None:
         sa.Column("first_try_passed", sa.Boolean(), nullable=True),
         sa.Column("passed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("best_seconds", sa.Integer(), nullable=True),
+        sa.Column("pending_seconds", sa.Integer(), nullable=True),
+        sa.Column("writeup_tries", sa.Integer(), nullable=False, server_default="0"),
         *_timestamps(),
         sa.UniqueConstraint("user_id", "step_id", name="uq_pt_user_steps"),
     )

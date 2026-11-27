@@ -1,0 +1,138 @@
+/* Pattern Trails step write-up (components/trails/TrailWriteup.tsx). Size and layout only. */
+.modal-card.pt-writeup {
+  display: flex;
+  flex-direction: column;
+  width: min(1040px, calc(100vw - 32px));
+  max-width: none;
+  max-height: min(92dvh, 900px);
+  padding: 0;
+  overflow: hidden;
+}
+.pt-writeup-head {
+  padding: var(--space-5) var(--space-6) var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+.pt-writeup-head h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: var(--text-2xl);
+  outline: none;
+}
+.pt-writeup-head p {
+  margin: 0;
+}
+.pt-writeup-kicker {
+  color: var(--accent-positive-strong);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.pt-writeup-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: var(--space-5);
+  min-height: 0;
+  padding: var(--space-4) var(--space-6);
+  overflow-y: auto;
+}
+.pt-writeup-code {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.pt-writeup-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.pt-writeup-code pre {
+  margin: 0;
+  max-height: 60dvh;
+  padding: var(--space-3);
+  overflow: auto;
+  border-radius: var(--radius-md);
+  background: var(--ink);
+  color: var(--green-lightest);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  white-space: pre;
+}
+.pt-writeup-form {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.pt-writeup-part {
+  display: grid;
+  gap: var(--space-1);
+}
+.pt-writeup-part .field {
+  margin: 0;
+}
+.pt-writeup-part.is-weak textarea {
+  border-color: var(--accent-danger);
+}
+.pt-writeup-hint {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.pt-writeup-feedback {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+.pt-writeup-feedback svg {
+  flex: none;
+  margin-top: 2px;
+}
+.pt-writeup-part.is-ok .pt-writeup-feedback {
+  background: var(--accent-positive-tint);
+  color: var(--accent-positive-strong);
+}
+.pt-writeup-part.is-weak .pt-writeup-feedback {
+  background: var(--accent-danger-tint);
+  color: var(--accent-danger-strong);
+}
+.pt-writeup-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-6);
+  border-top: 1px solid var(--border);
+}
+.pt-writeup-summary {
+  flex: 1 1 260px;
+  margin: 0;
+  font-family: var(--font-serif);
+}
+.pt-writeup-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-left: auto;
+}
+@media (max-width: 760px) {
+  .pt-writeup-body {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--space-3) var(--space-4);
+  }
+  .pt-writeup-head,
+  .pt-writeup-foot {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+  .pt-writeup-code pre {
+    max-height: 30dvh;
+  }
+}
+.pt-writeup-part textarea {
+  min-height: 0;
+  resize: vertical;
+}

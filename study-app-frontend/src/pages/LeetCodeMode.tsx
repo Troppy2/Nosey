@@ -80,6 +80,8 @@ import { PROBLEM_ROWS as TAXONOMY_PROBLEM_ROWS, SUBTOPICS_BY_TOPIC } from "../da
 import { ExecutionVisualizer } from "../components/ExecutionVisualizer";
 import { Link, useNavigate } from "react-router-dom";
 import { clock, readTrailRun, trailLimit, type TrailRun } from "../lib/trailEditor";
+import { TrailWriteup } from "../components/trails/TrailWriteup";
+import type { PTStepResult } from "../lib/types";
 import type {
   LeetCodeProblemData,
   LeetCodeComplexityCheckResponse,
@@ -2193,7 +2195,8 @@ export default function LeetCodeMode() {
   // Pattern Trails: a step or a redo run opened from the trail pages (one sitting, no 24h waits).
   const navigate = useNavigate();
   const [trail, setTrail] = useState<TrailRun | null>(() => readTrailRun(window.location.search));
-  const [trailPass, setTrailPass] = useState(1);
+  const [trailWriteup, setTrailWriteup] = useState<{ code: string } | null>(null);
+  const trailTimeUp = useRef(false);
   const [trailStartedAt, setTrailStartedAt] = useState<number | null>(null);
   const [trailNow, setTrailNow] = useState(() => Date.now());
   const [trailBusy, setTrailBusy] = useState(false);
@@ -4841,8 +4844,8 @@ export default function LeetCodeMode() {
     return runAndGradeCurrentCode(problemAtRun, currentCode, currentProblemData, currentCustomCases, !trail, preview);
   }
 
-  // Pattern Trails trail mode.
-  function openTrailProblem(slug: string, pass: number) {
+  // Pattern Trails trail mode: one timed solve, then (steps) Kojo reads the write-up.
+  function openTrailProblem(slug: string) {
     const category = CATEGORIES.find((c) => c.problems.some((p) => p.slug === slug));
     if (!category) {
       toast.error("This problem is not in KojoCode yet");
@@ -4850,37 +4853,30 @@ export default function LeetCodeMode() {
       return;
     }
     openProblem(category.id, slug);
-    startTrailPass(slug, pass);
-  }
-
-  // Each pass gets its own tab: passes 1 and 2 start from the function signature, pass 3 is blank.
-  function startTrailPass(slug: string, pass: number) {
-    setTrailPass(pass);
-    setTrailBlank({ slug, name: `Pass ${pass}`, pass });
-    setTrailStartedAt(pass === 3 ? Date.now() : null);
+    // Its own tab, starting from the function signature, so other work on the problem stays put.
+    setTrailBlank({ slug, name: "Trail", pass: 1 });
+    trailTimeUp.current = false;
+    setTrailStartedAt(Date.now());
   }
 
   useEffect(() => {
     if (!trail || trailOpened.current) return;
     trailOpened.current = true;
-    if (trail.kind === "step") {
-      openTrailProblem(trail.slug, 1);
-      return;
+    openTrailProblem(trail.slug);
+    if (trail.kind === "redo") {
+      fetchTrailRedos()
+        .then((list) => setTrailRedoSlugs(Object.fromEntries([...list.due, ...list.waiting].map((r) => [r.id, r.problem_slug]))))
+        .catch(() => undefined);
     }
-    openTrailProblem(trail.slug, 3);
-    fetchTrailRedos()
-      .then((list) => setTrailRedoSlugs(Object.fromEntries([...list.due, ...list.waiting].map((r) => [r.id, r.problem_slug]))))
-      .catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trail]);
 
-  // Put the pass tab in once the problem (and its signature) has loaded.
+  // Put the trail tab in once the problem (and its signature) has loaded.
   const trailSnippetReady = trailBlank ? problemStates[trailBlank.slug]?.data != null : false;
   useEffect(() => {
-    if (!trailBlank || currentProblem?.slug !== trailBlank.slug) return;
-    if (trailBlank.pass < 3 && !trailSnippetReady) return;
+    if (!trailBlank || currentProblem?.slug !== trailBlank.slug || !trailSnippetReady) return;
     const slug = trailBlank.slug;
-    const code = trailBlank.pass === 3 ? "" : problemStates[slug]?.data?.python_snippet?.trimEnd() ?? "";
+    const code = problemStates[slug]?.data?.python_snippet?.trimEnd() ?? "";
     const workspace = codeWorkspaces[slug] ?? loadCodeWorkspace(slug);
     const existing = workspace.tabs.find((tab) => tab.name === trailBlank.name);
     const tab = existing ? { ...existing, code } : { id: makeTabId(), name: trailBlank.name, code };
@@ -4901,54 +4897,77 @@ export default function LeetCodeMode() {
     return () => window.clearInterval(id);
   }, [trailStartedAt]);
 
+  const trailLimitS = trailLimit(currentProblem?.difficulty);
+  const trailElapsed = trailStartedAt == null ? 0 : (trailNow - trailStartedAt) / 1000;
+
+  // The clock ran out before the tests passed: the attempt counts as missed.
+  useEffect(() => {
+    if (!trail || trailStartedAt == null || trailWriteup || trailBusy || trailTimeUp.current) return;
+    if (trailElapsed <= trailLimitS) return;
+    trailTimeUp.current = true;
+    toast.info("Time is up", "Kojo stays put and this one comes back as a redo.");
+    void trailSettleAttempt(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trailElapsed > trailLimitS]);
+
   function leaveTrail() {
     if (trail?.kind === "step" && trail.pathSlug) navigate(`/pattern-trails/${trail.pathSlug}`);
     else navigate("/pattern-trails");
   }
 
+  function finishTrailStep(res: PTStepResult) {
+    setTrailWriteup(null);
+    if (res.passed && currentProblem) {
+      const slug = currentProblem.slug;
+      setProgress((prev) => {
+        const next = { ...prev, [slug]: true };
+        saveProgress(next);
+        return next;
+      });
+    } else if (!trailTimeUp.current) {
+      toast.info("Not this time", "Kojo stays put. It comes back as a redo, or try again from the path.");
+    }
+    navigate(`/pattern-trails/${res.path.slug}`, {
+      state:
+        res.passed && res.walked_to
+          ? { trailWalk: { walkedTo: res.walked_to, solvedDelta: res.solved_delta, slow: res.slow, redoDueAt: res.redo?.due_at ?? null } }
+          : null,
+    });
+  }
+
   async function trailSubmitted(ok: boolean) {
     if (!trail || !currentProblem) return;
-    if (trailPass < 3) {
-      if (!ok) {
-        toast.info(`Pass ${trailPass} is practice`, "Get every test passing, or move on when you are ready.");
-        return;
-      }
-      toast.success(`Pass ${trailPass} done`, trailPass === 2 ? "Pass 3 starts blank, on the clock." : "Now write it again.");
-      startTrailPass(currentProblem.slug, trailPass + 1);
+    if (!ok) {
+      toast.info("Not every test passes yet", "Keep going, the clock is still running.");
       return;
     }
+    await trailSettleAttempt(true);
+  }
+
+  async function trailSettleAttempt(accepted: boolean) {
+    if (!trail || !currentProblem) return;
     const seconds = Math.round((Date.now() - (trailStartedAt ?? Date.now())) / 1000);
     setTrailBusy(true);
     try {
       if (trail.kind === "step") {
-        const res = await postTrailStepResult(trail.stepId, { pass_number: 3, accepted: ok, seconds });
-        if (res.passed) {
-          const slug = currentProblem.slug;
-          setProgress((prev) => {
-            const next = { ...prev, [slug]: true };
-            saveProgress(next);
-            return next;
-          });
+        const res = await postTrailStepResult(trail.stepId, { pass_number: 3, accepted, seconds });
+        if (res.needs_writeup) {
+          setTrailStartedAt(null);
+          setTrailWriteup({ code: currentCode });
         } else {
-          toast.info(ok ? "Over the time limit" : "Not this time", "Kojo stays put. It comes back as a redo, or try again now.");
+          finishTrailStep(res);
         }
-        navigate(`/pattern-trails/${res.path.slug}`, {
-          state:
-            res.passed && res.walked_to
-              ? { trailWalk: { walkedTo: res.walked_to, solvedDelta: res.solved_delta, slow: res.slow, redoDueAt: res.redo?.due_at ?? null } }
-              : null,
-        });
         return;
       }
       const id = trail.ids[trailRedoIndex];
-      const res = await postTrailRedoResult(id, { accepted: ok, seconds });
+      const res = await postTrailRedoResult(id, { accepted, seconds });
       if (res.passed) toast.success(res.retired ? "Redo retired" : "Redo passed", res.retired ? "You will not see this one again." : undefined);
       else toast.info("Redo missed", "It comes back tomorrow.");
       const nextIndex = trailRedoIndex + 1;
       const nextSlug = trail.ids[nextIndex] != null ? trailRedoSlugs[trail.ids[nextIndex]] : undefined;
       if (nextSlug) {
         setTrailRedoIndex(nextIndex);
-        openTrailProblem(nextSlug, 3);
+        openTrailProblem(nextSlug);
       } else {
         navigate("/pattern-trails");
       }
@@ -7176,17 +7195,18 @@ export default function LeetCodeMode() {
                 <PlayIcon size={15} /> Run
               </Button>
               {trail ? (
-                <span className="lc-trail-chip" aria-live="polite">
-                  {trail.kind === "redo" ? "Redo" : `Pass ${trailPass} of 3`}
-                  {trailStartedAt != null
-                    ? `, ${clock((trailNow - trailStartedAt) / 1000)} of ${clock(trailLimit(currentProblem.difficulty))}`
-                    : ", practice"}
+                <span className={`lc-trail-chip${trailElapsed > trailLimitS * 0.8 ? " is-late" : ""}`}>
+                  {trail.kind === "redo" ? "Redo" : "Trail step"}
+                  {trailStartedAt != null ? `, ${clock(trailElapsed)} of ${clock(trailLimitS)}` : ", explain it"}
                 </span>
               ) : null}
-              {trail && trailPass < 3 ? (
-                <Button variant="ghost" onClick={() => startTrailPass(currentProblem.slug, trailPass + 1)}>
-                  {trailPass === 2 ? "Start pass 3" : "Next pass"}
-                </Button>
+              {trail?.kind === "step" && trailWriteup ? (
+                <TrailWriteup
+                  stepId={trail.stepId}
+                  title={currentProblem.title}
+                  code={trailWriteup.code}
+                  onDone={finishTrailStep}
+                />
               ) : null}
               <Button
                 disabled={!runnable || runnerLoading || trailBusy}

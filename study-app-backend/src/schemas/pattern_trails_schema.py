@@ -138,7 +138,8 @@ class PTPathResponse(BaseModel):
 
 
 class PTStepResultRequest(BaseModel):
-    pass_number: int = Field(..., ge=1, le=3)
+    # Kept for old clients; a step is one timed solve now, so it is ignored.
+    pass_number: int = Field(3, ge=1, le=3)
     # Every test accepted on this run (the client's verdict). The server decides
     # whether that is a pass (pass 3, inside the time limit).
     accepted: bool
@@ -148,6 +149,8 @@ class PTStepResultRequest(BaseModel):
 
 class PTStepResultResponse(BaseModel):
     passed: bool
+    # Tests passed in time: the step now waits on the write-up (POST .../writeup).
+    needs_writeup: bool = False
     slow: bool
     # 1 when Kojo walks (first pass of this step), else 0.
     solved_delta: int
@@ -157,6 +160,35 @@ class PTStepResultResponse(BaseModel):
     next_subtopic_opened: Optional[str] = None
     gate_opened: bool
     path: PTPathResponse
+
+
+class PTWriteupRequest(BaseModel):
+    code: str = Field(..., min_length=1, max_length=12000)
+    approach: str = Field(..., min_length=1, max_length=600)
+    how_it_works: str = Field(..., min_length=1, max_length=1200)
+    complexity: str = Field(..., min_length=1, max_length=400)
+    thought_process: str = Field(..., min_length=1, max_length=1200)
+    tz_offset_minutes: int = _TZ
+
+
+class PTWriteupPart(BaseModel):
+    ok: bool
+    note: str
+
+
+class PTWriteupGrade(BaseModel):
+    approach: PTWriteupPart
+    how_it_works: PTWriteupPart
+    complexity: PTWriteupPart
+    thought_process: PTWriteupPart
+    summary: str
+
+
+class PTWriteupResponse(BaseModel):
+    # Null when Kojo could not grade it; the step then passes on the tests.
+    grade: Optional[PTWriteupGrade] = None
+    tries_left: int
+    result: PTStepResultResponse
 
 
 # ── Redos ─────────────────────────────────────────────────────────────────────

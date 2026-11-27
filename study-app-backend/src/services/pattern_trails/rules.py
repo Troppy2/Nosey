@@ -84,6 +84,15 @@ def is_pass(pass_number: int, accepted: bool, seconds: int, limit_s: int) -> boo
     return pass_number == 3 and accepted and 0 <= seconds <= limit_s
 
 
+def solved_in_time(accepted: bool, seconds: int, limit_s: int) -> bool:
+    """A step's one solve: every test accepted inside the limit. The step then waits
+    on the write-up (2026-11-26: one solve + an explained write-up replaced the 3 passes)."""
+    return accepted and 0 <= seconds <= limit_s
+
+
+WRITEUP_TRIES = 2  # a weak write-up gets one retry, then a redo
+
+
 def is_slow(seconds: int, limit_s: int) -> bool:
     return seconds > SLOW_FRACTION * limit_s
 

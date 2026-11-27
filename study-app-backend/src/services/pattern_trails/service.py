@@ -398,18 +398,7 @@ class PatternTrailService:
 
     # ── Step results ──────────────────────────────────────────────────────────
 
-    async def record_step_result(
-        self,
-        session: AsyncSession,
-        user_id: int,
-        step_id: int,
-        *,
-        pass_number: int,
-        accepted: bool,
-        seconds: int,
-        tz_offset_minutes: int,
-    ) -> PTStepResultResponse:
-        now = _utcnow()
+    async def _step_context(self, session: AsyncSession, user_id: int, step_id: int):
         content = await self._content(session)
         step = content.step_by_id.get(step_id)
         if step is None:
@@ -421,25 +410,89 @@ class PatternTrailService:
         state = progress.states[sub.id][content.steps_by_subtopic[sub.id].index(step)]
         if state == rules.LOCKED:
             raise TrailConflict(rules.locked_reason(step.position, sub.id in progress.lessons))
+        return content, step, sub, progress
 
+    async def record_step_result(
+        self,
+        session: AsyncSession,
+        user_id: int,
+        step_id: int,
+        *,
+        pass_number: int = 3,
+        accepted: bool,
+        seconds: int,
+        tz_offset_minutes: int,
+    ) -> PTStepResultResponse:
+        """The step's one timed solve. In time and accepted: the step waits on the
+        write-up (nothing is counted yet). Otherwise it fails now and gets a redo."""
+        now = _utcnow()
+        content, step, sub, progress = await self._step_context(session, user_id, step_id)
+        limit = rules.step_time_limit(step.difficulty, step.time_limit_s)
+        row = progress.user_steps.get(step.id)
+        if row is None:
+            row = PTUserStep(user_id=user_id, step_id=step.id, status=rules.OPEN, attempts=0, writeup_tries=0)
+            session.add(row)
+        row.attempts = (row.attempts or 0) + 1
+        if rules.solved_in_time(accepted, seconds, limit):
+            row.pending_seconds = seconds
+            row.writeup_tries = 0
+            await session.commit()
+            return PTStepResultResponse(
+                passed=False, slow=False, solved_delta=0, needs_writeup=True,
+                path_finished=progress.finished[sub.id], gate_opened=False,
+                path=self._path_out(content, progress, sub, now),
+            )
+        return await self._settle_step(
+            session, user_id, content, step, sub, progress, row,
+            passed=False, seconds=seconds, tz_offset_minutes=tz_offset_minutes, now=now,
+        )
+
+    async def pending_writeup(self, session: AsyncSession, user_id: int, step_id: int) -> PTStep:
+        """The step, when a solve is waiting on its write-up (checked before Kojo grades,
+        so no Kojo call is spent on a write-up that cannot count)."""
+        _, step, _, progress = await self._step_context(session, user_id, step_id)
+        row = progress.user_steps.get(step.id)
+        if row is None or row.pending_seconds is None:
+            raise TrailConflict("Solve the problem first, then explain it.")
+        return step
+
+    async def record_step_writeup(
+        self, session: AsyncSession, user_id: int, step_id: int, *, ok: Optional[bool], tz_offset_minutes: int
+    ) -> tuple[PTStepResultResponse, int]:
+        """Settles a pending solve. ok=None means Kojo could not grade: the tests carry
+        it. A weak write-up gets one retry; the second miss fails the step (redo).
+        Returns (result, tries left)."""
+        now = _utcnow()
+        content, step, sub, progress = await self._step_context(session, user_id, step_id)
+        row = progress.user_steps.get(step.id)
+        if row is None or row.pending_seconds is None:
+            raise TrailConflict("Solve the problem first, then explain it.")
+        seconds = row.pending_seconds
+        if ok is False:
+            row.writeup_tries = (row.writeup_tries or 0) + 1
+            left = max(0, rules.WRITEUP_TRIES - row.writeup_tries)
+            if left:
+                await session.commit()
+                return PTStepResultResponse(
+                    passed=False, slow=False, solved_delta=0, needs_writeup=True,
+                    path_finished=progress.finished[sub.id], gate_opened=False,
+                    path=self._path_out(content, progress, sub, now),
+                ), left
+        row.pending_seconds = None
+        result = await self._settle_step(
+            session, user_id, content, step, sub, progress, row,
+            passed=ok is not False, seconds=seconds, tz_offset_minutes=tz_offset_minutes, now=now,
+        )
+        return result, 0
+
+    async def _settle_step(
+        self, session: AsyncSession, user_id: int, content, step, sub, progress, row: PTUserStep,
+        *, passed: bool, seconds: int, tz_offset_minutes: int, now: datetime,
+    ) -> PTStepResultResponse:
         was_finished = progress.finished[sub.id]
         gate_was_open = self._topic_finished(content, progress, sub.topic_id)
         limit = rules.step_time_limit(step.difficulty, step.time_limit_s)
-
-        if pass_number != 3:
-            # Passes 1 and 2 are practice in the same sitting (Q1): nothing to score.
-            return PTStepResultResponse(
-                passed=False, slow=False, solved_delta=0, path_finished=was_finished,
-                gate_opened=False, path=self._path_out(content, progress, sub, now),
-            )
-
-        passed = rules.is_pass(pass_number, accepted, seconds, limit)
         slow = passed and rules.is_slow(seconds, limit)
-        row = progress.user_steps.get(step.id)
-        if row is None:
-            row = PTUserStep(user_id=user_id, step_id=step.id, status=rules.OPEN, attempts=0)
-            session.add(row)
-        row.attempts = (row.attempts or 0) + 1
         if row.first_try_passed is None:
             row.first_try_passed = passed
 

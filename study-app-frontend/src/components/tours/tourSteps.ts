@@ -368,7 +368,7 @@ export const TOURS: Record<TourId, TourDef> = {
       {
         element: t("pt-path-title"),
         title: "One problem per step",
-        body: "Start with Kojo's lesson. Each step opens in the editor as a three-pass drill; pass 3 starts blank and must pass every test inside the time limit.",
+        body: "Start with Kojo's lesson. Solve each step in the editor inside the time limit, then explain your code to Kojo. Kojo walks on when the explanation holds up.",
         side: "bottom",
         align: "start",
       },

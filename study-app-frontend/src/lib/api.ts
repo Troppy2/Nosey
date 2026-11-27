@@ -3220,6 +3220,17 @@ export async function postTrailStepResult(
   });
 }
 
+/** Kojo grades the write-up of a solve that passed in time; settles the step. */
+export async function postTrailWriteup(
+  stepId: number,
+  body: { code: string; approach: string; how_it_works: string; complexity: string; thought_process: string },
+): Promise<import("./types").PTWriteupResponse> {
+  return request<import("./types").PTWriteupResponse>(`/pattern-trails/steps/${stepId}/writeup`, {
+    method: "POST",
+    body: JSON.stringify({ ...body, tz_offset_minutes: new Date().getTimezoneOffset() }),
+  });
+}
+
 export async function postTrailRedoResult(
   redoId: number,
   body: { accepted: boolean; seconds: number },

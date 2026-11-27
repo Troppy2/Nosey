@@ -17,6 +17,7 @@ from src.models.lc_sync import LCActivityDate, LCProgress
 from src.models.pattern_trail import PTGateItem, PTRedo, PTStep, PTSubtopic, PTTopic
 from src.models.user import User
 from src.routes import pattern_trails as pt_routes
+from src.schemas.pattern_trails_schema import PTWriteupGrade, PTWriteupPart
 from src.schemas.leetcode_schema import LeetCodeExample, LeetCodeProblemResponse, LeetCodeTopicTag
 
 pytestmark = pytest.mark.asyncio
@@ -76,7 +77,7 @@ async def client(db_session_maker, seeded, monkeypatch):
         return state["user"]
 
     async def _gate(session, user, feature):
-        assert feature == "kojo_trail_reason"
+        assert feature in ("kojo_trail_reason", "kojo_trail_writeup")
         slot = _Slot()
         slots.append(slot)
         return slot
@@ -88,9 +89,25 @@ async def client(db_session_maker, seeded, monkeypatch):
     async def _screen(*args, **kwargs):
         return None
 
+    grades: dict[str, object] = {"ok": True, "fail": False}
+
+    async def _grade(prompt):
+        if grades["fail"]:
+            return None
+        part = {"ok": True, "note": "Right."}
+        weak = {"ok": False, "note": "Say what the window holds."}
+        return PTWriteupGrade(
+            approach=PTWriteupPart(**part),
+            how_it_works=PTWriteupPart(**(part if grades["ok"] else weak)),
+            complexity=PTWriteupPart(**part),
+            thought_process=PTWriteupPart(**part),
+            summary="Nice.",
+        )
+
     monkeypatch.setattr(pt_routes, "_kojo_gate", _gate)
     monkeypatch.setattr(pt_routes, "write_reason_note", _note)
     monkeypatch.setattr(pt_routes, "screen_user_input", _screen)
+    monkeypatch.setattr(pt_routes, "grade_writeup", _grade)
     app.dependency_overrides[get_session] = _session
     app.dependency_overrides[get_current_user] = _user
     limiter.reset()
@@ -99,6 +116,7 @@ async def client(db_session_maker, seeded, monkeypatch):
             http.state = state  # type: ignore[attr-defined]
             http.slots = slots  # type: ignore[attr-defined]
             http.notes = notes  # type: ignore[attr-defined]
+            http.grades = grades  # type: ignore[attr-defined]
             yield http
     finally:
         app.dependency_overrides.clear()
@@ -110,11 +128,34 @@ async def _steps(client, slug: str) -> list[dict]:
     return res.json()["steps"]
 
 
-async def _pass(client, step_id: int, seconds: int = 600, **extra) -> dict:
-    body = {"pass_number": 3, "accepted": True, "seconds": seconds, "tz_offset_minutes": 0, **extra}
+WRITEUP = {
+    "code": "class Solution: ...",
+    "approach": "Sliding window of fixed size k.",
+    "how_it_works": "Add the right value, drop the left one, track the best sum.",
+    "complexity": "O(n) time, O(1) space.",
+    "thought_process": "Every window overlaps the last, so reuse the sum.",
+    "tz_offset_minutes": 0,
+}
+
+
+async def _solve(client, step_id: int, seconds: int = 600, accepted: bool = True) -> dict:
+    body = {"accepted": accepted, "seconds": seconds, "tz_offset_minutes": 0}
     res = await client.post(f"/pattern-trails/steps/{step_id}/result", json=body)
     assert res.status_code == 200, res.text
     return res.json()
+
+
+async def _writeup(client, step_id: int) -> dict:
+    res = await client.post(f"/pattern-trails/steps/{step_id}/writeup", json=WRITEUP)
+    assert res.status_code == 200, res.text
+    return res.json()
+
+
+async def _pass(client, step_id: int, seconds: int = 600) -> dict:
+    """One solve in time, then a write-up Kojo accepts."""
+    solved = await _solve(client, step_id, seconds)
+    assert solved["needs_writeup"] is True and solved["passed"] is False
+    return (await _writeup(client, step_id))["result"]
 
 
 async def _finish(client, slug: str) -> dict:
@@ -202,7 +243,7 @@ async def test_already_solved_problem_still_counts_globally(client, db_session_m
 async def test_fail_stays_put_and_schedules_redo(client) -> None:
     await client.post("/pattern-trails/subtopics/fixed-window/lesson-watched")
     steps = await _steps(client, "fixed-window")
-    out = await _pass(client, steps[0]["id"], accepted=False)
+    out = await _solve(client, steps[0]["id"], accepted=False)
     assert out["passed"] is False and out["solved_delta"] == 0
     assert out["path"]["steps"][0]["state"] == "open"
     redo = out["redo"]
@@ -210,7 +251,7 @@ async def test_fail_stays_put_and_schedules_redo(client) -> None:
     assert out["path"]["steps"][0]["redo"]["id"] == redo["id"]
 
     # Over the time limit (Medium = 1500s) is a fail too, and replaces the live redo.
-    over = await _pass(client, steps[0]["id"], seconds=1501)
+    over = await _solve(client, steps[0]["id"], seconds=1501)
     assert over["passed"] is False and over["redo"]["id"] == redo["id"]
     redos = (await client.get("/pattern-trails/redos")).json()
     assert len(redos["waiting"]) == 1 and redos["due"] == []
@@ -224,12 +265,62 @@ async def test_slow_pass_passes_and_schedules_redo(client) -> None:
     assert out["redo"]["last_result"] == "slow"
 
 
-async def test_practice_passes_change_nothing(client) -> None:
+async def test_solve_waits_on_the_writeup(client) -> None:
     await client.post("/pattern-trails/subtopics/fixed-window/lesson-watched")
     steps = await _steps(client, "fixed-window")
-    out = await _pass(client, steps[0]["id"], pass_number=2)
-    assert out["passed"] is False and out["redo"] is None
-    assert out["path"]["steps"][0]["attempts"] == 0
+    # A write-up before any solve is refused, and costs no Kojo call.
+    res = await client.post(f"/pattern-trails/steps/{steps[0]['id']}/writeup", json=WRITEUP)
+    assert res.status_code == 409
+    assert client.slots == []
+    out = await _solve(client, steps[0]["id"])
+    assert out["needs_writeup"] and not out["passed"] and out["solved_delta"] == 0 and out["redo"] is None
+    assert out["path"]["steps"][0]["state"] == "open"
+
+
+async def test_weak_writeup_gets_one_retry_then_a_redo(client) -> None:
+    await client.post("/pattern-trails/subtopics/fixed-window/lesson-watched")
+    step = (await _steps(client, "fixed-window"))[0]["id"]
+    client.grades["ok"] = False
+    await _solve(client, step)
+    first = await _writeup(client, step)
+    assert first["tries_left"] == 1 and first["result"]["needs_writeup"] and not first["result"]["passed"]
+    assert first["grade"]["how_it_works"]["ok"] is False
+    second = await _writeup(client, step)
+    assert second["tries_left"] == 0 and not second["result"]["passed"]
+    assert second["result"]["redo"]["last_result"] == "failed"
+    assert all(slot.released == 1 for slot in client.slots)
+    # The solve is used up: another write-up needs a new solve.
+    res = await client.post(f"/pattern-trails/steps/{step}/writeup", json=WRITEUP)
+    assert res.status_code == 409
+
+
+async def test_writeup_retry_can_still_pass(client) -> None:
+    await client.post("/pattern-trails/subtopics/fixed-window/lesson-watched")
+    step = (await _steps(client, "fixed-window"))[0]["id"]
+    client.grades["ok"] = False
+    await _solve(client, step)
+    await _writeup(client, step)
+    client.grades["ok"] = True
+    out = await _writeup(client, step)
+    assert out["result"]["passed"] and out["result"]["walked_to"] == 1 and out["result"]["solved_delta"] == 1
+
+
+async def test_grader_failure_lets_the_tests_carry_the_step(client) -> None:
+    await client.post("/pattern-trails/subtopics/fixed-window/lesson-watched")
+    step = (await _steps(client, "fixed-window"))[0]["id"]
+    client.grades["fail"] = True
+    await _solve(client, step)
+    out = await _writeup(client, step)
+    assert out["grade"] is None and out["result"]["passed"]
+
+
+async def test_failed_solve_skips_the_writeup(client) -> None:
+    await client.post("/pattern-trails/subtopics/fixed-window/lesson-watched")
+    step = (await _steps(client, "fixed-window"))[0]["id"]
+    out = await _solve(client, step, accepted=False)
+    assert not out["needs_writeup"] and not out["passed"] and out["redo"]["last_result"] == "failed"
+    over = await _solve(client, step, seconds=5000)
+    assert not over["needs_writeup"] and not over["passed"]
 
 
 async def test_finishing_paths_opens_next_then_gate(client) -> None:
@@ -249,7 +340,7 @@ async def test_finishing_paths_opens_next_then_gate(client) -> None:
 async def test_redo_not_due_then_advance_and_reset(client, db_session_maker) -> None:
     await client.post("/pattern-trails/subtopics/fixed-window/lesson-watched")
     steps = await _steps(client, "fixed-window")
-    redo_id = (await _pass(client, steps[0]["id"], accepted=False))["redo"]["id"]
+    redo_id = (await _solve(client, steps[0]["id"], accepted=False))["redo"]["id"]
     assert (await client.post(f"/pattern-trails/redos/{redo_id}/result",
                               json={"accepted": True, "seconds": 100})).status_code == 409
 
@@ -323,7 +414,7 @@ async def test_pick_verdict_is_the_servers_and_slot_is_released(client, db_sessi
     assert body["correct"] is True and body["right_pattern"]["key"] == right
     assert body["kojo_note"] == "That is wrong."
     assert "Their pick is RIGHT" in client.notes["prompts"][-1]
-    assert [slot.released for slot in client.slots] == [1]
+    assert client.slots[-1].released == 1 and all(s.released == 1 for s in client.slots)
 
     # Same item twice: refused. Unknown pattern: refused.
     dup = await client.post(f"/pattern-trails/gates/attempts/{attempt['attempt_id']}/pick",

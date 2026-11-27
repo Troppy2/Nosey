@@ -109,7 +109,7 @@ export function pathStops(path: PTPath, now: Date = new Date()): PathStop[] {
         ? `${s.difficulty}. Passed in ${formatMinutes(s.best_seconds)}.`
         : `${s.difficulty}. Passed.`;
     } else if (s.state === "open") {
-      detail = `${s.difficulty}. Three passes in the editor; pass 3 starts blank and must pass every test inside ${limit}.`;
+      detail = `${s.difficulty}. Pass every test inside ${limit}, then explain your code to Kojo: approach, how it works, complexity and your thinking.`;
       if (s.attempts > 0) detail += ` ${s.attempts === 1 ? "One try" : `${s.attempts} tries`} so far.`;
     } else {
       detail = `${s.difficulty}. ${s.locked_reason ?? "Locked"}.`;

@@ -32,11 +32,15 @@ from src.schemas.pattern_trails_schema import (
     PTRedoResultResponse,
     PTStepResultRequest,
     PTStepResultResponse,
+    PTWriteupRequest,
+    PTWriteupResponse,
 )
 from src.services.account_safety_service import screen_user_input
 from src.services.leetcode_service import LeetCodeService
 from src.services.pattern_trails.reason_note import build_reason_prompt, write_reason_note
+from src.services import lc_catalog
 from src.services.pattern_trails.service import PatternTrailService, TrailConflict
+from src.services.pattern_trails.writeup_grade import build_writeup_prompt, grade_passes, grade_writeup
 from src.utils.exceptions import ResourceNotFoundException, StudyAppException
 from src.utils.logger import get_logger
 
@@ -45,6 +49,7 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/pattern-trails", tags=["pattern-trails"], dependencies=[Depends(get_beta_user)])
 
 NOTE_FEATURE = "kojo_trail_reason"
+WRITEUP_FEATURE = "kojo_trail_writeup"
 
 T = TypeVar("T")
 
@@ -114,6 +119,57 @@ async def step_result(
             tz_offset_minutes=body.tz_offset_minutes,
         )
     )
+
+
+@router.post("/steps/{step_id}/writeup", response_model=PTWriteupResponse)
+@limiter.limit("10/minute")
+async def step_writeup(
+    request: Request,
+    response: Response,
+    step_id: int,
+    body: PTWriteupRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_beta_user),
+) -> PTWriteupResponse:
+    """Kojo grades the write-up of a solve that passed its tests in time. Every part
+    must be sound for Kojo to walk; one retry, then a redo. If Kojo cannot grade
+    (limits, provider down), the tests carry the step."""
+    service = PatternTrailService()
+    step = await _run(service.pending_writeup(session, user.id, step_id))
+    written = "\n".join([body.approach, body.how_it_works, body.complexity, body.thought_process])
+    # GH #173: typed text is screened before it reaches any AI model.
+    await screen_user_input(user, WRITEUP_FEATURE, written)
+
+    grade = None
+    if user.age is None or user.age >= 15:  # same age floor as Kojo chat
+        try:
+            slot = await _kojo_gate(session, user, WRITEUP_FEATURE)
+        except HTTPException as exc:
+            logger.info("Pattern Trails write-up grade skipped by the Kojo gate: %s", exc.detail)
+            slot = None
+        if slot is not None:
+            try:
+                # No transaction held across the LLM call (GH #169).
+                await session.commit()
+                entry = lc_catalog.get(step.problem_slug)
+                grade = await grade_writeup(
+                    build_writeup_prompt(
+                        problem_title=entry.title if entry else step.problem_slug,
+                        code=body.code,
+                        approach=body.approach,
+                        how_it_works=body.how_it_works,
+                        complexity=body.complexity,
+                        thought_process=body.thought_process,
+                    )
+                )
+            finally:
+                slot.release()
+
+    ok = None if grade is None else grade_passes(grade)
+    result, tries_left = await _run(
+        service.record_step_writeup(session, user.id, step_id, ok=ok, tz_offset_minutes=body.tz_offset_minutes)
+    )
+    return PTWriteupResponse(grade=grade, tries_left=tries_left, result=result)
 
 
 # ── Redos ─────────────────────────────────────────────────────────────────────

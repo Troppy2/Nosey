@@ -146,6 +146,10 @@ class PTUserStep(Base, TimestampMixin):
     first_try_passed: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     passed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     best_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Tests passed in time, waiting on the write-up (Kojo grades it). Cleared when the
+    # write-up passes or runs out of tries.
+    pending_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    writeup_tries: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
 
 class PTRedo(Base, TimestampMixin):

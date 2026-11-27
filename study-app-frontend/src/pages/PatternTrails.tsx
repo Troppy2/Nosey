@@ -281,7 +281,7 @@ export default function PatternTrails() {
                 </div>
                 <div>
                   <strong>{percent(topic.stats.solve_rate)}</strong>
-                  <span className="muted">Solved on the first pass 3</span>
+                  <span className="muted">Solved on the first try</span>
                 </div>
               </div>
               {weakest ? (

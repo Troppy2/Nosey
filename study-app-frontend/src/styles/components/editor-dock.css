@@ -457,3 +457,7 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+.lc-trail-chip.is-late {
+  background: var(--accent-caution-tint);
+  color: var(--accent-caution-strong);
+}

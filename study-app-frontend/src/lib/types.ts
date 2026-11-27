@@ -1727,6 +1727,8 @@ export type PTGateSolveResponse = { item_id: number; solved: boolean; slow: bool
 
 export type PTStepResult = {
   passed: boolean;
+  /** Tests passed in time: the step waits on the write-up. */
+  needs_writeup: boolean;
   slow: boolean;
   solved_delta: number;
   walked_to: number | null;
@@ -1736,3 +1738,7 @@ export type PTStepResult = {
   gate_opened: boolean;
   path: PTPath;
 };
+
+export type PTWriteupPartKey = "approach" | "how_it_works" | "complexity" | "thought_process";
+export type PTWriteupGrade = Record<PTWriteupPartKey, { ok: boolean; note: string }> & { summary: string };
+export type PTWriteupResponse = { grade: PTWriteupGrade | null; tries_left: number; result: PTStepResult };
