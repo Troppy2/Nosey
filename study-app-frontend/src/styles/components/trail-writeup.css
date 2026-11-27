@@ -48,6 +48,11 @@
   max-height: 60dvh;
   margin: 0;
   overflow: auto;
+  /* The light Kojo chat block (.chat-mode-shell .kojo-code-block: --k-hover / --k-ink),
+     not the shared default dark one. Same mirror as .lc-kojocode-body. */
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--green-dark) 10%, transparent);
+  color: var(--ink);
 }
 .pt-writeup-form {
   display: grid;
