@@ -41,6 +41,8 @@ export function Sidebar() {
   const dockItems = visibleBaseItems;
   const isMobileShell = useMobileShell();
   const [isNavHidden, setIsNavHidden] = useState(false);
+  // Pattern Trails is a full-screen game on desktop: no app sidebar, its own back link.
+  const isFullscreen = !isMobileShell && location.pathname.startsWith("/pattern-trails");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -109,10 +111,10 @@ export function Sidebar() {
   // re-ran every page's data load and flashed its loading state.
   return (
     <div
-      className={isMobileShell ? "shell shell--mobile" : "shell"}
+      className={isMobileShell ? "shell shell--mobile" : isFullscreen ? "shell shell--full" : "shell"}
       data-sidebar-collapsed={isMobileShell ? undefined : isSidebarCollapsed}
     >
-      {isMobileShell ? null : (
+      {isMobileShell || isFullscreen ? null : (
         <>
           {/* Mobile top bar , shown only on phones (<760px) */}
           <div className="mobile-topbar">

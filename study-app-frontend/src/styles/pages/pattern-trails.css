@@ -1382,3 +1382,8 @@ a.pt-gate-row.is-cleared:hover {
     top: var(--space-4);
   }
 }
+
+/* Full screen on desktop: components/Sidebar.tsx drops the sidebar on /pattern-trails. */
+.shell.shell--full {
+  grid-template-columns: minmax(0, 1fr);
+}
