@@ -44,19 +44,10 @@
   font-size: var(--text-sm);
   font-weight: 600;
 }
-.pt-writeup-code pre {
-  margin: 0;
+.pt-writeup-code .kojo-code-block {
   max-height: 60dvh;
-  padding: var(--space-3);
+  margin: 0;
   overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--white);
-  color: var(--ink);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  line-height: 1.6;
-  white-space: pre;
 }
 .pt-writeup-form {
   display: grid;
@@ -129,7 +120,7 @@
     padding-left: var(--space-4);
     padding-right: var(--space-4);
   }
-  .pt-writeup-code pre {
+  .pt-writeup-code .kojo-code-block {
     max-height: 30dvh;
   }
 }

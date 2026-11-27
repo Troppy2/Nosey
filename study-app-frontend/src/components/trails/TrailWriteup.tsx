@@ -7,6 +7,7 @@ import type { PTStepResult, PTWriteupGrade, PTWriteupPartKey } from "../../lib/t
 import { Button } from "../Button";
 import { TextArea } from "../Field";
 import { InlineLoading } from "../Loaders";
+import { MarkdownContent } from "../MarkdownContent";
 import "../../styles/components/trail-writeup.css";
 
 /** The four parts Kojo reads, in order. Minimums keep it to real sentences. */
@@ -84,9 +85,8 @@ export function TrailWriteup({
         <div className="pt-writeup-body">
           <section className="pt-writeup-code" aria-label="Your code">
             <span className="pt-writeup-label">Your code</span>
-            <pre>
-              <code>{code}</code>
-            </pre>
+            {/* Same sage code block as Kojo chat (standing rule: rules/frontend.md 2). */}
+            <MarkdownContent content={"```python\n" + code.replace(/```/g, "'''") + "\n```"} />
           </section>
           <div className="pt-writeup-form">
             {PARTS.map((part) => {
